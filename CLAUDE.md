@@ -9,16 +9,17 @@ Dépôt **public** : n'y écris et n'y commit jamais de donnée personnelle (nom
 | Dossier / fichier Drive | ID |
 |---|---|
 | `RD Assistant/` (racine) | `1FQ57AnYNMaqSZi2RC2pG436tI_9RcUxZ` |
-| `RD Assistant/Profil` (Google Doc, mémoire) | `1W2oYrC6sEu3nhVHhV3mNCUUdv_Cu0iZcgW8wdqaBGKA` |
+| `RD Assistant/Profil` (Google Doc, mémoire) | pas d'ID fixe : voir ci-dessous |
 | `RD Assistant/Voyages/` | `1tqfaDCtJQsCvx4y_nys4EZRDyrlfpINy` |
 | `RD Assistant/Finances/` | `1rd9YnCy79oYv421qVEM66vIzwi8NBpED` |
 | `RD Assistant/CV/` | `1e6bZxtgR4Tk21Vpf7losMoUfomyghK8r` |
 
 Si un ID ne répond plus, retrouve le fichier avec `search_files` par titre.
 
+- **Trouver le Profil** : `search_files` avec `parentId = '1FQ57AnYNMaqSZi2RC2pG436tI_9RcUxZ' and title = 'Profil'`. S'il y en a plusieurs, prends le plus récent (`modifiedTime`) et signale le doublon au propriétaire.
 - Lis le **Profil** avant toute tâche qui dépend des préférences (voyage, bons plans, CV, finances, brief).
 - L'adresse du propriétaire = l'`id` de son agenda principal (`list_calendars`). Fuseau : Europe/Paris.
-- Pour mettre à jour le Profil : propose la modification, et une fois validée, recrée le Doc avec le contenu complet mis à jour dans le dossier racine puis mets l'ancien à la corbeille. Mets à jour l'ID dans ta réponse (pas dans le dépôt si le propriétaire ne l'a pas demandé).
+- Pour mettre à jour le Profil : propose la modification, et une fois validée, relis-le juste avant d'écrire (le propriétaire a pu le modifier dans Google Docs), recrée le Doc avec le contenu complet mis à jour dans le dossier racine, vérifie le nouveau Doc, puis mets l'ancien à la corbeille. Pas besoin de toucher au dépôt : le Profil est retrouvé par son titre.
 
 ## Format des réponses (iPhone)
 
