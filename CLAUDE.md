@@ -23,7 +23,7 @@ Si un ID ne répond plus, retrouve le fichier avec `search_files` par titre.
 - **Trouver le Profil** : `search_files` avec `parentId = '1FQ57AnYNMaqSZi2RC2pG436tI_9RcUxZ' and title = 'Profil'`. S'il y en a plusieurs, prends le plus récent (`modifiedTime`) et signale le doublon au propriétaire.
 - Lis le **Profil** avant toute tâche qui dépend des préférences (voyage, bons plans, CV, finances, brief).
 - L'adresse du propriétaire = l'`id` de son agenda principal (`list_calendars`). Fuseau : Europe/Paris.
-- Pour mettre à jour le Profil : propose la modification, et une fois validée, relis-le juste avant d'écrire (le propriétaire a pu le modifier dans Google Docs), recrée le Doc avec le contenu complet mis à jour dans le dossier racine, vérifie le nouveau Doc, puis mets l'ancien à la corbeille. Pas besoin de toucher au dépôt : le Profil est retrouvé par son titre.
+- Pour mettre à jour le Profil : propose la modification, et une fois validée, relis-le juste avant d'écrire (le propriétaire a pu le modifier dans Google Docs), puis modifie-le **sur place** avec le connecteur Google Docs (`read_doc` puis `update_doc`, seulement les passages concernés) : même document, même lien. Relis-le ensuite pour vérifier. Si le connecteur Google Docs n'est pas disponible, recrée le Doc complet dans le dossier racine, vérifie-le, puis mets l'ancien à la corbeille. Pas besoin de toucher au dépôt : le Profil est retrouvé par son titre.
 
 ## Mémoire partagée avec Hermes
 

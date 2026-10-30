@@ -13,7 +13,8 @@ description: Remplir ou mettre à jour le Profil du propriétaire (préférences
 ## Enregistrer
 1. Montre le Profil complet mis à jour et demande « J'enregistre ? ».
 2. Après accord : relis le Profil actuel (le propriétaire a pu le modifier entre-temps) et intègre ses changements.
-3. `create_file` dans le dossier racine `RD Assistant` (titre `Profil`, `contentMimeType: text/markdown`), relis le nouveau Doc pour vérifier qu'il est complet, puis seulement mets l'ancien à la corbeille (`trash_file`). Donne le lien du nouveau Doc ; rien à modifier dans le dépôt.
+3. Modifie le Profil **sur place** avec le connecteur Google Docs : `read_doc`, puis `update_doc` sur les seuls passages qui changent (suis le skill `google-workspace` s'il est disponible, pour les positions et la garde de révision). Relis le Doc pour vérifier, puis donne son lien, qui ne change pas.
+   - Sans connecteur Google Docs : `create_file` dans le dossier racine `RD Assistant` (titre `Profil`, `contentMimeType: text/markdown`), relis le nouveau Doc, puis seulement mets l'ancien à la corbeille (`trash_file`).
 4. Ajoute une ligne datée dans « Historique des décisions ».
 5. Garde le titre exact `Profil` : Hermes le retrouve par ce titre chaque matin. Si la modification le concerne (nouveau seuil, nouvelle échéance, nouveau contrat), dépose aussi une note dans `Notes de Claude/` (voir `CLAUDE.md`).
 
