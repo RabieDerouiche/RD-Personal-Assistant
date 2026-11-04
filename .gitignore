@@ -1,0 +1,4 @@
+# Secrets and Grok replies never go in this public repo
+*.env
+secrets*
+grok-replies/
