@@ -21,6 +21,13 @@ Si un ID ne répond plus, retrouve le fichier avec `search_files` par titre.
 - L'adresse du propriétaire = l'`id` de son agenda principal (`list_calendars`). Fuseau : Europe/Paris.
 - Pour mettre à jour le Profil : propose la modification, et une fois validée, relis-le juste avant d'écrire (le propriétaire a pu le modifier dans Google Docs), puis modifie-le **sur place** avec le connecteur Google Docs (`read_doc` puis `update_doc`, seulement les passages concernés) : même document, même lien. Relis-le ensuite pour vérifier. Si le connecteur Google Docs n'est pas disponible, recrée le Doc complet dans le dossier racine, vérifie-le, puis mets l'ancien à la corbeille. Pas besoin de toucher au dépôt : le Profil est retrouvé par son titre.
 
+## Autre assistant : Grok Bot
+
+Les veilles de prix, alertes, échéances et automatismes récurrents (dont la note de frais mensuelle) sont gérés par Grok Bot, hors de ce dépôt. Il n'y a pas de mémoire partagée : Grok lit Gmail, Agenda et Drive en lecture seule.
+
+- Ne crée pas de tâche planifiée qui ferait doublon avec Grok Bot. Si une veille ou un rappel manque, propose au propriétaire de l'ajouter à Grok Bot ; ne crée une tâche planifiée Claude que s'il le demande explicitement.
+- Tu peux rédiger pour lui les consignes à donner à ses bots.
+
 ## Format des réponses (iPhone)
 
 - Commence par la réponse ou la recommandation, pas par une introduction.
