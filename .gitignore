@@ -2,3 +2,5 @@
 *.env
 secrets*
 grok-replies/
+__pycache__/
+*.pyc
