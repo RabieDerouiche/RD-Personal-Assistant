@@ -1,6 +1,6 @@
 ---
 name: bons-plans
-description: Trouver et vérifier des bons plans (vols, produits, services, restaurants), détecter les fausses promos et arnaques, et mettre en place une surveillance de prix. Utiliser pour « trouve-moi », « moins cher », « promo », « bon plan », « surveille le prix ».
+description: Trouver et vérifier des bons plans (vols, produits, services, restaurants), détecter les fausses promos et arnaques, et préparer la surveillance de prix confiée à Unicorn (Grok Bot). Utiliser pour « trouve-moi », « moins cher », « promo », « bon plan », « surveille le prix ».
 ---
 
 # Bons plans
@@ -18,8 +18,9 @@ description: Trouver et vérifier des bons plans (vols, produits, services, rest
 Résultat : top 3 classé, avec pour chacun « ✅ fiable / ⚠️ à vérifier / ❌ éviter » et une phrase de justification.
 
 ## Surveiller un prix
-1. Recommande d'abord l'alerte native (Google Flights, Idealo, Keepa) : elle arrive dans Gmail et le brief la remonte.
-2. Si le propriétaire veut que tu surveilles toi-même et que l'outil de tâches planifiées est disponible (`create_trigger`) : propose une vérification quotidienne ou hebdomadaire (heure Europe/Paris, `create_new_session_on_fire: true`, connecteur Gmail uniquement), qui envoie un mail **au propriétaire seulement** si le prix passe sous le seuil. Crée-la après confirmation et donne son nom pour pouvoir l'arrêter.
-3. Préviens que les prix lus sur le web par recherche sont moins fiables que les alertes natives.
+La surveillance est faite par **Unicorn (Grok Bot)**, jamais par une tâche planifiée de Claude.
+1. Donne le prix de référence TTC livré, le vendeur fiable et le seuil d'alerte proposé.
+2. Rédige le prompt prêt à coller dans Unicorn (produit, vendeurs autorisés, seuil, fréquence).
+3. Pour les vols, recommande en plus l'alerte native Google Flights.
 
 Jamais d'achat, de saisie de paiement ou de création de compte : tu donnes le lien, le propriétaire achète.

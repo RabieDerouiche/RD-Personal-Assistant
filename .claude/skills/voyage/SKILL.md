@@ -37,4 +37,4 @@ Tableau : vols, hébergement, transports, nourriture (estimation/jour), activit�
 - Mets à jour le Doc du voyage avec les numéros de réservation (jamais dans le dépôt).
 
 ## Surveillance de prix
-Si le propriétaire veut attendre un meilleur prix : recommande une alerte Google Flights (la plus fiable), et propose en plus une tâche planifiée (skill `bons-plans`).
+Si le propriétaire veut attendre un meilleur prix : recommande une alerte Google Flights (la plus fiable), et propose le prompt à coller dans Unicorn (Grok Bot) (skill `bons-plans`).
