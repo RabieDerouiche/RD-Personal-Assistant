@@ -35,7 +35,7 @@ Grok Bot assure **toute** l'assistance continue du propriétaire, avec 7 bots :
 | Mermaid | Sorties en famille du week-end |
 | Unicorn | Prix suivis et alertes de prix |
 | Pegasus | Audit des abonnements et contrats |
-| Cyclops | Santé des routines des autres bots |
+| Cyclops | Copie renommée de « Dr Eggbot » (Lauren Tan, marketplace Grok Bot) : conçoit et corrige les bots, et contrôle leur santé (routines `transcript-healthcheck` et `routine-healthcheck`) |
 | Medusa | Notes de frais et CRA (agit sur des portails) |
 
 Ce que ça change pour toi :
