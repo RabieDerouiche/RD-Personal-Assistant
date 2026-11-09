@@ -30,11 +30,11 @@ Grok Bot assure **toute** l'assistance continue du propriétaire, avec 7 bots :
 
 | Bot | Domaine |
 |---|---|
-| Hydra | Veille du matin, semaine à venir, surveillance des mails, rappels et échéances |
+| Hydra | Veille du matin, semaine à venir, surveillance des mails, rappels et échéances, calendrier de l'année |
 | Griffon | Veille IA et tech (lundi) |
 | Mermaid | Sorties en famille du week-end |
 | Unicorn | Prix suivis et alertes de prix |
-| Pegasus | Audit des abonnements et contrats |
+| Pegasus | Audit des abonnements et contrats, échéancier des prélèvements (le 1er et le 15), bilan budget et épargne |
 | Cyclops | Copie renommée de « Dr Eggbot » (Lauren Tan, marketplace Grok Bot) : conçoit et corrige les bots, et contrôle leur santé (routines `transcript-healthcheck` et `routine-healthcheck`) |
 | Medusa | Notes de frais et CRA (agit sur des portails) |
 
