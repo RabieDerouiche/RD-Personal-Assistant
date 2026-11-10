@@ -45,6 +45,8 @@ Grok Bot assure **toute** l'assistance du quotidien, avec 7 bots. Toi : dévelop
 ### Comment le système est construit
 
 - **Pilotage** (Google Sheet) : source de vérité commune. Onglets Faits, Dossiers, Échéances, Prix, Expéditeurs, Autonomie, Routines, Canal. Le propriétaire et les bots y écrivent.
+  - Onglet **Déploiement** : compte rendu de la mise en place, une ligne par point de fiche. Cyclops remplit État, Preuve et Reste à faire ; toi, la colonne « Vérifié par Claude ».
+  - Onglet **Textes des routines** : le texte enregistré de chaque routine, recopié par Cyclops. Vérifie un bot sur ce texte, jamais sur ce qu'un bot dit avoir fait.
 - **Budget suivi** (Google Sheet) : budget prévu, opérations, prélèvements, épargne, tableau de bord calculé par formules. Pegasus écrit les données.
 - **Charte commune** (Google Doc) : règles valables pour tous les bots, enregistrée chez Grok Bot comme skill « registre ».
 - **Fiche <Bot>** (Google Docs) : ce que chaque bot fait. Les bots les lisent dans Drive.
