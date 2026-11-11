@@ -51,6 +51,7 @@ Grok Bot assure l'assistance du quotidien, avec 6 bots. Toi : développement, te
   - Onglet **Papiers** : index des documents importants (lien Drive, validité, usage), tenu par Hydra. Jamais de numéro de document ni de copie.
   - Onglet **Déploiement** : compte rendu de la mise en place, une ligne par point de fiche. Cyclops remplit État, Preuve et Reste à faire ; toi, la colonne « Vérifié par Claude ».
   - Onglet **Textes des routines** : le texte enregistré de chaque routine, recopié par Cyclops. Vérifie un bot sur ce texte, jamais sur ce qu'un bot dit avoir fait.
+- **Page Jarvis** (page Grok Bot tenue par Hydra, règle dans sa fiche) : le centre de contrôle du propriétaire. Elle copie d'abord l'onglet « À toi », puis les 14 prochains jours de l'onglet Échéances, les dossiers en attente d'un tiers et l'état calculé des bots. C'est une photo prise à chaque passage de Hydra, pas un direct : elle ne contient rien qui ne soit dans Pilotage ou le journal, et en cas d'écart Pilotage a raison.
 - **Charte commune** (Google Doc) : règles valables pour tous les bots, enregistrée chez Grok Bot comme skill « registre ».
 - **Fiche <Bot>** (Google Docs) : ce que chaque bot fait. Les bots les lisent dans Drive.
 - **Journal** : fichier sur l'ordinateur partagé des bots (`/workspace/registre/`). Tu n'y as pas accès. Les bots le lisent par un script (`/workspace/registre/resume.py`), jamais en entier. Une question posée au propriétaire ne va pas dans le journal mais dans le Canal.
