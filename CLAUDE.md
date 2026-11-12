@@ -39,7 +39,7 @@ Grok Bot assure l'assistance du quotidien, avec 6 bots. Toi : développement, te
 | Iris | Point d'entrée du propriétaire : courrier (dont le courrier prioritaire traité à l'arrivée), agenda, dossiers, échéances, papiers, calendrier familial de l'année, rangement de ce que le propriétaire lui envoie depuis son iPhone, et regroupement de ce qui attend sa réponse chez tous les bots |
 | Chronos | Notes de frais et CRA, sur les portails |
 | Kairos | Prix suivis et alertes d'achat |
-| Ulysse | Sorties en famille du week-end ; une fois par mois, ce qui se réserve à l'avance |
+| Ulysse | Sorties en famille du week-end ; une fois par mois, ce qui se réserve à l'avance ; projets de voyage (onglets Voyages et Options voyage, depuis le 12/11/2026) |
 | Athéna | Veille IA et .NET du lundi |
 | Argus | Copie renommée de « Dr Eggbot » (Lauren Tan) : socle commun, supervision, application des fiches |
 
@@ -56,6 +56,7 @@ Grok Bot assure l'assistance du quotidien, avec 6 bots. Toi : développement, te
   - Colonnes ajoutées le 12/11/2026 dans l'onglet **Prix** (H à J) : Dernier prix TTC, Relevé le, Où (vendeur et lien), remplies par le bot qui relève un prix (Charte, section 5, règle « une ligne qui se suffit » : toute ligne pour le propriétaire nomme l'objet exact, sa source et l'action attendue ; la Remarque d'une échéance n'est jamais vide).
   - Onglet **Journal** (12/11/2026) : les lignes ETAT, DECISION, DEMANDE et ALERTE du journal des bots, recopiées au fil de l'eau par chaque bot (Charte, section 3). C'est là que tu lis ce qu'ils ont fait : le fichier du journal reste sur leur ordinateur.
   - Horaires optimisés le 12/11/2026 : le raccourci iPhone écrit la présence à 11h, donc Chronos passe à midi (CRA Allegis le vendredi, validation le 24, saisie Hightekers le 26 ; fiche Chronos, section F) ; Kairos fait Prix suivis le dimanche à 17h, avant la Semaine à venir d'Iris à 18h. Les autres horaires ne changent pas.
+  - Ajouts du 12/11/2026 pour les onglets Achats et Voyages de la page Jarvis (validés par le propriétaire) : onglet **Relevés** (historique des prix, une ligne par prix relevé, écrit par Kairos ; il remplace son CSV), colonnes K à M de l'onglet **Prix** (Statut : Suivi, En pause jusqu'au …, Acheté, Plus suivi ; Prix payé ; Acheté le), onglets **Voyages** (un projet par ligne) et **Options voyage** (options avec prix total TTC, date, lien, statut et raison), tenus par Ulysse, et colonne H **Objet** du Canal (« Prix : » ou « Voyage : » suivi du nom exact) qui donne un fil par produit et par voyage. Charte (noms, sections 1, 5 et 7), fiche Kairos section G, fiche Ulysse points 21 à 27.
   - Onglet **Papiers** : index des documents importants (lien Drive, validité, usage), tenu par Iris. Jamais de numéro de document ni de copie.
   - Onglet **Déploiement** : compte rendu de la mise en place, une ligne par point de fiche. Argus remplit État, Preuve et Reste à faire ; toi, la colonne « Vérifié par Claude ».
   - Onglet **Textes des routines** : le texte enregistré de chaque routine, recopié par Argus. Vérifie un bot sur ce texte, jamais sur ce qu'un bot dit avoir fait.
