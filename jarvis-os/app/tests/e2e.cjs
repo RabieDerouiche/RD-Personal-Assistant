@@ -43,20 +43,23 @@ async function scen(name, sc, fn) {
   results.push('[' + name + ']' + (errs.length ? ' ERREURS ' + errs.join(' | ') : '') + '\n   ' + out.join('\n   '));
   await b.close();
 }
-const st = (p) => p.evaluate(() => { const j = window.__jarvis; return 'état : ' + (document.getElementById('pill') || {}).textContent + ' · voix : ' + j.voice.state + ' · missions : ' + j.store.missions.map((m) => m.agent + '/' + m.status).join(',') + ' · dernier : ' + (j.store.msgs.slice(-1)[0] || {}).text; });
+const st = (p) => p.evaluate(() => { const j = window.__jarvis; return 'vue : ' + document.body.className + ' · voix : ' + j.voice.state + ' · missions : ' + j.store.missions.map((m) => m.agent + '/' + m.status).join(',') + ' · dernier : ' + (j.store.msgs.slice(-1)[0] || {}).text; });
 const say = (p, t) => p.evaluate((t) => window.__say.push(t), t);
+const over = (p) => p.evaluate(() => (document.querySelector('.title, .intro, .cmd-h h2, .help, .bar h2') || {}).textContent + ' · débordement : ' + (document.documentElement.scrollWidth > innerWidth));
+const shot = async (p, n, full) => { if (process.env.SHOTS) await p.screenshot({path: process.env.SHOTS + '/' + n + '.png', fullPage: !!full}); };
+const MIC = '.home-ask .ask-ic';
 
 (async () => {
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
   await scen('A chargement', {}, async (p, step) => {
-    await step('hologramme et onglets', () => p.evaluate(() => ({webgl: !!document.querySelector('.holo canvas'), css: !!document.querySelector('.holo-css'), tabs: document.querySelectorAll('.tabs button').length, debord: document.documentElement.scrollWidth > innerWidth})).then(JSON.stringify));
-    if (process.env.SHOTS) await p.screenshot({path: process.env.SHOTS + '/center.png'});
+    await step('orbe, onglets, accueil', () => p.evaluate(() => ({webgl: !!document.querySelector('.orb-stage canvas'), css: !!document.querySelector('.orb-css'), tabs: document.querySelectorAll('.tabs button').length, titre: document.querySelector('.help').textContent, debord: document.documentElement.scrollWidth > innerWidth})).then(JSON.stringify));
+    await p.waitForTimeout(600); await shot(p, 'accueil');
   });
   await scen('B conversation vocale continue', {}, async (p, step) => {
-    await p.click('.mic'); await p.waitForTimeout(200);
-    await step('micro ouvert', () => st(p));
+    await p.click(MIC); await p.waitForTimeout(250);
+    await step('session ouverte : orbe et voile, sans onglets', async () => (await st(p)) + ' · onglets : ' + (await p.evaluate(() => !!document.querySelector('.tabs'))) + ' · micro : ' + (await p.evaluate(() => !!document.querySelector('.voice .mic'))));
     await say(p, "Jarvis, demande à Claude d'analyser mes documents"); await p.waitForTimeout(1200);
-    await step('mission Claude, réponse lue, écoute repartie', async () => (await st(p)) + ' · lu : ' + (await p.evaluate(() => window.__spoken.slice(-1)[0])));
+    await step('mission Claude, réponse lue, écoute repartie', async () => (await st(p)) + ' · lu : ' + (await p.evaluate(() => window.__spoken.slice(-1)[0])) + ' · sous-titre : ' + (await p.evaluate(() => document.querySelector('.cap-j').textContent)));
     await say(p, "Demande à Claude de préparer un rapport et à Grok de vérifier les données"); await p.waitForTimeout(1200);
     await step('deux missions', () => st(p));
     await say(p, 'Fais travailler Claude et Grok ensemble sur ce projet'); await p.waitForTimeout(1200);
@@ -67,53 +70,44 @@ const say = (p, t) => p.evaluate((t) => window.__say.push(t), t);
     await step('mission Kairos', () => st(p));
     await say(p, 'Quel temps fait-il demain'); await p.waitForTimeout(1200);
     await step('question hors de portée : proposition', () => st(p));
-    await say(p, 'oui'); await p.waitForTimeout(1200);
+    await say(p, 'oui'); await p.waitForTimeout(400); await shot(p, 'session'); await p.waitForTimeout(800);
     await step('oui : mission créée', () => st(p));
-    if (process.env.SHOTS) await p.screenshot({path: process.env.SHOTS + '/session.png'});
-    await step('session : salutation masquée, fil visible', () => p.evaluate(() => { const t = document.getElementById('log').getBoundingClientRect(), tabs = document.querySelector('.tabs').getBoundingClientRect(); return 'salutation : ' + (getComputedStyle(document.querySelector('.hello')).display) + ' · fil en haut ' + Math.round(t.top) + ' < onglets ' + Math.round(tabs.top); }));
     await say(p, "Merci c'est tout"); await p.waitForTimeout(1200);
-    await step('fin', () => st(p));
-    if (process.env.SHOTS) await p.screenshot({path: process.env.SHOTS + '/conversation.png'});
+    await step('fin : retour à l\'accueil', async () => (await st(p)) + ' · onglets : ' + (await p.evaluate(() => !!document.querySelector('.tabs'))));
+    await shot(p, 'accueil-apres');
     await step('missions : badge', () => p.evaluate(() => (document.querySelector('.badge') || {}).textContent));
-    await p.click('.tabs button:nth-child(3)'); await p.waitForTimeout(200);
-    await step('approuver la première', async () => { await p.click('.mcard .btn.main'); await p.waitForTimeout(100); return st(p); });
-    await step('priorité haute', async () => { await p.click('.kanban-tabs button:nth-child(2)'); await p.waitForTimeout(100); await p.click('.mcard .prio'); await p.waitForTimeout(100); return p.evaluate(() => window.__jarvis.store.missions.filter((m) => m.priority === 'haute').map((m) => m.agent + '/' + m.status).join(',')); });
-    await p.click('.kanban-tabs button:nth-child(1)'); await p.waitForTimeout(100);
-    if (process.env.SHOTS) await p.screenshot({path: process.env.SHOTS + '/missions.png', fullPage: true});
-    await p.click('.tabs button:nth-child(2)'); await p.waitForTimeout(150);
-    await step('agents : stats et recherche', async () => { const a = await p.evaluate(() => [...document.querySelectorAll('.agent-card')].map((c) => c.querySelector('.ag-id b').textContent + ':' + c.querySelector('.ag-stats b').textContent).join(',')); await p.fill('.search', 'prix'); await p.waitForTimeout(150); const b = await p.evaluate(() => [...document.querySelectorAll('.agent-card .ag-id b')].map((x) => x.textContent).join(',') + ' · focus : ' + (document.activeElement && document.activeElement.className)); return a + ' → « prix » : ' + b; });
-    await p.fill('.search', ''); await p.waitForTimeout(100);
-    await step('fiche ouverte puis mission confiée', async () => { await p.click('.agent-card:nth-child(5)'); await p.waitForTimeout(100); const o = await p.evaluate(() => document.querySelector('.agent-card.open .ag-id b').textContent + ' · ' + document.querySelectorAll('.agent-card.open .skills li').length + ' compétences'); if (process.env.SHOTS) await p.screenshot({path: process.env.SHOTS + '/agent-ouvert.png', fullPage: true}); await p.click('.agent-card.open .btn.main'); await p.waitForTimeout(200); return o + ' → champ : « ' + (await p.inputValue('#in')) + ' » · focus : ' + (await p.evaluate(() => document.activeElement.id)); });
-    await p.click('.tabs button:nth-child(2)'); await p.waitForTimeout(150);
-    if (process.env.SHOTS) await p.screenshot({path: process.env.SHOTS + '/agents.png', fullPage: true});
-    await p.click('.tabs button:nth-child(4)'); await p.waitForTimeout(150);
-    await step('mémoire : graphe', () => p.evaluate(() => !!document.querySelector('canvas.graph') + ' · souvenirs : ' + document.querySelector('.mem-stats b').textContent));
-    if (process.env.SHOTS) await p.screenshot({path: process.env.SHOTS + '/memoire.png', fullPage: true});
-    await p.click('.tabs button:nth-child(5)'); await p.click('text=Intelligence'); await p.waitForTimeout(150);
-    await step('intelligence : jauges et état', () => p.evaluate(() => document.querySelectorAll('.gauge').length + ' jauges · ' + [...document.querySelectorAll('.llm-row')].map((r) => r.querySelector('b').textContent + '=' + r.querySelector('.pill').textContent).join(', ')));
-    if (process.env.SHOTS) await p.screenshot({path: process.env.SHOTS + '/intelligence.png', fullPage: true});
-    await p.click('.back'); await p.click('text=Automatisations'); await p.waitForTimeout(150);
-    if (process.env.SHOTS) await p.screenshot({path: process.env.SHOTS + '/automatisations.png', fullPage: true});
-    await p.click('.tabs button:nth-child(1)'); await p.waitForTimeout(150);
+    await p.click('.tabs button:nth-child(2)'); await p.waitForTimeout(200); await shot(p, 'commandes');
+    await step('centre de commandes : fil complet', () => p.evaluate(() => document.querySelectorAll('.b-me').length + ' de toi, ' + document.querySelectorAll('.b-ai').length + ' de JARVIS, ' + document.querySelectorAll('.b-chip.link').length + ' liens vers les missions'));
+    await p.click('.tabs button:nth-child(4)'); await p.waitForTimeout(200);
+    await step('approuver la première', async () => { await p.click('.m-card .btn.main'); await p.waitForTimeout(100); return st(p); });
+    await step('priorité haute', async () => { await p.click('.k-tabs button:nth-child(2)'); await p.waitForTimeout(100); await p.click('.m-card .prio'); await p.waitForTimeout(100); return p.evaluate(() => window.__jarvis.store.missions.filter((m) => m.priority === 'haute').map((m) => m.agent + '/' + m.status).join(',')); });
+    await p.click('.k-tabs button:nth-child(1)'); await p.waitForTimeout(100); await shot(p, 'missions', true);
+    await p.click('.tabs button:nth-child(3)'); await p.waitForTimeout(150); await shot(p, 'agents', true);
+    await step('agents : missions et recherche', async () => { const a = await p.evaluate(() => [...document.querySelectorAll('.a-card')].map((c) => c.querySelector('.a-txt b').textContent + ':' + c.querySelector('.a-txt small').textContent.split(' ')[0]).join(',')); await p.fill('.search-in', 'prix'); await p.waitForTimeout(150); const b = await p.evaluate(() => [...document.querySelectorAll('.a-card .a-txt b')].map((x) => x.textContent).join(',') + ' · focus : ' + document.activeElement.className); await p.click('.chips button:nth-child(2)'); await p.waitForTimeout(100); const c = await p.evaluate(() => (document.querySelector('.empty') || {}).textContent); return a + ' → « prix » : ' + b + ' → Actifs : ' + c; });
+    await p.click('.chips button:nth-child(1)'); await p.fill('.search-in', ''); await p.waitForTimeout(100);
+    await step('fiche Kairos puis mission confiée', async () => { await p.click('.a-card:nth-child(5)'); await p.waitForTimeout(150); const o = await p.evaluate(() => document.querySelector('.d-head b').textContent + ' · ' + document.querySelectorAll('.d-card .skills li').length + ' compétences · ' + document.querySelectorAll('.act').length + ' activités'); await shot(p, 'fiche-agent', true); await p.click('.d-card .btn.main'); await p.waitForTimeout(200); return o + ' → champ : « ' + (await p.inputValue('#cin')) + ' » · focus : ' + (await p.evaluate(() => document.activeElement.id)); });
     await step('rechargement : tout est gardé', async () => { await p.reload(); await p.waitForTimeout(400); return st(p); });
   });
   await scen('C clavier', {}, async (p, step) => {
     await p.fill('#in', 'Demande à Ulysse de trouver une sortie pour samedi'); await p.keyboard.press('Enter'); await p.waitForTimeout(500);
-    await step('mission Ulysse par écrit', () => st(p));
-    await p.click('.chip-q'); await p.waitForTimeout(300);
-    await step('commande rapide', () => st(p));
+    await step('mission Ulysse depuis l\'accueil', async () => (await st(p)) + ' · rappel : ' + (await p.evaluate(() => !!document.querySelector('.last'))) + ' · ' + (await p.evaluate(() => (document.querySelector('.nudge') || {}).textContent)));
+    await p.click('.tabs button:nth-child(2)'); await p.fill('#cin', 'Quelles sont les missions en attente ?'); await p.keyboard.press('Enter'); await p.waitForTimeout(300);
+    await step('question au centre de commandes', () => st(p));
   });
-  await scen('D micro refusé', {deny: 'not-allowed'}, async (p, step) => { await p.click('.mic'); await p.waitForTimeout(400); await step('note et clavier', async () => (await st(p)) + ' · note : ' + (await p.evaluate(() => (document.querySelector('.note') || {}).textContent)) + ' · clavier : ' + (await p.evaluate(() => !!document.getElementById('in')))); });
-  await scen("E micro qui ne répond jamais", {hang: true}, async (p, step) => { await p.click('.mic'); await p.waitForTimeout(4500); await step('arrêt clair après 4 s', async () => (await st(p)) + ' · note : ' + (await p.evaluate(() => (document.querySelector('.note') || {}).textContent))); });
+  await scen('D micro refusé', {deny: 'not-allowed'}, async (p, step) => { await p.click(MIC); await p.waitForTimeout(400); await step('note et clavier', async () => (await st(p)) + ' · note : ' + (await p.evaluate(() => (document.querySelector('.note') || {}).textContent)) + ' · clavier : ' + (await p.evaluate(() => !!document.querySelector('.ask-in')))); });
+  await scen("E micro qui ne répond jamais", {hang: true}, async (p, step) => { await p.click(MIC); await p.waitForTimeout(4500); await step('arrêt clair après 4 s', async () => (await st(p)) + ' · note : ' + (await p.evaluate(() => (document.querySelector('.note') || {}).textContent))); });
   await scen('F coupure du micro une fois', {captureOnce: true}, async (p, step) => {
-    await p.click('.mic'); await p.waitForTimeout(200); await say(p, 'Demande à Iris de ranger mes papiers'); await p.waitForTimeout(1300);
+    await p.click(MIC); await p.waitForTimeout(200); await say(p, 'Demande à Iris de ranger mes papiers'); await p.waitForTimeout(1300);
     await say(p, 'Demande à Chronos de préparer mon CRA'); await p.waitForTimeout(2500);
     await step('reprise après la coupure', () => st(p));
   });
-  await scen('G pas de reconnaissance vocale', {noRec: true}, async (p, step) => { await p.click('.mic'); await p.waitForTimeout(200); await step('clavier proposé', async () => (await p.evaluate(() => (document.querySelector('.note') || {}).textContent)) + ' · clavier : ' + (await p.evaluate(() => !!document.getElementById('in')))); });
+  await scen('G pas de reconnaissance vocale', {noRec: true}, async (p, step) => { await p.click(MIC); await p.waitForTimeout(200); await step('clavier proposé', async () => (await p.evaluate(() => (document.querySelector('.note') || {}).textContent)) + ' · clavier : ' + (await p.evaluate(() => !!document.getElementById('in')))); });
   await scen('H écrans', {}, async (p, step) => {
-    for (const [i, n] of [[2, 'agents'], [4, 'mémoire'], [5, 'plus']]) { await p.click('.tabs button:nth-child(' + i + ')'); await p.waitForTimeout(150); await step(n, () => p.evaluate(() => document.querySelector('.page h2').textContent + ' · débordement : ' + (document.documentElement.scrollWidth > innerWidth))); }
-    for (const t of ['Automatisations', 'Intelligence', 'Réglages']) { await p.click('text=' + t); await p.waitForTimeout(150); await step(t, () => p.evaluate(() => document.querySelector('.page h2').textContent + ' · débordement : ' + (document.documentElement.scrollWidth > innerWidth))); if (process.env.SHOTS && t === 'Réglages') await p.screenshot({path: process.env.SHOTS + '/reglages.png', fullPage: true}); await p.click('.back'); await p.waitForTimeout(100); }
+    for (const [i, n] of [[2, 'commandes'], [3, 'agents'], [4, 'missions'], [5, 'plus']]) { await p.click('.tabs button:nth-child(' + i + ')'); await p.waitForTimeout(150); await step(n, () => over(p)); }
+    await shot(p, 'plus', true);
+    await step('salle de contrôle', () => p.evaluate(() => document.querySelector('.salle a').href));
+    for (const t of ['Workflows', 'Intelligence', 'Mémoire', 'Réglages']) { await p.click('.tile:has-text("' + t + '")'); await p.waitForTimeout(200); await step(t, () => over(p)); await shot(p, t.toLowerCase().normalize('NFD').replace(/[^a-z]/g, ''), true); if (t === 'Workflows') { await p.click('.chips button:nth-child(2)'); await p.waitForTimeout(100); await step('automatisations', () => p.evaluate(() => document.querySelectorAll('.g-row').length + ' prévues, ' + document.querySelectorAll('.switch[aria-disabled="true"]').length + ' non reliées')); } if (t !== 'Réglages') { await p.click('.back'); await p.waitForTimeout(100); } }
+    await step('prénom à l\'accueil', async () => { await p.fill('.field[aria-label="Prénom"]', 'Alex'); await p.press('.field[aria-label="Prénom"]', 'Tab'); await p.click('.tabs button:nth-child(1)'); await p.waitForTimeout(150); return p.evaluate(() => document.querySelector('.hi').textContent); });
   });
   console.log(results.join('\n'));
   server.close();

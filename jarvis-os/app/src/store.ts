@@ -7,7 +7,7 @@ export type MissionStatus = 'brouillon' | 'a_approuver' | 'approuvee' | 'refusee
 export type Priority = 'haute' | 'normale' | 'basse';
 export interface Mission { id: string; agent: AgentId; text: string; status: MissionStatus; at: number; result?: string; group?: string; priority?: Priority; done?: number }
 export type RouteMode = 'auto' | 'claude' | 'grok';
-export interface Settings { voiceURI: string; rate: number; listenMode: 'phrase' | 'continu'; route: RouteMode; approveAll: boolean }
+export interface Settings { voiceURI: string; rate: number; listenMode: 'phrase' | 'continu'; route: RouteMode; approveAll: boolean; name: string; salle: 'copie' | 'service' }
 export interface Stats { turns: number; voiceTurns: number; autoRestarts: number; autoRestartFails: number; errors: number; replyMs: number[] }
 
 const K = {msgs: 'jarvis.msgs', missions: 'jarvis.missions', settings: 'jarvis.settings', stats: 'jarvis.stats'};
@@ -18,7 +18,7 @@ const write = (k: string, v: unknown) => { try { localStorage.setItem(k, JSON.st
 export const store = {
   msgs: readArr<Msg>(K.msgs),
   missions: readArr<Mission>(K.missions),
-  settings: read<Settings>(K.settings, {voiceURI: '', rate: 1, listenMode: 'phrase', route: 'auto', approveAll: true}),
+  settings: read<Settings>(K.settings, {voiceURI: '', rate: 1, listenMode: 'phrase', route: 'auto', approveAll: true, name: '', salle: 'copie'}),
   stats: read<Stats>(K.stats, {turns: 0, voiceTurns: 0, autoRestarts: 0, autoRestartFails: 0, errors: 0, replyMs: []}),
   save() {
     write(K.msgs, this.msgs.slice(-400));
