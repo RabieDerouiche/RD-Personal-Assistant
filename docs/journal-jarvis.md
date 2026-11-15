@@ -8,12 +8,12 @@ Tenu à la demande du propriétaire (15/11/2026) : **chaque modification de la p
 |---|---|---|
 | En service (v16), premier compte | `https://claude.ai/artifact/QwLf64Ggstzu4p3uznZrr8` | Ne pas toucher : aucun report dessus (décision du 15/11/2026) |
 | Essai (v17.5), premier compte, partagée | `https://claude.ai/artifact/UDFVL3TQ2RUeYMq1JBtT4m` | En retard sur la copie : il lui manque les modifications notées « copie seulement » |
-| Copie de travail (v17.11), second compte | `https://claude.ai/artifact/NMAqUak7A5JYsLsc12VyaZ` | C'est ici que l'on modifie et que le propriétaire valide |
+| Copie de travail (v17.12), second compte | `https://claude.ai/artifact/NMAqUak7A5JYsLsc12VyaZ` | C'est ici que l'on modifie et que le propriétaire valide |
 
 ## Où est le code de la page
 
 - **Google Drive** (à la demande du propriétaire, 15/11/2026) : dossier `RD Assistant/Jarvis (sources de la page)` (`1LO_y3DbvXjQQtuSQPlQfbnMU5Mlyzz3X`). **Un fichier par version publiée**, nommé `jarvis-page-v<version>.html` : la source complète de la copie de travail. L'outil Drive ne sait pas remplacer le contenu d'un fichier : après chaque publication, crée un fichier neuf (`create_file`, `contentMimeType: text/html`, `disableConversionToGoogleType: true`, contenu passé par référence `sha256:<empreinte>:<chemin absolu>` dans `base64Content`, sans recopier le texte). Ne supprime pas les anciens sans le oui du propriétaire.
-- Dernière version déposée : **v17.11** (`1x6BECa6OubYyU5DMJmkypbIh-3cm7TFZ`, 486 534 octets). Avant : v17.10 (`11FJKUO7xl_Tm-9wbhD_3S27tpgTrWtHD`), v17.9 (`14iF99wD98LHWIPpnXTznZaQgbfnpG8dY`), v17.8 (`1KM4NISDFckz0BVprZRNeRMvjbtQhwTcd`).
+- Dernière version déposée : **v17.12** (`1IFWOSGSkQWme6S4PFCv_JE1CPQk1PqOB`, 491 135 octets). Avant : v17.11 (`1x6BECa6OubYyU5DMJmkypbIh-3cm7TFZ`), v17.10 (`11FJKUO7xl_Tm-9wbhD_3S27tpgTrWtHD`), v17.9 (`14iF99wD98LHWIPpnXTznZaQgbfnpG8dY`), v17.8 (`1KM4NISDFckz0BVprZRNeRMvjbtQhwTcd`).
 - Pour reprendre depuis l'autre compte, du moins coûteux au plus coûteux : (1) le propriétaire partage la copie de travail avec ce compte, droit de modification, puis `Artifact` action `read` ; (2) télécharger `jarvis-page.html` depuis Drive dans un fichier local, sans l'afficher, puis le publier.
 - Capacités à déclarer pour publier la page sur un compte qui ne l'a pas encore : `{"mcp": {"servers": [{"server": "Google Sheets", "tools": ["get_values", "append_values", "update_values"]}, {"server": "Google Calendar", "tools": ["list_events", "create_event", "update_event", "delete_event"]}, {"server": "Gmail", "tools": ["search_threads", "get_thread", "list_drafts", "send_message", "unlabel_thread", "delete_draft"]}, {"server": "Claude Code Remote", "tools": ["fire_trigger"]}]}, "sample": {}, "tts": {}}`.
 - Le reste (instructions, ce journal, banc d'essai) est dans `main`.
@@ -98,8 +98,20 @@ Choix du propriétaire en QCM : « essai sur iPhone d'abord » ; allègement : �
 
 ### 15/11/2026 : résultat de l'essai v17.11 (rien de modifié dans la page)
 - Sur l'iPhone du propriétaire (iOS en anglais, voix par défaut anglaise « enhanced ») : la voix reste robotique. La page ne voit que deux voix françaises de base, et « Voix des réglages de l'iPhone » donne la même chose. Il ne trouve pas le menu « Contenu énoncé » (nom différent selon la version d'iOS : « Spoken Content » ou « Read & Speak » en anglais) ; ses voix téléchargées l'ont peut-être été dans le menu VoiceOver, qui ne sert qu'à VoiceOver.
-- Conclusion : sur iPhone, la page ne peut pas offrir une voix naturelle avec les voix du téléphone. Ne plus y passer de temps.
+- Conclusion de ce jour-là, **démentie ensuite** (voir v17.12) : la voix choisie dans « Read & Speak » pour le français est bien jouée par la page.
 - Pistes présentées au propriétaire, à lui de choisir (QCM) : (1) le mode vocal de l'app Claude, dans une conversation qui a ses connecteurs Google : aucune modification de la page, à essayer (on ne sait pas si le mode vocal lit Pilotage) ; (2) le mode conversation de Jarvis sur ordinateur, où la voix de Claude (`tts`) et la dictée (`dictation`) sont offertes à la page ; (3) un moteur de voix embarqué dans la page (modèle de plusieurs dizaines de Mo à charger, autorisation de la plateforme inconnue, coûteux à essayer).
+
+### 15/11/2026 : v17.12, mode conversation (copie seulement, à reporter)
+- **Suite de l'essai de la voix : c'est réglé sur son iPhone.** Il a trouvé le menu (« Read & Speak », pas « Spoken Content », iOS en anglais), y a choisi une voix française de meilleure qualité, et Jarvis la joue bien avec « Voix des réglages de l'iPhone » (le choix par défaut depuis la v17.11). Donc : la page ne voit pas les voix téléchargées dans sa liste, mais sans voix imposée le téléphone lit avec celle choisie dans ce menu. La voix de Claude (`tts`) ne marche pas dans l'app iPhone : il l'accepte. Il a demandé de continuer.
+- Mode conversation, dans la discussion avec Claude :
+  - bouton « Conversation » / « Fil » à droite de l'en-tête de la discussion (`talkSet`), et bouton « Parler » sur la carte du point du jour de l'accueil ;
+  - `talkStage(T)` remplace le fil : hologramme de Claude en 150 px (gardé dans `VOX.big`, remis dans `LIVE` si la vue l'en a sorti), état (« Je t'écoute », « Je réfléchis », « Je réponds », « Je te lis la réponse »), la dernière question, la réponse en grand qui s'écrit en direct, les propositions à confirmer (ordre, tâche, échéance), « Réécouter » / « Arrêter », les relances en boutons, un rappel « touche le micro du clavier pour dicter » ;
+  - la réponse est lue toute seule à la fin (`voxSpeak` appelé depuis `sendChat` quand `CHAT.talk`) ; `voxPrime()` lance une lecture muette au moment où la question part, parce que l'iPhone ne laisse parler une page qu'après un geste ;
+  - `voxClean` retire les mentions (certain), (Likely), (guessing) et les tirets de liste avant la lecture ; le message « Lu par la voix du téléphone » ne s'affiche plus qu'une fois par ouverture de la page.
+- `VERSION` passe à `'17.12'`.
+- Testé : scénarios Z1 (voix du téléphone : scène, lecture seule, état « Je te lis la réponse », relance, retour au fil), Z2 (voix de Claude sur ordinateur), Z3 (voix muette : réponse lisible, « Réécouter », message), capture d'écran à 390 px, puis tout le banc sans erreur. **Non vérifié sur iPhone** : que la lecture démarre bien seule après l'envoi de la question (sinon « Réécouter » la lance), et l'animation de l'hologramme pendant la lecture.
+- Pas fait, à proposer ensuite : lecture phrase par phrase pendant que la réponse s'écrit ; micro dans la page sur ordinateur (capacité `dictation`) ; « parler à un bot » (Claude qui répond à sa place d'après Pilotage).
+- Publié sur la copie (version 8), source déposée dans Drive.
 
 ### À venir
 
