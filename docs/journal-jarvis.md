@@ -8,14 +8,14 @@ Tenu à la demande du propriétaire (15/11/2026) : **chaque modification de la p
 |---|---|---|
 | En service (v16), premier compte | `https://claude.ai/artifact/QwLf64Ggstzu4p3uznZrr8` | Ne pas toucher : aucun report dessus (décision du 15/11/2026) |
 | Essai (v17.5), premier compte, partagée | `https://claude.ai/artifact/UDFVL3TQ2RUeYMq1JBtT4m` | En retard sur la copie : il lui manque les modifications notées « copie seulement » |
-| Copie de travail (v17.8), second compte | `https://claude.ai/artifact/NMAqUak7A5JYsLsc12VyaZ` | C'est ici que l'on modifie et que le propriétaire valide |
+| Copie de travail (v17.9), second compte | `https://claude.ai/artifact/NMAqUak7A5JYsLsc12VyaZ` | C'est ici que l'on modifie et que le propriétaire valide |
 
 ## Où est le code de la page
 
-- **Google Drive** (à la demande du propriétaire, 15/11/2026) : dossier `RD Assistant/Jarvis (sources de la page)` (`1LO_y3DbvXjQQtuSQPlQfbnMU5Mlyzz3X`), fichier `jarvis-page.html` (`1KM4NISDFckz0BVprZRNeRMvjbtQhwTcd`). C'est la source complète de la dernière version publiée sur la copie de travail. **Après chaque publication, remplace ce fichier** (outil Drive `update_file` ou, à défaut, `create_file` dans le même dossier ; contenu passé par référence de fichier `sha256:<empreinte>:<chemin absolu>`, sans recopier le texte) et note la version ici.
-- Version déposée dans Drive : **v17.8** (15/11/2026, 477 617 octets).
+- **Google Drive** (à la demande du propriétaire, 15/11/2026) : dossier `RD Assistant/Jarvis (sources de la page)` (`1LO_y3DbvXjQQtuSQPlQfbnMU5Mlyzz3X`). **Un fichier par version publiée**, nommé `jarvis-page-v<version>.html` : la source complète de la copie de travail. L'outil Drive ne sait pas remplacer le contenu d'un fichier : après chaque publication, crée un fichier neuf (`create_file`, `contentMimeType: text/html`, `disableConversionToGoogleType: true`, contenu passé par référence `sha256:<empreinte>:<chemin absolu>` dans `base64Content`, sans recopier le texte). Ne supprime pas les anciens sans le oui du propriétaire.
+- Dernière version déposée : **v17.9** (`14iF99wD98LHWIPpnXTznZaQgbfnpG8dY`, 481 393 octets). Avant : v17.8 (`1KM4NISDFckz0BVprZRNeRMvjbtQhwTcd`).
 - Pour reprendre depuis l'autre compte, du moins coûteux au plus coûteux : (1) le propriétaire partage la copie de travail avec ce compte, droit de modification, puis `Artifact` action `read` ; (2) télécharger `jarvis-page.html` depuis Drive dans un fichier local, sans l'afficher, puis le publier.
-- Capacités à déclarer pour publier la page sur un compte qui ne l'a pas encore : `{"mcp": {"servers": [{"server": "Google Sheets", "tools": ["get_values", "append_values", "update_values"]}, {"server": "Google Calendar", "tools": ["list_events", "create_event", "update_event", "delete_event"]}, {"server": "Gmail", "tools": ["search_threads", "get_thread", "list_drafts", "send_message", "unlabel_thread", "delete_draft"]}, {"server": "Claude Code Remote", "tools": ["fire_trigger"]}]}, "sample": {}}`.
+- Capacités à déclarer pour publier la page sur un compte qui ne l'a pas encore : `{"mcp": {"servers": [{"server": "Google Sheets", "tools": ["get_values", "append_values", "update_values"]}, {"server": "Google Calendar", "tools": ["list_events", "create_event", "update_event", "delete_event"]}, {"server": "Gmail", "tools": ["search_threads", "get_thread", "list_drafts", "send_message", "unlabel_thread", "delete_draft"]}, {"server": "Claude Code Remote", "tools": ["fire_trigger"]}]}, "sample": {}, "tts": {}}`.
 - Le reste (instructions, ce journal, banc d'essai) est dans `main`.
 
 ## Comment travailler
@@ -70,13 +70,22 @@ Publié sur la copie (version 3). Pas encore reporté sur la page d'essai.
 - Testé : scénario P (onze demandes : cinq lignes et « Voir les 6 autres », puis onze lignes), puis tout le banc sans erreur.
 - Publié sur la copie (version 4) et déposé dans Drive.
 
+### 15/11/2026 : v17.9, essai de la voix (copie seulement, à reporter)
+Choix du propriétaire en QCM : « essai sur iPhone d'abord » ; allègement : « laisser tel quel » ; report sur la page d'essai : « plus tard, après validation ».
+- Bouton « Écouter » / « Arrêter » (`.vox-btn`, icône `sound`) sous chaque message de Claude dans la discussion, y compris son message d'accueil (l'essai ne coûte donc aucune question).
+- Module `VOX` avant la fonction `lvFireTask` : `voxSpeak(m)` lit le texte nettoyé. D'abord la voix de Claude (capacité `tts`, ajoutée à la déclaration ; `speak(texte, {language: 'fr'})`, 2 000 caractères au plus) ; si elle est absente ou refusée, la voix du téléphone ou du navigateur (`speechSynthesis`, phrases regroupées par blocs de 220 caractères, voix française si elle existe). Un message dit quelle voix a servi, ou pourquoi rien ne sort (« Aucun son n'a démarré… » après 5 s, « Pas de voix disponible dans cette vue »). L'hologramme de la discussion s'anime pendant la lecture. Fermer la discussion coupe la voix.
+- `VERSION` passe à `'17.9'`.
+- Testé : scénarios X1 à X5 (voix de Claude, voix du téléphone, repli quand celle de Claude est refusée, voix muette, aucune voix), puis tout le banc sans erreur. **Non testé : le son réel**, ni sur iPhone ni sur ordinateur. La suite dépend de ce que le propriétaire entend sur son iPhone.
+- Publié sur la copie (version 5), source déposée dans Drive.
+
 ### À venir
 
 **Allègement de la page** (choisi par le propriétaire le 15/11/2026) : mesuré avant d'y toucher, rien n'a été retiré.
 - Mesure (`COV=<dossier>` sur tout le banc, v17.7) : 26 % du script ne tourne jamais pendant les essais (104 Ko sur 403), mais l'essentiel est du code vivant que les essais ne parcourent pas (actions selon la nature d'une échéance, parcours de voyage, outils de la discussion). Le code vraiment mort, hérité de la maquette (rubriques « communes aux cinq maquettes », réponses simulées, `liveTick`), ne dépasse pas 15 à 25 Ko, soit 3 à 5 % de la page.
-- Conclusion : retirer le code mort ne change presque rien au coût d'une session. Ce qui le changerait : découper la page en plusieurs fichiers publiés ensemble (styles, socle, écrans, liaison, v17), pour qu'une session ne lise que le fichier qu'elle modifie. Gros chantier (le script est une seule fonction : il faut en sortir les déclarations communes et vérifier les noms réservés du navigateur). Décision demandée au propriétaire en QCM le 15/11/2026.
+- **Décision du propriétaire (QCM du 15/11/2026) : laisser la page telle quelle.** Ne pas relancer ce chantier sans sa demande.
+- Conclusion : retirer le code mort ne change presque rien au coût d'une session. Ce qui le changerait : découper la page en plusieurs fichiers publiés ensemble (styles, socle, écrans, liaison, v17), pour qu'une session ne lise que le fichier qu'elle modifie. Gros chantier (le script est une seule fonction : il faut en sortir les déclarations communes et vérifier les noms réservés du navigateur).
 
 **Voix** (demandée par le propriétaire le 15/11/2026 : poser une question à la voix, entendre la réponse, voir l'agent parler, discussion en direct). Ce que la plateforme permet :
 - Capacités `tts` (voix de Claude) et `dictation` (parole vers texte) des pages : offertes sur ordinateur (app Claude, Chrome), **pas dans l'app iPhone ni Safari**. Sur iPhone : la dictée du clavier marche dans tout champ de texte ; la lecture à voix haute par la voix du téléphone (synthèse vocale du navigateur) est à essayer sur son iPhone, non vérifiée.
 - Seul Claude répond en direct dans la page ; un bot Grok répond à son passage. « Parler à un bot » en direct = Claude qui répond à sa place d'après Pilotage, en le disant, et qui propose l'ordre pour le vrai bot.
-- Pistes proposées en QCM : un essai de la voix sur iPhone d'abord ; bouton « Écouter » sur les réponses ; mode conversation plein écran (hologramme du bot animé pendant qu'il parle, sous-titres en direct, question dictée, réponse lue seule). Pas d'androïde 3D (déjà rejeté par le propriétaire).
+- Essai en cours (v17.9). Si la voix sort sur iPhone, la suite envisagée : bouton « Écouter » sur les réponses ; mode conversation plein écran (hologramme du bot animé pendant qu'il parle, sous-titres en direct, question dictée, réponse lue seule). Pas d'androïde 3D (déjà rejeté par le propriétaire).
