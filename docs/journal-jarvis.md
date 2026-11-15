@@ -8,12 +8,12 @@ Tenu à la demande du propriétaire (15/11/2026) : **chaque modification de la p
 |---|---|---|
 | En service (v16), premier compte | `https://claude.ai/artifact/QwLf64Ggstzu4p3uznZrr8` | Ne pas toucher : aucun report dessus (décision du 15/11/2026) |
 | Essai (v17.5), premier compte, partagée | `https://claude.ai/artifact/UDFVL3TQ2RUeYMq1JBtT4m` | En retard sur la copie : il lui manque les modifications notées « copie seulement » |
-| Copie de travail (v17.13), second compte | `https://claude.ai/artifact/NMAqUak7A5JYsLsc12VyaZ` | C'est ici que l'on modifie et que le propriétaire valide |
+| Copie de travail (v17.14), second compte | `https://claude.ai/artifact/NMAqUak7A5JYsLsc12VyaZ` | C'est ici que l'on modifie et que le propriétaire valide |
 
 ## Où est le code de la page
 
 - **Google Drive** (à la demande du propriétaire, 15/11/2026) : dossier `RD Assistant/Jarvis (sources de la page)` (`1LO_y3DbvXjQQtuSQPlQfbnMU5Mlyzz3X`). **Un fichier par version publiée**, nommé `jarvis-page-v<version>.html` : la source complète de la copie de travail. L'outil Drive ne sait pas remplacer le contenu d'un fichier : après chaque publication, crée un fichier neuf (`create_file`, `contentMimeType: text/html`, `disableConversionToGoogleType: true`, contenu passé par référence `sha256:<empreinte>:<chemin absolu>` dans `base64Content`, sans recopier le texte). Ne supprime pas les anciens sans le oui du propriétaire.
-- Dernière version déposée : **v17.13** (`1Vx4JuLzPVgxNXfU-RB9yJxRJWvzxZT6m`, 507 093 octets). Avant : v17.12 (`1IFWOSGSkQWme6S4PFCv_JE1CPQk1PqOB`), v17.11 (`1x6BECa6OubYyU5DMJmkypbIh-3cm7TFZ`), v17.10 (`11FJKUO7xl_Tm-9wbhD_3S27tpgTrWtHD`), v17.9 (`14iF99wD98LHWIPpnXTznZaQgbfnpG8dY`), v17.8 (`1KM4NISDFckz0BVprZRNeRMvjbtQhwTcd`).
+- Dernière version déposée : **v17.14** (`1uoKVgQ4gqE2QNyn3krddmrIkCg_wE8k6`, 516 505 octets). Avant : v17.13 (`1Vx4JuLzPVgxNXfU-RB9yJxRJWvzxZT6m`), v17.12 (`1IFWOSGSkQWme6S4PFCv_JE1CPQk1PqOB`), v17.11 (`1x6BECa6OubYyU5DMJmkypbIh-3cm7TFZ`), v17.10 (`11FJKUO7xl_Tm-9wbhD_3S27tpgTrWtHD`), v17.9 (`14iF99wD98LHWIPpnXTznZaQgbfnpG8dY`), v17.8 (`1KM4NISDFckz0BVprZRNeRMvjbtQhwTcd`).
 - Pour reprendre depuis l'autre compte, du moins coûteux au plus coûteux : (1) le propriétaire partage la copie de travail avec ce compte, droit de modification, puis `Artifact` action `read` ; (2) télécharger `jarvis-page.html` depuis Drive dans un fichier local, sans l'afficher, puis le publier.
 - Capacités à déclarer pour publier la page sur un compte qui ne l'a pas encore : `{"mcp": {"servers": [{"server": "Google Sheets", "tools": ["get_values", "append_values", "update_values"]}, {"server": "Google Calendar", "tools": ["list_events", "create_event", "update_event", "delete_event"]}, {"server": "Gmail", "tools": ["search_threads", "get_thread", "list_drafts", "send_message", "unlabel_thread", "delete_draft"]}, {"server": "Claude Code Remote", "tools": ["fire_trigger"]}]}, "sample": {}, "tts": {}, "dictation": {}}`.
 - Le reste (instructions, ce journal, banc d'essai) est dans `main`.
@@ -125,6 +125,15 @@ Choix du propriétaire en QCM : « essai sur iPhone d'abord » ; allègement : �
 - `VERSION` passe à `'17.13'`.
 - Testé : scénarios Z1 (boucle complète avec le micro du téléphone : écoute, transcription, envoi seul, lecture, reprise, deuxième question sans geste, silence prolongé, pause et reprise, « Terminer », historique gardé), Z2 (micro refusé), Z3 (aucun micro), Z4 (dictée de Claude), Z5 (historique retrouvé, effacé), Q (historique des demandes : filtres, recherche), captures d'écran à 390 px, puis tout le banc sans erreur. **Non vérifié sur iPhone** : que l'app Claude laisse la page utiliser le micro (la dictée de Claude n'y est pas offerte aux pages ; la reconnaissance vocale du navigateur est inconnue dans l'app). Si elle refuse, la page bascule sur le clavier.
 - Publié sur la copie (version 9, capacités : mcp, sample, tts, dictation), source déposée dans Drive.
+
+### 15/11/2026 : v17.14, commandes dites et état des systèmes (copie seulement, à reporter)
+Suite de la demande « ajoute tout ce qui en fait un vrai centre de commandes ». Module « v17.14 » juste avant le bloc « démarrage ».
+- **Commandes que la page exécute elle-même** (`localCmd`, appelée dans `sendChat` juste après le message du propriétaire ; Claude n'est pas appelé, rien ne coûte) : « fais le point » (le point du jour de `claudeBrief`, lu à voix haute en conversation), « mes demandes », « mes tâches », « ouvre l'agenda » (ou demandes, achats, voyages, sorties, suivi, équipe, accueil : la discussion se ferme et l'écran s'ouvre), « c'est tout » / « au revoir » (fin de la conversation). Phrases reconnues seulement en entier : « fais le point sur le dossier du syndic » part bien à Claude. Puces « Fais le point », « Mes demandes », « Mes tâches » sous le fil en conversation (`talkQuick`).
+- **État des systèmes** (`sysRows`, `sysBox`, `sysSheet`) : Pilotage, Agenda, Gmail (lu à, ou l'erreur), Claude dans la page, micro, voix, Grok Bot (actif ou en pause), sonnettes (directes ou par Iris), tâche Claude (reconnue ou pas encore lancée), version de la page ; pastille verte, orange, rouge ou grise. S'ouvre en touchant la ligne d'état en haut (`#demo`), et en bas de l'onglet Suivi.
+- `lower1` garde les sigles en majuscules (« CRA » ne devient plus « cRA »).
+- `VERSION` passe à `'17.14'`.
+- Testé : scénarios C (point du jour lu sans appel à Claude, demandes, tâches par la puce, vraie question envoyée à Claude, « ouvre l'agenda », « c'est tout »), S et S2 (état des systèmes en direct et hors liaison), puis tout le banc sans erreur.
+- Publié sur la copie (version 10), source déposée dans Drive.
 
 ### À venir
 

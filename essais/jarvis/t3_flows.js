@@ -189,6 +189,25 @@ const fill = async (h, sel, val) => { await h.page.fill(sel, val); };
     await step('les anciens messages sont là', async () => { const a = await fab(h); await L.tick(h, 300); return a + ' // ' + await stage(h) + ' // ' + await h.page.evaluate(() => Array.from(document.querySelectorAll('#chat .talk-log .msg p')).map((x) => x.innerText.slice(0, 24)).join(' | ') + ' // ' + ((document.querySelector('#chat .talk-hist') || {}).innerText || '').replace(/\s+/g, ' ')); }, 0);
     await step('effacer l\'historique, en deux appuis', async () => { const a = await L.click(h, 'Effacer', '#chat'); const b = await L.click(h, 'Confirmer', '#chat'); return a + ' / ' + b + ' // ' + await stage(h) + ' // gardé : ' + await h.page.evaluate(() => localStorage.getItem('jarvis.conv')); }, 0);
   });
+  /* commandes que la page exécute elle-même, sans appeler Claude */
+  await scen('C commandes dites, sans Claude', {scen: {active: true, synth: 'ok', ear: 'ok'}}, async (h, step) => {
+    const claudeCalls = () => h.page.evaluate(() => (window.__samples || []).length);
+    const lastC = () => h.page.evaluate(() => { const m = Array.from(document.querySelectorAll('#chat .msg.them p')).pop(); return m ? m.innerText.replace(/\n/g, ' / ').slice(0, 230) : 'aucun'; });
+    await step('fais le point : lu, Claude non appelé', async () => { await fab(h); await L.tick(h, 150); const c0 = await claudeCalls(); await sayIt(h, 'Fais le point'); await L.tick(h, 900); return (await lastC()) + ' // appels à Claude : ' + (await claudeCalls() - c0) + ' // ' + await stage(h) + ' // lu : ' + (await spoken(h)).slice(0, 90); }, 0);
+    await step('mes demandes', async () => { await L.tick(h, 2500); await sayIt(h, 'Mes demandes.'); await L.tick(h, 900); return await lastC(); }, 0);
+    await step('mes tâches, par la puce', async () => { await L.tick(h, 2500); const a = await L.click(h, 'Mes tâches', '#chat'); await L.tick(h, 400); return a + ' // ' + await lastC(); }, 0);
+    await step('une vraie question part bien à Claude', async () => { await L.tick(h, 2500); const c0 = await claudeCalls(); await sayIt(h, 'Fais le point sur le dossier du syndic'); await L.tick(h, 1500); return 'appels à Claude : ' + (await claudeCalls() - c0) + ' // ' + await lastC(); }, 0);
+    await step('ouvre l\'agenda : la page change d\'écran', async () => { await L.tick(h, 2500); await sayIt(h, "Jarvis, ouvre l'agenda"); await L.tick(h, 1200); return await h.page.evaluate(() => 'onglet : ' + (document.querySelector('.tab[aria-current=page]') || {}).dataset.tab + ' // discussion ouverte : ' + !document.getElementById('chat').hidden); }, 0);
+    await step('c\'est tout : fin de la conversation', async () => { await fab(h); await L.tick(h, 200); await sayIt(h, "Merci, c'est tout"); await L.tick(h, 1200); return await stage(h); }, 0);
+  });
+  await scen('S état des systèmes', {scen: {active: true, synth: 'ok', ear: 'ok', bells: true}}, async (h, step) => {
+    const sys = (sel) => h.page.evaluate((sel) => Array.from(document.querySelectorAll(sel + ' .sys-row')).map((r) => r.className.replace('sys-row is-', '') + ':' + r.innerText.replace(/\s+/g, ' ').trim()).join(' | '), sel);
+    await step('en touchant la ligne d\'état', async () => { await h.page.evaluate(() => document.getElementById('demo').click()); await L.tick(h, 500); return (await sheetTxt(h)).slice(0, 120) + ' // ' + await sys('#sheet'); }, 0);
+    await step('dans l\'onglet Suivi', async () => { await h.page.evaluate(() => document.getElementById('sheet-back').click()); await L.tick(h, 400); await L.tab(h, 'suivi'); return await sys('#view') + ' // débordement : ' + (await h.page.evaluate(() => Array.from(document.querySelectorAll('#view .sys *')).filter((e) => e.getBoundingClientRect().right > innerWidth + 1).length)); }, 0);
+  });
+  await scen('S2 état des systèmes hors liaison', {scen: {offline: true}}, async (h, step) => {
+    await step('en touchant la ligne d\'état', async () => { await h.page.evaluate(() => document.getElementById('demo').click()); await L.tick(h, 500); return (await sheetTxt(h)).slice(0, 400); }, 0);
+  });
   /* l'historique des demandes, dans l'onglet Demandes */
   await scen('Q historique des demandes', {scen: {active: true, pending: 3}}, async (h, step) => {
     await L.tab(h, 'demandes');
