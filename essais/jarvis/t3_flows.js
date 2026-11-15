@@ -136,6 +136,22 @@ const fill = async (h, sel, val) => { await h.page.fill(sel, val); };
     await step('page de Kairos', async () => { await h.page.evaluate(() => { const b = Array.from(document.querySelectorAll('.mate')).find((x) => /Kairos/.test(x.innerText)); b.click(); }); await L.tick(h, 600); return (await L.text(h)).replace(/\n+/g, ' | ').slice(0, 520); }, 0);
     await step('commande rapide', async () => L.click(h, 'Vérifie mes prix maintenant'));
   });
+  /* la tâche Claude : chaque compte a la sienne ; la page essaie les identifiants connus et retient celui qui marche */
+  const task = async (h) => { const a = await card(h, 'Question technique', 'Confier à la tâche Claude'); await L.tick(h, 500); const b = await L.click(h, 'Oui, lancer la tâche', '#sheet'); return a + ' / ' + b; };
+  const fired = (h) => L.calls(h, (c) => c.tool === 'fire_trigger').then((c) => c.map((x) => x.input.trigger_id.slice(-6)).join(' > ') + ' // retenu : ' + '');
+  await scen('T1 tâche Claude du second compte', {scen: {tasks: ['trig_01T263zKge8mnGiu4vs2DGwL']}}, async (h, step) => {
+    await L.tab(h, 'suivi');
+    await step('premier lancement : essaie les deux', async () => { const a = await task(h); await L.tick(h, 6500); return a + ' // ' + await fired(h) + await h.page.evaluate(() => localStorage.getItem('jarvis.tache')); }, 0);
+    await step('second lancement : va droit à la bonne', async () => { const a = await task(h); await L.tick(h, 6500); return a + ' // ' + await fired(h) + await h.page.evaluate(() => localStorage.getItem('jarvis.tache')); }, 0);
+  });
+  await scen('T2 tâche Claude du premier compte', {scen: {tasks: ['trig_012M51J8A3NmbFgE36av8PR3']}}, async (h, step) => {
+    await L.tab(h, 'suivi');
+    await step('lancement', async () => { const a = await task(h); await L.tick(h, 6500); return a + ' // ' + await fired(h) + await h.page.evaluate(() => localStorage.getItem('jarvis.tache')); }, 0);
+  });
+  await scen('T3 aucune tâche sur ce compte', {scen: {tasks: []}}, async (h, step) => {
+    await L.tab(h, 'suivi');
+    await step('lancement refusé, dit clairement', async () => { const a = await task(h); await L.tick(h, 6500); return a + ' // ' + await fired(h) + await h.page.evaluate(() => localStorage.getItem('jarvis.tache')); }, 0);
+  });
   for (const r of results) {
     console.log('\n[' + r.scen + '] ' + r.step + (r.note ? '\n   note: ' + String(r.note).slice(0, 900) : ''));
     (r.writes || []).forEach((w) => console.log('   ÉCRIT: ' + w));
