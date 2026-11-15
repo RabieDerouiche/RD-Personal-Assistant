@@ -96,6 +96,10 @@ const fill = async (h, sel, val) => { await h.page.fill(sel, val); };
   });
   await scen('E hors liaison', {scen: {offline: true}}, async (h, step) => {
     await step('en-tête', async () => (await L.text(h, '#demo')) + ' // ' + (await L.text(h)).slice(0, 160).replace(/\n/g, ' | '), 0);
+    await step('bandeau sans liaison et pied de page', async () => (await L.text(h, '.nolink-b') || 'BANDEAU ABSENT').replace(/\n+/g, ' | ').slice(0, 330) + ' // ' + (await L.text(h, '.ver-foot') || 'PIED ABSENT') + ' // débordement : ' + JSON.stringify((await L.overflow(h)).wide), 0);
+  });
+  await scen('V version visible en direct', {scen: {active: true}}, async (h, step) => {
+    await step('pied de page, pas de bandeau', async () => (await L.text(h, '.ver-foot') || 'PIED ABSENT') + ' // bandeau : ' + ((await L.text(h, '.nolink-b')) ? 'PRÉSENT À TORT' : 'absent') + ' // ' + (await L.text(h, '#demo')), 0);
   });
   await scen('F écriture refusée', {scen: {fail: {update_values: 'needs_reauth'}}}, async (h, step) => {
     await L.tab(h, 'suivi');
@@ -135,6 +139,16 @@ const fill = async (h, sel, val) => { await h.page.fill(sel, val); };
     await step('dépôt de document', async () => { const t = (await L.text(h)).match(/Déposer un document[\s\S]{0,420}/); const a = await L.click(h, "Iris range ce que j'ai déposé"); return a + ' // ' + (t ? t[0].replace(/\n+/g, ' | ') : 'absent'); });
     await step('page de Kairos', async () => { await h.page.evaluate(() => { const b = Array.from(document.querySelectorAll('.mate')).find((x) => /Kairos/.test(x.innerText)); b.click(); }); await L.tick(h, 600); return (await L.text(h)).replace(/\n+/g, ' | ').slice(0, 520); }, 0);
     await step('commande rapide', async () => L.click(h, 'Vérifie mes prix maintenant'));
+  });
+  /* l'événement rouge : déplacé ou retiré directement dans l'agenda ; l'annuel reste confié à Iris */
+  const evCard = (h, title, btn) => h.page.evaluate(({title, btn}) => { const norm = (s) => s.replace(/\s+/g, ' ').trim(); const c = Array.from(document.querySelectorAll('#view article')).find((a) => a.getClientRects().length && /important/i.test((a.querySelector(".nature") || {}).innerText || "") && norm(a.innerText).includes(title)); if (!c) return 'carte absente : ' + title; const b = Array.from(c.querySelectorAll('button')).find((x) => norm(x.innerText).startsWith(btn)); if (!b) return 'bouton absent : ' + btn; b.click(); return 'ok'; }, {title, btn});
+  const calState = (h) => h.page.evaluate(() => window.__CAL.primary.filter((e) => e.colorId === '11').map((e) => e.summary + ' ' + (e.start.dateTime || e.start.date) + ' > ' + (e.end.dateTime || e.end.date)).join(' ; ') + ' // Échéances : ' + window.__G['Échéances'].filter((r) => /notaire/.test(r[1])).map((r) => r[0] + ' ' + r[4]).join(' ; '));
+  await scen('R événement rouge', {scen: {active: true}}, async (h, step) => {
+    await L.tab(h, 'agenda');
+    await step('déplacer un événement avec heure', async () => { const a = await evCard(h, 'Rendez-vous notaire', 'Plus'); await L.tick(h, 500); const b = await L.click(h, 'Déplacer', '#sheet'); await L.tick(h, 500); await fill(h, '#sheet input[type=date]', '2026-11-25'); await h.page.evaluate(() => document.querySelector('#sheet form').requestSubmit()); await L.tick(h, 8000); return [a, b].join(' / ') + ' // ' + await calState(h); }, 0);
+    await step("déplacer un événement d'une journée", async () => { await L.tick(h, 30000); await L.tab(h, 'agenda'); const a = await evCard(h, 'Visite médicale', 'Plus'); await L.tick(h, 500); const b = await L.click(h, 'Déplacer', '#sheet'); await L.tick(h, 500); await fill(h, '#sheet input[type=date]', '2026-11-27'); await h.page.evaluate(() => document.querySelector('#sheet form').requestSubmit()); await L.tick(h, 8000); return [a, b].join(' / ') + ' // ' + await calState(h); }, 0);
+    await step('retirer cet événement', async () => { await L.tick(h, 30000); await L.tab(h, 'agenda'); const a = await evCard(h, 'Rendez-vous notaire', 'Plus'); await L.tick(h, 500); const b = await L.click(h, 'Retirer de mon agenda', '#sheet'); await L.tick(h, 500); const s = await sheetTxt(h); const c = await L.click(h, 'Oui', '#sheet'); await L.tick(h, 8000); return [a, b, c].join(' / ') + ' // CONFIRME: ' + s.slice(0, 160) + ' // ' + await calState(h); }, 0);
+    await step('événement annuel : reste confié à Iris', async () => { await L.tab(h, 'agenda'); const a = await evCard(h, 'Anniversaire', 'Plus'); await L.tick(h, 500); const b = await L.click(h, 'Déplacer', '#sheet'); await L.tick(h, 500); await fill(h, '#sheet input[type=date]', '2026-12-20'); await h.page.evaluate(() => document.querySelector('#sheet form').requestSubmit()); await L.tick(h, 8000); return [a, b].join(' / ') + ' // ' + await calState(h); }, 0);
   });
   /* la tâche Claude : chaque compte a la sienne ; la page essaie les identifiants connus et retient celui qui marche */
   const task = async (h) => { const a = await card(h, 'Question technique', 'Confier à la tâche Claude'); await L.tick(h, 500); const b = await L.click(h, 'Oui, lancer la tâche', '#sheet'); return a + ' / ' + b; };
