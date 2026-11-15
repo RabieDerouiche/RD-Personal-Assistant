@@ -8,7 +8,7 @@ Tenu à la demande du propriétaire (15/11/2026) : **chaque modification de la p
 |---|---|---|
 | En service (v16), premier compte | `https://claude.ai/artifact/QwLf64Ggstzu4p3uznZrr8` | Ne pas toucher : aucun report dessus (décision du 15/11/2026) |
 | Essai (v17.5), premier compte, partagée | `https://claude.ai/artifact/UDFVL3TQ2RUeYMq1JBtT4m` | En retard sur la copie : il lui manque les modifications notées « copie seulement » |
-| Copie de travail (v17.14), second compte | `https://claude.ai/artifact/NMAqUak7A5JYsLsc12VyaZ` | C'est ici que l'on modifie et que le propriétaire valide |
+| Copie de travail (v17.15), second compte | `https://claude.ai/artifact/NMAqUak7A5JYsLsc12VyaZ` | C'est ici que l'on modifie et que le propriétaire valide |
 
 ## Où est le code de la page
 
@@ -134,6 +134,15 @@ Suite de la demande « ajoute tout ce qui en fait un vrai centre de commandes »
 - `VERSION` passe à `'17.14'`.
 - Testé : scénarios C (point du jour lu sans appel à Claude, demandes, tâches par la puce, vraie question envoyée à Claude, « ouvre l'agenda », « c'est tout »), S et S2 (état des systèmes en direct et hors liaison), puis tout le banc sans erreur.
 - Publié sur la copie (version 10), source déposée dans Drive.
+
+### 15/11/2026 : v17.15, micro en panne visible, lecture pendant l'écriture, alertes en direct (copie seulement, à reporter)
+- **Retour du propriétaire sur la v17.14** : sur son iPhone, le bouton micro ouvre la discussion mais « rien ne se passe » quand il appuie sur le micro. Cause probable, non confirmée : l'app Claude expose la reconnaissance vocale à la page mais ne la fait pas marcher (aucun début, aucune erreur, ou une erreur avalée) ; la page restait alors muette. Ses choix (QCM) pour la suite : « réponse lue plus tôt » et « alertes en direct ».
+- **Micro** : le micro doit s'ouvrir en 3 s, sinon la page le déclare en panne (`earDead`) ; toute erreur autre qu'un silence, une exception au démarrage, ou trois écoutes coupées aussitôt font de même. La panne est dite en clair dans la conversation avec sa cause, mémorisée sur l'appareil (`localStorage['jarvis.micro']` = `non:<cause>`, `oui` après un micro qui a marché), et la page passe au clavier : le gros bouton devient « Dicter au clavier » et ouvre le clavier de l'iPhone (son micro sert à dicter), la réponse est lue toute seule. Au prochain appui sur le bouton flottant, la page ouvre directement le clavier. « Réessayer le micro » efface la mémoire. Le champ garde la main quand la discussion se redessine.
+- **Lecture pendant l'écriture** (`voxFeed`, `voxPiece`, `voxStreamEnd`) : en conversation, avec la voix du téléphone, chaque phrase est lue dès qu'elle est écrite (morceaux de 25 caractères au moins, coupés à la ponctuation ou au retour à la ligne) ; la ligne « Suite : » n'est jamais lue ; l'écoute reprend après la dernière phrase. La voix de Claude (ordinateur) lit toujours la réponse entière à la fin. `voxClean` retire aussi le tiret de liste en début de morceau.
+- **Alertes en direct** (`alertsCheck`, appelée après chaque relecture de Pilotage en enveloppant `lvApply`) : quand un bot répond à un ordre du propriétaire (Réponse remplie, « Attend ton oui » ou « Fait ») ou qu'une nouvelle demande arrive dans « À toi » : un son court (Web Audio, possible après un premier appui sur la page) et un bandeau de 30 s avec « Écouter » et « Voir » (onglet Demandes). Rien à la première lecture ; trois bandeaux au plus, puis un résumé. Pilotage est relu toutes les 4 minutes : l'alerte arrive dans ce délai.
+- Banc : le faux connecteur relit maintenant les données à l'intervalle demandé par la page (`refetchInterval`), comme la plateforme ; nouveaux réglages `ear: 'muet' | 'reseau' | 'jette'` et `stream: true`.
+- `VERSION` passe à `'17.15'`.
+- Testé : scénarios M (micro muet, erreur réseau, démarrage refusé : panne dite, mémorisée, clavier, réponse lue), M2 (panne mémorisée, réessayer), M3, L (trois phrases lues avant la fin de la réponse, « Suite » non lue, écoute reprise), A2 (aucune alerte au départ ; réponse d'un bot et nouvelle demande ; « Écouter » ; « Voir »), puis tout le banc. **Non vérifié sur iPhone** : le micro (on saura si l'app le donne ou si la page bascule bien sur le clavier), le son des alertes, la lecture phrase par phrase.
 
 ### À venir
 

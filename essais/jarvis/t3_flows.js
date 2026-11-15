@@ -208,6 +208,43 @@ const fill = async (h, sel, val) => { await h.page.fill(sel, val); };
   await scen('S2 état des systèmes hors liaison', {scen: {offline: true}}, async (h, step) => {
     await step('en touchant la ligne d\'état', async () => { await h.page.evaluate(() => document.getElementById('demo').click()); await L.tick(h, 500); return (await sheetTxt(h)).slice(0, 400); }, 0);
   });
+  /* v17.15 : un micro qui ne marche pas se voit, se mémorise, et bascule sur le clavier */
+  const micState = (h) => h.page.evaluate(() => 'mémoire : ' + localStorage.getItem('jarvis.micro') + ' // champ actif : ' + (document.activeElement && document.activeElement.id === 'chat-in') + ' // réessayer : ' + !!Array.from(document.querySelectorAll('#chat button')).find((b) => /Réessayer le micro/.test(b.innerText)));
+  for (const [k, lab] of [['muet', 'le micro ne répond jamais'], ['reseau', 'erreur réseau'], ['jette', 'démarrage refusé']]) {
+    await scen('M ' + lab, {scen: {active: true, synth: 'ok', ear: k}}, async (h, step) => {
+      await step('le bouton : la panne est dite, le clavier arrive', async () => { const a = await fab(h); await L.tick(h, 3500); return a + ' // ' + await stage(h) + ' // ' + await micState(h); }, 0);
+      await step('le gros bouton ouvre le clavier', async () => { await h.page.evaluate(() => document.activeElement && document.activeElement.blur()); const a = await h.page.evaluate(() => { const b = document.querySelector('#chat .talk-mic'); b.click(); return b.getAttribute('aria-label'); }); await L.tick(h, 200); return a + ' // ' + await micState(h) + ' // ' + (await L.toasts(h)).join(' + '); }, 0);
+      await step('question au clavier : réponse lue', async () => { await fill(h, '#chat-in', 'Qui est en retard ?'); await h.page.keyboard.press('Enter'); await L.tick(h, 1500); return (await spoken(h)).slice(0, 120); }, 0);
+    });
+  }
+  await scen('M2 micro déjà en panne sur cet appareil', {scen: {active: true, synth: 'ok', ear: 'ok'}, storage: {'jarvis.micro': 'non:le micro ne répond pas'}}, async (h, step) => {
+    const raw = () => h.page.evaluate(() => 'mémoire : ' + localStorage.getItem('jarvis.micro') + ' // champ actif : ' + (document.activeElement && document.activeElement.id === 'chat-in'));
+    await step('le bouton ouvre directement le clavier', async () => { const a = await fab(h); await L.tick(h, 300); return a + ' // ' + await stage(h) + ' // ' + await raw(); }, 0);
+    await step('réessayer le micro', async () => { const a = await L.click(h, 'Réessayer le micro', '#chat'); await L.tick(h, 400); return a + ' // ' + await stage(h) + ' // ' + await raw(); }, 0);
+  });
+  await scen('M3 micro qui marche : mémorisé', {scen: {active: true, synth: 'ok', ear: 'ok'}}, async (h, step) => { await step('premier lancement réussi : mémorisé', async () => { await fab(h); await L.tick(h, 400); return await h.page.evaluate(() => localStorage.getItem('jarvis.micro')); }, 0); });
+  /* la réponse lue phrase par phrase pendant qu'elle s'écrit */
+  await scen('L lecture pendant l\'écriture', {scen: {active: true, synth: 'ok', ear: 'ok', stream: true}}, async (h, step) => {
+    await step('la première phrase est lue avant la fin de la réponse', async () => { await fab(h); await L.tick(h, 150); await sayIt(h, 'Que dois-je faire en premier'); await L.tick(h, 6000); return await h.page.evaluate(() => JSON.stringify(window.__voice.filter((x) => !/cancel|stop|: $/.test(x)).map((x) => x.replace(/^tel:fr-FR:undefined:/, '')))); }, 0);
+    await step('la suite n\'est pas lue, l\'écoute reprend', async () => { await L.tick(h, 1500); return await stage(h); }, 0);
+  });
+  /* les alertes en direct */
+  await scen('A2 alertes en direct', {scen: {active: true, synth: 'ok'}}, async (h, step) => {
+    await step('rien à la première lecture', async () => (await L.toasts(h)).join(' + ') || 'aucune alerte', 0);
+    await step('un bot répond, une demande arrive', async () => {
+      await h.page.evaluate(() => { const g = window.__G['Canal']; const r = g.slice().reverse().find((x) => x[1] === 'Rabie' && !x[6]); r[5] = 'Fait'; r[6] = 'Relevé fait : 1 449 €.'; const a = window.__G['À toi']; a.push([a[a.length - 1][0], 'Kairos', 'Nouveau seuil', 'Oui/Non : Je baisse le seuil ?']); });
+      await L.tick(h, 242000); return (await L.toasts(h)).join(' + ');
+    }, 0);
+    await step('Écouter puis Voir', async () => {
+      await h.page.evaluate(() => { const g = window.__G['Canal']; const r = g.slice().reverse().find((x) => x[1] === 'Rabie' && !x[6]); r[5] = 'Fait'; r[6] = 'Deuxième réponse.'; });
+      await L.tick(h, 241000);
+      await h.page.evaluate(() => { window.__voice.length = 0; const b = Array.from(document.querySelectorAll('.alert-t button')).find((x) => /Écouter/.test(x.innerText)); if (b) b.click(); });
+      await L.tick(h, 600); const lu = await spoken(h);
+      await h.page.evaluate(() => { const b = Array.from(document.querySelectorAll('.alert-t button')).find((x) => /Voir/.test(x.innerText)); if (b) b.click(); });
+      await L.tick(h, 400);
+      return 'lu : ' + lu + ' // onglet : ' + await h.page.evaluate(() => (document.querySelector('.tab[aria-current=page]') || {}).dataset.tab);
+    }, 0);
+  });
   /* l'historique des demandes, dans l'onglet Demandes */
   await scen('Q historique des demandes', {scen: {active: true, pending: 3}}, async (h, step) => {
     await L.tab(h, 'demandes');
