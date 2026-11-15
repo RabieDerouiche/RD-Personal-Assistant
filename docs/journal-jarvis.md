@@ -8,12 +8,12 @@ Tenu à la demande du propriétaire (15/11/2026) : **chaque modification de la p
 |---|---|---|
 | En service (v16), premier compte | `https://claude.ai/artifact/QwLf64Ggstzu4p3uznZrr8` | Ne pas toucher : aucun report dessus (décision du 15/11/2026) |
 | Essai (v17.5), premier compte, partagée | `https://claude.ai/artifact/UDFVL3TQ2RUeYMq1JBtT4m` | En retard sur la copie : il lui manque les modifications notées « copie seulement » |
-| Copie de travail (v17.10), second compte | `https://claude.ai/artifact/NMAqUak7A5JYsLsc12VyaZ` | C'est ici que l'on modifie et que le propriétaire valide |
+| Copie de travail (v17.11), second compte | `https://claude.ai/artifact/NMAqUak7A5JYsLsc12VyaZ` | C'est ici que l'on modifie et que le propriétaire valide |
 
 ## Où est le code de la page
 
 - **Google Drive** (à la demande du propriétaire, 15/11/2026) : dossier `RD Assistant/Jarvis (sources de la page)` (`1LO_y3DbvXjQQtuSQPlQfbnMU5Mlyzz3X`). **Un fichier par version publiée**, nommé `jarvis-page-v<version>.html` : la source complète de la copie de travail. L'outil Drive ne sait pas remplacer le contenu d'un fichier : après chaque publication, crée un fichier neuf (`create_file`, `contentMimeType: text/html`, `disableConversionToGoogleType: true`, contenu passé par référence `sha256:<empreinte>:<chemin absolu>` dans `base64Content`, sans recopier le texte). Ne supprime pas les anciens sans le oui du propriétaire.
-- Dernière version déposée : **v17.10** (`11FJKUO7xl_Tm-9wbhD_3S27tpgTrWtHD`, 485 701 octets). Avant : v17.9 (`14iF99wD98LHWIPpnXTznZaQgbfnpG8dY`), v17.8 (`1KM4NISDFckz0BVprZRNeRMvjbtQhwTcd`).
+- Dernière version déposée : **v17.11** (`1x6BECa6OubYyU5DMJmkypbIh-3cm7TFZ`, 486 534 octets). Avant : v17.10 (`11FJKUO7xl_Tm-9wbhD_3S27tpgTrWtHD`), v17.9 (`14iF99wD98LHWIPpnXTznZaQgbfnpG8dY`), v17.8 (`1KM4NISDFckz0BVprZRNeRMvjbtQhwTcd`).
 - Pour reprendre depuis l'autre compte, du moins coûteux au plus coûteux : (1) le propriétaire partage la copie de travail avec ce compte, droit de modification, puis `Artifact` action `read` ; (2) télécharger `jarvis-page.html` depuis Drive dans un fichier local, sans l'afficher, puis le publier.
 - Capacités à déclarer pour publier la page sur un compte qui ne l'a pas encore : `{"mcp": {"servers": [{"server": "Google Sheets", "tools": ["get_values", "append_values", "update_values"]}, {"server": "Google Calendar", "tools": ["list_events", "create_event", "update_event", "delete_event"]}, {"server": "Gmail", "tools": ["search_threads", "get_thread", "list_drafts", "send_message", "unlabel_thread", "delete_draft"]}, {"server": "Claude Code Remote", "tools": ["fire_trigger"]}]}, "sample": {}, "tts": {}}`.
 - Le reste (instructions, ce journal, banc d'essai) est dans `main`.
@@ -85,6 +85,16 @@ Choix du propriétaire en QCM : « essai sur iPhone d'abord » ; allègement : �
 - `VERSION` passe à `'17.10'`.
 - Testé : scénarios Y1 (trois voix : la premium par défaut, en choisir une autre, « Écouter » s'en sert), Y2 (seulement la voix de base), Y3 (voix de Claude : pas de panneau), capture d'écran à 390 px, puis tout le banc sans erreur. **Non vérifié** : que l'app iPhone montre à la page les voix « améliorées » ou « premium » téléchargées ; c'est l'essai suivant du propriétaire.
 - Publié sur la copie (version 6), source déposée dans Drive.
+
+### 15/11/2026 : v17.11, voix des réglages de l'iPhone par défaut (copie seulement, à reporter)
+- **Retour du propriétaire sur la v17.10** : (1) les voix « premium » et « améliorée » qu'il a téléchargées n'apparaissent pas dans la liste : l'app iPhone ne montre à la page que les voix de base ; (2) il a entendu la voix avec un appareil audio Bluetooth, mais plus rien sur le haut-parleur du téléphone. Cause la plus probable du (2), non confirmée : le mode silencieux de l'iPhone coupe la lecture vocale d'une page sur le haut-parleur, pas sur un casque ou une enceinte.
+- Retouches du module `VOX` :
+  1. `voxPick()` ne choisit plus une voix d'office : sans choix fait dans la page (ou avec `jarvis.voix = 'reglages'`), aucune voix n'est imposée et la lecture part avec la seule langue `fr-FR`. Le téléphone prend alors la voix cochée dans Réglages, Accessibilité, Contenu énoncé, Voix, Français, qui peut être une voix « premium » invisible pour la page. Probable, non vérifié.
+  2. `voxPanel()` : première ligne « Voix des réglages de l'iPhone » (par défaut), puis les voix que la page voit ; texte d'aide réécrit (télécharger **et cocher** la voix, couper le mode silencieux, monter le volume).
+  3. `voxPhone()` : avant de lire, `navigator.audioSession.type = 'playback'` quand l'appareil le propose, pour tenter de jouer le son même en mode silencieux. Sans garantie.
+- `VERSION` passe à `'17.11'`.
+- Testé : scénarios Y1 à Y3 et X1 à X5 (par défaut la lecture part sans voix imposée ; un choix fait dans la liste est respecté), puis tout le banc sans erreur. **Non vérifié** : le son réel sur iPhone. Guide pas à pas donné au propriétaire dans la conversation (mode silencieux, volume, voix cochée dans les réglages).
+- Publié sur la copie (version 7), source déposée dans Drive.
 
 ### À venir
 
