@@ -96,6 +96,11 @@ Choix du propriétaire en QCM : « essai sur iPhone d'abord » ; allègement : �
 - Testé : scénarios Y1 à Y3 et X1 à X5 (par défaut la lecture part sans voix imposée ; un choix fait dans la liste est respecté), puis tout le banc sans erreur. **Non vérifié** : le son réel sur iPhone. Guide pas à pas donné au propriétaire dans la conversation (mode silencieux, volume, voix cochée dans les réglages).
 - Publié sur la copie (version 7), source déposée dans Drive.
 
+### 15/11/2026 : résultat de l'essai v17.11 (rien de modifié dans la page)
+- Sur l'iPhone du propriétaire (iOS en anglais, voix par défaut anglaise « enhanced ») : la voix reste robotique. La page ne voit que deux voix françaises de base, et « Voix des réglages de l'iPhone » donne la même chose. Il ne trouve pas le menu « Contenu énoncé » (nom différent selon la version d'iOS : « Spoken Content » ou « Read & Speak » en anglais) ; ses voix téléchargées l'ont peut-être été dans le menu VoiceOver, qui ne sert qu'à VoiceOver.
+- Conclusion : sur iPhone, la page ne peut pas offrir une voix naturelle avec les voix du téléphone. Ne plus y passer de temps.
+- Pistes présentées au propriétaire, à lui de choisir (QCM) : (1) le mode vocal de l'app Claude, dans une conversation qui a ses connecteurs Google : aucune modification de la page, à essayer (on ne sait pas si le mode vocal lit Pilotage) ; (2) le mode conversation de Jarvis sur ordinateur, où la voix de Claude (`tts`) et la dictée (`dictation`) sont offertes à la page ; (3) un moteur de voix embarqué dans la page (modèle de plusieurs dizaines de Mo à charger, autorisation de la plateforme inconnue, coûteux à essayer).
+
 ### À venir
 
 **Allègement de la page** (choisi par le propriétaire le 15/11/2026) : mesuré avant d'y toucher, rien n'a été retiré.
