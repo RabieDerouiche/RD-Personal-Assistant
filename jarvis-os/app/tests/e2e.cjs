@@ -45,14 +45,14 @@ async function scen(name, sc, fn) {
 }
 const st = (p) => p.evaluate(() => { const j = window.__jarvis; return 'vue : ' + document.body.className + ' · voix : ' + j.voice.state + ' · missions : ' + j.store.missions.map((m) => m.agent + '/' + m.status).join(',') + ' · dernier : ' + (j.store.msgs.slice(-1)[0] || {}).text; });
 const say = (p, t) => p.evaluate((t) => window.__say.push(t), t);
-const over = (p) => p.evaluate(() => (document.querySelector('.title, .intro, .cmd-h h2, .help, .bar h2') || {}).textContent + ' · débordement : ' + (document.documentElement.scrollWidth > innerWidth));
+const over = (p) => p.evaluate(() => (document.querySelector('.p-head h2, .help') || {}).textContent + ' · débordement : ' + (document.documentElement.scrollWidth > innerWidth));
 const shot = async (p, n, full) => { if (process.env.SHOTS) await p.screenshot({path: process.env.SHOTS + '/' + n + '.png', fullPage: !!full}); };
 const MIC = '.home-ask .ask-ic';
 
 (async () => {
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
   await scen('A chargement', {}, async (p, step) => {
-    await step('orbe, onglets, accueil', () => p.evaluate(() => ({webgl: !!document.querySelector('.orb-stage canvas'), css: !!document.querySelector('.orb-css'), tabs: document.querySelectorAll('.tabs button').length, titre: document.querySelector('.help').textContent, debord: document.documentElement.scrollWidth > innerWidth})).then(JSON.stringify));
+    await step('orbe, onglets, accueil', () => p.evaluate(() => ({webgl: !!document.querySelector('.orb-stage canvas'), css: !!document.querySelector('.orb-css'), tabs: document.querySelectorAll('.tabs button').length, titre: document.querySelector('.help').textContent, sphères: document.querySelectorAll('.dock .chr canvas').length, debord: document.documentElement.scrollWidth > innerWidth})).then(JSON.stringify));
     await p.waitForTimeout(600); await shot(p, 'accueil');
   });
   await scen('B conversation vocale continue', {}, async (p, step) => {
@@ -77,15 +77,15 @@ const MIC = '.home-ask .ask-ic';
     await shot(p, 'accueil-apres');
     await step('missions : badge', () => p.evaluate(() => (document.querySelector('.badge') || {}).textContent));
     await p.click('.tabs button:nth-child(2)'); await p.waitForTimeout(200); await shot(p, 'commandes');
-    await step('centre de commandes : fil complet', () => p.evaluate(() => document.querySelectorAll('.b-me').length + ' de toi, ' + document.querySelectorAll('.b-ai').length + ' de JARVIS, ' + document.querySelectorAll('.b-chip.link').length + ' liens vers les missions'));
+    await step('centre de commandes : fil complet', () => p.evaluate(() => document.querySelectorAll('.b-me').length + ' de toi, ' + document.querySelectorAll('.b-ai').length + ' de JARVIS, ' + document.querySelectorAll('.b-ai .link').length + ' liens vers les missions'));
     await p.click('.tabs button:nth-child(4)'); await p.waitForTimeout(200);
     await step('approuver la première', async () => { await p.click('.m-card .btn.main'); await p.waitForTimeout(100); return st(p); });
-    await step('priorité haute', async () => { await p.click('.k-tabs button:nth-child(2)'); await p.waitForTimeout(100); await p.click('.m-card .prio'); await p.waitForTimeout(100); return p.evaluate(() => window.__jarvis.store.missions.filter((m) => m.priority === 'haute').map((m) => m.agent + '/' + m.status).join(',')); });
-    await p.click('.k-tabs button:nth-child(1)'); await p.waitForTimeout(100); await shot(p, 'missions', true);
+    await step('priorité haute', async () => { await p.click('.k4 button:nth-child(2)'); await p.waitForTimeout(100); await p.click('.m-card .prio'); await p.waitForTimeout(100); return p.evaluate(() => window.__jarvis.store.missions.filter((m) => m.priority === 'haute').map((m) => m.agent + '/' + m.status).join(',')); });
+    await p.click('.k4 button:nth-child(1)'); await p.waitForTimeout(100); await shot(p, 'missions', true);
     await p.click('.tabs button:nth-child(3)'); await p.waitForTimeout(150); await shot(p, 'agents', true);
-    await step('agents : missions et recherche', async () => { const a = await p.evaluate(() => [...document.querySelectorAll('.a-card')].map((c) => c.querySelector('.a-txt b').textContent + ':' + c.querySelector('.a-txt small').textContent.split(' ')[0]).join(',')); await p.fill('.search-in', 'prix'); await p.waitForTimeout(150); const b = await p.evaluate(() => [...document.querySelectorAll('.a-card .a-txt b')].map((x) => x.textContent).join(',') + ' · focus : ' + document.activeElement.className); await p.click('.chips button:nth-child(2)'); await p.waitForTimeout(100); const c = await p.evaluate(() => (document.querySelector('.empty') || {}).textContent); return a + ' → « prix » : ' + b + ' → Actifs : ' + c; });
+    await step('agents : missions et recherche', async () => { const a = await p.evaluate(() => [...document.querySelectorAll('.units .unit')].map((c) => c.querySelector('.unit-id b').textContent + ':' + c.querySelector('.unit-foot span').textContent.split(' ')[0] + ':' + c.dataset.mode).join(',')); await p.fill('.search-in', 'prix'); await p.waitForTimeout(150); const b = await p.evaluate(() => [...document.querySelectorAll('.units .unit-id b')].map((x) => x.textContent).join(',') + ' · focus : ' + document.activeElement.className); await p.click('.chips button:nth-child(2)'); await p.waitForTimeout(100); const c = await p.evaluate(() => [...document.querySelectorAll('.units .unit-id b')].map((x) => x.textContent).join(',') || (document.querySelector('.empty') || {}).textContent); return a + ' → « prix » : ' + b + ' → Attendent : ' + c; });
     await p.click('.chips button:nth-child(1)'); await p.fill('.search-in', ''); await p.waitForTimeout(100);
-    await step('fiche Kairos puis mission confiée', async () => { await p.click('.a-card:nth-child(5)'); await p.waitForTimeout(150); const o = await p.evaluate(() => document.querySelector('.d-head b').textContent + ' · ' + document.querySelectorAll('.d-card .skills li').length + ' compétences · ' + document.querySelectorAll('.act').length + ' activités'); await shot(p, 'fiche-agent', true); await p.click('.d-card .btn.main'); await p.waitForTimeout(200); return o + ' → champ : « ' + (await p.inputValue('#cin')) + ' » · focus : ' + (await p.evaluate(() => document.activeElement.id)); });
+    await step('fiche Kairos puis mission confiée', async () => { await p.click('.units .unit:nth-child(5) .unit-hit'); await p.waitForTimeout(250); const o = await p.evaluate(() => document.querySelector('.a-hero .hello').textContent + ' · ' + document.querySelectorAll('.card .skills li').length + ' compétences · ' + document.querySelectorAll('.feed .unit-log').length + ' activités · sphère : ' + !!document.querySelector('.a-hero .chr canvas')); await shot(p, 'fiche-agent', true); await p.click('.page > .btn.main'); await p.waitForTimeout(200); return o + ' → champ : « ' + (await p.inputValue('#cin')) + ' » · focus : ' + (await p.evaluate(() => document.activeElement.id)); });
     await step('rechargement : tout est gardé', async () => { await p.reload(); await p.waitForTimeout(400); return st(p); });
   });
   await scen('C clavier', {}, async (p, step) => {
@@ -106,7 +106,7 @@ const MIC = '.home-ask .ask-ic';
     for (const [i, n] of [[2, 'commandes'], [3, 'agents'], [4, 'missions'], [5, 'plus']]) { await p.click('.tabs button:nth-child(' + i + ')'); await p.waitForTimeout(150); await step(n, () => over(p)); }
     await shot(p, 'plus', true);
     await step('salle de contrôle', () => p.evaluate(() => document.querySelector('.salle a').href));
-    for (const t of ['Workflows', 'Intelligence', 'Mémoire', 'Réglages']) { await p.click('.tile:has-text("' + t + '")'); await p.waitForTimeout(200); await step(t, () => over(p)); await shot(p, t.toLowerCase().normalize('NFD').replace(/[^a-z]/g, ''), true); if (t === 'Workflows') { await p.click('.chips button:nth-child(2)'); await p.waitForTimeout(100); await step('automatisations', () => p.evaluate(() => document.querySelectorAll('.g-row').length + ' prévues, ' + document.querySelectorAll('.switch[aria-disabled="true"]').length + ' non reliées')); } if (t !== 'Réglages') { await p.click('.back'); await p.waitForTimeout(100); } }
+    for (const t of ['Workflows', 'Intelligence', 'Mémoire', 'Réglages']) { await p.click('.tile:has-text("' + t + '")'); await p.waitForTimeout(200); await step(t, () => over(p)); await shot(p, t.toLowerCase().normalize('NFD').replace(/[^a-z]/g, ''), true); if (t === 'Workflows') { await step('circuit et automatisations', () => p.evaluate(() => document.querySelectorAll('.wf-node').length + ' étapes, ' + document.querySelectorAll('.g-row').length + ' automatisations prévues, ' + document.querySelectorAll('.switch[aria-disabled="true"]').length + ' non reliées')); } if (t !== 'Réglages') { await p.click('.back'); await p.waitForTimeout(100); } }
     await step('prénom à l\'accueil', async () => { await p.fill('.field[aria-label="Prénom"]', 'Alex'); await p.press('.field[aria-label="Prénom"]', 'Tab'); await p.click('.tabs button:nth-child(1)'); await p.waitForTimeout(150); return p.evaluate(() => document.querySelector('.hi').textContent); });
   });
   console.log(results.join('\n'));
