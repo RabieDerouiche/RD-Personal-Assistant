@@ -145,6 +145,11 @@ Suite de la demande « ajoute tout ce qui en fait un vrai centre de commandes »
 - Testé : scénarios M (micro muet, erreur réseau, démarrage refusé : panne dite, mémorisée, clavier, réponse lue), M2 (panne mémorisée, réessayer), M3, L (trois phrases lues avant la fin de la réponse, « Suite » non lue, écoute reprise), A2 (aucune alerte au départ ; réponse d'un bot et nouvelle demande ; « Écouter » ; « Voir »), puis tout le banc sans erreur. **Non vérifié sur iPhone** : le micro (on saura si l'app le donne ou si la page bascule bien sur le clavier), le son des alertes, la lecture phrase par phrase.
 - Publié sur la copie (version 11), source déposée dans Drive.
 
+### 15/11/2026 : résultat de l'essai v17.15 sur iPhone (rien de modifié dans la page)
+- Le micro **ne marche pas** dans l'app Claude sur iPhone : la page le dit et ouvre le clavier ; la réponse est lue. Cause exacte non relevée par le propriétaire.
+- Conséquence : sur iPhone, la conversation à la voix se fait avec le micro du clavier (un appui par question), la réponse étant lue toute seule. Une conversation mains libres en continu n'y est possible que sur ordinateur (dictée de Claude), ou avec le mode vocal de l'app Claude elle-même, hors de la page.
+- Ne plus chercher à faire marcher le micro de la page dans l'app iPhone sans un changement de la plateforme.
+
 ### À venir
 
 **Allègement de la page** (choisi par le propriétaire le 15/11/2026) : mesuré avant d'y toucher, rien n'a été retiré.
