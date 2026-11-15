@@ -1,0 +1,71 @@
+/* Banc de bout en bout de la phase 3 : l'app servie par le vrai serveur JARVIS, avec un faux Claude (aucun coût).
+   npm run build, puis : NODE_PATH=/opt/node-tools/node_modules node tests/e2e-server.cjs */
+const {chromium} = require('playwright');
+const {spawn, execFileSync} = require('child_process'), fs = require('fs'), os = require('os'), path = require('path');
+const MOCK = require('./mock.cjs');
+const SRV = path.resolve(__dirname, '../../server');
+const DATA = fs.mkdtempSync(path.join(os.tmpdir(), 'jarvis-e2e-'));
+const PORT = 19000 + Math.floor(Math.random() * 900), BASE = 'http://127.0.0.1:' + PORT;
+const env = {...process.env, PORT: String(PORT), JARVIS_DATA: DATA, CLAUDE_BIN: path.join(SRV, 'tests/fake-claude.mjs'), JARVIS_WEB: path.resolve(__dirname, '../../web'), FAKE_DELAY: '40'};
+const out = []; let fails = 0;
+const ok = (n, c, i) => { out.push((c ? 'OK   ' : 'ÉCHEC') + ' ' + n + (i ? ' :: ' + i : '')); if (!c) fails++; };
+(async () => {
+  const code = execFileSync(process.execPath, [path.join(SRV, 'server.mjs'), 'pair'], {env}).toString().match(/: ([A-Z0-9]{4}-[A-Z0-9]{4})/)[1];
+  const srv = spawn(process.execPath, [path.join(SRV, 'server.mjs')], {env, stdio: ['ignore', 'pipe', 'inherit']});
+  await new Promise((r) => srv.stdout.once('data', r));
+  const b = await chromium.launch(); const p = await b.newPage({viewport: {width: 390, height: 844}});
+  const errs = []; p.on('pageerror', (e) => errs.push(e.message));
+  await p.addInitScript(MOCK({})); await p.goto(BASE + '/'); await p.waitForTimeout(400);
+  try {
+    await p.evaluate(() => { const j = window.__jarvis; j.store.add({who: 'me', text: 'souvenir d\'avant le serveur', at: Date.now()}); });
+    await p.click('.tabs button:nth-child(5)'); await p.click('.tile:has-text("Réglages")'); await p.waitForTimeout(150);
+    await p.fill('input[aria-label="Adresse du serveur"]', BASE); await p.fill('input[aria-label="Code d\'appairage"]', 'ZZZZ-ZZZZ'); await p.click('.card .btn.main'); await p.waitForTimeout(500);
+    ok('mauvais code refusé à l\'écran', /Code faux/.test(await p.textContent('.card .note')));
+    await p.fill('input[aria-label="Adresse du serveur"]', BASE); await p.fill('input[aria-label="Code d\'appairage"]', code); await p.click('.card .btn.main'); await p.waitForTimeout(800);
+    const card = await p.textContent('.card');
+    ok('iPhone relié, Claude connecté', /Relié · version/.test(card) && /connecté à ton abonnement/.test(card), card.slice(0, 160));
+    ok('historique du téléphone envoyé au serveur', await p.evaluate(() => window.__jarvis.store.msgs.some((m) => /souvenir d'avant/.test(m.text))));
+    if (process.env.SHOTS) await p.screenshot({path: process.env.SHOTS + '/reglages-serveur.png'});
+    await p.click('.tabs button:nth-child(1)'); await p.waitForTimeout(150);
+    await p.click('.home-ask .ask-ic'); await p.waitForTimeout(250);
+    await p.evaluate(() => window.__say.push('Bonjour JARVIS'));
+    const seen = new Set();
+    for (let i = 0; i < 50; i++) { const t = await p.evaluate(() => (document.querySelector('[data-stream]') || {}).textContent || ''); if (t && t !== '…') seen.add(t); await p.waitForTimeout(50); }
+    const mid = [...seen].sort((x, y) => x.length - y.length)[0] || '';
+    await p.waitForTimeout(1500);
+    const spoken = await p.evaluate(() => window.__spoken.slice(-1)[0] || '');
+    ok('réponse de Claude via le serveur, lue à voix haute', /Tu as dit : Bonjour JARVIS\. Session : nouvelle, modèle : sonnet/.test(spoken), spoken);
+    ok('texte affiché pendant qu\'il arrive', seen.size >= 3 && !/modèle/.test(mid), seen.size + ' états, premier : ' + mid.slice(0, 40));
+    ok('écoute repartie après la réponse', await p.evaluate(() => window.__jarvis.voice.state === 'listening'));
+    await p.evaluate(() => window.__say.push('Et ensuite'));
+    await p.waitForTimeout(2500);
+    ok('même conversation côté Claude', /Session : reprise/.test(await p.evaluate(() => window.__spoken.slice(-1)[0])));
+    await p.evaluate(() => window.__say.push('Demande à Kairos de vérifier le prix du robot'));
+    await p.waitForTimeout(2500);
+    const sp2 = await p.evaluate(() => window.__spoken.slice(-1)[0]);
+    ok('mission proposée par Claude, sans la ligne technique', /attend ton accord/.test(sp2) && !/MISSIONS/.test(sp2), sp2);
+    if (process.env.SHOTS) await p.screenshot({path: process.env.SHOTS + '/session-serveur.png'});
+    await p.evaluate(() => window.__say.push('Prépare un rapport sur la veille .NET'));
+    await p.waitForTimeout(2500);
+    await p.evaluate(() => window.__say.push("Merci c'est tout")); await p.waitForTimeout(1200);
+    ok('« c\'est tout » reste sur l\'iPhone', await p.evaluate(() => window.__jarvis.voice.state === 'off' && window.__spoken.slice(-1)[0] === 'À plus tard.'));
+    await p.click('.tabs button:nth-child(4)'); await p.waitForTimeout(200);
+    ok('missions venues du serveur', (await p.evaluate(() => document.querySelectorAll('.m-card').length)) === 2);
+    await p.click('.m-card:has-text("rapport") .btn.main'); await p.waitForTimeout(300);
+    ok('mission Claude approuvée : envoyée au serveur', await p.evaluate(() => window.__jarvis.store.missions.find((m) => m.agent === 'claude').status === 'envoyee' || window.__jarvis.store.missions.find((m) => m.agent === 'claude').status === 'terminee'));
+    await p.click('.k4 button:nth-child(4)'); await p.waitForTimeout(11000);
+    await p.click('.k4 button:nth-child(4)'); await p.waitForTimeout(200);
+    const res = await p.evaluate(() => (document.querySelector('.m-card .result') || {}).textContent || '');
+    ok('compte rendu de Claude affiché', /Compte rendu/.test(res), res.slice(0, 100));
+    if (process.env.SHOTS) await p.screenshot({path: process.env.SHOTS + '/mission-faite.png', fullPage: true});
+    await p.click('.tabs button:nth-child(2)'); await p.waitForTimeout(300);
+    ok('Commandes : Claude relié', /Claude relié/.test(await p.textContent('.lead')));
+    if (process.env.SHOTS) await p.screenshot({path: process.env.SHOTS + '/commandes-serveur.png'});
+    await p.reload(); await p.waitForTimeout(800);
+    ok('après rechargement : toujours relié, mémoire du serveur', await p.evaluate(() => window.__jarvis.srv.linked() && window.__jarvis.store.msgs.length >= 8));
+    ok('aucune erreur dans la page', errs.length === 0, errs.join(' | '));
+  } catch (e) { ok('exception', false, e.message); }
+  await b.close(); srv.kill(); fs.rmSync(DATA, {recursive: true, force: true});
+  console.log(out.join('\n')); console.log(fails ? fails + ' échec(s)' : 'Tout passe (' + out.length + ' vérifications).');
+  process.exit(fails ? 1 : 0);
+})();

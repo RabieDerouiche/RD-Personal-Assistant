@@ -9,12 +9,13 @@ import {think, resetBrain} from './brain';
 import {Voice, canListen, canSpeak, frenchVoices, type VoiceState} from './voice';
 import {createOrb, type OrbState} from './orb';
 import {charOf, setModeSource, talkAll, refreshModes, type Mode} from './chars';
+import * as srv from './server';
 
 const PHASE = 2;
-const VERSION = '0.4.0';
+const VERSION = '0.5.0';
 type View = 'home' | 'command' | 'agents' | 'agent' | 'missions' | 'more' | 'memory' | 'automations' | 'intelligence' | 'settings';
 let view: View = 'home';
-let live = '', note = '', clearArm = 0, orbState: OrbState = 'idle', agentFilter = 'tous', agentQuery = '', agentSel: AgentId = 'claude', missionCol = 'a_approuver', draftNext = '';
+let live = '', note = '', clearArm = 0, orbState: OrbState = 'idle', agentFilter = 'tous', agentQuery = '', agentSel: AgentId = 'claude', missionCol = 'a_approuver', draftNext = '', streaming = '', fresh = true, pairMsg = '';
 
 const SALLE = {copie: 'https://claude.ai/artifact/NMAqUak7A5JYsLsc12VyaZ', service: 'https://claude.ai/artifact/QwLf64Ggstzu4p3uznZrr8'};
 const app = document.getElementById('app')!;
@@ -28,6 +29,8 @@ const pending = () => store.missions.filter((m) => m.status === 'a_approuver').l
 const modeOf = (id: AgentId): Mode => store.missions.some((m) => m.agent === id && m.status === 'envoyee') ? 'travail' : store.missions.some((m) => m.agent === id && m.status === 'a_approuver') ? 'demande' : 'veille';
 setModeSource(modeOf);
 const MODE_TXT: Record<Mode, string> = {veille: 'Non relié', travail: 'Au travail', demande: 'Attend ton accord'};
+const claudeOn = () => srv.linked() && !!srv.lastStatus().claude?.loggedIn;
+const stateTxt = (id: AgentId, m: Mode) => m === 'veille' && id === 'claude' && claudeOn() ? 'Prêt' : MODE_TXT[m];
 const sph = (id: AgentId, size: number, slot = '') => charOf(id, size, slot);
 
 const ST: Record<MissionStatus, string> = {brouillon: 'Brouillon', a_approuver: 'À approuver', approuvee: 'Approuvée', refusee: 'Refusée', envoyee: 'En cours', terminee: 'Terminée', echouee: 'Échouée'};
@@ -50,6 +53,34 @@ const voice = new Voice({
 });
 
 function handle(text: string, byVoice: boolean) {
+  if (srv.linked()) {
+    const loc = think(text, store.settings.route);   /* fin de session et navigation restent sur l'iPhone */
+    if (!loc.end && !loc.nav) { resetBrain(); handleRemote(text, byVoice); return; }
+  }
+  handleLocal(text, byVoice);
+}
+/* phase 3 : Claude répond depuis le serveur, en flux */
+async function handleRemote(text: string, byVoice: boolean) {
+  const t0 = performance.now();
+  store.add({who: 'me', text, at: Date.now()}); store.stats.turns++;
+  setOrb('thinking'); streaming = '…'; live = ''; paint();
+  let reply = '', agentId: AgentId | undefined;
+  try {
+    const out = await srv.chat(text, {newSession: fresh, model: store.settings.model}, (t) => { streaming = t || '…'; document.querySelectorAll('[data-stream]').forEach((n) => { n.textContent = streaming; }); });
+    fresh = false; reply = out.reply; agentId = (out.agent as AgentId) || 'claude';
+    if (out.missions.length) { store.missions.push(...out.missions); setOrb('executing'); }
+  } catch (e) {
+    reply = (e as Error).message || 'Le serveur ne répond pas.'; store.stats.errors++;
+  }
+  streaming = '';
+  store.add({who: 'jarvis', text: reply, at: Date.now(), agent: agentId});
+  store.stats.replyMs.push(Math.round(performance.now() - t0)); store.save();
+  if (agentId) talkAll(agentId, Math.min(8, 1 + reply.length / 16));
+  refreshModes(); paint();
+  if ((byVoice || voice.active) && canSpeak()) voice.speak(reply);
+  else setTimeout(() => { if (orbState === 'thinking' || orbState === 'executing') setOrb('idle'); }, 900);
+}
+function handleLocal(text: string, byVoice: boolean) {
   const t0 = performance.now();
   store.add({who: 'me', text, at: Date.now()}); store.stats.turns++;
   setOrb('thinking');
@@ -60,7 +91,7 @@ function handle(text: string, byVoice: boolean) {
   if (out.agent) talkAll(out.agent, Math.min(8, 1 + out.reply.length / 16));
   refreshModes();
   live = ''; paint();
-  const go = () => { if (out.nav) { voice.stop(); show(out.nav as View); } if (out.end) { voice.stop(); resetBrain(); paint(); } };
+  const go = () => { if (out.nav) { voice.stop(); show(out.nav as View); } if (out.end) { voice.stop(); resetBrain(); fresh = true; paint(); } };
   if ((byVoice || voice.active) && canSpeak() && !out.end) voice.speak(out.reply, go);
   else if (canSpeak() && out.end) voice.speak(out.reply, () => { voice.stop(); go(); });
   else { setTimeout(() => { if (orbState === 'thinking' || orbState === 'executing') setOrb('idle'); }, 900); go(); }
@@ -69,7 +100,7 @@ const micTap = () => {
   if (!canListen()) { note = 'Pas de reconnaissance vocale ici : écris ta demande.'; paint(); return; }
   if (voice.state === 'speaking') { voice.interrupt(); return; }
   if (voice.active) { voice.stop(); return; }
-  note = ''; voice.start();
+  note = ''; fresh = true; voice.start();
 };
 const askBox = (id: string, ph: string, cls: string) => {
   const input = h('input', {class: 'ask-in', id, type: 'text', placeholder: ph, enterkeyhint: 'send', autocomplete: 'off', 'aria-label': 'Ta demande'}) as HTMLInputElement;
@@ -110,7 +141,8 @@ function voiceView(): HTMLElement {
     h('div', {class: 'stage tall'}, orb.el),
     h('div', {class: 'captions'},
       h('p', {class: 'cap-me', 'data-live': '', text: live}),
-      lastJ ? h('div', {class: 'cap-j'}, lastJ.agent ? sph(lastJ.agent, 34, 'voice') : null, h('p', {text: lastJ.text})) : h('p', {class: 'cap-hint', text: 'Parle normalement, je réponds à voix haute. « C\'est tout » pour finir.'})),
+      streaming ? h('div', {class: 'cap-j'}, sph('claude', 34, 'voice'), h('p', {'data-stream': '', text: streaming}))
+        : lastJ ? h('div', {class: 'cap-j'}, lastJ.agent ? sph(lastJ.agent, 34, 'voice') : null, h('p', {text: lastJ.text})) : h('p', {class: 'cap-hint', text: 'Parle normalement, je réponds à voix haute. « C\'est tout » pour finir.'})),
     note ? h('p', {class: 'note', text: note}) : null,
     h('div', {class: 'v-bar'},
       h('button', {type: 'button', class: 'v-side', 'aria-label': 'Passer au clavier', html: icon('key', 22), onclick: () => { voice.stop(); show('command'); }}),
@@ -126,10 +158,11 @@ function command(): HTMLElement {
   const msgs = store.msgs.slice(-80);
   return h('section', {class: 'page cmd'},
     head('Centre de commandes', 'Parle à ton équipe', h('button', {type: 'button', class: 'ic-btn', 'aria-label': 'Session vocale', html: icon('wave', 20), onclick: () => { show('home'); micTap(); }})),
-    h('p', {class: 'lead', text: '0 agent relié · ' + AGENTS.length + ' prêts à recevoir des missions (phase 3 et 4).'}),
+    h('p', {class: 'lead', text: claudeOn() ? 'Claude relié : il te répond en direct, sur ton abonnement. Bots Grok en phase 4.' : srv.linked() ? 'Serveur relié, ' + (srv.lastStatus().error || 'Claude pas encore connecté sur le serveur') + '.' : 'Pas encore de serveur : réponses locales simples. Relie le serveur dans Plus, Réglages.'}),
     h('div', {class: 'chat', id: 'log'}, msgs.length ? msgs.map((m, i) => m.who === 'me' ? h('div', {class: 'b-me'}, h('p', {text: m.text}), h('time', {text: ago(m.at)})) :
       h('div', {class: 'b-ai glass'}, h('div', {class: 'b-head'}, sph(m.agent || 'jarvis', 30, 'chat' + i), h('b', {text: 'JARVIS' + (m.agent ? ' → ' + short(m.agent) : '')}), h('time', {text: ago(m.at)})), h('p', {text: m.text}),
         /Mission(s)? (commune )?cré|missions créées/.test(m.text) ? h('div', {class: 'b-chips'}, h('span', {class: 'pill is-demande', text: 'Attend ton accord'}), h('button', {type: 'button', class: 'link', onclick: () => show('missions')}, 'Voir les missions ›')) : null))
+      .concat(streaming ? [h('div', {class: 'b-ai glass'}, h('div', {class: 'b-head'}, sph('claude', 30, 'chat-live'), h('b', {text: 'CLAUDE'}), h('time', {text: 'écrit…'})), h('p', {'data-stream': '', text: streaming}))] : [])
       : h('div', {class: 'chat-empty glass'}, h('p', {text: 'Tout ce que tu dis à JARVIS, à la voix ou au clavier, est écrit ici.'}), h('p', {class: 'muted', text: 'Essaie : « Demande à Kairos de vérifier le prix du robot ».'}))),
     note ? h('p', {class: 'note', text: note}) : null,
     askBox('cin', 'Tapez une commande…', 'cmd-ask'));
@@ -150,13 +183,13 @@ function agents(): HTMLElement {
   const search = h('input', {class: 'search-in', type: 'search', placeholder: 'Chercher un agent', value: agentQuery, 'aria-label': 'Chercher un agent'}) as HTMLInputElement;
   search.addEventListener('input', () => { agentQuery = search.value; const pos = search.selectionStart; render(); const s = document.querySelector('.search-in') as HTMLInputElement; if (s) { s.focus(); s.setSelectionRange(pos, pos); } });
   return h('section', {class: 'page'},
-    head('L\'équipe', 'Tes agents', h('span', {class: 'pill', text: '0 relié'})),
+    head('L\'équipe', 'Tes agents', h('span', {class: 'pill' + (claudeOn() ? ' is-ok' : ''), text: claudeOn() ? 'Claude relié' : '0 relié'})),
     h('div', {class: 'team-hero glass'}, sph('claude', 120, 'hero'), h('div', {}, h('b', {text: 'Claude, chef d\'équipe'}), h('span', {class: 'muted', text: 'Il commande les six bots Grok, avec Jarvis (Grok) comme relais vocal.'}))),
     h('label', {class: 'search glass'}, h('span', {html: icon('search', 18)}), search),
     h('div', {class: 'chips'}, F.map(([k, l]) => h('button', {type: 'button', 'aria-pressed': String(agentFilter === k), onclick: () => { agentFilter = k; render(); }}, l))),
     list.length ? h('div', {class: 'units'}, list.map((a) => { const s = stats(a.id), m = modeOf(a.id);
       return h('article', {class: 'unit glass', 'data-mode': m},
-        h('button', {type: 'button', class: 'unit-hit', onclick: () => { agentSel = a.id; show('agent'); }}, sph(a.id, 56, 'list'), h('span', {class: 'unit-id'}, h('b', {text: a.name}), h('span', {text: a.role})), h('span', {class: 'pill is-' + m, text: MODE_TXT[m]})),
+        h('button', {type: 'button', class: 'unit-hit', onclick: () => { agentSel = a.id; show('agent'); }}, sph(a.id, 56, 'list'), h('span', {class: 'unit-id'}, h('b', {text: a.name}), h('span', {text: a.role})), h('span', {class: 'pill is-' + (stateTxt(a.id, m) === 'Prêt' ? 'ok' : m), text: stateTxt(a.id, m)})),
         h('p', {class: 'unit-log'}, h('time', {text: s.lastM ? ago(s.lastM.at) : '—'}), h('span', {text: s.lastM ? ST[s.lastM.status] + ' · ' + s.lastM.text : 'Aucune mission pour l\'instant.'})),
         h('div', {class: 'unit-foot'}, h('span', {text: s.ms.length + ' mission' + (s.ms.length > 1 ? 's' : '') + ' · ' + (a.provider === 'claude' ? 'phase 3' : 'phase 4')}), h('i', {class: 'meter', 'data-mode': m}, h('i', {})))); }))
       : h('p', {class: 'empty', text: agentFilter === 'demande' ? 'Aucun agent n\'attend ton accord.' : 'Aucun agent ne correspond.'}));
@@ -166,7 +199,7 @@ function agentPage(): HTMLElement {
   const acts = s.ms.slice().sort((x, y) => y.at - x.at).slice(0, 8);
   return h('section', {class: 'page'},
     h('button', {type: 'button', class: 'back', onclick: () => show('agents')}, h('span', {html: icon('back', 16)}), 'L\'équipe'),
-    h('div', {class: 'a-hero'}, sph(a.id, 150, 'detail'), h('h2', {class: 'hello', text: a.name}), h('p', {class: 'muted', text: a.role}), h('span', {class: 'pill is-' + m, text: MODE_TXT[m]})),
+    h('div', {class: 'a-hero'}, sph(a.id, 150, 'detail'), h('h2', {class: 'hello', text: a.name}), h('p', {class: 'muted', text: a.role}), h('span', {class: 'pill is-' + (stateTxt(a.id, m) === 'Prêt' ? 'ok' : m), text: stateTxt(a.id, m)})),
     h('div', {class: 'brief'}, h('div', {class: 'kpi glass'}, h('span', {class: 'kpi-l', text: 'Missions'}), h('b', {text: String(s.ms.length)}), h('span', {class: 'kpi-s', text: s.today + " aujourd'hui"})), h('div', {class: 'kpi glass'}, h('span', {class: 'kpi-l', text: 'Réussite'}), h('b', {text: s.ok})), h('div', {class: 'kpi glass'}, h('span', {class: 'kpi-l', text: 'Dernière'}), h('b', {class: 'kpi-txt', text: s.last}))),
     h('div', {class: 'card glass'}, h('p', {class: 'kpi-l', text: 'Ce qu\'il sait faire'}), h('ul', {class: 'skills'}, a.skills.map((k) => h('li', {text: k}))), h('p', {class: 'muted small', text: a.link})),
     h('button', {type: 'button', class: 'btn main', onclick: () => { draftNext = 'Demande à ' + short(a.id) + ' de '; show('command'); }}, 'Lui confier une mission'),
@@ -177,22 +210,27 @@ function agentPage(): HTMLElement {
 /* ---------- missions ---------- */
 const COLS: [string, string, MissionStatus[]][] = [['a_approuver', 'À approuver', ['a_approuver', 'brouillon']], ['approuvee', 'Approuvées', ['approuvee']], ['envoyee', 'En cours', ['envoyee']], ['terminee', 'Terminées', ['terminee', 'echouee', 'refusee']]];
 function missions(): HTMLElement {
-  const act = (m: Mission, s: MissionStatus) => { m.status = s; if (s === 'terminee' || s === 'refusee') m.done = Date.now(); store.save(); refreshModes(); render(); };
+  const act = (m: Mission, s: MissionStatus) => {
+    if (srv.linked() && m.source !== 'local') { srv.missionUpdate(m.id, {status: s}).then((x) => { Object.assign(m, x); store.save(); refreshModes(); render(); }).catch(() => { note = 'Le serveur n\'a pas pris en compte le changement.'; render(); }); return; }
+    m.status = s; if (s === 'terminee' || s === 'refusee') m.done = Date.now(); store.save(); refreshModes(); render();
+  };
   const col = COLS.find((c) => c[0] === missionCol) || COLS[0];
   const list = store.missions.filter((m) => col[2].includes(m.status)).sort((a, b) => (a.priority === 'haute' ? -1 : 0) - (b.priority === 'haute' ? -1 : 0) || b.at - a.at);
   return h('section', {class: 'page'},
     head('Missions', 'Ce que ton équipe va faire'),
-    h('p', {class: 'lead', text: "JARVIS les prépare, tu les approuves. L'envoi réel arrive en phase 3 (Claude) et 4 (Grok) : rien ne part pour l'instant."}),
+    h('p', {class: 'lead', text: srv.linked() ? "JARVIS les prépare, tu les approuves. Claude fait les siennes sur ton serveur ; les bots Grok arrivent en phase 4." : "JARVIS les prépare, tu les approuves. Rien ne part tant que le serveur n'est pas relié."}),
     h('div', {class: 'brief k4'}, COLS.map(([k, l, ss]) => { const n = store.missions.filter((m) => ss.includes(m.status)).length; return h('button', {type: 'button', class: 'kpi glass' + (k === 'a_approuver' && n ? ' is-amber' : '') + (missionCol === k ? ' is-on' : ''), 'aria-pressed': String(missionCol === k), onclick: () => { missionCol = k; render(); }}, h('span', {class: 'kpi-l', text: l}), h('b', {text: String(n)})); })),
     list.length ? list.map((m) => h('article', {class: 'unit glass m-card', 'data-mode': m.status === 'a_approuver' ? 'demande' : 'veille'},
       h('div', {class: 'unit-hit'}, sph(m.agent, 40, 'm-' + m.id), h('span', {class: 'unit-id'}, h('b', {text: short(m.agent)}), h('span', {text: ago(m.at) + (m.group ? ' · mission commune' : '')})),
-        h('button', {type: 'button', class: 'pill prio p-' + (m.priority || 'normale'), 'aria-label': 'Priorité', onclick: () => { m.priority = nextPrio(m.priority); store.save(); render(); }}, PRIO[m.priority || 'normale'])),
+        h('button', {type: 'button', class: 'pill prio p-' + (m.priority || 'normale'), 'aria-label': 'Priorité', onclick: () => { m.priority = nextPrio(m.priority); store.save(); render(); if (srv.linked()) srv.missionUpdate(m.id, {priority: m.priority}).catch(() => {}); }}, PRIO[m.priority || 'normale'])),
       h('p', {class: 'm-text', text: m.text}),
-      m.status === 'approuvee' ? h('p', {class: 'muted small', text: 'Envoi réel en phase ' + (agent(m.agent).provider === 'claude' ? '3' : '4') + '.'}) : null,
+      m.status === 'approuvee' ? h('p', {class: 'muted small', text: agent(m.agent).provider === 'claude' ? (srv.linked() ? 'Claude va s\'en charger.' : 'Envoi réel quand le serveur sera relié.') : 'Envoi aux bots Grok en phase 4.'}) : null,
+      m.status === 'envoyee' ? h('p', {class: 'muted small', text: short(m.agent) + ' y travaille…'}) : null,
+      m.result ? h('div', {class: 'result'}, h('p', {class: 'kpi-l', text: m.status === 'echouee' ? 'Échec' : 'Compte rendu'}), h('p', {text: m.result})) : null,
       h('div', {class: 'acts'},
         m.status === 'a_approuver' ? [h('button', {type: 'button', class: 'btn main', onclick: () => act(m, 'approuvee')}, 'Approuver'), h('button', {type: 'button', class: 'btn', onclick: () => act(m, 'refusee')}, 'Refuser')] : null,
         m.status === 'refusee' ? h('button', {type: 'button', class: 'btn', onclick: () => act(m, 'a_approuver')}, 'Reprendre') : null,
-        h('button', {type: 'button', class: 'btn ghost', onclick: () => { store.missions = store.missions.filter((x) => x !== m); store.save(); refreshModes(); render(); }}, 'Supprimer'))))
+        h('button', {type: 'button', class: 'btn ghost', onclick: () => { store.missions = store.missions.filter((x) => x !== m); store.save(); refreshModes(); render(); if (srv.linked()) srv.missionDelete(m.id).catch(() => {}); }}, 'Supprimer'))))
       : h('p', {class: 'empty', text: col[0] === 'a_approuver' ? 'Rien à approuver. Dis par exemple : « Demande à Kairos de vérifier le prix du robot ».' : 'Aucune mission ici.'}));
 }
 
@@ -223,9 +261,9 @@ function memory(): HTMLElement {
   return h('section', {class: 'page'}, back(), head('Mémoire', 'Tout ce qui a été dit'),
     h('div', {class: 'brief'}, h('div', {class: 'kpi glass'}, h('span', {class: 'kpi-l', text: 'Souvenirs'}), h('b', {text: String(store.msgs.length)})), h('div', {class: 'kpi glass'}, h('span', {class: 'kpi-l', text: 'Missions'}), h('b', {text: String(store.missions.length)})), h('div', {class: 'kpi glass'}, h('span', {class: 'kpi-l', text: 'Agents'}), h('b', {text: String(used.size)}))),
     used.size ? h('div', {class: 'dock'}, [...used].map((id) => h('div', {class: 'dock-b'}, sph(id, 44, 'mem'), h('b', {text: short(id)}), h('span', {text: store.missions.filter((m) => m.agent === id).length + ' missions'})))) : null,
-    h('p', {class: 'small', text: 'Gardée sur cet iPhone. En phase 3, la mémoire passera sur ton serveur et sera partagée avec les agents.'}),
+    h('p', {class: 'small', text: srv.linked() ? 'Gardée sur ton serveur, et en copie sur cet iPhone.' : 'Gardée sur cet iPhone. Une fois le serveur relié, elle y passe.'}),
     h('label', {class: 'search glass'}, h('span', {html: icon('search', 18)}), q), out,
-    h('button', {type: 'button', class: 'btn danger', onclick: (e: Event) => { if (!clearArm) { clearArm = window.setTimeout(() => { clearArm = 0; render(); }, 5000); (e.target as HTMLElement).textContent = 'Confirmer : tout effacer'; return; } clearTimeout(clearArm); clearArm = 0; store.clearAll(); resetBrain(); refreshModes(); render(); }}, 'Effacer la mémoire et les missions'));
+    h('button', {type: 'button', class: 'btn danger', onclick: (e: Event) => { if (!clearArm) { clearArm = window.setTimeout(() => { clearArm = 0; render(); }, 5000); (e.target as HTMLElement).textContent = 'Confirmer : tout effacer'; return; } clearTimeout(clearArm); clearArm = 0; store.clearAll(); resetBrain(); refreshModes(); render(); if (srv.linked()) srv.memoryClear().catch(() => {}); }}, 'Effacer la mémoire et les missions'));
 }
 
 /* ---------- workflows : le circuit, avec les sphères de l'équipe ---------- */
@@ -250,7 +288,8 @@ function intelligence(): HTMLElement {
   const s = store.stats, avg = s.replyMs.length ? Math.round(s.replyMs.reduce((a, b) => a + b, 0) / s.replyMs.length) : 0;
   const voiceOk = s.voiceTurns + s.errors ? s.voiceTurns / (s.voiceTurns + s.errors) : 0;
   const approved = store.missions.length ? store.missions.filter((m) => ['approuvee', 'envoyee', 'terminee'].includes(m.status)).length / store.missions.length : 0;
-  const llm: [string, string, boolean][] = [['Claude (en direct)', 'phase 3 · Claude Code sur ton serveur', false], ['Claude Code (missions)', "phase 3 · déclencheur d'API", false], ['Grok Bot', 'phase 4 · webhooks', false], ['Reconnaissance vocale', canListen() ? 'disponible sur cet appareil' : 'absente ici', canListen()], ['Voix de JARVIS', canSpeak() ? 'disponible' : 'absente ici', canSpeak()]];
+  const st3 = srv.lastStatus(), cl = claudeOn();
+  const llm: [string, string, boolean][] = [['Serveur JARVIS', srv.linked() ? (st3.ok ? 'relié · version ' + st3.version : st3.error || 'vérification…') : 'pas encore relié (Réglages)', srv.linked() && st3.ok], ['Claude (en direct)', cl ? 'abonnement Claude, sur ton serveur' : 'connecte Claude sur le serveur', cl], ['Claude (missions)', cl ? 'faites sur ton serveur après ton accord' : 'avec le serveur', cl], ['Grok Bot', 'phase 4 · webhooks', false], ['Reconnaissance vocale', canListen() ? 'disponible sur cet appareil' : 'absente ici', canListen()], ['Voix de JARVIS', canSpeak() ? 'disponible' : 'absente ici', canSpeak()]];
   return h('section', {class: 'page'}, back(), head('Intelligence', 'Activité et services'),
     h('div', {class: 'gauges'}, gauge(Math.min(1, s.turns / 50), 'Échanges', String(s.turns), '#67e8f9'), gauge(voiceOk, 'Micro réussi', Math.round(voiceOk * 100) + '%', '#a5b4fc'), gauge(approved, 'Missions approuvées', Math.round(approved * 100) + '%', '#e9a8fb'), gauge(Math.min(1, avg / 1000), 'Réponse locale', avg + 'ms', '#fcd6a4')),
     h('div', {class: 'panel-h'}, h('h3', {text: 'État des modèles et services'})),
@@ -264,8 +303,21 @@ function settings(): HTMLElement {
   const sel = h('select', {class: 'field', 'aria-label': 'Voix', onchange: (e: Event) => { st.voiceURI = (e.target as HTMLSelectElement).value; store.save(); }},
     h('option', {value: '', text: "Voix des réglages de l'iPhone (recommandé)"}), vs.map((v) => h('option', {value: v.voiceURI || v.name, text: v.name + ' · ' + v.lang}))) as HTMLSelectElement;
   sel.value = st.voiceURI;
-  const seg = (k: 'listenMode' | 'route' | 'salle', opts: [string, string][]) => h('div', {class: 'seg'}, opts.map(([v, l]) => h('button', {type: 'button', 'aria-pressed': String((st as any)[k] === v), onclick: () => { (st as any)[k] = v; store.save(); render(); }}, l)));
+  const seg = (k: 'listenMode' | 'route' | 'salle' | 'model', opts: [string, string][]) => h('div', {class: 'seg'}, opts.map(([v, l]) => h('button', {type: 'button', 'aria-pressed': String((st as any)[k] === v), onclick: () => { (st as any)[k] = v; store.save(); render(); }}, l)));
+  const url = h('input', {class: 'field', type: 'url', value: st.serverUrl, placeholder: 'Adresse : https://…sslip.io', autocapitalize: 'off', autocomplete: 'off', 'aria-label': 'Adresse du serveur'}) as HTMLInputElement;
+  const code = h('input', {class: 'field', type: 'text', placeholder: 'Code d\'appairage (ex. K7Q2-M9XD)', autocapitalize: 'characters', autocomplete: 'off', 'aria-label': 'Code d\'appairage'}) as HTMLInputElement;
+  const st3 = srv.lastStatus();
+  const server = srv.linked()
+    ? h('div', {class: 'card glass'}, h('p', {class: 'kpi-l', text: 'Serveur JARVIS'}), h('b', {class: 'srv-url', text: st.serverUrl}),
+        h('p', {class: 'muted small', text: st3.ok ? 'Relié · version ' + st3.version + ' · Claude ' + (st3.claude?.loggedIn ? 'connecté à ton abonnement' : 'pas encore connecté : sur le serveur, « sudo -iu jarvis claude auth login »') : (st3.error || 'Vérification…')}),
+        h('div', {class: 'acts'}, h('button', {type: 'button', class: 'btn', onclick: () => { srv.status().then(render); }}, 'Vérifier'), h('button', {type: 'button', class: 'btn ghost', onclick: () => { srv.unpair(); render(); }}, 'Délier cet iPhone')))
+    : h('div', {class: 'card glass'}, h('p', {class: 'kpi-l', text: 'Relier ton serveur JARVIS'}),
+        h('p', {class: 'muted small', text: 'L\'adresse et le code s\'affichent sur le serveur quand tu t\'y connectes (guide dans docs/jarvis-os.md).'}), url, code,
+        pairMsg ? h('p', {class: 'note', text: pairMsg}) : null,
+        h('button', {type: 'button', class: 'btn main', onclick: async () => { pairMsg = 'Connexion…'; render(); const e = await srv.pair(url.value, code.value); pairMsg = e || ''; if (!e) { await srv.status(); refreshModes(); } render(); }}, 'Relier'));
   return h('section', {class: 'page'}, back(), head('Réglages', 'Ta façon de travailler'),
+    server,
+    srv.linked() ? [h('label', {class: 'lbl', text: 'Claude répond'}), seg('model', [['rapide', 'Vite (Haiku)'], ['equilibre', 'Bien (Sonnet)'], ['profond', 'À fond (Opus)']])] : null,
     h('label', {class: 'lbl', text: 'Prénom pour l\'accueil'}), name,
     h('label', {class: 'lbl', text: 'Voix de JARVIS'}), sel,
     h('p', {class: 'small', text: "Voix plus naturelle : Réglages de l'iPhone, Accessibilité, Read & Speak (Contenu énoncé), Voix, Français, puis une voix « améliorée » ou « premium »."}),
@@ -302,6 +354,9 @@ function render() {
 }
 
 render();
+/* phase 3 : au lancement, l'état du serveur et la mémoire qu'il garde ; les missions en cours sont suivies */
+if (srv.linked()) { srv.status().then(() => { refreshModes(); render(); }); srv.sync().then((okk) => { if (okk) { refreshModes(); if (!(view === 'home' && voice.active)) paint(); } }); }
+setInterval(() => { if (srv.linked() && store.missions.some((m) => m.status === 'envoyee') && !document.hidden) srv.sync().then((okk) => { if (okk && (view === 'missions' || view === 'agent')) render(); }); }, 10000);
 if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
 try { (window as any).speechSynthesis?.addEventListener?.('voiceschanged', () => { if (view === 'settings') render(); }); } catch { /* rien */ }
-(window as any).__jarvis = {store, voice, think};
+(window as any).__jarvis = {store, voice, think, srv};
