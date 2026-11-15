@@ -158,26 +158,45 @@ const fill = async (h, sel, val) => { await h.page.fill(sel, val); };
   });
   await scen('Y2 choix de la voix, seulement la voix de base', {scen: {active: true, synth: 'ok', voices: 'base'}}, async (h, step) => { await ask(h); await step('panneau', async () => { const a = await L.click(h, 'Voix :', '#chat'); return a + ' // ' + await voxState(h); }, 0); });
   await scen('Y3 voix de Claude disponible : pas de choix à faire', {scen: {active: true, tts: 'ok', synth: 'ok'}}, async (h, step) => { await ask(h); await step('panneau', () => voxState(h), 0); });
-  /* le mode conversation : hologramme, sous-titres, réponse lue toute seule, retour au fil */
-  const stage = (h) => h.page.evaluate(() => { const c = document.getElementById('chat'), st = c.querySelector('.talk-stage'); if (!st) return 'scène absente // fil : ' + (c.querySelector('.chat-log') ? c.querySelectorAll('.chat-log .msg').length + ' messages' : 'absent'); const t = (q) => ((st.querySelector(q) || {}).innerText || '').replace(/\s+/g, ' ').trim(); return 'état : ' + t('.talk-state') + ' // question : ' + t('.talk-q') + ' // sous-titres : ' + t('.talk-sub').slice(0, 90) + ' // hologramme : ' + (st.querySelector('.talk-av canvas') ? Math.round(st.querySelector('.talk-av .chr').getBoundingClientRect().width) + ' px' : 'absent') + ' // bouton : ' + t('.talk-play') + ' // relances : ' + st.querySelectorAll('.talk-next button').length + ' // bascule : ' + ((c.querySelector('.talk-toggle') || {}).innerText || '').trim(); });
-  const spoken = (h) => h.page.evaluate(() => JSON.stringify(window.__voice.filter((x) => !/cancel|stop/.test(x))).slice(0, 300));
-  const sayIt = async (h, q) => { await fill(h, '#chat-in', q); await h.page.keyboard.press('Enter'); };
-  await scen('Z1 conversation, voix du téléphone', {scen: {active: true, synth: 'ok'}}, async (h, step) => {
-    await L.tab(h, 'accueil');
-    await step('« Parler » ouvre la scène', async () => { const a = await L.click(h, 'Parler'); await L.tick(h, 600); return a + ' // ' + await stage(h) + ' // débordement : ' + (await h.page.evaluate(() => Array.from(document.querySelectorAll('#chat .talk-stage *')).filter((e) => e.getBoundingClientRect().right > innerWidth + 1).length)); }, 0);
-    await step('question : pendant la lecture', async () => { await sayIt(h, 'Que dois-je faire en premier ?'); await L.tick(h, 260); return await stage(h); }, 0);
-    await step('réponse lue toute seule', async () => { await L.tick(h, 1500); return await stage(h) + ' // lu : ' + await spoken(h); }, 0);
-    await step('après la lecture', async () => { await L.tick(h, 3000); return await stage(h); }, 0);
-    await step('relance touchée : nouvelle question, nouvelle lecture', async () => { await h.page.evaluate(() => { window.__voice.length = 0; const b = document.querySelector('#chat .talk-next button'); if (b) b.click(); }); await L.tick(h, 2500); return await stage(h) + ' // lu : ' + await spoken(h); }, 0);
-    await step('retour au fil', async () => { const a = await L.click(h, 'Fil', '#chat'); return a + ' // ' + await stage(h); }, 0);
+  /* la conversation en continu : un bouton, on parle, tout est écrit, la réponse est lue, l'écoute reprend */
+  const stage = (h) => h.page.evaluate(() => { const c = document.getElementById('chat'), w = c.querySelector('.talk-wrap'); const form = c.querySelector('.chat-form'); const kb = form && form.getClientRects().length ? 'clavier visible' : 'clavier caché'; if (!w) return 'scène absente // fil : ' + c.querySelectorAll('.chat-log .msg').length + ' messages // ' + kb; const t = (q) => ((w.querySelector(q) || {}).innerText || '').replace(/\s+/g, ' ').trim(); return 'état : ' + t('.talk-state') + ' // en direct : ' + t('#talk-live') + ' // écrit : ' + w.querySelectorAll('.talk-log .msg').length + ' messages // micro : ' + ((w.querySelector('.talk-mic') || {}).getAttribute('aria-label')) + ' // ' + kb + ' // note : ' + t('.talk-hint').slice(0, 90); });
+  const spoken = (h) => h.page.evaluate(() => JSON.stringify(window.__voice.filter((x) => !/cancel|stop|: $/.test(x))).slice(0, 260));
+  const sayIt = (h, q) => h.page.evaluate((q) => { window.__say.push(q); }, q);
+  const fab = (h) => h.page.evaluate(() => { const b = document.getElementById('fab-talk'); if (!b || !b.getClientRects().length) return 'bouton absent'; b.click(); return 'ok'; });
+  await scen('Z1 conversation en continu, micro et voix du téléphone', {scen: {active: true, synth: 'ok', ear: 'ok'}}, async (h, step) => {
+    await step('un bouton : la scène s\'ouvre et écoute', async () => { const a = await fab(h); await L.tick(h, 120); return a + ' // ' + await stage(h) + ' // débordement : ' + (await h.page.evaluate(() => Array.from(document.querySelectorAll('#chat .talk-wrap *')).filter((e) => e.getBoundingClientRect().right > innerWidth + 1 && !e.closest('.msg-next')).length)); }, 0);
+    await step('je parle : écrit en direct', async () => { await sayIt(h, 'Que dois-je faire en premier'); await L.tick(h, 330); return await stage(h); }, 0);
+    await step('la question part seule, la réponse est lue', async () => { await L.tick(h, 700); return await stage(h) + ' // lu : ' + await spoken(h); }, 0);
+    await step('après la lecture, l\'écoute reprend seule', async () => { await L.tick(h, 1500); return await stage(h) + ' // écoutes : ' + await h.page.evaluate(() => window.__ear.join(',')); }, 0);
+    await step('deuxième question sans rien toucher', async () => { await h.page.evaluate(() => { window.__voice.length = 0; }); await sayIt(h, 'Prépare ma semaine'); await L.tick(h, 2600); return await stage(h) + ' // lu : ' + await spoken(h); }, 0);
+    await step('silence prolongé : l\'écoute se relance', async () => { await L.tick(h, 9000); return await stage(h) + ' // écoutes : ' + await h.page.evaluate(() => window.__ear.length); }, 0);
+    await step('pause puis reprise', async () => { const a = await h.page.evaluate(() => { document.querySelector('#chat .talk-mic').click(); return 'ok'; }); await L.tick(h, 200); const s1 = await stage(h); await h.page.evaluate(() => { document.querySelector('#chat .talk-mic').click(); }); await L.tick(h, 200); return a + ' // ' + s1 + ' /// ' + await stage(h); }, 0);
+    await step('terminer : tout est dans le fil, gardé sur l\'appareil', async () => { const a = await L.click(h, 'Terminer', '#chat'); return a + ' // ' + await stage(h) + ' // gardé : ' + await h.page.evaluate(() => { const j = JSON.parse(localStorage.getItem('jarvis.conv') || 'null'); return j ? j.msgs.map((m) => m.who + ':' + m.text.slice(0, 22)).join(' | ') + ' // tours : ' + j.turns.length : 'rien'; }); }, 0);
   });
-  await scen('Z2 conversation, voix de Claude (ordinateur)', {scen: {active: true, tts: 'ok', synth: 'ok'}}, async (h, step) => {
-    await L.tab(h, 'accueil'); await L.click(h, 'Parler'); await L.tick(h, 600);
-    await step('réponse lue par la voix de Claude', async () => { await sayIt(h, 'Prépare ma semaine'); await L.tick(h, 2500); return await stage(h) + ' // lu : ' + await h.page.evaluate(() => JSON.stringify(window.__voice).slice(0, 200)); }, 0);
+  await scen('Z2 conversation, micro refusé par l\'app', {scen: {active: true, synth: 'ok', ear: 'refuse'}}, async (h, step) => {
+    await step('la page le dit, le clavier revient', async () => { const a = await fab(h); await L.tick(h, 400); return a + ' // ' + await stage(h); }, 0);
+    await step('question écrite : lue quand même', async () => { await fill(h, '#chat-in', 'Qui est en retard ?'); await h.page.keyboard.press('Enter'); await L.tick(h, 1500); return await stage(h) + ' // lu : ' + await spoken(h); }, 0);
   });
-  await scen('Z3 conversation, la voix ne démarre pas', {scen: {active: true, synth: 'muet'}}, async (h, step) => {
-    await L.tab(h, 'accueil'); await L.click(h, 'Parler'); await L.tick(h, 600);
-    await step('la réponse reste lisible, « Réécouter » proposé', async () => { await sayIt(h, 'Qui est en retard ?'); await L.tick(h, 7500); return await stage(h) + ' // message : ' + (await L.toasts(h)).join(' + '); }, 0);
+  await scen('Z3 conversation, aucun micro offert à la page', {scen: {active: true, synth: 'ok'}}, async (h, step) => {
+    await step('la page le dit, le clavier reste', async () => { const a = await fab(h); await L.tick(h, 400); return a + ' // ' + await stage(h); }, 0);
+  });
+  await scen('Z4 conversation avec la dictée de Claude (ordinateur)', {scen: {active: true, synth: 'ok', tts: 'ok', dict: 'ok'}}, async (h, step) => {
+    await step('écoute par la dictée de Claude', async () => { const a = await fab(h); await L.tick(h, 300); return a + ' // ' + await stage(h) + ' // ' + await h.page.evaluate(() => window.__ear.join(',')); }, 0);
+    await step('je parle : envoyé après le silence, lu par la voix du navigateur', async () => { await sayIt(h, 'Que dois-je faire en premier'); await L.tick(h, 3200); return await stage(h) + ' // lu : ' + await h.page.evaluate(() => JSON.stringify(window.__voice.filter((x) => !/cancel|stop|: $/.test(x))).slice(0, 200)); }, 0);
+    await step('l\'écoute reprend, deuxième question', async () => { await L.tick(h, 1200); const s1 = await stage(h); await sayIt(h, 'Et ensuite'); await L.tick(h, 3200); return s1 + ' /// ' + await stage(h); }, 0);
+  });
+  await scen('Z5 conversation, historique retrouvé à la réouverture', {scen: {active: true, synth: 'ok', ear: 'ok'}, storage: {'jarvis.conv': {msgs: [{who: 'toi', text: 'Question de la veille', date: '13/11 21h05'}, {who: 'claude', text: 'Réponse de la veille.', date: '13/11 21h05'}], turns: [{role: 'user', content: 'Question de la veille'}, {role: 'assistant', content: 'Réponse de la veille.'}]}}}, async (h, step) => {
+    await step('les anciens messages sont là', async () => { const a = await fab(h); await L.tick(h, 300); return a + ' // ' + await stage(h) + ' // ' + await h.page.evaluate(() => Array.from(document.querySelectorAll('#chat .talk-log .msg p')).map((x) => x.innerText.slice(0, 24)).join(' | ') + ' // ' + ((document.querySelector('#chat .talk-hist') || {}).innerText || '').replace(/\s+/g, ' ')); }, 0);
+    await step('effacer l\'historique, en deux appuis', async () => { const a = await L.click(h, 'Effacer', '#chat'); const b = await L.click(h, 'Confirmer', '#chat'); return a + ' / ' + b + ' // ' + await stage(h) + ' // gardé : ' + await h.page.evaluate(() => localStorage.getItem('jarvis.conv')); }, 0);
+  });
+  /* l'historique des demandes, dans l'onglet Demandes */
+  await scen('Q historique des demandes', {scen: {active: true, pending: 3}}, async (h, step) => {
+    await L.tab(h, 'demandes');
+    const hist = () => h.page.evaluate(() => { const p = document.querySelector('#view .hist-panel'); if (!p) return 'panneau absent'; return p.querySelector('.aside').innerText + ' // lignes : ' + p.querySelectorAll('.hist').length + ' // première : ' + ((p.querySelector('.hist') || {}).innerText || '').replace(/\s+/g, ' ').slice(0, 130) + ' // suite : ' + ((p.querySelector('.hist-more') || {}).innerText || 'aucune') + ' // débordement : ' + Array.from(p.querySelectorAll('*')).filter((e) => e.getBoundingClientRect().right > innerWidth + 1).length; });
+    await step('tout', () => hist(), 0);
+    await step('en cours seulement', async () => { const a = await L.click(h, 'En cours', '.hist-panel'); return a + ' // ' + await hist(); }, 0);
+    await step('terminées seulement', async () => { const a = await L.click(h, 'Terminées', '.hist-panel'); return a + ' // ' + await hist(); }, 0);
+    await step('recherche', async () => { await L.click(h, 'Tout', '.hist-panel'); await fill(h, '.hist-panel input[type=search]', 'numéro 2'); await L.tick(h, 200); return await hist() + ' // champ gardé : ' + await h.page.evaluate(() => document.activeElement && document.activeElement.type); }, 0);
   });
   /* « En cours chez tes bots » : le compteur et la liste doivent dire la même chose */
   await scen('P en cours chez tes bots, plus de cinq', {scen: {active: true, pending: 7}}, async (h, step) => {

@@ -273,7 +273,39 @@
     try { Object.defineProperty(window, 'speechSynthesis', {value: fake, configurable: true}); } catch (e) { /* rien */ }
     window.SpeechSynthesisUtterance = SCEN.synth === 'absent' ? undefined : function (t) { this.text = t; };
   }
-  window.claude = {use: async (name) => { await delay(null, 10); if (SCEN.offline) return null; return name === 'mcp' ? mcp : name === 'sample' ? (SCEN.noSample ? null : sample) : name === 'tts' ? tts : null; }};
+  /* écoute : scénario ear ('ok' ou 'refuse') pour la reconnaissance vocale du téléphone, dict ('ok') pour la dictée de Claude.
+     Les phrases « dites » se mettent dans window.__say ; sans scénario, la page n'a aucun micro. */
+  window.__say = []; window.__ear = [];
+  const noRec = () => { ['SpeechRecognition', 'webkitSpeechRecognition'].forEach((k) => { try { Object.defineProperty(window, k, {value: undefined, configurable: true, writable: true}); } catch (e) { /* rien */ } }); };
+  noRec();
+  if (SCEN.ear) {
+    const Rec = function () { this._t = []; };
+    Rec.prototype.start = function () {
+      const r = this; window.__ear.push('start');
+      if (SCEN.ear === 'refuse') { r._t.push(setTimeout(() => { if (r.onerror) r.onerror({error: 'not-allowed'}); if (r.onend) r.onend(); }, 20)); return; }
+      r._t.push(setTimeout(() => { if (r.onstart) r.onstart(); }, 50));
+      let n = 0;
+      const turn = () => {
+        const p = window.__say.shift();
+        if (!p) { if (++n > 10) { if (r.onerror) r.onerror({error: 'no-speech'}); if (r.onend) r.onend(); return; } r._t.push(setTimeout(turn, 250)); return; }
+        if (r.onresult) r.onresult({resultIndex: 0, results: [Object.assign([{transcript: p.slice(0, Math.ceil(p.length / 2))}], {isFinal: false})]});
+        r._t.push(setTimeout(() => { if (r.onresult) r.onresult({resultIndex: 0, results: [Object.assign([{transcript: p}], {isFinal: true})]}); r._t.push(setTimeout(() => { if (r.onend) r.onend(); }, 50)); }, 200));
+      };
+      r._t.push(setTimeout(turn, 150));
+    };
+    Rec.prototype.abort = function () { this._t.forEach(clearTimeout); window.__ear.push('abort'); };
+    Rec.prototype.stop = Rec.prototype.abort;
+    Object.defineProperty(window, 'webkitSpeechRecognition', {value: Rec, configurable: true, writable: true});
+  }
+  let dict = null;
+  if (SCEN.dict) {
+    const hs = {p: [], f: [], s: []}; let live = false, poll = 0;
+    const st = (state, reason) => hs.s.forEach((fn) => fn({state, reason}));
+    dict = {active: () => live, onPartial: (fn) => { hs.p.push(fn); return () => {}; }, onFinal: (fn) => { hs.f.push(fn); return () => {}; }, onState: (fn) => { hs.s.push(fn); return () => {}; },
+      start: async (o) => { window.__ear.push('dict:start:' + (o && o.language)); await delay(null, 30); live = true; st('listening'); clearInterval(poll); poll = setInterval(() => { const p = live && window.__say.shift(); if (!p) return; hs.p.forEach((fn) => fn({text: p.slice(0, 8)})); setTimeout(() => { hs.p.forEach((fn) => fn({text: ''})); hs.f.forEach((fn) => fn({text: p})); }, 150); }, 250); },
+      stop: async () => { window.__ear.push('dict:stop'); live = false; clearInterval(poll); st('idle', 'stopped'); }};
+  }
+  window.claude = {use: async (name) => { await delay(null, 10); if (SCEN.offline) return null; return name === 'mcp' ? mcp : name === 'sample' ? (SCEN.noSample ? null : sample) : name === 'tts' ? tts : name === 'dictation' ? dict : null; }};
   /* scénario pending : n ordres du propriétaire encore « À faire », datés d'aujourd'hui */
   if (SCEN.pending) for (let i = 1; i <= SCEN.pending; i++) G['Canal'].push([fr(D(0)), 'Rabie', 'Iris', 'Ordre', 'Ordre numéro ' + i, 'À faire', '', '']);
   window.__G = G; window.__MAIL = MAIL; window.__CAL = CAL;
