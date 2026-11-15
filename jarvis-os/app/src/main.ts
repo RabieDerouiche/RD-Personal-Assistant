@@ -1,253 +1,304 @@
-/* JARVIS OS, phase 2 : la PWA vocale, style choisi le 15/11/2026 (sphère d'anneaux bleu-violet, cartes de verre violettes).
-   Le cerveau en ligne arrive en phase 3 : ce qui n'est pas encore relié le dit toujours. */
+/* JARVIS OS, phase 2. Accueil et session vocale : d'après les captures du propriétaire (orbe de verre, voile de soie).
+   Le reste : le thème et les personnages de la page Jarvis (sphères irisées, silhouettes en hologramme, Claude couronné),
+   à sa demande du 15/11/2026. Ce qui n'est pas relié le dit toujours. */
 import './style.css';
 import {h, icon, ago} from './ui';
-import {AGENTS, agent, type Agent, type AgentId} from './agents';
+import {AGENTS, agent, type AgentId} from './agents';
 import {store, type Mission, type MissionStatus, type Priority, type RouteMode} from './store';
 import {think, resetBrain} from './brain';
 import {Voice, canListen, canSpeak, frenchVoices, type VoiceState} from './voice';
-import {createHologram, type HoloState} from './hologram';
+import {createOrb, type OrbState} from './orb';
+import {charOf, setModeSource, talkAll, refreshModes, type Mode} from './chars';
 
 const PHASE = 2;
-const VERSION = '0.2.1';
-type View = 'center' | 'agents' | 'missions' | 'memory' | 'more' | 'automations' | 'intelligence' | 'settings';
-let view: View = 'center';
-let kb = false, live = '', note = '', clearArm = 0, holoState: HoloState = 'idle', agentFilter = 'tous', agentQuery = '', missionCol = 'a_approuver', agentOpen = '', draftNext = '';
+const VERSION = '0.4.0';
+type View = 'home' | 'command' | 'agents' | 'agent' | 'missions' | 'more' | 'memory' | 'automations' | 'intelligence' | 'settings';
+let view: View = 'home';
+let live = '', note = '', clearArm = 0, orbState: OrbState = 'idle', agentFilter = 'tous', agentQuery = '', agentSel: AgentId = 'claude', missionCol = 'a_approuver', draftNext = '';
 
+const SALLE = {copie: 'https://claude.ai/artifact/NMAqUak7A5JYsLsc12VyaZ', service: 'https://claude.ai/artifact/QwLf64Ggstzu4p3uznZrr8'};
 const app = document.getElementById('app')!;
-const holo = createHologram(Math.min(300, Math.max(220, window.innerWidth - 110)));
-const setHolo = (s: HoloState) => { holoState = s; holo.set(s); const p = document.getElementById('pill'); if (p) { p.textContent = PILL[s]; p.dataset.s = s; } };
-const PILL: Record<HoloState, string> = {idle: 'Système en veille', listening: "À l'écoute", thinking: 'Analyse en cours', executing: 'Mission créée', speaking: 'Réponse vocale', error: 'Micro indisponible'};
-const DAYS = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
-const hello = () => { const hr = new Date().getHours(); return hr >= 18 || hr < 5 ? 'Bonsoir.' : 'Bonjour.'; };
+const orb = createOrb();
+const STATE_TXT: Record<OrbState, string> = {idle: 'Système en veille', listening: "Je t'écoute…", thinking: 'Je réfléchis…', executing: 'Mission préparée', speaking: 'Je réponds…', error: 'Micro indisponible'};
+const setOrb = (s: OrbState) => { orbState = s; orb.set(s); document.querySelectorAll('[data-orbtxt]').forEach((n) => { n.textContent = STATE_TXT[s]; }); };
+const hello = () => { const hr = new Date().getHours(); const n = store.settings.name.trim(); return (hr >= 18 || hr < 5 ? 'Bonsoir' : 'Bonjour') + (n ? ' ' + n : ''); };
+const pending = () => store.missions.filter((m) => m.status === 'a_approuver').length;
+
+/* l'humeur d'un agent, comme dans la page Jarvis : ambre s'il attend ta réponse, animé s'il travaille */
+const modeOf = (id: AgentId): Mode => store.missions.some((m) => m.agent === id && m.status === 'envoyee') ? 'travail' : store.missions.some((m) => m.agent === id && m.status === 'a_approuver') ? 'demande' : 'veille';
+setModeSource(modeOf);
+const MODE_TXT: Record<Mode, string> = {veille: 'Non relié', travail: 'Au travail', demande: 'Attend ton accord'};
+const sph = (id: AgentId, size: number, slot = '') => charOf(id, size, slot);
 
 const ST: Record<MissionStatus, string> = {brouillon: 'Brouillon', a_approuver: 'À approuver', approuvee: 'Approuvée', refusee: 'Refusée', envoyee: 'En cours', terminee: 'Terminée', echouee: 'Échouée'};
 const PRIO: Record<Priority, string> = {haute: 'Haute', normale: 'Normale', basse: 'Basse'};
 const nextPrio = (p?: Priority): Priority => p === 'haute' ? 'basse' : p === 'basse' ? 'normale' : 'haute';
+const short = (id: AgentId) => agent(id).name.replace(' (Grok)', '');
 
 /* ---------- la voix ---------- */
 const voice = new Voice({
   mode: () => store.settings.listenMode, voiceURI: () => store.settings.voiceURI, rate: () => store.settings.rate,
   onState: (s, why) => {
-    const map: Record<VoiceState, HoloState> = {off: 'idle', listening: 'listening', waiting: 'thinking', speaking: 'speaking', error: 'error'};
-    setHolo(map[s]);
-    if (s === 'error' && why) { note = 'Micro : ' + why + '. Écris ta demande avec le clavier.'; store.stats.errors++; store.save(); kb = true; }
+    const map: Record<VoiceState, OrbState> = {off: 'idle', listening: 'listening', waiting: 'thinking', speaking: 'speaking', error: 'error'};
+    setOrb(map[s]);
+    if (s === 'error' && why) { note = 'Micro : ' + why + '. Écris ta demande.'; store.stats.errors++; store.save(); }
     if (s === 'listening') note = '';
     paint();
   },
-  onPartial: (t) => { live = t; const n = document.getElementById('live'); if (n) n.textContent = t; },
+  onPartial: (t) => { live = t; document.querySelectorAll('[data-live]').forEach((n) => { n.textContent = t; }); },
   onUtterance: (t) => { store.stats.voiceTurns++; handle(t, true); }
 });
 
 function handle(text: string, byVoice: boolean) {
   const t0 = performance.now();
   store.add({who: 'me', text, at: Date.now()}); store.stats.turns++;
-  setHolo('thinking');
+  setOrb('thinking');
   const out = think(text, store.settings.route);
-  if (out.missions && out.missions.length) { store.missions.push(...out.missions.map((m) => ({...m, priority: 'normale' as Priority}))); setHolo('executing'); }
+  if (out.missions && out.missions.length) { store.missions.push(...out.missions.map((m) => ({...m, priority: 'normale' as Priority}))); setOrb('executing'); }
   store.add({who: 'jarvis', text: out.reply, at: Date.now(), agent: out.agent});
   store.stats.replyMs.push(Math.round(performance.now() - t0)); store.save();
+  if (out.agent) talkAll(out.agent, Math.min(8, 1 + out.reply.length / 16));
+  refreshModes();
   live = ''; paint();
   const go = () => { if (out.nav) { voice.stop(); show(out.nav as View); } if (out.end) { voice.stop(); resetBrain(); paint(); } };
   if ((byVoice || voice.active) && canSpeak() && !out.end) voice.speak(out.reply, go);
   else if (canSpeak() && out.end) voice.speak(out.reply, () => { voice.stop(); go(); });
-  else { setTimeout(() => setHolo('idle'), 900); go(); }
+  else { setTimeout(() => { if (orbState === 'thinking' || orbState === 'executing') setOrb('idle'); }, 900); go(); }
 }
 const micTap = () => {
-  if (!canListen()) { kb = true; note = 'Pas de micro ici : écris ta demande.'; paint(); return; }
+  if (!canListen()) { note = 'Pas de reconnaissance vocale ici : écris ta demande.'; paint(); return; }
   if (voice.state === 'speaking') { voice.interrupt(); return; }
   if (voice.active) { voice.stop(); return; }
   note = ''; voice.start();
 };
-
-/* ---------- 01 · centre de commandes ---------- */
-function center(): HTMLElement {
-  const d = new Date(), on = voice.active, speaking = voice.state === 'speaking';
-  const session = store.msgs.slice(-6);
-  const input = h('input', {class: 'ask-in', id: 'in', type: 'text', placeholder: 'Demandez quelque chose…', enterkeyhint: 'send', autocomplete: 'off', 'aria-label': 'Votre demande'}) as HTMLInputElement;
-  if (draftNext) { input.value = draftNext; draftNext = ''; setTimeout(() => { input.focus(); input.setSelectionRange(input.value.length, input.value.length); input.scrollIntoView({block: 'center'}); }, 50); }
-  const send = () => { const v = input.value.trim(); if (!v) return; input.value = ''; handle(v, false); };
+const askBox = (id: string, ph: string, cls: string) => {
+  const input = h('input', {class: 'ask-in', id, type: 'text', placeholder: ph, enterkeyhint: 'send', autocomplete: 'off', 'aria-label': 'Ta demande'}) as HTMLInputElement;
+  const send = () => { const v = input.value.trim(); if (!v) return; input.value = ''; input.parentElement?.classList.remove('has-text'); handle(v, false); };
   input.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !(e as KeyboardEvent).isComposing) { e.preventDefault(); send(); } });
-  const quick = ['Quelles sont les missions en attente ?', 'Fais le point', "Demande à Claude d'analyser mes documents", 'Demande à Kairos de vérifier mes prix'];
-  return h('section', {class: 'center' + (on ? ' in-session' : '')},
-    h('p', {class: 'kicker', text: DAYS[d.getDay()] + ' · Command Center'}),
-    h('h1', {class: 'hello', text: hello()}),
-    h('p', {class: 'sub', text: 'Je suis à votre écoute.'}),
-    h('div', {class: 'orb-panel'}, holo.el),
-    h('span', {class: 'pill-state', id: 'pill', 'data-s': holoState, text: PILL[holoState]}),
-    h('p', {class: 'live', id: 'live', 'aria-live': 'polite', text: live || (on ? '' : 'Touchez le microphone pour démarrer une session.')}),
+  input.addEventListener('input', () => input.parentElement?.classList.toggle('has-text', !!input.value.trim()));
+  if (draftNext) { input.value = draftNext; draftNext = ''; setTimeout(() => { input.focus(); input.setSelectionRange(input.value.length, input.value.length); }, 60); }
+  return h('div', {class: 'ask ' + cls + (input.value.trim() ? ' has-text' : '')}, input,
+    h('button', {type: 'button', class: 'ask-ic', 'aria-label': 'Parler à JARVIS', html: icon('wave', 20), onclick: micTap}),
+    h('button', {type: 'button', class: 'ask-send', 'aria-label': 'Envoyer', html: icon('send', 17), onclick: send}));
+};
+const dock = () => h('div', {class: 'dock', 'aria-label': 'Ton équipe'}, AGENTS.map((a) => { const m = modeOf(a.id);
+  return h('button', {type: 'button', class: 'dock-b', 'data-mode': m, onclick: () => { agentSel = a.id; show('agent'); }}, sph(a.id, 54, 'dock'), h('b', {text: short(a.id)}), h('span', {text: m === 'demande' ? 'Attend' : m === 'travail' ? 'Travaille' : 'Non relié'})); }));
+
+/* ---------- accueil : l'orbe et « Comment puis-je vous aider ? » ---------- */
+function home(): HTMLElement {
+  const last = store.msgs.slice(-2), recent = last.length === 2 && Date.now() - last[1].at < 15 * 60000;
+  const n = pending();
+  return h('section', {class: 'home'},
+    h('div', {class: 'stage'}, orb.el),
+    h('p', {class: 'hi', text: hello()}),
+    h('h1', {class: 'help', text: 'Comment puis-je vous aider ?'}),
     note ? h('p', {class: 'note', text: note}) : null,
-    h('button', {type: 'button', class: 'mic' + (voice.state === 'listening' ? ' is-on' : '') + (speaking ? ' is-say' : ''), 'aria-label': speaking ? 'Couper la parole' : on ? 'Arrêter la session' : 'Démarrer une session vocale', html: icon(on ? (speaking ? 'speaker' : 'stop') : 'mic', 30), onclick: micTap}),
-    h('div', {class: 'seg route', role: 'group', 'aria-label': 'Agent'}, (['auto', 'claude', 'grok'] as RouteMode[]).map((r) => h('button', {type: 'button', 'aria-pressed': String(store.settings.route === r), onclick: () => { store.settings.route = r; store.save(); paint(); }}, r.toUpperCase()))),
-    session.length ? h('div', {class: 'thread', id: 'log'}, session.map((m) => h('div', {class: 'msg ' + m.who}, m.who === 'jarvis' ? h('span', {class: 'who', text: 'JARVIS' + (m.agent ? ' → ' + agent(m.agent).name : '')}) : null, h('p', {text: m.text})))) : null,
-    h('div', {class: 'chips'}, quick.map((q) => h('button', {type: 'button', class: 'chip-q', onclick: () => handle(q, voice.active)}, q))),
-    h('div', {class: 'ask' + (kb ? ' open' : '')}, input, h('button', {type: 'button', class: 'ask-btn', 'aria-label': 'Envoyer', html: icon('send', 18), onclick: send})));
+    n ? h('button', {type: 'button', class: 'nudge', onclick: () => show('missions')}, n + ' mission' + (n > 1 ? 's attendent' : ' attend') + ' ton accord ›') : null,
+    dock(),
+    recent ? h('button', {type: 'button', class: 'last glass', onclick: () => show('command')}, h('small', {text: 'Toi : ' + last[0].text}), h('span', {text: last[1].text})) : null,
+    h('div', {class: 'home-glow'}), askBox('in', 'Demandez quelque chose…', 'home-ask'));
 }
 
-/* ---------- 02 · agents ---------- */
-const AV: Record<AgentId, string> = {claude: '✳', jarvis: 'J', iris: 'I', chronos: 'C', kairos: 'K', ulysse: 'U', athena: 'A', argus: 'Ar'};
-function agentStats(a: Agent) {
-  const ms = store.missions.filter((m) => m.agent === a.id);
+/* ---------- session vocale : orbe, voile de soie, micro ---------- */
+function voiceView(): HTMLElement {
+  const lastJ = store.msgs.slice().reverse().find((m) => m.who === 'jarvis');
+  const routes: RouteMode[] = ['auto', 'claude', 'grok'];
+  const speaking = voice.state === 'speaking';
+  return h('section', {class: 'voice'},
+    h('div', {class: 'v-top'}, h('span', {class: 'v-dot'}), h('span', {'data-orbtxt': '', text: STATE_TXT[orbState]}),
+      h('button', {type: 'button', class: 'v-route', 'aria-label': 'Agent', onclick: () => { const i = routes.indexOf(store.settings.route); store.settings.route = routes[(i + 1) % 3]; store.save(); paint(); }}, store.settings.route.toUpperCase())),
+    h('div', {class: 'stage tall'}, orb.el),
+    h('div', {class: 'captions'},
+      h('p', {class: 'cap-me', 'data-live': '', text: live}),
+      lastJ ? h('div', {class: 'cap-j'}, lastJ.agent ? sph(lastJ.agent, 34, 'voice') : null, h('p', {text: lastJ.text})) : h('p', {class: 'cap-hint', text: 'Parle normalement, je réponds à voix haute. « C\'est tout » pour finir.'})),
+    note ? h('p', {class: 'note', text: note}) : null,
+    h('div', {class: 'v-bar'},
+      h('button', {type: 'button', class: 'v-side', 'aria-label': 'Passer au clavier', html: icon('key', 22), onclick: () => { voice.stop(); show('command'); }}),
+      h('button', {type: 'button', class: 'mic' + (voice.state === 'listening' ? ' is-on' : '') + (speaking ? ' is-say' : ''), 'aria-label': speaking ? 'Couper la parole' : 'Arrêter la session', html: icon(speaking ? 'speaker' : 'mic', 30), onclick: micTap}),
+      h('button', {type: 'button', class: 'v-side', 'aria-label': 'Terminer la session', html: icon('x', 22), onclick: () => { voice.stop(); paint(); }})));
+}
+
+/* ---------- en-tête des écrans, comme la page Jarvis ---------- */
+const head = (kicker: string, title: string, aside?: HTMLElement | null) => h('header', {class: 'p-head'}, h('div', {}, h('p', {class: 'view-title', text: kicker}), h('h2', {text: title})), aside || null);
+
+/* ---------- centre de commandes ---------- */
+function command(): HTMLElement {
+  const msgs = store.msgs.slice(-80);
+  return h('section', {class: 'page cmd'},
+    head('Centre de commandes', 'Parle à ton équipe', h('button', {type: 'button', class: 'ic-btn', 'aria-label': 'Session vocale', html: icon('wave', 20), onclick: () => { show('home'); micTap(); }})),
+    h('p', {class: 'lead', text: '0 agent relié · ' + AGENTS.length + ' prêts à recevoir des missions (phase 3 et 4).'}),
+    h('div', {class: 'chat', id: 'log'}, msgs.length ? msgs.map((m, i) => m.who === 'me' ? h('div', {class: 'b-me'}, h('p', {text: m.text}), h('time', {text: ago(m.at)})) :
+      h('div', {class: 'b-ai glass'}, h('div', {class: 'b-head'}, sph(m.agent || 'jarvis', 30, 'chat' + i), h('b', {text: 'JARVIS' + (m.agent ? ' → ' + short(m.agent) : '')}), h('time', {text: ago(m.at)})), h('p', {text: m.text}),
+        /Mission(s)? (commune )?cré|missions créées/.test(m.text) ? h('div', {class: 'b-chips'}, h('span', {class: 'pill is-demande', text: 'Attend ton accord'}), h('button', {type: 'button', class: 'link', onclick: () => show('missions')}, 'Voir les missions ›')) : null))
+      : h('div', {class: 'chat-empty glass'}, h('p', {text: 'Tout ce que tu dis à JARVIS, à la voix ou au clavier, est écrit ici.'}), h('p', {class: 'muted', text: 'Essaie : « Demande à Kairos de vérifier le prix du robot ».'}))),
+    note ? h('p', {class: 'note', text: note}) : null,
+    askBox('cin', 'Tapez une commande…', 'cmd-ask'));
+}
+
+/* ---------- l'équipe : cartes d'activité de la page Jarvis ---------- */
+function stats(id: AgentId) {
+  const ms = store.missions.filter((m) => m.agent === id);
   const today = ms.filter((m) => new Date(m.at).toDateString() === new Date().toDateString()).length;
   const ended = ms.filter((m) => ['terminee', 'echouee'].includes(m.status));
-  const ok = ended.length ? Math.round(100 * ended.filter((m) => m.status === 'terminee').length / ended.length) + ' %' : '—';
-  const last = ms.length ? ago(Math.max(...ms.map((m) => m.at))) : '—';
-  return {ms, today, ok, last};
+  const lastM = ms.slice().sort((a, b) => b.at - a.at)[0];
+  return {ms, today, lastM, ok: ended.length ? Math.round(100 * ended.filter((m) => m.status === 'terminee').length / ended.length) + ' %' : '—', last: lastM ? ago(lastM.at) : '—'};
 }
 function agents(): HTMLElement {
-  const total = Math.max(1, store.missions.length);
   const q = agentQuery.toLowerCase();
-  const list = AGENTS.filter((a) => (agentFilter === 'tous' || a.provider === agentFilter) && (!q || (a.name + ' ' + a.role + ' ' + a.skills.join(' ')).toLowerCase().includes(q)));
-  const search = h('input', {class: 'search', type: 'search', placeholder: 'Chercher un agent', value: agentQuery, 'aria-label': 'Chercher un agent'}) as HTMLInputElement;
-  search.addEventListener('input', () => { agentQuery = search.value; const pos = search.selectionStart; render(); const s = document.querySelector('.search') as HTMLInputElement; if (s) { s.focus(); s.setSelectionRange(pos, pos); } });
-  const recent = store.missions.slice().sort((a, b) => b.at - a.at).slice(0, 5);
+  const F: [string, string][] = [['tous', 'Tous'], ['demande', 'Attendent'], ['claude', 'Claude'], ['grok', 'Grok']];
+  const list = AGENTS.filter((a) => (agentFilter === 'tous' || a.provider === agentFilter || (agentFilter === 'demande' && modeOf(a.id) === 'demande')) && (!q || (a.name + ' ' + a.role + ' ' + a.skills.join(' ')).toLowerCase().includes(q)));
+  const search = h('input', {class: 'search-in', type: 'search', placeholder: 'Chercher un agent', value: agentQuery, 'aria-label': 'Chercher un agent'}) as HTMLInputElement;
+  search.addEventListener('input', () => { agentQuery = search.value; const pos = search.selectionStart; render(); const s = document.querySelector('.search-in') as HTMLInputElement; if (s) { s.focus(); s.setSelectionRange(pos, pos); } });
   return h('section', {class: 'page'},
-    h('h2', {text: 'Agents'}),
-    h('p', {class: 'lead', text: AGENTS.length + ' agents · aucun relié pour l\'instant (Claude en phase 3, bots Grok en phase 4).'}),
-    search,
-    h('div', {class: 'filters'}, [['tous', 'Tous'], ['claude', 'Claude'], ['grok', 'Grok']].map(([k, l]) => h('button', {type: 'button', 'aria-pressed': String(agentFilter === k), onclick: () => { agentFilter = k; render(); }}, l))),
-    h('div', {class: 'ag-grid'}, list.map((a) => { const s = agentStats(a), open = agentOpen === a.id;
-      return h('article', {class: 'agent-card ' + a.provider + (open ? ' open' : ''), tabindex: '0', role: 'button', 'aria-expanded': String(open), onclick: (e: Event) => { if ((e.target as HTMLElement).closest('.btn')) return; agentOpen = open ? '' : a.id; render(); }, onkeydown: (e: KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); agentOpen = open ? '' : a.id; render(); } }},
-        h('div', {class: 'ag-top'}, h('span', {class: 'avatar ' + a.provider, text: AV[a.id]}), h('span', {class: 'state-tag', text: 'Non relié'})),
-        h('div', {class: 'ag-id'}, h('b', {text: a.name}), h('span', {text: a.role})),
-        h('div', {class: 'ag-stats'}, h('div', {}, h('small', {text: 'Missions'}), h('b', {text: String(s.ms.length)})), h('div', {}, h('small', {text: 'Réussite'}), h('b', {text: s.ok})), open ? h('div', {}, h('small', {text: "Aujourd'hui"}), h('b', {text: String(s.today)})) : null),
-        h('div', {class: 'usage'}, h('small', {text: 'Dernière : ' + s.last}), h('i', {}, h('span', {style: 'width:' + Math.round(100 * s.ms.length / total) + '%'}))),
-        open ? [h('ul', {class: 'skills'}, a.skills.map((k) => h('li', {text: k}))), h('p', {class: 'ag-link', text: a.link}),
-          h('button', {type: 'button', class: 'btn main', onclick: () => { draftNext = 'Demande à ' + a.name.replace(' (Grok)', '') + ' de '; show('center'); }}, 'Lui confier une mission')] : null); })),
-    h('h3', {text: 'Activité récente'}),
-    recent.length ? h('div', {class: 'activity'}, recent.map((m) => h('div', {class: 'act-row'}, h('span', {class: 'avatar sm ' + agent(m.agent).provider, text: AV[m.agent]}), h('div', {}, h('b', {text: agent(m.agent).name + ' · ' + ST[m.status]}), h('small', {text: ago(m.at) + ' · ' + m.text.slice(0, 60)}))))) : h('p', {class: 'empty', text: 'Aucune activité pour l\'instant.'}));
+    head('L\'équipe', 'Tes agents', h('span', {class: 'pill', text: '0 relié'})),
+    h('div', {class: 'team-hero glass'}, sph('claude', 120, 'hero'), h('div', {}, h('b', {text: 'Claude, chef d\'équipe'}), h('span', {class: 'muted', text: 'Il commande les six bots Grok, avec Jarvis (Grok) comme relais vocal.'}))),
+    h('label', {class: 'search glass'}, h('span', {html: icon('search', 18)}), search),
+    h('div', {class: 'chips'}, F.map(([k, l]) => h('button', {type: 'button', 'aria-pressed': String(agentFilter === k), onclick: () => { agentFilter = k; render(); }}, l))),
+    list.length ? h('div', {class: 'units'}, list.map((a) => { const s = stats(a.id), m = modeOf(a.id);
+      return h('article', {class: 'unit glass', 'data-mode': m},
+        h('button', {type: 'button', class: 'unit-hit', onclick: () => { agentSel = a.id; show('agent'); }}, sph(a.id, 56, 'list'), h('span', {class: 'unit-id'}, h('b', {text: a.name}), h('span', {text: a.role})), h('span', {class: 'pill is-' + m, text: MODE_TXT[m]})),
+        h('p', {class: 'unit-log'}, h('time', {text: s.lastM ? ago(s.lastM.at) : '—'}), h('span', {text: s.lastM ? ST[s.lastM.status] + ' · ' + s.lastM.text : 'Aucune mission pour l\'instant.'})),
+        h('div', {class: 'unit-foot'}, h('span', {text: s.ms.length + ' mission' + (s.ms.length > 1 ? 's' : '') + ' · ' + (a.provider === 'claude' ? 'phase 3' : 'phase 4')}), h('i', {class: 'meter', 'data-mode': m}, h('i', {})))); }))
+      : h('p', {class: 'empty', text: agentFilter === 'demande' ? 'Aucun agent n\'attend ton accord.' : 'Aucun agent ne correspond.'}));
+}
+function agentPage(): HTMLElement {
+  const a = agent(agentSel), s = stats(a.id), m = modeOf(a.id);
+  const acts = s.ms.slice().sort((x, y) => y.at - x.at).slice(0, 8);
+  return h('section', {class: 'page'},
+    h('button', {type: 'button', class: 'back', onclick: () => show('agents')}, h('span', {html: icon('back', 16)}), 'L\'équipe'),
+    h('div', {class: 'a-hero'}, sph(a.id, 150, 'detail'), h('h2', {class: 'hello', text: a.name}), h('p', {class: 'muted', text: a.role}), h('span', {class: 'pill is-' + m, text: MODE_TXT[m]})),
+    h('div', {class: 'brief'}, h('div', {class: 'kpi glass'}, h('span', {class: 'kpi-l', text: 'Missions'}), h('b', {text: String(s.ms.length)}), h('span', {class: 'kpi-s', text: s.today + " aujourd'hui"})), h('div', {class: 'kpi glass'}, h('span', {class: 'kpi-l', text: 'Réussite'}), h('b', {text: s.ok})), h('div', {class: 'kpi glass'}, h('span', {class: 'kpi-l', text: 'Dernière'}), h('b', {class: 'kpi-txt', text: s.last}))),
+    h('div', {class: 'card glass'}, h('p', {class: 'kpi-l', text: 'Ce qu\'il sait faire'}), h('ul', {class: 'skills'}, a.skills.map((k) => h('li', {text: k}))), h('p', {class: 'muted small', text: a.link})),
+    h('button', {type: 'button', class: 'btn main', onclick: () => { draftNext = 'Demande à ' + short(a.id) + ' de '; show('command'); }}, 'Lui confier une mission'),
+    h('div', {class: 'panel-h'}, h('h3', {text: 'Activité récente'}), h('button', {type: 'button', class: 'link', onclick: () => show('missions')}, 'Voir tout')),
+    acts.length ? h('div', {class: 'feed glass'}, acts.map((x) => h('p', {class: 'unit-log'}, h('time', {text: ago(x.at)}), h('span', {text: ST[x.status] + ' · ' + x.text})))) : h('p', {class: 'empty', text: 'Aucune mission pour ' + a.name + ' pour l\'instant.'}));
 }
 
-/* ---------- 03 · missions ---------- */
+/* ---------- missions ---------- */
 const COLS: [string, string, MissionStatus[]][] = [['a_approuver', 'À approuver', ['a_approuver', 'brouillon']], ['approuvee', 'Approuvées', ['approuvee']], ['envoyee', 'En cours', ['envoyee']], ['terminee', 'Terminées', ['terminee', 'echouee', 'refusee']]];
 function missions(): HTMLElement {
-  const act = (m: Mission, s: MissionStatus) => { m.status = s; if (s === 'terminee' || s === 'refusee') m.done = Date.now(); store.save(); render(); };
+  const act = (m: Mission, s: MissionStatus) => { m.status = s; if (s === 'terminee' || s === 'refusee') m.done = Date.now(); store.save(); refreshModes(); render(); };
   const col = COLS.find((c) => c[0] === missionCol) || COLS[0];
   const list = store.missions.filter((m) => col[2].includes(m.status)).sort((a, b) => (a.priority === 'haute' ? -1 : 0) - (b.priority === 'haute' ? -1 : 0) || b.at - a.at);
   return h('section', {class: 'page'},
-    h('h2', {text: 'Missions'}),
-    h('p', {class: 'lead', text: "JARVIS prépare les missions et attend ton accord. L'envoi réel arrive en phase 3 (Claude) et 4 (Grok) : rien ne part pour l'instant."}),
-    h('div', {class: 'kanban-tabs'}, COLS.map(([k, l, ss]) => { const n = store.missions.filter((m) => ss.includes(m.status)).length; return h('button', {type: 'button', 'aria-pressed': String(missionCol === k), onclick: () => { missionCol = k; render(); }}, h('span', {text: l}), h('b', {text: String(n)})); })),
-    list.length ? list.map((m) => h('article', {class: 'mcard st-' + m.status},
-      h('div', {class: 'mc-top'}, h('span', {class: 'avatar sm ' + agent(m.agent).provider, text: AV[m.agent]}), h('b', {text: agent(m.agent).name}),
-        h('button', {type: 'button', class: 'prio p-' + (m.priority || 'normale'), title: 'Changer la priorité', onclick: () => { m.priority = nextPrio(m.priority); store.save(); render(); }}, PRIO[m.priority || 'normale']), h('time', {text: ago(m.at)})),
-      h('p', {class: 'mc-text', text: m.text}),
-      m.group ? h('small', {class: 'muted', text: 'Mission commune'}) : null,
-      m.status === 'approuvee' ? h('small', {class: 'muted', text: 'Envoi réel en phase ' + (agent(m.agent).provider === 'claude' ? '3' : '4') + '.'}) : null,
+    head('Missions', 'Ce que ton équipe va faire'),
+    h('p', {class: 'lead', text: "JARVIS les prépare, tu les approuves. L'envoi réel arrive en phase 3 (Claude) et 4 (Grok) : rien ne part pour l'instant."}),
+    h('div', {class: 'brief k4'}, COLS.map(([k, l, ss]) => { const n = store.missions.filter((m) => ss.includes(m.status)).length; return h('button', {type: 'button', class: 'kpi glass' + (k === 'a_approuver' && n ? ' is-amber' : '') + (missionCol === k ? ' is-on' : ''), 'aria-pressed': String(missionCol === k), onclick: () => { missionCol = k; render(); }}, h('span', {class: 'kpi-l', text: l}), h('b', {text: String(n)})); })),
+    list.length ? list.map((m) => h('article', {class: 'unit glass m-card', 'data-mode': m.status === 'a_approuver' ? 'demande' : 'veille'},
+      h('div', {class: 'unit-hit'}, sph(m.agent, 40, 'm-' + m.id), h('span', {class: 'unit-id'}, h('b', {text: short(m.agent)}), h('span', {text: ago(m.at) + (m.group ? ' · mission commune' : '')})),
+        h('button', {type: 'button', class: 'pill prio p-' + (m.priority || 'normale'), 'aria-label': 'Priorité', onclick: () => { m.priority = nextPrio(m.priority); store.save(); render(); }}, PRIO[m.priority || 'normale'])),
+      h('p', {class: 'm-text', text: m.text}),
+      m.status === 'approuvee' ? h('p', {class: 'muted small', text: 'Envoi réel en phase ' + (agent(m.agent).provider === 'claude' ? '3' : '4') + '.'}) : null,
       h('div', {class: 'acts'},
         m.status === 'a_approuver' ? [h('button', {type: 'button', class: 'btn main', onclick: () => act(m, 'approuvee')}, 'Approuver'), h('button', {type: 'button', class: 'btn', onclick: () => act(m, 'refusee')}, 'Refuser')] : null,
         m.status === 'refusee' ? h('button', {type: 'button', class: 'btn', onclick: () => act(m, 'a_approuver')}, 'Reprendre') : null,
-        h('button', {type: 'button', class: 'btn ghost', onclick: () => { store.missions = store.missions.filter((x) => x !== m); store.save(); render(); }}, 'Supprimer')))) : h('p', {class: 'empty', text: col[0] === 'a_approuver' ? 'Rien à approuver. Dis par exemple : « Demande à Kairos de vérifier le prix du robot ».' : 'Aucune mission ici.'}));
+        h('button', {type: 'button', class: 'btn ghost', onclick: () => { store.missions = store.missions.filter((x) => x !== m); store.save(); refreshModes(); render(); }}, 'Supprimer'))))
+      : h('p', {class: 'empty', text: col[0] === 'a_approuver' ? 'Rien à approuver. Dis par exemple : « Demande à Kairos de vérifier le prix du robot ».' : 'Aucune mission ici.'}));
 }
 
-/* ---------- 04 · mémoire : constellation et recherche ---------- */
-function constellation(): HTMLElement {
-  const W = Math.min(window.innerWidth - 32, 420), H = 230, cv = h('canvas', {class: 'graph', width: String(W * 2), height: String(H * 2), style: `width:${W}px;height:${H}px`, 'aria-label': 'Graphe de la mémoire'}) as HTMLCanvasElement;
-  const g = cv.getContext('2d'); if (!g) return cv;
-  g.scale(2, 2);
-  const used = AGENTS.filter((a) => store.missions.some((m) => m.agent === a.id));
-  const hubs = (used.length ? used : AGENTS.slice(0, 4)).map((a, i, arr) => ({a, x: W / 2 + Math.cos(i / arr.length * Math.PI * 2) * W * 0.3, y: H / 2 + Math.sin(i / arr.length * Math.PI * 2) * H * 0.32}));
-  const core = {x: W / 2, y: H / 2};
-  g.lineWidth = 1;
-  hubs.forEach((hb) => { g.strokeStyle = 'rgba(125, 140, 255, .45)'; g.beginPath(); g.moveTo(core.x, core.y); g.lineTo(hb.x, hb.y); g.stroke(); });
-  hubs.forEach((hb) => {
-    const ms = store.missions.filter((m) => m.agent === hb.a.id).slice(-10);
-    ms.forEach((m, j) => { const an = j / Math.max(1, ms.length) * Math.PI * 2 + hb.x, x = hb.x + Math.cos(an) * 34, y = hb.y + Math.sin(an) * 30; g.strokeStyle = 'rgba(56, 189, 248, .35)'; g.beginPath(); g.moveTo(hb.x, hb.y); g.lineTo(x, y); g.stroke(); g.fillStyle = m.status === 'a_approuver' ? '#fbbf24' : '#7dd3fc'; g.beginPath(); g.arc(x, y, 2.6, 0, Math.PI * 2); g.fill(); });
-    g.fillStyle = hb.a.provider === 'claude' ? '#f0abfc' : '#67e8f9'; g.beginPath(); g.arc(hb.x, hb.y, 7, 0, Math.PI * 2); g.fill();
-    g.fillStyle = '#c7d2fe'; g.font = '600 11px -apple-system, system-ui, sans-serif'; g.textAlign = 'center'; g.fillText(hb.a.name.replace(' (Grok)', ''), hb.x, hb.y + 20);
-  });
-  const rg = g.createRadialGradient(core.x, core.y, 0, core.x, core.y, 26); rg.addColorStop(0, '#e0f2fe'); rg.addColorStop(0.4, '#6366f1'); rg.addColorStop(1, 'rgba(99,102,241,0)');
-  g.fillStyle = rg; g.beginPath(); g.arc(core.x, core.y, 26, 0, Math.PI * 2); g.fill();
-  g.fillStyle = '#e0e7ff'; g.font = '700 10px -apple-system, system-ui, sans-serif'; g.fillText('JARVIS', core.x, core.y + 3);
-  return cv;
-}
-function memory(): HTMLElement {
-  const q = h('input', {class: 'search', type: 'search', placeholder: 'Chercher dans la mémoire', 'aria-label': 'Chercher'}) as HTMLInputElement;
-  const out = h('div', {class: 'stack'});
-  const draw = () => { const s = q.value.trim().toLowerCase(); const ms = store.msgs.filter((m) => !s || m.text.toLowerCase().includes(s)).slice(-60).reverse();
-    out.replaceChildren(...(ms.length ? ms.map((m) => h('div', {class: 'mem ' + m.who}, h('time', {text: (m.who === 'me' ? 'Toi' : 'JARVIS') + ' · ' + ago(m.at)}), h('p', {text: m.text}))) : [h('p', {class: 'empty', text: s ? 'Rien ne correspond.' : 'La mémoire est vide.'})])); };
-  q.addEventListener('input', draw); draw();
-  return h('section', {class: 'page'}, h('h2', {text: 'Mémoire'}),
-    h('div', {class: 'mem-stats'}, h('div', {}, h('b', {text: String(store.msgs.length)}), h('small', {text: 'souvenirs'})), h('div', {}, h('b', {text: String(store.missions.length)}), h('small', {text: 'missions'})), h('div', {}, h('b', {text: String(new Set(store.missions.map((m) => m.agent)).size)}), h('small', {text: 'agents sollicités'}))),
-    h('div', {class: 'panel'}, constellation()),
-    h('p', {class: 'small', text: "Gardée sur cet iPhone. En phase 3, la mémoire passera sur ton serveur et sera partagée avec les agents."}),
-    q, out,
-    h('button', {type: 'button', class: 'btn danger', onclick: (e: Event) => { if (!clearArm) { clearArm = window.setTimeout(() => { clearArm = 0; render(); }, 5000); (e.target as HTMLElement).textContent = 'Confirmer : tout effacer'; return; } clearTimeout(clearArm); clearArm = 0; store.clearAll(); resetBrain(); render(); }}, 'Effacer la mémoire et les missions'));
-}
-
-/* ---------- plus ---------- */
+/* ---------- plus : salle de contrôle Jarvis et modules ---------- */
 function more(): HTMLElement {
-  const item = (v: View, n: string, t: string, s: string) => h('button', {type: 'button', class: 'more-card', onclick: () => show(v)}, h('span', {class: 'num', text: n}), h('b', {text: t}), h('span', {class: 'muted', text: s}));
-  return h('section', {class: 'page'}, h('h2', {text: 'Plus'}),
-    item('automations', '05', 'Automatisations', 'Routines des bots, tâches de Claude, déclencheurs'),
-    item('intelligence', '06', 'Intelligence', 'Activité, modèles, temps de réponse'),
-    item('settings', '07', 'Réglages', 'Voix, écoute, agent par défaut, approbation'),
-    h('p', {class: 'small', text: 'JARVIS OS ' + VERSION + ' · phase ' + PHASE + ' (prototype) · ' + ((matchMedia('(display-mode: standalone)').matches) || (navigator as any).standalone ? "ouvert depuis l'écran d'accueil" : 'ouvert dans le navigateur')}));
+  const tile = (v: View, ic: string, t: string, s: string) => h('button', {type: 'button', class: 'tile glass', onclick: () => show(v)}, h('span', {class: 'tile-ic', html: icon(ic, 20)}), h('b', {text: t}), h('small', {text: s}));
+  const mods = ['Demandes et oui', 'Agenda et présence', 'Achats et prix', 'Voyages', 'Sorties', 'Suivi du coût', 'Brouillons Gmail', 'Tri des mails'];
+  return h('section', {class: 'page'},
+    head('Plus', 'Salle de contrôle et réglages'),
+    h('article', {class: 'salle glass'},
+      h('div', {class: 'salle-h'}, sph('jarvis', 64, 'salle'), h('div', {}, h('b', {text: 'Salle de contrôle Jarvis'}), h('small', {text: 'Tes vraies données, en direct, dans l\'app Claude'}))),
+      h('div', {class: 'mods'}, mods.map((m) => h('span', {class: 'pill', text: m}))),
+      h('a', {class: 'btn main', href: SALLE[store.settings.salle], target: '_blank', rel: 'noopener'}, h('span', {html: icon('ext', 16)}), ' Ouvrir la salle de contrôle'),
+      h('small', {class: 'muted small', text: 'Ces modules arriveront ici, dans JARVIS OS, avec le serveur de la phase 3. D\'ici là, la page Jarvis reste ton tableau de bord.'})),
+    h('div', {class: 'tiles'}, tile('automations', 'flow', 'Workflows', 'Le circuit des missions'), tile('intelligence', 'gauge', 'Intelligence', 'Activité et services'), tile('memory', 'memory', 'Mémoire', 'Tout ce qui a été dit'), tile('settings', 'gear', 'Réglages', 'Voix, prénom, écoute')),
+    h('p', {class: 'small', text: 'JARVIS OS ' + VERSION + ' · phase ' + PHASE + ' (prototype) · ' + (matchMedia('(display-mode: standalone)').matches || (navigator as any).standalone ? "ouvert depuis l'écran d'accueil" : 'ouvert dans le navigateur')}),
+    h('p', {class: 'small', text: 'Silhouettes des agents : game-icons.net (Lorc, Delapouite et contributeurs), licence CC BY 3.0.'}));
 }
+const back = () => h('button', {type: 'button', class: 'back', onclick: () => show('more')}, h('span', {html: icon('back', 16)}), 'Plus');
+
+function memory(): HTMLElement {
+  const q = h('input', {class: 'search-in', type: 'search', placeholder: 'Chercher dans la mémoire', 'aria-label': 'Chercher'}) as HTMLInputElement;
+  const out = h('div', {class: 'feed glass'});
+  const draw = () => { const s = q.value.trim().toLowerCase(); const ms = store.msgs.filter((m) => !s || m.text.toLowerCase().includes(s)).slice(-60).reverse();
+    out.replaceChildren(...(ms.length ? ms.map((m) => h('p', {class: 'unit-log'}, h('time', {text: ago(m.at)}), h('span', {class: m.who === 'me' ? 'me' : '', text: (m.who === 'me' ? 'Toi : ' : 'JARVIS : ') + m.text}))) : [h('p', {class: 'empty', text: s ? 'Rien ne correspond.' : 'La mémoire est vide.'})])); };
+  q.addEventListener('input', draw); draw();
+  const used = new Set(store.missions.map((m) => m.agent));
+  return h('section', {class: 'page'}, back(), head('Mémoire', 'Tout ce qui a été dit'),
+    h('div', {class: 'brief'}, h('div', {class: 'kpi glass'}, h('span', {class: 'kpi-l', text: 'Souvenirs'}), h('b', {text: String(store.msgs.length)})), h('div', {class: 'kpi glass'}, h('span', {class: 'kpi-l', text: 'Missions'}), h('b', {text: String(store.missions.length)})), h('div', {class: 'kpi glass'}, h('span', {class: 'kpi-l', text: 'Agents'}), h('b', {text: String(used.size)}))),
+    used.size ? h('div', {class: 'dock'}, [...used].map((id) => h('div', {class: 'dock-b'}, sph(id, 44, 'mem'), h('b', {text: short(id)}), h('span', {text: store.missions.filter((m) => m.agent === id).length + ' missions'})))) : null,
+    h('p', {class: 'small', text: 'Gardée sur cet iPhone. En phase 3, la mémoire passera sur ton serveur et sera partagée avec les agents.'}),
+    h('label', {class: 'search glass'}, h('span', {html: icon('search', 18)}), q), out,
+    h('button', {type: 'button', class: 'btn danger', onclick: (e: Event) => { if (!clearArm) { clearArm = window.setTimeout(() => { clearArm = 0; render(); }, 5000); (e.target as HTMLElement).textContent = 'Confirmer : tout effacer'; return; } clearTimeout(clearArm); clearArm = 0; store.clearAll(); resetBrain(); refreshModes(); render(); }}, 'Effacer la mémoire et les missions'));
+}
+
+/* ---------- workflows : le circuit, avec les sphères de l'équipe ---------- */
 function automations(): HTMLElement {
-  const node = (x: number, y: number, w: number, t: string, c: string, sub: string) => `<g><rect x="${x}" y="${y}" width="${w}" height="40" rx="10" fill="${c}" fill-opacity=".18" stroke="${c}" stroke-opacity=".7"/><text x="${x + w / 2}" y="${y + 17}" text-anchor="middle" fill="#e0e7ff" font-size="11" font-weight="700">${t}</text><text x="${x + w / 2}" y="${y + 31}" text-anchor="middle" fill="#94a3b8" font-size="9">${sub}</text></g>`;
-  const link = (x1: number, y1: number, x2: number, y2: number, c: string) => `<path d="M${x1} ${y1} C ${x1} ${(y1 + y2) / 2}, ${x2} ${(y1 + y2) / 2}, ${x2} ${y2}" fill="none" stroke="${c}" stroke-width="1.6" stroke-dasharray="4 4" opacity=".8"/>`;
-  const svg = `<svg viewBox="0 0 340 300" width="100%" role="img" aria-label="Schéma des automatisations prévues">
-    ${link(170, 50, 170, 90, '#22d3ee')}${link(170, 130, 80, 180, '#f0abfc')}${link(170, 130, 260, 180, '#67e8f9')}${link(80, 220, 170, 250, '#a78bfa')}${link(260, 220, 170, 250, '#a78bfa')}
-    ${node(120, 10, 100, 'Ta voix', '#22d3ee', 'iPhone')}${node(110, 90, 120, 'JARVIS', '#818cf8', 'routage, accord')}
-    ${node(20, 180, 120, 'Claude Code', '#f0abfc', 'phase 3 · déclencheur')}${node(200, 180, 120, 'Bots Grok', '#67e8f9', 'phase 4 · webhook')}
-    ${node(110, 250, 120, 'Résultats', '#a78bfa', 'missions, alertes')}</svg>`;
-  return h('section', {class: 'page'}, back(), h('h2', {text: 'Automatisations'}),
-    h('p', {class: 'lead', text: "Le circuit prévu. Rien n'est encore relié : les routines et les tâches planifiées s'afficheront ici, avec leurs déclencheurs et leurs dernières exécutions."}),
-    h('div', {class: 'panel', html: svg}),
-    h('div', {class: 'card'}, h('b', {text: 'À venir'}), h('ul', {class: 'skills'}, ["Lancer une routine d'un bot (webhook Grok Bot) — phase 4", "Lancer une tâche Claude Code (déclencheur d'API) — phase 3", 'Historique des exécutions et des résultats', 'Notification quand ton accord est nécessaire'].map((s) => h('li', {text: s})))));
+  const step = (el: HTMLElement, t: string, s: string) => h('div', {class: 'wf-node glass'}, el, h('div', {}, h('b', {text: t}), h('small', {text: s})));
+  const autos: [string, string, string][] = [['Lancer une routine d\'un bot', 'Webhook Grok Bot', 'phase 4'], ['Lancer une tâche Claude Code', "Déclencheur d'API", 'phase 3'], ['Prévenir quand ton accord est nécessaire', 'Notification', 'phase 3'], ['Historique des exécutions', 'Résultats et coûts', 'phase 3']];
+  return h('section', {class: 'page'}, back(), head('Workflows', 'Le circuit d\'une mission'),
+    h('div', {class: 'wf'},
+      step(h('span', {class: 'tile-ic', html: icon('wave', 20)}), 'Ta voix ou ton texte', 'sur l\'iPhone'), h('i', {class: 'wf-line'}),
+      step(sph('jarvis', 44, 'wf'), 'JARVIS', 'comprend, choisit l\'agent, prépare la mission'), h('i', {class: 'wf-line'}),
+      step(h('span', {class: 'tile-ic amber', html: icon('missions', 20)}), 'Ton accord', 'Missions : approuver ou refuser'), h('i', {class: 'wf-line off'}),
+      h('div', {class: 'wf-split'}, step(sph('claude', 44, 'wf'), 'Claude Code', 'phase 3'), step(sph('iris', 44, 'wf'), 'Bots Grok', 'phase 4'))),
+    h('p', {class: 'small', text: "Rien n'est encore relié : chaque mission s'arrête à ton accord."}),
+    h('div', {class: 'panel-h'}, h('h3', {text: 'Automatisations prévues'})),
+    h('div', {class: 'stack'}, autos.map(([t, s, p]) => h('div', {class: 'g-row glass'}, h('span', {class: 'tile-ic', html: icon('flow', 18)}), h('div', {}, h('b', {text: t}), h('small', {text: s + ' · ' + p})), h('span', {class: 'switch', role: 'switch', 'aria-checked': 'false', 'aria-disabled': 'true', title: 'Pas encore relié'})))));
 }
 function gauge(v: number, label: string, txt: string, c: string) {
   const r = 30, L = 2 * Math.PI * r, off = L * (1 - Math.max(0, Math.min(1, v)));
-  return h('div', {class: 'gauge', html: `<svg viewBox="0 0 80 80" width="80" height="80" aria-hidden="true"><circle cx="40" cy="40" r="${r}" fill="none" stroke="rgba(148,163,184,.18)" stroke-width="6"/><circle cx="40" cy="40" r="${r}" fill="none" stroke="${c}" stroke-width="6" stroke-linecap="round" stroke-dasharray="${L.toFixed(1)}" stroke-dashoffset="${off.toFixed(1)}" transform="rotate(-90 40 40)"/><text x="40" y="45" text-anchor="middle" fill="#e0e7ff" font-size="15" font-weight="700">${txt}</text></svg><small>${label}</small>`});
+  return h('div', {class: 'gauge glass', html: `<svg viewBox="0 0 80 80" width="80" height="80" aria-hidden="true"><circle cx="40" cy="40" r="${r}" fill="none" stroke="rgba(255,255,255,.08)" stroke-width="6"/><circle cx="40" cy="40" r="${r}" fill="none" stroke="${c}" stroke-width="6" stroke-linecap="round" stroke-dasharray="${L.toFixed(1)}" stroke-dashoffset="${off.toFixed(1)}" transform="rotate(-90 40 40)"/><text x="40" y="45" text-anchor="middle" fill="#eef1fb" font-size="15" font-weight="700">${txt}</text></svg><small>${label}</small>`});
 }
 function intelligence(): HTMLElement {
   const s = store.stats, avg = s.replyMs.length ? Math.round(s.replyMs.reduce((a, b) => a + b, 0) / s.replyMs.length) : 0;
   const voiceOk = s.voiceTurns + s.errors ? s.voiceTurns / (s.voiceTurns + s.errors) : 0;
   const approved = store.missions.length ? store.missions.filter((m) => ['approuvee', 'envoyee', 'terminee'].includes(m.status)).length / store.missions.length : 0;
-  const llm: [string, string, boolean][] = [['Claude (en direct)', 'phase 3 · serveur Claude Code', false], ['Claude Code (missions)', 'phase 3 · déclencheur d\'API', false], ['Grok Bot', 'phase 4 · webhooks', false], ['Reconnaissance vocale', canListen() ? 'disponible sur cet appareil' : 'absente ici', canListen()], ['Voix de JARVIS', canSpeak() ? 'disponible' : 'absente ici', canSpeak()]];
-  return h('section', {class: 'page'}, back(), h('h2', {text: 'Intelligence'}),
-    h('div', {class: 'gauges'}, gauge(Math.min(1, s.turns / 50), 'Échanges', String(s.turns), '#22d3ee'), gauge(voiceOk, 'Micro réussi', Math.round(voiceOk * 100) + '%', '#818cf8'), gauge(approved, 'Missions approuvées', Math.round(approved * 100) + '%', '#c084fc'), gauge(Math.min(1, avg / 1000), 'Réponse locale', avg + 'ms', '#67e8f9')),
-    h('h3', {text: 'État des modèles et services'}),
-    h('div', {class: 'llm'}, llm.map(([n, d, ok]) => h('div', {class: 'llm-row'}, h('span', {class: 'dot ' + (ok ? 'ok' : 'off')}), h('div', {}, h('b', {text: n}), h('small', {text: d})), h('span', {class: 'pill ' + (ok ? 'ok' : 'off'), text: ok ? 'Prêt' : 'Non relié'})))),
-    h('p', {class: 'small', text: 'La consommation de tes abonnements Claude et Grok s\'affichera ici quand ils seront reliés.'}));
+  const llm: [string, string, boolean][] = [['Claude (en direct)', 'phase 3 · Claude Code sur ton serveur', false], ['Claude Code (missions)', "phase 3 · déclencheur d'API", false], ['Grok Bot', 'phase 4 · webhooks', false], ['Reconnaissance vocale', canListen() ? 'disponible sur cet appareil' : 'absente ici', canListen()], ['Voix de JARVIS', canSpeak() ? 'disponible' : 'absente ici', canSpeak()]];
+  return h('section', {class: 'page'}, back(), head('Intelligence', 'Activité et services'),
+    h('div', {class: 'gauges'}, gauge(Math.min(1, s.turns / 50), 'Échanges', String(s.turns), '#67e8f9'), gauge(voiceOk, 'Micro réussi', Math.round(voiceOk * 100) + '%', '#a5b4fc'), gauge(approved, 'Missions approuvées', Math.round(approved * 100) + '%', '#e9a8fb'), gauge(Math.min(1, avg / 1000), 'Réponse locale', avg + 'ms', '#fcd6a4')),
+    h('div', {class: 'panel-h'}, h('h3', {text: 'État des modèles et services'})),
+    h('div', {class: 'feed glass'}, llm.map(([n, d, ok]) => h('div', {class: 'llm-row'}, h('span', {class: 'st-dot ' + (ok ? 'ok' : 'off')}), h('div', {}, h('b', {text: n}), h('small', {text: d})), h('span', {class: 'pill ' + (ok ? 'is-ok' : 'is-demande'), text: ok ? 'Prêt' : 'Non relié'})))),
+    h('p', {class: 'small', text: "La consommation de tes abonnements Claude et Grok s'affichera ici quand ils seront reliés."}));
 }
 function settings(): HTMLElement {
   const st = store.settings, vs = frenchVoices();
-  const sel = h('select', {class: 'search', 'aria-label': 'Voix', onchange: (e: Event) => { st.voiceURI = (e.target as HTMLSelectElement).value; store.save(); }},
+  const name = h('input', {class: 'field', type: 'text', value: st.name, placeholder: 'Ton prénom (gardé sur cet iPhone)', autocomplete: 'given-name', 'aria-label': 'Prénom'}) as HTMLInputElement;
+  name.addEventListener('change', () => { st.name = name.value.trim().slice(0, 30); store.save(); });
+  const sel = h('select', {class: 'field', 'aria-label': 'Voix', onchange: (e: Event) => { st.voiceURI = (e.target as HTMLSelectElement).value; store.save(); }},
     h('option', {value: '', text: "Voix des réglages de l'iPhone (recommandé)"}), vs.map((v) => h('option', {value: v.voiceURI || v.name, text: v.name + ' · ' + v.lang}))) as HTMLSelectElement;
   sel.value = st.voiceURI;
-  const seg = (k: 'listenMode' | 'route', opts: [string, string][]) => h('div', {class: 'seg'}, opts.map(([v, l]) => h('button', {type: 'button', 'aria-pressed': String((st as any)[k] === v), onclick: () => { (st as any)[k] = v; store.save(); render(); }}, l)));
-  return h('section', {class: 'page'}, back(), h('h2', {text: 'Réglages'}),
+  const seg = (k: 'listenMode' | 'route' | 'salle', opts: [string, string][]) => h('div', {class: 'seg'}, opts.map(([v, l]) => h('button', {type: 'button', 'aria-pressed': String((st as any)[k] === v), onclick: () => { (st as any)[k] = v; store.save(); render(); }}, l)));
+  return h('section', {class: 'page'}, back(), head('Réglages', 'Ta façon de travailler'),
+    h('label', {class: 'lbl', text: 'Prénom pour l\'accueil'}), name,
     h('label', {class: 'lbl', text: 'Voix de JARVIS'}), sel,
     h('p', {class: 'small', text: "Voix plus naturelle : Réglages de l'iPhone, Accessibilité, Read & Speak (Contenu énoncé), Voix, Français, puis une voix « améliorée » ou « premium »."}),
     h('label', {class: 'lbl', text: 'Vitesse'}), h('input', {type: 'range', min: '0.8', max: '1.3', step: '0.05', value: String(st.rate), 'aria-label': 'Vitesse de la voix', oninput: (e: Event) => { st.rate = +(e.target as HTMLInputElement).value; store.save(); }}),
     h('button', {type: 'button', class: 'btn', onclick: () => voice.speak('Bonsoir, je suis JARVIS. Voici ma voix.')}, 'Essayer la voix'),
     h('label', {class: 'lbl', text: 'Écoute'}), seg('listenMode', [['phrase', 'Phrase par phrase'], ['continu', 'Écoute continue']]),
     h('label', {class: 'lbl', text: 'Agent par défaut'}), seg('route', [['auto', 'AUTO'], ['claude', 'CLAUDE'], ['grok', 'GROK']]),
+    h('label', {class: 'lbl', text: 'Salle de contrôle à ouvrir'}), seg('salle', [['copie', 'Copie v17.15'], ['service', 'En service v16']]),
     h('label', {class: 'check'}, h('input', {type: 'checkbox', checked: st.approveAll ? true : null, onchange: (e: Event) => { st.approveAll = (e.target as HTMLInputElement).checked; store.save(); }}), ' Demander mon accord avant chaque mission'));
 }
-const back = () => h('button', {type: 'button', class: 'back', onclick: () => show('more')}, '‹ Plus');
 
 /* ---------- la navigation ---------- */
-const TABS: [View, string, string][] = [['center', 'Centre', 'core'], ['agents', 'Agents', 'agents'], ['missions', 'Missions', 'missions'], ['memory', 'Mémoire', 'memory'], ['more', 'Plus', 'more']];
+const TABS: [View, string, string][] = [['home', 'Accueil', 'home'], ['command', 'Commandes', 'chat'], ['agents', 'Équipe', 'agents'], ['missions', 'Missions', 'missions'], ['more', 'Plus', 'more']];
+const PARENT: Partial<Record<View, View>> = {agent: 'agents', memory: 'more', automations: 'more', intelligence: 'more', settings: 'more'};
 function nav(): HTMLElement {
-  const cur = ['automations', 'intelligence', 'settings'].includes(view) ? 'more' : view;
-  const pend = store.missions.filter((m) => m.status === 'a_approuver').length;
-  return h('nav', {class: 'tabs', id: 'tabs', 'aria-label': 'Modules'}, TABS.map(([v, l, ic]) => h('button', {type: 'button', 'aria-current': cur === v ? 'page' : null, onclick: () => show(v)}, h('span', {class: 'ti', html: icon(ic, 21)}), h('span', {text: l}), v === 'missions' && pend ? h('b', {class: 'badge', text: String(pend)}) : null)));
+  const cur = PARENT[view] || view, n = pending();
+  return h('nav', {class: 'tabs', id: 'tabs', 'aria-label': 'Modules'}, TABS.map(([v, l, ic]) => h('button', {type: 'button', 'aria-current': cur === v ? 'page' : null, onclick: () => show(v)}, h('span', {class: 'ti', html: icon(ic, 21)}), h('span', {text: l}), v === 'missions' && n ? h('b', {class: 'badge', text: String(n)}) : null)));
 }
-function show(v: View) { view = v; render(); window.scrollTo(0, 0); }
+const toEnd = () => { if (view === 'command') window.scrollTo(0, document.documentElement.scrollHeight); };
+function show(v: View) { view = v; render(); window.scrollTo(0, 0); toEnd(); }
 function paint() {
-  if (view !== 'center') { const n = document.getElementById('tabs'); if (n) n.replaceWith(nav()); return; }
-  const old = document.getElementById('in') as HTMLInputElement | null; const draft = old ? old.value : '', focus = !!old && document.activeElement === old;
+  if (view !== 'home' && view !== 'command') { const n = document.getElementById('tabs'); if (n) n.replaceWith(nav()); return; }
+  const old = document.querySelector('.ask-in') as HTMLInputElement | null; const draft = old ? old.value : '', focus = !!old && document.activeElement === old;
   render();
-  const n = document.getElementById('in') as HTMLInputElement | null; if (n) { n.value = draft; if (focus) n.focus(); }
-  const lg = document.getElementById('log'); if (lg) { lg.scrollTop = lg.scrollHeight; if (voice.active) lg.scrollIntoView({block: 'nearest'}); }
+  const n = document.querySelector('.ask-in') as HTMLInputElement | null; if (n && draft) { n.value = draft; n.parentElement?.classList.add('has-text'); if (focus) n.focus(); }
+  toEnd();
 }
 function render() {
-  const views: Record<View, () => HTMLElement> = {center, agents, missions, memory, more, automations, intelligence, settings};
-  const top = h('header', {class: 'top'}, h('span', {class: 'logo', html: icon('core', 22)}), h('div', {class: 'brand'}, h('b', {text: 'J.A.R.V.I.S.'}), h('small', {text: 'Personal Agentic OS'})), h('span', {class: 'chip', title: 'Phase 2 : prototype', text: 'Prototype'}));
-  app.replaceChildren(top, h('main', {class: 'main view-' + view}, views[view]()), nav());
+  const inVoice = view === 'home' && voice.active;
+  document.body.className = 'v-' + view + (inVoice ? ' in-voice' : '');
+  orb.wave(inVoice);
+  const views: Record<View, () => HTMLElement> = {home: inVoice ? voiceView : home, command, agents, agent: agentPage, missions, more, memory, automations, intelligence, settings};
+  app.replaceChildren(...[h('main', {class: 'main'}, views[view]()), inVoice ? null : nav()].filter((x): x is HTMLElement => !!x));
 }
 
 render();
