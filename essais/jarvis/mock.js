@@ -266,5 +266,7 @@
   sample.limits = async () => ({tools: true, images: false});
   sample.json = async () => ({});
   window.claude = {use: async (name) => { await delay(null, 10); if (SCEN.offline) return null; return name === 'mcp' ? mcp : name === 'sample' ? (SCEN.noSample ? null : sample) : null; }};
+  /* scénario pending : n ordres du propriétaire encore « À faire », datés d'aujourd'hui */
+  if (SCEN.pending) for (let i = 1; i <= SCEN.pending; i++) G['Canal'].push([fr(D(0)), 'Rabie', 'Iris', 'Ordre', 'Ordre numéro ' + i, 'À faire', '', '']);
   window.__G = G; window.__MAIL = MAIL; window.__CAL = CAL;
 })();

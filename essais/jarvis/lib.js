@@ -18,8 +18,14 @@ async function open(opts) {
   await page.addInitScript('window.__SCEN = ' + JSON.stringify(opts.scen || {}) + ';');
   if (opts.storage) await page.addInitScript('try { const s = ' + JSON.stringify(opts.storage) + '; Object.keys(s).forEach((k) => localStorage.setItem(k, JSON.stringify(s[k]))); } catch (e) {}');
   await page.addInitScript(MOCK);
+  if (process.env.COV) await page.coverage.startJSCoverage({resetOnNavigation: false, reportAnonymousScripts: true});
   await page.goto('file://' + path.resolve(DIR, opts.file || 'jarvis.html'));
   if (opts.time) await page.clock.runFor(3600); else await page.waitForTimeout(3600);
+  /* COV=<dossier> : enregistre quelles parties du code de la page ont tourné (pour repérer le code mort) */
+  if (process.env.COV) {
+    const close = browser.close.bind(browser);
+    browser.close = async () => { try { const cov = await page.coverage.stopJSCoverage(); const main = cov.find((c) => /\.html$/.test(c.url)); if (main) fs.writeFileSync(path.join(process.env.COV, 'cov-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7) + '.json'), JSON.stringify({source: main.source, functions: main.functions})); } catch (e) { /* rien */ } return close(); };
+  }
   return {browser, page, errors, opts};
 }
 /* avance le temps : horloge simulée si elle est installée */

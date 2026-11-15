@@ -8,13 +8,21 @@ Tenu à la demande du propriétaire (15/11/2026) : **chaque modification de la p
 |---|---|---|
 | En service (v16), premier compte | `https://claude.ai/artifact/QwLf64Ggstzu4p3uznZrr8` | Ne pas toucher : aucun report dessus (décision du 15/11/2026) |
 | Essai (v17.5), premier compte, partagée | `https://claude.ai/artifact/UDFVL3TQ2RUeYMq1JBtT4m` | En retard sur la copie : il lui manque les modifications notées « copie seulement » |
-| Copie de travail (v17.7), second compte | `https://claude.ai/artifact/NMAqUak7A5JYsLsc12VyaZ` | C'est ici que l'on modifie et que le propriétaire valide |
+| Copie de travail (v17.8), second compte | `https://claude.ai/artifact/NMAqUak7A5JYsLsc12VyaZ` | C'est ici que l'on modifie et que le propriétaire valide |
+
+## Où est le code de la page
+
+- **Google Drive** (à la demande du propriétaire, 15/11/2026) : dossier `RD Assistant/Jarvis (sources de la page)` (`1LO_y3DbvXjQQtuSQPlQfbnMU5Mlyzz3X`), fichier `jarvis-page.html` (`1KM4NISDFckz0BVprZRNeRMvjbtQhwTcd`). C'est la source complète de la dernière version publiée sur la copie de travail. **Après chaque publication, remplace ce fichier** (outil Drive `update_file` ou, à défaut, `create_file` dans le même dossier ; contenu passé par référence de fichier `sha256:<empreinte>:<chemin absolu>`, sans recopier le texte) et note la version ici.
+- Version déposée dans Drive : **v17.8** (15/11/2026, 477 617 octets).
+- Pour reprendre depuis l'autre compte, du moins coûteux au plus coûteux : (1) le propriétaire partage la copie de travail avec ce compte, droit de modification, puis `Artifact` action `read` ; (2) télécharger `jarvis-page.html` depuis Drive dans un fichier local, sans l'afficher, puis le publier.
+- Capacités à déclarer pour publier la page sur un compte qui ne l'a pas encore : `{"mcp": {"servers": [{"server": "Google Sheets", "tools": ["get_values", "append_values", "update_values"]}, {"server": "Google Calendar", "tools": ["list_events", "create_event", "update_event", "delete_event"]}, {"server": "Gmail", "tools": ["search_threads", "get_thread", "list_drafts", "send_message", "unlabel_thread", "delete_draft"]}, {"server": "Claude Code Remote", "tools": ["fire_trigger"]}]}, "sample": {}}`.
+- Le reste (instructions, ce journal, banc d'essai) est dans `main`.
 
 ## Comment travailler
 
 1. Modifier la copie de travail : petite retouche par `edits` sur la publication (aucune relecture si la session l'a publiée) ; sinon `Artifact` action `read`, puis republier avec `url`.
 2. Tester soi-même avant de publier : `essais/jarvis/` (voir son README) sur le fichier modifié. Ajouter un scénario pour chaque fonction nouvelle.
-3. Noter la modification ci-dessous (date, quoi, pourquoi, testé comment, reporté ou non sur la page d'essai).
+3. Noter la modification ci-dessous (date, quoi, pourquoi, testé comment, reporté ou non sur la page d'essai), déposer la source dans Drive, fusionner dans `main`.
 4. Questions au propriétaire : toujours en QCM.
 5. Report sur la page d'essai du premier compte : une seule fois, quand le propriétaire a validé la copie ; le moins coûteux est de le faire depuis le premier compte.
 
@@ -54,6 +62,13 @@ Choisies par le propriétaire en QCM (avec l'allègement, voir « À venir »).
 - Testé : scénario R (déplacer avec heure, déplacer une journée, retirer avec confirmation, annuel vers Iris), puis tout le banc sans erreur. Non testé : sur le vrai agenda.
 
 Publié sur la copie (version 3). Pas encore reporté sur la page d'essai.
+
+### 15/11/2026 : v17.8, liste « En cours chez tes bots » complète (copie seulement, à reporter)
+- Signalé par le propriétaire : le bloc de l'accueil annonçait « 7 demandes » et n'en montrait que 5 (la liste était coupée à cinq sans le dire).
+- Retouche dans le `VIEWS.accueil` du module v17 : la liste montre cinq lignes, puis un bouton « Voir les N autres » / « Réduire la liste » (`SEL.pendAll`, classe `.pend-more`).
+- `VERSION` passe à `'17.8'`.
+- Testé : scénario P (onze demandes : cinq lignes et « Voir les 6 autres », puis onze lignes), puis tout le banc sans erreur.
+- Publié sur la copie (version 4) et déposé dans Drive.
 
 ### À venir
 **Allègement de la page** (choisi par le propriétaire le 15/11/2026, en cours) : retirer le code de l'ancienne maquette qui ne sert plus en direct (470 Ko aujourd'hui), sans changer ce que la page fait. À faire par petites étapes, tout le banc relancé à chaque étape ; noter ici ce qui a été retiré.
