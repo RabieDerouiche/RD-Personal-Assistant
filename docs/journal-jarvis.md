@@ -8,12 +8,12 @@ Tenu à la demande du propriétaire (15/11/2026) : **chaque modification de la p
 |---|---|---|
 | En service (v16), premier compte | `https://claude.ai/artifact/QwLf64Ggstzu4p3uznZrr8` | Ne pas toucher : aucun report dessus (décision du 15/11/2026) |
 | Essai (v17.5), premier compte, partagée | `https://claude.ai/artifact/UDFVL3TQ2RUeYMq1JBtT4m` | En retard sur la copie : il lui manque les modifications notées « copie seulement » |
-| Copie de travail (v17.9), second compte | `https://claude.ai/artifact/NMAqUak7A5JYsLsc12VyaZ` | C'est ici que l'on modifie et que le propriétaire valide |
+| Copie de travail (v17.10), second compte | `https://claude.ai/artifact/NMAqUak7A5JYsLsc12VyaZ` | C'est ici que l'on modifie et que le propriétaire valide |
 
 ## Où est le code de la page
 
 - **Google Drive** (à la demande du propriétaire, 15/11/2026) : dossier `RD Assistant/Jarvis (sources de la page)` (`1LO_y3DbvXjQQtuSQPlQfbnMU5Mlyzz3X`). **Un fichier par version publiée**, nommé `jarvis-page-v<version>.html` : la source complète de la copie de travail. L'outil Drive ne sait pas remplacer le contenu d'un fichier : après chaque publication, crée un fichier neuf (`create_file`, `contentMimeType: text/html`, `disableConversionToGoogleType: true`, contenu passé par référence `sha256:<empreinte>:<chemin absolu>` dans `base64Content`, sans recopier le texte). Ne supprime pas les anciens sans le oui du propriétaire.
-- Dernière version déposée : **v17.9** (`14iF99wD98LHWIPpnXTznZaQgbfnpG8dY`, 481 393 octets). Avant : v17.8 (`1KM4NISDFckz0BVprZRNeRMvjbtQhwTcd`).
+- Dernière version déposée : **v17.10** (`11FJKUO7xl_Tm-9wbhD_3S27tpgTrWtHD`, 485 701 octets). Avant : v17.9 (`14iF99wD98LHWIPpnXTznZaQgbfnpG8dY`), v17.8 (`1KM4NISDFckz0BVprZRNeRMvjbtQhwTcd`).
 - Pour reprendre depuis l'autre compte, du moins coûteux au plus coûteux : (1) le propriétaire partage la copie de travail avec ce compte, droit de modification, puis `Artifact` action `read` ; (2) télécharger `jarvis-page.html` depuis Drive dans un fichier local, sans l'afficher, puis le publier.
 - Capacités à déclarer pour publier la page sur un compte qui ne l'a pas encore : `{"mcp": {"servers": [{"server": "Google Sheets", "tools": ["get_values", "append_values", "update_values"]}, {"server": "Google Calendar", "tools": ["list_events", "create_event", "update_event", "delete_event"]}, {"server": "Gmail", "tools": ["search_threads", "get_thread", "list_drafts", "send_message", "unlabel_thread", "delete_draft"]}, {"server": "Claude Code Remote", "tools": ["fire_trigger"]}]}, "sample": {}, "tts": {}}`.
 - Le reste (instructions, ce journal, banc d'essai) est dans `main`.
@@ -78,6 +78,14 @@ Choix du propriétaire en QCM : « essai sur iPhone d'abord » ; allègement : �
 - Testé : scénarios X1 à X5 (voix de Claude, voix du téléphone, repli quand celle de Claude est refusée, voix muette, aucune voix), puis tout le banc sans erreur. **Non testé : le son réel**, ni sur iPhone ni sur ordinateur. La suite dépend de ce que le propriétaire entend sur son iPhone.
 - Publié sur la copie (version 5), source déposée dans Drive.
 
+### 15/11/2026 : v17.10, choix de la voix du téléphone (copie seulement, à reporter)
+- **Résultat de l'essai v17.9 sur l'iPhone du propriétaire** : la voix sort bien (voix du téléphone), mais il la trouve « robotisée, sans personnalité ». La voix de Claude n'est pas offerte dans l'app iPhone. Une voix naturelle sur iPhone demanderait un service extérieur, que la page ne peut pas appeler.
+- Son choix (QCM) : « choisir une meilleure voix ».
+- Dans le module `VOX` : `voxList()` (voix françaises du téléphone, triées par qualité d'après `voiceURI` et le nom : premium, améliorée, standard, de base ; `fr-FR` avant les autres), `voxPick()` (la voix retenue dans `localStorage['jarvis.voix']`, sinon la meilleure), `voxPanel()` (sous « Rapide / Approfondi » dans la discussion avec Claude : bouton « Voix : <nom> · <qualité> » qui ouvre la liste ; toucher une voix la retient et lit une phrase d'essai ; rappel du chemin dans les réglages de l'iPhone pour télécharger une voix « améliorée » ou « premium »). Le panneau n'apparaît pas quand la voix de Claude est disponible. `voxPhone` lit avec la voix retenue et sa langue. Écoute de `voiceschanged` pour redessiner la discussion.
+- `VERSION` passe à `'17.10'`.
+- Testé : scénarios Y1 (trois voix : la premium par défaut, en choisir une autre, « Écouter » s'en sert), Y2 (seulement la voix de base), Y3 (voix de Claude : pas de panneau), capture d'écran à 390 px, puis tout le banc sans erreur. **Non vérifié** : que l'app iPhone montre à la page les voix « améliorées » ou « premium » téléchargées ; c'est l'essai suivant du propriétaire.
+- Publié sur la copie (version 6), source déposée dans Drive.
+
 ### À venir
 
 **Allègement de la page** (choisi par le propriétaire le 15/11/2026) : mesuré avant d'y toucher, rien n'a été retiré.
@@ -88,4 +96,4 @@ Choix du propriétaire en QCM : « essai sur iPhone d'abord » ; allègement : �
 **Voix** (demandée par le propriétaire le 15/11/2026 : poser une question à la voix, entendre la réponse, voir l'agent parler, discussion en direct). Ce que la plateforme permet :
 - Capacités `tts` (voix de Claude) et `dictation` (parole vers texte) des pages : offertes sur ordinateur (app Claude, Chrome), **pas dans l'app iPhone ni Safari**. Sur iPhone : la dictée du clavier marche dans tout champ de texte ; la lecture à voix haute par la voix du téléphone (synthèse vocale du navigateur) est à essayer sur son iPhone, non vérifiée.
 - Seul Claude répond en direct dans la page ; un bot Grok répond à son passage. « Parler à un bot » en direct = Claude qui répond à sa place d'après Pilotage, en le disant, et qui propose l'ordre pour le vrai bot.
-- Essai en cours (v17.9). Si la voix sort sur iPhone, la suite envisagée : bouton « Écouter » sur les réponses ; mode conversation plein écran (hologramme du bot animé pendant qu'il parle, sous-titres en direct, question dictée, réponse lue seule). Pas d'androïde 3D (déjà rejeté par le propriétaire).
+- Essais en cours (v17.9 puis v17.10, voir plus haut). Si une voix du téléphone lui convient, la suite envisagée : bouton « Écouter » sur les réponses ; mode conversation plein écran (hologramme du bot animé pendant qu'il parle, sous-titres en direct, question dictée, réponse lue seule). Pas d'androïde 3D (déjà rejeté par le propriétaire).
