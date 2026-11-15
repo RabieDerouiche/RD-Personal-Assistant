@@ -265,7 +265,15 @@
   };
   sample.limits = async () => ({tools: true, images: false});
   sample.json = async () => ({});
-  window.claude = {use: async (name) => { await delay(null, 10); if (SCEN.offline) return null; return name === 'mcp' ? mcp : name === 'sample' ? (SCEN.noSample ? null : sample) : null; }};
+  /* voix : scénario tts ('ok' ou 'refuse') pour la voix de Claude, synth ('ok', 'muet' ou 'absent') pour celle du téléphone */
+  window.__voice = [];
+  const tts = SCEN.tts ? {speak: async (text, o) => { window.__voice.push('claude:' + (o && o.language) + ':' + text.slice(0, 60)); await delay(null, 300); if (SCEN.tts === 'refuse') throw {code: 'not_granted'}; }, stop: () => { window.__voice.push('claude:stop'); }, onState: () => {}} : null;
+  if (SCEN.synth) {
+    const fake = SCEN.synth === 'absent' ? undefined : {getVoices: () => [{lang: 'en-US', name: 'x'}, {lang: 'fr-FR', name: 'Amélie'}], cancel: () => { window.__voice.push('tel:cancel'); }, speak: (u) => { window.__voice.push('tel:' + u.lang + ':' + (u.voice && u.voice.name) + ':' + u.text.slice(0, 40)); if (SCEN.synth === 'ok') setTimeout(() => { if (u.onstart) u.onstart({}); setTimeout(() => { if (u.onend) u.onend({}); }, 200); }, 100); }};
+    try { Object.defineProperty(window, 'speechSynthesis', {value: fake, configurable: true}); } catch (e) { /* rien */ }
+    window.SpeechSynthesisUtterance = SCEN.synth === 'absent' ? undefined : function (t) { this.text = t; };
+  }
+  window.claude = {use: async (name) => { await delay(null, 10); if (SCEN.offline) return null; return name === 'mcp' ? mcp : name === 'sample' ? (SCEN.noSample ? null : sample) : name === 'tts' ? tts : null; }};
   /* scénario pending : n ordres du propriétaire encore « À faire », datés d'aujourd'hui */
   if (SCEN.pending) for (let i = 1; i <= SCEN.pending; i++) G['Canal'].push([fr(D(0)), 'Rabie', 'Iris', 'Ordre', 'Ordre numéro ' + i, 'À faire', '', '']);
   window.__G = G; window.__MAIL = MAIL; window.__CAL = CAL;

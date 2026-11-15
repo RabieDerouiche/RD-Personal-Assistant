@@ -140,6 +140,14 @@ const fill = async (h, sel, val) => { await h.page.fill(sel, val); };
     await step('page de Kairos', async () => { await h.page.evaluate(() => { const b = Array.from(document.querySelectorAll('.mate')).find((x) => /Kairos/.test(x.innerText)); b.click(); }); await L.tick(h, 600); return (await L.text(h)).replace(/\n+/g, ' | ').slice(0, 520); }, 0);
     await step('commande rapide', async () => L.click(h, 'Vérifie mes prix maintenant'));
   });
+  /* la voix : « Écouter » sur une réponse de Claude, selon ce que la vue permet */
+  const ask = async (h) => { await L.tab(h, 'accueil'); await fill(h, '.intent-input', 'Que dois-je faire en premier ?'); await h.page.keyboard.press('Enter'); await L.tick(h, 1500); };
+  const voice = async (h) => { const a = await L.click(h, 'Écouter', '#chat'); await L.tick(h, 150); const mid = await h.page.evaluate(() => (document.querySelector('#chat .vox-btn') || {}).innerText || 'bouton absent'); const said = (await L.toasts(h)).join(' + '); await L.tick(h, 6500); const end = await h.page.evaluate(() => (document.querySelector('#chat .vox-btn') || {}).innerText || 'bouton absent'); return a + ' // pendant : ' + mid.trim() + ' // après : ' + end.trim() + ' // message : ' + (said || 'aucun') + ' // ' + JSON.stringify(await h.page.evaluate(() => window.__voice)).slice(0, 330); };
+  await scen('X1 voix de Claude disponible (ordinateur)', {scen: {active: true, tts: 'ok', synth: 'ok'}}, async (h, step) => { await ask(h); await step('écouter', () => voice(h), 0); });
+  await scen('X2 voix du téléphone seulement', {scen: {active: true, synth: 'ok'}}, async (h, step) => { await ask(h); await step('écouter', () => voice(h), 0); });
+  await scen('X3 voix de Claude refusée, repli sur le téléphone', {scen: {active: true, tts: 'refuse', synth: 'ok'}}, async (h, step) => { await ask(h); await step('écouter', () => voice(h), 0); });
+  await scen('X4 la voix du téléphone ne démarre pas', {scen: {active: true, synth: 'muet'}}, async (h, step) => { await ask(h); await step('écouter', () => voice(h), 0); });
+  await scen('X5 aucune voix dans la vue', {scen: {active: true, synth: 'absent'}}, async (h, step) => { await ask(h); await step('écouter', () => voice(h), 0); });
   /* « En cours chez tes bots » : le compteur et la liste doivent dire la même chose */
   await scen('P en cours chez tes bots, plus de cinq', {scen: {active: true, pending: 7}}, async (h, step) => {
     const pend = () => h.page.evaluate(() => { const p = Array.from(document.querySelectorAll('#view .panel')).find((x) => /En cours chez tes bots/.test(x.innerText)); return p ? p.querySelector('.aside').innerText + ' // lignes affichées : ' + p.querySelectorAll('.pending li').length + ' // bouton : ' + ((p.querySelector('.pend-more') || {}).innerText || 'aucun') : 'bloc absent'; });
