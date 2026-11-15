@@ -9,6 +9,10 @@ La page n'a ni cerveau ni donnée : elle répète ce qu'on lui dit (« Tu as dit
 - `_headers` : en-têtes Cloudflare Pages (micro autorisé pour la page elle-même).
 - `test.js` : banc avec faux micro et fausse voix (boucle réussie, écoute continue, micro refusé, relance refusée depuis l'écran d'accueil, micro qui ne répond jamais, démarrage refusé, pas de reconnaissance, silence). `NODE_PATH=/opt/node-tools/node_modules node essais/voix-pwa/test.js`.
 
+## Mise en ligne sur GitHub Pages (gratuit, choix du 15/11/2026)
+
+Le déploiement Cloudflare (Workers) a échoué sur « Connection blocked » le 15/11/2026 ; le propriétaire a choisi GitHub Pages. Réglages du dépôt : Pages, source « Deploy from a branch », branche `main`, dossier `/ (root)`. Le fichier `.nojekyll` à la racine coupe Jekyll (les fichiers sont servis tels quels). Adresse : `https://rabiederouiche.github.io/RD-Personal-Assistant/essais/voix-pwa/`.
+
 ## Mise en ligne sur Cloudflare Pages (gratuit)
 
 Le dossier se publie tel quel, sans étape de construction : projet Pages relié au dépôt, branche `main`, commande de build vide, dossier de sortie `essais/voix-pwa`. Adresse : `https://<nom du projet>.pages.dev`.
