@@ -71,4 +71,12 @@ Publié sur la copie (version 3). Pas encore reporté sur la page d'essai.
 - Publié sur la copie (version 4) et déposé dans Drive.
 
 ### À venir
-**Allègement de la page** (choisi par le propriétaire le 15/11/2026, en cours) : retirer le code de l'ancienne maquette qui ne sert plus en direct (470 Ko aujourd'hui), sans changer ce que la page fait. À faire par petites étapes, tout le banc relancé à chaque étape ; noter ici ce qui a été retiré.
+
+**Allègement de la page** (choisi par le propriétaire le 15/11/2026) : mesuré avant d'y toucher, rien n'a été retiré.
+- Mesure (`COV=<dossier>` sur tout le banc, v17.7) : 26 % du script ne tourne jamais pendant les essais (104 Ko sur 403), mais l'essentiel est du code vivant que les essais ne parcourent pas (actions selon la nature d'une échéance, parcours de voyage, outils de la discussion). Le code vraiment mort, hérité de la maquette (rubriques « communes aux cinq maquettes », réponses simulées, `liveTick`), ne dépasse pas 15 à 25 Ko, soit 3 à 5 % de la page.
+- Conclusion : retirer le code mort ne change presque rien au coût d'une session. Ce qui le changerait : découper la page en plusieurs fichiers publiés ensemble (styles, socle, écrans, liaison, v17), pour qu'une session ne lise que le fichier qu'elle modifie. Gros chantier (le script est une seule fonction : il faut en sortir les déclarations communes et vérifier les noms réservés du navigateur). Décision demandée au propriétaire en QCM le 15/11/2026.
+
+**Voix** (demandée par le propriétaire le 15/11/2026 : poser une question à la voix, entendre la réponse, voir l'agent parler, discussion en direct). Ce que la plateforme permet :
+- Capacités `tts` (voix de Claude) et `dictation` (parole vers texte) des pages : offertes sur ordinateur (app Claude, Chrome), **pas dans l'app iPhone ni Safari**. Sur iPhone : la dictée du clavier marche dans tout champ de texte ; la lecture à voix haute par la voix du téléphone (synthèse vocale du navigateur) est à essayer sur son iPhone, non vérifiée.
+- Seul Claude répond en direct dans la page ; un bot Grok répond à son passage. « Parler à un bot » en direct = Claude qui répond à sa place d'après Pilotage, en le disant, et qui propose l'ordre pour le vrai bot.
+- Pistes proposées en QCM : un essai de la voix sur iPhone d'abord ; bouton « Écouter » sur les réponses ; mode conversation plein écran (hologramme du bot animé pendant qu'il parle, sous-titres en direct, question dictée, réponse lue seule). Pas d'androïde 3D (déjà rejeté par le propriétaire).
