@@ -18,4 +18,10 @@ Décisions du propriétaire (QCM du 15/11/2026) :
 
 - 15/11/2026, sa question : « la conversation en continu est-elle possible sur la PWA au premier plan ? Si oui, on tient notre gagnant » (une app à lui, Siri et Raccourcis plus tard). Réponse : à prouver sur son iPhone ; et il faudra un cerveau (`claude -p` sur un serveur, Oracle gratuit ou VPS). Il a choisi un essai publié sur **Cloudflare** : page `essais/voix-pwa/` (écoute, répète, réécoute ; aucune donnée), testée au banc (8 comportements de l'iPhone simulés). Le déploiement Cloudflare (Worker relié au dépôt) a échoué sur « Connection blocked » ; il a choisi **GitHub Pages** à la place (branche `main`, racine ; `.nojekyll` ajouté). Adresse de l'essai : `https://rabiederouiche.github.io/RD-Personal-Assistant/essais/voix-pwa/`.
 
-Suite : son rapport d'essai (Safari, puis écran d'accueil). Si réussi des deux côtés : PWA JARVIS avec cerveau `claude -p` ; sinon, appel vocal Grok avec le bot Jarvis (essai après la remise à zéro du mardi 17/11 à 12h).
+**Résultat de l'essai (15/11/2026, iPhone, iOS 27.0.1) : la conversation en continu marche.**
+- Dans le navigateur (Chrome pour iOS, moteur WebKit) : 4 tours complets, l'écoute est repartie seule 4 fois sur 4 après la réponse ; la première demande n'a pas démarré en 4 s (le temps d'autoriser le micro).
+- Depuis l'écran d'accueil (PWA Safari) : en « phrase par phrase », 3 tours sans toucher, puis une erreur `audio-capture` (micro pris un instant par autre chose) qui a arrêté l'essai ; en « écoute continue », tours réussis, relance seule après la réponse.
+- À retenir pour la vraie app : relancer l'écoute après une erreur `audio-capture` au lieu de s'arrêter ; la phrase part à la fin de la parole (environ 0,3 s après la réponse en mode phrase, 4 s en mode continu, à régler).
+- La voix et l'écoute ne sont donc plus un obstacle. Reste le cerveau en direct : `claude -p` sur un serveur à lui (Oracle gratuit ou VPS), sur son abonnement Max.
+
+Suite : son choix pour le serveur du cerveau, puis la phase 2 (prototype).
