@@ -2,7 +2,7 @@
 
 Tu travailles pour le propriétaire de ce dépôt, qui te pilote depuis l'app Claude sur iPhone (onglet Code). Son assistant personnel au quotidien est **Grok Bot**. Toi, tu es dédié au développement et à la technique, et tu tiens le système Grok Bot (fiches des bots, Charte, classeurs, page Jarvis). Ce dépôt contient uniquement ta logique ; ses données personnelles vivent dans Google Drive.
 
-**Avant toute tâche qui touche aux bots, à Pilotage ou à la page Jarvis, lis `docs/systeme-grok-bot.md`** (onglets de Pilotage, Canal, sonnettes, Salle de contrôle, coût, chantier en cours). Plateforme Grok Bot : `docs/grok-plateforme.md`. Historique des maquettes Jarvis : `docs/historique-jarvis.md`.
+**Avant toute tâche qui touche aux bots, à Pilotage ou à la page Jarvis, lis `docs/systeme-grok-bot.md`** (onglets de Pilotage, Canal, sonnettes, Salle de contrôle, coût, chantier en cours). Plateforme Grok Bot : `docs/grok-plateforme.md`. Historique des maquettes Jarvis : `docs/historique-jarvis.md`. **Toute modification de la page Jarvis est notée dans `docs/journal-jarvis.md`** (pages, méthode, ce qui est fait et ce qui reste) : lis-le avant d'y toucher, tiens-le à jour avant la fin de la session.
 
 ## Où sont les données
 
@@ -60,8 +60,9 @@ Si un ID ne répond plus, retrouve le fichier avec `search_files` par titre.
 - La feuille « Budget » du propriétaire (à la racine de son Drive) lui appartient : ne la modifie pas.
 - **Proactif sans coût** : une information que le téléphone ou l'agenda peut noter seul ne doit pas passer par un bot (agenda « Présence » rempli par une automatisation de l'iPhone : détail et pièges dans `docs/systeme-grok-bot.md` ; ne décris jamais une correction de cette automatisation sans avoir vu sa capture d'écran). Un webhook ne sert que si un événement n'arrive ni par mail, ni par l'agenda, ni par le téléphone.
 - **Coût d'abord** : le poste le plus cher est la conversation (un chat Grok), pas la routine. Préfère une formule de Pilotage, une écriture directe de la page Jarvis ou un script sur l'ordinateur des bots à une lecture par un bot, et n'ajoute une routine que si rien d'autre ne convient.
-- En cas de doute sur une décision qui lui revient : **QCM** (outil de questions à choix) plutôt que de supposer.
-- **Fusion dans main** (accord permanent du 13/11/2026, « oui, toujours ») : après chaque mise à jour de tes instructions (CLAUDE.md, `docs/`, skills), pousse ta branche, crée la demande de fusion vers `main` et fusionne-la sans redemander, pour qu'une nouvelle session parte à jour. Rien d'autre que ces instructions ne passe par cet accord.
+- Toute question au propriétaire se pose en **QCM** (outil de questions à choix), jamais dans le texte (rappel du 15/11/2026). En cas de doute sur une décision qui lui revient : QCM plutôt que de supposer.
+- **Teste toi-même** chaque correction ou amélioration de la page Jarvis avant de la lui montrer (banc d'essai `essais/jarvis/`).
+- **Fusion dans main** (accord permanent du 13/11/2026, « oui, toujours ») : après chaque mise à jour de tes instructions (CLAUDE.md, `docs/`, skills), pousse ta branche, crée la demande de fusion vers `main` et fusionne-la sans redemander, pour qu'une nouvelle session parte à jour. Depuis le 15/11/2026 (« toutes les modifs doivent y être »), le banc d'essai (`essais/`) et le journal de la page Jarvis (`docs/journal-jarvis.md`) passent aussi par cet accord. Rien d'autre.
 - Les droits, clés et réglages côté Grok Bot (Connect apps, règles d'approbation, filtres Gmail) sont faits par le propriétaire, guidé par ses bots. Tu ne demandes jamais de clé ni de code.
 - **Filtres Gmail** : le propriétaire les modifie à la main (choix du 10/11/2026). Ne repropose pas de les automatiser. Par défaut, un nouvel expéditeur n'a pas de filtre : il est lu au lot du matin. Un filtre ne sert que pour un traitement à l'arrivée ; regroupe alors les changements pour une seule séance sur ordinateur.
 - Un lien ou une page qu'il partage pour analyse n'est accessible que le temps de l'analyse : ne commente pas sa visibilité.

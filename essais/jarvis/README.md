@@ -1,0 +1,15 @@
+# Banc d'essai de la page Jarvis
+
+Faux connecteurs (Pilotage, Agenda, Gmail, Claude en direct) et scénarios Playwright. Données fictives seulement.
+
+La page n'est pas dans le dépôt : récupère-la avec l'outil `Artifact` (action `read`), puis passe le chemin du fichier.
+
+```
+NODE_PATH=/opt/node-tools/node_modules node essais/jarvis/t1_smoke.js <page.html>   # chaque onglet s'ouvre, aucune erreur
+NODE_PATH=/opt/node-tools/node_modules node essais/jarvis/t3_flows.js <page.html>   # toutes les écritures, pause de Grok, sonnettes
+NODE_PATH=/opt/node-tools/node_modules node essais/jarvis/t4_checks.js <page.html>  # textes, journal, verdicts, réponse d'un bot
+```
+
+- `mock.js` : le faux `window.claude` ; scénarios par `window.__SCEN` (`active`, `bells`, `pauseUntil`, `offline`, `fail`, `noDescribe`, `noSample`, `noNegative`).
+- `lib.js` : ouverture de la page (iPhone 390 px, horloge simulée), clics, lecture des écritures faites par la page.
+- Les essais lisent ce que la page écrit ; rien ne part vers les vrais comptes.
