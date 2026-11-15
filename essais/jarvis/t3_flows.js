@@ -140,6 +140,12 @@ const fill = async (h, sel, val) => { await h.page.fill(sel, val); };
     await step('page de Kairos', async () => { await h.page.evaluate(() => { const b = Array.from(document.querySelectorAll('.mate')).find((x) => /Kairos/.test(x.innerText)); b.click(); }); await L.tick(h, 600); return (await L.text(h)).replace(/\n+/g, ' | ').slice(0, 520); }, 0);
     await step('commande rapide', async () => L.click(h, 'Vérifie mes prix maintenant'));
   });
+  /* « En cours chez tes bots » : le compteur et la liste doivent dire la même chose */
+  await scen('P en cours chez tes bots, plus de cinq', {scen: {active: true, pending: 7}}, async (h, step) => {
+    const pend = () => h.page.evaluate(() => { const p = Array.from(document.querySelectorAll('#view .panel')).find((x) => /En cours chez tes bots/.test(x.innerText)); return p ? p.querySelector('.aside').innerText + ' // lignes affichées : ' + p.querySelectorAll('.pending li').length + ' // bouton : ' + ((p.querySelector('.pend-more') || {}).innerText || 'aucun') : 'bloc absent'; });
+    await step('sept ordres en attente de plus', async () => pend(), 0);
+    await step('voir les autres', async () => { const a = await L.click(h, 'Voir les'); return a + ' // ' + await pend(); }, 0);
+  });
   /* l'événement rouge : déplacé ou retiré directement dans l'agenda ; l'annuel reste confié à Iris */
   const evCard = (h, title, btn) => h.page.evaluate(({title, btn}) => { const norm = (s) => s.replace(/\s+/g, ' ').trim(); const c = Array.from(document.querySelectorAll('#view article')).find((a) => a.getClientRects().length && /important/i.test((a.querySelector(".nature") || {}).innerText || "") && norm(a.innerText).includes(title)); if (!c) return 'carte absente : ' + title; const b = Array.from(c.querySelectorAll('button')).find((x) => norm(x.innerText).startsWith(btn)); if (!b) return 'bouton absent : ' + btn; b.click(); return 'ok'; }, {title, btn});
   const calState = (h) => h.page.evaluate(() => window.__CAL.primary.filter((e) => e.colorId === '11').map((e) => e.summary + ' ' + (e.start.dateTime || e.start.date) + ' > ' + (e.end.dateTime || e.end.date)).join(' ; ') + ' // Échéances : ' + window.__G['Échéances'].filter((r) => /notaire/.test(r[1])).map((r) => r[0] + ' ' + r[4]).join(' ; '));
