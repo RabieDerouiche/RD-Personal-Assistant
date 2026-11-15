@@ -234,10 +234,13 @@
   }
   const mcp = {
     callTool: (server, tool, input) => delay(null).then(() => ({payload: exec(server, tool, input), content: []})),
-    watchTool: (server, tool, input, handler) => {
-      let stop = false;
-      delay(null, 30).then(() => { if (stop) return; try { handler({type: 'data', result: {payload: exec(server, tool, input), content: [], cache: {storedAt: Date.now(), revalidating: false}}}); } catch (e) { handler({type: 'error', error: e}); } });
-      return () => { stop = true; };
+    watchTool: (server, tool, input, handler, opts) => {
+      let stop = false, timer = 0;
+      const send = () => { if (stop) return; try { handler({type: 'data', result: {payload: exec(server, tool, input), content: [], cache: {storedAt: Date.now(), revalidating: false}}}); } catch (e) { handler({type: 'error', error: e}); } };
+      delay(null, 30).then(send);
+      /* comme la plateforme : relecture périodique quand la page la demande */
+      if (opts && opts.refetchInterval) timer = setInterval(send, opts.refetchInterval);
+      return () => { stop = true; clearInterval(timer); };
     },
     describeTool: SCEN.noDescribe ? undefined : (server, tool) => delay({name: tool, description: '', inputSchema: {type: 'object', properties: {threadId: {type: 'string'}, labelIds: {type: 'array', items: {type: 'string'}}}}}),
     listTools: () => delay({servers: []})
@@ -259,6 +262,14 @@
       if (opts.tools && /tâche/i.test(last)) { const t = opts.tools.find((x) => x.name === 'ajouter_tache'); if (t) await t.execute({titre: 'Appeler le syndic', date: isoD(D(2))}); }
       if (opts.tools && /mise à jour/i.test(last)) { const t = opts.tools.find((x) => x.name === 'mettre_a_jour_dossier'); if (t) await t.execute({statut: 'En cours', prochaine_etape: 'Confirmer mardi', resume: 'Expert mardi', consigne_iris: 'Prépare la confirmation'}); }
       text = 'Voici ma réponse (certain).\n- Point un\n- Point deux\nSuite : Prépare l\'ordre pour Iris | Ça peut attendre ? | Quels papiers ?';
+    }
+    /* scénario stream : la réponse arrive mot à mot, comme en vrai */
+    if (SCEN.stream && /^Voici ma réponse/.test(text)) {
+      text = "Première phrase de la réponse, assez longue pour être lue seule. Deuxième phrase, elle aussi complète et lisible. Troisième et dernière phrase.\nSuite : Et ensuite | Merci";
+      const words = text.split(' ');
+      for (let i = 1; i <= words.length; i++) { if (opts.onText) opts.onText({text: words.slice(0, i).join(' '), delta: words[i - 1]}); await delay(null, 60); }
+      (window.__voice || []).push('fin de la réponse');
+      return {text, truncated: false};
     }
     if (opts.onText) opts.onText({text, delta: text});
     return {text, truncated: false};
@@ -283,6 +294,9 @@
     Rec.prototype.start = function () {
       const r = this; window.__ear.push('start');
       if (SCEN.ear === 'refuse') { r._t.push(setTimeout(() => { if (r.onerror) r.onerror({error: 'not-allowed'}); if (r.onend) r.onend(); }, 20)); return; }
+      if (SCEN.ear === 'muet') return; /* l'app ne répond jamais : ni début, ni erreur, ni fin */
+      if (SCEN.ear === 'reseau') { r._t.push(setTimeout(() => { if (r.onerror) r.onerror({error: 'network'}); if (r.onend) r.onend(); }, 40)); return; }
+      if (SCEN.ear === 'jette') throw new Error('NotAllowedError');
       r._t.push(setTimeout(() => { if (r.onstart) r.onstart(); }, 50));
       let n = 0;
       const turn = () => {
