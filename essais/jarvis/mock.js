@@ -227,7 +227,7 @@
       if (tool === 'delete_draft') { const i = MAIL.drafts.findIndex((d) => d.id === input.draftId); if (i < 0) throw {code: 'tool_error', server, message: 'brouillon introuvable'}; MAIL.drafts.splice(i, 1); return {}; }
       if (tool === 'unlabel_thread') { if (!input.threadId || !Array.isArray(input.labelIds)) throw {code: 'tool_error', server, message: 'arguments'}; const i = MAIL.inbox.findIndex((t) => t.id === input.threadId); if (i >= 0) MAIL.inbox.splice(i, 1); return {}; }
     }
-    if (server === 'Claude Code Remote' && tool === 'fire_trigger') return {ok: true};
+    if (server === 'Claude Code Remote' && tool === 'fire_trigger') { /* scénario tasks : les seules tâches que ce compte possède */ if (SCEN.tasks && !SCEN.tasks.includes(input.trigger_id)) { const e = new Error('trigger not found'); e.code = 'tool_error'; throw e; } return {ok: true}; }
     throw {code: 'not_in_manifest', server, message: tool};
   }
   const mcp = {
