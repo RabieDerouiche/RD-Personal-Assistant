@@ -247,3 +247,7 @@ input[type="range"] { width: 100%; accent-color: #a5b4fc; }
 .badge { position: absolute; top: 1px; left: calc(50% + 6px); min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: var(--amber); color: #1a1100; font: 700 11px/18px var(--sans); }
 
 @media (prefers-reduced-motion: reduce) { .mic.is-on, .v-dot, .orb-ball, .meter i { animation: none; } }
+.result { margin-top: 2px; padding: 10px 12px; border-radius: 14px; background: rgba(110, 231, 183, .06); border: 1px solid rgba(110, 231, 183, .2); }
+.result p:last-child { margin: 2px 0 0; font-size: 13.5px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.srv-url { font: 500 13px var(--mono); overflow-wrap: anywhere; }
+.card .field { margin-top: 2px; }

@@ -1,0 +1,5 @@
+#cloud-config
+# À coller dans le champ « Cloud config » à la création du serveur Hetzner (Ubuntu 24.04).
+runcmd:
+  - curl -fsSL https://raw.githubusercontent.com/RabieDerouiche/RD-Personal-Assistant/main/jarvis-os/server/install/setup.sh -o /root/jarvis-setup.sh
+  - bash /root/jarvis-setup.sh > /root/jarvis-setup.log 2>&1

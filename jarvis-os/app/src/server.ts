@@ -1,0 +1,89 @@
+/* Le lien avec le serveur JARVIS (phase 3) : appairage, discussion en flux, missions et mémoire.
+   Sans serveur relié, l'app garde le cerveau local de la phase 2. */
+import {store, type Mission, type Msg} from './store';
+
+const base = () => store.settings.serverUrl.replace(/\/+$/, '');
+export const linked = () => !!(store.settings.serverUrl && store.settings.serverToken);
+const headers = () => ({'content-type': 'application/json', authorization: 'Bearer ' + store.settings.serverToken});
+async function call(path: string, init: RequestInit = {}, ms = 15000) {
+  const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), ms);
+  try { return await fetch(base() + path, {...init, headers: {...headers(), ...(init.headers || {})}, signal: ctl.signal}); }
+  finally { clearTimeout(t); }
+}
+
+export function normalizeUrl(u: string) {
+  let s = u.trim(); if (!s) return '';
+  if (!/^https?:\/\//i.test(s)) s = 'https://' + s;
+  return s.replace(/\/+$/, '');
+}
+
+export async function pair(url: string, code: string): Promise<string | null> {
+  const u = normalizeUrl(url);
+  if (!u) return 'Indique l\'adresse du serveur.';
+  try {
+    const r = await fetch(u + '/api/pair', {method: 'POST', headers: {'content-type': 'application/json'}, body: JSON.stringify({code, device: 'iPhone'})});
+    const b = await r.json().catch(() => ({}));
+    if (!r.ok || !b.token) return b.error || 'Le serveur a refusé (' + r.status + ').';
+    store.settings.serverUrl = u; store.settings.serverToken = b.token; store.save();
+    await call('/api/import', {method: 'POST', body: JSON.stringify({msgs: store.msgs.slice(-200), missions: store.missions})}).catch(() => null);
+    await sync();
+    return null;
+  } catch { return 'Serveur injoignable à cette adresse.'; }
+}
+export function unpair() { store.settings.serverToken = ''; store.save(); }
+
+export interface Status { ok: boolean; claude?: {installed: boolean; loggedIn: boolean; method: string}; version?: string; error?: string }
+let last: Status = {ok: false};
+export const lastStatus = () => last;
+export async function status(): Promise<Status> {
+  if (!linked()) return (last = {ok: false, error: 'non relié'});
+  try {
+    const r = await call('/api/status');
+    if (r.status === 401) return (last = {ok: false, error: 'appareil plus reconnu : relie-le de nouveau'});
+    const b = await r.json(); return (last = {ok: true, claude: b.claude, version: b.version});
+  } catch { return (last = {ok: false, error: 'serveur injoignable'}); }
+}
+
+/* le serveur fait foi pour la mémoire et les missions */
+export async function sync(): Promise<boolean> {
+  if (!linked()) return false;
+  try {
+    const r = await call('/api/state'); if (!r.ok) return false;
+    const b = await r.json() as {msgs: Msg[]; missions: Mission[]};
+    store.msgs = b.msgs; store.missions = b.missions; store.save(); return true;
+  } catch { return false; }
+}
+
+export interface ChatOut { reply: string; missions: Mission[]; agent?: string }
+/* la réponse arrive en flux (SSE) : onDelta reçoit le texte déjà écrit */
+export async function chat(text: string, opts: {newSession?: boolean; model: string}, onDelta: (t: string) => void): Promise<ChatOut> {
+  const r = await call('/api/chat', {method: 'POST', body: JSON.stringify({text, newSession: opts.newSession, model: opts.model})}, 150000);
+  if (r.status === 401) throw new Error('Cet iPhone n\'est plus reconnu par le serveur : relie-le de nouveau dans Réglages.');
+  if (!r.ok || !r.body) throw new Error('Le serveur a répondu ' + r.status + '.');
+  const rd = r.body.getReader(), dec = new TextDecoder();
+  let buf = '', out: ChatOut | null = null, err = '';
+  for (;;) {
+    const {value, done} = await rd.read(); if (done) break;
+    buf += dec.decode(value, {stream: true});
+    let i;
+    while ((i = buf.indexOf('\n\n')) >= 0) {
+      const block = buf.slice(0, i); buf = buf.slice(i + 2);
+      const m = /^event: (\w+)\ndata: (.*)$/s.exec(block.trim()); if (!m) continue;
+      const d = JSON.parse(m[2]);
+      if (m[1] === 'delta') onDelta(d.text);
+      else if (m[1] === 'done') out = d;
+      else if (m[1] === 'error') err = d.message;
+    }
+  }
+  if (err) throw new Error(err);
+  if (!out) throw new Error('Réponse interrompue.');
+  return out;
+}
+
+export async function missionUpdate(id: string, patch: {status?: string; priority?: string}) {
+  const r = await call('/api/missions/' + encodeURIComponent(id), {method: 'POST', body: JSON.stringify(patch)});
+  if (!r.ok) throw new Error('Le serveur a refusé.');
+  return (await r.json()).mission as Mission;
+}
+export async function missionDelete(id: string) { await call('/api/missions/' + encodeURIComponent(id), {method: 'DELETE'}); }
+export async function memoryClear() { await call('/api/memory', {method: 'DELETE'}); }
