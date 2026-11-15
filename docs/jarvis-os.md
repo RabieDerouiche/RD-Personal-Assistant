@@ -11,4 +11,9 @@ Conclusions à retenir :
 - L'app OpenClaw sur Blitz n'est plus en ligne (constaté le 15/11/2026). Blitz gratuit : les webhooks ne réveillent pas une app endormie. Options d'hébergement évaluées : Cloudflare Workers + Pages + D1 (gratuit, toujours éveillé, pas de `claude -p`), Oracle Always Free (2 cœurs, 12 Go depuis le 15/06/2026), Blitz Pro (7 € par mois TTC), petit VPS.
 - Architecture recommandée pour la v1 (0 € de plus) : bot Grok « Jarvis » pour la voix ; missions Grok vers Claude par le déclencheur d'API, Claude vers Grok par webhook ; page Jarvis pour l'écran ; Pilotage (onglet Missions à créer) pour la mémoire. PWA à soi en option, plus tard.
 
-Suite : attend le choix du propriétaire (QCM du 15/11/2026) et l'essai de l'appel vocal Grok après la remise à zéro du mardi 17/11 à 12h.
+Décisions du propriétaire (QCM du 15/11/2026) :
+- **Chef vocal : un nouveau bot Grok « Jarvis »**, chef d'orchestre (Iris garde courrier et dossiers).
+- **Hébergement de la future PWA : Cloudflare s'il suffit, sinon un VPS.**
+- Architecture v1 : pas encore choisie ; options réexpliquées en détail (v1 sans frais, PWA tout de suite, ou les deux avec une page d'essai de la voix dans Safari).
+
+Suite : son choix d'architecture, puis l'essai de l'appel vocal Grok après la remise à zéro du mardi 17/11 à 12h.
