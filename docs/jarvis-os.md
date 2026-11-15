@@ -24,4 +24,9 @@ Décisions du propriétaire (QCM du 15/11/2026) :
 - À retenir pour la vraie app : relancer l'écoute après une erreur `audio-capture` au lieu de s'arrêter ; la phrase part à la fin de la parole (environ 0,3 s après la réponse en mode phrase, 4 s en mode continu, à régler).
 - La voix et l'écoute ne sont donc plus un obstacle. Reste le cerveau en direct : `claude -p` sur un serveur à lui (Oracle gratuit ou VPS), sur son abonnement Max.
 
-Suite : son choix pour le serveur du cerveau, puis la phase 2 (prototype).
+Décisions suivantes (15/11/2026) :
+- **App (PWA) sur Cloudflare, gratuit** (pages et webhooks). Cloudflare gratuit ne peut pas faire tourner Claude Code : le cerveau a besoin d'une vraie machine.
+- **Cerveau : programme Claude Code (`claude -p`) sur un petit VPS Hetzner**, environ 5 à 8 € par mois TTC (prix à confirmer avant la commande). Options écartées : Cloudflare Containers (environ 5 $ HT par mois), Oracle gratuit.
+- « Usage personnel » expliqué : un seul utilisateur (lui), usage professionnel compris ; la déduction en frais professionnels est une question fiscale pour sa société de portage ou son comptable.
+
+Suite : son accord sur les conditions du cerveau en direct (délai de 5 à 15 s, usage Max, usage individuel), puis la phase 2 (prototype).
