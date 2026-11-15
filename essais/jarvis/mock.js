@@ -25,6 +25,7 @@
   G['Échéances'] = [
     ['Date', 'Sujet', 'Domaine', 'Rappels', 'Statut', 'Bot', 'Remarque', 'Nature'],
     [fr(D(-2)), "Envoyer l'attestation à l'école", 'Famille', '', 'À venir', 'Iris', 'Demandée par la directrice', 'À faire par moi'],
+    [fr(D(6)), 'Rendez-vous notaire (14h30)', 'Famille', '', 'À venir', 'Iris', 'Événement important ajouté depuis la page', 'Date à retenir'],
     [fr(D(0)), 'Rendez-vous médecin', 'Famille', '', 'À venir', 'Iris', 'Cabinet du centre', 'Date à retenir'],
     [fr(D(2)), 'CRA Allegis de la semaine', 'Travail', '', 'À venir', 'Chronos', 'Saisie sur le portail', "Un bot s'en occupe"],
     [fr(D(3)), 'Relancer la résiliation', 'Contrats', '', 'À venir', 'Iris', 'Si rien reçu', 'Un bot suit'],
@@ -167,6 +168,7 @@
   CAL.primary = [
     {id: 'imp1', summary: 'Rendez-vous notaire', status: 'confirmed', colorId: '11', start: {dateTime: isoD(D(6)) + 'T14:30:00+01:00'}, end: {dateTime: isoD(D(6)) + 'T15:30:00+01:00'}, location: 'Étude'},
     {id: 'imp2', summary: 'Anniversaire', status: 'confirmed', colorId: '11', start: {date: isoD(D(30))}, end: {date: isoD(D(31))}, recurrence: ['RRULE:FREQ=YEARLY']},
+    {id: 'imp3', summary: 'Visite médicale', status: 'confirmed', colorId: '11', start: {date: isoD(D(9))}, end: {date: isoD(D(10))}},
     {id: 'n1', summary: 'Réunion banale', status: 'confirmed', start: {date: isoD(D(1))}, end: {date: isoD(D(2))}}
   ];
 
@@ -216,7 +218,7 @@
       const cal = /@group\.calendar\.google\.com$/.test(input.calendarId || '') ? PRES : (input.calendarId || 'primary'), list = (CAL[cal] = CAL[cal] || []);
       if (tool === 'list_events') return {events: list.slice(), summary: 'x', timeZone: 'Europe/Paris'};
       if (tool === 'create_event') { if ((input.overrideReminders || []).some((r) => r.minutes < 0) && SCEN.noNegative) throw {code: 'tool_error', server, message: 'minutes négatives refusées'}; const ev = {id: 'new' + (++evSeq), summary: input.summary, status: 'confirmed', colorId: input.colorId, location: input.location}; if (input.allDay) { ev.start = {date: input.startTime.slice(0, 10)}; ev.end = {date: input.endTime.slice(0, 10)}; } else { ev.start = {dateTime: input.startTime + '+01:00'}; ev.end = {dateTime: input.endTime + '+01:00'}; } list.push(ev); return ev; }
-      if (tool === 'update_event') { const ev = list.find((e) => e.id === input.eventId); if (!ev) throw {code: 'tool_error', server, message: 'introuvable'}; if (input.summary) ev.summary = input.summary; return ev; }
+      if (tool === 'update_event') { const ev = list.find((e) => e.id === input.eventId); if (!ev) throw {code: 'tool_error', server, message: 'introuvable'}; if (input.summary) ev.summary = input.summary; if (input.startTime) { if (input.allDay) { if (!input.endTime) throw {code: 'tool_error', server, message: 'allDay sans endTime'}; ev.start = {date: input.startTime.slice(0, 10)}; ev.end = {date: input.endTime.slice(0, 10)}; } else { if (/Z$|[+-]\d\d:\d\d$/.test(input.startTime)) throw {code: 'tool_error', server, message: 'heure locale attendue, sans décalage'}; const len = new Date(ev.end.dateTime) - new Date(ev.start.dateTime); const s0 = new Date(input.startTime + '+01:00'); const f = (d) => new Date(d.getTime() + 3600000).toISOString().slice(0, 19) + '+01:00'; ev.start = {dateTime: f(s0)}; ev.end = {dateTime: f(new Date(s0.getTime() + len))}; } } return ev; }
       if (tool === 'delete_event') { const i = list.findIndex((e) => e.id === input.eventId); if (i < 0) throw {code: 'tool_error', server, message: 'introuvable'}; list.splice(i, 1); return {}; }
     }
     if (server === 'Gmail') {
