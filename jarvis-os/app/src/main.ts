@@ -12,10 +12,10 @@ import {charOf, setModeSource, talkAll, refreshModes, type Mode} from './chars';
 import * as srv from './server';
 
 const PHASE = 2;
-const VERSION = '0.7.4';
+const VERSION = '0.8.0';
 type View = 'home' | 'command' | 'agents' | 'agent' | 'missions' | 'more' | 'memory' | 'automations' | 'intelligence' | 'settings';
 let view: View = 'home';
-let live = '', note = '', clearArm = 0, orbState: OrbState = 'idle', agentFilter = 'tous', agentQuery = '', agentSel: AgentId = 'claude', missionCol = 'a_approuver', draftNext = '', streaming = '', fresh = true, pairMsg = '', pairUrl = '', pairCode = '', sessionAt = 0, updMsg = '', grokArm = 0, diagTxt = '';
+let live = '', note = '', clearArm = 0, orbState: OrbState = 'idle', agentFilter = 'tous', agentQuery = '', agentSel: AgentId = 'claude', missionCol = 'a_approuver', draftNext = '', streaming = '', fresh = true, pairMsg = '', pairUrl = '', pairCode = '', sessionAt = 0, lastTiming: any = null, voiceMsg = '', updMsg = '', grokArm = 0, diagTxt = '';
 
 const SALLE = {copie: 'https://claude.ai/artifact/NMAqUak7A5JYsLsc12VyaZ', service: 'https://claude.ai/artifact/QwLf64Ggstzu4p3uznZrr8'};
 const app = document.getElementById('app')!;
@@ -41,6 +41,7 @@ const short = (id: AgentId) => agent(id).name.replace(' (Grok)', '');
 /* ---------- la voix ---------- */
 const voice = new Voice({
   mode: () => store.settings.listenMode, voiceURI: () => store.settings.voiceURI, rate: () => store.settings.rate,
+  tts: () => (srv.serverVoice() ? srv.ttsUrl : null),
   onState: (s, why) => {
     const map: Record<VoiceState, OrbState> = {off: 'idle', listening: 'listening', waiting: 'thinking', speaking: 'speaking', error: 'error'};
     setOrb(map[s]);
@@ -75,9 +76,10 @@ async function handleRemote(text: string, byVoice: boolean) {
     if (m > 0) { const part = rest.slice(0, m).trim(); said += m; if (part) { if (!firstSpoken) { firstSpoken = Math.round(performance.now() - t0); store.stats.firstMs = [...(store.stats.firstMs || []), firstSpoken].slice(-50); } voice.streamPart(part, vg); } }
   };
   try {
-    const out = await srv.chat(text, {newSession: fresh, model: store.settings.model}, (t) => { streaming = t || '…'; document.querySelectorAll('[data-stream]').forEach((n) => { n.textContent = streaming; }); feed(t, false); });
+    const out = await srv.chat(text, {newSession: fresh, model: store.settings.model}, (t) => { streaming = t || '…'; document.querySelectorAll('[data-stream]').forEach((n) => { n.textContent = streaming; const box = n.closest('.cap-j'); if (box) box.scrollTop = box.scrollHeight; }); feed(t, false); });
     fresh = false; reply = out.reply; agentId = (out.agent as AgentId) || 'claude';
     if (out.missions.length) { store.missions.push(...out.missions); setOrb('executing'); }
+    if ((out as any).timing) lastTiming = (out as any).timing;
   } catch (e) {
     reply = (e as Error).message || 'Le serveur ne répond pas.'; store.stats.errors++; failed = true;
   }
@@ -300,9 +302,11 @@ function intelligence(): HTMLElement {
   const approved = store.missions.length ? store.missions.filter((m) => ['approuvee', 'envoyee', 'terminee'].includes(m.status)).length / store.missions.length : 0;
   const st3 = srv.lastStatus(), cl = claudeOn();
   const cn = st3.connectors, data = !!(cn && (cn.gmail || cn.sheets || cn.calendar));
+  const tm = lastTiming || st3.timing;
   const llm: [string, string, boolean][] = [['Tes données Google', !srv.linked() ? 'avec le serveur' : !cn?.checked ? 'vérification au prochain « Vérifier »' : data ? [cn.gmail && 'Gmail', cn.calendar && 'Agenda', cn.sheets && 'Pilotage', cn.drive && 'Drive'].filter(Boolean).join(', ') + ' · lecture seule' : 'aucun connecteur vu par Claude Code sur le serveur', srv.linked() && data], ['Serveur JARVIS', srv.linked() ? (st3.ok ? 'relié · version ' + st3.version : st3.error || 'vérification…') : 'pas encore relié (Réglages)', srv.linked() && st3.ok], ['Claude (en direct)', cl ? 'abonnement Claude, sur ton serveur' : 'connecte Claude sur le serveur', cl], ['Claude (missions)', cl ? 'faites sur ton serveur après ton accord' : 'avec le serveur', cl], ['Bots Grok', !srv.linked() ? 'avec le serveur' : !cn?.sheets ? 'il faut le connecteur Google Sheets' : srv.grokPaused() ? 'Canal prêt · Grok en pause jusqu\'au ' + new Date(st3.grokPauseUntil || '').toLocaleString('fr-FR', {weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'}) : 'missions par le Canal et la sonnette', srv.linked() && !!cn?.sheets && !srv.grokPaused()], ['Reconnaissance vocale', canListen() ? 'disponible sur cet appareil' : 'absente ici', canListen()], ['Voix de JARVIS', canSpeak() ? 'disponible' : 'absente ici', canSpeak()]];
   return h('section', {class: 'page'}, back(), head('Intelligence', 'Activité et services'),
     h('div', {class: 'gauges'}, gauge(Math.min(1, s.turns / 50), 'Échanges', String(s.turns), '#67e8f9'), gauge(voiceOk, 'Micro réussi', Math.round(voiceOk * 100) + '%', '#a5b4fc'), gauge(approved, 'Missions approuvées', Math.round(approved * 100) + '%', '#e9a8fb'), gauge(Math.min(1, avg / 1000), 'Réponse locale', avg + 'ms', '#fcd6a4')),
+    tm ? h('div', {class: 'card glass'}, h('p', {class: 'kpi-l', text: 'Dernière réponse de Claude'}), h('p', {text: 'Premières paroles en ' + (tm.first != null ? (tm.first / 1000).toFixed(1) + ' s' : '—') + ', réponse complète en ' + (tm.total / 1000).toFixed(1) + ' s · ' + tm.tools + ' outil' + (tm.tools > 1 ? 's' : '') + ' · ' + (tm.warm ? 'Claude déjà ouvert' : 'Claude démarré') + ' · ' + tm.model})) : null,
     h('div', {class: 'panel-h'}, h('h3', {text: 'État des modèles et services'})),
     h('div', {class: 'feed glass'}, llm.map(([n, d, ok]) => h('div', {class: 'llm-row'}, h('span', {class: 'st-dot ' + (ok ? 'ok' : 'off')}), h('div', {}, h('b', {text: n}), h('small', {text: d})), h('span', {class: 'pill ' + (ok ? 'is-ok' : 'is-demande'), text: ok ? 'Prêt' : 'Non relié'})))),
     srv.linked() ? h('div', {class: 'acts'}, h('button', {type: 'button', class: 'btn', onclick: async () => { diagTxt = 'Diagnostic en cours (jusqu\'à une minute)…'; render(); diagTxt = await srv.diag(); await srv.status(); render(); }}, 'Diagnostic des connecteurs'),
@@ -317,7 +321,7 @@ function settings(): HTMLElement {
   const sel = h('select', {class: 'field', 'aria-label': 'Voix', onchange: (e: Event) => { st.voiceURI = (e.target as HTMLSelectElement).value; store.save(); }},
     h('option', {value: '', text: "Voix des réglages de l'iPhone (recommandé)"}), vs.map((v) => h('option', {value: v.voiceURI || v.name, text: v.name + ' · ' + v.lang}))) as HTMLSelectElement;
   sel.value = st.voiceURI;
-  const seg = (k: 'listenMode' | 'route' | 'salle' | 'model', opts: [string, string][]) => h('div', {class: 'seg'}, opts.map(([v, l]) => h('button', {type: 'button', 'aria-pressed': String((st as any)[k] === v), onclick: () => { (st as any)[k] = v; store.save(); render(); }}, l)));
+  const seg = (k: 'listenMode' | 'route' | 'salle' | 'model' | 'voiceEngine', opts: [string, string][]) => h('div', {class: 'seg'}, opts.map(([v, l]) => h('button', {type: 'button', 'aria-pressed': String((st as any)[k] === v), onclick: () => { (st as any)[k] = v; store.save(); render(); }}, l)));
   const url = h('input', {class: 'field', type: 'url', value: pairUrl || st.serverUrl || (srv.servedByServer() ? location.origin : ''), placeholder: 'Adresse IP du serveur, ou https://…sslip.io', autocapitalize: 'off', autocomplete: 'off', 'aria-label': 'Adresse du serveur'}) as HTMLInputElement;
   const code = h('input', {class: 'field', type: 'text', value: pairCode, placeholder: 'Code d\'appairage (ex. K7Q2-M9XD)', autocapitalize: 'characters', autocomplete: 'off', 'aria-label': 'Code d\'appairage'}) as HTMLInputElement;
   url.addEventListener('input', () => { pairUrl = url.value; }); code.addEventListener('input', () => { pairCode = code.value; });
@@ -339,7 +343,11 @@ function settings(): HTMLElement {
     server,
     srv.linked() ? [h('label', {class: 'lbl', text: 'Claude répond'}), seg('model', [['rapide', 'Vite (Haiku)'], ['equilibre', 'Bien (Sonnet)'], ['profond', 'À fond (Opus)']])] : null,
     h('label', {class: 'lbl', text: 'Prénom pour l\'accueil'}), name,
-    h('label', {class: 'lbl', text: 'Voix de JARVIS'}), sel,
+    h('label', {class: 'lbl', text: 'Voix de JARVIS'}),
+    srv.linked() ? seg('voiceEngine', [['serveur', 'Pierre (ton serveur)'], ['iphone', 'Voix de l\'iPhone']]) : null,
+    !srv.linked() || st.voiceEngine === 'iphone' ? sel : srv.lastStatus().tts ? h('p', {class: 'small', text: 'Voix gratuite qui tourne sur ton serveur (Piper). Si elle ne répond pas, JARVIS prend la voix de l\'iPhone.'})
+      : h('div', {class: 'card glass'}, h('p', {class: 'muted small', text: voiceMsg || 'La voix Pierre n\'est pas encore installée sur ton serveur (gratuit, environ 200 Mo, 3 à 5 minutes). En attendant : voix de l\'iPhone.'}),
+          h('button', {type: 'button', class: 'btn main', onclick: async () => { voiceMsg = 'Installation en cours sur ton serveur… tu peux quitter cet écran.'; render(); const r = await srv.installVoice(); voiceMsg = r === 'done' ? 'Voix Pierre installée.' : r === 'running' ? 'Toujours en cours : reviens dans quelques minutes.' : 'L\'installation a échoué : dis-le à Claude (journal sur le serveur : ~/.jarvis/voice-install.log).'; render(); }}, 'Installer la voix Pierre sur le serveur')),
     h('p', {class: 'small', text: "Voix plus naturelle : Réglages de l'iPhone, Accessibilité, Read & Speak (Contenu énoncé), Voix, Français, puis une voix « améliorée » ou « premium »."}),
     h('label', {class: 'lbl', text: 'Vitesse'}), h('input', {type: 'range', min: '0.8', max: '1.3', step: '0.05', value: String(st.rate), 'aria-label': 'Vitesse de la voix', oninput: (e: Event) => { st.rate = +(e.target as HTMLInputElement).value; store.save(); }}),
     h('button', {type: 'button', class: 'btn', onclick: () => voice.speak('Bonsoir, je suis JARVIS. Voici ma voix.')}, 'Essayer la voix'),

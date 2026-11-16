@@ -23,4 +23,8 @@ module.exports =  (sc) => `(() => {
   window.SpeechSynthesisUtterance = function (t) { this.text = t; };
   const synth = {speaking: false, getVoices() { return [{lang: 'fr-FR', name: 'Thomas', voiceURI: 'thomas'}]; }, addEventListener() {}, cancel() { synth.speaking = false; stuck = false; }, speak(u) { if (!u.text.trim()) return; if (stuck) return; window.__spoken.push(u.text); synth.speaking = true; setTimeout(() => { synth.speaking = false; u.onend && u.onend(); }, 250); }};
   Object.defineProperty(window, 'speechSynthesis', {value: synth, configurable: true});
+  /* lecteur audio (voix du serveur) : retient le texte joué, puis « fin » après 200 ms */
+  const MP = HTMLMediaElement.prototype;
+  MP.play = function () { const el = this, tok = el.dataset.token, t = el.dataset.text; if (t && tok && tok[0] === 'p') { window.__spoken.push(t); window.__audio = (window.__audio || 0) + 1; } setTimeout(() => { if (el.dataset.token === tok) el.dispatchEvent(new Event('ended')); }, 200); return Promise.resolve(); };
+  MP.pause = function () {};
 })();`;

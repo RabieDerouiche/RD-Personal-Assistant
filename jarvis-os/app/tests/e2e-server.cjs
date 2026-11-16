@@ -6,7 +6,7 @@ const MOCK = require('./mock.cjs');
 const SRV = path.resolve(__dirname, '../../server');
 const DATA = fs.mkdtempSync(path.join(os.tmpdir(), 'jarvis-e2e-'));
 const PORT = 19000 + Math.floor(Math.random() * 900), BASE = 'http://127.0.0.1:' + PORT;
-const env = {...process.env, PORT: String(PORT), JARVIS_DATA: DATA, CLAUDE_BIN: path.join(SRV, 'tests/fake-claude.mjs'), JARVIS_WEB: path.resolve(__dirname, '../../web'), FAKE_DELAY: '40'};
+const env = {...process.env, PORT: String(PORT), JARVIS_DATA: DATA, CLAUDE_BIN: path.join(SRV, 'tests/fake-claude.mjs'), JARVIS_WEB: path.resolve(__dirname, '../../web'), FAKE_DELAY: '40', JARVIS_TTS_HELPER: path.join(SRV, 'tests/fake-tts.mjs'), JARVIS_VOICE_MODEL: path.join(SRV, 'tests/fake-tts.mjs')};
 const out = []; let fails = 0;
 const ok = (n, c, i) => { out.push((c ? 'OK   ' : 'ÉCHEC') + ' ' + n + (i ? ' :: ' + i : '')); if (!c) fails++; };
 (async () => {
@@ -42,6 +42,8 @@ const ok = (n, c, i) => { out.push((c ? 'OK   ' : 'ÉCHEC') + ' ' + n + (i ? ' :
     await p.waitForTimeout(1500);
     const parts = await p.evaluate((n) => window.__spoken.slice(n), n0), spoken = parts.join(' ');
     ok('réponse de Claude via le serveur, lue à voix haute', /Tu as dit : Bonjour JARVIS\. Session : nouvelle, modèle : sonnet/.test(spoken), spoken);
+    ok('chaque phrase dite une seule fois', parts.length === 2 && parts[0] === 'Tu as dit : Bonjour JARVIS.' && /^Session : nouvelle/.test(parts[1]), JSON.stringify(parts).slice(0, 120));
+    ok('voix du serveur (Pierre) utilisée', (await p.evaluate(() => window.__audio || 0)) >= 2, (await p.evaluate(() => window.__audio || 0)) + ' sons joués');
     ok('première phrase dite avant la fin de la réponse', firstPartWhileStreaming === 'Tu as dit : Bonjour JARVIS.' && parts.length >= 2, parts.length + ' morceaux, premier pendant le flux : « ' + firstPartWhileStreaming + ' »');
     ok('texte affiché pendant qu\'il arrive', seen.size >= 3 && !/modèle/.test(mid), seen.size + ' états, premier : ' + mid.slice(0, 40));
     ok('écoute repartie après la réponse', await p.evaluate(() => window.__jarvis.voice.state === 'listening'));
@@ -77,12 +79,13 @@ const ok = (n, c, i) => { out.push((c ? 'OK   ' : 'ÉCHEC') + ' ' + n + (i ? ' :
     /* iPhone : voix bloquée après l'écoute, et reprise d'une session coupée en pleine réponse */
     const ls = await p.evaluate(() => JSON.stringify(localStorage)); await p.close();
     const q = await b.newPage({viewport: {width: 390, height: 844}});
-    await q.addInitScript((ls) => { const o = JSON.parse(ls); for (const k in o) localStorage.setItem(k, o[k]); }, ls);
+    await q.addInitScript((ls) => { const o = JSON.parse(ls); const st = JSON.parse(o['jarvis.settings'] || '{}'); st.voiceEngine = 'iphone'; o['jarvis.settings'] = JSON.stringify(st); for (const k in o) localStorage.setItem(k, o[k]); }, ls);
     await q.addInitScript(MOCK({iosStuck: true})); await q.goto(BASE + '/'); await q.waitForTimeout(500);
     await q.click('.home-ask .ask-ic'); await q.waitForTimeout(300);
     let m0 = await q.evaluate(() => window.__spoken.length);
     await q.evaluate(() => window.__say.push('Bonjour JARVIS'));
     await q.waitForTimeout(3000);
+    ok('voix de l\'iPhone choisie : pas de son du serveur', !(await q.evaluate(() => window.__audio || 0)));
     ok('iPhone : la réponse est dite malgré la voix bloquée par le micro', /Tu as dit : Bonjour JARVIS/.test(await q.evaluate((n) => window.__spoken.slice(n).join(' '), m0)));
     await q.evaluate(() => window.__say.push('Et ensuite'));
     await q.waitForTimeout(700);

@@ -90,7 +90,8 @@ body.in-voice { background: radial-gradient(120% 60% at 20% 0, #0b2027 0, #05050
 .captions { width: 100%; min-height: 96px; display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; margin-top: -6px; }
 .cap-me { margin: 0; min-height: 22px; font-size: 17px; font-style: italic; color: #fff; overflow-wrap: anywhere; }
 .cap-j { display: flex; align-items: center; gap: 8px; text-align: left; max-width: 100%; }
-.cap-j p, .cap-hint { margin: 0; color: var(--muted); font-size: 15px; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+.cap-j { max-height: 30dvh; overflow-y: auto; align-items: flex-start; }
+.cap-j p, .cap-hint { margin: 0; color: var(--muted); font-size: 15px; overflow-wrap: anywhere; }
 .cap-hint { text-align: center; }
 .v-bar { margin-top: auto; padding: 12px 0 calc(14px + env(safe-area-inset-bottom)); display: flex; align-items: center; justify-content: center; gap: 44px; }
 .v-side { width: 50px; height: 50px; border-radius: 50%; display: grid; place-items: center; border: 1px solid rgba(255, 255, 255, .1); background: rgba(255, 255, 255, .06); color: #c9c7e0; }
