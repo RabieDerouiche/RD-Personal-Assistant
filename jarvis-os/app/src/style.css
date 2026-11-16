@@ -256,3 +256,4 @@ input[type="range"] { width: 100%; accent-color: #a5b4fc; }
 .v-model.off { color: var(--dim); border-color: var(--line-2); }
 .v-model + .v-route { margin-left: 0; }
 .diag { margin: 0; padding: 12px 14px; border-radius: 16px; font: 400 11.5px/1.5 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; color: var(--fg); }
+.card .muted.small { white-space: pre-wrap; overflow-wrap: anywhere; }

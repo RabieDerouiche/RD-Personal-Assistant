@@ -12,7 +12,7 @@ import {charOf, setModeSource, talkAll, refreshModes, type Mode} from './chars';
 import * as srv from './server';
 
 const PHASE = 2;
-const VERSION = '0.8.0';
+const VERSION = '0.8.1';
 type View = 'home' | 'command' | 'agents' | 'agent' | 'missions' | 'more' | 'memory' | 'automations' | 'intelligence' | 'settings';
 let view: View = 'home';
 let live = '', note = '', clearArm = 0, orbState: OrbState = 'idle', agentFilter = 'tous', agentQuery = '', agentSel: AgentId = 'claude', missionCol = 'a_approuver', draftNext = '', streaming = '', fresh = true, pairMsg = '', pairUrl = '', pairCode = '', sessionAt = 0, lastTiming: any = null, voiceMsg = '', updMsg = '', grokArm = 0, diagTxt = '';
@@ -347,7 +347,7 @@ function settings(): HTMLElement {
     srv.linked() ? seg('voiceEngine', [['serveur', 'Pierre (ton serveur)'], ['iphone', 'Voix de l\'iPhone']]) : null,
     !srv.linked() || st.voiceEngine === 'iphone' ? sel : srv.lastStatus().tts ? h('p', {class: 'small', text: 'Voix gratuite qui tourne sur ton serveur (Piper). Si elle ne répond pas, JARVIS prend la voix de l\'iPhone.'})
       : h('div', {class: 'card glass'}, h('p', {class: 'muted small', text: voiceMsg || 'La voix Pierre n\'est pas encore installée sur ton serveur (gratuit, environ 200 Mo, 3 à 5 minutes). En attendant : voix de l\'iPhone.'}),
-          h('button', {type: 'button', class: 'btn main', onclick: async () => { voiceMsg = 'Installation en cours sur ton serveur… tu peux quitter cet écran.'; render(); const r = await srv.installVoice(); voiceMsg = r === 'done' ? 'Voix Pierre installée.' : r === 'running' ? 'Toujours en cours : reviens dans quelques minutes.' : 'L\'installation a échoué : dis-le à Claude (journal sur le serveur : ~/.jarvis/voice-install.log).'; render(); }}, 'Installer la voix Pierre sur le serveur')),
+          h('button', {type: 'button', class: 'btn main', onclick: async () => { voiceMsg = 'Installation en cours sur ton serveur… tu peux quitter cet écran.'; render(); const r = await srv.installVoice(); voiceMsg = r === 'done' ? 'Voix Pierre installée.' : r === 'running' ? 'Toujours en cours : reviens dans quelques minutes.' : 'L\'installation a échoué. Fin du journal (envoie une capture à Claude) :\n' + (srv.installTail || '(vide)').slice(-400); render(); }}, 'Installer la voix Pierre sur le serveur')),
     h('p', {class: 'small', text: "Voix plus naturelle : Réglages de l'iPhone, Accessibilité, Read & Speak (Contenu énoncé), Voix, Français, puis une voix « améliorée » ou « premium »."}),
     h('label', {class: 'lbl', text: 'Vitesse'}), h('input', {type: 'range', min: '0.8', max: '1.3', step: '0.05', value: String(st.rate), 'aria-label': 'Vitesse de la voix', oninput: (e: Event) => { st.rate = +(e.target as HTMLInputElement).value; store.save(); }}),
     h('button', {type: 'button', class: 'btn', onclick: () => voice.speak('Bonsoir, je suis JARVIS. Voici ma voix.')}, 'Essayer la voix'),
