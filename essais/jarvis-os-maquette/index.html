@@ -163,6 +163,46 @@
   .shop-add { margin-top: 10px; align-self: flex-start; }
   html.theme-holo .pc { --pc-line: #38bdf8; }
   html.theme-holo .pc-line { filter: drop-shadow(0 0 4px rgba(56, 189, 248, .7)); }
+
+  /* JARVIS OS : voyages en carte d'embarquement, sorties avec tuile de date */
+  .vp-wrap { margin-top: 12px; }
+  .vp { position: relative; border-radius: 16px; padding: 10px 12px 8px; background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 12%, transparent), rgba(168, 85, 247, .08)); border: 1px dashed var(--line-2); }
+  .vp-svg { display: block; width: 100%; height: 56px; overflow: visible; }
+  .vp-arc { fill: none; stroke: var(--line-2); stroke-width: 1.5; stroke-dasharray: 3 5; }
+  .vp-done { fill: none; stroke: var(--accent); stroke-width: 2.2; stroke-linecap: round; filter: drop-shadow(0 0 4px color-mix(in srgb, var(--accent) 70%, transparent)); }
+  .vp-end { fill: var(--accent); stroke: var(--bg); stroke-width: 2; } .vp-end.is-off { fill: var(--bg); stroke: var(--line-2); }
+  .vp-plane path { fill: none; stroke: #fff; stroke-width: 2; stroke-linejoin: round; } .vp-plane { filter: drop-shadow(0 0 6px var(--accent)); }
+  .vp-codes { display: flex; justify-content: space-between; align-items: flex-end; margin-top: -4px; }
+  .vp-codes > span { display: flex; flex-direction: column; min-width: 0; max-width: 40%; }
+  .vp-codes .is-to { align-items: flex-end; text-align: right; }
+  .vp-codes b { font: 700 22px/1.1 var(--display); letter-spacing: .06em; }
+  .vp-codes small { color: var(--muted); font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+  .vp-step { align-self: center; font: 600 10.5px var(--sans); letter-spacing: .1em; text-transform: uppercase; color: var(--accent); border: 1px solid var(--line-2); border-radius: 999px; padding: 2px 8px; }
+  .vp-chips { margin-top: 8px; }
+  .mchip.is-cd { color: var(--fg); border-color: var(--accent); }
+  .vp-bud { height: 5px; border-radius: 3px; background: rgba(255, 255, 255, .08); margin-top: 8px; overflow: hidden; }
+  .vp-bud i { display: block; height: 100%; border-radius: 3px; background: linear-gradient(90deg, #22d3ee, #6366f1); } .vp-bud i.is-over { background: var(--danger); }
+  .sor-date { flex: 0 0 auto; width: 48px; min-height: 52px; border-radius: 14px; display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.05; border: 1px solid var(--line-2); background: var(--glass-2); }
+  .sor-date small { font: 600 9.5px var(--sans); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+  .sor-date b { font: 700 20px var(--display); }
+  .sor-date.is-wk { border-color: var(--accent); box-shadow: 0 0 14px color-mix(in srgb, var(--accent) 35%, transparent); }
+  .sor-date.is-wk small { color: var(--accent); }
+  .sor-chip { display: inline-flex; align-items: center; gap: 5px; } .sor-chip .ic { display: inline-flex; color: var(--accent); }
+
+  /* JARVIS OS : en cours chez tes bots, détail dépliable */
+  .pend-x li { display: block; padding: 0; }
+  .pend-x details > summary { list-style: none; display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; padding: 9px 12px; cursor: pointer; }
+  .pend-x details > summary::-webkit-details-marker { display: none; }
+  .pend-x summary small { grid-column: 2; color: var(--muted); font-size: 11.5px; }
+  .pend-x details[open] > summary small { color: var(--accent); }
+  .pend-body { padding: 2px 12px 12px; display: flex; flex-direction: column; gap: 10px; }
+  .pend-x .track li.trk { display: flex; gap: 12px; padding: 0 0 12px 0; border: 0; border-radius: 0; background: none; box-shadow: none; grid-template-columns: none; }
+  .pend-x .track li.trk:last-child { padding-bottom: 0; }
+  .pend-x .track li.trk b { color: var(--fg); font-size: 13.5px; }
+  .pend-x .track li.trk small { color: var(--muted); font-size: 12.5px; }
+  .pend-full { margin: 0; font-size: 13px; line-height: 1.45; }
+  .trk.is-amber .trk-dot { border-color: var(--amber) !important; background: var(--amber) !important; box-shadow: 0 0 10px rgba(251, 191, 36, .6) !important; }
+  .trk.is-amber b { color: var(--amber); }
 </style></head><body>
 <title>Jarvis v17 copie</title>
 <meta name="claude:viewport-fit-sides" content="cover">
@@ -3123,6 +3163,8 @@ void main(){
 
   /* ================= Achats et Voyages : un onglet chacun, une fiche et un fil par produit ou par projet ================= */
   ICONS.plane = '<path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/>';
+  ICONS.car = '<path d="M4.5 16.5h15M6 16.5l1.6-5.2a1.5 1.5 0 0 1 1.4-1h6a1.5 1.5 0 0 1 1.4 1l1.6 5.2M4.5 16.5V19M19.5 16.5V19"/><circle cx="8" cy="16.5" r="1.2"/><circle cx="16" cy="16.5" r="1.2"/>';
+  ICONS.kid = '<circle cx="12" cy="6" r="2.5"/><path d="M12 9v6.5M7.5 11.5h9M9.5 21l2.5-5.5 2.5 5.5"/>';
   ICONS.plus = '<path d="M12 5v14M5 12h14"/>';
   ICONS.cart = '<path d="M3.5 4.5h2l2.2 10.2a1.5 1.5 0 0 0 1.5 1.2h7.9a1.5 1.5 0 0 0 1.4-1.1l1.6-6.3H6.4"/><circle cx="10" cy="19.5" r="1.2"/><circle cx="17" cy="19.5" r="1.2"/>';
   const runAct = (type, item, a) => (a.pick || a.confirm) ? openItem(type, item, a) : finish(a.go(), {type, item});
@@ -3431,11 +3473,32 @@ void main(){
   function stepper(v, small) {
     return h('ol', {class: 'stepper' + (small ? ' is-small' : ''), 'aria-label': 'Étape : ' + STEPS[v.step]}, STEPS.map((s, i) => h('li', {class: i < v.step ? 'is-done' : i === v.step ? 'is-now' : ''}, h('i'), small ? null : h('span', {text: s}))));
   }
+  /* JARVIS OS : la carte d'un voyage façon carte d'embarquement : le trajet en arc, l'avion avance avec l'étape du projet */
+  const iata = (t) => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-Za-z]/g, '').slice(0, 3).toUpperCase() || '···';
+  function voyPass(v) {
+    const leg = (v.legs || [])[0], parts = leg ? String(leg[1]).split(/\s+-\s+|\s*→\s*|\s*>\s*/) : [];
+    const from = parts.length > 1 ? parts[0] : 'Paris', to = parts.length > 1 ? parts[parts.length - 1] : (v.dest || v.title);
+    const k = Math.max(0, Math.min(1, (v.step || 0) / (STEPS.length - 1))), P0 = [16, 52], P1 = [150, -6], P2 = [284, 52];
+    const bz = (t, i) => (1 - t) * (1 - t) * P0[i] + 2 * (1 - t) * t * P1[i] + t * t * P2[i];
+    const px = bz(k, 0), py = bz(k, 1), ang = Math.atan2(2 * (1 - k) * (P1[1] - P0[1]) + 2 * k * (P2[1] - P1[1]), 2 * (1 - k) * (P1[0] - P0[0]) + 2 * k * (P2[0] - P1[0])) * 180 / Math.PI;
+    const arc = 'M' + P0 + ' Q' + P1 + ' ' + P2;
+    const box = h('div', {class: 'vp', 'aria-hidden': 'true'});
+    box.innerHTML = '<svg viewBox="0 0 300 64" class="vp-svg"><path d="' + arc + '" class="vp-arc"/><path d="' + arc + '" pathLength="100" stroke-dasharray="' + (k * 100).toFixed(1) + ' 100" class="vp-done"/>' +
+      '<circle cx="' + P0[0] + '" cy="' + P0[1] + '" r="4" class="vp-end"/><circle cx="' + P2[0] + '" cy="' + P2[1] + '" r="4" class="vp-end' + (k >= 1 ? '' : ' is-off') + '"/>' +
+      '<g transform="translate(' + px.toFixed(1) + ' ' + py.toFixed(1) + ') rotate(' + (ang + 45).toFixed(1) + ') translate(-9 -9) scale(.75)" class="vp-plane">' + ICONS.plane + '</g></svg>';
+    box.append(h('div', {class: 'vp-codes'}, h('span', {}, h('b', {text: iata(from)}), h('small', {text: from})), h('span', {class: 'vp-step', text: STEPS[v.step] || ''}), h('span', {class: 'is-to'}, h('b', {text: iata(to)}), h('small', {text: to}))));
+    const sum = typeof chosenSum === 'function' ? chosenSum(v) : 0;
+    const chips = [v.when && v.when !== 'à fixer' ? String(v.when).replace(/^.*?proposition[^:]*:\s*/i, '') : 'Dates à fixer', v.depart != null && v.depart >= 0 ? 'J-' + v.depart : null,
+      v.budget ? (sum ? eur(sum) + ' sur ' + eur(v.budget) : 'Budget ' + eur(v.budget) + ' max') : null].filter(Boolean);
+    return h('div', {class: 'vp-wrap'}, box, h('div', {class: 'mchips vp-chips'}, chips.map((c, i) => h('span', {class: 'mchip' + (i === 1 && /^J-/.test(c) ? ' is-cd' : ''), text: c}))),
+      v.budget && sum ? h('div', {class: 'vp-bud'}, h('i', {style: 'width:' + Math.min(100, Math.round(sum / v.budget * 100)) + '%', class: sum > v.budget ? 'is-over' : ''})) : null);
+  }
   function voyCard(v) {
     const nx = voyNext(v), last = filOf('voy:' + v.id).slice(-1)[0];
     return h('article', {class: 'card voy' + (v.demo ? ' is-demo' : ''), style: botVars('mermaid')},
       h('button', {type: 'button', class: 'fam-hit', 'aria-label': 'Ouvrir ' + v.title, onclick: () => { SEL.voyages = v.id; renderView(false); }},
         h('div', {class: 'fam-top'}, h('span', {class: 'fam-ic', html: icon('plane', 18)}), h('div', {class: 'fam-id'}, h('b', {text: v.title}), h('small', {text: v.who + (v.dest ? ' · ' + v.dest : '')})), v.demo ? h('span', {class: 'pill demo-pill', text: 'Exemple'}) : h('span', {class: 'pill', text: v.paused ? 'En pause' : STEPS[v.step]})),
+        voyPass(v),
         stepper(v, true),
         h('p', {class: 'fam-verdict', text: nx.text}),
         last ? h('p', {class: 'fam-last'}, h('b', {text: whoName(last.who) + ' · ' + last.d + ' : '}), last.t) : null));
@@ -3622,13 +3685,21 @@ void main(){
     };
     inner.addEventListener('pointerup', end); inner.addEventListener('pointercancel', end);
   }
+  /* JARVIS OS : tuile de date et repères (prix, trajet, âge) sur chaque sortie */
+  const WD = ['dim', 'lun', 'mar', 'mer', 'jeu', 'ven', 'sam'], MO = ['janv', 'févr', 'mars', 'avr', 'mai', 'juin', 'juil', 'août', 'sept', 'oct', 'nov', 'déc'];
+  function sorDate(s) {
+    const n = s.from != null && s.from >= 0 ? s.from : s.to != null && s.to >= 0 ? s.to : null;
+    if (n == null) return h('span', {class: 'sor-ic', html: icon('map', 18)});
+    const d = new Date(TODAY); d.setDate(d.getDate() + n);
+    return h('span', {class: 'sor-date' + (sorInWeekend(s) ? ' is-wk' : '')}, h('small', {text: s.from != null && s.from < 0 ? "jusqu'au" : WD[d.getDay()]}), h('b', {text: String(d.getDate())}), h('small', {text: MO[d.getMonth()]}));
+  }
   function sorCard(s) {
     const exp = sorExpired(s), chips = [s.price != null ? eur(s.price) + ' TTC' : null, s.trajet, s.age].filter(Boolean);
     const inner = h('button', {type: 'button', class: 'sor-in', 'aria-label': s.title + '. ' + sorWhen(s) + '. Ouvrir la fiche'},
-      h('div', {class: 'sor-top'}, h('span', {class: 'sor-ic', html: icon('map', 18)}),
+      h('div', {class: 'sor-top'}, sorDate(s),
         h('div', {class: 'sor-id'}, h('b', {text: s.title}), h('small', {text: [s.where, sorWhen(s)].filter(Boolean).join(' · ')})),
         exp ? h('span', {class: 'pill st-exp', text: 'Expirée'}) : s.status === 'faite' ? h('span', {class: 'pill st-achat', text: 'Faite'}) : sorInWeekend(s) ? h('span', {class: 'pill st-wk', text: 'Ce week-end'}) : null),
-      chips.length ? h('div', {class: 'mchips'}, chips.map((c) => h('span', {class: 'mchip', text: c}))) : h('p', {class: 'sor-miss', text: 'Prix, trajet et lien : Ulysse complète.'}));
+      chips.length ? h('div', {class: 'mchips'}, chips.map((c) => h('span', {class: 'mchip sor-chip'}, h('span', {class: 'ic', html: icon(c === s.trajet ? 'car' : c === s.age ? 'kid' : 'tag', 13)}), c))) : h('p', {class: 'sor-miss', text: 'Prix, trajet et lien : Ulysse complète.'}));
     inner.addEventListener('click', () => { if (card._swiped) return; openItem('sortie', s); });
     const card = h('article', {class: 'sor' + (exp ? ' is-exp' : ''), style: botVars('mermaid')},
       s.status === 'proposee' ? h('div', {class: 'sor-bg', 'aria-hidden': 'true'}, h('span', {class: 'sor-l', html: icon('check', 18) + '<b>Faite</b>'}), h('span', {class: 'sor-r', html: '<b>' + (exp ? 'Retirer' : 'Supprimer') + '</b>' + icon('x', 18)})) : null, inner);
@@ -3931,7 +4002,7 @@ void main(){
     const canal = rows('canal');
     if (canal) {
       S.canal = canal.slice().reverse().slice(0, 300).map((r) => { const c = C_(r['Date'], r['De'], r['Pour'], r['Type'], r['Message'], r['Statut'], r['Réponse']); c.from = lvBot(r['De']) === 'toi' ? 'rabie' : c.from; c.objet = r['Objet'] || ''; c._row = r._row; return c; });
-      S.ordres = canal.filter((r) => lvLow(r['De']) === 'rabie').slice(-30).reverse().map((r) => ({id: 'o:' + r._row, bot: lvBot(r['Pour']) === 'toi' ? 'hydra' : lvBot(r['Pour']), text: r['Message'], n: lvFrIso(r['Date']) ? N(lvFrIso(r['Date'])) : 0, status: r['Statut'] || 'À faire', reply: r['Réponse'] || ''}));
+      S.ordres = canal.filter((r) => lvLow(r['De']) === 'rabie').slice(-30).reverse().map((r) => ({id: 'o:' + r._row, bot: lvBot(r['Pour']) === 'toi' ? 'hydra' : lvBot(r['Pour']), text: r['Message'], n: lvFrIso(r['Date']) ? N(lvFrIso(r['Date'])) : 0, status: r['Statut'] || 'À faire', reply: r['Réponse'] || '', date: r['Date'] || '', objet: r['Objet'] || '', type: r['Type'] || ''}));
       lvCheckWait(canal);
       S.filmsgs = [];
       const famOf = (name) => { const n = lvLow(name); const p = (S.prix || []).find((x) => lvLow(x.name) === n) || (S.prix || []).find((x) => n.includes(lvLow(x.name)) || lvLow(x.name).includes(n)); return p ? (S.ach || []).find((f) => f.ids.includes(p.id)) : (S.ach || []).find((f) => n.includes(lvLow(f.title))); };
@@ -4368,6 +4439,29 @@ void main(){
     return SM0(cfg);
   };
 
+  /* JARVIS OS : ce qui attend chez tes bots, avec le contexte et un suivi par étapes (écrit, sonnette, pris en charge, réponse) */
+  function pendSteps(o) {
+    const st = lvLow(o.status), paused = typeof GP !== 'undefined' && GP.on, oui = /^attend ton oui/.test(st), going = /^en cours/.test(st) || oui, done = /^fait/.test(st);
+    const until = paused && GP.until ? fmt(GP.until, {weekday: 'short'}) + ' ' + pad2(GP.until.getHours()) + 'h' + pad2(GP.until.getMinutes()) : 'la reprise';
+    return [
+      {t: 'Écrit dans le Canal', d: (o.date || "aujourd'hui") + (o.objet ? ' · Objet : ' + o.objet : ''), ok: true},
+      {t: paused && !going && !done ? 'Sonnette à la reprise de Grok' : 'Sonnette envoyée', d: paused && !going && !done ? 'part à ' + until + ', une par bot' : 'le bot passe dès qu\'il la reçoit', ok: !(paused && !going && !done)},
+      {t: oui ? 'Attend ton oui' : 'Pris en charge', d: oui ? 'colle la phrase dans le chat de ' + (BOT[o.bot] ? BOT[o.bot].name : 'ce bot') : going ? 'en cours' : 'pas encore', ok: going || done, amber: oui},
+      {t: 'Réponse', d: o.reply || 'pas encore', ok: !!o.reply || done}];
+  }
+  function pendPanel(pend, max) {
+    const list = SEL.pendAll || !max ? pend : pend.slice(0, max);
+    return panel('En cours chez tes bots', h('span', {class: 'aside', text: pend.length + ' demande' + (pend.length > 1 ? 's' : '')}),
+      h('ul', {class: 'pending pend-x'}, list.map((o) => {
+        const steps = pendSteps(o), nxt = steps.findIndex((x) => !x.ok);
+        return h('li', {style: botVars(o.bot)}, h('details', {},
+          h('summary', {}, h('b', {text: BOT[o.bot] ? BOT[o.bot].name : '?'}), h('span', {text: o.text.length > 110 ? o.text.slice(0, 107) + '…' : o.text}),
+            h('small', {text: (/^attend ton oui/i.test(o.status) ? 'Attend ton oui' : o.status) + (o.n ? ' · ' + (o.n === -1 ? 'hier' : o.n < -1 ? 'il y a ' + (-o.n) + ' j' : '') : '') + ' · touche pour le détail'})),
+          h('div', {class: 'pend-body'}, o.text.length > 110 ? h('p', {class: 'pend-full', text: o.text}) : null,
+            h('ol', {class: 'track'}, steps.map((x, i) => h('li', {class: 'trk' + (x.ok ? ' done' : i === nxt ? ' next' : '') + (x.amber ? ' is-amber' : '')}, h('span', {class: 'trk-dot'}), h('div', {}, h('b', {text: x.t}), h('small', {text: x.d}))))))));
+      })),
+      max && pend.length > max ? h('button', {type: 'button', class: 'link pend-more', onclick: () => { SEL.pendAll = !SEL.pendAll; renderView(true); }}, SEL.pendAll ? 'Réduire la liste' : 'Voir les ' + (pend.length - max) + ' autres') : null);
+  }
   /* ---------- l'accueil : le courrier arrivé depuis la veille d'Iris ---------- */
   const ACC0 = VIEWS.accueil;
   VIEWS.accueil = (el) => {
@@ -4375,10 +4469,7 @@ void main(){
     const anchor = el.querySelector('.brief-card');
     const put = (node) => { if (anchor && anchor.parentNode) anchor.parentNode.insertBefore(node, anchor.nextSibling); else el.append(node); };
     const pend = (S.ordres || []).filter((o) => !/^(fait|annul)/i.test(o.status) && o.n >= -2);
-    if (pend.length) put(panel('En cours chez tes bots', h('span', {class: 'aside', text: pend.length + ' demande' + (pend.length > 1 ? 's' : '')}),
-      h('ul', {class: 'pending'}, (SEL.pendAll ? pend : pend.slice(0, 5)).map((o) => h('li', {style: botVars(o.bot)}, h('b', {text: BOT[o.bot] ? BOT[o.bot].name : '?'}), h('span', {text: o.text.length > 110 ? o.text.slice(0, 107) + '…' : o.text}), h('small', {text: /^attend ton oui/i.test(o.status) ? 'attend ton oui dans son chat' : /signalé/i.test(o.reply) ? 'transmis, réponse à son passage' : (o.n === 0 ? "envoyé aujourd'hui" : 'envoyé ' + rel(o.n)) + ', pas encore lu'})))),
-      /* v17.8 : le compteur annonçait toutes les demandes mais la liste s'arrêtait à cinq */
-      pend.length > 5 ? h('button', {type: 'button', class: 'link pend-more', onclick: () => { SEL.pendAll = !SEL.pendAll; renderView(true); }}, SEL.pendAll ? 'Réduire la liste' : 'Voir les ' + (pend.length - 5) + ' autres') : null));
+    if (pend.length) put(pendPanel(pend, 5));
     const nNew = S.demandes.filter((d) => d.isNew).length + (S.newReplies || 0);
     if (nNew) put(h('div', {class: 'new-banner'}, h('span', {class: 'ic', html: icon('bolt', 16)}), h('span', {text: nNew + ' nouveauté' + (nNew > 1 ? 's' : '') + ' depuis ta dernière visite'}), h('button', {type: 'button', class: 'btn sm', onclick: () => { lvMarkSeen(); refresh(); }}, 'Tout vu')));
     const m = S.mailAfter;
@@ -5062,7 +5153,7 @@ void main(){
     if (brief && brief.parentNode) brief.parentNode.insertBefore(dosRepliesPanel(), brief.nextSibling); else el.append(dosRepliesPanel());
   };
   const VS1 = VIEWS.suivi;
-  VIEWS.suivi = (el) => { if ((S.dosReplies || []).length) el.append(dosRepliesPanel()); VS1(el); };
+  VIEWS.suivi = (el) => { const pend = (S.ordres || []).filter((o) => !/^(fait|annul)/i.test(o.status) && o.n >= -14); if (pend.length) el.append(pendPanel(pend, 0)); if ((S.dosReplies || []).length) el.append(dosRepliesPanel()); VS1(el); };
 
   /* ================= v17.4 (14/11/2026) : la file d'attente des bots — toutes les lignes d'un bot partent en un seul passage ================= */
   function botQueue() {
