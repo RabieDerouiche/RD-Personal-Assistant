@@ -178,7 +178,7 @@
   let evSeq = 0;
   const allDay = (n, summary, len) => ({id: 'pe' + (++evSeq), summary, status: 'confirmed', start: {date: isoD(D(n))}, end: {date: isoD(D(n + (len || 1)))}});
   const CAL = {};
-  CAL[PRES] = [allDay(-5, 'Congé', 2), allDay(-2, 'Hors Domicile'), allDay(-1, 'Télétravail'), allDay(3, 'Télétravail')];
+  CAL[PRES] = [allDay(-5, 'Congé', 2), allDay(-2, 'Hors Domicile'), allDay(-1, 'Télétravail'), allDay(0, 'Télétravail'), allDay(3, 'Télétravail'), allDay(9, 'Congé', 2)];
   CAL.primary = [
     {id: 'imp6', summary: 'Dentiste', status: 'confirmed', colorId: '11', start: {dateTime: isoD(D(0)) + 'T09:00:00+01:00'}, end: {dateTime: isoD(D(0)) + 'T09:45:00+01:00'}, location: 'Cabinet'},
     {id: 'imp7', summary: 'Réunion parents', status: 'confirmed', colorId: '11', start: {dateTime: isoD(D(0)) + 'T18:00:00+01:00'}, end: {dateTime: isoD(D(0)) + 'T19:00:00+01:00'}, location: 'École'},

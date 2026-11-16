@@ -761,6 +761,84 @@
   .lg-chip b { font: 600 11px var(--sans); color: var(--muted); }
   .lg-chip.is-on { border-color: rgba(255, 255, 255, .6); background: rgba(255, 255, 255, .1); }
 
+  /* JARVIS OS : agenda plus vivant (16/11/2026) : carte Aujourd'hui, 7 prochains jours, grille contrastée, légende repliée, barres de couleur */
+  .mg-p { --pc: #94a3b8; color: var(--pc); background: color-mix(in srgb, var(--pc) 18%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--pc) 50%, transparent); font: 700 9.5px/1.55 var(--display); padding: 0 5px; }
+  .mg-p[data-c="tt"] { --pc: #22d3ee; color: #a5f3fc; } .mg-p[data-c="hd"] { --pc: #c084fc; color: #e9d5ff; } .mg-p[data-c="cg"] { --pc: #34d399; color: #a7f3d0; } .mg-p[data-c="fe"], .mg-p[data-c="bad"] { --pc: #fb7185; color: #fecdd3; }
+  .mg-p[data-c="none"] { --pc: #64748b; background: none; box-shadow: none; color: var(--dim); }
+  .mg-p.is-big { font: 600 12.5px/1 var(--sans); padding: 8px 12px; border-radius: 999px; white-space: nowrap; }
+  .mg-p.is-big[data-c="none"] { box-shadow: inset 0 0 0 1px var(--line-2); color: var(--muted); }
+  .mgrid:not(.mini) .mg-d { min-height: 62px; background: rgba(148, 197, 255, .06); border-color: rgba(148, 197, 255, .08); }
+  .mgrid:not(.mini) .mg-d.has { background: rgba(148, 197, 255, .1); border-color: rgba(148, 197, 255, .16); }
+  .mgrid:not(.mini) .mg-d.is-we { background: rgba(168, 85, 247, .1); border-color: rgba(168, 85, 247, .14); }
+  .mgrid:not(.mini) .mg-d.is-past { opacity: .42; }
+  .mgrid:not(.mini) .mg-d.is-today { background: linear-gradient(160deg, rgba(34, 211, 238, .42), rgba(99, 102, 241, .38) 55%, rgba(168, 85, 247, .42)); border-color: rgba(165, 243, 252, .9); box-shadow: 0 0 16px rgba(56, 189, 248, .55), inset 0 0 12px rgba(255, 255, 255, .12); }
+  .mgrid:not(.mini) .mg-d.is-today .mg-n { background: none; color: #fff; padding: 0; text-shadow: 0 0 10px rgba(255, 255, 255, .8); }
+  .mg-n { font: 700 14px/1.4 var(--display); }
+  .mg-ics { gap: 2px; }
+  .mg-ic svg { filter: drop-shadow(0 0 4px currentColor); }
+  .lg-fold { border-top: 1px solid var(--line); padding-top: 6px; }
+  .lg-fold > summary { list-style: none; display: flex; align-items: center; gap: 8px; min-height: 40px; cursor: pointer; font: 600 12px var(--display); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+  .lg-fold > summary::-webkit-details-marker { display: none; }
+  .lg-fold .lg-on { font: 600 11.5px var(--sans); letter-spacing: 0; text-transform: none; color: var(--accent); padding: 2px 9px; border-radius: 999px; box-shadow: inset 0 0 0 1px currentColor; }
+  .lg-fold .lg-chev { margin-left: auto; display: inline-flex; transition: transform .2s; }
+  .lg-fold[open] .lg-chev { transform: rotate(90deg); }
+  .lg-fold[open] > summary { margin-bottom: 4px; }
+  .mrow .dl-row { position: relative; grid-template-columns: 16px minmax(0, 1fr) auto; padding: 8px 8px 8px 12px; background: color-mix(in srgb, var(--kc, #94a3b8) 8%, transparent); }
+  .mrow .dl-row::before { content: ""; position: absolute; left: 0; top: 6px; bottom: 6px; width: 3px; border-radius: 2px; background: var(--kc, #94a3b8); box-shadow: 0 0 8px var(--kc, #94a3b8); }
+  .mrow-l { gap: 4px; }
+  .mrow.is-we .mrow-d { background: rgba(168, 85, 247, .14); }
+  .mrow.is-today .mrow-d { background: linear-gradient(160deg, #22d3ee, #6366f1 55%, #a855f7); color: #fff; box-shadow: 0 0 14px rgba(56, 189, 248, .5); }
+  .mrow.is-today .mrow-d span { color: #fff; }
+  .agt { display: flex; flex-direction: column; gap: 12px; padding: 14px; border-radius: 22px; border: 1px solid var(--line); background: var(--glass); }
+  .agt-h { display: flex; align-items: center; gap: 12px; }
+  .agt-date { flex: 0 0 62px; height: 66px; border-radius: 18px; display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1; background: linear-gradient(160deg, #22d3ee, #6366f1 55%, #a855f7); color: #fff; box-shadow: 0 0 22px rgba(56, 189, 248, .45), inset 0 1px 0 rgba(255, 255, 255, .35); }
+  .agt-date b { font: 700 31px var(--display); text-shadow: 0 0 12px rgba(255, 255, 255, .5); }
+  .agt-date small { font: 700 10.5px var(--display); letter-spacing: .16em; text-transform: uppercase; margin-top: 4px; }
+  .agt-id { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+  .agt-k { font: 600 10.5px var(--display); letter-spacing: .2em; text-transform: uppercase; color: var(--accent); }
+  .agt-id b { font: 700 22px/1.15 var(--display); text-transform: capitalize; }
+  .agt-id small { color: var(--muted); font-size: 12.5px; }
+  .agt-pr { flex: 0 0 auto; border: 0; background: none; padding: 0; }
+  .agt-fe { margin: 0; font-size: 13px; color: #fecdd3; }
+  .agt-list { display: flex; flex-direction: column; gap: 6px; }
+  .agt-row { position: relative; display: grid; grid-template-columns: 52px minmax(0, 1fr) auto; align-items: center; gap: 8px; min-height: 48px; padding: 8px 12px 8px 8px; border: 0; border-radius: 14px; background: color-mix(in srgb, var(--kc) 11%, transparent); color: var(--fg); text-align: left; overflow: hidden; width: 100%; }
+  .agt-row::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--kc); box-shadow: 0 0 12px var(--kc); }
+  .agt-t { font: 700 13.5px var(--display); text-align: center; color: var(--kc); }
+  .agt-t.is-day { font: 600 10.5px var(--display); letter-spacing: .08em; text-transform: uppercase; }
+  .agt-l { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .agt-l b { font-size: 14.5px; font-weight: 600; overflow-wrap: anywhere; }
+  .agt-row small { font-size: 11.5px; color: var(--muted); }
+  .agt-row.is-past { opacity: .5; }
+  .agt-now { display: flex; align-items: center; gap: 8px; color: var(--accent); }
+  .agt-now i { flex: 0 0 8px; height: 8px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 10px var(--accent); }
+  .agt-now small { font: 600 11px var(--display); letter-spacing: .08em; text-transform: uppercase; white-space: nowrap; }
+  .agt-now span { flex: 1; height: 2px; border-radius: 1px; background: linear-gradient(90deg, var(--accent), transparent); box-shadow: 0 0 8px var(--accent); }
+  .agt-empty { margin: 0; color: var(--muted); font-size: 13.5px; }
+  .agt-f { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .agt-f small { color: var(--muted); font-size: 12.5px; }
+  .agw-row { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 5px; }
+  .agw-d { display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 8px 0 9px; min-width: 0; border-radius: 16px; border: 1px solid var(--line); background: var(--glass); color: var(--fg); }
+  .agw-d small { font: 600 10px var(--display); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+  .agw-d b { font: 700 19px/1 var(--display); }
+  .agw-d.is-we { background: rgba(168, 85, 247, .12); border-color: rgba(168, 85, 247, .3); }
+  .agw-d.is-fe b { color: #fda4af; }
+  .agw-d.has { border-color: rgba(103, 232, 249, .35); }
+  .agw-d .mg-p.is-blank { visibility: hidden; }
+  .agw-dots { display: flex; flex-wrap: wrap; justify-content: center; gap: 3px; min-height: 7px; padding: 0 3px; }
+  .agw-dots i { width: 7px; height: 7px; border-radius: 50%; background: var(--kc); box-shadow: 0 0 6px var(--kc); }
+  html.theme-holo .agt { background: radial-gradient(360px 160px at 0% 0%, rgba(34, 211, 238, .14), transparent 70%) padding-box, linear-gradient(180deg, rgba(12, 38, 92, .6), rgba(4, 12, 34, .86)) padding-box, linear-gradient(135deg, rgba(103, 232, 249, .75), rgba(99, 102, 241, .3) 45%, rgba(168, 85, 247, .6)) border-box; border: 1px solid transparent; box-shadow: inset 0 1px 0 rgba(150, 220, 255, .1), 0 0 22px rgba(37, 99, 235, .2); }
+  html.theme-holo .agw-d { background: linear-gradient(180deg, rgba(10, 30, 72, .55), rgba(4, 12, 34, .8)); border-color: rgba(56, 189, 248, .24); box-shadow: inset 0 1px 0 rgba(150, 220, 255, .08); }
+  html.theme-holo .agw-d.is-we { background: linear-gradient(180deg, rgba(88, 28, 135, .35), rgba(4, 12, 34, .8)); border-color: rgba(168, 85, 247, .38); }
+  html.theme-holo .agw-d.has { border-color: rgba(103, 232, 249, .5); box-shadow: inset 0 1px 0 rgba(150, 220, 255, .1), 0 0 12px rgba(34, 211, 238, .18); }
+  html.theme-holo .mgrid:not(.mini) .mg-d { background: linear-gradient(180deg, rgba(14, 44, 104, .42), rgba(4, 12, 34, .55)); border-color: rgba(56, 189, 248, .14); }
+  html.theme-holo .mgrid:not(.mini) .mg-d.has { border-color: rgba(103, 232, 249, .32); }
+  html.theme-holo .mgrid:not(.mini) .mg-d.is-we { background: linear-gradient(180deg, rgba(88, 28, 135, .32), rgba(4, 12, 34, .55)); border-color: rgba(168, 85, 247, .26); }
+  html.theme-holo .mgrid:not(.mini) .mg-d.is-today { background: linear-gradient(160deg, rgba(34, 211, 238, .5), rgba(99, 102, 241, .45) 55%, rgba(168, 85, 247, .5)); border-color: rgba(165, 243, 252, .95); }
+  html.theme-holo .mgrid:not(.mini) .mg-d.is-hit { border-color: rgba(165, 243, 252, .85); box-shadow: 0 0 12px rgba(56, 189, 248, .35); }
+  html.theme-holo .mlist { background: linear-gradient(180deg, rgba(12, 38, 92, .45), rgba(4, 12, 34, .78)); border-color: rgba(56, 189, 248, .24); }
+  html.theme-holo .mrow { border-top-color: rgba(56, 189, 248, .14); }
+  html.theme-holo .mrow-d { background: rgba(56, 189, 248, .1); }
+
   .dl-ic { display: inline-flex; line-height: 0; }
   .dl-row { grid-template-columns: 14px minmax(0, 1fr) auto; }
   .bc-week { display: flex; flex-direction: column; gap: 4px; padding: 6px 4px; }
@@ -2868,22 +2946,22 @@ void main(){
   }
 
   /* ---------- l'agenda : le mois en cours, l'année, et le zoom sur un mois ---------- */
-  const CAL = {mode: 'month', y: TODAY.getFullYear(), m: TODAY.getMonth(), filter: null};
+  const CAL = {mode: 'month', y: TODAY.getFullYear(), m: TODAY.getMonth(), filter: null, legend: false};
   const MONTHS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
   const KCAT = [['e-moi', 'À faire par toi', 'check'], ['e-offre', 'Offre qui se termine', 'percent'], ['e-fin', 'Fin de validité', 'hourglass'], ['e-date', 'À retenir', 'star'], ['an', 'Anniversaire', 'cake'], ['ev', 'Ton événement', 'cal']];
   const KICON = Object.fromEntries(KCAT.map(([k, , ic]) => [k, ic]));
   const BOTJOB = {hydra: 'courrier, relances', medusa: 'CRA, timesheets', unicorn: 'prix, offres', mermaid: 'sorties', griffon: 'veille', cyclops: 'supervision'};
   /* un élément fait par un bot porte l'emblème et la couleur de ce bot : rien à faire pour toi */
   const embSvg = (id, s) => '<svg viewBox="0 0 24 24" width="' + s + '" height="' + s + '" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + (EMB[id] || []).map((d) => '<path d="' + d + '"/>').join('') + '</svg>';
-  const kIcon = (k, s) => k.startsWith('b-') ? h('span', {class: 'mg-ic', style: 'color:' + BOT[k.slice(2)].d, html: embSvg(k.slice(2), s)}) : h('span', {class: 'mg-ic k-' + k, html: icon(KICON[k] || 'star', s)});
-  const kDot = (k) => k.startsWith('b-') ? h('span', {class: 'dl-ic', style: 'color:' + BOT[k.slice(2)].d, html: embSvg(k.slice(2), 13)}) : h('span', {class: 'dl-ic k-' + k, html: icon(KICON[k] || (k === 'fe' ? 'star' : 'star'), 13)});
+  const kIcon = (k, s) => k.startsWith('b-') ? h('span', {class: 'mg-ic', style: 'color:' + BOT[k.slice(2)].c, /* JARVIS OS : couleur vive (.c) au lieu de la sombre (.d) */ html: embSvg(k.slice(2), s)}) : h('span', {class: 'mg-ic k-' + k, html: icon(KICON[k] || 'star', s)});
+  const kDot = (k) => k.startsWith('b-') ? h('span', {class: 'dl-ic', style: 'color:' + BOT[k.slice(2)].c, html: embSvg(k.slice(2), 13)}) : h('span', {class: 'dl-ic k-' + k, html: icon(KICON[k] || (k === 'fe' ? 'star' : 'star'), 13)});
   const KLABEL = {'e-moi': 'À faire par toi', 'e-bot': "Un bot s'en occupe", 'e-suivi': 'Un bot suit', 'e-offre': 'Offre', 'e-fin': 'Fin de validité', 'e-date': 'Date à retenir', an: 'Anniversaire', ev: 'Événement important'};
   function dayItems(iso) {
     const out = [], mm = +iso.slice(5, 7), dd = +iso.slice(8, 10);
     const hol = holiday(iso); if (hol) out.push({k: 'fe', label: 'Jour férié : ' + hol});
     const code = S.presence[iso]; if (code) out.push({k: 'pr', code, label: 'Présence : ' + CODE[code]});
     S.anniv.forEach((a) => { if (a.m === mm && a.d === dd) { const age = a.year ? +iso.slice(0, 4) - a.year : null; out.push({k: 'an', label: 'Anniversaire de ' + a.who + (age != null && age > 0 ? ' (' + age + ' ans)' : ''), open: () => openItem('anniv', a)}); } });
-    S.evenements.forEach((v) => { if (isoOf(day(v.n)) === iso) out.push({k: 'ev', label: v.title + (v.time ? ' · ' + v.time : ''), open: () => openItem('evenement', v)}); });
+    S.evenements.forEach((v) => { if (isoOf(day(v.n)) === iso) out.push({k: 'ev', label: v.title + (v.time ? ' · ' + v.time : ''), title: v.title, time: v.time, open: () => openItem('evenement', v)}); });
     S.echeances.forEach((e) => { if (isoOfItem(e) === iso) out.push({k: e.nature === 'bot' || e.nature === 'suivi' ? 'b-' + e.bot : 'e-' + e.nature, label: e.title, bot: e.bot, open: () => openItem('echeance', e)}); });
     return out;
   }
@@ -2909,7 +2987,7 @@ void main(){
       g.append(h('button', {type: 'button', class: cls, 'aria-label': fmt(new Date(y, m, d, 12), {weekday: 'long', day: 'numeric', month: 'long'}) + (its.length ? ' : ' + its.map((x) => x.label).join(', ') : ''), onclick: () => openDay(iso)},
         h('span', {class: 'mg-n', text: String(d)}),
         pr ? h('span', {class: 'mg-p', 'data-c': fe ? 'bad' : pr.code, text: pr.code.toUpperCase()}) : fe ? h('span', {class: 'mg-p', 'data-c': 'fe', text: 'FÉ'}) : null,
-        dots.length ? h('span', {class: 'mg-ics'}, [...new Set(dots.map((x) => x.k))].slice(0, 3).map((k) => kIcon(k, 12))) : null));
+        dots.length ? h('span', {class: 'mg-ics'}, [...new Set(dots.map((x) => x.k))].slice(0, 3).map((k) => kIcon(k, 15))) : null)); /* JARVIS OS : icônes plus grandes */
     }
     return g;
   }
@@ -2938,13 +3016,13 @@ void main(){
       const counts = {};
       for (let d = 1, nd = new Date(CAL.y, CAL.m + 1, 0).getDate(); d <= nd; d++) dayItems(CAL.y + '-' + pad2(CAL.m + 1) + '-' + pad2(d)).forEach((x) => { counts[x.k] = (counts[x.k] || 0) + 1; });
       const chip = (k, label, inner) => h('button', {type: 'button', class: 'lg-chip' + (CAL.filter === k ? ' is-on' : ''), 'aria-pressed': String(CAL.filter === k), onclick: () => set({filter: CAL.filter === k ? null : k})}, inner, h('span', {text: label}), counts[k] ? h('b', {text: String(counts[k])}) : null);
-      box.append(h('div', {class: 'cal-legend'},
+      box.append(legendFold(h('div', {class: 'cal-legend'},
         h('p', {class: 'lg-t', text: 'Pour toi · touche une icône pour surligner ses jours'}),
         h('div', {class: 'lg-row'}, KCAT.map(([k, label]) => chip(k, label, kIcon(k, 14)))),
         h('p', {class: 'lg-t', text: 'Fait par un bot, rien à faire pour toi'}),
         h('div', {class: 'lg-row'}, BOTS.map((b) => chip('b-' + b.id, b.name + ' · ' + BOTJOB[b.id], kIcon('b-' + b.id, 14)))),
         h('p', {class: 'lg-t', text: 'L\'étiquette sous le chiffre'}),
-        h('div', {class: 'lg-row'}, chip('pr', 'Ta présence : TT télétravail, HD sur site, CG congé', h('span', {class: 'mg-p', 'data-c': 'tt', text: 'TT'})), chip('fe', 'Jour férié', h('span', {class: 'mg-p', 'data-c': 'fe', text: 'FÉ'})))));
+        h('div', {class: 'lg-row'}, chip('pr', 'Ta présence : TT télétravail, HD sur site, CG congé', h('span', {class: 'mg-p', 'data-c': 'tt', text: 'TT'})), chip('fe', 'Jour férié', h('span', {class: 'mg-p', 'data-c': 'fe', text: 'FÉ'}))))));
     }
     return box;
   }
@@ -2954,11 +3032,62 @@ void main(){
       const iso = CAL.y + '-' + pad2(CAL.m + 1) + '-' + pad2(d), its = dayItems(iso).filter((x) => x.k !== 'pr');
       if (!its.length) continue;
       const n = dayDiff(iso);
-      rows.push(h('div', {class: 'mrow' + (n === 0 ? ' is-today' : '') + (n < 0 ? ' is-past' : '')},
+      const dw = new Date(CAL.y, CAL.m, d, 12).getDay();
+      rows.push(h('div', {class: 'mrow' + (n === 0 ? ' is-today' : '') + (n < 0 ? ' is-past' : '') + (dw === 0 || dw === 6 ? ' is-we' : '')},
         h('button', {type: 'button', class: 'mrow-d', onclick: () => openDay(iso)}, h('b', {text: String(d)}), h('span', {text: fmt(new Date(CAL.y, CAL.m, d, 12), {weekday: 'short'}).replace('.', '')})),
-        h('div', {class: 'mrow-l'}, its.map((x) => h(x.open ? 'button' : 'div', {type: x.open ? 'button' : null, class: 'dl-row', onclick: x.open || null}, kDot(x.k), h('span', {text: x.label}), x.bot ? h('small', {text: BOT[x.bot].name}) : null)))));
+        h('div', {class: 'mrow-l'}, its.map((x) => h(x.open ? 'button' : 'div', {type: x.open ? 'button' : null, class: 'dl-row', style: '--kc:' + kCol(x.k), onclick: x.open || null}, kDot(x.k), h('span', {text: x.label}), x.bot ? h('small', {text: BOT[x.bot].name}) : null)))));
     }
     return panel('En ' + MONTHS[CAL.m], null, rows.length ? h('div', {class: 'mlist'}, rows) : emptyState('Rien de prévu en ' + MONTHS[CAL.m] + '.'));
+  }
+
+  /* ---------- JARVIS OS : agenda plus vivant (16/11/2026) ---------- */
+  /* une couleur vive par type : barres de la liste, points de la semaine, carte Aujourd'hui */
+  const KCOL = {'e-moi': '#fbbf24', 'e-offre': '#34d399', 'e-fin': '#f87171', 'e-date': '#93c5fd', an: '#f0abfc', ev: '#fb923c', fe: '#fb7185'};
+  const kCol = (k) => k.startsWith('b-') ? ((BOT[k.slice(2)] || {}).c || '#94a3b8') : (KCOL[k] || '#94a3b8');
+  const agMin = (x) => { const m = String(x.time || '').match(/(\d{1,2})h(\d{2})?/); return m ? +m[1] * 60 + (+m[2] || 0) : null; };
+  const agWeekNo = (d) => { const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())), w = t.getUTCDay() || 7; t.setUTCDate(t.getUTCDate() + 4 - w); return Math.ceil(((t - Date.UTC(t.getUTCFullYear(), 0, 1)) / 86400000 + 1) / 7); };
+  const prPill = (code, fe, big) => code ? h('span', {class: 'mg-p' + (big ? ' is-big' : ''), 'data-c': fe ? 'bad' : code, text: big ? CODE[code] : code.toUpperCase()}) : fe ? h('span', {class: 'mg-p' + (big ? ' is-big' : ''), 'data-c': 'fe', text: big ? 'Férié' : 'FÉ'}) : null;
+  function legendFold(inner) {
+    const f = CAL.filter, lab = !f ? '' : f === 'pr' ? 'présence' : f === 'fe' ? 'jours fériés' : f.startsWith('b-') ? BOT[f.slice(2)].name : ((KCAT.find(([k]) => k === f) || [])[1] || f);
+    const d = h('details', {class: 'lg-fold'}, h('summary', {}, h('span', {text: 'Légende et filtres'}), f ? h('b', {class: 'lg-on', text: 'Filtre : ' + lab}) : null, h('span', {class: 'lg-chev', html: icon('next', 14)})), inner);
+    d.open = !!(f || CAL.legend);
+    d.addEventListener('toggle', () => { CAL.legend = d.open; });
+    return d;
+  }
+  function agToday() {
+    const iso = isoOf(TODAY), its = dayItems(iso), pr = its.find((x) => x.k === 'pr'), fe = its.find((x) => x.k === 'fe');
+    const list = its.filter((x) => x.k !== 'pr' && x.k !== 'fe'), timed = list.filter((x) => agMin(x) != null).sort((a, b) => agMin(a) - agMin(b)), allDay = list.filter((x) => agMin(x) == null);
+    const now = new Date(), nowM = now.getHours() * 60 + now.getMinutes();
+    const row = (x, past) => h(x.open ? 'button' : 'div', {type: x.open ? 'button' : null, class: 'agt-row' + (past ? ' is-past' : ''), style: '--kc:' + kCol(x.k), onclick: x.open || null},
+      h('span', {class: 'agt-t' + (x.time ? '' : ' is-day'), text: x.time || 'journée'}), h('span', {class: 'agt-l'}, kDot(x.k), h('b', {text: x.title || x.label})), x.bot ? h('small', {text: BOT[x.bot].name}) : null);
+    const nowLine = () => h('div', {class: 'agt-now', 'aria-hidden': 'true'}, h('i'), h('small', {text: 'Maintenant · ' + hm(now)}), h('span'));
+    const rows = []; let nowIn = false;
+    timed.forEach((x) => { if (!nowIn && agMin(x) > nowM) { rows.push(nowLine()); nowIn = true; } rows.push(row(x, agMin(x) <= nowM)); });
+    if (timed.length && !nowIn) rows.push(nowLine());
+    allDay.forEach((x) => rows.push(row(x, false)));
+    const mine = list.filter((x) => !x.k.startsWith('b-')).length, bots = list.length - mine;
+    const wd = fmt(TODAY, {weekday: 'long'});
+    return h('section', {class: 'agt', 'aria-label': "Aujourd'hui"},
+      h('header', {class: 'agt-h'},
+        h('div', {class: 'agt-date'}, h('b', {text: String(TODAY.getDate())}), h('small', {text: fmt(TODAY, {month: 'short'}).replace('.', '')})),
+        h('div', {class: 'agt-id'}, h('span', {class: 'agt-k', text: "Aujourd'hui"}), h('b', {text: wd}), h('small', {text: fmt(TODAY, {day: 'numeric', month: 'long', year: 'numeric'}) + ' · semaine ' + agWeekNo(TODAY)})),
+        h('button', {type: 'button', class: 'agt-pr', 'aria-label': 'Ma présence aujourd\'hui : ' + (pr ? CODE[pr.code] : fe ? 'férié' : 'rien de noté'), onclick: () => openDay(iso)}, prPill(pr && pr.code, !!fe, true) || h('span', {class: 'mg-p is-big', 'data-c': 'none', text: 'Présence ?'}))),
+      fe ? h('p', {class: 'agt-fe', text: fe.label}) : null,
+      rows.length ? h('div', {class: 'agt-list'}, rows) : h('p', {class: 'agt-empty', text: "Rien de prévu aujourd'hui."}),
+      h('footer', {class: 'agt-f'}, h('small', {text: list.length ? (mine ? mine + ' pour toi' : '') + (mine && bots ? ' · ' : '') + (bots ? bots + ' chez tes bots' : '') : 'Journée libre'}),
+        btn('Ajouter', () => openImportant(iso), 'sm', 'plus')));
+  }
+  function agWeek() {
+    const cells = []; let total = 0;
+    for (let n = 1; n <= 7; n++) {
+      const d = day(n), iso = isoOf(d), its = dayItems(iso), pr = its.find((x) => x.k === 'pr'), fe = its.find((x) => x.k === 'fe'), dots = its.filter((x) => x.k !== 'pr' && x.k !== 'fe'), we = d.getDay() === 0 || d.getDay() === 6;
+      total += dots.length;
+      cells.push(h('button', {type: 'button', class: 'agw-d' + (we ? ' is-we' : '') + (fe ? ' is-fe' : '') + (dots.length ? ' has' : ''), 'aria-label': longDay(n) + (its.length ? ' : ' + its.map((x) => x.label).join(', ') : ' : rien de prévu'), onclick: () => openDay(iso)},
+        h('small', {text: fmt(d, {weekday: 'short'}).replace('.', '')}), h('b', {text: String(d.getDate())}),
+        prPill(pr && pr.code, !!fe) || h('span', {class: 'mg-p is-blank', 'aria-hidden': 'true', text: 'TT'}),
+        h('span', {class: 'agw-dots'}, dots.slice(0, 4).map((x) => h('i', {style: '--kc:' + kCol(x.k)})))));
+    }
+    return h('section', {class: 'agw hm-sec'}, h('header', {class: 'hm-h'}, h('h2', {text: 'Les 7 prochains jours'}), h('span', {class: 'aside', text: total ? total + ' élément' + (total > 1 ? 's' : '') : 'semaine calme'})), h('div', {class: 'agw-row'}, cells));
   }
 
   /* JARVIS OS, thème hologramme : le globe de réseau remplace la sphère de Claude à l'accueil (même appui) */
@@ -2990,6 +3119,7 @@ void main(){
       if (S.snoozed.length) el.append(panel('Reportées', null, S.snoozed.map((d) => h('p', {class: 'muted', text: BOT[d.bot].name + ' · ' + d.title}))));
     },
     agenda(el) {
+      el.append(agToday(), agWeek()); /* JARVIS OS */
       el.append(calendar());
       el.append(h('div', {class: 'actions-bar'}, btn('Nouvel événement important', () => openImportant(), 'main', 'cal'), btn('Nouvelle tâche', () => openSheet({bot: 'hydra', title: 'Nouvelle tâche', say: 'Une tâche pour toi, avec ou sans date.', extra: newTaskForm, actions: []}), '', 'check')));
       if (CAL.mode === 'month') el.append(monthList());
