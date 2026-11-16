@@ -142,6 +142,24 @@ srv.listen(0, async () => {
     ok('doublon 15 : « Valider ces dates » une seule fois, le conseil renvoie aux dates proposées', await p.evaluate(() => [...document.querySelectorAll('#view button')].filter((x) => /Valider ces dates/.test(x.innerText)).length === 1 && !!document.querySelector('.verdict .verdict-go') && !!document.getElementById('plan-dates')));
     p = await page('#suivi');
     ok('doublon 16 : Suivi garde une ligne vers Papiers ; Équipe sans dépôt ; Papiers avec le dépôt', await p.evaluate(() => /papiers? suivis?/.test((document.querySelector('.pap-go') || {}).textContent || '') && !document.querySelector('#view .pap-search, #view input[type="search"]')) && await (async () => { const q = await page('#equipe'); const e = await q.evaluate(() => ![...document.querySelectorAll('#view .panel h2')].some((x) => /Déposer un document/.test(x.textContent))); const r = await page('#papiers'); return e && await r.evaluate(() => [...document.querySelectorAll('#view .panel h2')].some((x) => /Déposer un document/.test(x.textContent))); })());
+    /* glisser vers le bas ferme la fenêtre (demande du 16/11/2026) : vrais gestes tactiles */
+    { const drag = async (q, x, y, dx, dy, ms) => { const c = await q.context().newCDPSession(q); await c.send('Input.dispatchTouchEvent', {type: 'touchStart', touchPoints: [{x, y}]}); for (let i = 1; i <= 8; i++) { await c.send('Input.dispatchTouchEvent', {type: 'touchMove', touchPoints: [{x: x + dx * i / 8, y: y + dy * i / 8}]}); await q.waitForTimeout(ms / 8); } await c.send('Input.dispatchTouchEvent', {type: 'touchEnd', touchPoints: []}); await q.waitForTimeout(900); };
+      p = await page('#agenda'); await p.tap('.agw-d'); await p.waitForTimeout(700);
+      const box = await p.evaluate(() => { const r = document.getElementById('sheet').getBoundingClientRect(); return {x: r.left + r.width / 2, y: r.top + 40}; });
+      await drag(p, box.x, box.y, 0, 35, 500);
+      const shortOk = await p.evaluate(() => !document.getElementById('sheet').hidden && !document.getElementById('sheet').style.transform);
+      await drag(p, box.x - 80, box.y + 30, 170, 15, 300);
+      const sideOk = await p.evaluate(() => !document.getElementById('sheet').hidden);
+      await drag(p, box.x, box.y, 0, 220, 350);
+      ok('glisser : la feuille du bas se ferme (pas sur un petit glissé ni un glissé de côté)', shortOk && sideOk && await p.evaluate(() => document.getElementById('sheet').hidden), shortOk + ' ' + sideOk);
+      p = await page(''); await p.fill('.intent-input', 'Bonjour'); await p.press('.intent-input', 'Enter'); await p.waitForTimeout(900);
+      const opened = await p.evaluate(() => !document.getElementById('chat').hidden);
+      await drag(p, 215, 40, 0, 260, 350);
+      ok('glisser : la discussion se ferme d\'un glissé vers le bas', opened && await p.evaluate(() => document.getElementById('chat').hidden));
+      await p.tap('.talk-slot .jv-btn'); await p.waitForTimeout(900);
+      const vOpen = await p.evaluate(() => { const j = document.querySelector('.jv'); return !!j && !j.hidden && getComputedStyle(j).display !== 'none'; });
+      await drag(p, 215, 60, 0, 300, 350);
+      ok('glisser : la page vocale se ferme d\'un glissé vers le bas', vOpen && await p.evaluate(() => { const j = document.querySelector('.jv'); return !j || j.hidden || getComputedStyle(j).display === 'none'; })); }
     /* aucune rubrique n'affiche de texte cassé */
     const broken = [];
     for (const t of ['accueil', 'demandes', 'agenda', 'suivi', 'achats', 'voyages', 'sorties', 'papiers', 'equipe', 'automatisations', 'reglages']) {

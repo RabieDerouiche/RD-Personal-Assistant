@@ -2785,6 +2785,39 @@ void main(){
     renderChat();
     setTimeout(() => { const ta = $('chat-in'); if (ta) ta.focus({preventScroll: true}); }, 200);
   }
+  /* JARVIS OS (demande du 16/11/2026) : glisser vers le bas ferme la fenêtre ouverte (feuille du bas, discussion, rubrique ouverte, page vocale).
+     Le geste ne démarre que si ce qu'on touche est déjà tout en haut (sinon on fait défiler), jamais dans un champ, et s'efface devant un glissé de côté.
+     Fermeture au-delà de 110 px, ou 50 px d'un geste vif ; sinon la fenêtre revient en place. */
+  function swipeToClose() {
+    const LAYERS = [
+      {sel: '#sheet', on: () => !$('sheet').hidden, close: () => closeSheet(), slide: false},
+      {sel: '#chat', on: () => CHAT.open, close: () => closeChat(), slide: true},
+      {sel: '#app', on: () => !!APP.id, close: () => closeApp(), slide: true},
+      {sel: '.jv', on: (el) => !el.hidden && getComputedStyle(el).display !== 'none', close: (el) => { const x = el.querySelector('.jv-x'); if (x) x.click(); }, slide: true}];
+    const field = (t) => !!(t.closest && t.closest('input, textarea, select, [contenteditable], .no-swipe'));
+    const scrolledIn = (t, root) => { for (let n = t; n && n !== root.parentElement; n = n.parentElement) { const s = getComputedStyle(n); if (/(auto|scroll)/.test(s.overflowY) && n.scrollHeight > n.clientHeight + 1 && n.scrollTop > 0) return true; if (n === root) break; } return false; };
+    let G = null;
+    document.addEventListener('touchstart', (e) => {
+      G = null; if (e.touches.length !== 1) return;
+      const t = e.target, L = LAYERS.find((l) => { const el = t.closest && t.closest(l.sel); return el && l.on(el); }); if (!L) return;
+      const el = t.closest(L.sel); if (field(t) || scrolledIn(t, el)) return;
+      G = {L, el, y0: e.touches[0].clientY, x0: e.touches[0].clientX, t0: performance.now(), dy: 0, on: false};
+    }, {passive: true});
+    document.addEventListener('touchmove', (e) => {
+      if (!G) return; const ty = e.touches[0].clientY - G.y0, tx = e.touches[0].clientX - G.x0;
+      if (!G.on) { if ((Math.abs(tx) > 10 && Math.abs(tx) > Math.abs(ty)) || ty < -6) { G = null; return; } if (ty < 10) return; G.on = true; G.el.style.transition = 'none'; }
+      G.dy = Math.max(0, ty); G.el.style.transform = 'translateY(' + G.dy + 'px)'; if (e.cancelable) e.preventDefault();
+    }, {passive: false});
+    const end = () => {
+      const g = G; G = null; if (!g || !g.on) return;
+      const fast = g.dy > 50 && g.dy / Math.max(1, performance.now() - g.t0) > 0.6;
+      if (g.dy > 110 || fast) {
+        if (g.L.slide) { g.el.style.transition = 'transform .22s ease-in'; g.el.style.transform = 'translateY(100%)'; setTimeout(() => { g.L.close(g.el); g.el.style.transition = ''; g.el.style.transform = ''; }, 220); }
+        else { g.el.style.transition = ''; g.el.style.transform = ''; g.L.close(g.el); }
+      } else { g.el.style.transition = 'transform .2s'; g.el.style.transform = ''; setTimeout(() => { g.el.style.transition = ''; }, 220); }
+    };
+    document.addEventListener('touchend', end, {passive: true}); document.addEventListener('touchcancel', end, {passive: true});
+  }
   function closeChat() {
     if (typeof convPause === 'function' && EAR.session) convPause();
     if (typeof voxStop === 'function') voxStop();
@@ -3709,6 +3742,7 @@ void main(){
     $('sheet-back').addEventListener('click', () => closeSheet());
     $('nav-back').addEventListener('click', navBack);
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { if (!$('sheet').hidden) closeSheet(); else if (CHAT.open) closeChat(); else if (APP.id) closeApp(); } });
+    swipeToClose();
     window.addEventListener('hashchange', () => { const id = location.hash.slice(1) || 'accueil'; if (VIEWS[id] && id !== TAB) go(id); });
     const clk = () => { const n = new Date(); $('clock').textContent = hm(n); };
     clk(); setInterval(clk, 1000);
