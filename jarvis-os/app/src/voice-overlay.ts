@@ -1,6 +1,7 @@
 /* JARVIS OS : la page vocale (orbe, voile de soie, conversation continue), en module autonome pour la nouvelle app.
    Elle s'ouvre par le grand bouton orbe du bas. Avec le serveur relié : Claude en flux, voix Pierre ; sinon : réponses locales. */
 import {createOrb, type OrbState} from './orb';
+import {createHolo, type HoloOpts} from './holo';
 import {Voice, canListen, canSpeak} from './voice';
 import {think, resetBrain} from './brain';
 import {store} from './store';
@@ -34,11 +35,30 @@ const CSS = `
 .jv-mic.on { animation: jvring 1.5s ease-in-out infinite; }
 .jv-mic.say { background: linear-gradient(135deg, #a78bfa, #8b5cf6 50%, #d946ef); }
 @keyframes jvring { 50% { box-shadow: 0 0 0 16px rgba(91, 140, 255, 0), 0 10px 40px rgba(91, 140, 255, .55); } }
+/* thème hologramme (html.theme-holo) */
+.theme-holo .jv-btn { background: radial-gradient(circle, rgba(2, 8, 24, .95) 55%, rgba(2, 8, 24, 0) 72%); }
+.theme-holo .jv-btn::after { box-shadow: 0 0 0 1px rgba(56, 189, 248, .5), 0 0 22px rgba(56, 189, 248, .45); animation: jvholo 2.6s ease-in-out infinite; }
+@keyframes jvholo { 50% { box-shadow: 0 0 0 1px rgba(103, 232, 249, .75), 0 0 36px rgba(56, 189, 248, .7); } }
+.theme-holo .jv { background: radial-gradient(90% 46% at 50% 26%, #0b2d63 0, #04112b 45%, #02040d 100%); }
+.theme-holo .jv::before { content: ""; position: absolute; inset: 0; pointer-events: none; background-image: radial-gradient(1px 1px at 12% 18%, rgba(255,255,255,.55), transparent 60%), radial-gradient(1px 1px at 78% 12%, rgba(255,255,255,.4), transparent 60%), radial-gradient(1.5px 1.5px at 88% 46%, rgba(125,211,252,.6), transparent 60%), radial-gradient(1px 1px at 22% 62%, rgba(255,255,255,.35), transparent 60%), radial-gradient(1px 1px at 60% 80%, rgba(255,255,255,.3), transparent 60%), radial-gradient(1.5px 1.5px at 40% 8%, rgba(168,85,247,.6), transparent 60%); }
+.theme-holo .jv > * { position: relative; }
+.theme-holo .jv-top { font: 600 11px Orbitron, Inter, sans-serif; letter-spacing: .18em; text-transform: uppercase; color: #7dd3fc; }
+.theme-holo .jv-dot { background: #22d3ee; box-shadow: 0 0 12px #22d3ee; }
+.theme-holo .jv-chip { font-family: Inter, sans-serif; letter-spacing: 0; text-transform: none; color: #67e8f9; border-color: rgba(103, 232, 249, .4); }
+.theme-holo .jv-me { color: #e0f2fe; }
+.theme-holo .jv-rep { color: #bfdbfe; }
+.theme-holo .jv-comp { background: rgba(8, 30, 70, .55); border-color: rgba(56, 189, 248, .45); box-shadow: 0 0 18px rgba(56, 189, 248, .18); }
+.theme-holo .jv-comp button { background: linear-gradient(90deg, #0ea5e9, #6366f1 60%, #a855f7); color: #fff; }
+.theme-holo .jv-side { border-color: rgba(56, 189, 248, .45); background: rgba(8, 30, 70, .5); color: #bae6fd; box-shadow: 0 0 14px rgba(56, 189, 248, .2); }
+.theme-holo .jv-mic { background: radial-gradient(circle at 50% 35%, #38bdf8, #2563eb 55%, #6d28d9); box-shadow: 0 0 0 1px rgba(125, 211, 252, .8), 0 0 0 7px rgba(56, 189, 248, .14), 0 0 40px rgba(56, 189, 248, .6); }
+.theme-holo .jv-mic.say { background: radial-gradient(circle at 50% 35%, #c084fc, #7c3aed 55%, #4c1d95); }
 `;
 const SVG = (d: string, s = 24) => `<svg viewBox="0 0 24 24" width="${s}" height="${s}" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
 const I = {mic: '<rect x="9" y="3.5" width="6" height="11" rx="3"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3"/>', key: '<rect x="3" y="6.5" width="18" height="11" rx="2"/><path d="M7 10.5h.01M11 10.5h.01M15 10.5h.01M8 14h8"/>', x: '<path d="M6 6l12 12M18 6L6 18"/>', speaker: '<path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5z"/><path d="M15.5 9a4.2 4.2 0 0 1 0 6"/>', stop: '<rect x="7" y="7" width="10" height="10" rx="2"/>'};
 const TXT: Record<OrbState, string> = {idle: 'En veille', listening: "Je t'écoute…", thinking: 'Je réfléchis…', executing: 'Mission préparée', speaking: 'Je réponds…', error: 'Micro indisponible'};
 
+const isHolo = () => document.documentElement.classList.contains('theme-holo');
+const makeOrb = (o: HoloOpts) => (isHolo() ? createHolo(o) : createOrb());
 let root: HTMLElement, orb: ReturnType<typeof createOrb>, me: HTMLElement, rep: HTMLElement, note: HTMLElement, stateEl: HTMLElement, mic: HTMLButtonElement, comp: HTMLElement, input: HTMLInputElement, chip: HTMLElement;
 let fresh = true, sessionAt = 0, busy = false;
 const voice = new Voice({
@@ -88,7 +108,7 @@ function build() {
     <div class="jv-comp" hidden><input type="text" placeholder="Écris à JARVIS…" enterkeyhint="send" aria-label="Ta demande"><button type="button">Envoyer</button></div>
     <div class="jv-bar"><button type="button" class="jv-side jv-k" aria-label="Écrire">${SVG(I.key, 22)}</button><button type="button" class="jv-mic" aria-label="Parler">${SVG(I.mic, 30)}</button><button type="button" class="jv-side jv-x" aria-label="Fermer">${SVG(I.x, 22)}</button></div>`;
   document.body.append(root);
-  orb = createOrb(); root.querySelector('.jv-stage')!.append(orb.el);
+  orb = makeOrb({pedestal: true, nodes: 140}); root.querySelector('.jv-stage')!.append(orb.el);
   me = root.querySelector('.jv-me')!; rep = root.querySelector('.jv-rep')!; note = root.querySelector('.jv-note')!; stateEl = root.querySelector('.jv-state')!; chip = root.querySelector('.jv-chip')!;
   mic = root.querySelector('.jv-mic')!; comp = root.querySelector('.jv-comp')!; input = comp.querySelector('input')!;
   mic.onclick = () => { if (voice.state === 'speaking') { voice.interrupt(); return; } if (voice.active) { voice.stop(); return; } start(); };
@@ -110,8 +130,10 @@ export function close() { voice.stop(); resetBrain(); if (root) { root.hidden = 
 export function mountButton(host: HTMLElement = document.body) {
   const b = document.createElement('button'); b.type = 'button'; b.className = 'jv-btn'; b.setAttribute('aria-label', 'Parler à JARVIS');
   if (!document.getElementById('jv-css')) { const st = document.createElement('style'); st.id = 'jv-css'; st.textContent = CSS; document.head.append(st); }
-  const o = createOrb(); b.append(o.el); b.onclick = open; host.append(b);
+  const o = makeOrb({nodes: 46}); b.append(o.el); b.onclick = open; host.append(b);
   if (srv.linked()) srv.status().catch(() => {});
   return b;
 }
-(window as any).JarvisVoice = {open, close, mountButton};
+/* un globe autonome (thème hologramme) pour l'accueil de la page */
+export function holo(o: HoloOpts = {}) { return createHolo(o); }
+(window as any).JarvisVoice = {open, close, mountButton, holo};
