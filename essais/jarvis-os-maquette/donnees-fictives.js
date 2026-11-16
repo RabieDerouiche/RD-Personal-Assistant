@@ -55,7 +55,21 @@
   ];
   G['Relevés'] = [
     ['Date et heure', "Produit (nom exact de l'onglet Prix)", 'Vendeur', 'Prix total TTC livré (€)', 'Lien', 'Bot', 'Remarque (offre, cadeau, paiement en plusieurs fois, rupture)'],
+    [stamp(at(-58, 17, 0)), 'Robot Alpha X7', 'Marque Alpha', '1 599,00', '', 'Kairos', ''],
+    [stamp(at(-50, 17, 0)), 'Robot Alpha X7', 'Marque Alpha', '1 599,00', '', 'Kairos', ''],
+    [stamp(at(-43, 17, 0)), 'Robot Alpha X7', 'Boutique Alpha Paris', '1 549,00', '', 'Kairos', ''],
+    [stamp(at(-36, 17, 0)), 'Robot Alpha X7', 'Marque Alpha', '1 599,00', '', 'Kairos', ''],
+    [stamp(at(-29, 17, 0)), 'Robot Alpha X7', 'Marque Alpha', '1 529,00', '', 'Kairos', 'offre de rentrée'],
+    [stamp(at(-22, 17, 0)), 'Robot Alpha X7', 'Marque Alpha', '1 499,00', '', 'Kairos', ''],
+    [stamp(at(-15, 17, 0)), 'Robot Alpha X7', 'Marque Alpha', '1 549,00', '', 'Kairos', ''],
     [stamp(at(-8, 17, 0)), 'Robot Alpha X7', 'Marque Alpha', '1 599,00', '', 'Kairos', ''],
+    [stamp(at(-40, 17, 6)), 'Aspirateur Beta V9 Absolute', 'Darty', '749', '', 'Kairos', ''],
+    [stamp(at(-26, 17, 6)), 'Aspirateur Beta V9 Absolute', 'Boulanger', '729', '', 'Kairos', ''],
+    [stamp(at(-12, 17, 6)), 'Aspirateur Beta V9 Absolute', 'Darty', '719', '', 'Kairos', ''],
+    [stamp(at(-33, 17, 5)), 'Aspirateur Beta V9 Submarine', 'Darty', '849', '', 'Kairos', ''],
+    [stamp(at(-19, 17, 5)), 'Aspirateur Beta V9 Submarine', 'Marque Beta', '829', '', 'Kairos', ''],
+    [stamp(at(-30, 0, 15)), 'Jeu Gamma PS5 Standard', 'Leclerc', '69,99', '', 'Kairos', ''],
+    [stamp(at(-16, 0, 15)), 'Jeu Gamma PS5 Standard', 'Boulanger', '74,99', '', 'Kairos', ''],
     [stamp(at(-1, 17, 2)), 'Robot Alpha X7', 'Marque Alpha', '1 449,00', '', 'Kairos', 'cadeau'],
     [stamp(at(-1, 17, 6)), 'Aspirateur Beta V9 Absolute', 'Darty', '699', '', 'Kairos', '']
   ];

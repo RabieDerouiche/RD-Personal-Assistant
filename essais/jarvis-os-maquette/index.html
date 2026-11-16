@@ -129,6 +129,40 @@
   html.theme-holo .all-close { border-color: rgba(56, 189, 248, .45); background: rgba(10, 36, 86, .5); }
   html.theme-holo .sheet { background: linear-gradient(180deg, rgba(6, 20, 58, .98), rgba(3, 10, 30, .98)); border-top-color: rgba(56, 189, 248, .45); }
   html.theme-holo .pap-search, html.theme-holo .inp { border-color: rgba(56, 189, 248, .4); background: rgba(8, 30, 70, .45); }
+
+  /* JARVIS OS : courbe des prix */
+  .pc { --pc-line: #38bdf8; position: relative; height: var(--pc-h); margin-top: 10px; touch-action: pan-y; }
+  .pc-svg { display: block; width: 100%; height: 100%; overflow: visible; }
+  .pc-line { fill: none; stroke: var(--pc-line); stroke-width: 2; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+  .pc-grid { stroke: var(--line); stroke-width: 1; vector-effect: non-scaling-stroke; }
+  .pc-ref { stroke-width: 1; stroke-dasharray: 4 4; vector-effect: non-scaling-stroke; }
+  .pc-ref.pc-buy { stroke: #6ee7b7; } .pc-ref.pc-good { stroke: #5eead4; stroke-dasharray: 2 4; } .pc-ref.pc-ref { stroke: rgba(255, 255, 255, .45); }
+  .pc-dot { fill: var(--bg); stroke: var(--pc-line); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+  .pc-last { fill: var(--pc-line); stroke: var(--bg); stroke-width: 2; vector-effect: non-scaling-stroke; }
+  .pc.is-big .pc-svg circle { transform-box: fill-box; }
+  .pc-lab { position: absolute; right: 0; transform: translateY(-50%); font: 500 10.5px var(--sans); color: var(--muted); white-space: nowrap; padding-left: 10px; }
+  .pc-lab::before { content: ""; position: absolute; left: 0; top: 50%; width: 7px; border-top: 2px dashed; }
+  .pc-lab.pc-buy::before { border-color: #6ee7b7; } .pc-lab.pc-good::before { border-color: #5eead4; } .pc-lab.pc-ref::before { border-color: rgba(255, 255, 255, .45); }
+  .pc-x { position: absolute; bottom: 0; font: 500 10.5px var(--sans); color: var(--dim); }
+  .pc-cross { position: absolute; top: 0; bottom: 22px; width: 1px; background: var(--fg); opacity: .5; pointer-events: none; }
+  .pc-tip { position: absolute; top: -6px; transform: translate(-50%, -100%); display: flex; flex-direction: column; padding: 6px 10px; border-radius: 10px; background: var(--bg-2); border: 1px solid var(--line-2); box-shadow: 0 8px 24px rgba(0, 0, 0, .5); pointer-events: none; white-space: nowrap; z-index: 2; }
+  .pc-tip b { font: 700 14px var(--display); } .pc-tip span { font-size: 11.5px; color: var(--muted); }
+  .pc-wrap { margin-top: 14px; }
+  .pc-wrap .pc { margin-top: 30px; }
+  .pc-sum { margin: 8px 0 0; font-size: 12.5px; color: var(--muted); }
+  .pc-none { margin: 10px 0 0; font-size: 12.5px; color: var(--muted); }
+  .pc-table { margin-top: 6px; font-size: 12.5px; color: var(--muted); }
+  .pc-table summary { cursor: pointer; color: var(--accent); min-height: 32px; display: flex; align-items: center; }
+  .pc-table table { width: 100%; border-collapse: collapse; margin-top: 4px; }
+  .pc-table th, .pc-table td { text-align: left; padding: 5px 6px 5px 0; border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+  .pc-table th { font-weight: 600; color: var(--dim); }
+  .fam-stop { justify-content: flex-end; padding-top: 0 !important; margin-top: -10px; }
+  .pc:not(.is-big) .pc-last { stroke-width: 1.5; }
+  .obj-head { position: relative; }
+  .obj-stop { position: absolute; top: 8px; right: 8px; }
+  .shop-add { margin-top: 10px; align-self: flex-start; }
+  html.theme-holo .pc { --pc-line: #38bdf8; }
+  html.theme-holo .pc-line { filter: drop-shadow(0 0 4px rgba(56, 189, 248, .7)); }
 </style></head><body>
 <title>Jarvis v17 copie</title>
 <meta name="claude:viewport-fit-sides" content="cover">
@@ -3089,6 +3123,7 @@ void main(){
 
   /* ================= Achats et Voyages : un onglet chacun, une fiche et un fil par produit ou par projet ================= */
   ICONS.plane = '<path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/>';
+  ICONS.plus = '<path d="M12 5v14M5 12h14"/>';
   ICONS.cart = '<path d="M3.5 4.5h2l2.2 10.2a1.5 1.5 0 0 0 1.5 1.2h7.9a1.5 1.5 0 0 0 1.4-1.1l1.6-6.3H6.4"/><circle cx="10" cy="19.5" r="1.2"/><circle cx="17" cy="19.5" r="1.2"/>';
   const runAct = (type, item, a) => (a.pick || a.confirm) ? openItem(type, item, a) : finish(a.go(), {type, item});
   const backLink = (label, fn) => h('button', {type: 'button', class: 'link back-link', onclick: () => { NAV.up = true; fn(); }}, h('span', {'aria-hidden': 'true', text: '‹ '}), label);
@@ -3187,6 +3222,55 @@ void main(){
       w.url && !inCard ? h('a', {class: 'btn sm pnow-a', href: w.url, target: '_blank', rel: 'noopener'}, 'Voir chez ' + (w.name.length > 22 ? 'le vendeur' : w.name) + ' ›') : null);
   }
   const bestOf = (ps) => ps.filter((p) => p.last && p.last.price != null).sort((a, b) => a.last.price - b.last.price)[0];
+  /* JARVIS OS : la courbe des prix d'un produit (onglet Relevés). En escalier : le prix tient jusqu'au relevé suivant.
+     Seuils en lignes de repère (Achat, Bon prix, Public) ; un appui sur la courbe montre le relevé le plus proche. */
+  const ddmm = (t) => { const d = new Date(t); return pad2(d.getDate()) + '/' + pad2(d.getMonth() + 1); };
+  function priceChart(p, big) {
+    const pts = (p && p.hist) || [];
+    if (pts.length < 2) return big ? h('p', {class: 'pc-none', text: pts.length ? 'Un seul relevé pour l\'instant : la courbe se dessine au suivant.' : 'Pas encore de relevé : la courbe se dessine au premier passage de Kairos.'}) : null;
+    const W = 340, H = big ? 168 : 46, L = big ? 6 : 2, R = big ? 78 : 4, T = big ? 12 : 5, B = big ? 22 : 5;
+    const refs = (big ? [['buy', 'Achat', p.buy], ['good', 'Bon prix', p.good], ['ref', 'Public', p.ref]] : [['buy', 'Achat', p.buy]]).filter((x) => x[2] > 0);
+    const vals = pts.map((x) => x.v).concat(refs.map((x) => x[2]));
+    let lo = Math.min.apply(null, vals), hi = Math.max.apply(null, vals); const m = (hi - lo) * 0.12 || hi * 0.05 || 1; lo -= m; hi += m;
+    const t0 = pts[0].t, t1 = Math.max(pts[pts.length - 1].t, Date.now());
+    const X = (t) => L + (W - L - R) * ((t - t0) / ((t1 - t0) || 1)), Y = (v) => T + (H - T - B) * (1 - (v - lo) / ((hi - lo) || 1));
+    let d = 'M' + X(pts[0].t).toFixed(1) + ' ' + Y(pts[0].v).toFixed(1);
+    pts.slice(1).forEach((q) => { d += ' H' + X(q.t).toFixed(1) + ' V' + Y(q.v).toFixed(1); });
+    d += ' H' + X(t1).toFixed(1);
+    const area = d + ' V' + (H - B) + ' H' + X(pts[0].t).toFixed(1) + ' Z', gid = 'pcg' + (++SEQ), last = pts[pts.length - 1], low = pts.reduce((a, b) => (b.v < a.v ? b : a));
+    /* étiquettes des seuils à droite, écartées si elles se chevauchent */
+    const labs = refs.map((x) => ({k: x[0], txt: x[1] + ' ' + eur(x[2]), y: Y(x[2]), y0: Y(x[2])})).sort((a, b) => a.y - b.y);
+    for (let i = 1; i < labs.length; i++) if (labs[i].y - labs[i - 1].y < 12) labs[i].y = labs[i - 1].y + 12;
+    let svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" class="pc-svg" aria-hidden="true"><defs><linearGradient id="' + gid + '" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--pc-line)" stop-opacity=".32"/><stop offset="1" stop-color="var(--pc-line)" stop-opacity="0"/></linearGradient></defs>';
+    if (big) [0.25, 0.5, 0.75].forEach((f) => { svg += '<line x1="' + L + '" x2="' + (W - R) + '" y1="' + (T + (H - T - B) * f) + '" y2="' + (T + (H - T - B) * f) + '" class="pc-grid"/>'; });
+    refs.forEach((x) => { svg += '<line x1="' + L + '" x2="' + (W - R) + '" y1="' + Y(x[2]).toFixed(1) + '" y2="' + Y(x[2]).toFixed(1) + '" class="pc-ref pc-' + x[0] + '"/>'; });
+    svg += '<path d="' + area + '" fill="url(#' + gid + ')"/><path d="' + d + '" class="pc-line"/>';
+    if (big) pts.forEach((q) => { svg += '<circle cx="' + X(q.t).toFixed(1) + '" cy="' + Y(q.v).toFixed(1) + '" r="2.4" class="pc-dot"/>'; });
+    svg += '<circle cx="' + X(last.t).toFixed(1) + '" cy="' + Y(last.v).toFixed(1) + '" r="' + (big ? 4.5 : 4) + '" class="pc-last"/></svg>';
+    const box = h('div', {class: 'pc' + (big ? ' is-big' : ''), style: '--pc-h:' + H + 'px'});
+    box.innerHTML = svg;
+    if (!big) return box;
+    labs.forEach((l) => box.append(h('span', {class: 'pc-lab pc-' + l.k, style: 'top:' + (l.y / H * 100).toFixed(2) + '%', text: l.txt})));
+    box.append(h('span', {class: 'pc-x', style: 'left:' + (X(t0) / W * 100) + '%', text: ddmm(t0)}), h('span', {class: 'pc-x is-end', style: 'right:' + (R / W * 100) + '%', text: "aujourd'hui"}));
+    const cross = h('span', {class: 'pc-cross', hidden: true}), tip = h('div', {class: 'pc-tip', hidden: true, role: 'status'});
+    box.append(cross, tip);
+    const show = (ev) => {
+      const r = box.getBoundingClientRect(), x = (ev.clientX - r.left) / r.width * W;
+      const q = pts.reduce((a, b) => (Math.abs(X(b.t) - x) < Math.abs(X(a.t) - x) ? b : a));
+      const px = X(q.t) / W * 100;
+      cross.hidden = false; cross.style.left = px + '%';
+      tip.hidden = false; tip.style.left = Math.min(Math.max(px, 22), 62) + '%';
+      tip.replaceChildren(h('b', {text: eur2(q.v)}), h('span', {text: ddmm(q.t) + (q.where ? ' · ' + whereOf(q.where).name : '') + (q.note ? ' · ' + q.note : '')}));
+    };
+    box.addEventListener('pointerdown', show); box.addEventListener('pointermove', (ev) => { if (ev.pointerType === 'mouse' || ev.buttons) show(ev); });
+    box.addEventListener('pointerleave', (ev) => { if (ev.pointerType === 'mouse') { cross.hidden = true; tip.hidden = true; } });
+    const drop = Math.round((1 - low.v / pts[0].v) * 100);
+    const sum = h('p', {class: 'pc-sum', text: pts.length + ' relevés depuis le ' + ddmm(t0) + ' · plus bas ' + eur2(low.v) + ' le ' + ddmm(low.t) + (drop > 0 ? ' (−' + drop + ' % depuis le premier)' : '') + '. Touche la courbe pour voir un relevé.'});
+    const table = h('details', {class: 'pc-table'}, h('summary', {text: 'Voir les relevés en liste'}),
+      h('table', {}, h('thead', {}, h('tr', {}, h('th', {text: 'Date'}), h('th', {text: 'Prix TTC'}), h('th', {text: 'Vendeur'}))),
+        h('tbody', {}, pts.slice().reverse().map((q) => h('tr', {}, h('td', {text: ddmm(q.t)}), h('td', {text: eur2(q.v)}), h('td', {text: whereOf(q.where).name + (q.note ? ' · ' + q.note : '')}))))));
+    return h('div', {class: 'pc-wrap'}, h('small', {class: 'pnow-k', text: 'Évolution du prix'}), box, sum, table);
+  }
   const pauseChoices = [{label: "Jusqu'au Black Friday (23/11)", n: N('2026-11-23'), txt: 'Black Friday'}, {label: 'Un mois', n: 30, txt: short(30)}, {label: 'Jusqu\'aux soldes de janvier', n: N('2027-01-06'), txt: 'soldes de janvier'}];
   ACTIONS.famille = (f) => {
     const key = 'ach:' + f.id, obj = 'Prix : ' + f.title, ps = famProducts(f), names = ps.map((p) => p.name).join(', ');
@@ -3211,6 +3295,12 @@ void main(){
     const m = v.main && acts.find((a) => v.main.test(a.label)), alt = v.alt && acts.find((a) => v.alt.test(a.label));
     return [m, alt].concat(acts).filter((a, i, arr) => a && arr.indexOf(a) === i).slice(0, 2);
   }
+  /* JARVIS OS : « Ne plus suivre » à portée de main sur chaque achat (confirmation, 5 s pour annuler, rien n'est effacé) */
+  const stopAct = (f) => ACTIONS.famille(f).find((a) => a.label === 'Ne plus suivre');
+  function stopRow(f) {
+    const a = ['achete', 'retire'].includes(famState(f)) ? null : stopAct(f);
+    return a ? h('div', {class: 'row-actions fam-stop'}, h('button', {type: 'button', class: 'btn sm ghost danger', onclick: () => runAct('famille', f, a)}, h('span', {class: 'ic', html: icon('x', 14)}), 'Ne plus suivre')) : null;
+  }
   function famCard(f, big) {
     const st = famState(f), v = famVerdict(f), ps = famProducts(f), last = filOf('ach:' + f.id).slice(-1)[0];
     const lead = bestOf(ps) || ps[0];
@@ -3218,10 +3308,11 @@ void main(){
       h('button', {type: 'button', class: 'fam-hit', 'aria-label': 'Ouvrir ' + f.title, onclick: () => { SEL.achats = f.id; renderView(false); }},
         h('div', {class: 'fam-top'}, h('span', {class: 'fam-ic', html: icon('tag', 18)}), h('div', {class: 'fam-id'}, h('b', {text: f.title}), h('small', {text: f.need})), stPill(st)),
         lead && st !== 'retire' ? priceNow(st === 'achete' ? ps.find((x) => x.bought) : lead, ps.length > 1 ? (st === 'achete' ? ps.find((x) => x.bought) : lead).name : '', true) : null,
+        lead && st !== 'achete' && st !== 'retire' ? priceChart(lead, false) : null,
         lead && st !== 'achete' && st !== 'retire' ? gauge(lead) : null,
         h('p', {class: 'fam-verdict', text: v.text}),
         last ? h('p', {class: 'fam-last'}, h('b', {text: whoName(last.who) + ' · ' + last.d + ' : '}), last.t) : null),
-      big ? h('div', {class: 'row-actions'}, bigActs(f, v).map((a, i) => h('button', {type: 'button', class: 'btn ' + (i === 0 ? 'main' : ''), onclick: () => runAct('famille', f, a)}, a.label, costTag(a))), h('button', {type: 'button', class: 'btn ghost', onclick: () => { SEL.achats = f.id; renderView(false); }}, 'Ouvrir')) : null);
+      big ? h('div', {class: 'row-actions'}, bigActs(f, v).map((a, i) => h('button', {type: 'button', class: 'btn ' + (i === 0 ? 'main' : ''), onclick: () => runAct('famille', f, a)}, a.label, costTag(a))), h('button', {type: 'button', class: 'btn ghost', onclick: () => { SEL.achats = f.id; renderView(false); }}, 'Ouvrir')) : stopRow(f));
   }
   function newProductSheet() {
     const id1 = 'np-' + (++SEQ), id2 = 'np-' + (++SEQ), id3 = 'np-' + (++SEQ), id4 = 'np-' + (++SEQ);
@@ -3255,7 +3346,8 @@ void main(){
     const models = live.reduce((s, f) => s + famProducts(f).length, 0);
     el.append(h('section', {class: 'card shop-hero', style: botVars('unicorn')}, C('unicorn', 58).el,
       h('div', {}, h('b', {text: 'Kairos suit ' + live.length + ' achats (' + models + ' modèles).'}), h('p', {text: 'Prochain relevé : ' + S.nextReleve + '. Total TTC livré, vendeurs fiables seulement.'}),
-        h('div', {class: 'mchips'}, h('span', {class: 'mchip' + (hot.length ? ' is-amber' : ''), text: hot.length + ' à décider'}), h('span', {class: 'mchip', text: 'Économisé : ' + eur(saved)})))));
+        h('div', {class: 'mchips'}, h('span', {class: 'mchip' + (hot.length ? ' is-amber' : ''), text: hot.length + ' à décider'}), h('span', {class: 'mchip', text: 'Économisé : ' + eur(saved)})),
+        h('button', {type: 'button', class: 'btn main shop-add', onclick: newProductSheet}, h('span', {class: 'ic', html: icon('plus', 16)}), 'Suivre un produit'))));
     if (hot.length) el.append(panel('À décider maintenant', h('span', {class: 'aside', text: 'trié par urgence'}), hot.map((f) => famCard(f, true))));
     const strip = S.echeances.filter((e) => e.domain === 'Achats' && e.n >= 0 && e.n <= 60).sort((a, b) => a.n - b.n);
     if (strip.length) el.append(panel('Temps forts', null, h('div', {class: 'strip'}, strip.map((e) => h('button', {type: 'button', class: 'strip-it', onclick: () => openItem('echeance', e)}, h('b', {text: short(e.n)}), h('span', {text: e.title}))))));
@@ -3272,7 +3364,8 @@ void main(){
     const key = 'ach:' + f.id, v = famVerdict(f), ps = famProducts(f), acts = ACTIONS.famille(f);
     const main = v.main ? acts.find((a) => v.main.test(a.label)) : null;
     el.append(backLink('Tous les achats', () => { SEL.achats = null; renderView(false); }));
-    el.append(h('section', {class: 'card obj-head', style: botVars('unicorn')}, C('unicorn', 64).el,
+    const stopA = ['achete', 'retire'].includes(famState(f)) ? null : stopAct(f);
+    el.append(h('section', {class: 'card obj-head', style: botVars('unicorn')}, C('unicorn', 64).el, stopA ? h('button', {type: 'button', class: 'btn sm ghost danger obj-stop', onclick: () => runAct('famille', f, stopA)}, 'Ne plus suivre') : null,
       h('div', {class: 'obj-id'}, h('small', {text: f.need}), h('h2', {text: f.title}), stPill(v.st))));
     el.append(h('div', {class: 'verdict'}, h('span', {class: 'ic', html: icon('bolt', 16)}), h('p', {text: v.text})));
     if (main) el.append(h('div', {class: 'sa-main'}, h('button', {type: 'button', class: 'btn main is-sugg', onclick: () => runAct('famille', f, main)}, main.label, h('small', {class: 'sugg-tag', text: 'Suggéré'}), costTag(main))));
@@ -3281,6 +3374,7 @@ void main(){
         h('div', {class: 'var-top'}, h('b', {text: p.name}), stPill(pState(p))),
         priceNow(p),
         gauge(p),
+        priceChart(p, true),
         p.offer ? h('p', {class: 'var-last', text: p.offer.text + '.'}) : null,
         p.last ? h('p', {class: 'var-src', text: 'Source : ' + p.last.src + '. Historique dans le fil ci-dessous.'}) : null,
         ps.length > 1 ? h('div', {class: 'row-actions'}, h('button', {type: 'button', class: 'btn sm', onclick: () => finish({title: 'Une seule variante', effect: 'Les autres variantes de « ' + f.title + " » passent à « Plus suivi » dans l'onglet Prix ; Kairos ne suit plus que " + p.name + '.', bot: 'unicorn', say: 'Plus simple, je ne suis que celle-là.', mutate: () => { ps.forEach((x) => { if (x !== p) x.dropped = true; }); filPush(key, 'toi', 'Garde seulement ' + p.name + '.'); }, work: false}, {type: 'famille', item: f})}, 'Garder seulement celle-ci')) : null))));
@@ -3772,7 +3866,8 @@ void main(){
     /* achats : une famille par marque, ses modèles, leur dernier prix (onglet Prix, sinon onglet Relevés) */
     const prix = rows('prix'), rel = rows('rel') || [];
     if (prix) {
-      const lastRel = {};
+      const lastRel = {}, relBy = {};
+      rel.forEach((r) => { const k = lvLow(r["Produit (nom exact de l'onglet Prix)"]), v = lvNum(r['Prix total TTC livré (€)']), d = lvStamp(r['Date et heure']); if (k && v != null && d) (relBy[k] = relBy[k] || []).push({t: d.getTime(), v, where: r['Vendeur'] || '', note: r['Remarque (offre, cadeau, paiement en plusieurs fois, rupture)'] || ''}); });
       rel.forEach((r) => { const k = lvLow(r["Produit (nom exact de l'onglet Prix)"]); const s = lvStamp(r['Date et heure']); if (!k || lvNum(r['Prix total TTC livré (€)']) == null) return; if (!lastRel[k] || (s && s > lastRel[k].s)) lastRel[k] = {s, r}; });
       S.prix = prix.filter((r) => r['Produit']).map((r) => {
         const st = lvLow(r['Statut']), p = {id: 'p:' + r._row, _row: r._row, name: r['Produit'], ref: lvNum(r['Prix de référence (€)']) || 0, buy: lvNum(r['Seuil Achat (€)']) || 0, good: lvNum(r['Seuil Bon prix (€)']) || 0,
@@ -3780,6 +3875,10 @@ void main(){
         const h1 = lvNum(r['Dernier prix TTC (€)']), lr = lastRel[lvLow(p.name)];
         if (h1 != null) p.last = {price: h1, when: r['Relevé le'] || '', where: r['Où (vendeur et lien)'] || '', src: 'onglet Prix'};
         else if (lr) p.last = {price: lvNum(lr.r['Prix total TTC livré (€)']), when: lr.r['Date et heure'], where: lr.r['Vendeur'], src: 'onglet Relevés'};
+        /* JARVIS OS : l'historique des prix (onglet Relevés, plus le dernier prix de l'onglet Prix s'il n'y est pas) */
+        p.hist = (relBy[lvLow(p.name)] || []).slice();
+        if (h1 != null) { const d = lvStamp(r['Relevé le']); if (d && !p.hist.some((x) => Math.abs(x.t - d.getTime()) < 3600e3)) p.hist.push({t: d.getTime(), v: h1, where: r['Où (vendeur et lien)'] || '', note: ''}); }
+        p.hist.sort((a, b) => a.t - b.t);
         if (/^achet/.test(st)) p.bought = {price: lvNum(r['Prix payé TTC (€)']) || 0, when: r['Acheté le'] || ''};
         if (/^plus suivi/.test(st)) p.dropped = true;
         if (/^en pause/.test(st)) p.paused = r['Statut'];
