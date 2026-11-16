@@ -92,7 +92,7 @@ srv.listen(0, async () => {
     p = await page('#papiers');
     await p.evaluate(() => document.querySelector('.pap-priv').click()); await p.waitForTimeout(800);
     ok('papiers : papiers privés affichés à la demande (gardé dans le téléphone)', await p.evaluate(() => [...document.querySelectorAll('.hm-h h2')].some((x) => x.textContent === 'Papiers privés') && localStorage.getItem('jarvis.papiers.prive') === '1'));
-    ok('papiers : dates de validité de Pilotage gardées', await p.evaluate(() => !!document.querySelector('.pap-dates') && document.querySelectorAll('.pap-dates .pap').length > 0));
+    ok('papiers : dates de validité de Pilotage gardées, avec leurs gestes (venus de Suivi)', await p.evaluate(() => !!document.querySelector('.pap-dates') && document.querySelectorAll('.pap-dates .card').length > 0 && /Où est-il/.test(document.querySelector('.pap-dates').textContent) && !document.querySelector('.pap-dates input')));
     /* voyages plus riches (16/11/2026) : Wikipédia et Open-Meteo simulés, aucun appel réel */
     { const ctx = await b.newContext({...devices['iPhone 15 Pro Max']}); const q = await ctx.newPage(); q.on('pageerror', (e) => errs.push('voyages : ' + e.message));
       await q.route('https://fr.wikipedia.org/**', (r) => r.fulfill({status: 200, headers: {'access-control-allow-origin': '*'}, contentType: 'application/json', body: JSON.stringify({type: 'standard', originalimage: {source: 'https://photo.essai/img.png', width: 960}})}));
@@ -132,6 +132,16 @@ srv.listen(0, async () => {
     ok('check-up : page vocale dans les polices de la charte (plus d\'Inter)', await p.evaluate(() => [...document.querySelectorAll('.jv, .jv *')].filter((e) => [...e.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim())).every((e) => /^("?Exo 2|"?Oxanium|Orbitron)/.test(getComputedStyle(e).fontFamily))));
     p = await page('#demandes');
     ok('check-up : phrase des oui groupés sans police machine à écrire', await p.evaluate(() => [...document.querySelectorAll('.yes-p')].every((e) => /Exo 2/.test(getComputedStyle(e).fontFamily))));
+    /* doublons 14 à 16 (choix du 16/11/2026) */
+    p = await page('#achats');
+    ok('doublon 14 : sous « Tous », le produit à décider n\'est pas répété, une ligne y renvoie', await p.evaluate(() => { const pn = (t) => [...document.querySelectorAll('#view .panel')].find((x) => x.querySelector('h2').textContent.trim() === t); const top = pn('À décider maintenant'), all = pn('Tous mes achats'); const nm = (c) => (c.querySelector('b') || {}).textContent; const hot = [...top.querySelectorAll('.fam')].map(nm); return hot.length > 0 && ![...all.querySelectorAll('.fam')].some((c) => hot.includes(nm(c))) && /produit à décider, affiché plus haut/.test(all.textContent); }));
+    await p.evaluate(() => [...document.querySelectorAll('.seg button')].find((b) => b.textContent === 'À décider').click()); await p.waitForTimeout(400);
+    ok('doublon 14 : le filtre « À décider » montre toujours le produit', await p.evaluate(() => [...document.querySelectorAll('#view .panel')].find((x) => /Tous mes achats/.test(x.querySelector('h2').textContent)).querySelectorAll('.fam').length > 0));
+    p = await page('#voyages');
+    await p.evaluate(() => document.querySelector('.voy .fam-hit').click()); await p.waitForTimeout(800);
+    ok('doublon 15 : « Valider ces dates » une seule fois, le conseil renvoie aux dates proposées', await p.evaluate(() => [...document.querySelectorAll('#view button')].filter((x) => /Valider ces dates/.test(x.innerText)).length === 1 && !!document.querySelector('.verdict .verdict-go') && !!document.getElementById('plan-dates')));
+    p = await page('#suivi');
+    ok('doublon 16 : Suivi garde une ligne vers Papiers ; Équipe sans dépôt ; Papiers avec le dépôt', await p.evaluate(() => /papiers? suivis?/.test((document.querySelector('.pap-go') || {}).textContent || '') && !document.querySelector('#view .pap-search, #view input[type="search"]')) && await (async () => { const q = await page('#equipe'); const e = await q.evaluate(() => ![...document.querySelectorAll('#view .panel h2')].some((x) => /Déposer un document/.test(x.textContent))); const r = await page('#papiers'); return e && await r.evaluate(() => [...document.querySelectorAll('#view .panel h2')].some((x) => /Déposer un document/.test(x.textContent))); })());
     /* aucune rubrique n'affiche de texte cassé */
     const broken = [];
     for (const t of ['accueil', 'demandes', 'agenda', 'suivi', 'achats', 'voyages', 'sorties', 'papiers', 'equipe', 'automatisations', 'reglages']) {

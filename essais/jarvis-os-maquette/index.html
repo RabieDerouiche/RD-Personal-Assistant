@@ -1262,6 +1262,10 @@
   html.theme-holo .yes-p { font-family: var(--sans); font-size: 13px; }
   .sa-grid { grid-template-columns: 1fr; }
   .sa-grid .btn { min-height: 46px; }
+  .ach-up { display: block; margin: 2px 2px 10px; text-align: left; font-size: 13.5px; color: var(--muted); } .ach-up-go { color: var(--accent); font-weight: 600; }
+  .verdict-go { display: block; margin-top: 6px; padding: 0; font-weight: 600; }
+  .pap-go { width: 100%; text-align: left; }
+  .pap-dates.panel { border-top: 0; padding-top: 0; }
 </style>
 
 <div class="scroller" id="scroller">
@@ -1288,7 +1292,8 @@
   'use strict';
   /* ---------- données d'exemple : rien n'est lu ni écrit ---------- */
   const $ = (id) => document.getElementById(id);
-  const SRV_OS = window.__JARVIS_MODE === 'serveur';   /* JARVIS OS : sur son serveur, la tâche Claude est faite par le serveur (0.11.0) */
+  const SRV_OS = window.__JARVIS_MODE === 'serveur';
+  const scrollToEl = (t) => { const sc = document.getElementById('scroller'), hd = document.querySelector('.top'); if (!t || !sc) return; sc.scrollTo({top: sc.scrollTop + t.getBoundingClientRect().top - (hd ? hd.getBoundingClientRect().bottom : 0) - 10, behavior: 'smooth'}); };   /* JARVIS OS : sur son serveur, la tâche Claude est faite par le serveur (0.11.0) */
   const TODAY = new Date(); TODAY.setHours(12, 0, 0, 0);
   const day = (n) => { const d = new Date(TODAY); d.setDate(d.getDate() + n); return d; };
   const pad2 = (n) => String(n).padStart(2, '0');
@@ -2481,13 +2486,14 @@ void main(){
       if (!S.prix.length) el.append(emptyState('Aucun prix suivi.'));
       el.append(sec('Suivre un nouveau produit', newProductForm()));
     },
-    papiers(el) {
+    papiers(el, o) {
       const id = 'pp-' + (++SEQ);
       const inp = h('input', {class: 'inp', type: 'search', id, placeholder: 'passeport, assurance, facture'});
       const out = h('div', {class: 'stack'});
       const draw = () => { const q = inp.value.trim().toLowerCase(); const found = S.papiers.filter((p) => !q || (p.name + ' ' + p.use + ' ' + p.who).toLowerCase().includes(q)); out.replaceChildren(...(found.length ? found.map((p) => simpleCard('papier', p, p.name, 'Sert pour : ' + p.use, p.until == null ? p.who + ' · sans date de fin' : p.who + ' · ' + (p.until <= 180 ? 'expire ' + rel(p.until) : "valable jusqu'au " + fmt(day(p.until), {month: 'short', year: 'numeric'})), 'hydra', 2)) : [emptyState('Aucun document ne correspond.')])); };
       inp.addEventListener('input', draw);
-      el.append(h('div', {class: 'field'}, h('label', {for: id, class: 'pick-label', text: 'Chercher un document'}), inp), btn('Ranger un nouveau document', () => openApp('depot'), 'main', 'up'), out);
+      if (o && o.bare) el.append(out); /* JARVIS OS : dans la rubrique Papiers, qui a déjà sa recherche et le dépôt */
+      else el.append(h('div', {class: 'field'}, h('label', {for: id, class: 'pick-label', text: 'Chercher un document'}), inp), btn('Ranger un nouveau document', () => openApp('depot'), 'main', 'up'), out);
       draw();
     },
     ordres(el) {
@@ -3335,8 +3341,7 @@ void main(){
         btn('Nouvel ordre', () => openSheet({bot: 'hydra', title: 'Nouvel ordre', say: 'À qui tu donnes un ordre ?', actions: BOTS.concat([BOT.claude]).map((b) => write(b.id, b.name))}), 'main', 'send'),
         ords.length ? ords.map((o) => h('button', {type: 'button', class: 'canal-row', style: botVars(o.bot), onclick: () => openItem('ordre', o)}, h('time', {text: rel(o.n)}), h('span', {text: BOT[o.bot].name + ' · ' + o.text}), h('span', {class: 'pill' + (/^à faire/i.test(o.status) ? ' is-demande' : ''), text: o.status}))) : emptyState('Aucun ordre envoyé.'),
         S.ordres.length > 6 ? h('button', {type: 'button', class: 'link', onclick: () => { EQ.allOrd = !EQ.allOrd; renderView(true); }}, EQ.allOrd ? 'Seulement les 6 derniers' : 'Tous tes ordres (' + S.ordres.length + ')') : null)));
-      const dep = h('div', {class: 'stack'}); SCREEN.depot(dep);
-      el.append(panel('Déposer un document', null, dep));
+      /* JARVIS OS (doublon 16) : « Déposer un document » est dans la rubrique Papiers */
     },
     suivi(el) {
       el.append(panel('Dossiers en attente d\'un tiers', null, S.dossiers.map((k) => {
@@ -3345,8 +3350,11 @@ void main(){
           h('h3', {class: 'item-title', text: k.title}), h('p', {class: 'item-ask', text: k.step}), k.pour ? h('p', {class: 'item-why', text: k.pour}) : null, actionRow('dossier', k, 2));
         return c;
       })));
-      const pp = h('div', {class: 'stack'}); SCREEN.papiers(pp);
-      el.append(panel('Papiers', h('span', {class: 'aside', text: 'Onglet Papiers'}), pp));
+      /* JARVIS OS (doublon 16, choix du 16/11/2026) : les papiers suivis, leurs gestes et le dépôt sont dans la rubrique Papiers ; ici, une ligne qui y mène */
+      const soonP = S.papiers.filter((p) => p.until != null && p.until >= 0 && p.until <= 180).sort((a, b) => a.until - b.until);
+      el.append(panel('Papiers', null, h('button', {type: 'button', class: 'hm-row pap-go', onclick: () => go('papiers')}, h('span', {class: 'hm-ic', html: icon('doc', 17)}),
+        h('span', {class: 'hm-tx'}, h('b', {text: S.papiers.length + (S.papiers.length > 1 ? ' papiers suivis' : ' papier suivi') + (soonP.length === 1 ? ' · 1 expire ' + rel(soonP[0].until) : soonP.length ? ' · ' + soonP.length + ' expirent, le premier ' + rel(soonP[0].until) : '')}),
+          h('small', {text: 'Recherche, dossiers du Drive, dates de validité, dépôt : rubrique Papiers'})), h('span', {class: 'hm-go', html: icon('next', 16)}))));
       const tt = h('div', {class: 'stack'}); SCREEN.taches(tt);
       el.append(panel('Mes tâches', null, tt));
     }
@@ -3635,9 +3643,11 @@ void main(){
       body.append(h('button', {type: 'button', class: 'link pap-priv', onclick: () => { PT.priv = !PT.priv; try { localStorage.setItem('jarvis.papiers.prive', PT.priv ? '1' : '0'); } catch (e) { /* rien */ } papLoad(true); renderView(true); }},
         h('span', {html: icon('lock', 14)}), PT.priv ? 'Masquer les papiers privés' : 'Afficher les papiers privés (banque, impôts, salaires)'));
     }
-    const pil = h('div', {class: 'stack'}); papPilotage(pil);
-    const dates = h('details', {class: 'pap-dates'}, h('summary', {}, h('span', {text: 'Dates de validité et pièces à fournir'}), h('small', {text: 'onglet Papiers de Pilotage'}), h('span', {class: 'lg-chev', html: icon('next', 14)})), pil);
-    body.append(dates);
+    /* JARVIS OS (doublon 16, choix du 16/11/2026) : les papiers suivis de Pilotage avec leurs gestes (venus de Suivi), puis le dépôt pour Iris (venu d'Équipe) */
+    const pil = h('div', {class: 'stack'}); SCREEN.papiers(pil, {bare: true});
+    body.append(h('section', {class: 'panel pap-dates'}, h('header', {class: 'panel-h'}, h('h2', {text: 'Dates de validité et pièces à fournir'}), h('span', {class: 'aside', text: 'onglet Papiers de Pilotage'})), pil));
+    const dep = h('div', {class: 'stack'}); SCREEN.depot(dep);
+    body.append(panel('Déposer un document', null, dep));
     draw();
   };
 
@@ -3940,14 +3950,18 @@ void main(){
       h('div', {}, h('b', {text: 'Kairos suit ' + live.length + ' achats (' + models + ' modèles).'}), h('p', {text: 'Prochain relevé : ' + S.nextReleve + '. Total TTC livré, vendeurs fiables seulement.'}),
         h('div', {class: 'mchips'}, h('span', {class: 'mchip' + (hot.length ? ' is-amber' : ''), text: hot.length + ' à décider'}), h('span', {class: 'mchip', text: 'Économisé : ' + eur(saved)})),
         h('button', {type: 'button', class: 'btn main shop-add', onclick: newProductSheet}, h('span', {class: 'ic', html: icon('plus', 16)}), 'Suivre un produit'))));
-    if (hot.length) el.append(panel('À décider maintenant', h('span', {class: 'aside', text: 'trié par urgence'}), hot.map((f) => famCard(f, true))));
+    const hotP = hot.length ? panel('À décider maintenant', h('span', {class: 'aside', text: 'trié par urgence'}), hot.map((f) => famCard(f, true))) : null;
+    if (hotP) el.append(hotP);
     const strip = S.echeances.filter((e) => e.domain === 'Achats' && e.n >= 0 && e.n <= 60).sort((a, b) => a.n - b.n);
     if (strip.length) el.append(panel('Temps forts', null, h('div', {class: 'strip'}, strip.map((e) => h('button', {type: 'button', class: 'strip-it', onclick: () => openItem('echeance', e)}, h('b', {text: short(e.n)}), h('span', {text: e.title}))))));
     const flt = SEL.achFilter || 'tous';
     const pick = S.ach.filter((f) => { const st = famState(f); return flt === 'tous' ? !['achete', 'retire'].includes(st) : flt === 'decider' ? ACH_HOT.includes(st) : flt === 'veille' ? ['attendre', 'inconnu', 'pause'].includes(st) : ['achete', 'retire'].includes(st); });
     el.append(panel('Tous mes achats', h('button', {type: 'button', class: 'btn sm main', onclick: newProductSheet}, '+ Suivre un produit'),
       h('div', {class: 'seg', role: 'group', 'aria-label': 'Filtre'}, ACH_FILTERS.map(([k, l]) => h('button', {type: 'button', 'aria-pressed': String(flt === k), onclick: () => { SEL.achFilter = k; renderView(true); }}, l))),
-      pick.length ? pick.map((f) => famCard(f)) : emptyState('Rien dans cette liste.')));
+      /* JARVIS OS (doublon 14, choix du 16/11/2026) : sous « Tous », un produit déjà en haut n'est pas répété */
+      ...(() => { const dup = flt === 'tous' && hotP ? pick.filter((f) => hot.includes(f)) : [], rest = pick.filter((f) => !dup.includes(f));
+        return [dup.length ? h('button', {type: 'button', class: 'link ach-up', onclick: () => scrollToEl(hotP)}, dup.length + (dup.length > 1 ? ' produits à décider, affichés plus haut' : ' produit à décider, affiché plus haut'), h('span', {class: 'ach-up-go', text: ' · Voir ›'})) : null,
+          rest.length ? rest.map((f) => famCard(f)) : dup.length ? null : emptyState('Rien dans cette liste.')]; })()));
     const loan = S.echeances.find((e) => /prêt personnel/i.test(e.title) && e.n >= 0);
     if (loan) el.append(panel('Autres veilles de Kairos', null, h('button', {type: 'button', class: 'card watch', onclick: () => openItem('echeance', loan)},
       h('b', {text: loan.title}), h('p', {text: (loan.note || '') + ' Les chiffres exacts restent chez Iris.'}))));
@@ -4248,15 +4262,17 @@ void main(){
     el.append(backLink('Tous les voyages', () => { SEL.voyages = null; renderView(false); }));
     el.append(voyHero(v, true), voyPass(v)); /* JARVIS OS : photo en grand et carte d'embarquement */
     el.append(stepper(v));
-    el.append(h('div', {class: 'verdict'}, h('span', {class: 'ic', html: icon('bolt', 16)}), h('p', {text: nx.text})));
-    if (main) el.append(h('div', {class: 'sa-main'}, h('button', {type: 'button', class: 'btn main is-sugg', onclick: () => runAct('voyage', v, main)}, main.label, h('small', {class: 'sugg-tag', text: 'Suggéré'}), costTag(main))));
+    /* JARVIS OS (doublon 15, choix du 16/11/2026) : si l'action suggérée est dans « Dates proposées par Claude », on y renvoie au lieu de la répéter */
+    const inPlan = !!(main && v.step === 1 && v.plan && /Valider ces dates|D'autres dates|Attendre la date/.test(main.label));
+    el.append(h('div', {class: 'verdict'}, h('span', {class: 'ic', html: icon('bolt', 16)}), h('p', {text: nx.text}, inPlan ? h('button', {type: 'button', class: 'link verdict-go', onclick: () => scrollToEl(document.getElementById('plan-dates'))}, 'Voir les dates proposées', h('span', {'aria-hidden': 'true', text: ' ›'})) : null)));
+    if (main && !inPlan) el.append(h('div', {class: 'sa-main'}, h('button', {type: 'button', class: 'btn main is-sugg', onclick: () => runAct('voyage', v, main)}, main.label, h('small', {class: 'sugg-tag', text: 'Suggéré'}), costTag(main))));
     el.append(carnetSection(v), climTile(v)); const bud = voyBudget(v); if (bud) el.append(bud); /* JARVIS OS : carnet, météo, budget */
     const todo = v.checks.filter((c) => !c.done);
     const tick = (c) => h('li', {class: c.done ? 'is-done' : ''}, h('button', {type: 'button', class: 'chk', 'aria-pressed': String(!!c.done), onclick: () => { if (LINK.on) { finish({title: c.done ? 'Pas encore fait' : 'Fait', bot: v.bot, effect: '« ' + c.t + ' » ' + (c.done ? 'repasse à faire' : 'est fait') + ' pour « ' + v.title + ' ».', mutate: () => { c.done = !c.done; }, work: false}, {type: 'voyage', item: v}); return; } c.done = !c.done; filPush(key, 'toi', (c.done ? 'Fait : ' : 'Pas encore fait : ') + c.t); renderView(true); }}, h('span', {class: 'box', html: c.done ? icon('check', 14) : ''}), h('span', {class: 'chk-t', text: c.t}), h('small', {text: whoName(c.who)})));
     el.append(panel('Ce qui attend', h('span', {class: 'aside', text: todo.length + ' sur ' + v.checks.length}), todo.length ? h('ul', {class: 'checks'}, todo.sort((a, b) => (a.who === 'toi' ? 0 : 1) - (b.who === 'toi' ? 0 : 1)).map(tick)) : emptyState('Rien n\'attend.')));
     el.append(panel('Le plan', null, h('p', {class: 'plan-when'}, h('b', {text: 'Quand : '}), v.when), v.legs.length ? h('ul', {class: 'legs'}, v.legs.map(([w, r, n]) => h('li', {}, h('b', {text: r}), h('span', {text: w + ' · ' + n})))) : h('p', {class: 'muted', text: 'Trajets à définir avec la période.'}),
       v.rule ? h('p', {class: 'item-why', text: v.rule}) : null,
-      v.step === 1 && v.plan ? h('div', {class: 'plan-box'}, h('span', {class: 'pick-label', text: 'Dates proposées par Claude'}), h('ul', {class: 'legs'}, v.plan.dates.map(([w, d]) => h('li', {}, h('b', {text: d}), h('span', {text: w})))), h('p', {text: v.plan.conges}), h('p', {class: 'muted', text: v.plan.why}),
+      v.step === 1 && v.plan ? h('div', {class: 'plan-box', id: 'plan-dates'}, h('span', {class: 'pick-label', text: 'Dates proposées par Claude'}), h('ul', {class: 'legs'}, v.plan.dates.map(([w, d]) => h('li', {}, h('b', {text: d}), h('span', {text: w})))), h('p', {text: v.plan.conges}), h('p', {class: 'muted', text: v.plan.why}),
         h('div', {class: 'row-actions'}, acts.filter((a) => /Valider ces dates|D'autres dates|Attendre la date/.test(a.label)).map((a, i) => h('button', {type: 'button', class: 'btn ' + (i === 0 ? 'main' : ''), onclick: () => runAct('voyage', v, a)}, a.label, costTag(a))))) : null));
     if (v.options.length || v.step >= 2) {
       const types = optTypes(v);
