@@ -34,7 +34,7 @@ export class Voice {
   private quick = 0;
   private startedAt = 0;
   private speakingNow = false;
-  private q: string[] = []; private qBusy = false; private qOpen = false; private qEnd: (() => void) | null = null;
+  private q: string[] = []; private qBusy = false; private qOpen = false; private qEnd: (() => void) | null = null; private gen = 0;
   state: VoiceState = 'off';
   autoRestarts = 0;
   constructor(private o: VoiceOpts) {}
@@ -60,10 +60,10 @@ export class Voice {
   /* entre deux tours (pendant que le cerveau réfléchit) */
   pause() { clearTimeout(this.timer); const r = this.rec; this.rec = null; try { if (r) r.abort(); } catch { /* rien */ } if (this.on) this.set('waiting'); }
 
-  private hush() { this.speakingNow = false; this.q = []; this.qBusy = false; this.qOpen = false; this.qEnd = null; try { if (synth) synth.cancel(); } catch { /* rien */ } }
+  private hush() { this.gen++; this.speakingNow = false; this.q = []; this.qBusy = false; this.qOpen = false; this.qEnd = null; try { if (synth) synth.cancel(); } catch { /* rien */ } }
 
   listen(auto: boolean) {
-    if (!this.on || this.speakingNow || !SR) return;
+    if (!this.on || this.speakingNow || !SR || this.rec) return;   /* jamais deux micros à la fois */
     clearTimeout(this.timer);
     let rec: Rec;
     try { rec = new SR(); } catch (e: any) { this.fail('création impossible : ' + (e && e.message)); return; }
@@ -102,9 +102,10 @@ export class Voice {
   private fail(why: string) { this.on = false; this.rec = null; this.hush(); this.set('error', why); }
 
   /* lecture au fil de l'eau : chaque phrase est dite dès qu'elle arrive ; l'écoute reprend quand tout est dit */
-  streamStart() { this.q = []; this.qBusy = false; this.qOpen = true; this.qEnd = null; }
-  streamPart(text: string) { if (!this.qOpen || !text.trim() || !canSpeak()) return; this.q.push(text); this.pump(); }
-  streamEnd(then?: () => void) { this.qOpen = false; this.qEnd = then || null; this.pump(); }
+  /* chaque réponse a son numéro : ce qui reste d'une session coupée ou d'une ancienne réponse n'a plus d'effet */
+  streamStart(): number { this.gen++; this.q = []; this.qBusy = false; this.qOpen = true; this.qEnd = null; return this.gen; }
+  streamPart(text: string, g: number) { if (g !== this.gen || !this.qOpen || !text.trim() || !canSpeak()) return; this.q.push(text); this.pump(); }
+  streamEnd(g: number, then?: () => void) { if (g !== this.gen) return; this.qOpen = false; this.qEnd = then || null; this.pump(); }
   get streaming() { return this.qOpen || this.qBusy || this.q.length > 0; }
   private pump() {
     if (this.qBusy) return;
@@ -116,7 +117,8 @@ export class Voice {
       return;
     }
     this.qBusy = true; this.speakingNow = true; this.set('speaking');
-    this.utter(next, () => { this.qBusy = false; this.pump(); });
+    const g = this.gen;
+    this.utter(next, () => { if (g !== this.gen) return; this.qBusy = false; this.pump(); });
   }
   private utter(text: string, done: () => void) {
     const u = new W.SpeechSynthesisUtterance(text.replace(/[*_#>`]/g, ' '));
@@ -125,7 +127,8 @@ export class Voice {
     u.rate = Math.min(1.5, Math.max(0.7, this.o.rate()));
     let fin = false; const end = () => { if (fin) return; fin = true; done(); };
     u.onend = end; u.onerror = end;
-    try { synth!.speak(u); } catch { end(); return; }
+    /* Safari sur iPhone : la voix peut rester bloquée après l'écoute du micro ; une remise à zéro juste avant de parler la débloque */
+    try { if (!synth!.speaking) synth!.cancel(); synth!.speak(u); } catch { end(); return; }
     window.setTimeout(() => { if (!fin && synth && !synth.speaking) end(); }, Math.max(5000, text.length * 110));
   }
 

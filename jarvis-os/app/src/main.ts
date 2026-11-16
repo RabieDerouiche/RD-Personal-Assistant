@@ -12,7 +12,7 @@ import {charOf, setModeSource, talkAll, refreshModes, type Mode} from './chars';
 import * as srv from './server';
 
 const PHASE = 2;
-const VERSION = '0.7.2';
+const VERSION = '0.7.4';
 type View = 'home' | 'command' | 'agents' | 'agent' | 'missions' | 'more' | 'memory' | 'automations' | 'intelligence' | 'settings';
 let view: View = 'home';
 let live = '', note = '', clearArm = 0, orbState: OrbState = 'idle', agentFilter = 'tous', agentQuery = '', agentSel: AgentId = 'claude', missionCol = 'a_approuver', draftNext = '', streaming = '', fresh = true, pairMsg = '', pairUrl = '', pairCode = '', sessionAt = 0, updMsg = '', grokArm = 0, diagTxt = '';
@@ -66,13 +66,13 @@ async function handleRemote(text: string, byVoice: boolean) {
   setOrb('thinking'); streaming = '…'; live = ''; paint();
   let reply = '', agentId: AgentId | undefined, said = 0, firstSpoken = 0, failed = false;
   const speakLive = (byVoice || voice.active) && canSpeak();
-  if (speakLive) voice.streamStart();
+  const vg = speakLive ? voice.streamStart() : 0;
   /* dès qu'une phrase est complète, elle est dite : on n'attend plus toute la réponse */
   const feed = (t: string, final: boolean) => {
     if (!speakLive) return;
     const rest = t.slice(said);
     const m = final ? rest.length : (() => { let cut = -1; const re = /[.!?…](\s|$)/g; let x; while ((x = re.exec(rest))) { if (x.index >= 2) cut = x.index + 1; } return cut; })();
-    if (m > 0) { const part = rest.slice(0, m).trim(); said += m; if (part) { if (!firstSpoken) { firstSpoken = Math.round(performance.now() - t0); store.stats.firstMs = [...(store.stats.firstMs || []), firstSpoken].slice(-50); } voice.streamPart(part); } }
+    if (m > 0) { const part = rest.slice(0, m).trim(); said += m; if (part) { if (!firstSpoken) { firstSpoken = Math.round(performance.now() - t0); store.stats.firstMs = [...(store.stats.firstMs || []), firstSpoken].slice(-50); } voice.streamPart(part, vg); } }
   };
   try {
     const out = await srv.chat(text, {newSession: fresh, model: store.settings.model}, (t) => { streaming = t || '…'; document.querySelectorAll('[data-stream]').forEach((n) => { n.textContent = streaming; }); feed(t, false); });
@@ -86,7 +86,7 @@ async function handleRemote(text: string, byVoice: boolean) {
   store.stats.replyMs.push(Math.round(performance.now() - t0)); store.save();
   if (agentId) talkAll(agentId, Math.min(8, 1 + reply.length / 16));
   refreshModes(); paint();
-  if (speakLive) { if (failed) voice.streamPart(reply); else feed(reply, true); voice.streamEnd(); }
+  if (speakLive) { if (failed) voice.streamPart(reply, vg); else feed(reply, true); voice.streamEnd(vg); }
   else setTimeout(() => { if (orbState === 'thinking' || orbState === 'executing') setOrb('idle'); }, 900);
 }
 function handleLocal(text: string, byVoice: boolean) {
