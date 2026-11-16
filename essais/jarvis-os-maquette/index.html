@@ -1288,6 +1288,7 @@
   'use strict';
   /* ---------- données d'exemple : rien n'est lu ni écrit ---------- */
   const $ = (id) => document.getElementById(id);
+  const SRV_OS = window.__JARVIS_MODE === 'serveur';   /* JARVIS OS : sur son serveur, la tâche Claude est faite par le serveur (0.11.0) */
   const TODAY = new Date(); TODAY.setHours(12, 0, 0, 0);
   const day = (n) => { const d = new Date(TODAY); d.setDate(d.getDate() + n); return d; };
   const pad2 = (n) => String(n).padStart(2, '0');
@@ -2879,10 +2880,10 @@ void main(){
         execute: (input) => { const t = String(input.sujet || '').trim(), iso = String(input.date || ''); if (!t || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) throw new Error('Sujet ou date invalide'); const raw = String(input.bot || 'Iris').toLowerCase(); const b = (BOTS.find((x) => x.id === raw || x.name.toLowerCase() === raw) || {id: 'hydra'}).id; const nat = Object.keys(NATURE).find((k) => NATURE[k].toLowerCase() === String(input.nature || '').toLowerCase().replace('par moi', 'par toi')) || 'moi'; const note = String(input.remarque || '').trim(), n = dayDiff(iso);
           T.msgs.splice(T.msgs.indexOf(out), 0, {kind: 'act', label: 'Échéance proposée · suivie par ' + BOT[b].name, text: t + ' · ' + longDay(n) + ' · ' + NATURE[nat] + (note ? ' — ' + note : ''), ok: 'Ajouter', state: 'open', fin: () => ({title: 'Échéance ajoutée', effect: "Une ligne « " + t + " » pour " + longDay(n) + " dans l'onglet Échéances (Nature : " + NATURE[nat] + ') ; ' + BOT[b].name + ' la suit.', mutate: () => S.echeances.push({id: 'e' + (++SEQ), iso, n, title: t, domain: 'Famille', bot: b, nature: nat, note, rem: ''}), bot: b, say: 'Échéance notée.', work: false})});
           renderChat(); return 'Proposée à Rabie ; en attente de son bouton.'; }},
-      {name: 'confier_tache_claude', description: "Propose de confier la demande à la tâche Claude « Ordres Jarvis » : une session complète, plus lente et plus coûteuse, seulement quand il faut modifier une fiche, la Charte, une routine, la structure de Pilotage ou le dépôt. Rien ne part tant que Rabie n'a pas touché le bouton.",
+      {name: 'confier_tache_claude', description: SRV_OS ? "Propose de confier la demande à la tâche Claude du serveur : elle répond aux lignes du Canal adressées à Claude ; ce qui touche une fiche, la Charte, une routine ou le dépôt revient « à valider en conversation ». Rien ne part tant que Rabie n'a pas touché le bouton." : "Propose de confier la demande à la tâche Claude « Ordres Jarvis » : une session complète, plus lente et plus coûteuse, seulement quand il faut modifier une fiche, la Charte, une routine, la structure de Pilotage ou le dépôt. Rien ne part tant que Rabie n'a pas touché le bouton.",
         inputSchema: {type: 'object', properties: {demande: {type: 'string', description: 'La demande complète, telle que la tâche la lira'}}, required: ['demande']},
         execute: (input) => { const m = String(input.demande || '').trim(); if (!m) throw new Error('Demande vide');
-          T.msgs.splice(T.msgs.indexOf(out), 0, {kind: 'act', label: 'Confier à la tâche Claude (session complète)', text: m, ok: 'Lancer la tâche', state: 'open', fin: () => ({title: 'Ordre à Claude', effect: 'Une ligne pour Claude dans le Canal, puis la tâche « Ordres Jarvis » lancée.', bot: 'claude', order: m, viaTask: true, say: 'Je lance la tâche.', reply: ''})});
+          T.msgs.splice(T.msgs.indexOf(out), 0, {kind: 'act', label: SRV_OS ? 'Confier à la tâche Claude (sur ton serveur)' : 'Confier à la tâche Claude (session complète)', text: m, ok: 'Lancer la tâche', state: 'open', fin: () => ({title: 'Ordre à Claude', effect: 'Une ligne pour Claude dans le Canal, puis la tâche « Ordres Jarvis » lancée.', bot: 'claude', order: m, viaTask: true, say: 'Je lance la tâche.', reply: ''})});
           renderChat(); return 'Proposée à Rabie ; en attente de son bouton.'; }}].concat(extraChatTools(T, out));
     let canTools = false;
     try { const lim = await SAMPLE.limits(); canTools = !!(lim && lim.tools); } catch (e) { canTools = false; }
@@ -5242,7 +5243,7 @@ void main(){
 
   /* ce que coûte un bouton : gratuit (Jarvis écrit seul), 1 passage d'un bot (sonnette), un chat Grok, Claude */
   const COST_TXT = {free: 'gratuit', bot: '1 passage', chat: 'chat Grok', claude: 'Claude', task: 'session Claude'};
-  const COST_HELP = {free: 'Jarvis écrit lui-même : ni Grok ni Claude', bot: 'Une ligne dans le Canal et la sonnette : un passage du bot', chat: 'Il faut ouvrir le chat du bot dans Grok Bot', claude: 'Claude répond dans la page, sur ton forfait Claude', task: 'La tâche Claude « Ordres Jarvis » : une session complète'};
+  const COST_HELP = {free: 'Jarvis écrit lui-même : ni Grok ni Claude', bot: 'Une ligne dans le Canal et la sonnette : un passage du bot', chat: 'Il faut ouvrir le chat du bot dans Grok Bot', claude: 'Claude répond dans la page, sur ton forfait Claude', task: SRV_OS ? 'Ton serveur fait répondre Claude aux lignes du Canal qui lui sont adressées : un appel sur ton forfait' : 'La tâche Claude « Ordres Jarvis » : une session complète'};
   function costOf(a) {
     if (!a) return null;
     if (a.cost) return a.cost;
@@ -5627,9 +5628,9 @@ void main(){
   }
   function taskFor() {
     confirmSheet({bot: 'claude', title: 'Lancer la tâche Claude ?', ok: 'Oui, lancer la tâche', cost: 'task',
-      say: "La tâche « Ordres Jarvis » ouvre une session Claude complète : plus lente et plus coûteuse qu'une réponse ici. Elle sert à modifier une fiche, la Charte ou une routine.", run: taskRun});
+      say: SRV_OS ? "Ton serveur lit les lignes du Canal adressées à Claude et y écrit sa réponse (un appel sur ton forfait). Ce qui touche une fiche, la Charte ou une routine revient « à valider en conversation »." : "La tâche « Ordres Jarvis » ouvre une session Claude complète : plus lente et plus coûteuse qu'une réponse ici. Elle sert à modifier une fiche, la Charte ou une routine.", run: taskRun});
   }
-  function taskRun() { later5('Tâche Claude', 'lancement de la tâche « Ordres Jarvis » : une session Claude complète.', async () => { const notes = await lvRing(['claude']); return notes.length ? notes.join(' · ') : 'Tâche lancée : sa réponse arrive dans le Canal.'; }); }
+  function taskRun() { later5('Tâche Claude', SRV_OS ? 'lancement de la tâche Claude sur ton serveur.' : 'lancement de la tâche « Ordres Jarvis » : une session Claude complète.', async () => { const notes = await lvRing(['claude']); return notes.length ? notes.join(' · ') : 'Tâche lancée : sa réponse arrive dans le Canal.'; }); }
   /* un ordre pour Claude : il répond d'abord ici, en direct ; la tâche complète seulement s'il le faut */
   const FIN0 = finish;
   finish = function (e, ctx) {
