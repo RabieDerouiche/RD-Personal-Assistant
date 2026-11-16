@@ -94,7 +94,7 @@
     background: linear-gradient(180deg, rgba(12, 38, 92, .55), rgba(4, 12, 34, .82)) padding-box, linear-gradient(135deg, rgba(103, 232, 249, .65), rgba(99, 102, 241, .28) 45%, rgba(168, 85, 247, .55)) border-box; border: 1px solid transparent;
     box-shadow: inset 0 1px 0 rgba(150, 220, 255, .1), 0 0 18px rgba(37, 99, 235, .16); }
   /* l'ambre reste réservé à « attend ta réponse » */
-  html.theme-holo .kpi.is-amber, html.theme-holo .key.is-today, html.theme-holo .unit[data-mode="demande"], html.theme-holo .mate[data-mode="demande"], html.theme-holo .hero[data-mode="demande"] {
+  html.theme-holo .kpi.is-amber, html.theme-holo .key.is-today {
     background: linear-gradient(180deg, rgba(251, 191, 36, .12), rgba(4, 12, 34, .82)) padding-box, linear-gradient(135deg, rgba(251, 191, 36, .75), rgba(251, 191, 36, .2) 50%, rgba(168, 85, 247, .45)) border-box; box-shadow: 0 0 18px rgba(251, 191, 36, .12); }
   html.theme-holo .hero.boss { background: radial-gradient(420px 220px at 50% 0%, rgba(56, 189, 248, .16), transparent 70%) padding-box, linear-gradient(180deg, rgba(12, 38, 92, .55), rgba(4, 12, 34, .82)) padding-box, linear-gradient(135deg, rgba(103, 232, 249, .65), rgba(99, 102, 241, .28) 45%, rgba(168, 85, 247, .55)) border-box; }
   html.theme-holo .top { background: rgba(2, 6, 20, .82); border-bottom: 1px solid rgba(56, 189, 248, .3); box-shadow: 0 1px 0 rgba(56, 189, 248, .12), 0 10px 30px rgba(14, 165, 233, .08); }
@@ -761,6 +761,27 @@
   .lg-chip b { font: 600 11px var(--sans); color: var(--muted); }
   .lg-chip.is-on { border-color: rgba(255, 255, 255, .6); background: rgba(255, 255, 255, .1); }
 
+  /* JARVIS OS : Équipe harmonisée (16/11/2026) : cartes toutes pareilles (néon arrondi), Oxanium pour les titres et chiffres, Exo 2 pour le texte, l'ambre seulement sur « attend ta réponse » */
+  html.theme-holo .unit[data-mode="demande"], html.theme-holo .mate[data-mode="demande"], html.theme-holo .hero[data-mode="demande"] {
+    background: linear-gradient(180deg, rgba(12, 38, 92, .55), rgba(4, 12, 34, .82)) padding-box, linear-gradient(135deg, rgba(251, 191, 36, .8), rgba(99, 102, 241, .28) 40%, rgba(168, 85, 247, .55)) border-box; border: 1px solid transparent; }
+  html.theme-holo .unit-log { font-family: var(--sans); }
+  html.theme-holo .unit-log time { font-family: var(--tech); }
+  .team { gap: 10px; }
+  .mate { gap: 5px; padding: 14px 10px 12px; color: var(--fg); justify-content: flex-start; }
+  .mate b { font: 700 18px var(--display); letter-spacing: .01em; }
+  .mate-t { font: 500 12.5px/1.3 var(--sans); color: var(--muted); min-height: 2.6em; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .mate .pill { margin: 2px 0; }
+  .mate-log { width: 100%; justify-content: center; text-align: center; font: 500 12.5px/1.4 var(--sans); min-height: 2.8em; margin: 2px 0 0; }
+  .mate-log time { display: none; }
+  .mate-log span { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .mate-next { display: flex; flex-direction: column; gap: 6px; width: 100%; margin-top: auto; padding-top: 4px; }
+  .mate-next small { font: 500 11px var(--sans); color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .mate-next .meter { flex: none; height: 3px; width: 100%; }
+  .stats { flex-wrap: wrap; overflow: visible; }
+  .stat { font-family: var(--sans); }
+  html.theme-holo .stat { background: linear-gradient(180deg, rgba(10, 30, 72, .5), rgba(4, 12, 34, .78)); border-color: rgba(56, 189, 248, .26); }
+  html.theme-holo .stat.is-amber { border-color: rgba(251, 191, 36, .5); }
+  html.theme-holo .canal-row time, html.theme-holo .feed time { font-family: var(--tech); }
   /* JARVIS OS : agenda plus vivant (16/11/2026) : carte Aujourd'hui, 7 prochains jours, grille contrastée, légende repliée, barres de couleur */
   .mg-p { --pc: #94a3b8; color: var(--pc); background: color-mix(in srgb, var(--pc) 18%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--pc) 50%, transparent); font: 700 9.5px/1.55 var(--display); padding: 0 5px; }
   .mg-p[data-c="tt"] { --pc: #22d3ee; color: #a5f3fc; } .mg-p[data-c="hd"] { --pc: #c084fc; color: #e9d5ff; } .mg-p[data-c="cg"] { --pc: #34d399; color: #a7f3d0; } .mg-p[data-c="fe"], .mg-p[data-c="bad"] { --pc: #fb7185; color: #fecdd3; }
@@ -2366,7 +2387,7 @@ void main(){
     },
     ordres(el) {
       el.append(btn('Nouvel ordre', () => openSheet({bot: 'hydra', title: 'Nouvel ordre', say: 'À qui tu donnes un ordre ?', actions: BOTS.concat([BOT.claude]).map((b) => write(b.id, b.name))}), 'main', 'send'));
-      el.append(S.ordres.length ? S.ordres.map((o) => simpleCard('ordre', o, o.text, o.reply || null, BOT[o.bot].name + ' · ' + o.status + ' · ' + rel(o.n), o.bot, 2)) : emptyState('Aucun ordre envoyé.'));
+      el.append(...(S.ordres.length ? S.ordres.map((o) => simpleCard('ordre', o, o.text, o.reply || null, BOT[o.bot].name + ' · ' + o.status + ' · ' + rel(o.n), o.bot, 2)) : [emptyState('Aucun ordre envoyé.')])); /* JARVIS OS : liste dépliée (affichait « [object HTMLElement] ») */
     },
     activite(el) {
       const fresh = S.activite.filter((a) => a.fresh).length;
@@ -2800,6 +2821,24 @@ void main(){
     paintUnit(b, true);
     return card;
   }
+
+  /* JARVIS OS : carte d'un bot dans Équipe (16/11/2026) : personnage, rôle, état, ce qu'il fait (en direct), prochain passage d'après Routines */
+  const EQ = {allOrd: false};
+  function nextOf(b) {
+    const nx = (S.rout || []).filter((r) => r['Routine'] && lvBot(r['Bot']) === b).map((r) => ({d: nextRun(r['Moment']), r: r['Routine']})).filter((x) => x.d && x.d !== 'event').sort((x, y) => x.d - y.d)[0];
+    return nx ? shortWhen(nx.d) + ' · ' + nx.r : S.next[b];
+  }
+  function mateCard(b) {
+    const bt = BOT[b], ch = C(b, 84);
+    const log = h('p', {class: 'unit-log mate-log'}, h('time', {}), h('span', {}));
+    const meter = h('div', {class: 'meter', 'aria-hidden': 'true'}, h('i'));
+    const card = h('button', {type: 'button', class: 'mate', style: botVars(b), 'data-mode': modeOf(b), 'aria-label': bt.name + ', ' + (bt.title || bt.role) + '. Ouvrir sa page', onclick: () => openAgent(b)},
+      ch.el, h('b', {text: bt.name}), h('span', {class: 'mate-t', text: bt.title || bt.role}), pill(b), log,
+      h('span', {class: 'mate-next'}, h('small', {text: 'Prochain · ' + nextOf(b)}), meter));
+    UNITS[b] = {card, log, meter, ch, last: '', short: true};
+    paintUnit(b, true);
+    return card;
+  }
   const unitText = (b) => {
     if (S.late && S.late[b]) return 'En retard : passage prévu ' + S.next[b] + ', rien depuis';
     const m = b === 'claude' ? 'veille' : modeOf(b);
@@ -2816,7 +2855,7 @@ void main(){
   function paintUnit(b, instant) {
     const u = UNITS[b];
     if (!u) return;
-    const m = b === 'claude' ? 'veille' : modeOf(b), text = unitText(b);
+    const m = b === 'claude' ? 'veille' : modeOf(b), text = u.short ? unitText(b).replace(/^Te demande · /, '') : unitText(b); /* JARVIS OS : u.short = carte d'Équipe */
     u.card.dataset.mode = m;
     const old = u.card.querySelector('.pill'); if (old) old.replaceWith(pill(b));
     if (text !== u.last) { u.last = text; u.log.firstChild.textContent = hm(new Date()); typeLine(u.log.lastChild, text, instant); }
@@ -3140,20 +3179,18 @@ void main(){
       el.append(h('section', {class: 'hero boss', style: botVars('claude')}, boss.el,
         h('div', {class: 'hero-id'}, h('b', {text: 'Claude'}), h('span', {class: 'hero-t', text: "Chef d'équipe"}), h('span', {class: 'pill is-travail', text: 'En direct'}), h('p', {class: 'hero-m', text: BOT.claude.mission})),
         h('div', {class: 'row-actions center'}, btn("Mission pour l'équipe", () => openChat('claude', 'hydra', 'equipe', 'equipe'), 'main', 'send'), btn('Qui est en retard ?', () => { openChat('claude', 'hydra', 'equipe', 'equipe'); const ta = $('chat-in'); if (ta && SAMPLE) { ta.value = 'Qui est en retard dans l\'équipe, et que faut-il faire ?'; sendChat(); } }, '', 'pulse'))));
-      el.append(h('p', {class: 'lead', text: "Les six bots Grok Bot sous mes ordres. Touche un bot pour voir ce qu'il fait, ses passages, ce qu'il attend de toi, et lui parler."}));
-      el.append(h('div', {class: 'team'}, BOTS.map((b) => {
-        const ch = C(b.id, 104), w = waitingFor(b.id);
-        return h('button', {type: 'button', class: 'mate', style: botVars(b.id), 'data-mode': modeOf(b.id), onclick: () => openAgent(b.id)},
-          ch.el, h('b', {text: b.name}), h('span', {class: 'mate-t', text: b.title}), PROPOSED ? h('span', {class: 'mate-m', text: b.myth + ' · ex-' + OLDNAME[b.id]}) : null, pill(b.id),
-          h('span', {class: 'mate-now', text: w.length ? w.length + ' demande' + (w.length > 1 ? 's' : '') + ' pour toi' : 'Prochain · ' + S.next[b.id]}));
-      })));
-      el.append(panel('En ce moment', null, h('div', {class: 'units'}, BOTS.map((b) => unit(b.id)))));
+      /* JARVIS OS : une seule grille, cartes identiques ; « En ce moment » (activité en direct, prochain passage) est dans chaque carte */
+      el.append(panel('Ton équipe', h('span', {class: 'aside', text: 'Touche un bot pour sa page'}), h('div', {class: 'team'}, BOTS.map((b) => mateCard(b.id)))));
       el.append(panel('Échanges récents dans le Canal', null, h('div', {class: 'stack'}, S.canal.slice(0, 4).map((l) => {
         const b = BOT[l.to] && l.to !== 'claude' ? l.to : l.from;
-        return h('button', {type: 'button', class: 'canal-row', onclick: () => BOT[b] && b !== 'claude' ? openAgent(b) : null}, h('time', {text: l.date}), h('span', {text: (BOT[l.from] ? BOT[l.from].name : l.from) + ' → ' + (BOT[l.to] ? BOT[l.to].name : 'toi') + ' · ' + l.subject}), h('span', {class: 'pill' + (l.status === 'À faire' ? ' is-demande' : ''), text: l.status}));
+        return h('button', {type: 'button', class: 'canal-row', onclick: () => BOT[b] && b !== 'claude' ? openAgent(b) : null}, h('time', {text: l.date}), h('span', {text: (BOT[l.from] ? BOT[l.from].name : l.from === 'rabie' ? 'Toi' : l.from) + ' → ' + (BOT[l.to] ? BOT[l.to].name : 'toi') + ' · ' + l.subject}), h('span', {class: 'pill' + (l.status === 'À faire' ? ' is-demande' : ''), text: l.status}));
       }))));
-      const box = h('div', {class: 'stack'}); SCREEN.ordres(box);
-      el.append(panel('Tes ordres', null, box));
+      /* JARVIS OS : tes ordres en lignes, comme le Canal ; un appui ouvre l'ordre et ses gestes (Relancer, Préciser…) */
+      const ords = EQ.allOrd ? S.ordres : S.ordres.slice(0, 6);
+      el.append(panel('Tes ordres', null, h('div', {class: 'stack'},
+        btn('Nouvel ordre', () => openSheet({bot: 'hydra', title: 'Nouvel ordre', say: 'À qui tu donnes un ordre ?', actions: BOTS.concat([BOT.claude]).map((b) => write(b.id, b.name))}), 'main', 'send'),
+        ords.length ? ords.map((o) => h('button', {type: 'button', class: 'canal-row', style: botVars(o.bot), onclick: () => openItem('ordre', o)}, h('time', {text: rel(o.n)}), h('span', {text: BOT[o.bot].name + ' · ' + o.text}), h('span', {class: 'pill' + (/^à faire/i.test(o.status) ? ' is-demande' : ''), text: o.status}))) : emptyState('Aucun ordre envoyé.'),
+        S.ordres.length > 6 ? h('button', {type: 'button', class: 'link', onclick: () => { EQ.allOrd = !EQ.allOrd; renderView(true); }}, EQ.allOrd ? 'Seulement les 6 derniers' : 'Tous tes ordres (' + S.ordres.length + ')') : null)));
       const dep = h('div', {class: 'stack'}); SCREEN.depot(dep);
       el.append(panel('Déposer un document', null, dep));
     },

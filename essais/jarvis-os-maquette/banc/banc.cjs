@@ -69,6 +69,22 @@ srv.listen(0, async () => {
     ok('demandes : réponses reçues et courrier arrivé', await p.evaluate(() => [...document.querySelectorAll('.panel-h h2')].filter((x) => /Réponses reçues|Arrivés depuis/.test(x.textContent)).length === 2));
     p = await page('#equipe');
     ok('équipe : journal', await p.evaluate(() => [...document.querySelectorAll('.panel-h h2')].some((x) => /^Journal/.test(x.textContent))));
+    /* équipe harmonisée (16/11/2026) */
+    ok('équipe : une seule grille de 6 cartes identiques, plus de doublon « En ce moment »', await p.evaluate(() => { const m = [...document.querySelectorAll('.team .mate')]; return m.length === 6 && m.every((x) => x.querySelector('.mate-log span') && /^Prochain · /.test(x.querySelector('.mate-next small').textContent)) && ![...document.querySelectorAll('.panel-h h2')].some((x) => x.textContent === 'En ce moment'); }));
+    ok('équipe : texte en Exo 2, plus de police machine à écrire', await p.evaluate(() => /Exo 2/.test(getComputedStyle(document.querySelector('.mate-log')).fontFamily) && /Oxanium/.test(getComputedStyle(document.querySelector('.mate b')).fontFamily)));
+    ok('équipe : l\'ambre ne remplit plus les cartes', await p.evaluate(() => { const d = document.querySelector('.mate[data-mode="demande"]'); return !!d && !/251, 191, 36, 0\.12/.test(getComputedStyle(d).backgroundImage); }));
+    ok('équipe : « Te demande » une seule fois par carte', await p.evaluate(() => [...document.querySelectorAll('.mate[data-mode="demande"]')].every((x) => !/^Te demande/.test(x.querySelector('.mate-log span').textContent))));
+    ok('équipe : tes ordres en lignes, pastilles de chiffres sans débordement', await p.evaluate(() => { const st = document.querySelector('.stats'); const t = [...document.querySelectorAll('.panel')].find((x) => /Tes ordres/.test(x.textContent)); return !!t && t.querySelectorAll('.canal-row').length > 0 && !/\[object/.test(t.textContent) && !!st && st.scrollWidth <= st.clientWidth + 1; }));
+    await p.screenshot({path: path.join(SH, 'equipe.png')});
+    await p.evaluate(() => [...document.querySelectorAll('.panel')].find((x) => /Tes ordres/.test(x.textContent)).querySelector('.canal-row').click()); await p.waitForTimeout(700);
+    ok('équipe : un ordre s\'ouvre avec ses gestes', await p.evaluate(() => { const s = document.getElementById('sheet'); return !!s && !s.hidden && /Relancer|Merci/.test(s.textContent); }));
+    /* aucune rubrique n'affiche de texte cassé */
+    const broken = [];
+    for (const t of ['accueil', 'demandes', 'agenda', 'suivi', 'achats', 'voyages', 'sorties', 'papiers', 'equipe', 'automatisations', 'reglages']) {
+      p = await page('#' + t);
+      if (await p.evaluate(() => /\[object \w+\]|\bundefined\b|\bNaN\b/.test(document.getElementById('view').innerText))) broken.push(t);
+    }
+    ok('aucune rubrique n\'affiche « [object …] », « undefined » ou « NaN »', !broken.length, broken.join(', '));
     p = await page('#reglages');
     ok('réglages en maquette : explication', await p.evaluate(() => /Maquette/.test(document.querySelector('.view-in').textContent)));
     p = await page('#automatisations');
