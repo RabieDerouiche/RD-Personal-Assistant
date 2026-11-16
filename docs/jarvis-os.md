@@ -108,3 +108,5 @@ Comparatif complet (sa demande du 16/11/2026 : Hostinger, et « lesquelles tu pe
   - **volume** : sur iPhone, `speechSynthesis.speaking` peut être faux pendant que la voix parle ; le filet de 5 s terminait la phrase trop tôt, rouvrait le micro et l'iPhone baissait le son. Filet porté à max(9 s, 140 ms par caractère), sans se fier à `speaking`.
   - les actions sur ces données (marquer fait, choisir une option, répondre) passent par les missions, avec le garde-fou.
 - Bancs : serveur 41, bout en bout 29 (dont tableau de bord rempli, page Achats, actualisation d'un module), app 8 scénarios : tout passe (faux Claude).
+
+- **16/11/2026 : refonte complète décidée** (retour très négatif sur la 0.9.0). Plan, demandes et décisions : `docs/jarvis-os-refonte.md` (app complète qui remplace la page Jarvis, accès Google direct, maquette d'abord, zéro régression).
