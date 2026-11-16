@@ -203,6 +203,23 @@
   .pend-full { margin: 0; font-size: 13px; line-height: 1.45; }
   .trk.is-amber .trk-dot { border-color: var(--amber) !important; background: var(--amber) !important; box-shadow: 0 0 10px rgba(251, 191, 36, .6) !important; }
   .trk.is-amber b { color: var(--amber); }
+
+  /* JARVIS OS : accueil, tuiles d'accès rapide */
+  .home-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .htile { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 0; min-height: 96px; padding: 10px 11px; border-radius: 18px; border: 1px solid var(--line); background: linear-gradient(180deg, var(--glass-2), var(--glass)); color: var(--fg); text-align: left; overflow: hidden; }
+  .htile-ic { color: var(--accent); display: inline-flex; margin-bottom: 4px; }
+  .htile-n { font: 700 24px/1.1 var(--display); font-variant-numeric: tabular-nums; }
+  .htile-l { font: 600 12.5px var(--sans); margin-top: 2px; }
+  .htile small { color: var(--muted); font-size: 11px; line-height: 1.25; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; max-width: 100%; }
+  .htile.is-amber .htile-n { color: var(--amber); }
+  .htile.is-amber { border-color: rgba(251, 191, 36, .4); }
+  .htile:active { transform: scale(.97); }
+  html.theme-holo .htile { background: linear-gradient(180deg, rgba(12, 38, 92, .55), rgba(4, 12, 34, .82)) padding-box, linear-gradient(135deg, rgba(103, 232, 249, .55), rgba(99, 102, 241, .22) 45%, rgba(168, 85, 247, .45)) border-box; border: 1px solid transparent; box-shadow: 0 0 16px rgba(37, 99, 235, .14); }
+  html.theme-holo .htile.is-amber { background: linear-gradient(180deg, rgba(251, 191, 36, .1), rgba(4, 12, 34, .82)) padding-box, linear-gradient(135deg, rgba(251, 191, 36, .7), rgba(251, 191, 36, .15) 50%, rgba(168, 85, 247, .4)) border-box; }
+  html.theme-holo .htile-ic { filter: drop-shadow(0 0 6px rgba(103, 232, 249, .7)); }
+  html.theme-holo .htile-n { text-shadow: 0 0 12px rgba(56, 189, 248, .45); }
+  html.theme-holo .htile.is-amber .htile-n { text-shadow: 0 0 12px rgba(251, 191, 36, .4); }
+  html.theme-holo .holo-hero { width: min(240px, 64vw) !important; height: min(200px, 54vw) !important; margin: -14px auto -10px !important; }
 </style></head><body>
 <title>Jarvis v17 copie</title>
 <meta name="claude:viewport-fit-sides" content="cover">
@@ -5691,6 +5708,36 @@ void main(){
     if (!mcp) { try { renderView(true); } catch (e) { /* rien */ } return; }
     Object.keys(LV_SOURCES).forEach(lvWatch);
   })();
+  /* ---------- JARVIS OS : l'accueil réorganisé. Rien n'est retiré : le champ « Demande à Claude » sous le bonjour,
+     six tuiles qui ouvrent chaque rubrique en un appui, puis l'urgent avant le reste ---------- */
+  function homeTiles() {
+    const w = weekend(), wk = (S.sorties || []).filter((x) => x.status === 'proposee' && !sorExpired(x) && sorInWeekend(x)).length;
+    const hot = (S.ach || []).filter((f) => ACH_HOT.includes(famState(f))).length, live = (S.ach || []).filter((f) => !['achete', 'retire'].includes(famState(f))).length;
+    const trip = (S.voyages || []).filter((v) => !v.gone && !v.demo && v.depart != null && v.depart >= 0).sort((a, b) => a.depart - b.depart)[0];
+    const soon = (S.echeances || []).filter((e) => e.n >= 0 && e.n <= 7).length, today = (S.echeances || []).filter((e) => e.n === 0).length;
+    const bots = (S.ordres || []).filter((o) => !/^(fait|annul)/i.test(o.status) && o.n >= -2).length;
+    const T = [
+      ['demandes', 'chat', S.demandes.length, 'Demandes', S.demandes.length ? 'à traiter' : 'rien à décider', S.demandes.length > 0],
+      ['agenda', 'cal', soon, 'Agenda', today ? today + " aujourd'hui" : 'sur 7 jours', today > 0],
+      ['achats', 'tag', hot || live, 'Achats', hot ? 'à décider' : 'suivis', hot > 0],
+      ['sorties', 'map', wk, 'Sorties', 'ce week-end', false],
+      ['voyages', 'plane', trip ? 'J-' + trip.depart : (S.voyages || []).filter((v) => !v.gone).length, 'Voyages', trip ? trip.title : 'projets', false],
+      ['suivi', 'pulse', bots, 'Chez tes bots', 'en cours', false]];
+    return h('nav', {class: 'home-tiles', 'aria-label': 'Accès rapides'}, T.map(([id, ic, n, l, sub, amber]) => h('button', {type: 'button', class: 'htile' + (amber ? ' is-amber' : ''), onclick: () => go(id)},
+      h('span', {class: 'htile-ic', html: icon(ic, 18)}), h('b', {class: 'htile-n', text: String(n)}), h('span', {class: 'htile-l', text: l}), h('small', {text: sub}))));
+  }
+  const ACC_OS = VIEWS.accueil;
+  VIEWS.accueil = (el) => {
+    ACC_OS(el);
+    const kids = Array.prototype.slice.call(el.children);
+    const q = (sel) => kids.find((k) => k.matches && k.matches(sel)) || null;
+    const byH = (t) => kids.find((k) => { const x = k.querySelector('.panel-h h2'); return x && k.classList.contains('panel') && x.textContent.trim().indexOf(t) === 0; }) || null;
+    const order = [q('.home-hero'), q('.intent'), homeTiles(), q('.new-banner'), q('.pause-b'), q('.brief-card'), byH('Ce qui demande ton attention'), byH('Réponses reçues'), byH('Arrivés depuis'),
+      byH('En cours chez tes bots'), byH('Les 7 prochains jours'), q('.sor-acc'), byH('Ton équipe'), q('.stats'), q('.cost-chip'), byH('Journal')].filter(Boolean);
+    const rest = kids.filter((k) => !order.includes(k) && !k.classList.contains('ver-foot')), foot = q('.ver-foot');
+    el.replaceChildren.apply(el, order.concat(rest, foot ? [foot] : []));
+  };
+
   boot();
 })();
 </script>
