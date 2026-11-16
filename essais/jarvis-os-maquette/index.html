@@ -1,4 +1,32 @@
-<!doctype html><html><head><script>window.__SCEN = {};</script><script src="donnees-fictives.js"></script><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<!doctype html><html><head><script>window.__SCEN = {};</script><script src="donnees-fictives.js"></script><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}
+  /* ---------- JARVIS OS : navigation et écrans ajoutés ---------- */
+  .fab-talk { display: none !important; }
+  .tabs { grid-template-columns: repeat(5, minmax(0, 1fr)) !important; align-items: end; }
+  .tab-talk { position: relative; }
+  .talk-orb { width: 54px; height: 54px; margin-top: -26px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #e0f2fe, #6366f1 45%, #7c3aed 75%, #1e1b4b); box-shadow: 0 0 0 4px rgba(4, 6, 13, .9), 0 0 24px rgba(124, 92, 255, .7); }
+  .menu-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .menu-tile { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 16px 14px; border-radius: 20px; border: 1px solid var(--line); background: linear-gradient(180deg, var(--glass-2), var(--glass)); color: var(--fg); text-align: left; }
+  .menu-tile b { font: 600 16px var(--display); }
+  .menu-tile small { color: var(--muted); font-size: 12.5px; }
+  .menu-ic { color: var(--accent); }
+  .auto { display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border-radius: 18px; }
+  .auto-h { display: flex; align-items: flex-start; gap: 10px; justify-content: space-between; }
+  .auto-h b { font: 600 15px var(--display); }
+  .track { list-style: none; margin: 0; padding: 0 0 0 4px; display: flex; flex-direction: column; }
+  .trk { position: relative; display: flex; gap: 12px; padding: 0 0 12px 0; }
+  .trk:not(:last-child)::before { content: ""; position: absolute; left: 5px; top: 14px; bottom: 0; width: 2px; background: var(--line-2); }
+  .trk.done:not(:last-child)::before { background: linear-gradient(var(--green), var(--line-2)); }
+  .trk-dot { flex: 0 0 12px; width: 12px; height: 12px; margin-top: 3px; border-radius: 50%; border: 2px solid var(--dim); background: var(--bg); }
+  .trk.done .trk-dot { border-color: var(--green); background: var(--green); }
+  .trk.next .trk-dot { border-color: #67e8f9; box-shadow: 0 0 10px #67e8f9; }
+  .trk b { display: block; font-size: 13.5px; }
+  .trk small { color: var(--muted); font-size: 12.5px; }
+  .pap-search { width: 100%; min-height: 46px; padding: 10px 14px; border-radius: 14px; border: 1px solid var(--line-2); background: var(--glass-2); color: var(--fg); font-size: 16px; }
+  .pap-chips { display: flex; gap: 6px; overflow-x: auto; padding: 10px 0 4px; scrollbar-width: none; }
+  .pap-chips .chip { flex: 0 0 auto; border: 1px solid var(--line); background: var(--glass); color: var(--muted); border-radius: 999px; padding: 7px 12px; font: 500 13px var(--sans); }
+  .pap-chips .chip.is-on { color: var(--fg); background: var(--glass-3); border-color: var(--line-2); }
+  .pap { display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; border-radius: 16px; }
+</style></head><body>
 <title>Jarvis v17 copie</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sora:wght@400;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
@@ -2796,7 +2824,7 @@ void main(){
     $('view-title').textContent = VIEWTITLE[TAB] ? VIEWTITLE[TAB]() : TAB === 'equipe' && AGENT ? BOT[AGENT].name + ' · ' + BOT[AGENT].title : TITLES[TAB];
     VIEWS[TAB](body);
     v.replaceChildren(body);
-    document.querySelectorAll('.tab').forEach((t) => t.setAttribute('aria-current', t.dataset.tab === TAB ? 'page' : 'false'));
+    document.querySelectorAll('.tab').forEach((t) => t.setAttribute('aria-current', (t.dataset.tab === TAB || (t.dataset.tab === 'menu' && !['accueil', 'demandes', 'agenda'].includes(TAB))) ? 'page' : 'false'));
     header();
     const to = keep ? y : NAV.y != null ? NAV.y : 0; NAV.y = null;
     if (sc) sc.scrollTop = to; else window.scrollTo(0, to);
@@ -2839,9 +2867,77 @@ void main(){
     flowT = 0;
   }};
 
+  /* ---------- JARVIS OS : Menu, Automatisations, Papiers ---------- */
+  TITLES.menu = 'Tout JARVIS'; TITLES.automatisations = 'Tes automatisations'; TITLES.papiers = 'Tes papiers';
+  VIEWS.menu = (el) => {
+    const it = (id, label, ic, sub) => h('button', {type: 'button', class: 'menu-tile', onclick: () => go(id)}, h('span', {class: 'menu-ic', html: icon(ic, 22)}), h('b', {text: label}), h('small', {text: sub}));
+    el.append(h('div', {class: 'menu-grid'},
+      it('achats', 'Achats', 'tag', 'Prix suivis, courbes, ajouter'), it('voyages', 'Voyages', 'plane', 'Projets, plans, options'),
+      it('sorties', 'Sorties', 'map', 'Ce week-end, envies'), it('papiers', 'Papiers', 'doc', 'Chercher un document'),
+      it('automatisations', 'Automatisations', 'clock', 'Suivi de chaque routine'), it('equipe', 'Équipe', 'pulse', 'Tes bots et leurs passages'),
+      it('suivi', 'Suivi', 'folder', 'Dossiers, tâches, coût'), it('demandes', 'Demandes', 'chat', 'Ce qui attend ta réponse')));
+  };
+  const JOURS = {dim: 0, lun: 1, mar: 2, mer: 3, jeu: 4, ven: 5, sam: 6};
+  /* prochain passage d'après l'horaire écrit dans Routines (« Lun-ven 7h30 », « dim 18h », « le 24 », « chaque jour 8h44 »…) */
+  function nextRun(moment, from) {
+    const m = String(moment || '').toLowerCase(), now = from || new Date();
+    if (/arriv|mail|à la demande|sur demande/.test(m)) return 'event';
+    const tm = m.match(/(\d{1,2})\s*h\s*(\d{0,2})/), H = tm ? +tm[1] : 9, M = tm && tm[2] ? +tm[2] : 0;
+    const dom = m.match(/\ble (\d{1,2}|1er)\b/);
+    if (dom) { const d = dom[1] === '1er' ? 1 : +dom[1]; for (let k = 0; k < 2; k++) { const c = new Date(now.getFullYear(), now.getMonth() + k, d, H, M); if (c > now) return c; } }
+    let days = [0, 1, 2, 3, 4, 5, 6];
+    const rg = m.match(/(lun|mar|mer|jeu|ven|sam|dim)[a-z]*\s*-\s*(lun|mar|mer|jeu|ven|sam|dim)/);
+    if (rg) { days = []; for (let d = JOURS[rg[1]]; ; d = (d + 1) % 7) { days.push(d); if (d === JOURS[rg[2]]) break; } }
+    else { const one = [...m.matchAll(/\b(lun|mar|mer|jeu|ven|sam|dim)[a-z.]*/g)].map((x) => JOURS[x[1]]); if (one.length) days = one; }
+    for (let k = 0; k < 15; k++) { const c = new Date(now.getFullYear(), now.getMonth(), now.getDate() + k, H, M); if (c > now && days.includes(c.getDay())) return c; }
+    return null;
+  }
+  const whenTxt = (d) => { const n = new Date(), diff = Math.round((new Date(d.getFullYear(), d.getMonth(), d.getDate()) - new Date(n.getFullYear(), n.getMonth(), n.getDate())) / 864e5); return (diff === 0 ? "aujourd'hui" : diff === 1 ? 'demain' : fmt(d, {weekday: 'long', day: 'numeric', month: 'short'})) + ' à ' + hm(d); };
+  VIEWS.automatisations = (el) => {
+    const rows = (S.rout || []).filter((r) => r['Routine']), last = {};
+    (S.activite || []).forEach((a) => { if (a.bot && a.s && (!last[a.bot] || a.s > last[a.bot])) last[a.bot] = a.s; });
+    el.append(h('p', {class: 'lead', text: rows.length ? rows.length + ' automatisations, suivies comme une livraison : programmée, dernier passage, prochain passage.' : 'Aucune routine lue dans Pilotage.'}));
+    const by = {}; rows.forEach((r) => (by[r['Bot']] = by[r['Bot']] || []).push(r));
+    Object.entries(by).forEach(([bot, rs]) => el.append(panel(bot, null, rs.map((r) => {
+      const id = lvBot(r['Bot']), nx = nextRun(r['Moment']), lt = last[id], st = r['État'] || 'En place', ok = /en place/i.test(st);
+      const step = (label, txt, cls) => h('li', {class: 'trk ' + cls}, h('span', {class: 'trk-dot'}), h('div', {}, h('b', {text: label}), h('small', {text: txt})));
+      return h('article', {class: 'auto card'},
+        h('div', {class: 'auto-h'}, h('b', {text: r['Routine']}), h('span', {class: 'pill' + (ok ? ' is-ok' : ' is-demande'), text: st})),
+        h('ol', {class: 'track'},
+          step('Programmée', [r['Moment'], r['Déclencheur']].filter(Boolean).join(' · '), 'done'),
+          step('Dernier passage ' + (/^[aeiouyéèêàâîôû]/i.test(r['Bot']) ? "d'" : 'de ') + r['Bot'], lt ? whenTxt(new Date(lt)) : 'pas encore vu dans le journal', lt ? 'done' : 'todo'),
+          step('Prochain passage', nx === 'event' ? 'à chaque ' + (/mail/i.test(r['Déclencheur'] || '') ? 'mail reçu' : 'événement') : nx ? whenTxt(nx) : 'horaire à préciser', 'next')),
+        r['But'] && r['But'] !== 'x' ? h('p', {class: 'muted', text: r['But']}) : null);
+    }))));
+  };
+  /* papiers : catégories déduites du document, de la personne et de l'usage */
+  const PAP_CATS = [['Voiture', /voiture|véhicule|carte grise|auto\b|contrôle technique|immatricul/], ['Appartement et immobilier', /appartement|logement|bail|loyer|syndic|copro|foncière|notaire|immobili|prêt|habitation|edf|eau\b/], ['Fille', /\bfille\b|bébé|enfant|naissance|carnet de santé/], ['Entourage de la fille', /crèche|nounou|assistante maternelle|école|pédiatre|garde/], ['Épouse', /épouse|femme\b|conjointe/]];
+  const papCat = (q) => { const t = [q.name, q.who, q.use, q.note].join(' ').toLowerCase(); const c = PAP_CATS.find(([, re]) => re.test(t)); return c ? c[0] : /^rabie$/i.test(q.who || '') ? 'Moi' : /^foyer$/i.test(q.who || '') ? 'Foyer' : q.who ? q.who : 'Autres'; };
+  let PAPQ = '', PAPC = 'Tout';
+  VIEWS.papiers = (el) => {
+    const all = (S.papiers || []).map((q) => ({q, cat: papCat(q)})), cats = ['Tout', ...new Set(all.map((x) => x.cat))], people = [...new Set(all.map((x) => x.q.who).filter(Boolean))];
+    const list = h('div', {class: 'stack'});
+    const draw = () => {
+      const t = PAPQ.toLowerCase().trim();
+      const hits = all.filter((x) => (PAPC === 'Tout' || x.cat === PAPC || x.q.who === PAPC) && (!t || [x.q.name, x.q.who, x.q.use, x.q.note, x.q.where].join(' ').toLowerCase().includes(t)));
+      const groups = {}; hits.forEach((x) => (groups[x.cat] = groups[x.cat] || []).push(x));
+      list.replaceChildren(...(hits.length ? Object.entries(groups).map(([c, xs]) => panel(c + ' · ' + xs.length, null, xs.map(({q}) => h('article', {class: 'pap card'},
+        h('div', {class: 'auto-h'}, h('b', {text: q.name}), q.untilTxt ? h('span', {class: 'pill' + (q.until != null && q.until < 60 ? ' is-demande' : ''), text: 'jusqu\'au ' + q.untilTxt}) : null),
+        h('p', {class: 'muted', text: [q.who, q.use].filter(Boolean).join(' · ')}),
+        q.url ? h('a', {class: 'link', href: q.url, target: '_blank', rel: 'noopener', text: 'Ouvrir dans Drive ›'}) : h('small', {class: 'muted', text: q.where || ''}))))) : [h('p', {class: 'muted', text: 'Aucun papier ne correspond.'})]));
+    };
+    const input = h('input', {class: 'pap-search', type: 'search', placeholder: 'Chercher : carte grise, bail, passeport…', value: PAPQ, oninput: (e) => { PAPQ = e.target.value; draw(); }});
+    const chips = h('div', {class: 'pap-chips'}, [...cats, ...people.filter((p) => !cats.includes(p))].map((c) => h('button', {type: 'button', class: 'chip' + (c === PAPC ? ' is-on' : ''), onclick: (e) => { PAPC = c; chips.querySelectorAll('.chip').forEach((b) => b.classList.toggle('is-on', b === e.currentTarget)); draw(); }}, c)));
+    el.append(input, chips, list); draw();
+  };
+
   function boot() {
     const nav = $('tabs');
-    TABS.forEach((t) => nav.append(h('button', {type: 'button', class: 'tab', 'data-tab': t.id, onclick: () => go(t.id)}, h('span', {class: 'ic', html: icon(t.ic, 20)}), h('span', {text: t.label}), t.id === 'demandes' ? h('span', {class: 'badge', hidden: true}) : null)));
+    /* JARVIS OS : barre à 5 entrées, « Parler » au centre, tout le reste dans le Menu */
+    const navBtn = (id, label, ic, fn) => h('button', {type: 'button', class: 'tab', 'data-tab': id, onclick: fn || (() => go(id))}, h('span', {class: 'ic', html: icon(ic, 20)}), h('span', {text: label}), id === 'demandes' ? h('span', {class: 'badge', hidden: true}) : null);
+    nav.append(navBtn('accueil', 'Accueil', 'pulse'), navBtn('demandes', 'Demandes', 'chat'),
+      h('button', {type: 'button', class: 'tab tab-talk', 'aria-label': 'Parler à JARVIS', onclick: () => convOpen()}, h('span', {class: 'talk-orb'}), h('span', {text: 'Parler'})),
+      navBtn('agenda', 'Agenda', 'cal'), navBtn('menu', 'Menu', 'folder'));
     $('sheet-back').addEventListener('click', () => closeSheet());
     $('nav-back').addEventListener('click', navBack);
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { if (!$('sheet').hidden) closeSheet(); else if (CHAT.open) closeChat(); else if (APP.id) closeApp(); } });
@@ -3458,6 +3554,7 @@ void main(){
     const rows = (k) => (T[k] && T[k].rows) || null;
     const etat = rows('etat');
     if (etat) {
+      S.etatRows = etat;
       S.late = {}; S.base = {};
       etat.forEach((r) => {
         const b = lvBot(r['Bot']); if (!BOT[b] || b === 'toi') return;
@@ -3473,6 +3570,7 @@ void main(){
     }
     const rout = rows('rout');
     if (rout) {
+      S.rout = rout;
       Object.keys(ROUTINES).forEach((k) => { ROUTINES[k] = []; });
       rout.forEach((r) => { const b = lvBot(r['Bot']); if (!ROUTINES[b]) ROUTINES[b] = []; ROUTINES[b].push(r['Routine'] + ' · ' + r['Moment'] + (r['État'] && lvLow(r['État']) !== 'en place' ? ' · ' + r['État'] : '')); });
       ROUTINES.claude = ['Quand tu le lances depuis la page'];
