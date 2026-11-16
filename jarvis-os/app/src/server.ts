@@ -113,6 +113,12 @@ export async function diag(): Promise<string> {
   try {
     const r = await call('/api/diag', {}, 120000); const b = await r.json();
     const pr = b.probe || {};
-    return 'Serveur ' + b.version + '\n\nclaude mcp list :\n' + b.mcpList + '\n\nInventaire au démarrage de Claude Code : ' + pr.tools + ' outils, dont ' + (pr.mcpTools || []).length + ' de connecteurs' + ((pr.mcpTools || []).length ? ' :\n' + pr.mcpTools.join('\n') : '') + '\nServeurs MCP annoncés : ' + ((pr.servers || []).map((x: {name: string; status: string}) => x.name + ' (' + x.status + ')').join(', ') || 'aucun');
+    return 'Serveur ' + b.version + '\n\nConnecteurs autorisés : ' + ((b.rules || []).join(', ') || 'aucun') + '\n\nclaude mcp list :\n' + b.mcpList + '\n\nInventaire au démarrage de Claude Code : ' + pr.tools + ' outils, dont ' + (pr.mcpTools || []).length + ' de connecteurs' + ((pr.mcpTools || []).length ? ' :\n' + pr.mcpTools.join('\n') : '') + '\nServeurs MCP annoncés : ' + ((pr.servers || []).map((x: {name: string; status: string}) => x.name + ' (' + x.status + ')').join(', ') || 'aucun');
   } catch { return 'Le serveur n\'a pas répondu au diagnostic.'; }
+}
+export async function testData(): Promise<string> {
+  try {
+    const r = await call('/api/test-data', {method: 'POST'}, 200000); const b = await r.json();
+    return (b.ok ? 'Réponse de Claude : ' : 'Échec : ') + b.answer + '\n\nOutils utilisés : ' + ((b.used || []).join(', ') || 'aucun') + '\nConnecteurs autorisés : ' + ((b.allowed || []).join(', ') || 'aucun');
+  } catch { return 'Le serveur n\'a pas répondu à l\'essai.'; }
 }

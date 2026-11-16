@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /* Faux Claude Code pour le banc : imite `claude -p --output-format stream-json` et `claude auth status --json`. */
 const args = process.argv.slice(2);
-if (args[0] === 'mcp') { console.log('claude.ai Gmail: https://gmail.mcp.example - ✓ Connected\nclaude.ai Google Sheets: https://sheets.mcp.example - ✓ Connected'); process.exit(0); }
+if (args[0] === 'mcp') { console.log('Checking MCP server health…\n\nclaude.ai Claude Docs: https://api.example/v1/pages/mcp - ✓ Connected\nclaude.ai Google Calendar: https://calendarmcp.example/mcp/v1 - ✓ Connected\nclaude.ai Google Sheets: https://sheetsmcp.example/mcp/v1 - ✓ Connected\nclaude.ai Gmail: https://gmailmcp.example/mcp/v1 - ✓ Connected'); process.exit(0); }
 if (args[0] === 'auth') { console.log(JSON.stringify({loggedIn: true, authMethod: 'claude.ai'})); process.exit(0); }
 const out = (o) => process.stdout.write(JSON.stringify(o) + '\n');
 let input = '';
@@ -15,7 +15,8 @@ process.stdin.on('end', async () => {
   let reply;
   const si = args.indexOf('--settings'); let guard = 'aucune';
   if (si >= 0) { try { guard = JSON.parse((await import('node:fs')).readFileSync(args[si + 1], 'utf8')).hooks.PreToolUse[0].hooks[0].command.split(' ').pop(); } catch { guard = 'illisible'; } }
-  if (/onglet Canal/.test(input)) reply = 'Ligne écrite dans le Canal pour ' + (input.match(/pour le bot (\S+)/) || [])[1] + ' ; ' + (/N'envoie pas de sonnette/.test(input) ? 'pas de sonnette (pause).' : 'sonnette envoyée.') + ' Outils : ' + allow + '. Garde : ' + guard + '.';
+  if (/Test d'accès aux données/.test(input)) { out({type: 'system', subtype: 'init', session_id: sid, model, tools: [], mcp_servers: []}); out({type: 'assistant', session_id: sid, message: {content: [{type: 'tool_use', name: 'mcp__claude_ai_Google_Calendar__list_events', input: {}}, {type: 'tool_use', name: 'mcp__claude_ai_Gmail__search_threads', input: {}}]}}); reply = 'Ton prochain événement est « Réunion ». Le dernier mail a pour objet « Facture ». Outils : ' + allow + '.'; }
+  else if (/onglet Canal/.test(input)) reply = 'Ligne écrite dans le Canal pour ' + (input.match(/pour le bot (\S+)/) || [])[1] + ' ; ' + (/N'envoie pas de sonnette/.test(input) ? 'pas de sonnette (pause).' : 'sonnette envoyée.') + ' Outils : ' + allow + '. Garde : ' + guard + '.';
   else if (/^Mission :/.test(input)) reply = 'Compte rendu : mission faite (' + input.slice(10, 60) + ').';
   else if (/rapport/i.test(input)) reply = "Claude va préparer ce rapport, la mission attend ton accord.\nMISSIONS: [{\"agent\":\"claude\",\"text\":\"préparer un rapport sur la veille .NET\"}]";
   else if (/kairos/i.test(input)) reply = 'Je prépare ça pour Kairos, la mission attend ton accord.\nMISSIONS: [{"agent":"kairos","text":"vérifier le prix du robot cuiseur"}]';
