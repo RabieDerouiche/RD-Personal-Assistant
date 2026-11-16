@@ -44,7 +44,7 @@ export async function pair(url: string, code: string): Promise<string | null> {
 }
 export function unpair() { store.settings.serverToken = ''; store.save(); }
 
-export interface Status { ok: boolean; claude?: {installed: boolean; loggedIn: boolean; method: string}; version?: string; error?: string }
+export interface Status { ok: boolean; claude?: {installed: boolean; loggedIn: boolean; method: string}; version?: string; commit?: string; error?: string }
 let last: Status = {ok: false};
 export const lastStatus = () => last;
 export async function status(): Promise<Status> {
@@ -52,7 +52,7 @@ export async function status(): Promise<Status> {
   try {
     const r = await call('/api/status');
     if (r.status === 401) return (last = {ok: false, error: 'appareil plus reconnu : relie-le de nouveau'});
-    const b = await r.json(); return (last = {ok: true, claude: b.claude, version: b.version});
+    const b = await r.json(); return (last = {ok: true, claude: b.claude, version: b.version, commit: b.commit});
   } catch { return (last = {ok: false, error: 'serveur injoignable'}); }
 }
 
@@ -99,3 +99,10 @@ export async function missionUpdate(id: string, patch: {status?: string; priorit
 }
 export async function missionDelete(id: string) { await call('/api/missions/' + encodeURIComponent(id), {method: 'DELETE'}); }
 export async function memoryClear() { await call('/api/memory', {method: 'DELETE'}); }
+
+/* l'app servie par le serveur lui-même : son adresse est déjà connue */
+export const servedByServer = () => location.protocol === 'https:' && !/github\.io$/i.test(location.hostname);
+export async function updateServer(): Promise<string> {
+  try { const r = await call('/api/update', {method: 'POST'}, 90000); const b = await r.json(); return b.message || 'Réponse inattendue.'; }
+  catch { return 'Le serveur n\'a pas répondu.'; }
+}

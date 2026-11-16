@@ -13,7 +13,8 @@ if ! command -v node >/dev/null || ! node -v | grep -qE '^v(2[2-9]|[3-9][0-9])';
 fi
 npm install -g @anthropic-ai/claude-code
 id jarvis >/dev/null 2>&1 || useradd -m -s /bin/bash jarvis
-if [ -d /opt/rd/.git ]; then git -C /opt/rd pull --ff-only; else git clone --depth 1 "$REPO" /opt/rd; fi
+# le service (utilisateur jarvis) doit pouvoir se mettre à jour lui-même : le dépôt lui appartient
+if [ -d /opt/rd/.git ]; then chown -R jarvis:jarvis /opt/rd; sudo -u jarvis git -C /opt/rd pull --ff-only; else git clone --depth 1 "$REPO" /opt/rd; chown -R jarvis:jarvis /opt/rd; fi
 if ! command -v caddy >/dev/null; then
   curl -1sLf https://dl.cloudsmith.io/public/caddy/stable/gpg.key | gpg --dearmor --yes -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
   curl -1sLf https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt > /etc/apt/sources.list.d/caddy-stable.list
@@ -57,7 +58,7 @@ cat > /etc/motd <<MOTD
   1. Connecter Claude à ton abonnement :   sudo -iu jarvis claude auth login
   2. Code pour relier l'iPhone :            cat /root/jarvis-code.txt
      (nouveau code : sudo -iu jarvis node /opt/rd/jarvis-os/server/server.mjs pair)
-  Mise à jour : bash /opt/rd/jarvis-os/server/install/setup.sh
+  Mise à jour : bouton « Mettre à jour le serveur » dans l'app (Réglages)
 
 MOTD
 echo "Installation terminée : https://$HOST"

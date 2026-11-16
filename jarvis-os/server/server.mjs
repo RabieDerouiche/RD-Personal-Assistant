@@ -11,13 +11,14 @@ import os from 'node:os';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 
-const VERSION = '0.5.0';
+const VERSION = '0.6.0';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PORT = +(process.env.PORT || 8787);
 const HOST = process.env.HOST || '127.0.0.1';
 const DATA = process.env.JARVIS_DATA || path.join(os.homedir(), '.jarvis');
 const CLAUDE = process.env.CLAUDE_BIN || 'claude';
 const WEB = process.env.JARVIS_WEB || path.join(HERE, '..', 'web');
+const REPO = process.env.JARVIS_REPO || path.join(HERE, '..', '..');
 const ORIGINS = (process.env.JARVIS_ORIGINS || 'https://rabiederouiche.github.io').split(',').map((s) => s.trim()).filter(Boolean);
 const AGENTS = ['claude', 'jarvis', 'iris', 'chronos', 'kairos', 'ulysse', 'athena', 'argus'];
 const MODELS = {rapide: 'haiku', equilibre: 'sonnet', profond: 'opus'};
@@ -177,6 +178,20 @@ function claudeStatus() {
   });
 }
 
+/* ---------- mise à jour depuis le dépôt public (git pull), puis redémarrage par systemd ---------- */
+const git = (args) => new Promise((resolve) => execFile('git', ['-C', REPO, ...args], {timeout: 60000}, (err, out, errOut) => resolve({ok: !err, out: String(out || '').trim(), err: String(errOut || (err && err.message) || '').trim()})));
+let commit = '';
+git(['rev-parse', '--short', 'HEAD']).then((r) => { if (r.ok) commit = r.out; });
+async function update() {
+  const before = (await git(['rev-parse', 'HEAD'])).out;
+  const r = await git(['pull', '--ff-only']);
+  if (!r.ok) return {ok: false, message: 'Mise à jour impossible : ' + r.err.slice(0, 200)};
+  const after = (await git(['rev-parse', 'HEAD'])).out;
+  if (before === after) return {ok: true, changed: false, message: 'Déjà à jour (version ' + VERSION + ').'};
+  setTimeout(() => process.exit(0), 400);   /* systemd relance le service avec le nouveau code */
+  return {ok: true, changed: true, message: 'Mis à jour. Le serveur redémarre : quelques secondes.'};
+}
+
 /* ---------- HTTP ---------- */
 const TYPES = {'.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.json': 'application/json', '.webmanifest': 'application/manifest+json'};
 function cors(req, res) {
@@ -195,7 +210,8 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/pair' && req.method === 'POST') { const b = await readBody(req); const r = pair(b.code, b.device); return json(res, r.status, r.body); }
     if (p.startsWith('/api/')) {
       if (!authed(req)) return json(res, 401, {error: 'Appareil non relié.'});
-      if (p === '/api/status') return json(res, 200, {version: VERSION, claude: await claudeStatus(), usage: S.usage, session: !!S.session});
+      if (p === '/api/status') return json(res, 200, {version: VERSION, commit, claude: await claudeStatus(), usage: S.usage, session: !!S.session});
+      if (p === '/api/update' && req.method === 'POST') return json(res, 200, await update());
       if (p === '/api/state') return json(res, 200, {msgs: S.msgs.slice(-200), missions: S.missions});
       if (p === '/api/chat' && req.method === 'POST') {
         const b = await readBody(req);

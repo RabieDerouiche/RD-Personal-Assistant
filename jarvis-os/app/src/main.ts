@@ -12,10 +12,10 @@ import {charOf, setModeSource, talkAll, refreshModes, type Mode} from './chars';
 import * as srv from './server';
 
 const PHASE = 2;
-const VERSION = '0.5.0';
+const VERSION = '0.6.0';
 type View = 'home' | 'command' | 'agents' | 'agent' | 'missions' | 'more' | 'memory' | 'automations' | 'intelligence' | 'settings';
 let view: View = 'home';
-let live = '', note = '', clearArm = 0, orbState: OrbState = 'idle', agentFilter = 'tous', agentQuery = '', agentSel: AgentId = 'claude', missionCol = 'a_approuver', draftNext = '', streaming = '', fresh = true, pairMsg = '', pairUrl = '', pairCode = '';
+let live = '', note = '', clearArm = 0, orbState: OrbState = 'idle', agentFilter = 'tous', agentQuery = '', agentSel: AgentId = 'claude', missionCol = 'a_approuver', draftNext = '', streaming = '', fresh = true, pairMsg = '', pairUrl = '', pairCode = '', sessionAt = 0, updMsg = '';
 
 const SALLE = {copie: 'https://claude.ai/artifact/NMAqUak7A5JYsLsc12VyaZ', service: 'https://claude.ai/artifact/QwLf64Ggstzu4p3uznZrr8'};
 const app = document.getElementById('app')!;
@@ -100,7 +100,7 @@ const micTap = () => {
   if (!canListen()) { note = 'Pas de reconnaissance vocale ici : écris ta demande.'; paint(); return; }
   if (voice.state === 'speaking') { voice.interrupt(); return; }
   if (voice.active) { voice.stop(); return; }
-  note = ''; fresh = true; voice.start();
+  note = ''; fresh = true; sessionAt = Date.now(); voice.start();
 };
 const askBox = (id: string, ph: string, cls: string) => {
   const input = h('input', {class: 'ask-in', id, type: 'text', placeholder: ph, enterkeyhint: 'send', autocomplete: 'off', 'aria-label': 'Ta demande'}) as HTMLInputElement;
@@ -132,17 +132,18 @@ function home(): HTMLElement {
 
 /* ---------- session vocale : orbe, voile de soie, micro ---------- */
 function voiceView(): HTMLElement {
-  const lastJ = store.msgs.slice().reverse().find((m) => m.who === 'jarvis');
+  const lastJ = store.msgs.slice().reverse().find((m) => m.who === 'jarvis' && m.at >= sessionAt);   /* seulement cette session */
   const routes: RouteMode[] = ['auto', 'claude', 'grok'];
   const speaking = voice.state === 'speaking';
   return h('section', {class: 'voice'},
     h('div', {class: 'v-top'}, h('span', {class: 'v-dot'}), h('span', {'data-orbtxt': '', text: STATE_TXT[orbState]}),
+      srv.linked() ? h('span', {class: 'v-model', text: claudeOn() ? 'Claude · ' + ({rapide: 'Haiku', equilibre: 'Sonnet', profond: 'Opus'} as Record<string, string>)[store.settings.model] : 'serveur ' + (srv.lastStatus().error || 'en vérification')}) : h('span', {class: 'v-model off', text: 'réponses locales'}),
       h('button', {type: 'button', class: 'v-route', 'aria-label': 'Agent', onclick: () => { const i = routes.indexOf(store.settings.route); store.settings.route = routes[(i + 1) % 3]; store.save(); paint(); }}, store.settings.route.toUpperCase())),
     h('div', {class: 'stage tall'}, orb.el),
     h('div', {class: 'captions'},
       h('p', {class: 'cap-me', 'data-live': '', text: live}),
       streaming ? h('div', {class: 'cap-j'}, sph('claude', 34, 'voice'), h('p', {'data-stream': '', text: streaming}))
-        : lastJ ? h('div', {class: 'cap-j'}, lastJ.agent ? sph(lastJ.agent, 34, 'voice') : null, h('p', {text: lastJ.text})) : h('p', {class: 'cap-hint', text: 'Parle normalement, je réponds à voix haute. « C\'est tout » pour finir.'})),
+        : lastJ ? h('div', {class: 'cap-j'}, lastJ.agent ? sph(lastJ.agent, 34, 'voice') : null, h('p', {text: lastJ.text})) : h('p', {class: 'cap-hint', text: (claudeOn() ? 'Claude t\'écoute. ' : '') + 'Parle normalement, je réponds à voix haute. « C\'est tout » pour finir.'})),
     note ? h('p', {class: 'note', text: note}) : null,
     h('div', {class: 'v-bar'},
       h('button', {type: 'button', class: 'v-side', 'aria-label': 'Passer au clavier', html: icon('key', 22), onclick: () => { voice.stop(); show('command'); }}),
@@ -304,14 +305,17 @@ function settings(): HTMLElement {
     h('option', {value: '', text: "Voix des réglages de l'iPhone (recommandé)"}), vs.map((v) => h('option', {value: v.voiceURI || v.name, text: v.name + ' · ' + v.lang}))) as HTMLSelectElement;
   sel.value = st.voiceURI;
   const seg = (k: 'listenMode' | 'route' | 'salle' | 'model', opts: [string, string][]) => h('div', {class: 'seg'}, opts.map(([v, l]) => h('button', {type: 'button', 'aria-pressed': String((st as any)[k] === v), onclick: () => { (st as any)[k] = v; store.save(); render(); }}, l)));
-  const url = h('input', {class: 'field', type: 'url', value: pairUrl || st.serverUrl, placeholder: 'Adresse IP du serveur, ou https://…sslip.io', autocapitalize: 'off', autocomplete: 'off', 'aria-label': 'Adresse du serveur'}) as HTMLInputElement;
+  const url = h('input', {class: 'field', type: 'url', value: pairUrl || st.serverUrl || (srv.servedByServer() ? location.origin : ''), placeholder: 'Adresse IP du serveur, ou https://…sslip.io', autocapitalize: 'off', autocomplete: 'off', 'aria-label': 'Adresse du serveur'}) as HTMLInputElement;
   const code = h('input', {class: 'field', type: 'text', value: pairCode, placeholder: 'Code d\'appairage (ex. K7Q2-M9XD)', autocapitalize: 'characters', autocomplete: 'off', 'aria-label': 'Code d\'appairage'}) as HTMLInputElement;
   url.addEventListener('input', () => { pairUrl = url.value; }); code.addEventListener('input', () => { pairCode = code.value; });
   const st3 = srv.lastStatus();
   const server = srv.linked()
     ? h('div', {class: 'card glass'}, h('p', {class: 'kpi-l', text: 'Serveur JARVIS'}), h('b', {class: 'srv-url', text: st.serverUrl}),
-        h('p', {class: 'muted small', text: st3.ok ? 'Relié · version ' + st3.version + ' · Claude ' + (st3.claude?.loggedIn ? 'connecté à ton abonnement' : 'pas encore connecté : sur le serveur, « sudo -iu jarvis claude auth login »') : (st3.error || 'Vérification…')}),
-        h('div', {class: 'acts'}, h('button', {type: 'button', class: 'btn', onclick: () => { srv.status().then(render); }}, 'Vérifier'), h('button', {type: 'button', class: 'btn ghost', onclick: () => { srv.unpair(); render(); }}, 'Délier cet iPhone')))
+        h('p', {class: 'muted small', text: st3.ok ? 'Relié · version ' + st3.version + (st3.commit ? ' (' + st3.commit + ')' : '') + ' · Claude ' + (st3.claude?.loggedIn ? 'connecté à ton abonnement' : 'pas encore connecté : sur le serveur, « sudo -iu jarvis claude auth login »') : (st3.error || 'Vérification…')}),
+        updMsg ? h('p', {class: 'note', text: updMsg}) : null,
+        h('div', {class: 'acts'}, h('button', {type: 'button', class: 'btn', onclick: () => { srv.status().then(render); }}, 'Vérifier'),
+          h('button', {type: 'button', class: 'btn', onclick: async () => { updMsg = 'Mise à jour…'; render(); updMsg = await srv.updateServer(); render(); if (/redémarre/.test(updMsg)) setTimeout(async () => { await srv.status(); updMsg = 'Serveur à jour : version ' + (srv.lastStatus().version || '?') + '.' + (srv.servedByServer() ? ' Ferme et rouvre l\'app pour avoir la nouvelle version de l\'écran.' : ''); render(); }, 6000); }}, 'Mettre à jour le serveur'),
+          h('button', {type: 'button', class: 'btn ghost', onclick: () => { srv.unpair(); render(); }}, 'Délier cet iPhone')))
     : h('div', {class: 'card glass'}, h('p', {class: 'kpi-l', text: 'Relier ton serveur JARVIS'}),
         h('p', {class: 'muted small', text: 'D\'abord installer le serveur (guide dans docs/jarvis-os.md). Ensuite : son adresse IP (mail d\'OVH) ou l\'adresse https://…sslip.io affichée par le serveur, et le code donné par « sudo cat /root/jarvis-code.txt ».'}), url, code,
         pairMsg ? h('p', {class: 'note', text: pairMsg}) : null,
