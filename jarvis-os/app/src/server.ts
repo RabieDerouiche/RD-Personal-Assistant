@@ -45,7 +45,7 @@ export async function pair(url: string, code: string): Promise<string | null> {
 export function unpair() { store.settings.serverToken = ''; store.save(); }
 
 export interface Conn { checked: boolean; gmail: boolean; calendar: boolean; sheets: boolean; drive: boolean; read: number }
-export interface Status { ok: boolean; claude?: {installed: boolean; loggedIn: boolean; method: string}; version?: string; commit?: string; connectors?: Conn; grokPauseUntil?: string; error?: string }
+export interface Status { ok: boolean; claude?: {installed: boolean; loggedIn: boolean; method: string}; version?: string; commit?: string; connectors?: Conn; grokPauseUntil?: string; tts?: boolean; timing?: {total: number; first: number | null; tools: number; warm: boolean; model: string} | null; error?: string }
 let last: Status = {ok: false};
 export const lastStatus = () => last;
 export async function status(): Promise<Status> {
@@ -53,7 +53,7 @@ export async function status(): Promise<Status> {
   try {
     const r = await call('/api/status');
     if (r.status === 401) return (last = {ok: false, error: 'appareil plus reconnu : relie-le de nouveau'});
-    const b = await r.json(); return (last = {ok: true, claude: b.claude, version: b.version, commit: b.commit, connectors: b.connectors, grokPauseUntil: b.grokPauseUntil});
+    const b = await r.json(); return (last = {ok: true, claude: b.claude, version: b.version, commit: b.commit, connectors: b.connectors, grokPauseUntil: b.grokPauseUntil, tts: !!b.tts, timing: b.timing});
   } catch { return (last = {ok: false, error: 'serveur injoignable'}); }
 }
 
@@ -121,4 +121,19 @@ export async function testData(): Promise<string> {
     const r = await call('/api/test-data', {method: 'POST'}, 200000); const b = await r.json();
     return (b.ok ? 'Réponse de Claude : ' : 'Échec : ') + b.answer + '\n\nOutils utilisés : ' + ((b.used || []).join(', ') || 'aucun') + '\nConnecteurs autorisés : ' + ((b.allowed || []).join(', ') || 'aucun');
   } catch { return 'Le serveur n\'a pas répondu à l\'essai.'; }
+}
+/* la voix du serveur (Pierre) : une phrase → un son, prêt pendant que la phrase précédente est dite */
+export async function ttsUrl(text: string): Promise<string | null> {
+  const r = await call('/api/tts', {method: 'POST', body: JSON.stringify({text})}, 20000);
+  if (!r.ok) return null;
+  return URL.createObjectURL(await r.blob());
+}
+export const serverVoice = () => linked() && store.settings.voiceEngine === 'serveur' && last.tts === true;
+export async function installVoice(): Promise<string> {
+  try { await call('/api/voice/install', {method: 'POST'}); } catch { return 'error'; }
+  for (let i = 0; i < 120; i++) {   /* jusqu'à 10 minutes */
+    await new Promise((r) => setTimeout(r, 5000));
+    try { const b = await (await call('/api/voice/install')).json(); if (b.state !== 'running') { await status(); return b.state; } } catch { /* on réessaie */ }
+  }
+  return 'running';
 }

@@ -5,6 +5,7 @@ interface Rec { lang: string; interimResults: boolean; continuous: boolean; maxA
   onstart: (() => void) | null; onresult: ((e: any) => void) | null; onerror: ((e: any) => void) | null; onend: (() => void) | null; }
 
 const W = window as any;
+const SILENT = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=';
 const SR: (new () => Rec) | null = W.SpeechRecognition || W.webkitSpeechRecognition || null;
 const synth: SpeechSynthesis | null = W.speechSynthesis || null;
 export const canListen = () => !!SR;
@@ -22,7 +23,7 @@ export interface VoiceOpts {
   onPartial: (text: string) => void;
   onUtterance: (text: string) => void;   /* une phrase complète de l'utilisateur */
   onLog?: (t: string) => void;
-}
+  tts?: () => ((text: string) => Promise<string | null>) | null }
 
 export class Voice {
   private rec: Rec | null = null;
@@ -34,7 +35,7 @@ export class Voice {
   private quick = 0;
   private startedAt = 0;
   private speakingNow = false;
-  private q: string[] = []; private qBusy = false; private qOpen = false; private qEnd: (() => void) | null = null; private gen = 0;
+  private q: {text: string; url: Promise<string | null> | null}[] = []; private qBusy = false; private qOpen = false; private qEnd: (() => void) | null = null; private gen = 0; private audio: HTMLAudioElement | null = null;
   state: VoiceState = 'off';
   autoRestarts = 0;
   constructor(private o: VoiceOpts) {}
@@ -48,6 +49,8 @@ export class Voice {
     if (!SR) { this.set('error', "Pas de reconnaissance vocale ici : écris ta demande."); return; }
     this.on = true; this.fails = 0; this.quick = 0;
     try { if (synth) { synth.cancel(); const u = new W.SpeechSynthesisUtterance(' '); u.volume = 0; synth.speak(u); } } catch { /* rien */ }
+    /* la voix du serveur passe par un lecteur audio, débloqué ici, pendant l'appui */
+    try { if (!this.audio) this.audio = new Audio(); this.audio.dataset.token = 'unlock'; this.audio.src = SILENT; this.audio.play().catch(() => {}); } catch { /* rien */ }
     this.listen(false);
   }
   stop() {
@@ -60,7 +63,7 @@ export class Voice {
   /* entre deux tours (pendant que le cerveau réfléchit) */
   pause() { clearTimeout(this.timer); const r = this.rec; this.rec = null; try { if (r) r.abort(); } catch { /* rien */ } if (this.on) this.set('waiting'); }
 
-  private hush() { this.gen++; this.speakingNow = false; this.q = []; this.qBusy = false; this.qOpen = false; this.qEnd = null; try { if (synth) synth.cancel(); } catch { /* rien */ } }
+  private hush() { try { if (this.audio) { this.audio.dataset.token = 'stop'; this.audio.pause(); } } catch { /* rien */ } this.gen++; this.speakingNow = false; this.q = []; this.qBusy = false; this.qOpen = false; this.qEnd = null; try { if (synth) synth.cancel(); } catch { /* rien */ } }
 
   listen(auto: boolean) {
     if (!this.on || this.speakingNow || !SR || this.rec) return;   /* jamais deux micros à la fois */
@@ -104,7 +107,13 @@ export class Voice {
   /* lecture au fil de l'eau : chaque phrase est dite dès qu'elle arrive ; l'écoute reprend quand tout est dit */
   /* chaque réponse a son numéro : ce qui reste d'une session coupée ou d'une ancienne réponse n'a plus d'effet */
   streamStart(): number { this.gen++; this.q = []; this.qBusy = false; this.qOpen = true; this.qEnd = null; return this.gen; }
-  streamPart(text: string, g: number) { if (g !== this.gen || !this.qOpen || !text.trim() || !canSpeak()) return; this.q.push(text); this.pump(); }
+  streamPart(text: string, g: number) {
+    if (g !== this.gen || !this.qOpen || !text.trim()) return;
+    const f = this.o.tts ? this.o.tts() : null;
+    if (!f && !canSpeak()) return;
+    this.q.push({text, url: f ? f(text).catch(() => null) : null});   /* la voix du serveur prépare la phrase tout de suite */
+    this.pump();
+  }
   streamEnd(g: number, then?: () => void) { if (g !== this.gen) return; this.qOpen = false; this.qEnd = then || null; this.pump(); }
   get streaming() { return this.qOpen || this.qBusy || this.q.length > 0; }
   private pump() {
@@ -120,7 +129,25 @@ export class Voice {
     const g = this.gen;
     this.utter(next, () => { if (g !== this.gen) return; this.qBusy = false; this.pump(); });
   }
-  private utter(text: string, done: () => void) {
+  private utter(item: {text: string; url: Promise<string | null> | null}, done: () => void) {
+    if (!item.url || !this.audio) { this.utterLocal(item.text, done); return; }
+    const g = this.gen, a = this.audio;
+    item.url.then((url) => {
+      if (g !== this.gen) return;
+      if (!url) { this.utterLocal(item.text, done); return; }
+      const token = 'p' + Math.random().toString(36).slice(2);
+      let fin = false; const end = () => { if (fin) return; fin = true; a.removeEventListener('ended', onEnd); a.removeEventListener('error', onErr); URL.revokeObjectURL(url); done(); };
+      const onEnd = () => { if (a.dataset.token === token) end(); };
+      let started = false; const onPlay = () => { if (a.dataset.token === token) started = true; };
+      /* repli sur la voix de l'iPhone seulement si le son n'a jamais démarré ; sinon on passe simplement à la suite */
+      const onErr = () => { if (a.dataset.token !== token || fin) return; if (started) { end(); return; } fin = true; a.removeEventListener('ended', onEnd); a.removeEventListener('error', onErr); a.removeEventListener('playing', onPlay); URL.revokeObjectURL(url); this.utterLocal(item.text, done); };
+      a.addEventListener('ended', onEnd); a.addEventListener('error', onErr); a.addEventListener('playing', onPlay);
+      a.dataset.token = token; a.dataset.text = item.text; a.src = url;
+      a.play().then(() => { started = true; }, onErr);
+    });
+  }
+  private utterLocal(text: string, done: () => void) {
+    if (!canSpeak()) { done(); return; }
     const u = new W.SpeechSynthesisUtterance(text.replace(/[*_#>`]/g, ' '));
     const v = frenchVoices().find((x) => (x.voiceURI || x.name) === this.o.voiceURI());
     u.lang = v ? v.lang : 'fr-FR'; if (v) u.voice = v;
@@ -134,6 +161,7 @@ export class Voice {
 
   /* lit la réponse, puis réécoute si la conversation est ouverte */
   speak(text: string, then?: () => void) {
+    if (this.o.tts && this.o.tts()) { const g = this.streamStart(); this.streamPart(text, g); this.streamEnd(g, then); return; }
     const after = () => { this.speakingNow = false; if (then) then(); if (this.on) window.setTimeout(() => this.listen(true), 250); };
     if (!canSpeak() || !text.trim()) { after(); return; }
     const u = new W.SpeechSynthesisUtterance(text.replace(/[*_#>`]/g, ' '));

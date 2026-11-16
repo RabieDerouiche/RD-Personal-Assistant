@@ -11,7 +11,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 
-const VERSION = '0.7.3';
+const VERSION = '0.8.0';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PORT = +(process.env.PORT || 8787);
 const HOST = process.env.HOST || '127.0.0.1';
@@ -74,6 +74,7 @@ const authed = (req) => { const m = /^Bearer (.+)$/.exec(req.headers.authorizati
 /* ---------- Claude Code ---------- */
 const childEnv = () => { const e = {...process.env}; for (const k of PAID_ENV) delete e[k]; return e; };
 const SYSTEM = `Tu es JARVIS, l'assistant vocal personnel du propriétaire, dans son app JARVIS OS sur iPhone. Tu parles français et tu le tutoies.
+Personnalité (son choix du 16/11/2026) : un mélange de majordome complice et d'ami décontracté. Posé, efficace, chaleureux, avec de l'humour et un sarcasme léger et bienveillant (une pique par réponse au plus, jamais méchante, jamais au détriment de l'information). Tu vas droit au but : l'info d'abord, la blague ensuite.
 Tes réponses sont lues à voix haute : une à trois phrases courtes, naturelles, sans liste, sans markdown, sans emoji, sans adresse web.
 Tu diriges une équipe : Claude (analyse, rédaction, développement), Jarvis (Grok, chef d'orchestre des bots Grok), Iris (courrier, agenda, dossiers, papiers), Chronos (notes de frais, CRA), Kairos (prix suivis, alertes d'achat), Ulysse (sorties en famille, voyages), Athéna (veille IA et .NET), Argus (supervision des bots).
 Réponds toi-même aux questions simples. Quand une demande doit être confiée à un agent ou demande un travail long, propose une mission au lieu de la faire : écris alors, seule sur la dernière ligne, MISSIONS: suivi d'un tableau JSON, par exemple MISSIONS: [{"agent":"kairos","text":"vérifier le prix du robot cuiseur"}] (agents : ${AGENTS.join(', ')}). Dis à voix haute que la mission attend son accord : rien ne part sans lui.
@@ -196,6 +197,46 @@ const visible = (t) => { const i = t.search(/(^|\n)\s*M(I(S(S(I(O(N(S)?)?)?)?)?)
 let busy = Promise.resolve();
 const serial = (fn) => { const p = busy.then(fn, fn); busy = p.catch(() => {}); return p; };
 
+/* ---------- la conversation : un seul Claude Code ouvert pendant toute la session (entrée en flux) ----------
+   Évite de relancer Claude et de reconnecter les connecteurs à chaque phrase. Fermé après 15 min sans parole. */
+let SESS = null;
+function closeSession() { if (SESS) { try { SESS.child.stdin.end(); } catch { /* rien */ } const c = SESS.child; setTimeout(() => { try { c.kill('SIGTERM'); } catch { /* rien */ } }, 3000); SESS = null; } }
+setInterval(() => { if (SESS && !SESS.pending && now() - SESS.lastUse > 15 * 60000) closeSession(); }, 60000);
+function openSession({model, system, allow, deny, resume}) {
+  const args = ['-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose', '--include-partial-messages', '--append-system-prompt', system, '--model', model, '--settings', guardSettings('chat')];
+  if (resume) args.push('--resume', resume);
+  if (allow.length) args.push('--allowedTools', ...allow);
+  if (deny.length) args.push('--disallowedTools', ...deny);
+  const child = spawn(CLAUDE, args, {cwd: path.join(DATA, 'work'), env: {...childEnv(), ENABLE_TOOL_SEARCH: 'false'}, stdio: ['pipe', 'pipe', 'pipe']});
+  const s = {child, key: model + '|' + allow.join(','), sessionId: resume || null, buf: '', stderr: '', pending: null, lastUse: now(), turns: 0, born: now()};
+  const settle = (r) => { const p = s.pending; if (!p) return; s.pending = null; clearTimeout(p.timer); p.resolve(r); };
+  child.on('error', () => { settle({ok: false, error: 'Claude Code introuvable sur le serveur.'}); if (SESS === s) SESS = null; });
+  child.on('close', () => { settle({ok: false, error: friendly(s.stderr || 'Claude s\'est arrêté.')}); if (SESS === s) SESS = null; });
+  child.stderr.on('data', (d) => { s.stderr = (s.stderr + d).slice(-2000); });
+  child.stdout.on('data', (d) => {
+    s.buf += d; let i;
+    while ((i = s.buf.indexOf('\n')) >= 0) {
+      const line = s.buf.slice(0, i).trim(); s.buf = s.buf.slice(i + 1);
+      if (!line) continue;
+      let ev; try { ev = JSON.parse(line); } catch { continue; }
+      if (ev.session_id) s.sessionId = ev.session_id;
+      const p = s.pending; if (!p) continue;
+      if (ev.type === 'stream_event' && ev.event?.type === 'content_block_delta' && ev.event.delta?.type === 'text_delta') { if (!p.first) p.first = now(); p.text += ev.event.delta.text; p.onDelta(p.text); }
+      if (ev.type === 'assistant') for (const c of ev.message?.content || []) { if (c.type === 'tool_use' && c.name) p.used.push(c.name); if (c.type === 'text' && c.text && !p.text) { p.text = c.text; p.onDelta(p.text); } }
+      if (ev.type === 'result') { const out = (typeof ev.result === 'string' ? ev.result : p.text).trim(); settle(ev.is_error ? {ok: false, error: friendly(out), used: p.used, first: p.first} : {ok: true, text: out, used: p.used, first: p.first}); }
+    }
+  });
+  return s;
+}
+function askSession(s, text, onDelta, timeoutMs) {
+  return new Promise((resolve) => {
+    s.lastUse = now(); s.turns++;
+    s.pending = {resolve, onDelta, text: '', used: [], first: 0, timer: setTimeout(() => { closeSession(); resolve({ok: false, error: 'Claude a mis trop de temps à répondre.'}); }, timeoutMs)};
+    try { s.child.stdin.write(JSON.stringify({type: 'user', message: {role: 'user', content: [{type: 'text', text}]}, parent_tool_use_id: null}) + '\n'); }
+    catch { s.pending = null; resolve({ok: false, error: 'Claude n\'a pas pu recevoir la demande.'}); }
+  });
+}
+
 async function chat(body, send) {
   const text = String(body.text || '').trim().slice(0, 4000);
   if (!text) return send('error', {message: 'Demande vide.'});
@@ -204,16 +245,23 @@ async function chat(body, send) {
   const model = MODELS[body.model] || MODELS.equilibre;
   const reads = readTools();
   const sys = SYSTEM + '\n' + (reads.length ? 'Tu peux lire ses mails, son agenda et ses fichiers Google avec tes outils de connecteurs, en lecture seule.\n' + DATA_RULES : 'Tu n\'as pas accès à ses mails, à son agenda ni à Pilotage sur ce serveur : ne prétends jamais les avoir lus.');
-  const r = await serial(() => runClaude({prompt: text, system: sys, model, resume: S.session?.id, tools: {allow: ['WebSearch', 'WebFetch', ...reads], deny: ['Bash', 'Edit', 'Write', 'NotebookEdit']}, settings: guardSettings('chat'), cwd: path.join(DATA, 'work'), timeoutMs: 180000,
-    onDelta: (t) => send('delta', {text: visible(t)})}));
+  const allow = ['WebSearch', 'WebFetch', ...reads], deny = ['Bash', 'Edit', 'Write', 'NotebookEdit'];
+  const t0 = now(); let warm = true;
+  const r = await serial(async () => {
+    if (!S.session) closeSession();   /* nouvelle conversation */
+    if (SESS && SESS.key !== model + '|' + allow.join(',')) closeSession();   /* autre modèle : on rouvre en gardant la conversation */
+    if (!SESS) { warm = false; SESS = openSession({model, system: sys, allow, deny, resume: S.session?.id}); }
+    return askSession(SESS, text, (t) => send('delta', {text: visible(t)}), 180000);
+  });
   S.usage.chats++;
+  S.lastTiming = {at: now(), total: now() - t0, first: r.first ? r.first - t0 : null, tools: (r.used || []).length, warm, model};
   if (!r.ok) { save(); return send('error', {message: r.error}); }
   const {reply, missions} = splitMissions(r.text);
-  S.session = {id: r.sessionId, at: now()};
+  S.session = {id: SESS?.sessionId || S.session?.id, at: now()};
   S.missions.push(...missions);
   const agent = missions[0]?.agent || 'claude';
   S.msgs.push({who: 'jarvis', text: reply, at: now(), agent}); save();
-  send('done', {reply, missions, agent});
+  send('done', {reply, missions, agent, timing: S.lastTiming});
 }
 
 /* une mission approuvée pour Claude : il la fait ici, avec le web, sans commande système */
@@ -272,6 +320,50 @@ async function update() {
   return {ok: true, changed: true, message: 'Mis à jour. Le serveur redémarre : quelques secondes.'};
 }
 
+/* ---------- la voix du serveur (Piper, gratuite) : Pierre par défaut ; noms prononcés correctement ---------- */
+const PIPER_DIR = process.env.JARVIS_PIPER_DIR || path.join(os.homedir(), 'piper');
+const PIPER_PY = process.env.JARVIS_PIPER_PY || path.join(PIPER_DIR, 'bin', 'python');
+const TTS_HELPER = process.env.JARVIS_TTS_HELPER || path.join(HERE, 'tts', 'piper_helper.py');
+const VOICE = {model: process.env.JARVIS_VOICE_MODEL || path.join(PIPER_DIR, 'voices', 'fr_FR-upmc-medium.onnx'), speaker: process.env.JARVIS_VOICE_SPEAKER ?? '1'};
+const SAY = [[/\bJARVIS\b|\bJarvis\b/g, 'Djarviss'], [/\bKairos\b/g, 'Kaïross'], [/\bChronos\b/g, 'Kronoss'], [/\bArgus\b/g, 'Argusse'], [/\bIris\b/g, 'Iriss'], [/\bCRA\b/g, 'C.R.A.'], [/\bPDF\b/g, 'P.D.F.']];
+const pronounce = (t) => SAY.reduce((a, [re, r]) => a.replace(re, r), t).replace(/[*_#`>|]/g, ' ');
+let TTS = null;
+const ttsReady = () => fs.existsSync(VOICE.model) && (fs.existsSync(PIPER_PY) || !!process.env.JARVIS_TTS_HELPER);
+function ttsHelper() {
+  if (TTS && !TTS.dead) return TTS;
+  const helperCmd = process.env.JARVIS_TTS_HELPER ? [process.execPath, [TTS_HELPER, VOICE.model, VOICE.speaker]] : [PIPER_PY, [TTS_HELPER, VOICE.model, VOICE.speaker]];
+  const child = spawn(helperCmd[0], helperCmd[1], {stdio: ['pipe', 'pipe', 'ignore']});
+  const t = {child, buf: '', waits: new Map(), dead: false, n: 0};
+  child.on('close', () => { t.dead = true; for (const w of t.waits.values()) w(false); t.waits.clear(); });
+  child.on('error', () => { t.dead = true; });
+  child.stdout.on('data', (d) => { t.buf += d; let i; while ((i = t.buf.indexOf('\n')) >= 0) { const line = t.buf.slice(0, i); t.buf = t.buf.slice(i + 1); try { const m = JSON.parse(line); const w = t.waits.get(m.id); if (w) { t.waits.delete(m.id); w(!!m.ok); } } catch { /* rien */ } } });
+  return (TTS = t);
+}
+/* installation de la voix par le service lui-même (sans root) : en arrière-plan, journal dans ~/.jarvis/voice-install.log */
+let VOICE_INSTALL = {state: 'idle', at: 0, tail: ''};
+function installVoice() {
+  if (VOICE_INSTALL.state === 'running') return VOICE_INSTALL;
+  const log = path.join(DATA, 'voice-install.log');
+  VOICE_INSTALL = {state: 'running', at: now(), tail: ''};
+  const child = spawn('bash', [process.env.JARVIS_VOICE_SCRIPT || path.join(HERE, 'install', 'voice.sh')], {env: {...childEnv(), JARVIS_PIPER_DIR: PIPER_DIR}, stdio: ['ignore', 'pipe', 'pipe']});
+  const out = fs.createWriteStream(log);
+  const keep = (d) => { out.write(d); VOICE_INSTALL.tail = (VOICE_INSTALL.tail + d).slice(-600); };
+  child.stdout.on('data', keep); child.stderr.on('data', keep);
+  child.on('close', (code) => { out.end(); VOICE_INSTALL.state = code === 0 && ttsReady() ? 'done' : 'error'; if (TTS) { try { TTS.child.kill(); } catch { /* rien */ } TTS = null; } });
+  child.on('error', () => { VOICE_INSTALL.state = 'error'; });
+  return VOICE_INSTALL;
+}
+async function tts(text) {
+  const clean = pronounce(String(text || '').trim()).slice(0, 600);
+  if (!clean) return null;
+  const dir = path.join(DATA, 'tts'); fs.mkdirSync(dir, {recursive: true});
+  const out = path.join(dir, sha(VOICE.model + VOICE.speaker + clean).slice(0, 24) + '.wav');
+  if (fs.existsSync(out)) return out;
+  const t = ttsHelper(), id = ++t.n;
+  const ok = await new Promise((resolve) => { t.waits.set(id, resolve); setTimeout(() => { if (t.waits.delete(id)) resolve(false); }, 20000); try { t.child.stdin.write(JSON.stringify({id, text: clean, out}) + '\n'); } catch { resolve(false); } });
+  return ok && fs.existsSync(out) ? out : null;
+}
+
 /* ---------- HTTP ---------- */
 const TYPES = {'.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.json': 'application/json', '.webmanifest': 'application/manifest+json'};
 function cors(req, res) {
@@ -290,8 +382,16 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/pair' && req.method === 'POST') { const b = await readBody(req); const r = pair(b.code, b.device); return json(res, r.status, r.body); }
     if (p.startsWith('/api/')) {
       if (!authed(req)) return json(res, 401, {error: 'Appareil non relié.'});
-      if (p === '/api/status') { const cs = await claudeStatus(); if (cs.loggedIn && (!MCP.at || now() - MCP.at > 600000)) await mcpList(); return json(res, 200, {version: VERSION, commit, claude: cs, connectors: connSummary(), grokPauseUntil: S.config.grokPauseUntil, usage: S.usage, session: !!S.session}); }
+      if (p === '/api/status') { const cs = await claudeStatus(); if (cs.loggedIn && (!MCP.at || now() - MCP.at > 600000)) await mcpList(); return json(res, 200, {version: VERSION, commit, claude: cs, connectors: connSummary(), grokPauseUntil: S.config.grokPauseUntil, usage: S.usage, session: !!S.session, timing: S.lastTiming || null, tts: ttsReady(), voiceInstall: VOICE_INSTALL.state}); }
       if (p === '/api/update' && req.method === 'POST') return json(res, 200, await update());
+      if (p === '/api/voice/install' && req.method === 'POST') return json(res, 200, installVoice());
+      if (p === '/api/voice/install') return json(res, 200, VOICE_INSTALL);
+      if (p === '/api/tts' && req.method === 'POST') {
+        if (!ttsReady()) return json(res, 503, {error: 'Voix du serveur pas installée.'});
+        const b = await readBody(req); const f = await tts(b.text);
+        if (!f) return json(res, 500, {error: 'Synthèse impossible.'});
+        res.writeHead(200, {'content-type': 'audio/wav', 'cache-control': 'private, max-age=86400'}); fs.createReadStream(f).pipe(res); return;
+      }
       if (p === '/api/diag') { await probe(); return json(res, 200, await diag()); }
       if (p === '/api/test-data' && req.method === 'POST') {
         if (!MCP.at) await mcpList();
@@ -329,7 +429,7 @@ const server = http.createServer(async (req, res) => {
         }
         save(); return json(res, 200, {mission: m});
       }
-      if (p === '/api/memory' && req.method === 'DELETE') { S.msgs = []; S.missions = []; S.session = null; save(); return json(res, 200, {ok: true}); }
+      if (p === '/api/memory' && req.method === 'DELETE') { S.msgs = []; S.missions = []; S.session = null; closeSession(); save(); return json(res, 200, {ok: true}); }
       return json(res, 404, {error: 'Inconnu.'});
     }
     /* l'app elle-même, servie aussi par le serveur (même adresse) */
