@@ -36,7 +36,7 @@ Ses demandes, dans ses mots (résumées) :
 
 ## Étapes
 
-1. Liste de parité : chaque fonction de la page v17.15 (onglets, panneaux, boutons, écritures), à cocher dans JARVIS OS. Source : code de la page (Drive, `jarvis-page-v17.15.html`), `docs/systeme-grok-bot.md` (section « La page Jarvis »), `docs/journal-jarvis.md`.
+1. Liste de parité (`docs/jarvis-os-parite.md`, écrite le 16/11/2026) : chaque fonction de la page v17.15 (onglets, panneaux, boutons, écritures), à cocher dans JARVIS OS. Source : code de la page (Drive, `jarvis-page-v17.15.html`), `docs/systeme-grok-bot.md` (section « La page Jarvis »), `docs/journal-jarvis.md`.
 2. Maquette : la page dans la coquille JARVIS OS (mode Maquette, données fictives) + les écrans nouveaux dans le même style ; publiée pour validation ; corrections.
 3. Couche `POST /api/tool` + accès Google (guide), essais au banc avec de fausses API Google.
 4. Branchement, essais réels, mise en ligne avec son accord.
