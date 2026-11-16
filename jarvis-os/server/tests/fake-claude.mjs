@@ -22,10 +22,20 @@ function answer(raw) {
     return {text: 'Voici : ' + JSON.stringify({items: [{module: mod, from: 'Banque', subject: 'Facture de novembre', title: 'Réunion', date: '2026-11-17', message: 'Exemple ' + mod, bot: 'Iris', objet: 'Robot cuiseur', sortie: 'Zoo', projet: 'Tunisie', statut: 'À faire'}]}) + ' Fin.', tools: ['mcp__claude_ai_Google_Sheets__get_values']};
   }
   if (/erreur/i.test(input)) return {error: 'Invalid API key · Please run /login'};
+  /* tâche « Ordres Jarvis » faite par le serveur : répond aux lignes données, laisse « à valider » ce qui touche une fiche */
+  if (/Lignes du Canal de Pilotage adressées à Claude/.test(input)) {
+    const arr = JSON.parse(input.slice(input.indexOf('['), input.indexOf(']\n') + 1));
+    const lignes = arr.map((x) => /fiche/i.test(x.message) ? {ligne: x.ligne, reponse: 'Je propose de changer la fiche, à valider en conversation.', statut: 'À faire'} : {ligne: x.ligne, reponse: 'Réponse de Claude à : ' + x.message, statut: 'Fait'});
+    return {text: JSON.stringify({lignes, verifie: /Onglet « Déploiement »/.test(input) ? [{ligne: 2, valeur: 'Conforme'}] : []}) + (/outils/.test(allow) ? '' : '')};
+  }
   if (/Test d'accès aux données/.test(input)) return {tools: ['mcp__claude_ai_Google_Calendar__list_events', 'mcp__claude_ai_Gmail__search_threads'], text: 'Ton prochain événement est « Réunion ». Le dernier mail a pour objet « Facture ». Outils : ' + allow + '.'};
   if (/onglet Canal/.test(input)) return {text: 'Ligne écrite dans le Canal pour ' + (input.match(/pour le bot (\S+)/) || [])[1] + ' ; ' + (/N'envoie pas de sonnette/.test(input) ? 'pas de sonnette (pause).' : 'sonnette envoyée.') + ' Outils : ' + allow + '. Garde : ' + guard + '.'};
   if (/^Mission :/.test(input)) return {text: 'Compte rendu : mission faite (' + input.slice(10, 60) + ').'};
   if (/rapport/i.test(input)) return {text: 'Claude va préparer ce rapport, la mission attend ton accord.\nMISSIONS: [{"agent":"claude","text":"préparer un rapport sur la veille .NET"}]'};
+  /* discussion de la page sur le serveur : propositions en fin de réponse (⟦outil …⟧), seulement si la consigne décrit les outils */
+  const lastQ = input.split('Lui : ').pop(), sys = opt('--append-system-prompt') || '';
+  if (/ordre de test pour Kairos/.test(lastQ)) return {text: /outil preparer_ordre/.test(sys) ? 'Je te propose cet ordre pour Kairos : il attend ton bouton.\n⟦outil preparer_ordre {"bot":"Kairos","message":"Relève le prix du robot cuiseur."}⟧' : 'Pas d’outils décrits.'};
+  if (/confie à la tâche/.test(lastQ)) return {text: 'Je te propose de lancer la tâche Claude.\n```\n⟦outil confier_tache_claude {"demande":"Vérifie les routines d’Iris."}⟧\n```'};
   if (/kairos/i.test(input)) return {text: 'Je prépare ça pour Kairos, la mission attend ton accord.\nMISSIONS: [{"agent":"kairos","text":"vérifier le prix du robot cuiseur"}]'};
   if (/clé/i.test(input)) return {text: 'clé payante : ' + (process.env.ANTHROPIC_API_KEY ? 'présente' : 'absente') + ', base : ' + (process.env.ANTHROPIC_BASE_URL ? 'présente' : 'absente') + ', recherche d\'outils : ' + (process.env.ENABLE_TOOL_SEARCH || 'défaut') + '.'};
   return {text: 'Tu as dit : ' + input.trim() + '. Session : ' + (resume || turn > 1 ? 'reprise' : 'nouvelle') + ', modèle : ' + model + ', outils : ' + allow + ', garde : ' + guard + ', processus : ' + process.pid + ', tour : ' + turn + ', contexte : ' + (ctx ? 'oui' : 'non') + '.'};

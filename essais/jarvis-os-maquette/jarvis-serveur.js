@@ -2,7 +2,11 @@
    Elle garde l'interface `window.claude.use(...)` de la page claude.ai :
    - « mcp » : chaque outil (Google Sheets, Google Calendar, Gmail) part vers POST /api/tool, que le serveur traduit
      en appel direct aux API Google (accès créé et collé par le propriétaire, jamais vu par Claude) ;
-   - « sample » : Claude de l'abonnement, par POST /api/sample (appel ponctuel, sans aucun outil) ;
+   - « sample » : Claude de l'abonnement, par POST /api/sample (un appel ponctuel). Claude n'y a aucun outil : ses propositions
+     (ordre à un bot, tâche, échéance, mise à jour d'un dossier, tâche Claude) arrivent en fin de réponse sous la forme
+     ⟦outil nom {json}⟧ ; le pont les retire du texte et les passe aux outils de la page, qui les affichent avec leur bouton.
+     Rien ne part sans son appui, et une seule question = un seul appel (16/11/2026) ;
+   - « Confier à la tâche Claude » (fire_trigger) : fait par le serveur lui-même (POST /api/tool), sans clé ;
    - « tts » et « dictation » : absents ici, la voix passe par l'orbe (page vocale JARVIS).
    L'appairage est celui de l'app JARVIS sur le même serveur (localStorage « jarvis.settings »). */
 (function () {
@@ -43,18 +47,37 @@
     listTools: async () => ({servers: [
       {name: 'Google Sheets', tools: ['get_values', 'append_values', 'update_values']},
       {name: 'Google Calendar', tools: ['list_events', 'create_event', 'update_event', 'delete_event']},
-      {name: 'Gmail', tools: ['search_threads', 'get_thread', 'list_drafts', 'send_message', 'delete_draft', 'unlabel_thread']}]})
+      {name: 'Gmail', tools: ['search_threads', 'get_thread', 'list_drafts', 'send_message', 'delete_draft', 'unlabel_thread']},
+      {name: 'Claude Code Remote', tools: ['fire_trigger']}]})
   };
+  /* outils de la page pour Claude : décrits dans la consigne, appelés depuis le texte de sa réponse */
+  const BASE_SYS = 'Tu réponds au propriétaire dans sa page Jarvis (JARVIS OS), en français, en le tutoyant. Réponds exactement au format demandé.';
+  const OUTIL = /⟦\s*outil\s+([a-z_]+)\s*(\{[\s\S]*?\})\s*⟧/g;
+  const toolsSys = (tools) => 'Outils (des propositions seulement : la page les affiche avec un bouton, rien ne part sans son appui). Pour en utiliser un, termine ta réponse par une ligne par proposition, exactement de cette forme, avec un JSON valide sur une seule ligne :\n'
+    + '⟦outil preparer_ordre {"bot":"Iris","message":"…"}⟧\n'
+    + "N'écris jamais qu'une proposition est envoyée, ajoutée ou faite : dis qu'elle attend son bouton. N'utilise un outil que si c'est utile.\nOutils disponibles :\n"
+    + tools.map((t) => { const sc = t.inputSchema || t.input_schema || {}, req = sc.required || [], pr = sc.properties || {};
+      return '- ' + t.name + ' : ' + String(t.description || '') + (Object.keys(pr).length ? ' Champs : ' + Object.keys(pr).map((k) => k + (req.includes(k) ? '' : ' (facultatif)') + (pr[k].description ? ' = ' + pr[k].description : '')).join(' ; ') + '.' : ''); }).join('\n');
+  const sansOutils = (t) => t.replace(OUTIL, '').replace(/```\s*```/g, '').replace(/\n{3,}/g, '\n\n').trim();
   const sample = async (input, opts) => {
     opts = opts || {};
     if (!token()) throw {code: 'server_not_connected', message: 'Cet iPhone n’est pas relié au serveur JARVIS (Réglages).'};
-    const r = await req('/api/sample', {input, tier: opts.modelTier || 'default', system: opts.system || ''});
+    const tools = Array.isArray(opts.tools) ? opts.tools.filter((t) => t && t.name && typeof t.execute === 'function') : [];
+    const r = await req('/api/sample', {input, tier: opts.modelTier || 'default', system: (opts.system || BASE_SYS) + (tools.length ? '\n\n' + toolsSys(tools) : '')});
     if (r.status !== 200) throw {code: r.status === 401 ? 'server_not_connected' : 'tool_error', message: (r.j && r.j.error) || 'Claude indisponible sur le serveur.'};
-    const text = String(r.j.text || '');
+    let text = String(r.j.text || '');
+    if (tools.length) {
+      const calls = [...text.matchAll(OUTIL)]; text = sansOutils(text);
+      for (const m of calls) {
+        const t = tools.find((x) => x.name === m[1]); if (!t) continue;
+        let inp; try { inp = JSON.parse(m[2]); } catch (e) { continue; }
+        try { await t.execute(inp); } catch (e) { /* proposition incomplète : ignorée */ }
+      }
+    }
     if (opts.onText) try { opts.onText({text, delta: text}); } catch (e) { /* rien */ }
     return {text, truncated: false};
   };
-  sample.limits = async () => ({tools: false, images: false});
+  sample.limits = async () => ({tools: true, images: false});
   sample.json = async () => ({});
   window.claude = {use: async (name) => (name === 'mcp' ? mcp : name === 'sample' ? sample : null)};
 

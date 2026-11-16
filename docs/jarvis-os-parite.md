@@ -44,14 +44,14 @@ Règle (16/11/2026) : **aucune régression**. Chaque fonction de la page (copie 
 - [ ] Pilotage : `append_values` (Canal, Échéances, Tâches, Sorties…), `update_values` (statuts : sortie, échéance, prix, voyage, option, tâche)
 - [ ] Agenda : `create_event`, `update_event`, `delete_event` (événements importants, présence)
 - [ ] Gmail : `send_message` (brouillon envoyé tel quel, sonnette), `unlabel_thread` (« Rien à faire »), `delete_draft`
-- [ ] Claude Code : `fire_trigger` (tâche « Ordres Jarvis »)
+- [x] Claude Code : `fire_trigger` (tâche « Ordres Jarvis ») : fait par le serveur depuis 0.11.0 (choix du 16/11/2026), vérifié au banc de bout en bout
 - [ ] Ordres groupés : un mail par bot (10 s après le dernier ordre, 45 s au plus), double appui écrit une fois (90 s), mode Grok en pause (pas de sonnette, reprise sonnée)
 
 ## Autres
 
 - [ ] Coût affiché sur chaque bouton (gratuit, 1 passage, chat Grok, Claude…)
 - [ ] Confirmation avant « Grok est reparti », « Iris les traite tous », « Confier à la tâche Claude », envoi et suppression d'un brouillon
-- [ ] Claude dans la page : discussion en direct (modèle « Rapide » par défaut), contexte allégé
+- [ ] Claude dans la page : discussion en direct (modèle « Rapide » par défaut), contexte allégé ; ses propositions (ordre, tâche, échéance, dossier, tâche Claude) marchent sur le serveur depuis 0.11.0 (banc de bout en bout), à essayer en vrai
 - [ ] Bouton retour avec position gardée ; version visible
 
 ## Nouveautés à ajouter (demandes du 16/11/2026)

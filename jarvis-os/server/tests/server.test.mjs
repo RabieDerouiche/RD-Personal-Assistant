@@ -127,7 +127,21 @@ try {
     r = await T('Gmail', 'unlabel_thread', {threadId: 'th1', labelIds: ['INBOX']}); c = FG.calls.filter((x) => x.path.endsWith('/modify')).pop(); ok('Gmail : archivage (retrait de la boîte de réception)', r.status === 200 && c.body.removeLabelIds[0] === 'INBOX');
     r = await T('Gmail', 'delete_draft', {draftId: 'r-1'}); ok('Gmail : brouillon supprimé', r.status === 200);
     FG.valid.clear(); r = await T('Google Sheets', 'get_values', {spreadsheetId: 'PIL', range: "'À toi'!A3:D300"}); ok('jeton expiré : renouvelé sans rien demander', r.status === 200 && FG.calls.some((x) => x.path === '/token' && x.body.grant_type === 'refresh_token'));
-    r = await T('Claude Code Remote', 'fire_trigger', {trigger_id: 'x'}); ok('outil non traduit : refus clair', r.status === 404 && r.body.error.code === 'not_in_manifest');
+    r = await T('Google Drive', 'delete_file', {fileId: 'x'}); ok('outil non traduit : refus clair', r.status === 404 && r.body.error.code === 'not_in_manifest');
+    /* « Confier à la tâche Claude » : fait par le serveur (16/11/2026) */
+    FG.sheet['Canal!A1:H3000'] = [['Date', 'De', 'Pour', 'Type', 'Message', 'Statut', 'Réponse', 'Objet'], ['15/11/2026', 'Rabie', 'Iris', 'Ordre', 'Relève les prix', 'À faire', '', ''],
+      ['16/11/2026', 'Rabie', 'Claude', 'Question', 'Vérifie la colonne Nature', 'À faire', '', ''], ['16/11/2026', 'Rabie', 'Claude', 'Ordre', 'Modifie la fiche d’Iris', 'À faire', '', ''], ['14/11/2026', 'Rabie', 'Claude', 'Info', 'Déjà traité', 'Fait', 'ok', '']];
+    FG.sheet["'Déploiement'!A1:Z300"] = [['Point', 'Bot', 'Vérifié par Claude'], ['Veille du matin', 'Iris', '']]; FG.sheet["'Textes des routines'!A1:Z300"] = [['Routine', 'Texte'], ['Veille du matin', 'Chaque matin…']];
+    const n0 = FG.calls.length, waitT = async () => { for (let k = 0; k < 100; k++) { const st = await G('/api/status'); if (st.body.tache && !st.body.tache.running) return st.body.tache; await new Promise((z) => setTimeout(z, 100)); } return null; };
+    r = await T('Claude Code Remote', 'fire_trigger', {trigger_id: 'trig_x'}); const t1 = await waitT();
+    const puts = FG.calls.slice(n0).filter((x) => x.method === 'PUT').map((x) => x.path.split('/values/')[1] + '=' + JSON.stringify(x.body.values));
+    ok('tâche Claude : lancée par le serveur, sans clé', r.status === 200 && r.body.payload.started === true, JSON.stringify(r.body));
+    ok('tâche Claude : réponse et statut écrits sur les seules lignes « Pour = Claude, À faire »', puts.includes('Canal!G3=[["Réponse de Claude à : Vérifie la colonne Nature"]]') && puts.includes('Canal!F3=[["Fait"]]') && !puts.some((x) => /!.2=|!.5=/.test(x) && /^Canal/.test(x)), puts.join(' | '));
+    ok('tâche Claude : ce qui touche une fiche reste « À faire », proposé « à valider »', puts.some((x) => /^Canal!G4=.*à valider en conversation/.test(x)) && !puts.includes('Canal!F4=[["Fait"]]'));
+    ok('tâche Claude : « Vérifie » remplit « Vérifié par Claude » dans Déploiement', puts.includes("'Déploiement'!C2=[[\"Conforme\"]]") && t1 && t1.last && t1.last.ok && t1.last.faites === 1 && t1.last.lignes === 2, JSON.stringify(t1));
+    FG.sheet['Canal!A1:H3000'] = [FG.sheet['Canal!A1:H3000'][0], ['15/11/2026', 'Rabie', 'Iris', 'Ordre', 'Relève les prix', 'À faire', '', '']];
+    const before = (await G('/api/status')).body.usage.taches; r = await T('Claude Code Remote', 'fire_trigger', {trigger_id: 'trig_x'}); const t2 = await waitT();
+    ok('tâche Claude : aucune ligne pour Claude, aucun appel à Claude', t2 && t2.last.lignes === 0 && (await G('/api/status')).body.usage.taches === before, JSON.stringify(t2));
     FG.valid.clear(); FG.refreshOk = false; r = await T('Google Sheets', 'get_values', {spreadsheetId: 'PIL', range: 'Canal!A1:H3'}); g = await G('/api/google');
     ok('accès retiré dans Google : « à reconnecter », plus relié', r.body.error && r.body.error.code === 'needs_reauth' && !g.body.linked, JSON.stringify(r.body.error));
     FG.refreshOk = true; r = await G('/api/google/link', {}); await fetch(BASE + '/api/google/callback?state=' + new URL(r.body.url).searchParams.get('state') + '&code=CODE-OK');
