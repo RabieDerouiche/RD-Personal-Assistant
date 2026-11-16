@@ -30,15 +30,15 @@ L'assistant personnel du propriétaire sur iPhone : une app web (installable sur
 
 - Projet Google Cloud « JARVIS » du compte de Pilotage ; Google Auth Platform : type Externe, **publiée** en production (sinon le jeton expire en 7 jours), Branding sans logo (un logo impose une vérification), page d'accueil `https://<serveur>/`, confidentialité `https://<serveur>/confidentialite.html`, domaine autorisé `sslip.io`. Client OAuth « Application Web », redirection `https://<serveur>/api/google/callback`.
 - L'identifiant et le secret ont été collés par lui dans Réglages : ils ne sont que sur le serveur. **Ne jamais les demander.** S'il faut reconnecter : Réglages, « Reconnecter ».
-- Outils traduits (`google.mjs`) : Sheets `get_values`, `append_values`, `update_values` ; Calendar `list_events`, `create_event`, `update_event`, `delete_event` ; Gmail `search_threads`, `get_thread`, `list_drafts`, `send_message`, `delete_draft`, `unlabel_thread`. Pas encore : `fire_trigger` (« Confier à la tâche Claude »), les outils que Claude utilise dans la discussion de la page (`preparer_ordre`, `ajouter_tache`, `mettre_a_jour_dossier`).
+- Outils traduits (`google.mjs`) : Sheets `get_values`, `append_values`, `update_values` ; Calendar `list_events`, `create_event`, `update_event`, `delete_event` ; Gmail `search_threads`, `get_thread`, `list_drafts`, `send_message`, `delete_draft`, `unlabel_thread`. Pas encore : `fire_trigger` (« Confier à la tâche Claude »), les outils que Claude utilise dans la discussion de la page (`preparer_ordre`, `ajouter_tache`, `mettre_a_jour_dossier`). Depuis 0.10.1 : Drive `folder_tree` (lecture seule, arborescence d'un dossier, pour l'écran Papiers).
 
 ## Tester (toujours avant de montrer)
 
 | Banc | Commande (depuis la racine du dépôt) |
 |---|---|
-| Serveur (79 vérifications, faux Claude, faux Google) | `node jarvis-os/server/tests/server.test.mjs` |
-| Nouvelle app, maquette (iPhone simulé) | `NODE_PATH=/opt/node-tools/node_modules node essais/jarvis-os-maquette/banc/banc.cjs` |
-| Nouvelle app sur le vrai serveur (faux Google), de bout en bout | `NODE_PATH=/opt/node-tools/node_modules node essais/jarvis-os-maquette/banc/banc-serveur.mjs` |
+| Serveur (85 vérifications, faux Claude, faux Google et faux Drive) | `node jarvis-os/server/tests/server.test.mjs` |
+| Nouvelle app, maquette (iPhone simulé, 49 vérifications ; Wikipédia et Open-Meteo simulés) | `NODE_PATH=/opt/node-tools/node_modules node essais/jarvis-os-maquette/banc/banc.cjs` |
+| Nouvelle app sur le vrai serveur (faux Google), de bout en bout (11 vérifications) | `NODE_PATH=/opt/node-tools/node_modules node essais/jarvis-os-maquette/banc/banc-serveur.mjs` |
 | Ancienne app avec le serveur | `node jarvis-os/app/tests/e2e-server.cjs` (dans `jarvis-os/app`) |
 
 Playwright et Chromium sont préinstallés dans les sessions cloud (`NODE_PATH=/opt/node-tools/node_modules`). Captures dans le dossier temporaire `jarvis-os-banc`.
@@ -52,4 +52,8 @@ Playwright et Chromium sont préinstallés dans les sessions cloud (`NODE_PATH=/
 
 ## État et reste à faire
 
-Voir la fin de `docs/jarvis-os-refonte.md` (toujours à jour). Au 16/11/2026 : maquette complète et branchée ; accès Google relié par le propriétaire. Retours du 16/11 en cours de traitement : nouvelle app à l'adresse principale, menu du bas (fluidité, Accueil, « Pour moi », ordre), baisse de volume de la voix après 5 s, raccourcis par bot dans Automatisations, Agenda plus vivant, Équipe harmonisée, Voyages plus riches, Papiers par catégorie (aussi rangés dans le Drive, avec changement de la fiche d'Iris).
+Voir la fin de `docs/jarvis-os-refonte.md` (toujours à jour). **Au soir du 16/11/2026** : refonte livrée et fusionnée dans `main` (serveur 0.10.1) : accueil Fil du jour, barre à favoris, Agenda plus vivant, Équipe harmonisée avec « En ce moment » en fil en direct, Papiers lus dans le Drive (rangé par catégorie ; `Papiers privés` hors de RD Assistant, affiché seulement sur demande), Voyages plus riches (photo Wikipédia, carnet préparé par Claude, météo Open-Meteo, budget par poste), Achats avec courbes, Automatisations en frise, Réglages. Le propriétaire met le serveur à jour lui-même (Réglages, « Mettre à jour le serveur ») ou par la session « Serveur JARVIS ».
+
+À vérifier sur son iPhone (impossible depuis une session cloud) : vraie photo et vraie météo des Voyages (Wikipédia et Open-Meteo limitent l'adresse partagée des sessions), écran Papiers avec le vrai Drive, voix sans baisse de volume, « Tester mes données ». Reste à faire : brancher sur le serveur « Confier à la tâche Claude » (`fire_trigger`) et les outils de Claude dans la discussion (`preparer_ordre`, `ajouter_tache`, `mettre_a_jour_dossier`). Sonnette d'Iris à envoyer à la reprise de Grok (mardi 17/11 après 12h) pour la ligne Canal du 16/11 « Papiers rangés par catégorie ».
+
+Permissions : `.claude/settings.json` autorise `update_file` du connecteur Google Drive (déplacer, renommer) sans confirmation ; partage et suppression restent soumis à confirmation. Une règle ajoutée en cours de session n'est lue qu'à la session suivante (constaté le 16/11/2026).
