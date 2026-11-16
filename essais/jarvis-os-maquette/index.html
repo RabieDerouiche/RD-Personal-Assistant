@@ -1,9 +1,13 @@
 <!doctype html><html><head><script>window.__SCEN = {};</script><script src="donnees-fictives.js"></script><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}
   /* ---------- JARVIS OS : navigation et écrans ajoutés ---------- */
   .fab-talk { display: none !important; }
-  .tabs { grid-template-columns: repeat(5, minmax(0, 1fr)) !important; align-items: end; }
-  .tab-talk { position: relative; }
-  .talk-orb { width: 54px; height: 54px; margin-top: -26px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #e0f2fe, #6366f1 45%, #7c3aed 75%, #1e1b4b); box-shadow: 0 0 0 4px rgba(4, 6, 13, .9), 0 0 24px rgba(124, 92, 255, .7); }
+  /* bandeau de rubriques en haut (remplace la barre du bas) */
+  .top .tabs { position: static !important; transform: none !important; left: auto !important; bottom: auto !important; width: auto !important; display: flex !important; gap: 6px; overflow-x: auto; scrollbar-width: none; padding: 8px max(16px, env(safe-area-inset-left, 0px)) 10px !important; margin: 0 auto; max-width: 980px; background: none !important; border: 0 !important; box-shadow: none !important; border-radius: 0 !important; backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
+  .top .tabs::-webkit-scrollbar { display: none; }
+  .top .tab { flex: 0 0 auto; flex-direction: row !important; gap: 6px !important; min-height: 36px !important; padding: 0 14px !important; border-radius: 999px !important; border: 1px solid var(--line) !important; background: var(--glass) !important; color: var(--muted) !important; font: 500 13.5px var(--sans) !important; letter-spacing: 0 !important; white-space: nowrap; }
+  .top .tab[aria-current="page"] { color: #070a14 !important; background: var(--iris) !important; border-color: transparent !important; }
+  .top .tab .badge { position: static !important; transform: none !important; margin-left: 2px; }
+  .dir { padding-bottom: calc(120px + env(safe-area-inset-bottom, 0px)) !important; }
   .menu-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
   .menu-tile { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 16px 14px; border-radius: 20px; border: 1px solid var(--line); background: linear-gradient(180deg, var(--glass-2), var(--glass)); color: var(--fg); text-align: left; }
   .menu-tile b { font: 600 16px var(--display); }
@@ -798,13 +802,13 @@
     <div class="top-meta"><span id="today"></span><span class="clock" id="clock">--:--</span><span class="top-tools" id="top-tools"></span></div>
     <div class="status" id="status" aria-live="polite"></div>
   </div>
+  <nav class="tabs" id="tabs" aria-label="Rubriques"></nav>
 </header>
 <main id="dir" class="dir">
   <h1 class="view-title" id="view-title">Vue d'ensemble</h1>
   <div id="view"></div>
 </main>
 </div>
-<nav class="tabs" id="tabs" aria-label="Rubriques"></nav>
 <div class="sheet-back" id="sheet-back" hidden></div>
 <section class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title" hidden></section>
 <div class="app" id="app" role="dialog" aria-modal="true" aria-label="Rubrique" hidden></div>
@@ -2824,7 +2828,7 @@ void main(){
     $('view-title').textContent = VIEWTITLE[TAB] ? VIEWTITLE[TAB]() : TAB === 'equipe' && AGENT ? BOT[AGENT].name + ' · ' + BOT[AGENT].title : TITLES[TAB];
     VIEWS[TAB](body);
     v.replaceChildren(body);
-    document.querySelectorAll('.tab').forEach((t) => t.setAttribute('aria-current', (t.dataset.tab === TAB || (t.dataset.tab === 'menu' && !['accueil', 'demandes', 'agenda'].includes(TAB))) ? 'page' : 'false'));
+    document.querySelectorAll('.tab').forEach((t) => { const on = t.dataset.tab === TAB; t.setAttribute('aria-current', on ? 'page' : 'false'); if (on) try { t.scrollIntoView({inline: 'center', block: 'nearest'}); } catch (e) { /* rien */ } });
     header();
     const to = keep ? y : NAV.y != null ? NAV.y : 0; NAV.y = null;
     if (sc) sc.scrollTop = to; else window.scrollTo(0, to);
@@ -2933,11 +2937,10 @@ void main(){
 
   function boot() {
     const nav = $('tabs');
-    /* JARVIS OS : barre à 5 entrées, « Parler » au centre, tout le reste dans le Menu */
-    const navBtn = (id, label, ic, fn) => h('button', {type: 'button', class: 'tab', 'data-tab': id, onclick: fn || (() => go(id))}, h('span', {class: 'ic', html: icon(ic, 20)}), h('span', {text: label}), id === 'demandes' ? h('span', {class: 'badge', hidden: true}) : null);
-    nav.append(navBtn('accueil', 'Accueil', 'pulse'), navBtn('demandes', 'Demandes', 'chat'),
-      h('button', {type: 'button', class: 'tab tab-talk', 'aria-label': 'Parler à JARVIS', onclick: () => convOpen()}, h('span', {class: 'talk-orb'}), h('span', {text: 'Parler'})),
-      navBtn('agenda', 'Agenda', 'cal'), navBtn('menu', 'Menu', 'folder'));
+    /* JARVIS OS : toutes les rubriques en pastilles dans le bandeau du haut, à un appui ; la voix = le grand bouton orbe du bas */
+    const navBtn = (id, label, ic) => h('button', {type: 'button', class: 'tab', 'data-tab': id, onclick: () => { go(id); }}, h('span', {class: 'ic', html: icon(ic, 16)}), h('span', {text: label}), id === 'demandes' ? h('span', {class: 'badge', hidden: true}) : null);
+    nav.append(navBtn('accueil', 'Accueil', 'pulse'), navBtn('demandes', 'Demandes', 'chat'), navBtn('agenda', 'Agenda', 'cal'), navBtn('achats', 'Achats', 'tag'), navBtn('sorties', 'Sorties', 'map'), navBtn('voyages', 'Voyages', 'plane'),
+      navBtn('papiers', 'Papiers', 'doc'), navBtn('automatisations', 'Automatisations', 'clock'), navBtn('equipe', 'Équipe', 'pulse'), navBtn('suivi', 'Suivi', 'folder'));
     $('sheet-back').addEventListener('click', () => closeSheet());
     $('nav-back').addEventListener('click', navBack);
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { if (!$('sheet').hidden) closeSheet(); else if (CHAT.open) closeChat(); else if (APP.id) closeApp(); } });
@@ -5371,4 +5374,6 @@ void main(){
 })();
 </script>
 
+<script src="jarvis-voix.js"></script>
+<script>/* JARVIS OS : le grand bouton orbe du bas ouvre la page vocale */ try { window.JarvisVoice.mountButton(document.body); } catch (e) { /* rien */ }</script>
 </body></html>

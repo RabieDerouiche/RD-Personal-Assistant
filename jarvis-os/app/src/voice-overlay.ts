@@ -1,0 +1,116 @@
+/* JARVIS OS : la page vocale (orbe, voile de soie, conversation continue), en module autonome pour la nouvelle app.
+   Elle s'ouvre par le grand bouton orbe du bas. Avec le serveur relié : Claude en flux, voix Pierre ; sinon : réponses locales. */
+import {createOrb, type OrbState} from './orb';
+import {Voice, canListen, canSpeak} from './voice';
+import {think, resetBrain} from './brain';
+import {store} from './store';
+import * as srv from './server';
+
+const CSS = `
+.jv-btn { position: fixed; left: 50%; bottom: calc(14px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 60; width: 74px; height: 74px; border: 0; padding: 0; border-radius: 50%; background: radial-gradient(circle, rgba(10, 10, 30, .9) 55%, rgba(10, 10, 30, 0) 72%); cursor: pointer; }
+.jv-btn .orb-stage { position: absolute; inset: -10px; pointer-events: none; }
+.jv-btn::after { content: ""; position: absolute; inset: 2px; border-radius: 50%; box-shadow: 0 0 0 1px rgba(180, 192, 255, .25), 0 8px 30px rgba(99, 102, 241, .45); animation: jvpulse 2.6s ease-in-out infinite; pointer-events: none; }
+@keyframes jvpulse { 50% { box-shadow: 0 0 0 1px rgba(180, 192, 255, .35), 0 8px 44px rgba(124, 92, 255, .7); } }
+.jv { position: fixed; inset: 0; z-index: 9999; display: flex; flex-direction: column; background: radial-gradient(120% 60% at 20% 0, #0b2027 0, #050509 50%); color: #eef1fb; font: 400 15px/1.5 Inter, system-ui, -apple-system, sans-serif; padding: calc(10px + env(safe-area-inset-top, 0px)) 16px calc(10px + env(safe-area-inset-bottom, 0px)); }
+.jv[hidden] { display: none; }
+.jv-top { display: flex; align-items: center; gap: 8px; color: #9aa3c2; font-size: 13px; }
+.jv-dot { width: 8px; height: 8px; border-radius: 50%; background: #5b8cff; box-shadow: 0 0 10px #5b8cff; }
+.jv-chip { margin-left: auto; font-size: 11.5px; color: #6ee7b7; border: 1px solid rgba(110, 231, 183, .35); border-radius: 999px; padding: 3px 10px; }
+.jv-stage { position: relative; height: min(46dvh, 420px); margin: 0 -16px; }
+.jv-stage .orb-stage { position: absolute; inset: 0; }
+.jv-cap { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding: 4px 4px 8px; }
+.jv-me { margin: 0; font-size: 17px; font-style: italic; color: #fff; text-align: center; min-height: 24px; }
+.jv-rep { margin: 0; color: #c7cce3; font-size: 16px; line-height: 1.55; }
+.jv-hint { margin: 0; color: #646d8c; text-align: center; }
+.jv-note { margin: 0; color: #fbbf24; text-align: center; font-size: 13.5px; }
+.jv-comp { display: flex; gap: 8px; padding: 6px; border-radius: 18px; background: rgba(255, 255, 255, .06); border: 1px solid rgba(255, 255, 255, .12); margin-bottom: 10px; }
+.jv-comp[hidden] { display: none; }
+.jv-comp input { flex: 1; min-width: 0; border: 0; background: transparent; color: #fff; font-size: 16px; padding: 8px 10px; outline: none; }
+.jv-comp button { border: 0; border-radius: 12px; padding: 0 14px; background: linear-gradient(135deg, #67e8f9, #a5b4fc 40%, #e9a8fb); color: #070a14; font-weight: 600; }
+.jv-bar { display: flex; align-items: center; justify-content: center; gap: 40px; padding-top: 4px; }
+.jv-side { width: 52px; height: 52px; border-radius: 50%; border: 1px solid rgba(255, 255, 255, .12); background: rgba(255, 255, 255, .06); color: #c9c7e0; display: grid; place-items: center; }
+.jv-mic { width: 80px; height: 80px; border-radius: 50%; border: 0; color: #fff; display: grid; place-items: center; background: linear-gradient(135deg, #22d3ee, #5b8cff 45%, #8b5cf6); box-shadow: 0 0 0 6px rgba(91, 140, 255, .12), 0 10px 40px rgba(91, 140, 255, .55); }
+.jv-mic.on { animation: jvring 1.5s ease-in-out infinite; }
+.jv-mic.say { background: linear-gradient(135deg, #a78bfa, #8b5cf6 50%, #d946ef); }
+@keyframes jvring { 50% { box-shadow: 0 0 0 16px rgba(91, 140, 255, 0), 0 10px 40px rgba(91, 140, 255, .55); } }
+`;
+const SVG = (d: string, s = 24) => `<svg viewBox="0 0 24 24" width="${s}" height="${s}" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
+const I = {mic: '<rect x="9" y="3.5" width="6" height="11" rx="3"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3"/>', key: '<rect x="3" y="6.5" width="18" height="11" rx="2"/><path d="M7 10.5h.01M11 10.5h.01M15 10.5h.01M8 14h8"/>', x: '<path d="M6 6l12 12M18 6L6 18"/>', speaker: '<path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5z"/><path d="M15.5 9a4.2 4.2 0 0 1 0 6"/>', stop: '<rect x="7" y="7" width="10" height="10" rx="2"/>'};
+const TXT: Record<OrbState, string> = {idle: 'En veille', listening: "Je t'écoute…", thinking: 'Je réfléchis…', executing: 'Mission préparée', speaking: 'Je réponds…', error: 'Micro indisponible'};
+
+let root: HTMLElement, orb: ReturnType<typeof createOrb>, me: HTMLElement, rep: HTMLElement, note: HTMLElement, stateEl: HTMLElement, mic: HTMLButtonElement, comp: HTMLElement, input: HTMLInputElement, chip: HTMLElement;
+let fresh = true, sessionAt = 0, busy = false;
+const voice = new Voice({
+  mode: () => store.settings.listenMode, voiceURI: () => store.settings.voiceURI, rate: () => store.settings.rate,
+  tts: () => (srv.serverVoice() ? srv.ttsUrl : null),
+  onState: (s, why) => {
+    const map: Record<string, OrbState> = {off: 'idle', listening: 'listening', waiting: 'thinking', speaking: 'speaking', error: 'error'};
+    set(map[s]); if (s === 'error' && why) note.textContent = 'Micro : ' + why + '. Touche le clavier pour écrire.'; if (s === 'listening') note.textContent = '';
+    mic.className = 'jv-mic' + (s === 'listening' ? ' on' : s === 'speaking' ? ' say' : ''); mic.innerHTML = SVG(s === 'speaking' ? I.speaker : voice.active ? I.stop : I.mic, 30);
+  },
+  onPartial: (t) => { me.textContent = t; },
+  onUtterance: (t) => { me.textContent = t; ask(t, true); }
+});
+function set(s: OrbState) { orb.set(s); stateEl.textContent = TXT[s]; }
+
+async function ask(text: string, byVoice: boolean) {
+  if (busy) return; busy = true;
+  store.add({who: 'me', text, at: Date.now()});
+  set('thinking'); rep.textContent = '…';
+  const live = (byVoice || voice.active) && (canSpeak() || srv.serverVoice());
+  let said = 0, reply = '';
+  if (srv.linked()) {
+    const g = live ? voice.streamStart() : 0;
+    const feed = (t: string, final: boolean) => { if (!live) return; const rest = t.slice(said); let cut = final ? rest.length : -1; if (!final) { const re = /[.!?…](\s|$)/g; let x; while ((x = re.exec(rest))) if (x.index >= 2) cut = x.index + 1; } if (cut > 0) { const part = rest.slice(0, cut).trim(); said += cut; if (part) voice.streamPart(part, g); } };
+    try {
+      const out = await srv.chat(text, {newSession: fresh, model: store.settings.model}, (t) => { rep.textContent = t; rep.parentElement!.scrollTop = 1e6; feed(t, false); });
+      fresh = false; reply = out.reply; if (out.missions.length) store.missions.push(...out.missions);
+      rep.textContent = reply; feed(reply, true);
+    } catch (e) { reply = (e as Error).message; rep.textContent = reply; if (live) voice.streamPart(reply, g); }
+    if (live) voice.streamEnd(g); else set('idle');
+  } else {
+    const out = think(text, store.settings.route);
+    if (out.missions?.length) store.missions.push(...out.missions);
+    reply = out.reply; rep.textContent = reply;
+    if (out.end) { voice.speak(reply, () => close()); busy = false; store.add({who: 'jarvis', text: reply, at: Date.now()}); return; }
+    if (live) voice.speak(reply); else set('idle');
+  }
+  store.add({who: 'jarvis', text: reply, at: Date.now()});
+  busy = false;
+}
+
+function build() {
+  const st = document.createElement('style'); st.textContent = CSS; document.head.append(st);
+  root = document.createElement('div'); root.className = 'jv'; root.hidden = true; root.setAttribute('role', 'dialog'); root.setAttribute('aria-label', 'Conversation avec JARVIS');
+  root.innerHTML = `<div class="jv-top"><span class="jv-dot"></span><span class="jv-state">En veille</span><span class="jv-chip"></span></div>
+    <div class="jv-stage"></div><div class="jv-cap"><p class="jv-me"></p><p class="jv-rep"></p><p class="jv-note"></p></div>
+    <div class="jv-comp" hidden><input type="text" placeholder="Écris à JARVIS…" enterkeyhint="send" aria-label="Ta demande"><button type="button">Envoyer</button></div>
+    <div class="jv-bar"><button type="button" class="jv-side jv-k" aria-label="Écrire">${SVG(I.key, 22)}</button><button type="button" class="jv-mic" aria-label="Parler">${SVG(I.mic, 30)}</button><button type="button" class="jv-side jv-x" aria-label="Fermer">${SVG(I.x, 22)}</button></div>`;
+  document.body.append(root);
+  orb = createOrb(); root.querySelector('.jv-stage')!.append(orb.el);
+  me = root.querySelector('.jv-me')!; rep = root.querySelector('.jv-rep')!; note = root.querySelector('.jv-note')!; stateEl = root.querySelector('.jv-state')!; chip = root.querySelector('.jv-chip')!;
+  mic = root.querySelector('.jv-mic')!; comp = root.querySelector('.jv-comp')!; input = comp.querySelector('input')!;
+  mic.onclick = () => { if (voice.state === 'speaking') { voice.interrupt(); return; } if (voice.active) { voice.stop(); return; } start(); };
+  (root.querySelector('.jv-k') as HTMLElement).onclick = () => { comp.hidden = !comp.hidden; if (!comp.hidden) { voice.stop(); setTimeout(() => input.focus(), 50); } };
+  (root.querySelector('.jv-x') as HTMLElement).onclick = close;
+  const send = () => { const v = input.value.trim(); if (!v) return; input.value = ''; me.textContent = v; ask(v, false); };
+  comp.querySelector('button')!.onclick = send;
+  input.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); send(); } });
+}
+function start() { note.textContent = ''; if (!canListen()) { note.textContent = 'Pas de reconnaissance vocale ici : touche le clavier pour écrire.'; comp.hidden = false; return; } fresh = true; sessionAt = Date.now(); voice.start(); }
+export function open() {
+  if (!root) build();
+  root.hidden = false; orb.wave(true); me.textContent = ''; rep.textContent = ''; comp.hidden = true;
+  chip.textContent = srv.linked() ? 'Claude · ' + ({rapide: 'Haiku', equilibre: 'Sonnet', profond: 'Opus'} as Record<string, string>)[store.settings.model] : 'réponses locales';
+  set('idle'); start();
+}
+export function close() { voice.stop(); resetBrain(); if (root) { root.hidden = true; orb.wave(false); } busy = false; void sessionAt; }
+/* le grand bouton orbe du bas */
+export function mountButton(host: HTMLElement = document.body) {
+  const b = document.createElement('button'); b.type = 'button'; b.className = 'jv-btn'; b.setAttribute('aria-label', 'Parler à JARVIS');
+  if (!document.getElementById('jv-css')) { const st = document.createElement('style'); st.id = 'jv-css'; st.textContent = CSS; document.head.append(st); }
+  const o = createOrb(); b.append(o.el); b.onclick = open; host.append(b);
+  if (srv.linked()) srv.status().catch(() => {});
+  return b;
+}
+(window as any).JarvisVoice = {open, close, mountButton};
