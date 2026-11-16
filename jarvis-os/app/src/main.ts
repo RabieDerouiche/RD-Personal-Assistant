@@ -12,7 +12,7 @@ import {charOf, setModeSource, talkAll, refreshModes, type Mode} from './chars';
 import * as srv from './server';
 
 const PHASE = 2;
-const VERSION = '0.7.1';
+const VERSION = '0.7.2';
 type View = 'home' | 'command' | 'agents' | 'agent' | 'missions' | 'more' | 'memory' | 'automations' | 'intelligence' | 'settings';
 let view: View = 'home';
 let live = '', note = '', clearArm = 0, orbState: OrbState = 'idle', agentFilter = 'tous', agentQuery = '', agentSel: AgentId = 'claude', missionCol = 'a_approuver', draftNext = '', streaming = '', fresh = true, pairMsg = '', pairUrl = '', pairCode = '', sessionAt = 0, updMsg = '', grokArm = 0, diagTxt = '';
@@ -305,7 +305,8 @@ function intelligence(): HTMLElement {
     h('div', {class: 'gauges'}, gauge(Math.min(1, s.turns / 50), 'Échanges', String(s.turns), '#67e8f9'), gauge(voiceOk, 'Micro réussi', Math.round(voiceOk * 100) + '%', '#a5b4fc'), gauge(approved, 'Missions approuvées', Math.round(approved * 100) + '%', '#e9a8fb'), gauge(Math.min(1, avg / 1000), 'Réponse locale', avg + 'ms', '#fcd6a4')),
     h('div', {class: 'panel-h'}, h('h3', {text: 'État des modèles et services'})),
     h('div', {class: 'feed glass'}, llm.map(([n, d, ok]) => h('div', {class: 'llm-row'}, h('span', {class: 'st-dot ' + (ok ? 'ok' : 'off')}), h('div', {}, h('b', {text: n}), h('small', {text: d})), h('span', {class: 'pill ' + (ok ? 'is-ok' : 'is-demande'), text: ok ? 'Prêt' : 'Non relié'})))),
-    srv.linked() ? h('button', {type: 'button', class: 'btn', onclick: async () => { diagTxt = 'Diagnostic en cours (jusqu\'à une minute)…'; render(); diagTxt = await srv.diag(); await srv.status(); render(); }}, 'Diagnostic des connecteurs') : null,
+    srv.linked() ? h('div', {class: 'acts'}, h('button', {type: 'button', class: 'btn', onclick: async () => { diagTxt = 'Diagnostic en cours (jusqu\'à une minute)…'; render(); diagTxt = await srv.diag(); await srv.status(); render(); }}, 'Diagnostic des connecteurs'),
+      h('button', {type: 'button', class: 'btn main', onclick: async () => { diagTxt = 'Claude lit ton agenda et ta boîte mail (jusqu\'à une minute)…'; render(); diagTxt = await srv.testData(); render(); }}, 'Tester l\'accès à mes données')) : null,
     diagTxt ? h('pre', {class: 'diag glass', text: diagTxt}) : null,
     h('p', {class: 'small', text: "La consommation de tes abonnements Claude et Grok s'affichera ici quand ils seront reliés."}));
 }
