@@ -517,13 +517,15 @@ const server = http.createServer(async (req, res) => {
       if (p === '/api/memory' && req.method === 'DELETE') { S.msgs = []; S.missions = []; S.session = null; closeSession(); save(); return json(res, 200, {ok: true}); }
       return json(res, 404, {error: 'Inconnu.'});
     }
-    /* l'app elle-même, servie aussi par le serveur (même adresse) ; la nouvelle app à /os/ */
-    if (p === '/os') { res.writeHead(302, {location: '/os/'}); res.end(); return; }
-    const root = p.startsWith('/os/') ? OS_DIR : WEB;
-    let f = path.normalize(path.join(root, decodeURIComponent(p.startsWith('/os/') ? p.slice(3) : p)));
-    if (!f.startsWith(path.normalize(root))) return json(res, 403, {error: 'Interdit.'});
-    if (p.endsWith('/')) f = path.join(f, 'index.html');
-    fs.readFile(f, (e, d) => { if (e) { res.writeHead(404); res.end(); return; } res.writeHead(200, {'content-type': TYPES[path.extname(f)] || 'application/octet-stream'}); res.end(d); });
+    /* les apps (16/11/2026) : la nouvelle (page Jarvis refondue) à la racine ; l'ancienne PWA à /ancienne/ (ses réglages avancés) ;
+       /os/ (adresse d'essai) renvoie à la racine ; un fichier absent de la nouvelle app est cherché dans l'ancienne (ex. /confidentialite.html) */
+    if (p === '/os' || p.startsWith('/os/')) { res.writeHead(301, {location: '/' + p.slice(4) + url.search}); res.end(); return; }
+    if (p === '/ancienne') { res.writeHead(302, {location: '/ancienne/'}); res.end(); return; }
+    const old = p.startsWith('/ancienne/'), rel = decodeURIComponent(old ? p.slice('/ancienne'.length) : p);
+    const tryFile = (root, cb) => { let f = path.normalize(path.join(root, rel)); if (!f.startsWith(path.normalize(root))) return cb(null); if (rel.endsWith('/')) f = path.join(f, 'index.html'); fs.readFile(f, (e, d) => cb(e ? null : {f, d})); };
+    const send = (r) => { if (!r) { res.writeHead(404); res.end(); return; } res.writeHead(200, {'content-type': TYPES[path.extname(r.f)] || 'application/octet-stream', 'cache-control': /\.(html|js|webmanifest)$/.test(r.f) ? 'no-cache' : 'public, max-age=3600'}); res.end(r.d); };
+    if (rel.split('/').includes('..')) return json(res, 403, {error: 'Interdit.'});
+    if (old) tryFile(WEB, send); else tryFile(OS_DIR, (r) => (r ? send(r) : tryFile(WEB, send)));
   } catch (e) { if (!res.headersSent) json(res, 500, {error: 'Erreur du serveur.'}); else res.end(); }
 });
 setTimeout(() => { mcpList().then(() => console.log('Connecteurs Google : ' + (readTools().join(', ') || 'aucun'))); }, 1500);

@@ -15,7 +15,7 @@ const ok = (n, c, i) => { out.push((c ? 'OK   ' : 'ÉCHEC') + ' ' + n + (i ? ' :
   await new Promise((r) => srv.stdout.once('data', r));
   const b = await chromium.launch(); const p = await b.newPage({viewport: {width: 390, height: 844}});
   const errs = []; p.on('pageerror', (e) => errs.push(e.message));
-  await p.addInitScript(MOCK({})); await p.goto(BASE + '/'); await p.waitForTimeout(400);
+  await p.addInitScript(MOCK({})); await p.goto(BASE + '/ancienne/'); await p.waitForTimeout(400);
   try {
     await p.evaluate(() => { const j = window.__jarvis; j.store.add({who: 'me', text: 'souvenir d\'avant le serveur', at: Date.now()}); });
     await p.click('.tabs button:nth-child(5)'); await p.click('.tile:has-text("Réglages")'); await p.waitForTimeout(150);
@@ -91,7 +91,7 @@ const ok = (n, c, i) => { out.push((c ? 'OK   ' : 'ÉCHEC') + ' ' + n + (i ? ' :
     const ls = await p.evaluate(() => JSON.stringify(localStorage)); await p.close();
     const q = await b.newPage({viewport: {width: 390, height: 844}});
     await q.addInitScript((ls) => { const o = JSON.parse(ls); const st = JSON.parse(o['jarvis.settings'] || '{}'); st.voiceEngine = 'iphone'; o['jarvis.settings'] = JSON.stringify(st); for (const k in o) localStorage.setItem(k, o[k]); }, ls);
-    await q.addInitScript(MOCK({iosStuck: true})); await q.goto(BASE + '/'); await q.waitForTimeout(500);
+    await q.addInitScript(MOCK({iosStuck: true})); await q.goto(BASE + '/ancienne/'); await q.waitForTimeout(500);
     await q.click('.home-ask .ask-ic'); await q.waitForTimeout(300);
     let m0 = await q.evaluate(() => window.__spoken.length);
     await q.evaluate(() => window.__say.push('Bonjour JARVIS'));

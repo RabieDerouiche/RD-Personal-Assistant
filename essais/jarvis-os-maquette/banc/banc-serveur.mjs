@@ -15,7 +15,7 @@ const b = await chromium.launch(); const ctx = await b.newContext({...devices['i
 p.on('pageerror', (e) => errs.push(e.message));
 await p.route(FG.url + '/auth**', (route) => { const u = new URL(route.request().url()); route.fulfill({status: 302, headers: {location: BASE + '/api/google/callback?state=' + u.searchParams.get('state') + '&code=CODE-OK'}}); });
 try {
-  await p.goto(BASE + '/os/?serveur#reglages'); await p.waitForTimeout(2500);
+  await p.goto(BASE + '/?serveur#reglages'); await p.waitForTimeout(2500);
   ok('mode serveur choisi', await p.evaluate(() => window.__JARVIS_MODE === 'serveur' && !!window.JarvisServeur));
   await p.fill('.set-card input', code); await p.tap('.set-card .btn.main'); await p.waitForTimeout(2500);
   ok('iPhone relié par code', await p.evaluate(() => window.JarvisServeur.linked() && /relié à/.test(document.querySelector('.set-wrap').textContent)));
@@ -25,13 +25,13 @@ try {
   ok('identifiant Google enregistré', await p.evaluate(() => /Enregistré sur ton serveur/.test(document.querySelector('.set-wrap').textContent)));
   await p.tap('button:has-text("Connecter Google")'); await p.waitForTimeout(1500);
   ok('retour de Google : page « relié »', /Google est relié/.test(await p.textContent('body')), (await p.textContent('body')).slice(0, 80));
-  await p.goto(BASE + '/os/?serveur#reglages'); await p.waitForTimeout(2500);
+  await p.goto(BASE + '/?serveur#reglages'); await p.waitForTimeout(2500);
   ok('Réglages : compte Google affiché', await p.evaluate(() => /proprietaire@example\.org/.test(document.querySelector('.set-wrap').textContent)));
   await p.tap('button:has-text("Tester mes données")'); await p.waitForTimeout(1500);
   const t = await p.evaluate(() => document.querySelector('.set-card .set-msg').textContent); ok('test des données : Pilotage lu par le serveur', /Pilotage lu : 1 lignes/.test(t), t);
   await p.screenshot({path: SH + 'set-2.png'});
   const before = FG.calls.length;
-  await p.goto(BASE + '/os/?serveur'); await p.waitForTimeout(6000);
+  await p.goto(BASE + '/?serveur'); await p.waitForTimeout(6000);
   const used = FG.calls.slice(before).map((c) => c.path.replace(/\/v4\/spreadsheets\/[^/]+\/values\//, ' values ').replace(/^\/(\w+).*?(values .*|events|threads|drafts).*$/, '$1 $2'));
   const uniq = [...new Set(used)];
   ok('page en direct : Pilotage, agenda et Gmail lus par l’accès Google', uniq.some((u) => /sheets values Canal/.test(u)) && uniq.some((u) => /calendar events/.test(u)) && uniq.some((u) => /gmail threads/.test(u)), uniq.length + ' sources : ' + uniq.slice(0, 8).join(' | '));

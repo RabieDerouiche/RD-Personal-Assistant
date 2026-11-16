@@ -20,6 +20,7 @@ srv.listen(0, async () => {
     await p.screenshot({path: path.join(SH, 'accueil.png')});
     /* barre du bas et toutes les rubriques */
     const bar = await p.evaluate(() => [...document.querySelectorAll('.fav-row .tab')].map((t) => t.dataset.tab));
+    ok('Accueil et « Pour moi » dans les favoris par défaut', bar[0] === 'accueil' && bar[1] === 'demandes' && await p.evaluate(() => document.querySelector('.fav-row .tab[data-tab="demandes"]').textContent.includes('Pour moi')));
     ok('barre : 4 favoris et l\'orbe au centre', bar.length === 4 && await p.evaluate(() => !!document.querySelector('.talk-slot .jv-btn')), bar.join(','));
     await p.tap('.fav-handle'); await p.waitForTimeout(500);
     ok('« Tout » : toutes les rubriques', await p.evaluate(() => document.querySelectorAll('.all-grid .tab').length >= 11));
