@@ -2,7 +2,7 @@
 
 Tu travailles pour le propriétaire de ce dépôt, qui te pilote depuis l'app Claude sur iPhone (onglet Code). Son assistant personnel au quotidien est **Grok Bot**. Toi, tu es dédié au développement et à la technique, et tu tiens le système Grok Bot (fiches des bots, Charte, classeurs, page Jarvis). Ce dépôt contient uniquement ta logique ; ses données personnelles vivent dans Google Drive.
 
-**Avant toute tâche qui touche aux bots, à Pilotage ou à la page Jarvis, lis `docs/systeme-grok-bot.md`** (onglets de Pilotage, Canal, sonnettes, Salle de contrôle, coût, chantier en cours). Plateforme Grok Bot : `docs/grok-plateforme.md`. Historique des maquettes Jarvis : `docs/historique-jarvis.md`. Projet **JARVIS OS** (agentic OS sur iPhone, sans frais d'API) : `docs/jarvis-os.md`. **Toute modification de la page Jarvis est notée dans `docs/journal-jarvis.md`** (pages, méthode, ce qui est fait et ce qui reste) : lis-le avant d'y toucher, tiens-le à jour avant la fin de la session.
+**Avant toute tâche qui touche aux bots, à Pilotage ou à la page Jarvis, lis `docs/systeme-grok-bot.md`** (onglets de Pilotage, Canal, sonnettes, Salle de contrôle, coût, chantier en cours). Plateforme Grok Bot : `docs/grok-plateforme.md`. Historique des maquettes Jarvis : `docs/historique-jarvis.md`. Projet **JARVIS OS** (agentic OS sur iPhone, sans frais d'API) : `docs/jarvis-os.md`. Refonte en cours (16/11/2026) : `docs/jarvis-os-refonte.md`. **Toute modification de la page Jarvis est notée dans `docs/journal-jarvis.md`** (pages, méthode, ce qui est fait et ce qui reste) : lis-le avant d'y toucher, tiens-le à jour avant la fin de la session.
 
 ## Où sont les données
 
