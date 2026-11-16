@@ -5849,7 +5849,7 @@ void main(){
       /* 1. cet iPhone et le serveur */
       if (!JS.linked()) {
         const code = h('input', {class: 'inp', type: 'text', placeholder: 'Code affiché par le serveur, ex. AB12-CD34', autocomplete: 'off', autocapitalize: 'characters'});
-        parts.push(h('section', {class: 'card set-card'}, h('b', {text: 'Relier cet iPhone au serveur'}), h('p', {class: 'muted', text: "Sur le serveur, lance « sudo -u jarvis node /opt/rd/jarvis-os/server/server.mjs pair » : il affiche un code valable 30 minutes. Si l'app JARVIS de ce serveur est déjà reliée sur ce téléphone, rien à faire."}), code,
+        parts.push(h('section', {class: 'card set-card'}, h('b', {text: 'Relier cet iPhone au serveur'}), h('p', {class: 'muted', text: "Sur le serveur, lance « sudo -iu jarvis node /opt/rd/jarvis-os/server/server.mjs pair » : il affiche un code valable 30 minutes. Si l'app JARVIS de ce serveur est déjà reliée sur ce téléphone, rien à faire."}), code,
           h('button', {type: 'button', class: 'btn main', onclick: async () => { const r = await JS.pair(code.value); if (r.ok) location.reload(); else draw(msg(r.error, true)); }}, 'Relier')));
         box.replaceChildren(...parts); return;
       }
