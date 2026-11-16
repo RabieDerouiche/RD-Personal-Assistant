@@ -1,0 +1,15 @@
+{
+  "name": "jarvis-os",
+  "private": true,
+  "version": "0.2.0",
+  "description": "JARVIS OS : PWA vocale pour piloter ses agents (phase 2, prototype)",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "vite": "8.3.8"
+  }
+}

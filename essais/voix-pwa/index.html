@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Essai voix">
+<meta name="theme-color" content="#060a18">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<title>Essai voix Jarvis</title>
+<style>
+  :root { --bg: #060a18; --fg: #e8f1ff; --muted: #8b9ab8; --cy: #22d3ee; --ok: #34d399; --warn: #fbbf24; --bad: #f87171; --line: rgba(148, 197, 255, .18); }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.45 -apple-system, system-ui, sans-serif; }
+  body { min-height: 100dvh; padding: calc(14px + env(safe-area-inset-top)) 16px calc(18px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 14px; }
+  h1 { margin: 0; font-size: 20px; letter-spacing: .04em; }
+  .sub { margin: 0; color: var(--muted); font-size: 13.5px; }
+  .orb { align-self: center; width: 150px; height: 150px; border-radius: 50%; margin: 6px 0; background: radial-gradient(circle at 40% 35%, #a5f3fc 0, #22d3ee 32%, #0e7490 62%, #082f49 100%); box-shadow: 0 0 40px rgba(34, 211, 238, .35); transition: transform .3s, box-shadow .3s, filter .3s; }
+  .orb[data-s="listen"] { animation: pulse 1.3s ease-in-out infinite; }
+  .orb[data-s="speak"] { animation: talk .45s ease-in-out infinite alternate; }
+  .orb[data-s="idle"], .orb[data-s="stop"] { filter: saturate(.4) brightness(.7); }
+  .orb[data-s="error"] { filter: hue-rotate(160deg); }
+  @keyframes pulse { 50% { transform: scale(1.06); box-shadow: 0 0 70px rgba(34, 211, 238, .6); } }
+  @keyframes talk { to { transform: scale(1.04); filter: brightness(1.25); } }
+  @media (prefers-reduced-motion: reduce) { .orb { animation: none !important; } }
+  .state { text-align: center; margin: 0; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; font-size: 13px; color: var(--cy); }
+  .live { min-height: 48px; text-align: center; margin: 0; font-size: 18px; font-style: italic; overflow-wrap: anywhere; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+  button { font: 600 15px -apple-system, system-ui, sans-serif; border-radius: 999px; border: 1px solid var(--line); background: rgba(255, 255, 255, .06); color: var(--fg); padding: 12px 18px; min-height: 46px; }
+  button.main { background: linear-gradient(135deg, #22d3ee, #818cf8); color: #04121f; border: 0; min-width: 180px; }
+  button[disabled] { opacity: .45; }
+  .seg { display: flex; gap: 6px; justify-content: center; }
+  .seg button { padding: 8px 14px; min-height: 38px; font-size: 13.5px; }
+  .seg button[aria-pressed="true"] { border-color: var(--cy); color: var(--cy); }
+  .stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .stat { border: 1px solid var(--line); border-radius: 14px; padding: 8px; text-align: center; }
+  .stat b { display: block; font-size: 22px; }
+  .stat span { font-size: 11.5px; color: var(--muted); }
+  .verdict { border-radius: 14px; padding: 10px 12px; border: 1px solid var(--line); font-size: 14.5px; margin: 0; }
+  .verdict.ok { border-color: rgba(52, 211, 153, .6); } .verdict.bad { border-color: rgba(248, 113, 113, .6); } .verdict.warn { border-color: rgba(251, 191, 36, .6); }
+  details { border: 1px solid var(--line); border-radius: 14px; padding: 8px 12px; }
+  summary { font-weight: 600; font-size: 14px; }
+  #log { margin: 8px 0 0; padding: 0; list-style: none; font: 12px/1.4 ui-monospace, Menlo, monospace; color: var(--muted); max-height: 260px; overflow-y: auto; overflow-wrap: anywhere; }
+  #log li.e { color: var(--bad); } #log li.k { color: var(--ok); }
+  .env { font: 12px/1.4 ui-monospace, Menlo, monospace; color: var(--muted); margin: 0; overflow-wrap: anywhere; }
+</style>
+</head>
+<body>
+  <h1>Essai voix · Jarvis</h1>
+  <p class="sub">Parle : la page écrit ce que tu dis, te le répète à voix haute, puis réécoute toute seule. Aucune donnée ne quitte ton iPhone, sauf ta voix, que l'iPhone envoie à Apple pour la transcrire.</p>
+  <div class="orb" id="orb" data-s="idle" aria-hidden="true"></div>
+  <p class="state" id="state">Prêt</p>
+  <p class="live" id="live" aria-live="polite"></p>
+  <div class="seg" role="group" aria-label="Mode d'écoute">
+    <button type="button" id="m-phrase" aria-pressed="true">Phrase par phrase</button>
+    <button type="button" id="m-continu" aria-pressed="false">Écoute continue</button>
+  </div>
+  <div class="row">
+    <button type="button" class="main" id="go">Démarrer</button>
+    <button type="button" id="stop" disabled>Arrêter</button>
+  </div>
+  <div class="stats">
+    <div class="stat"><b id="n-tours">0</b><span>tours complets</span></div>
+    <div class="stat"><b id="n-relances">0</b><span>écoutes relancées seules</span></div>
+    <div class="stat"><b id="n-err">0</b><span>erreurs</span></div>
+  </div>
+  <p class="verdict" id="verdict">Touche « Démarrer », autorise le micro, puis dis une phrase. Ensuite, ne touche plus l'écran : dis-en trois ou quatre autres.</p>
+  <div class="row"><button type="button" id="copy">Copier le rapport</button></div>
+  <details>
+    <summary>Journal technique</summary>
+    <p class="env" id="env"></p>
+    <ol id="log"></ol>
+  </details>
+<script>
+(() => {
+  'use strict';
+  const $ = (id) => document.getElementById(id);
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition || null;
+  const synth = window.speechSynthesis || null;
+  const T0 = Date.now();
+  const S = {run: false, mode: 'phrase', rec: null, buf: '', tmp: '', tours: 0, relances: 0, err: 0, lastErr: '', auto: false, autoStarts: 0, autoOk: 0, speaking: false, timer: 0, quick: 0, at: 0, errs: {}};
+  const standalone = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || window.navigator.standalone === true;
+  const log = (t, cls) => { const li = document.createElement('li'); li.textContent = ((Date.now() - T0) / 1000).toFixed(1) + ' s · ' + t; if (cls) li.className = cls; const l = $('log'); l.append(li); while (l.children.length > 300) l.firstChild.remove(); l.scrollTop = l.scrollHeight; };
+  const setState = (s, txt) => { $('orb').dataset.s = s; $('state').textContent = txt; };
+  const paint = () => {
+    $('n-tours').textContent = S.tours; $('n-relances').textContent = S.relances; $('n-err').textContent = S.err;
+    $('go').disabled = S.run; $('stop').disabled = !S.run;
+    $('m-phrase').setAttribute('aria-pressed', String(S.mode === 'phrase')); $('m-continu').setAttribute('aria-pressed', String(S.mode === 'continu'));
+    const v = $('verdict');
+    if (!SR) { v.className = 'verdict bad'; v.textContent = "Cette vue n'a pas de reconnaissance vocale : la conversation à la voix y est impossible."; return; }
+    if (S.tours >= 3 && S.autoOk >= 2) { v.className = 'verdict ok'; v.textContent = 'Réussi : ' + S.tours + " tours complets, dont " + S.autoOk + " où l'écoute est repartie seule après la réponse. La conversation en continu marche ici" + (standalone ? ' (depuis l\'écran d\'accueil).' : ' (dans Safari). Refais l\'essai depuis l\'écran d\'accueil.'); return; }
+    if (S.lastErr && !(S.lastErr === 'coupée aussitôt' && S.tours > 0)) { v.className = 'verdict bad'; v.textContent = 'Erreur « ' + S.lastErr + ' » : ' + (EXPLAIN[S.lastErr] || "la reconnaissance s'est arrêtée.") ; return; }
+    if (S.autoStarts > 0 && S.autoOk === 0 && !S.run) { v.className = 'verdict warn'; v.textContent = "L'écoute ne repart pas seule après la réponse : il faudrait toucher l'écran à chaque phrase."; return; }
+    v.className = 'verdict'; v.textContent = S.run ? 'En cours : parle, attends la réponse, puis parle de nouveau sans toucher.' : 'Touche « Démarrer », autorise le micro, puis dis une phrase. Ensuite, ne touche plus l\'écran : dis-en trois ou quatre autres.';
+  };
+  const EXPLAIN = {'not-allowed': "le micro ou la reconnaissance vocale est refusé à cette page (Réglages, Safari, Micro ; ou Réglages, Confidentialité, Reconnaissance vocale).", 'service-not-allowed': "le service de reconnaissance vocale refuse cette page (fréquent depuis l'écran d'accueil).", 'audio-capture': 'aucun micro disponible.', 'network': 'pas de connexion avec le service de transcription.', 'language-not-supported': "le français n'est pas proposé ici.", 'no-speech': "rien entendu (silence).", 'NotAllowedError': "le micro ou la reconnaissance vocale est refusé à cette page.", 'coupée aussitôt': "l'écoute s'arrête dès qu'elle démarre : l'iPhone exige sans doute un appui à chaque phrase.", 'ne démarre pas': "l'écoute ne démarre jamais : cette app ne donne pas le micro à la page."};
+  $('env').textContent = 'Affichage : ' + (standalone ? "écran d'accueil (PWA)" : 'Safari / navigateur') + ' · Reconnaissance : ' + (SR ? (window.SpeechRecognition ? 'SpeechRecognition' : 'webkitSpeechRecognition') : 'absente') + ' · Synthèse : ' + (synth ? 'oui' : 'non') + ' · ' + navigator.userAgent;
+
+  function speak(text, then) {
+    if (!synth || !window.SpeechSynthesisUtterance) { log('pas de synthèse vocale', 'e'); then(); return; }
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = 'fr-FR';
+    let done = false; const fin = (why) => { if (done) return; done = true; S.speaking = false; log('fin de la réponse (' + why + ')'); then(); };
+    u.onstart = () => log('réponse lue à voix haute');
+    u.onend = () => fin('normale'); u.onerror = (e) => { log('erreur de synthèse : ' + (e && e.error), 'e'); fin('erreur'); };
+    S.speaking = true; setState('speak', 'Je réponds');
+    try { synth.cancel(); synth.speak(u); } catch (e) { log('synthèse impossible : ' + e.message, 'e'); fin('exception'); return; }
+    setTimeout(() => { if (!done && !synth.speaking) fin('délai'); }, Math.max(6000, text.length * 120));
+  }
+  function listen(auto, afterReply) {
+    if (!S.run || S.speaking) return;
+    clearTimeout(S.timer);
+    let rec;
+    try { rec = new SR(); } catch (e) { S.err++; S.lastErr = 'exception'; log('création impossible : ' + e.message, 'e'); stop(); return; }
+    S.rec = rec; S.buf = ''; S.tmp = ''; S.auto = !!auto; S.afterReply = !!afterReply; S.at = Date.now();
+    rec.lang = 'fr-FR'; rec.interimResults = true; rec.continuous = S.mode === 'continu'; rec.maxAlternatives = 1;
+    if (auto && afterReply) S.autoStarts++;
+    rec.onstart = () => { if (S.rec !== rec) return; if (S.auto && S.afterReply) { S.autoOk++; S.relances++; log('écoute relancée seule après la réponse : OK', 'k'); } else if (S.auto) log('écoute relancée seule après un silence', 'k'); else log('écoute démarrée (après un appui)', 'k'); setState('listen', "Je t'écoute"); paint(); };
+    rec.onresult = (ev) => {
+      if (S.rec !== rec) return;
+      let fin = '', tmp = '';
+      for (let i = ev.resultIndex || 0; i < ev.results.length; i++) { const r = ev.results[i]; const t = r && r[0] ? r[0].transcript : ''; if (r.isFinal) fin += ' ' + t; else tmp += ' ' + t; }
+      if (fin.trim()) { S.buf = (S.buf + ' ' + fin).trim(); log('entendu : « ' + fin.trim() + ' »'); }
+      S.tmp = tmp.trim(); $('live').textContent = (S.buf + ' ' + S.tmp).trim();
+      /* en écoute continue, la phrase est finie quand plus rien n'arrive pendant 1,4 s */
+      if (S.mode === 'continu') { clearTimeout(S.timer); S.timer = setTimeout(() => { if (S.rec === rec && S.buf) { try { rec.stop(); } catch (e) { /* rien */ } } }, 1400); }
+    };
+    rec.onerror = (ev) => { if (S.rec !== rec) return; const c = (ev && ev.error) || 'inconnue'; S.errs[c] = (S.errs[c] || 0) + 1; if (c !== 'no-speech' && c !== 'aborted') { S.err++; S.lastErr = c; } log('erreur : ' + c, c === 'no-speech' ? '' : 'e'); paint(); };
+    rec.onend = () => {
+      if (S.rec !== rec) return;
+      S.rec = null; clearTimeout(S.timer);
+      const text = (S.buf + ' ' + S.tmp).trim();
+      log('fin de l\'écoute' + (text ? '' : ' (rien entendu)'));
+      if (!S.run) { paint(); return; }
+      if (/not-allowed|service-not-allowed|audio-capture|language-not-supported/.test(S.lastErr)) { stop(); return; }
+      if (text) {
+        S.tours++; paint();
+        speak('Tu as dit : ' + text + '. Je t\'écoute.', () => { if (S.run) setTimeout(() => listen(true, true), 250); });
+        return;
+      }
+      /* silence : on réécoute ; une écoute qui retombe trois fois aussitôt veut dire que l'iPhone exige un appui */
+      S.quick = Date.now() - S.at < 1200 ? S.quick + 1 : 0;
+      if (S.quick >= 3) { S.lastErr = S.lastErr || 'coupée aussitôt'; log("l'écoute retombe aussitôt : arrêt", 'e'); stop(); return; }
+      setTimeout(() => listen(true), 300);
+    };
+    try { rec.start(); log('demande d\'écoute' + (auto ? ' (sans appui)' : '')); }
+    catch (e) { S.err++; S.lastErr = e.name || 'exception'; log('démarrage refusé : ' + (e.name || '') + ' ' + e.message, 'e'); stop(); return; }
+    setTimeout(() => { if (S.run && S.rec === rec && $('orb').dataset.s !== 'listen') { S.err++; S.lastErr = 'ne démarre pas'; log("l'écoute n'a pas démarré en 4 s", 'e'); stop(); } }, 4000);
+  }
+  function start() {
+    if (!SR) { paint(); return; }
+    S.run = true; S.lastErr = ''; S.quick = 0;
+    /* le premier appui « ouvre » la voix du téléphone pour la suite */
+    try { if (synth) { synth.cancel(); const u = new SpeechSynthesisUtterance(' '); u.volume = 0; synth.speak(u); } } catch (e) { /* rien */ }
+    log('— démarrage, mode ' + (S.mode === 'continu' ? 'écoute continue' : 'phrase par phrase'));
+    paint(); listen(false);
+  }
+  function stop() {
+    S.run = false; clearTimeout(S.timer);
+    const r = S.rec; S.rec = null; try { if (r) r.abort(); } catch (e) { /* rien */ }
+    try { if (synth) synth.cancel(); } catch (e) { /* rien */ }
+    S.speaking = false;
+    const silence = S.lastErr === 'coupée aussitôt' && S.tours > 0;
+    setState(S.lastErr && !silence ? 'error' : 'stop', silence ? 'Arrêté (silence)' : S.lastErr ? 'Arrêté sur une erreur' : 'Arrêté'); log('— arrêt'); paint();
+  }
+  function report() {
+    return ['Essai voix Jarvis', new Date().toISOString(), $('env').textContent, 'Mode : ' + S.mode, 'Tours complets : ' + S.tours, 'Écoutes relancées seules : ' + S.autoOk + ' sur ' + S.autoStarts, 'Erreurs : ' + JSON.stringify(S.errs), 'Verdict : ' + $('verdict').textContent, '', 'Journal :'].concat(Array.from($('log').children).map((li) => li.textContent)).join('\n');
+  }
+  $('go').addEventListener('click', start);
+  $('stop').addEventListener('click', stop);
+  $('m-phrase').addEventListener('click', () => { if (!S.run) { S.mode = 'phrase'; paint(); } });
+  $('m-continu').addEventListener('click', () => { if (!S.run) { S.mode = 'continu'; paint(); } });
+  $('copy').addEventListener('click', async () => { const t = report(); try { await navigator.clipboard.writeText(t); $('copy').textContent = 'Rapport copié'; } catch (e) { const ta = document.createElement('textarea'); ta.value = t; document.body.append(ta); ta.select(); try { document.execCommand('copy'); $('copy').textContent = 'Rapport copié'; } catch (e2) { $('copy').textContent = 'Copie impossible'; } ta.remove(); } setTimeout(() => { $('copy').textContent = 'Copier le rapport'; }, 2500); });
+  document.addEventListener('visibilitychange', () => { if (document.hidden && S.run) { log('page masquée : arrêt'); stop(); } });
+  if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
+  paint();
+  window.__essai = S;
+})();
+</script>
+</body>
+</html>
