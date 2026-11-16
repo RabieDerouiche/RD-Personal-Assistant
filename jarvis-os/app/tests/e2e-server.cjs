@@ -21,6 +21,11 @@ const ok = (n, c, i) => { out.push((c ? 'OK   ' : 'ÉCHEC') + ' ' + n + (i ? ' :
     await p.click('.tabs button:nth-child(5)'); await p.click('.tile:has-text("Réglages")'); await p.waitForTimeout(150);
     await p.fill('input[aria-label="Adresse du serveur"]', BASE); await p.fill('input[aria-label="Code d\'appairage"]', 'ZZZZ-ZZZZ'); await p.click('.card .btn.main'); await p.waitForTimeout(500);
     ok('mauvais code refusé à l\'écran', /Code faux/.test(await p.textContent('.card .note')));
+    ok('saisie gardée après un échec', (await p.inputValue('input[aria-label="Adresse du serveur"]')) === BASE && (await p.inputValue('input[aria-label="Code d\'appairage"]')) === 'ZZZZ-ZZZZ');
+    await p.fill('input[aria-label="Adresse du serveur"]', '203.0.113.7'); await p.fill('input[aria-label="Code d\'appairage"]', 'ABCD-EFGH'); await p.click('.card .btn.main'); await p.waitForTimeout(1500);
+    const msg = await p.textContent('.card .note');
+    ok('adresse IP convertie et message clair', /https:\/\/203-0-113-7\.sslip\.io/.test(msg) && /Installation terminée/.test(msg), msg);
+    await p.fill('input[aria-label="Code d\'appairage"]', '');
     await p.fill('input[aria-label="Adresse du serveur"]', BASE); await p.fill('input[aria-label="Code d\'appairage"]', code); await p.click('.card .btn.main'); await p.waitForTimeout(800);
     const card = await p.textContent('.card');
     ok('iPhone relié, Claude connecté', /Relié · version/.test(card) && /connecté à ton abonnement/.test(card), card.slice(0, 160));

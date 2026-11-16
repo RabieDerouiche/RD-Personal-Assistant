@@ -15,7 +15,7 @@ const PHASE = 2;
 const VERSION = '0.5.0';
 type View = 'home' | 'command' | 'agents' | 'agent' | 'missions' | 'more' | 'memory' | 'automations' | 'intelligence' | 'settings';
 let view: View = 'home';
-let live = '', note = '', clearArm = 0, orbState: OrbState = 'idle', agentFilter = 'tous', agentQuery = '', agentSel: AgentId = 'claude', missionCol = 'a_approuver', draftNext = '', streaming = '', fresh = true, pairMsg = '';
+let live = '', note = '', clearArm = 0, orbState: OrbState = 'idle', agentFilter = 'tous', agentQuery = '', agentSel: AgentId = 'claude', missionCol = 'a_approuver', draftNext = '', streaming = '', fresh = true, pairMsg = '', pairUrl = '', pairCode = '';
 
 const SALLE = {copie: 'https://claude.ai/artifact/NMAqUak7A5JYsLsc12VyaZ', service: 'https://claude.ai/artifact/QwLf64Ggstzu4p3uznZrr8'};
 const app = document.getElementById('app')!;
@@ -304,17 +304,18 @@ function settings(): HTMLElement {
     h('option', {value: '', text: "Voix des réglages de l'iPhone (recommandé)"}), vs.map((v) => h('option', {value: v.voiceURI || v.name, text: v.name + ' · ' + v.lang}))) as HTMLSelectElement;
   sel.value = st.voiceURI;
   const seg = (k: 'listenMode' | 'route' | 'salle' | 'model', opts: [string, string][]) => h('div', {class: 'seg'}, opts.map(([v, l]) => h('button', {type: 'button', 'aria-pressed': String((st as any)[k] === v), onclick: () => { (st as any)[k] = v; store.save(); render(); }}, l)));
-  const url = h('input', {class: 'field', type: 'url', value: st.serverUrl, placeholder: 'Adresse : https://…sslip.io', autocapitalize: 'off', autocomplete: 'off', 'aria-label': 'Adresse du serveur'}) as HTMLInputElement;
-  const code = h('input', {class: 'field', type: 'text', placeholder: 'Code d\'appairage (ex. K7Q2-M9XD)', autocapitalize: 'characters', autocomplete: 'off', 'aria-label': 'Code d\'appairage'}) as HTMLInputElement;
+  const url = h('input', {class: 'field', type: 'url', value: pairUrl || st.serverUrl, placeholder: 'Adresse IP du serveur, ou https://…sslip.io', autocapitalize: 'off', autocomplete: 'off', 'aria-label': 'Adresse du serveur'}) as HTMLInputElement;
+  const code = h('input', {class: 'field', type: 'text', value: pairCode, placeholder: 'Code d\'appairage (ex. K7Q2-M9XD)', autocapitalize: 'characters', autocomplete: 'off', 'aria-label': 'Code d\'appairage'}) as HTMLInputElement;
+  url.addEventListener('input', () => { pairUrl = url.value; }); code.addEventListener('input', () => { pairCode = code.value; });
   const st3 = srv.lastStatus();
   const server = srv.linked()
     ? h('div', {class: 'card glass'}, h('p', {class: 'kpi-l', text: 'Serveur JARVIS'}), h('b', {class: 'srv-url', text: st.serverUrl}),
         h('p', {class: 'muted small', text: st3.ok ? 'Relié · version ' + st3.version + ' · Claude ' + (st3.claude?.loggedIn ? 'connecté à ton abonnement' : 'pas encore connecté : sur le serveur, « sudo -iu jarvis claude auth login »') : (st3.error || 'Vérification…')}),
         h('div', {class: 'acts'}, h('button', {type: 'button', class: 'btn', onclick: () => { srv.status().then(render); }}, 'Vérifier'), h('button', {type: 'button', class: 'btn ghost', onclick: () => { srv.unpair(); render(); }}, 'Délier cet iPhone')))
     : h('div', {class: 'card glass'}, h('p', {class: 'kpi-l', text: 'Relier ton serveur JARVIS'}),
-        h('p', {class: 'muted small', text: 'L\'adresse et le code s\'affichent sur le serveur quand tu t\'y connectes (guide dans docs/jarvis-os.md).'}), url, code,
+        h('p', {class: 'muted small', text: 'D\'abord installer le serveur (guide dans docs/jarvis-os.md). Ensuite : son adresse IP (mail d\'OVH) ou l\'adresse https://…sslip.io affichée par le serveur, et le code donné par « sudo cat /root/jarvis-code.txt ».'}), url, code,
         pairMsg ? h('p', {class: 'note', text: pairMsg}) : null,
-        h('button', {type: 'button', class: 'btn main', onclick: async () => { pairMsg = 'Connexion…'; render(); const e = await srv.pair(url.value, code.value); pairMsg = e || ''; if (!e) { await srv.status(); refreshModes(); } render(); }}, 'Relier'));
+        h('button', {type: 'button', class: 'btn main', onclick: async () => { pairUrl = url.value; pairCode = code.value; pairMsg = 'Connexion…'; render(); const e = await srv.pair(pairUrl, pairCode); pairMsg = e || ''; if (!e) { pairUrl = ''; pairCode = ''; await srv.status(); refreshModes(); } render(); }}, 'Relier'));
   return h('section', {class: 'page'}, back(), head('Réglages', 'Ta façon de travailler'),
     server,
     srv.linked() ? [h('label', {class: 'lbl', text: 'Claude répond'}), seg('model', [['rapide', 'Vite (Haiku)'], ['equilibre', 'Bien (Sonnet)'], ['profond', 'À fond (Opus)']])] : null,
