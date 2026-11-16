@@ -1,6 +1,27 @@
 <!doctype html><html><head><script>window.__SCEN = {};</script><script src="donnees-fictives.js"></script><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}
   /* ---------- JARVIS OS : navigation et écrans ajoutés ---------- */
   .fab-talk { display: none !important; }
+  /* barre à tes favoris (bas) et toutes les rubriques */
+  .fav-bar { position: fixed !important; left: 0 !important; right: 0 !important; bottom: 0 !important; top: auto !important; transform: none !important; width: auto !important; z-index: 50; display: block !important; padding: 0 8px calc(6px + env(safe-area-inset-bottom, 0px)) !important; background: rgba(5, 8, 16, .98) !important; -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); border: 0 !important; border-top: 1px solid var(--line) !important; border-radius: 0 !important; box-shadow: none !important; }
+  .fav-handle { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; border: 0; background: none; color: var(--dim); font: 500 10.5px var(--sans); padding: 5px 0 2px; }
+  .fav-handle .grip { width: 36px; height: 4px; border-radius: 2px; background: var(--line-2); }
+  .fav-row { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); align-items: end; }
+  .fav-bar .tab, .all-grid .tab { position: relative; display: flex !important; flex-direction: column !important; align-items: center; gap: 3px !important; min-height: 50px !important; padding: 4px 2px !important; border: 0 !important; border-radius: 12px !important; background: none !important; color: var(--muted) !important; font: 500 11px var(--sans) !important; letter-spacing: 0 !important; }
+  .fav-bar .tab[aria-current="page"] { color: #fff !important; background: rgba(255, 255, 255, .08) !important; }
+  .fav-bar .tab .badge, .all-grid .tab .badge { position: absolute !important; top: 2px; right: calc(50% - 22px); transform: none !important; }
+  .talk-slot { position: relative; height: 62px; display: grid; place-items: center; }
+  .talk-slot .jv-btn { position: relative !important; left: auto !important; bottom: auto !important; transform: none !important; width: 60px !important; height: 60px !important; margin: 0 !important; }
+  .all-sheet { position: fixed; inset: 0; z-index: 70; background: rgba(0, 0, 0, .45); display: flex; align-items: flex-end; }
+  .all-sheet[hidden] { display: none; }
+  .all-panel { width: 100%; padding: 14px 14px calc(14px + env(safe-area-inset-bottom, 0px)); border-radius: 22px 22px 0 0; background: var(--bg-2); border-top: 1px solid var(--line-2); display: flex; flex-direction: column; gap: 10px; }
+  .all-h { display: flex; justify-content: space-between; align-items: center; }
+  .all-h b { font: 600 17px var(--display); }
+  .all-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+  .all-grid .tab { min-height: 68px !important; background: var(--glass) !important; border: 1px solid var(--line) !important; color: var(--fg) !important; font-size: 12.5px !important; }
+  .fav-pick.is-fav { border-color: rgba(251, 191, 36, .5) !important; }
+  .fav-pick .star { position: absolute; top: 4px; right: 8px; color: var(--amber); font-size: 13px; }
+  .all-close { border: 1px solid var(--line-2); background: var(--glass-2); color: var(--fg); border-radius: 999px; min-height: 44px; font: 600 14px var(--sans); }
+  .dir { padding-bottom: calc(130px + env(safe-area-inset-bottom, 0px)) !important; }
   /* variante « grille » : les 10 rubriques en deux rangées fixes sous l'en-tête, sans défilement */
   html.nav-grille .top .tabs { display: grid !important; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; overflow: visible; padding: 6px 10px 8px !important; }
   html.nav-grille .top .tab { flex-direction: column !important; gap: 2px !important; min-height: 46px !important; padding: 4px 2px !important; border-radius: 12px !important; font: 500 10.5px var(--sans) !important; justify-content: center; }
@@ -815,8 +836,8 @@
     <div class="top-meta"><span id="today"></span><span class="clock" id="clock">--:--</span><span class="top-tools" id="top-tools"></span></div>
     <div class="status" id="status" aria-live="polite"></div>
   </div>
-  <nav class="tabs" id="tabs" aria-label="Rubriques"></nav>
 </header>
+<nav class="tabs fav-bar" id="tabs" aria-label="Rubriques"></nav>
 <main id="dir" class="dir">
   <h1 class="view-title" id="view-title">Vue d'ensemble</h1>
   <div id="view"></div>
@@ -2950,10 +2971,37 @@ void main(){
 
   function boot() {
     const nav = $('tabs');
-    /* JARVIS OS : toutes les rubriques en pastilles dans le bandeau du haut, à un appui ; la voix = le grand bouton orbe du bas */
-    const navBtn = (id, label, ic) => h('button', {type: 'button', class: 'tab', 'data-tab': id, onclick: () => { go(id); }}, h('span', {class: 'ic', html: icon(ic, 16)}), h('span', {text: label}), id === 'demandes' ? h('span', {class: 'badge', hidden: true}) : null);
-    nav.append(navBtn('accueil', 'Accueil', 'pulse'), navBtn('demandes', 'Demandes', 'chat'), navBtn('agenda', 'Agenda', 'cal'), navBtn('achats', 'Achats', 'tag'), navBtn('sorties', 'Sorties', 'map'), navBtn('voyages', 'Voyages', 'plane'),
-      navBtn('papiers', 'Papiers', 'doc'), navBtn('automatisations', 'Automatisations', 'clock'), navBtn('equipe', 'Équipe', 'pulse'), navBtn('suivi', 'Suivi', 'folder'));
+    /* JARVIS OS : barre à tes 4 favoris, l'orbe au centre ; la poignée (ou un geste vers le haut) montre toutes les rubriques */
+    const ALL = [['accueil', 'Accueil', 'pulse'], ['demandes', 'Demandes', 'chat'], ['agenda', 'Agenda', 'cal'], ['achats', 'Achats', 'tag'], ['sorties', 'Sorties', 'map'], ['voyages', 'Voyages', 'plane'], ['papiers', 'Papiers', 'doc'], ['automatisations', 'Automatisations', 'clock'], ['equipe', 'Équipe', 'pulse'], ['suivi', 'Suivi', 'folder']];
+    let FAV = null; try { FAV = JSON.parse(localStorage.getItem('jarvis.fav')); } catch (e) { /* rien */ }
+    if (!Array.isArray(FAV) || FAV.length !== 4 || FAV.some((f) => !ALL.find((a) => a[0] === f))) FAV = ['demandes', 'achats', 'agenda', 'sorties'];
+    const sheet = h('div', {class: 'all-sheet', hidden: true, role: 'dialog', 'aria-label': 'Toutes les rubriques'});
+    let editFav = false;
+    const navBtn = ([id, label, ic], extra) => h('button', {type: 'button', class: 'tab', 'data-tab': id, onclick: () => { closeAll(); go(id); }, ...(extra || {})}, h('span', {class: 'ic', html: icon(ic, 20)}), h('span', {class: 'lbl', text: label}), id === 'demandes' ? h('span', {class: 'badge', hidden: true}) : null);
+    const openAll = () => { drawSheet(); sheet.hidden = false; document.body.classList.add('all-open'); };
+    function closeAll() { sheet.hidden = true; editFav = false; document.body.classList.remove('all-open'); }
+    function drawSheet() {
+      sheet.replaceChildren(h('div', {class: 'all-panel'},
+        h('div', {class: 'all-h'}, h('b', {text: editFav ? 'Choisis 4 favoris' : 'Toutes les rubriques'}), h('button', {type: 'button', class: 'link', onclick: () => { editFav = !editFav; drawSheet(); }}, editFav ? 'Terminé' : 'Modifier mes favoris')),
+        h('div', {class: 'all-grid'}, ALL.map((a) => editFav
+          ? h('button', {type: 'button', class: 'tab fav-pick' + (FAV.includes(a[0]) ? ' is-fav' : ''), onclick: () => { if (FAV.includes(a[0])) FAV = FAV.filter((f) => f !== a[0]); else if (FAV.length < 4) FAV.push(a[0]); if (FAV.length === 4) { try { localStorage.setItem('jarvis.fav', JSON.stringify(FAV)); } catch (e) { /* rien */ } drawBar(); } drawSheet(); }}, h('span', {class: 'ic', html: icon(a[2], 20)}), h('span', {class: 'lbl', text: a[1]}), h('span', {class: 'star', text: FAV.includes(a[0]) ? '★' : '☆'}))
+          : navBtn(a))),
+        h('button', {type: 'button', class: 'all-close', onclick: closeAll}, 'Fermer')));
+    }
+    sheet.addEventListener('click', (e) => { if (e.target === sheet) closeAll(); });
+    function drawBar() {
+      const fav = FAV.map((f) => ALL.find((a) => a[0] === f));
+      nav.replaceChildren(h('button', {type: 'button', class: 'fav-handle', 'aria-label': 'Toutes les rubriques', onclick: openAll}, h('span', {class: 'grip'}), h('span', {text: 'Tout'})),
+        h('div', {class: 'fav-row'}, navBtn(fav[0]), navBtn(fav[1]), h('div', {class: 'talk-slot'}), navBtn(fav[2]), navBtn(fav[3])));
+      if (window.JarvisVoice) try { window.JarvisVoice.mountButton(nav.querySelector('.talk-slot')); } catch (e) { /* rien */ }
+      try { renderView(true); } catch (e) { /* rien */ }
+    }
+    let y0 = null;
+    nav.addEventListener('touchstart', (e) => { y0 = e.touches[0].clientY; }, {passive: true});
+    nav.addEventListener('touchend', (e) => { if (y0 != null && y0 - e.changedTouches[0].clientY > 30) openAll(); y0 = null; }, {passive: true});
+    document.body.append(sheet);
+    drawBar();
+    const brand = document.querySelector('.brand b'); if (brand) { brand.style.cursor = 'pointer'; brand.addEventListener('click', () => go('accueil')); }
     $('sheet-back').addEventListener('click', () => closeSheet());
     $('nav-back').addEventListener('click', navBack);
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { if (!$('sheet').hidden) closeSheet(); else if (CHAT.open) closeChat(); else if (APP.id) closeApp(); } });
@@ -5389,5 +5437,5 @@ void main(){
 
 <script>/* comparaison des dispositions : ?nav=grille ou ?nav=dock */ (function () { var v = (location.search.match(/nav=(grille|dock)/) || [])[1]; if (!v) return; document.documentElement.classList.add('nav-' + v); if (v === 'dock') { var n = document.getElementById('tabs'); var d = document.createElement('nav'); d.className = 'dock-nav'; d.setAttribute('aria-label', 'Rubriques'); setTimeout(function () { Array.prototype.slice.call(n.children).forEach(function (b) { d.appendChild(b); }); document.body.appendChild(d); }, 0); } })();</script>
 <script src="jarvis-voix.js"></script>
-<script>/* JARVIS OS : le grand bouton orbe du bas ouvre la page vocale */ try { window.JarvisVoice.mountButton(document.body); } catch (e) { /* rien */ }</script>
+<script>/* JARVIS OS : l'orbe au centre de la barre ouvre la page vocale */ try { var slot = document.querySelector('.talk-slot'); if (slot && !slot.querySelector('.jv-btn')) window.JarvisVoice.mountButton(slot); } catch (e) { /* rien */ }</script>
 </body></html>
