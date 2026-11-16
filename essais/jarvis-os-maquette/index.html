@@ -1,4 +1,6 @@
-<!doctype html><html><head><meta charset="utf-8"><script>window.__SCEN = {};</script><script src="donnees-fictives.js"></script><script>/* JARVIS OS : thème « hologramme » par défaut (choisi le 16/11/2026) ; ?theme=actuel ou « Thème » dans Toutes les rubriques pour l'ancien, gardé dans le téléphone */
+<!doctype html><html><head><meta charset="utf-8"><script>window.__SCEN = {};
+/* JARVIS OS : sur le serveur du propriétaire, ses vraies données (jarvis-serveur.js) ; sur GitHub ou en local, les exemples. ?maquette ou ?serveur pour forcer. */
+(function () { var q = location.search, srv = /[?&]serveur\b/.test(q) || (location.protocol === 'https:' && !/github\.io$/i.test(location.hostname) && !/[?&]maquette\b/.test(q)); window.__JARVIS_MODE = srv ? 'serveur' : 'maquette'; document.write('<script src="' + (srv ? 'jarvis-serveur.js' : 'donnees-fictives.js') + '"><\/script>'); })();</script><script>/* JARVIS OS : thème « hologramme » par défaut (choisi le 16/11/2026) ; ?theme=actuel ou « Thème » dans Toutes les rubriques pour l'ancien, gardé dans le téléphone */
 (function () { var q = (location.search.match(/[?&]theme=(\w+)/) || [])[1], t = null; try { if (q) localStorage.setItem('jarvis.theme', q); t = localStorage.getItem('jarvis.theme'); } catch (e) { t = q; }
   if (t !== 'actuel') { document.documentElement.classList.add('theme-holo'); var l = document.createElement('link'); l.rel = 'stylesheet'; l.href = 'https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700&family=Oxanium:wght@500;600;700&family=Exo+2:wght@400;500;600;700&display=swap'; document.head.appendChild(l); } })();</script><script src="jarvis-voix.js"></script><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}
   /* ---------- JARVIS OS : navigation et écrans ajoutés ---------- */
@@ -249,6 +251,18 @@
   html.theme-holo .hm-row, html.theme-holo .soon, html.theme-holo .pause-pill { background: linear-gradient(180deg, rgba(10, 30, 72, .5), rgba(4, 12, 34, .78)); border-color: rgba(56, 189, 248, .22); box-shadow: inset 0 1px 0 rgba(150, 220, 255, .08); }
   html.theme-holo .hm-ic, html.theme-holo .hm-day { border-color: rgba(56, 189, 248, .3); box-shadow: 0 0 10px rgba(56, 189, 248, .12); }
   html.theme-holo .hm-h h2 { color: #7dd3fc; }
+
+  /* JARVIS OS : Réglages */
+  .set-wrap { display: flex; flex-direction: column; gap: 12px; }
+  .set-card { display: flex; flex-direction: column; gap: 10px; padding: 14px; border-radius: 20px; }
+  .set-card > b { font: 600 16px var(--display); }
+  .set-msg { margin: 0; font-size: 13.5px; color: var(--green); } .set-msg.is-bad { color: var(--danger); } .set-msg:empty { display: none; }
+  .set-small { font-size: 12px; }
+  .set-guide summary { cursor: pointer; color: var(--accent); font-weight: 600; min-height: 32px; display: flex; align-items: center; }
+  .set-guide ol { margin: 8px 0; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; font-size: 13.5px; line-height: 1.45; }
+  .set-guide a { color: var(--accent); white-space: nowrap; }
+  .set-uri { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 10px; border-radius: 12px; border: 1px dashed var(--line-2); }
+  .set-uri small { width: 100%; color: var(--muted); } .set-uri code { flex: 1; min-width: 0; overflow-wrap: anywhere; font: 12.5px var(--mono); }
 </style></head><body>
 <title>Jarvis v17 copie</title>
 <meta name="claude:viewport-fit-sides" content="cover">
@@ -3161,7 +3175,7 @@ void main(){
   function boot() {
     const nav = $('tabs');
     /* JARVIS OS : barre à tes 4 favoris, l'orbe au centre ; la poignée (ou un geste vers le haut) montre toutes les rubriques */
-    const ALL = [['accueil', 'Accueil', 'pulse'], ['demandes', 'Demandes', 'chat'], ['agenda', 'Agenda', 'cal'], ['achats', 'Achats', 'tag'], ['sorties', 'Sorties', 'map'], ['voyages', 'Voyages', 'plane'], ['papiers', 'Papiers', 'doc'], ['automatisations', 'Automatisations', 'clock'], ['equipe', 'Équipe', 'pulse'], ['suivi', 'Suivi', 'folder']];
+    const ALL = [['reglages', 'Réglages', 'gear'], ['accueil', 'Accueil', 'pulse'], ['demandes', 'Demandes', 'chat'], ['agenda', 'Agenda', 'cal'], ['achats', 'Achats', 'tag'], ['sorties', 'Sorties', 'map'], ['voyages', 'Voyages', 'plane'], ['papiers', 'Papiers', 'doc'], ['automatisations', 'Automatisations', 'clock'], ['equipe', 'Équipe', 'pulse'], ['suivi', 'Suivi', 'folder']];
     let FAV = null; try { FAV = JSON.parse(localStorage.getItem('jarvis.fav')); } catch (e) { /* rien */ }
     if (!Array.isArray(FAV) || FAV.length !== 4 || FAV.some((f) => !ALL.find((a) => a[0] === f))) FAV = ['demandes', 'achats', 'agenda', 'sorties'];
     const sheet = h('div', {class: 'all-sheet', hidden: true, role: 'dialog', 'aria-label': 'Toutes les rubriques'});
@@ -5810,6 +5824,66 @@ void main(){
   VIEWS.demandes = (el) => { VDM_OS(el); const src = h('div'); ACC_ORIG(src); ['Réponses reçues', 'Arrivés depuis'].forEach((t) => { const p2 = hpanel(src, t); if (p2) el.append(p2); }); };
   const VEQ_OS = VIEWS.equipe;
   VIEWS.equipe = (el) => { VEQ_OS(el); if (AGENT) return; const src = h('div'); ACC_ORIG(src); ['Journal'].forEach((t) => { const p2 = hpanel(src, t); if (p2) el.append(p2); }); const st = src.querySelector('.stats'); if (st) el.append(st); };
+
+  /* ---------- JARVIS OS : Réglages. Relier cet iPhone au serveur, créer et relier l'accès Google, tester les données ---------- */
+  ICONS.gear = '<circle cx="12" cy="12" r="3"/><path d="M12 2.5v2.2M12 19.3v2.2M4.6 4.6l1.6 1.6M17.8 17.8l1.6 1.6M2.5 12h2.2M19.3 12h2.2M4.6 19.4l1.6-1.6M17.8 6.2l1.6-1.6"/>';
+  TITLES.reglages = 'Réglages';
+  const GSTEPS = [
+    ["Sur l'iPhone, ouvre console.cloud.google.com avec le compte Google de Pilotage et crée un projet (nom : JARVIS).", 'https://console.cloud.google.com/projectcreate'],
+    ['Active quatre API (API et services, Bibliothèque) : Google Sheets API, Google Calendar API, Gmail API, Google Drive API.', 'https://console.cloud.google.com/apis/library'],
+    ["Ouvre « Google Auth Platform » (ancien nom : écran de consentement OAuth). Image de marque : nom JARVIS, ton adresse. Audience : type « Externe », puis « Publier l'application » (en production, sinon l'accès expire au bout de 7 jours).", 'https://console.cloud.google.com/auth/overview'],
+    ['Clients : « Créer un client », type « Application Web », nom JARVIS. Dans « URI de redirection autorisés », colle l’adresse ci-dessous, puis Créer.', 'https://console.cloud.google.com/auth/clients'],
+    ["Copie l'ID client et le code secret du client, colle-les ici, Enregistrer, puis « Connecter Google ». Google dira « application non validée » : c'est normal, c'est la tienne (Paramètres avancés, Accéder à JARVIS), et coche tous les accès.", '']];
+  VIEWS.reglages = (el) => {
+    const JS = window.JarvisServeur;
+    if (!JS) {
+      el.append(h('section', {class: 'card set-card'}, h('b', {text: 'Maquette'}), h('p', {class: 'muted', text: "Ici, la page montre des données d'exemple. Sur ton serveur (adresse de ton serveur suivie de /os/), cet écran relie l'iPhone, crée l'accès Google et affiche tes vraies données."})));
+      return;
+    }
+    const box = h('div', {class: 'set-wrap'}, h('p', {class: 'muted', text: 'Lecture des réglages…'}));
+    el.append(box);
+    const msg = (t, bad) => h('p', {class: 'set-msg' + (bad ? ' is-bad' : ''), text: t});
+    const draw = async (note) => {
+      const parts = [];
+      if (note) parts.push(note);
+      /* 1. cet iPhone et le serveur */
+      if (!JS.linked()) {
+        const code = h('input', {class: 'inp', type: 'text', placeholder: 'Code affiché par le serveur, ex. AB12-CD34', autocomplete: 'off', autocapitalize: 'characters'});
+        parts.push(h('section', {class: 'card set-card'}, h('b', {text: 'Relier cet iPhone au serveur'}), h('p', {class: 'muted', text: "Sur le serveur, lance « sudo -u jarvis node /opt/rd/jarvis-os/server/server.mjs pair » : il affiche un code valable 30 minutes. Si l'app JARVIS de ce serveur est déjà reliée sur ce téléphone, rien à faire."}), code,
+          h('button', {type: 'button', class: 'btn main', onclick: async () => { const r = await JS.pair(code.value); if (r.ok) location.reload(); else draw(msg(r.error, true)); }}, 'Relier')));
+        box.replaceChildren(...parts); return;
+      }
+      parts.push(h('section', {class: 'card set-card'}, h('b', {text: 'Serveur JARVIS'}), h('p', {class: 'muted', text: 'Cet iPhone est relié à ' + JS.base + '.'}),
+        h('button', {type: 'button', class: 'btn sm ghost danger', onclick: () => confirmSheet({bot: 'claude', title: 'Délier cet iPhone ?', ok: 'Oui, délier', cost: 'free', say: 'Il faudra un nouveau code pour le relier.', run: () => { JS.unpair(); location.reload(); }})}, 'Délier cet iPhone')));
+      /* 2. l'accès Google */
+      const g = await JS.google();
+      if (!g) { parts.push(msg('Serveur injoignable ou version trop ancienne : mets-le à jour depuis l’app JARVIS (Réglages, Mettre à jour).', true)); box.replaceChildren(...parts); return; }
+      const gcard = h('section', {class: 'card set-card'}, h('b', {text: 'Accès Google direct'}));
+      if (g.linked) {
+        gcard.append(h('p', {class: 'muted', text: 'Relié' + (g.account ? ' au compte ' + g.account : '') + (g.linkedAt ? ' depuis le ' + fmt(new Date(g.linkedAt), {day: 'numeric', month: 'long'}) : '') + '. Pilotage, l’agenda et Gmail sont lus et écrits directement, sans Claude.'}));
+        const out = h('p', {class: 'set-msg'});
+        gcard.append(h('div', {class: 'row-actions'},
+          h('button', {type: 'button', class: 'btn main', onclick: async () => { out.textContent = 'Lecture de Pilotage…'; try { const m = await window.claude.use('mcp'); const r = lvPayload(await m.callTool(LV.SHEETS, 'get_values', {spreadsheetId: LV.SHEET, range: 'Canal!A1:H3000'})); const n = ((r && r.values) || []).length; out.textContent = 'Pilotage lu : ' + Math.max(0, n - 1) + ' lignes dans le Canal.'; out.classList.remove('is-bad'); } catch (e) { out.textContent = 'Échec : ' + ((e && e.message) || e); out.classList.add('is-bad'); } }}, 'Tester mes données'),
+          h('button', {type: 'button', class: 'btn', onclick: async () => { const r = await JS.googleLink(); if (r && r.url) location.href = r.url; else draw(msg((r && r.error) || 'Lien impossible.', true)); }}, 'Reconnecter'),
+          h('button', {type: 'button', class: 'btn ghost danger', onclick: () => confirmSheet({bot: 'claude', title: 'Déconnecter Google ?', ok: 'Oui, déconnecter', cost: 'free', say: "JARVIS ne lira plus tes données jusqu'à la prochaine connexion.", run: async () => { await JS.googleUnlink(); draw(); }})}, 'Déconnecter')), out);
+        if (g.missing && g.missing.length) gcard.append(msg('Des accès n’ont pas été cochés : « Reconnecter » et coche tout.', true));
+      } else {
+        if (g.configured) gcard.append(h('p', {class: 'muted', text: 'Identifiant enregistré (' + g.clientId + '). Il reste à te connecter avec ton compte Google.'}),
+          h('button', {type: 'button', class: 'btn main', onclick: async () => { const r = await JS.googleLink(); if (r && r.url) location.href = r.url; else draw(msg((r && r.error) || 'Lien impossible.', true)); }}, 'Connecter Google'));
+        const id = h('input', {class: 'inp', type: 'text', placeholder: 'ID client : …apps.googleusercontent.com', autocomplete: 'off', autocapitalize: 'off', spellcheck: 'false'});
+        const sec = h('input', {class: 'inp', type: 'password', placeholder: 'Code secret du client', autocomplete: 'off'});
+        const copy = h('button', {type: 'button', class: 'btn sm', onclick: async () => { try { await navigator.clipboard.writeText(g.redirect); copy.textContent = 'Copiée'; } catch (e) { copy.textContent = 'Sélectionne-la'; } }}, 'Copier');
+        gcard.append(h('details', {class: 'set-guide', open: !g.configured}, h('summary', {text: "Créer l'accès Google (une seule fois, 10 minutes, gratuit)"}),
+          h('ol', {}, GSTEPS.map(([t, u]) => h('li', {}, h('span', {text: t}), u ? h('a', {href: u, target: '_blank', rel: 'noopener', text: ' Ouvrir ›'}) : null))),
+          h('div', {class: 'set-uri'}, h('small', {text: 'Adresse de redirection à coller dans Google :'}), h('code', {text: g.redirect}), copy)),
+          id, sec, h('button', {type: 'button', class: 'btn' + (g.configured ? '' : ' main'), onclick: async () => { const r = await JS.googleConfig(id.value, sec.value); sec.value = ''; draw(r && r.ok ? msg('Enregistré sur ton serveur. Touche « Connecter Google ».') : msg((r && r.error) || 'Refusé.', true)); }}, g.configured ? 'Remplacer l’identifiant' : 'Enregistrer'),
+          h('p', {class: 'muted set-small', text: "L'identifiant et le secret restent sur ton serveur (fichier protégé) : ni Claude ni l'app ne les relisent."}));
+      }
+      parts.push(gcard);
+      box.replaceChildren(...parts);
+    };
+    draw(/[?&#]google=ok/.test(location.href) ? msg('Google est relié.') : null);
+  };
 
   boot();
 })();
