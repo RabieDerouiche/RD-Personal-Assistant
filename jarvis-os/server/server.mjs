@@ -10,8 +10,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
+import {createGoogle} from './google.mjs';
 
-const VERSION = '0.9.0';
+const VERSION = '0.10.0';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PORT = +(process.env.PORT || 8787);
 const HOST = process.env.HOST || '127.0.0.1';
@@ -19,6 +20,7 @@ const DATA = process.env.JARVIS_DATA || path.join(os.homedir(), '.jarvis');
 const CLAUDE = process.env.CLAUDE_BIN || 'claude';
 const WEB = process.env.JARVIS_WEB || path.join(HERE, '..', 'web');
 const REPO = process.env.JARVIS_REPO || path.join(HERE, '..', '..');
+const OS_DIR = process.env.JARVIS_OS_DIR || path.join(REPO, 'essais', 'jarvis-os-maquette');   /* la nouvelle app (page Jarvis refondue), servie à /os/ en essai */
 const ORIGINS = (process.env.JARVIS_ORIGINS || 'https://rabiederouiche.github.io').split(',').map((s) => s.trim()).filter(Boolean);
 const AGENTS = ['claude', 'jarvis', 'iris', 'chronos', 'kairos', 'ulysse', 'athena', 'argus'];
 const BOT_NAME = {jarvis: 'Iris', iris: 'Iris', chronos: 'Chronos', kairos: 'Kairos', ulysse: 'Ulysse', athena: 'Athéna', argus: 'Argus'};   /* « Jarvis » (Grok) passe par Iris, point d'entrée */
@@ -42,6 +44,16 @@ function save() {
   S.msgs = S.msgs.slice(-600); S.missions = S.missions.slice(-400);
   const tmp = FILE + '.tmp'; fs.writeFileSync(tmp, JSON.stringify(S), {mode: 0o600}); fs.renameSync(tmp, FILE);
 }
+
+/* ---------- accès Google direct (Pilotage, agenda, Gmail) : voir google.mjs ---------- */
+const GG = createGoogle({S, save});
+const publicBase = (req) => (req.headers['x-forwarded-proto'] || (req.socket.encrypted ? 'https' : 'http')).split(',')[0].trim() + '://' + req.headers.host;
+const googleRedirect = (req) => publicBase(req) + '/api/google/callback';
+const escHtml = (t) => String(t).replace(/[&<>"]/g, (c) => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
+const googlePage = (r) => '<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>JARVIS · Google</title>' +
+  '<body style="margin:0;min-height:100vh;display:grid;place-items:center;background:#02040e;color:#e6f2ff;font:16px/1.5 system-ui,sans-serif;text-align:center;padding:24px">' +
+  '<div><h1 style="font-size:22px">' + (r.ok ? 'Google est relié à JARVIS' : 'Google n’est pas relié') + '</h1><p>' + escHtml(r.ok ? (r.account ? 'Compte : ' + r.account + '. ' : '') + (r.missing && r.missing.length ? 'Droits manquants : ' + r.missing.length + ' (refais « Connecter Google » en cochant tout). ' : '') + 'Tu peux revenir dans JARVIS.' : r.error) + '</p>' +
+  '<p><a href="/" style="color:#67e8f9">Revenir dans JARVIS</a></p></div>' + (r.ok ? '<script>setTimeout(function(){location.replace("/")},2500)</script>' : '');
 
 /* ---------- appairage : un code à usage unique, affiché sur le serveur ---------- */
 function newPairing() {
@@ -427,9 +439,33 @@ const server = http.createServer(async (req, res) => {
   try {
     if (p === '/api/health') return json(res, 200, {ok: true, version: VERSION, paired: S.tokens.length > 0});
     if (p === '/api/pair' && req.method === 'POST') { const b = await readBody(req); const r = pair(b.code, b.device); return json(res, r.status, r.body); }
+    /* retour de Google après « Connecter Google » : protégé par l'état à usage unique, pas par le jeton de l'appareil */
+    if (p === '/api/google/callback') { const r = await GG.callback(url.searchParams); res.writeHead(r.ok ? 200 : 400, {'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'referrer-policy': 'no-referrer'}); res.end(googlePage(r)); return; }
     if (p.startsWith('/api/')) {
       if (!authed(req)) return json(res, 401, {error: 'Appareil non relié.'});
-      if (p === '/api/status') { const cs = await claudeStatus(); if (cs.loggedIn && (!MCP.at || now() - MCP.at > 600000)) await mcpList(); return json(res, 200, {version: VERSION, commit, claude: cs, connectors: connSummary(), grokPauseUntil: S.config.grokPauseUntil, usage: S.usage, session: !!S.session, timing: S.lastTiming || null, tts: ttsReady(), voiceInstall: VOICE_INSTALL.state}); }
+      if (p === '/api/google') return json(res, 200, GG.status(googleRedirect(req)));
+      if (p === '/api/google/config' && req.method === 'POST') { const r = GG.configure(await readBody(req)); return json(res, r.ok ? 200 : 400, {...r, google: GG.status(googleRedirect(req))}); }
+      if (p === '/api/google/link' && req.method === 'POST') { const r = GG.link(googleRedirect(req)); return json(res, r.ok ? 200 : 400, r); }
+      if (p === '/api/google/unlink' && req.method === 'POST') return json(res, 200, await GG.unlink());
+      /* Claude pour la page (discussion, aide à la décision) : un appel ponctuel, sans aucun outil, hors de la conversation vocale */
+      if (p === '/api/sample' && req.method === 'POST') {
+        const b = await readBody(req), msgs = Array.isArray(b.input) ? b.input : [{role: 'user', content: String(b.input || '')}];
+        const txt = (c) => typeof c === 'string' ? c : Array.isArray(c) ? c.map((x) => (x && x.text) || '').join('\n') : JSON.stringify(c);
+        const prompt = msgs.length === 1 ? txt(msgs[0].content) : msgs.map((m) => (m.role === 'assistant' ? 'Toi (réponse précédente) : ' : 'Lui : ') + txt(m.content)).join('\n\n');
+        const model = {quick: MODELS.rapide, default: MODELS.equilibre, deep: MODELS.profond, smart: MODELS.profond}[b.tier] || MODELS.equilibre;
+        const box = path.join(DATA, 'sample'); fs.mkdirSync(box, {recursive: true});
+        const r = await serial(() => runClaude({prompt: prompt.slice(0, 60000), system: String(b.system || "Tu réponds au propriétaire dans sa page Jarvis (JARVIS OS), en français, en le tutoyant. Réponds exactement au format demandé.").slice(0, 8000), model, cwd: box, timeoutMs: 120000, effort: 'low', settings: guardSettings('chat'),
+          tools: {allow: [], deny: ['Bash', 'Read', 'Edit', 'Write', 'Glob', 'Grep', 'NotebookEdit', 'WebFetch', 'WebSearch', 'Task']}}));
+        S.usage.samples = (S.usage.samples || 0) + 1; save();
+        return json(res, r.ok ? 200 : 502, r.ok ? {text: r.text} : {error: r.error});
+      }
+      /* les outils de la page Jarvis, traduits en appels directs aux API Google */
+      if (p === '/api/tool' && req.method === 'POST') {
+        const b = await readBody(req);
+        try { return json(res, 200, {payload: await GG.tool(String(b.server || ''), String(b.tool || ''), b.input || {})}); }
+        catch (e) { return json(res, e.code === 'server_not_connected' ? 409 : e.code === 'not_in_manifest' ? 404 : 502, {error: {code: e.code || 'tool_error', message: e.message, status: e.status || 0}}); }
+      }
+      if (p === '/api/status') { const cs = await claudeStatus(); if (cs.loggedIn && (!MCP.at || now() - MCP.at > 600000)) await mcpList(); return json(res, 200, {version: VERSION, commit, claude: cs, connectors: connSummary(), google: (({configured, linked, account}) => ({configured, linked, account}))(GG.status('')), grokPauseUntil: S.config.grokPauseUntil, usage: S.usage, session: !!S.session, timing: S.lastTiming || null, tts: ttsReady(), voiceInstall: VOICE_INSTALL.state}); }
       if (p === '/api/update' && req.method === 'POST') return json(res, 200, await update());
       if (p === '/api/snap') { refreshStale(); return json(res, 200, {modules: snapView()}); }
       if (p === '/api/snap/refresh' && req.method === 'POST') { const b = await readBody(req); for (const n of (Array.isArray(b.modules) ? b.modules : Object.keys(MODULES))) refreshModule(n); return json(res, 200, {modules: snapView()}); }
@@ -481,9 +517,11 @@ const server = http.createServer(async (req, res) => {
       if (p === '/api/memory' && req.method === 'DELETE') { S.msgs = []; S.missions = []; S.session = null; closeSession(); save(); return json(res, 200, {ok: true}); }
       return json(res, 404, {error: 'Inconnu.'});
     }
-    /* l'app elle-même, servie aussi par le serveur (même adresse) */
-    let f = path.normalize(path.join(WEB, decodeURIComponent(p)));
-    if (!f.startsWith(path.normalize(WEB))) return json(res, 403, {error: 'Interdit.'});
+    /* l'app elle-même, servie aussi par le serveur (même adresse) ; la nouvelle app à /os/ */
+    if (p === '/os') { res.writeHead(302, {location: '/os/'}); res.end(); return; }
+    const root = p.startsWith('/os/') ? OS_DIR : WEB;
+    let f = path.normalize(path.join(root, decodeURIComponent(p.startsWith('/os/') ? p.slice(3) : p)));
+    if (!f.startsWith(path.normalize(root))) return json(res, 403, {error: 'Interdit.'});
     if (p.endsWith('/')) f = path.join(f, 'index.html');
     fs.readFile(f, (e, d) => { if (e) { res.writeHead(404); res.end(); return; } res.writeHead(200, {'content-type': TYPES[path.extname(f)] || 'application/octet-stream'}); res.end(d); });
   } catch (e) { if (!res.headersSent) json(res, 500, {error: 'Erreur du serveur.'}); else res.end(); }
