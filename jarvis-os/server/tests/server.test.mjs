@@ -4,7 +4,7 @@ import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path'
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const DATA = fs.mkdtempSync(path.join(os.tmpdir(), 'jarvis-'));
 const PORT = 18000 + Math.floor(Math.random() * 1000), BASE = 'http://127.0.0.1:' + PORT;
-const env = {...process.env, PORT: String(PORT), JARVIS_DATA: DATA, CLAUDE_BIN: path.join(HERE, 'fake-claude.mjs'), ANTHROPIC_API_KEY: 'sk-ant-faux-pour-le-test', ANTHROPIC_BASE_URL: 'https://exemple.invalid', JARVIS_ORIGINS: 'https://rabiederouiche.github.io'};
+const env = {...process.env, PORT: String(PORT), JARVIS_DATA: DATA, CLAUDE_BIN: path.join(HERE, 'fake-claude.mjs'), ANTHROPIC_API_KEY: 'sk-ant-faux-pour-le-test', ANTHROPIC_BASE_URL: 'https://exemple.invalid', JARVIS_ORIGINS: 'https://rabiederouiche.github.io', JARVIS_REPO: os.tmpdir()};
 const results = []; let fails = 0;
 const ok = (name, cond, info) => { results.push((cond ? 'OK   ' : 'ÉCHEC') + ' ' + name + (info ? ' :: ' + info : '')); if (!cond) fails++; };
 const code = execFileSync(process.execPath, [path.join(HERE, '..', 'server.mjs'), 'pair'], {env}).toString().match(/: ([A-Z0-9]{4}-[A-Z0-9]{4})/)[1];
@@ -16,11 +16,13 @@ const sse = async (body, tok) => { const r = await fetch(BASE + '/api/chat', {me
 try {
   let r = await call('/api/health'); ok('santé', r.status === 200 && r.body.paired === false, JSON.stringify(r.body));
   r = await call('/api/state'); ok('sans appairage : refusé', r.status === 401);
+  r = await call('/api/update', {method: 'POST'}); ok('mise à jour : refusée sans appairage', r.status === 401);
   r = await call('/api/pair', {method: 'POST', body: JSON.stringify({code: 'AAAA-BBBB'})}); ok('mauvais code : refusé', r.status === 401, r.body.error);
   r = await call('/api/pair', {method: 'POST', body: JSON.stringify({code: code.toLowerCase().replace('-', ' '), device: 'iPhone test'})}); const tok = r.body && r.body.token;
   ok('bon code (minuscules, espace) : jeton', r.status === 200 && tok && tok.length > 30);
   r = await call('/api/pair', {method: 'POST', body: JSON.stringify({code})}); ok('code à usage unique', r.status === 401);
   const A = {authorization: 'Bearer ' + tok};
+  r = await call('/api/update', {method: 'POST', headers: A}); ok('mise à jour : échec propre hors dépôt git', r.status === 200 && r.body.ok === false && /impossible/.test(r.body.message), r.body.message);
   r = await call('/api/status', {headers: A}); ok('état de Claude Code', r.status === 200 && r.body.claude.loggedIn === true, JSON.stringify(r.body.claude));
   let evs = await sse({text: 'Bonjour JARVIS', model: 'rapide'}, tok);
   const done = evs.find((e) => e.ev === 'done');
