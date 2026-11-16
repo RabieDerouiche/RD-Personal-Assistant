@@ -15,6 +15,7 @@ Règle (16/11/2026) : **aucune régression**. Chaque fonction de la page (copie 
 - [ ] Carte de briefing (chiffres clés), barre Claude, pastilles de statistiques
 - [ ] Ton équipe (organigramme), Ce qui demande ton attention (3 demandes), Les 7 prochains jours, Journal (6 derniers)
 - [ ] En-tête : heure, date, état de chaque bot (travaille, attend ta réponse), bandeau « Grok en pause »
+- Accueil JARVIS OS (« Fil du jour », 16/11/2026) : les panneaux de l'ancien accueil ont changé de place, sans perte : « Réponses reçues sur tes dossiers » et « Arrivés depuis le dernier tour d'Iris » → Demandes ; Journal et pastilles de chiffres → Équipe ; « En cours chez tes bots » et coût de la semaine → Suivi ; bloc « Grok en pause » → pastille qui l'ouvre ; point de Claude → discussion (globe) ; « Ce qui demande ton attention » et « Les 7 prochains jours » → « À faire maintenant », « Aujourd'hui », « Cette semaine ».
 
 **Demandes (« Ce qui attend ta réponse »)**
 - [ ] À décider maintenant, Tes oui à donner dans Grok (oui groupés : une phrase par bot), Brouillons prêts à partir (relus, envoyés tels quels, avertissement si déjà répondu), Arrivés depuis le dernier tour d'Iris (« Pour Iris » / « Rien à faire »), En cours chez tes bots (avec le contexte), Réponses reçues sur tes dossiers, Pour Claude (« Claude répond ici », « Confier à la tâche Claude »), Tes ordres, Échanges récents dans le Canal, Expirées, Reportées, Plus tard

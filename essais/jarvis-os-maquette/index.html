@@ -205,10 +205,7 @@
   .trk.is-amber b { color: var(--amber); }
 
 
-  /* JARVIS OS : trois accueils à l'essai */
-  .home-seg { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--dim); }
-  .home-seg button { border: 1px solid var(--line); background: transparent; color: var(--muted); border-radius: 999px; padding: 5px 11px; font: 500 12.5px var(--sans); }
-  .home-seg button[aria-pressed="true"] { color: var(--fg); border-color: var(--accent); background: var(--glass-2); }
+  /* JARVIS OS : l'accueil « Fil du jour » */
   .pause-pill { display: flex; align-items: center; gap: 8px; width: 100%; border: 1px solid var(--line); background: var(--glass); color: var(--fg); border-radius: 999px; padding: 7px 14px; font: 500 13px var(--sans); text-align: left; }
   .pause-pill i { flex: 0 0 8px; height: 8px; border-radius: 50%; background: var(--danger); box-shadow: 0 0 8px var(--danger); }
   .pause-pill span { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -231,33 +228,6 @@
   .hm-glb { flex: 0 0 56px; width: 56px; height: 56px; position: relative; display: block; }
   .hm-glb .orb-stage, .hm-glb .chr { position: absolute !important; inset: 0; width: 100% !important; height: 100% !important; }
   .hm-glb canvas { width: 100% !important; height: 100% !important; }
-  /* cockpit */
-  .ck { position: relative; width: min(100%, 380px); aspect-ratio: 1; margin: 0 auto; }
-  .ck-lines, .ck-lines svg { position: absolute; inset: 0; width: 100%; height: 100%; }
-  .ck-ring { fill: none; stroke: var(--line-2); stroke-width: .3; stroke-dasharray: 1 1.6; }
-  .ck-line { stroke: var(--line-2); stroke-width: .25; }
-  .ck-core { position: absolute; left: 50%; top: 50%; width: 46%; height: 46%; transform: translate(-50%, -50%); border: 0; padding: 0; background: none; border-radius: 50%; }
-  .ck-core .orb-stage, .ck-core .chr { position: absolute !important; inset: 0; width: 100% !important; height: 100% !important; }
-  .ck-core canvas { width: 100% !important; height: 100% !important; }
-  .ck-sat { position: absolute; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: 1px; border: 0; background: none; color: var(--fg); padding: 0; width: 84px; }
-  .ck-dot { width: 54px; height: 54px; border-radius: 50%; display: grid; place-items: center; border: 1px solid var(--line-2); background: var(--bg-2); color: var(--accent); box-shadow: 0 0 0 4px var(--bg); }
-  .ck-sat b { font: 700 17px var(--display); margin-top: 3px; } .ck-sat small { font-size: 11.5px; color: var(--muted); }
-  .ck-hello { margin: -6px 0 0; text-align: center; font: 600 18px var(--display); color: var(--muted); }
-  /* widgets */
-  .wg-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-  .wg { display: flex; flex-direction: column; gap: 8px; min-height: 132px; padding: 12px; border-radius: 20px; border: 1px solid var(--line); background: var(--glass); color: var(--fg); text-align: left; min-width: 0; overflow: hidden; }
-  .wg.is-full { grid-column: 1 / -1; min-height: 0; }
-  .wg-h { display: flex; align-items: center; gap: 6px; font: 600 11.5px var(--display); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
-  .wg-h .ic { color: var(--accent); display: inline-flex; } .wg-h b { margin-left: auto; font: 700 15px var(--display); color: var(--fg); letter-spacing: 0; text-transform: none; }
-  .wg-li { display: flex; flex-direction: column; min-width: 0; }
-  .wg-li span { font-size: 13.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .wg-li small { font-size: 11.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .wg .vp-wrap { margin-top: 0; } .wg .vp { padding: 6px 10px 6px; } .wg .vp-svg { height: 44px; }
-  .wg .pc { margin-top: auto; }
-  .wg-sor { display: flex; gap: 10px; align-items: center; min-width: 0; } .wg-sor .sor-date { width: 42px; min-height: 46px; }
-  .wg-bots { display: flex; justify-content: space-between; gap: 4px; }
-  .wg-bot { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 0; } .wg-bot small { font-size: 10.5px; color: var(--muted); }
-  .wg-bot.is-veille .chr { opacity: .55; } .wg-bot.is-demande small { color: var(--amber); }
   /* fil du jour */
   .tl-axis { position: relative; height: 72px; margin: 0 12px; }
   .tl-axis::before { content: ""; position: absolute; left: 0; right: 0; top: 40px; height: 2px; border-radius: 1px; background: var(--line-2); }
@@ -276,12 +246,9 @@
   .soon { display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto; column-gap: 8px; align-items: center; padding: 10px 12px; border-radius: 18px; border: 1px solid var(--line); background: var(--glass); color: var(--fg); text-align: left; min-width: 0; }
   .soon .ic { grid-row: 1 / 3; color: var(--accent); display: inline-flex; } .soon b { font: 700 16px var(--display); } .soon small { color: var(--muted); font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   /* thème hologramme : mêmes formes, bords lumineux discrets */
-  html.theme-holo .hm-row, html.theme-holo .wg, html.theme-holo .soon, html.theme-holo .pause-pill { background: linear-gradient(180deg, rgba(10, 30, 72, .5), rgba(4, 12, 34, .78)); border-color: rgba(56, 189, 248, .22); box-shadow: inset 0 1px 0 rgba(150, 220, 255, .08); }
+  html.theme-holo .hm-row, html.theme-holo .soon, html.theme-holo .pause-pill { background: linear-gradient(180deg, rgba(10, 30, 72, .5), rgba(4, 12, 34, .78)); border-color: rgba(56, 189, 248, .22); box-shadow: inset 0 1px 0 rgba(150, 220, 255, .08); }
   html.theme-holo .hm-ic, html.theme-holo .hm-day { border-color: rgba(56, 189, 248, .3); box-shadow: 0 0 10px rgba(56, 189, 248, .12); }
   html.theme-holo .hm-h h2 { color: #7dd3fc; }
-  html.theme-holo .ck-dot { border-color: rgba(56, 189, 248, .55); background: #030a1e; box-shadow: 0 0 0 4px #02040e, 0 0 16px rgba(56, 189, 248, .35); }
-  html.theme-holo .ck-ring, html.theme-holo .ck-line { stroke: rgba(56, 189, 248, .35); }
-  html.theme-holo .ck-sat b { text-shadow: 0 0 10px rgba(56, 189, 248, .5); }
 </style></head><body>
 <title>Jarvis v17 copie</title>
 <meta name="claude:viewport-fit-sides" content="cover">
@@ -5770,10 +5737,8 @@ void main(){
     if (!mcp) { try { renderView(true); } catch (e) { /* rien */ } return; }
     Object.keys(LV_SOURCES).forEach(lvWatch);
   })();
-  /* ---------- JARVIS OS : trois accueils à comparer (16/11/2026) : Cockpit, Widgets, Fil du jour.
-     Dans les trois : « Grok en pause » en pastille (détail d'un appui), cartes de même forme, couleurs sobres. ---------- */
-  const HOMES = [['cockpit', 'Cockpit'], ['widgets', 'Widgets'], ['fil', 'Fil du jour']];
-  const homeKind = () => { const q = (location.search.match(/[?&]accueil=(\w+)/) || [])[1]; let k = q; try { if (q) localStorage.setItem('jarvis.home', q); k = k || localStorage.getItem('jarvis.home'); } catch (e) { /* rien */ } return HOMES.some((x) => x[0] === k) ? k : 'cockpit'; };
+  /* ---------- JARVIS OS : l'accueil « Fil du jour » (choisi le 16/11/2026 parmi trois maquettes).
+     « Grok en pause » en pastille (détail d'un appui), cartes de même forme, couleurs sobres. ---------- */
   const ACC_ORIG = VIEWS.accueil;
   const hpanel = (src, t) => Array.prototype.slice.call(src.children).find((k) => { const x = k.querySelector('.panel-h h2'); return x && k.classList.contains('panel') && x.textContent.trim().indexOf(t) === 0; }) || null;
   const dueTxt = (n) => n == null ? '' : n < 0 ? 'en retard de ' + (-n) + ' j' : n === 0 ? "aujourd'hui" : n === 1 ? 'demain' : 'dans ' + n + ' j';
@@ -5799,9 +5764,7 @@ void main(){
     return {dem, ag, hot, liveA, fam, lead, wk, trip, bots, now: now.slice(0, 4), openFam};
   }
   function homeTop(src) {
-    const kind = homeKind();
-    const seg = h('div', {class: 'home-seg', role: 'group', 'aria-label': "Disposition de l'accueil (essai)"}, h('span', {text: 'Essai :'}), HOMES.map(([k, l]) => h('button', {type: 'button', 'aria-pressed': String(k === kind), onclick: () => { try { localStorage.setItem('jarvis.home', k); } catch (e) { /* rien */ } if (/[?&]accueil=/.test(location.search)) history.replaceState(null, '', location.pathname); renderView(true); }}, l)));
-    const pb = src.querySelector('.pause-b'), items = [seg];
+    const pb = src.querySelector('.pause-b'), items = [];
     if (pb) {
       const t = (pb.querySelector('p') || {}).textContent || '', m = t.match(/Reprise attendue ([^.]+)/);
       items.push(h('button', {type: 'button', class: 'pause-pill', onclick: () => openSheet({bot: 'cyclops', kicker: 'Grok Bot', title: 'Grok Bot est en pause', say: 'Tes ordres sont écrits tout de suite ; la sonnette part à la reprise.', extra: () => pb, actions: []})},
@@ -5816,38 +5779,7 @@ void main(){
   const hsec = (t, aside, ...kids) => h('section', {class: 'hm-sec'}, h('header', {class: 'hm-h'}, h('h2', {text: t}), aside || null), ...kids);
   const more = (label, id) => h('button', {type: 'button', class: 'link', onclick: () => go(id)}, label);
 
-  /* 1. Cockpit : le globe au centre, les rubriques en orbite, « Maintenant », le champ */
-  function homeCockpit(el, D, bar) {
-    const sats = [['demandes', 'chat', 'Demandes', S.demandes.length, S.demandes.some((d) => d.due != null && d.due <= 2)], ['agenda', 'cal', 'Agenda', D.ag.length, false], ['achats', 'tag', 'Achats', D.hot.length || D.liveA.length, D.hot.length > 0],
-      ['voyages', 'plane', 'Voyages', D.trip && D.trip.depart != null ? 'J-' + D.trip.depart : (S.voyages || []).length, false], ['sorties', 'map', 'Sorties', D.wk.length, false], ['suivi', 'pulse', 'Bots', D.bots.length, false]];
-    const orbit = h('div', {class: 'ck'});
-    const lines = h('div', {class: 'ck-lines', 'aria-hidden': 'true'});
-    let svg = '<svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="38" class="ck-ring"/>';
-    sats.forEach((x, i) => { const a = (-90 + i * 60) * Math.PI / 180; svg += '<line x1="50" y1="50" x2="' + (50 + 38 * Math.cos(a)).toFixed(1) + '" y2="' + (50 + 38 * Math.sin(a)).toFixed(1) + '" class="ck-line"/>'; });
-    lines.innerHTML = svg + '</svg>';
-    orbit.append(lines, h('button', {type: 'button', class: 'ck-core', 'aria-label': 'Parler à Claude', onclick: () => openChat('claude', 'hydra', 'equipe', 'equipe')}, globe({nodes: 90, size: 96})));
-    sats.forEach(([id, ic, l, n, urgent], i) => { const a = (-90 + i * 60) * Math.PI / 180;
-      orbit.append(h('button', {type: 'button', class: 'ck-sat', style: 'left:' + (50 + 38 * Math.cos(a)).toFixed(1) + '%;top:' + (50 + 38 * Math.sin(a)).toFixed(1) + '%', onclick: () => go(id)},
-        h('span', {class: 'ck-dot'}, h('span', {class: 'ic', html: icon(ic, 18)})), h('b', {class: urgent ? 'is-urgent' : '', text: String(n)}), h('small', {text: l}))); });
-    el.append(orbit, h('p', {class: 'ck-hello', text: hello() + ', Rabie.'}), hsec('Maintenant', null, nowRows(D)), bar);
-  }
-  /* 2. Widgets : chaque carte montre déjà son contenu */
-  function homeWidgets(el, D, bar) {
-    const wg = (id, ic, t, n, full, ...kids) => h('button', {type: 'button', class: 'wg' + (full ? ' is-full' : ''), onclick: () => go(id)}, h('span', {class: 'wg-h'}, h('span', {class: 'ic', html: icon(ic, 15)}), h('span', {text: t}), n != null ? h('b', {text: String(n)}) : null), ...kids);
-    const li = (a, b2, urgent) => h('span', {class: 'wg-li'}, h('span', {text: a}), b2 ? h('small', {class: urgent ? 'is-urgent' : '', text: b2}) : null);
-    el.append(h('header', {class: 'hm-hello'}, h('span', {class: 'hm-glb'}, globe({nodes: 60, size: 52, ring: false})), h('div', {}, h('b', {text: hello() + ', Rabie'}), h('small', {text: S.demandes.length + ' demandes · ' + D.ag.filter((a) => a.n === 0).length + " aujourd'hui"}))), bar);
-    const grid = h('div', {class: 'wg-grid'});
-    grid.append(
-      wg('demandes', 'chat', 'Demandes', S.demandes.length, false, D.dem.slice(0, 2).map((d) => li(d.title, (BOT[d.bot] ? BOT[d.bot].name : '') + (d.due != null ? ' · ' + dueTxt(d.due) : ''), d.due != null && d.due <= 2))),
-      wg('agenda', 'cal', 'Agenda', null, false, D.ag.slice(0, 3).map((a) => li(a.title, (a.n === 0 ? "aujourd'hui" : dueTxt(a.n)) + (a.time ? ' · ' + a.time : '')))));
-    if (D.trip) grid.append(wg('voyages', 'plane', 'Voyage · ' + D.trip.title, null, true, voyPass(D.trip)));
-    grid.append(
-      wg('achats', 'tag', 'Achats', D.hot.length ? D.hot.length + ' à décider' : D.liveA.length, false, D.fam ? li(D.fam.title, D.lead && D.lead.last ? eur2(D.lead.last.price) : 'pas encore relevé') : li('Rien de suivi'), D.lead ? priceChart(D.lead, false) : null),
-      wg('sorties', 'map', 'Sorties', D.wk.length, false, D.wk[0] ? h('span', {class: 'wg-sor'}, sorDate(D.wk[0]), li(D.wk[0].title, D.wk[0].where || '')) : li('Aucune idée en attente')));
-    grid.append(wg('equipe', 'pulse', 'Tes bots', D.bots.length + ' en cours', true, h('span', {class: 'wg-bots'}, BOTS.map((b) => h('span', {class: 'wg-bot is-' + modeOf(b.id)}, C(b.id, 34).el, h('small', {text: BOT[b.id].name}))))));
-    el.append(grid);
-  }
-  /* 3. Fil du jour : à faire, la journée en frise horaire, la semaine, bientôt */
+  /* L'accueil « Fil du jour » (choisi le 16/11/2026) : à faire, la journée en frise horaire, la semaine, bientôt */
   function homeFil(el, D, bar) {
     el.append(h('header', {class: 'hm-hello'}, h('span', {class: 'hm-glb'}, globe({nodes: 60, size: 52, ring: false})), h('div', {}, h('b', {text: hello() + ', Rabie'}), h('small', {text: D.now.length + ' choses à faire · ' + D.ag.filter((a) => a.n === 0).length + " aujourd'hui"}))), bar);
     el.append(hsec('À faire maintenant', more('Tout voir', 'demandes'), nowRows(D)));
@@ -5871,7 +5803,7 @@ void main(){
     const src = h('div'); ACC_ORIG(src);
     const bar = src.querySelector('.intent'), D = homeData();
     el.append.apply(el, homeTop(src));
-    ({cockpit: homeCockpit, widgets: homeWidgets, fil: homeFil})[homeKind()](el, D, bar || h('div'));
+    homeFil(el, D, bar || h('div'));
   };
   /* rien n'est perdu : ce que l'ancien accueil montrait va dans sa rubrique */
   const VDM_OS = VIEWS.demandes;
