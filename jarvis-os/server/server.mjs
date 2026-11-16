@@ -11,7 +11,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 
-const VERSION = '0.7.0';
+const VERSION = '0.7.1';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PORT = +(process.env.PORT || 8787);
 const HOST = process.env.HOST || '127.0.0.1';
@@ -98,6 +98,15 @@ function probe() {
     child.on('error', end); child.on('close', end);
     child.stdout.on('data', (d) => { buf += d; let i; while ((i = buf.indexOf('\n')) >= 0) { const line = buf.slice(0, i); buf = buf.slice(i + 1); try { const ev = JSON.parse(line); if (ev.type === 'system' && ev.subtype === 'init') { CONN = {at: now(), tools: Array.isArray(ev.tools) ? ev.tools.map(String) : [], servers: Array.isArray(ev.mcp_servers) ? ev.mcp_servers.map((x) => ({name: String(x.name || x), status: String(x.status || '')})) : []}; end(); return; } } catch { /* ligne non JSON */ } } });
     child.stdin.end('ping');
+  });
+}
+/* diagnostic des connecteurs : la liste de Claude Code et ce que l'inventaire a vu (aucun appel au modèle) */
+function diag() {
+  return new Promise((resolve) => {
+    execFile(CLAUDE, ['mcp', 'list'], {cwd: path.join(DATA, 'work'), env: childEnv(), timeout: 90000, maxBuffer: 1 << 20}, (err, out, errOut) => {
+      resolve({version: VERSION, mcpList: (String(out || '') + String(errOut || '')).trim().slice(0, 4000) || (err ? 'erreur : ' + err.message : '(vide)'),
+        probe: {at: CONN.at ? new Date(CONN.at).toISOString() : null, tools: CONN.tools.length, mcpTools: CONN.tools.filter((t) => t.startsWith('mcp__')).slice(0, 40), servers: CONN.servers}});
+    });
   });
 }
 const connSummary = () => ({checked: !!CONN.at, gmail: !!findTool(/gmail/i, 'search_threads'), calendar: CONN.tools.some((t) => /calendar/i.test(t)), sheets: !!findTool(/sheet/i, 'get_values'), drive: CONN.tools.some((t) => /drive/i.test(t)), read: readTools().length, servers: CONN.servers});
@@ -266,6 +275,7 @@ const server = http.createServer(async (req, res) => {
       if (!authed(req)) return json(res, 401, {error: 'Appareil non relié.'});
       if (p === '/api/status') { const cs = await claudeStatus(); if (cs.loggedIn && (!CONN.at || now() - CONN.at > 600000)) await probe(); return json(res, 200, {version: VERSION, commit, claude: cs, connectors: connSummary(), grokPauseUntil: S.config.grokPauseUntil, usage: S.usage, session: !!S.session}); }
       if (p === '/api/update' && req.method === 'POST') return json(res, 200, await update());
+      if (p === '/api/diag') { await probe(); return json(res, 200, await diag()); }
       if (p === '/api/config' && req.method === 'POST') { const b = await readBody(req); if (typeof b.grokPauseUntil === 'string' && (b.grokPauseUntil === '' || !isNaN(Date.parse(b.grokPauseUntil)))) S.config.grokPauseUntil = b.grokPauseUntil; save(); return json(res, 200, {config: S.config}); }
       if (p === '/api/state') return json(res, 200, {msgs: S.msgs.slice(-200), missions: S.missions});
       if (p === '/api/chat' && req.method === 'POST') {

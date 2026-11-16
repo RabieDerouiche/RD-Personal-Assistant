@@ -109,3 +109,10 @@ export async function updateServer(): Promise<string> {
 }
 export async function setGrokPause(until: string) { try { await call('/api/config', {method: 'POST', body: JSON.stringify({grokPauseUntil: until})}); } catch { /* rien */ } await status(); }
 export const grokPaused = () => { const u = last.grokPauseUntil; return !!u && Date.parse(u) > Date.now(); };
+export async function diag(): Promise<string> {
+  try {
+    const r = await call('/api/diag', {}, 120000); const b = await r.json();
+    const pr = b.probe || {};
+    return 'Serveur ' + b.version + '\n\nclaude mcp list :\n' + b.mcpList + '\n\nInventaire au démarrage de Claude Code : ' + pr.tools + ' outils, dont ' + (pr.mcpTools || []).length + ' de connecteurs' + ((pr.mcpTools || []).length ? ' :\n' + pr.mcpTools.join('\n') : '') + '\nServeurs MCP annoncés : ' + ((pr.servers || []).map((x: {name: string; status: string}) => x.name + ' (' + x.status + ')').join(', ') || 'aucun');
+  } catch { return 'Le serveur n\'a pas répondu au diagnostic.'; }
+}

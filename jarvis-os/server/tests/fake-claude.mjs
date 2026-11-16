@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /* Faux Claude Code pour le banc : imite `claude -p --output-format stream-json` et `claude auth status --json`. */
 const args = process.argv.slice(2);
+if (args[0] === 'mcp') { console.log('claude.ai Gmail: https://gmail.mcp.example - ✓ Connected\nclaude.ai Google Sheets: https://sheets.mcp.example - ✓ Connected'); process.exit(0); }
 if (args[0] === 'auth') { console.log(JSON.stringify({loggedIn: true, authMethod: 'claude.ai'})); process.exit(0); }
 const out = (o) => process.stdout.write(JSON.stringify(o) + '\n');
 let input = '';

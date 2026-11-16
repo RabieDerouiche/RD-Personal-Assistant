@@ -24,6 +24,7 @@ try {
   const A = {authorization: 'Bearer ' + tok};
   r = await call('/api/update', {method: 'POST', headers: A}); ok('mise à jour : échec propre hors dépôt git', r.status === 200 && r.body.ok === false && /impossible/.test(r.body.message), r.body.message);
   r = await call('/api/status', {headers: A}); ok('état de Claude Code', r.status === 200 && r.body.claude.loggedIn === true, JSON.stringify(r.body.claude));
+  { const d = await call('/api/diag', {headers: A}); ok('diagnostic des connecteurs', d.status === 200 && /claude\.ai Gmail/.test(d.body.mcpList) && d.body.probe.mcpTools.length === 8 && d.body.probe.servers.length === 3, d.body.mcpList.split('\n')[0]); }
   ok('connecteurs relevés sans appel au modèle', r.body.connectors.gmail && r.body.connectors.sheets && r.body.connectors.calendar && r.body.connectors.read === 4, JSON.stringify(r.body.connectors).slice(0, 120));
   let evs = await sse({text: 'Bonjour JARVIS', model: 'rapide'}, tok);
   const done = evs.find((e) => e.ev === 'done');
