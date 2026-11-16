@@ -33,6 +33,7 @@ const ok = (n, c, i) => { out.push((c ? 'OK   ' : 'ÉCHEC') + ' ' + n + (i ? ' :
     if (process.env.SHOTS) await p.screenshot({path: process.env.SHOTS + '/reglages-serveur.png'});
     await p.click('.tabs button:nth-child(1)'); await p.waitForTimeout(150);
     await p.click('.home-ask .ask-ic'); await p.waitForTimeout(250);
+    ok('début de session : pas d\'ancienne réponse, Claude indiqué', await p.evaluate(() => !document.querySelector('.cap-j') && /Claude t'écoute/.test(document.querySelector('.cap-hint').textContent) && /Claude · Sonnet/.test(document.querySelector('.v-model').textContent)));
     await p.evaluate(() => window.__say.push('Bonjour JARVIS'));
     const seen = new Set();
     for (let i = 0; i < 50; i++) { const t = await p.evaluate(() => (document.querySelector('[data-stream]') || {}).textContent || ''); if (t && t !== '…') seen.add(t); await p.waitForTimeout(50); }

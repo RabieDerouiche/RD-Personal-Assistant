@@ -15,7 +15,7 @@ const PHASE = 2;
 const VERSION = '0.5.0';
 type View = 'home' | 'command' | 'agents' | 'agent' | 'missions' | 'more' | 'memory' | 'automations' | 'intelligence' | 'settings';
 let view: View = 'home';
-let live = '', note = '', clearArm = 0, orbState: OrbState = 'idle', agentFilter = 'tous', agentQuery = '', agentSel: AgentId = 'claude', missionCol = 'a_approuver', draftNext = '', streaming = '', fresh = true, pairMsg = '', pairUrl = '', pairCode = '';
+let live = '', note = '', clearArm = 0, orbState: OrbState = 'idle', agentFilter = 'tous', agentQuery = '', agentSel: AgentId = 'claude', missionCol = 'a_approuver', draftNext = '', streaming = '', fresh = true, pairMsg = '', pairUrl = '', pairCode = '', sessionAt = 0;
 
 const SALLE = {copie: 'https://claude.ai/artifact/NMAqUak7A5JYsLsc12VyaZ', service: 'https://claude.ai/artifact/QwLf64Ggstzu4p3uznZrr8'};
 const app = document.getElementById('app')!;
@@ -100,7 +100,7 @@ const micTap = () => {
   if (!canListen()) { note = 'Pas de reconnaissance vocale ici : écris ta demande.'; paint(); return; }
   if (voice.state === 'speaking') { voice.interrupt(); return; }
   if (voice.active) { voice.stop(); return; }
-  note = ''; fresh = true; voice.start();
+  note = ''; fresh = true; sessionAt = Date.now(); voice.start();
 };
 const askBox = (id: string, ph: string, cls: string) => {
   const input = h('input', {class: 'ask-in', id, type: 'text', placeholder: ph, enterkeyhint: 'send', autocomplete: 'off', 'aria-label': 'Ta demande'}) as HTMLInputElement;
@@ -132,17 +132,18 @@ function home(): HTMLElement {
 
 /* ---------- session vocale : orbe, voile de soie, micro ---------- */
 function voiceView(): HTMLElement {
-  const lastJ = store.msgs.slice().reverse().find((m) => m.who === 'jarvis');
+  const lastJ = store.msgs.slice().reverse().find((m) => m.who === 'jarvis' && m.at >= sessionAt);   /* seulement cette session */
   const routes: RouteMode[] = ['auto', 'claude', 'grok'];
   const speaking = voice.state === 'speaking';
   return h('section', {class: 'voice'},
     h('div', {class: 'v-top'}, h('span', {class: 'v-dot'}), h('span', {'data-orbtxt': '', text: STATE_TXT[orbState]}),
+      srv.linked() ? h('span', {class: 'v-model', text: claudeOn() ? 'Claude · ' + ({rapide: 'Haiku', equilibre: 'Sonnet', profond: 'Opus'} as Record<string, string>)[store.settings.model] : 'serveur ' + (srv.lastStatus().error || 'en vérification')}) : h('span', {class: 'v-model off', text: 'réponses locales'}),
       h('button', {type: 'button', class: 'v-route', 'aria-label': 'Agent', onclick: () => { const i = routes.indexOf(store.settings.route); store.settings.route = routes[(i + 1) % 3]; store.save(); paint(); }}, store.settings.route.toUpperCase())),
     h('div', {class: 'stage tall'}, orb.el),
     h('div', {class: 'captions'},
       h('p', {class: 'cap-me', 'data-live': '', text: live}),
       streaming ? h('div', {class: 'cap-j'}, sph('claude', 34, 'voice'), h('p', {'data-stream': '', text: streaming}))
-        : lastJ ? h('div', {class: 'cap-j'}, lastJ.agent ? sph(lastJ.agent, 34, 'voice') : null, h('p', {text: lastJ.text})) : h('p', {class: 'cap-hint', text: 'Parle normalement, je réponds à voix haute. « C\'est tout » pour finir.'})),
+        : lastJ ? h('div', {class: 'cap-j'}, lastJ.agent ? sph(lastJ.agent, 34, 'voice') : null, h('p', {text: lastJ.text})) : h('p', {class: 'cap-hint', text: (claudeOn() ? 'Claude t\'écoute. ' : '') + 'Parle normalement, je réponds à voix haute. « C\'est tout » pour finir.'})),
     note ? h('p', {class: 'note', text: note}) : null,
     h('div', {class: 'v-bar'},
       h('button', {type: 'button', class: 'v-side', 'aria-label': 'Passer au clavier', html: icon('key', 22), onclick: () => { voice.stop(); show('command'); }}),

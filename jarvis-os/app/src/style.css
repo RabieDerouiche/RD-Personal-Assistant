@@ -251,3 +251,6 @@ input[type="range"] { width: 100%; accent-color: #a5b4fc; }
 .result p:last-child { margin: 2px 0 0; font-size: 13.5px; white-space: pre-wrap; overflow-wrap: anywhere; }
 .srv-url { font: 500 13px var(--mono); overflow-wrap: anywhere; }
 .card .field { margin-top: 2px; }
+.v-model { margin-left: auto; font: 500 11.5px var(--sans); color: var(--green); border: 1px solid rgba(110, 231, 183, .35); border-radius: 999px; padding: 4px 10px; }
+.v-model.off { color: var(--dim); border-color: var(--line-2); }
+.v-model + .v-route { margin-left: 0; }
