@@ -58,3 +58,9 @@ Guide pour le propriétaire, tout depuis l'iPhone :
 5. Code d'appairage : `cat /root/jarvis-code.txt` (expiré au bout de 30 min : `sudo -iu jarvis node /opt/rd/jarvis-os/server/server.mjs pair`).
 6. Dans JARVIS OS : Plus, Réglages, « Relier ton serveur JARVIS » : l'adresse (`https://…sslip.io`) et le code, puis « Relier ».
 Si l'installation a échoué : `cat /root/jarvis-setup.log`. Mise à jour du serveur : `bash /opt/rd/jarvis-os/server/install/setup.sh`.
+
+Hébergement moins cher (sa demande du 15/11/2026, « Chercher moins cher ») — Claude Code demande officiellement **4 Go de mémoire au moins** (https://code.claude.com/docs/en/setup), ce qui écarte les offres à 1 ou 2 Go (IONOS VPS XS 1 Go à 1 € HT par mois + 10 € HT de mise en service, Netcup VPS pico 1 Go à 2,21 € TTC par mois sur 12 mois : sources tierces). Offres à 4 Go ou plus, relevées le 15/11/2026 :
+- **OVHcloud VPS-1** : 2 cœurs, 4 Go, 40 Go, trafic illimité, **3,81 € HT, soit 4,57 € TTC par mois** (page officielle ovhcloud.com/fr/vps, vue dans les résultats de recherche ; hausses de prix annoncées en 2026, et le prix peut dépendre de la durée d'engagement : vérifier dans le panier). Société française. Pas de champ « cloud config » à la commande : installation en une ligne depuis Termius (`curl -fsSL https://raw.githubusercontent.com/RabieDerouiche/RD-Personal-Assistant/main/jarvis-os/server/install/setup.sh | sudo bash`).
+- **Hetzner CX23** : 2 cœurs, 4 Go, environ 7,19 € TTC par mois (voir plus haut).
+- **Contabo** : plus petite offre 6 Go, environ 4,99 € HT par mois (source tierce, frais de mise en service possibles).
+- **Oracle Cloud gratuit** (Ampere A1, réduit à 2 cœurs et 12 Go en 2026) : 0 €, mais carte bancaire demandée, places souvent indisponibles, et Oracle peut reprendre une machine jugée inactive (moins de 20 % d'utilisation sur 7 jours, ce qui serait notre cas). Pas fiable pour un service permanent.
