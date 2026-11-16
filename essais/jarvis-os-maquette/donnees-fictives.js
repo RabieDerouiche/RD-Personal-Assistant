@@ -213,6 +213,32 @@
     if (!m) throw {code: 'tool_error', message: 'plage illisible : ' + r};
     return {sheet: m[1], c1: colN(m[2]), r1: +(m[3] || 1), c2: m[4] ? colN(m[4]) : colN(m[2]), r2: m[5] ? +m[5] : (m[4] ? 1e6 : +(m[3] || 1))};
   }
+  /* faux Drive de Papiers (JARVIS OS, 16/11/2026) : noms fictifs, rangement par personne et par thème */
+  const DRIVE = (() => {
+    const folders = [], files = [], byName = {}; let n = 0;
+    const dir = (name, parent) => { const id = 'fd' + (++n); folders.push({id, name, parent}); return id; };
+    const put = (parent, names, mod) => names.forEach((nm, i) => files.push({id: 'ff' + (++n), name: nm, parent, mimeType: /\.(jpe?g|png)$/i.test(nm) ? 'image/jpeg' : /\.docx?$/i.test(nm) ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' : 'application/pdf', modifiedTime: (mod || '2023') + '-0' + (1 + i % 9) + '-12T10:00:00Z', size: 120000, viewUrl: 'https://drive.google.com/file/d/exemple-' + n + '/view'}));
+    const P = '1huMsPD8I81buG4GWhuoGmsOafvy4HrE4';
+    const lui = dir('Lui', P), id = dir('Identité et séjour', lui), sa = dir('Santé', lui), cv = dir('Diplômes et CV', lui), tr = dir('Travail', lui);
+    put(id, ['Passeport - Identité.pdf', 'Passeport - Pages 4-5 - 2024.pdf', 'Carte Résident - Recto.png', 'Carte Résident - Verso.png', 'Récépissé de demande de carte de séjour 01-2024.pdf', 'Extrait de naissance - 10 novembre 2022.pdf', 'Vignette OFII.jpg'], '2024');
+    put(sa, ['Carte Vitale - Recto.png', 'Attestation de droits Ameli.pdf', 'Carnet de santé.pdf'], '2025');
+    put(cv, ['Diplômes.pdf', 'CV 2024.pdf'], '2024'); put(tr, ['Contrat de travail.pdf', 'Attestation employeur 2025.pdf', 'Lettre de déontologie.pdf'], '2025');
+    const ep = dir('Sarah', P), eps = dir('Santé et grossesse', ep), epr = dir('Résident', ep);
+    put(ep, ['Passeport - Sarah - 2023.pdf', 'Diplôme Master.pdf', 'Attestation Navigo 2025.pdf'], '2023'); put(eps, ['Échographie - 15-11-2023.pdf', 'Carte mutualiste 2024.pdf'], '2024'); put(epr, ['Carte Résident - Sarah.png', 'Titre de séjour - Recto.pdf'], '2025');
+    const fi = dir('Léa', P), cr = dir('Crèche', fi);
+    put(fi, ['Acte de naissance - 31-08-2024.pdf', 'Passeport - Léa.pdf', 'Attestation scolaire 2025.pdf', 'Attestation de responsabilité civile.pdf'], '2025'); put(cr, ['Contrat de garde.pdf', 'Bulletin de présence - septembre 2024.pdf'], '2024');
+    const fa = dir('Famille et proches', P); put(fa, ['Livret de famille.pdf', 'Acte de mariage.pdf', 'Attestation de quotient familial - CAF.pdf'], '2024');
+    const lo = dir('Logement', P), ach = dir("Achat de l'appartement (2022)", lo), loc = dir('Locations 2018-2022', lo), fac = dir('Factures et abonnements', lo);
+    put(lo, ['Attestation - Appartement - 2025.pdf'], '2025'); put(ach, ['Offre d’achat.pdf', 'Attestation de vente.pdf', 'Plan de l’appartement.pdf'], '2022'); put(loc, ['Contrat de location 2019.pdf', 'Quittance 2019-05.pdf', 'Quittance 2019-06.pdf', 'Attestation d’assurance habitation 2019.pdf'], '2019'); put(fac, ['Facture internet 09-2018.pdf', 'Justificatif de domicile - énergie.pdf', 'Garantie robot de cuisine.pdf'], '2020');
+    const vo = dir('Voiture', P); put(vo, ['Permis de conduire - Recto.png', 'Certificat d’immatriculation.pdf', 'Attestation d’assurance auto.pdf'], '2024');
+    const vy = dir('Voyages', P), b23 = dir('Bali 2023', vy); put(vy, ['Billet Paris - Tunis 2019.pdf', 'Réservation hôtel Hurghada 2026.pdf'], '2026'); put(b23, ['Itinéraire Bali.pdf', 'Billets Bali.pdf'], '2023');
+    const at = dir('À trier', P); put(at, ['Scan sans nom.pdf'], '2019');
+    put(P, ['Document déposé ce matin.pdf'], '2026');
+    const pr = dir('Papiers privés', 'root'); byName['Papiers privés'] = pr;
+    const im = dir('Impôts', pr), sl = dir('Salaires et revenus', pr), bq = dir('Banque et crédit', pr);
+    put(im, ['Avis d’impôt 2025.pdf', 'Avis d’impôt 2024.pdf'], '2025'); put(sl, ['Bulletin de salaire 2025-09.pdf', 'Bulletin de salaire 2025-10.pdf'], '2025'); put(bq, ['RIB.pdf', 'Offre de prêt.pdf'], '2022');
+    return {folders, files, byName};
+  })();
   const delay = (v, ms) => new Promise((res) => setTimeout(() => res(v), ms == null ? 20 : ms));
   const FAIL = SCEN.fail || {};
   function exec(server, tool, input) {
@@ -246,6 +272,13 @@
       if (tool === 'unlabel_thread') { if (!input.threadId || !Array.isArray(input.labelIds)) throw {code: 'tool_error', server, message: 'arguments'}; const i = MAIL.inbox.findIndex((t) => t.id === input.threadId); if (i >= 0) MAIL.inbox.splice(i, 1); return {}; }
     }
     if (server === 'Claude Code Remote' && tool === 'fire_trigger') { /* scénario tasks : les seules tâches que ce compte possède */ if (SCEN.tasks && !SCEN.tasks.includes(input.trigger_id)) { const e = new Error('trigger not found'); e.code = 'tool_error'; throw e; } return {ok: true}; }
+    if (server === 'Google Drive' && tool === 'folder_tree') {
+      /* JARVIS OS : faux Drive de Papiers (noms fictifs), même forme que le serveur */
+      const roots = (input.roots || []).map((r) => r.id ? {key: r.key || r.id, id: r.id, name: r.name || '', found: true} : (DRIVE.byName[r.name] ? {key: r.key || r.name, id: DRIVE.byName[r.name], name: r.name, found: true} : {key: r.key || r.name, id: '', name: r.name, found: false}));
+      const seen = new Set(roots.map((r) => r.id).filter(Boolean)); let grew = true;
+      while (grew) { grew = false; DRIVE.folders.forEach((f) => { if (seen.has(f.parent) && !seen.has(f.id)) { seen.add(f.id); grew = true; } }); }
+      return {roots, folders: DRIVE.folders.filter((f) => seen.has(f.id) && !roots.some((r) => r.id === f.id)), files: DRIVE.files.filter((f) => seen.has(f.parent))};
+    }
     throw {code: 'not_in_manifest', server, message: tool};
   }
   const mcp = {
