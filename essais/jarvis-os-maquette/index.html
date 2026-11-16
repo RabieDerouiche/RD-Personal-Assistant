@@ -1,4 +1,6 @@
-<!doctype html><html><head><script>window.__SCEN = {};</script><script src="donnees-fictives.js"></script><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}
+<!doctype html><html><head><meta charset="utf-8"><script>window.__SCEN = {};</script><script src="donnees-fictives.js"></script><script>/* JARVIS OS : thème à l'essai (« hologramme », image du 16/11/2026) : ?theme=holo ou ?theme=actuel, gardé dans le téléphone */
+(function () { var q = (location.search.match(/[?&]theme=(\w+)/) || [])[1], t = null; try { if (q) localStorage.setItem('jarvis.theme', q); t = localStorage.getItem('jarvis.theme'); } catch (e) { t = q; }
+  if (t === 'holo') { document.documentElement.classList.add('theme-holo'); var l = document.createElement('link'); l.rel = 'stylesheet'; l.href = 'https://fonts.googleapis.com/css2?family=Orbitron:wght@500;600;700&family=Exo+2:wght@500;600;700&display=swap'; document.head.appendChild(l); } })();</script><script src="jarvis-voix.js"></script><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}
   /* ---------- JARVIS OS : navigation et écrans ajoutés ---------- */
   .fab-talk { display: none !important; }
   /* barre à tes favoris (bas) et toutes les rubriques */
@@ -64,6 +66,64 @@
   .pap-chips .chip { flex: 0 0 auto; border: 1px solid var(--line); background: var(--glass); color: var(--muted); border-radius: 999px; padding: 7px 12px; font: 500 13px var(--sans); }
   .pap-chips .chip.is-on { color: var(--fg); background: var(--glass-3); border-color: var(--line-2); }
   .pap { display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; border-radius: 16px; }
+
+  /* ---------- JARVIS OS : thème « hologramme » à l'essai (image du 16/11/2026) : nuit bleue, néons cyan et violet, globe de réseau ---------- */
+  .theme-row { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 13px; }
+  .theme-row span { margin-right: auto; }
+  .theme-row .chip.is-on { color: var(--fg); border-color: var(--accent); background: var(--glass-3); }
+  html.theme-holo {
+    --bg: #02040e; --bg-2: #040b1f; --sheet: rgba(4, 12, 34, .97);
+    --glass: rgba(18, 56, 130, .14); --glass-2: rgba(30, 90, 190, .16); --glass-3: rgba(56, 140, 255, .22);
+    --line: rgba(56, 189, 248, .2); --line-2: rgba(96, 165, 250, .42);
+    --fg: #e6f2ff; --muted: #8fb3db; --dim: #5d7ea8;
+    --accent: #38bdf8; --accent-fg: #ffffff;
+    --iris: linear-gradient(110deg, #67e8f9 0%, #38bdf8 30%, #6366f1 65%, #a855f7 100%);
+    --display: 'Exo 2', 'Inter', system-ui, sans-serif; --tech: 'Orbitron', 'Exo 2', system-ui, sans-serif;
+  }
+  html.theme-holo body::after { background:
+    radial-gradient(1px 1px at 8% 14%, rgba(255,255,255,.5), transparent 60%), radial-gradient(1px 1px at 34% 6%, rgba(255,255,255,.35), transparent 60%),
+    radial-gradient(1.5px 1.5px at 72% 22%, rgba(125,211,252,.55), transparent 60%), radial-gradient(1px 1px at 91% 9%, rgba(255,255,255,.4), transparent 60%),
+    radial-gradient(1px 1px at 18% 48%, rgba(255,255,255,.3), transparent 60%), radial-gradient(1.5px 1.5px at 84% 58%, rgba(168,85,247,.55), transparent 60%),
+    radial-gradient(1px 1px at 46% 72%, rgba(255,255,255,.3), transparent 60%), radial-gradient(1px 1px at 6% 86%, rgba(125,211,252,.45), transparent 60%),
+    radial-gradient(900px 520px at 50% -8%, rgba(29, 78, 216, .42), transparent 62%), radial-gradient(640px 520px at -10% 70%, rgba(14, 116, 204, .22), transparent 62%),
+    radial-gradient(700px 560px at 110% 95%, rgba(124, 58, 237, .30), transparent 62%), var(--bg); }
+  html.theme-holo .glass, html.theme-holo .card, html.theme-holo .unit, html.theme-holo .kpi, html.theme-holo .key, html.theme-holo .mate, html.theme-holo .hero, html.theme-holo .feed, html.theme-holo .canal-row, html.theme-holo .tl, html.theme-holo .routines, html.theme-holo .intent-row, html.theme-holo .brief-card, html.theme-holo .auto, html.theme-holo .pap, html.theme-holo .menu-tile {
+    background: linear-gradient(180deg, rgba(14, 44, 104, .38), rgba(4, 12, 34, .62)); border: 1px solid rgba(56, 189, 248, .26);
+    box-shadow: inset 0 1px 0 rgba(150, 220, 255, .14), inset 0 0 24px rgba(56, 189, 248, .05), 0 0 22px rgba(37, 99, 235, .14); }
+  html.theme-holo .top { background: rgba(2, 6, 20, .82); border-bottom: 1px solid rgba(56, 189, 248, .3); box-shadow: 0 1px 0 rgba(56, 189, 248, .12), 0 10px 30px rgba(14, 165, 233, .08); }
+  html.theme-holo .brand b { font: 700 19px var(--tech); letter-spacing: .2em; background: linear-gradient(90deg, #a5f3fc, #e0f2fe 45%, #60a5fa); -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 0 8px rgba(56, 189, 248, .65)); }
+  html.theme-holo .view-title { font: 600 11px var(--tech); letter-spacing: .24em; color: #7dd3fc; }
+  html.theme-holo .view-title::after { content: ""; display: block; height: 1px; margin-top: 8px; background: linear-gradient(90deg, rgba(56, 189, 248, .8), rgba(168, 85, 247, .35) 50%, transparent); box-shadow: 0 0 8px rgba(56, 189, 248, .5); }
+  html.theme-holo .panel-h h2 { display: flex; align-items: center; gap: 9px; color: #e0f2fe; letter-spacing: .01em; }
+  html.theme-holo .panel-h h2::before { content: ""; flex: 0 0 3px; height: 16px; border-radius: 2px; background: linear-gradient(#67e8f9, #6366f1); box-shadow: 0 0 10px rgba(56, 189, 248, .8); }
+  html.theme-holo .hello { font: 700 30px/1.15 var(--display); letter-spacing: .01em; }
+  html.theme-holo .hello span { filter: drop-shadow(0 0 10px rgba(56, 189, 248, .5)); }
+  html.theme-holo .holo-hero { width: min(300px, 78vw); height: min(270px, 70vw); margin: -10px auto -6px; }
+  html.theme-holo .holo-hero .orb-stage { position: relative; width: 100%; height: 100%; }
+  html.theme-holo .holo-hero canvas { display: block; width: 100%; height: 100%; }
+  html.theme-holo .kpi b { font: 600 24px/1.15 var(--tech); color: #e0f2fe; text-shadow: 0 0 14px rgba(56, 189, 248, .55); }
+  html.theme-holo .kpi-l, html.theme-holo .hero-t { color: #7dd3fc; letter-spacing: .14em; }
+  html.theme-holo .btn { border-color: rgba(56, 189, 248, .4); background: rgba(10, 36, 86, .45); }
+  html.theme-holo .btn:hover { background: rgba(20, 60, 140, .55); }
+  html.theme-holo .btn.main { background: linear-gradient(90deg, #0ea5e9, #6366f1 62%, #a855f7); color: #fff; border-color: rgba(165, 243, 252, .5); box-shadow: 0 0 0 1px rgba(56, 189, 248, .25), 0 0 22px rgba(56, 189, 248, .45); }
+  html.theme-holo .btn.main2 { border-color: rgba(103, 232, 249, .65); box-shadow: 0 0 14px rgba(56, 189, 248, .25); }
+  html.theme-holo .btn.ghost { background: transparent; border-color: transparent; }
+  html.theme-holo .chip, html.theme-holo .pap-chips .chip { border-color: rgba(56, 189, 248, .35); }
+  html.theme-holo .pill.is-travail { color: #67e8f9; border-color: rgba(103, 232, 249, .55); background: rgba(34, 211, 238, .1); box-shadow: 0 0 10px rgba(34, 211, 238, .25); }
+  html.theme-holo .mate .chr, html.theme-holo .unit .chr { filter: drop-shadow(0 0 9px rgba(56, 189, 248, .45)); }
+  html.theme-holo .link { color: #67e8f9; }
+  html.theme-holo .trk.next .trk-dot { border-color: #22d3ee; box-shadow: 0 0 12px #22d3ee; }
+  html.theme-holo .fav-bar { background: rgba(2, 6, 20, .98) !important; border-top: 1px solid rgba(56, 189, 248, .4) !important; box-shadow: 0 -1px 0 rgba(56, 189, 248, .12), 0 -14px 34px rgba(14, 165, 233, .12) !important; }
+  html.theme-holo .fav-bar .tab { color: var(--muted) !important; }
+  html.theme-holo .fav-bar .tab[aria-current="page"] { color: #67e8f9 !important; background: rgba(56, 189, 248, .12) !important; box-shadow: inset 0 -2px 0 #22d3ee, 0 0 14px rgba(56, 189, 248, .2); }
+  html.theme-holo .fav-bar .tab[aria-current="page"] .ic { filter: drop-shadow(0 0 6px rgba(103, 232, 249, .9)); }
+  html.theme-holo .fav-handle .grip { background: linear-gradient(90deg, #22d3ee, #6366f1); box-shadow: 0 0 8px rgba(56, 189, 248, .7); }
+  html.theme-holo .all-panel { background: linear-gradient(180deg, #06143a, #030a1e); border-top: 1px solid rgba(56, 189, 248, .45); box-shadow: 0 -20px 50px rgba(14, 165, 233, .15); }
+  html.theme-holo .all-grid .tab { background: linear-gradient(180deg, rgba(14, 44, 104, .45), rgba(4, 12, 34, .7)) !important; border: 1px solid rgba(56, 189, 248, .3) !important; box-shadow: inset 0 1px 0 rgba(150, 220, 255, .12), 0 0 16px rgba(37, 99, 235, .12); }
+  html.theme-holo .all-grid .tab .ic { color: #67e8f9; filter: drop-shadow(0 0 6px rgba(103, 232, 249, .7)); }
+  html.theme-holo .all-close { border-color: rgba(56, 189, 248, .45); background: rgba(10, 36, 86, .5); }
+  html.theme-holo .sheet { background: linear-gradient(180deg, rgba(6, 20, 58, .98), rgba(3, 10, 30, .98)); border-top-color: rgba(56, 189, 248, .45); }
+  html.theme-holo .pap-search, html.theme-holo .inp { border-color: rgba(56, 189, 248, .4); background: rgba(8, 30, 70, .45); }
 </style></head><body>
 <title>Jarvis v17 copie</title>
 <meta name="claude:viewport-fit-sides" content="cover">
@@ -2727,13 +2787,17 @@ void main(){
     return panel('En ' + MONTHS[CAL.m], null, rows.length ? h('div', {class: 'mlist'}, rows) : emptyState('Rien de prévu en ' + MONTHS[CAL.m] + '.'));
   }
 
+  /* JARVIS OS, thème hologramme : le globe de réseau remplace la sphère de Claude à l'accueil (même appui) */
+  const HOLO = () => document.documentElement.classList.contains('theme-holo') && !!(window.JarvisVoice && window.JarvisVoice.holo);
+  let HOLOG = null;
+  function holoHero() { if (!HOLOG) HOLOG = window.JarvisVoice.holo({pedestal: true, nodes: 120}); HOLOG.set(counts().travail ? 'thinking' : 'idle'); return h('div', {class: 'holo-hero'}, HOLOG.el); }
   const VIEWS = {
     accueil(el) {
       const hr = new Date().getHours(), hello = hr >= 5 && hr < 12 ? 'Bonjour' : hr >= 12 && hr < 18 ? 'Bon après-midi' : 'Bonsoir';
       const chief = makeChar('claude', {size: 150, mode: counts().travail ? 'travail' : 'veille'});
       JARVIS = chief;
       el.append(h('section', {class: 'home-hero'},
-        h('button', {type: 'button', class: 'item-chr', 'aria-label': 'Parler à Claude, chef d\'équipe', onclick: () => openChat('claude', 'hydra', 'equipe', 'equipe')}, chief.el),
+        h('button', {type: 'button', class: 'item-chr', 'aria-label': 'Parler à Claude, chef d\'équipe', onclick: () => openChat('claude', 'hydra', 'equipe', 'equipe')}, HOLO() ? holoHero() : chief.el),
         h('h1', {class: 'hello'}, hello + ', ', h('span', {text: 'Rabie'})),
         h('p', {class: 'brief-line', text: "Je suis Claude, le chef de ton équipe. Voici le point."})));
       el.append(briefCard());
@@ -2986,6 +3050,7 @@ void main(){
         h('div', {class: 'all-grid'}, ALL.map((a) => editFav
           ? h('button', {type: 'button', class: 'tab fav-pick' + (FAV.includes(a[0]) ? ' is-fav' : ''), onclick: () => { if (FAV.includes(a[0])) FAV = FAV.filter((f) => f !== a[0]); else if (FAV.length < 4) FAV.push(a[0]); if (FAV.length === 4) { try { localStorage.setItem('jarvis.fav', JSON.stringify(FAV)); } catch (e) { /* rien */ } drawBar(); } drawSheet(); }}, h('span', {class: 'ic', html: icon(a[2], 20)}), h('span', {class: 'lbl', text: a[1]}), h('span', {class: 'star', text: FAV.includes(a[0]) ? '★' : '☆'}))
           : navBtn(a))),
+        h('div', {class: 'theme-row'}, h('span', {text: 'Thème'}), [['actuel', 'Actuel'], ['holo', 'Hologramme']].map(([k, l]) => h('button', {type: 'button', class: 'chip' + ((k === 'holo') === document.documentElement.classList.contains('theme-holo') ? ' is-on' : ''), onclick: () => { try { localStorage.setItem('jarvis.theme', k); } catch (e) { /* rien */ } location.replace(location.pathname + location.hash); }}, l))),
         h('button', {type: 'button', class: 'all-close', onclick: closeAll}, 'Fermer')));
     }
     sheet.addEventListener('click', (e) => { if (e.target === sheet) closeAll(); });
@@ -5436,6 +5501,5 @@ void main(){
 </script>
 
 <script>/* comparaison des dispositions : ?nav=grille ou ?nav=dock */ (function () { var v = (location.search.match(/nav=(grille|dock)/) || [])[1]; if (!v) return; document.documentElement.classList.add('nav-' + v); if (v === 'dock') { var n = document.getElementById('tabs'); var d = document.createElement('nav'); d.className = 'dock-nav'; d.setAttribute('aria-label', 'Rubriques'); setTimeout(function () { Array.prototype.slice.call(n.children).forEach(function (b) { d.appendChild(b); }); document.body.appendChild(d); }, 0); } })();</script>
-<script src="jarvis-voix.js"></script>
 <script>/* JARVIS OS : l'orbe au centre de la barre ouvre la page vocale */ try { var slot = document.querySelector('.talk-slot'); if (slot && !slot.querySelector('.jv-btn')) window.JarvisVoice.mountButton(slot); } catch (e) { /* rien */ }</script>
 </body></html>
