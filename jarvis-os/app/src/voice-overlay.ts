@@ -20,10 +20,27 @@ const CSS = `
 .jv-chip { margin-left: auto; font-size: 11.5px; color: #6ee7b7; border: 1px solid rgba(110, 231, 183, .35); border-radius: 999px; padding: 3px 10px; }
 .jv-stage { position: relative; height: min(46dvh, 420px); margin: 0 -16px; }
 .jv-stage .orb-stage { position: absolute; inset: 0; }
+.jv-stage { transition: height .35s ease; }
+.jv.is-talk .jv-stage { height: min(28dvh, 240px); }
 .jv-cap { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding: 4px 4px 8px; }
 .jv-me { margin: 0; font-size: 17px; font-style: italic; color: #fff; text-align: center; min-height: 24px; }
 .jv-rep { margin: 0; color: #c7cce3; font-size: 16px; line-height: 1.55; }
 .jv-hint { margin: 0; color: #646d8c; text-align: center; }
+.jv-log { display: flex; flex-direction: column; gap: 12px; }
+.jv-turn { display: flex; flex-direction: column; gap: 6px; }
+.jv-q { align-self: flex-end; max-width: 85%; margin: 0; padding: 8px 12px; border-radius: 16px 16px 4px 16px; background: rgba(91, 140, 255, .18); color: #fff; font-size: 15px; }
+.jv-a { margin: 0; color: #c7cce3; font-size: 16px; line-height: 1.55; white-space: pre-wrap; }
+.jv-pill { align-self: center; display: inline-flex; align-items: center; gap: 8px; margin: -6px auto 6px; padding: 5px 14px; border-radius: 999px; border: 1px solid rgba(255, 255, 255, .14); background: rgba(255, 255, 255, .05); font-size: 13px; color: #c9c7e0; }
+.jv-pill i { width: 8px; height: 8px; border-radius: 50%; background: #646d8c; }
+.jv-pill[data-s="listening"] i { background: #22d3ee; box-shadow: 0 0 10px #22d3ee; animation: jvblink 1s ease-in-out infinite; }
+.jv-pill[data-s="thinking"] i { background: #a855f7; box-shadow: 0 0 10px #a855f7; animation: jvblink .6s ease-in-out infinite; }
+.jv-pill[data-s="speaking"] i { background: #60a5fa; box-shadow: 0 0 10px #60a5fa; }
+.jv-pill[data-s="error"] i { background: #fb7185; }
+@keyframes jvblink { 50% { opacity: .35; } }
+.jv-sugg { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.jv-sugg[hidden] { display: none; }
+.jv-sugg button { border: 1px solid rgba(255, 255, 255, .14); background: rgba(255, 255, 255, .05); color: #dfe6ff; border-radius: 14px; padding: 9px 10px; font-size: 13px; line-height: 1.3; font-family: inherit; text-align: center; }
+.jv-title { font-weight: 600; letter-spacing: .02em; }
 .jv-note { margin: 0; color: #fbbf24; text-align: center; font-size: 13.5px; }
 .jv-comp { display: flex; gap: 8px; padding: 6px; border-radius: 18px; background: rgba(255, 255, 255, .06); border: 1px solid rgba(255, 255, 255, .12); margin-bottom: 10px; }
 .jv-comp[hidden] { display: none; }
@@ -46,7 +63,11 @@ const CSS = `
 .theme-holo .jv-dot { background: #22d3ee; box-shadow: 0 0 12px #22d3ee; }
 .theme-holo .jv-chip { font-family: Inter, sans-serif; letter-spacing: 0; text-transform: none; color: #67e8f9; border-color: rgba(103, 232, 249, .4); }
 .theme-holo .jv-me { color: #e0f2fe; }
-.theme-holo .jv-rep { color: #bfdbfe; }
+.theme-holo .jv-rep, .theme-holo .jv-a { color: #bfdbfe; }
+.theme-holo .jv-q { background: rgba(14, 165, 233, .2); border: 1px solid rgba(56, 189, 248, .35); }
+.theme-holo .jv-pill { font-family: Oxanium, 'Exo 2', sans-serif; letter-spacing: .06em; border-color: rgba(56, 189, 248, .45); background: rgba(8, 30, 70, .5); color: #bae6fd; box-shadow: 0 0 14px rgba(56, 189, 248, .18); }
+.theme-holo .jv-sugg button { border-color: rgba(56, 189, 248, .4); background: rgba(8, 30, 70, .45); color: #e0f2fe; }
+.theme-holo .jv-title { font: 700 13px Orbitron, Oxanium, sans-serif; letter-spacing: .22em; color: #a5f3fc; text-shadow: 0 0 8px rgba(56, 189, 248, .6); }
 .theme-holo .jv-comp { background: rgba(8, 30, 70, .55); border-color: rgba(56, 189, 248, .45); box-shadow: 0 0 18px rgba(56, 189, 248, .18); }
 .theme-holo .jv-comp button { background: linear-gradient(90deg, #0ea5e9, #6366f1 60%, #a855f7); color: #fff; }
 .theme-holo .jv-side { border-color: rgba(56, 189, 248, .45); background: rgba(8, 30, 70, .5); color: #bae6fd; box-shadow: 0 0 14px rgba(56, 189, 248, .2); }
@@ -59,7 +80,8 @@ const TXT: Record<OrbState, string> = {idle: 'En veille', listening: "Je t'écou
 
 const isHolo = () => document.documentElement.classList.contains('theme-holo');
 const makeOrb = (o: HoloOpts) => (isHolo() ? createHolo(o) : createOrb());
-let root: HTMLElement, orb: ReturnType<typeof createOrb>, me: HTMLElement, rep: HTMLElement, note: HTMLElement, stateEl: HTMLElement, mic: HTMLButtonElement, comp: HTMLElement, input: HTMLInputElement, chip: HTMLElement;
+let root: HTMLElement, orb: ReturnType<typeof createOrb>, me: HTMLElement, rep: HTMLElement, note: HTMLElement, stateEl: HTMLElement, mic: HTMLButtonElement, comp: HTMLElement, input: HTMLInputElement, chip: HTMLElement, log: HTMLElement, cap: HTMLElement, sugg: HTMLElement;
+const SUGG = ["Quoi de neuf aujourd'hui ?", "Qu'est-ce qui m'attend cette semaine ?", 'Où en sont mes achats ?', 'Une idée de sortie ce week-end ?'];
 let fresh = true, sessionAt = 0, busy = false;
 const voice = new Voice({
   mode: () => store.settings.listenMode, voiceURI: () => store.settings.voiceURI, rate: () => store.settings.rate,
@@ -69,30 +91,33 @@ const voice = new Voice({
     set(map[s]); if (s === 'error' && why) note.textContent = 'Micro : ' + why + '. Touche le clavier pour écrire.'; if (s === 'listening') note.textContent = '';
     mic.className = 'jv-mic' + (s === 'listening' ? ' on' : s === 'speaking' ? ' say' : ''); mic.innerHTML = SVG(s === 'speaking' ? I.speaker : voice.active ? I.stop : I.mic, 30);
   },
-  onPartial: (t) => { me.textContent = t; },
-  onUtterance: (t) => { me.textContent = t; ask(t, true); }
+  onPartial: (t) => { me.textContent = t; down(); },
+  onUtterance: (t) => { ask(t, true); }
 });
-function set(s: OrbState) { orb.set(s); stateEl.textContent = TXT[s]; }
+function set(s: OrbState) { orb.set(s); stateEl.textContent = TXT[s]; (stateEl.parentElement as HTMLElement).dataset.s = s; }
+const down = () => { cap.scrollTop = cap.scrollHeight; };
+/* chaque échange reste à l'écran : ta question, puis la réponse complète (sous-titres) */
+function turn(q: string) { sugg.hidden = true; root.classList.add('is-talk'); const t = document.createElement('div'); t.className = 'jv-turn'; const a = document.createElement('p'); a.className = 'jv-q'; a.textContent = q; const b = document.createElement('p'); b.className = 'jv-a'; b.textContent = '…'; t.append(a, b); log.append(t); me.textContent = ''; rep = b; down(); }
 
 async function ask(text: string, byVoice: boolean) {
   if (busy) return; busy = true;
   store.add({who: 'me', text, at: Date.now()});
-  set('thinking'); rep.textContent = '…';
+  turn(text); set('thinking');
   const live = (byVoice || voice.active) && (canSpeak() || srv.serverVoice());
   let said = 0, reply = '';
   if (srv.linked()) {
     const g = live ? voice.streamStart() : 0;
     const feed = (t: string, final: boolean) => { if (!live) return; const rest = t.slice(said); let cut = final ? rest.length : -1; if (!final) { const re = /[.!?…](\s|$)/g; let x; while ((x = re.exec(rest))) if (x.index >= 2) cut = x.index + 1; } if (cut > 0) { const part = rest.slice(0, cut).trim(); said += cut; if (part) voice.streamPart(part, g); } };
     try {
-      const out = await srv.chat(text, {newSession: fresh, model: store.settings.model}, (t) => { rep.textContent = t; rep.parentElement!.scrollTop = 1e6; feed(t, false); });
+      const out = await srv.chat(text, {newSession: fresh, model: store.settings.model}, (t) => { rep.textContent = t; down(); feed(t, false); });
       fresh = false; reply = out.reply; if (out.missions.length) store.missions.push(...out.missions);
-      rep.textContent = reply; feed(reply, true);
+      rep.textContent = reply; down(); feed(reply, true);
     } catch (e) { reply = (e as Error).message; rep.textContent = reply; if (live) voice.streamPart(reply, g); }
     if (live) voice.streamEnd(g); else set('idle');
   } else {
     const out = think(text, store.settings.route);
     if (out.missions?.length) store.missions.push(...out.missions);
-    reply = out.reply; rep.textContent = reply;
+    reply = out.reply; rep.textContent = reply; down();
     if (out.end) { voice.speak(reply, () => close()); busy = false; store.add({who: 'jarvis', text: reply, at: Date.now()}); return; }
     if (live) voice.speak(reply); else set('idle');
   }
@@ -103,25 +128,27 @@ async function ask(text: string, byVoice: boolean) {
 function build() {
   const st = document.createElement('style'); st.textContent = CSS; document.head.append(st);
   root = document.createElement('div'); root.className = 'jv'; root.hidden = true; root.setAttribute('role', 'dialog'); root.setAttribute('aria-label', 'Conversation avec JARVIS');
-  root.innerHTML = `<div class="jv-top"><span class="jv-dot"></span><span class="jv-state">En veille</span><span class="jv-chip"></span></div>
-    <div class="jv-stage"></div><div class="jv-cap"><p class="jv-me"></p><p class="jv-rep"></p><p class="jv-note"></p></div>
+  root.innerHTML = `<div class="jv-top"><span class="jv-dot"></span><span class="jv-title">JARVIS</span><span class="jv-chip"></span></div>
+    <div class="jv-stage"></div><div class="jv-pill" data-s="idle"><i></i><span class="jv-state">En veille</span></div>
+    <div class="jv-cap"><div class="jv-sugg"></div><div class="jv-log"></div><p class="jv-me"></p><p class="jv-note"></p></div>
     <div class="jv-comp" hidden><input type="text" placeholder="Écris à JARVIS…" enterkeyhint="send" aria-label="Ta demande"><button type="button">Envoyer</button></div>
     <div class="jv-bar"><button type="button" class="jv-side jv-k" aria-label="Écrire">${SVG(I.key, 22)}</button><button type="button" class="jv-mic" aria-label="Parler">${SVG(I.mic, 30)}</button><button type="button" class="jv-side jv-x" aria-label="Fermer">${SVG(I.x, 22)}</button></div>`;
   document.body.append(root);
   orb = makeOrb({pedestal: true, nodes: 140}); root.querySelector('.jv-stage')!.append(orb.el);
-  me = root.querySelector('.jv-me')!; rep = root.querySelector('.jv-rep')!; note = root.querySelector('.jv-note')!; stateEl = root.querySelector('.jv-state')!; chip = root.querySelector('.jv-chip')!;
+  me = root.querySelector('.jv-me')!; log = root.querySelector('.jv-log')!; cap = root.querySelector('.jv-cap')!; sugg = root.querySelector('.jv-sugg')!; rep = document.createElement('p');
+  SUGG.forEach((q) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = q; b.onclick = () => ask(q, voice.active); sugg.append(b); }); note = root.querySelector('.jv-note')!; stateEl = root.querySelector('.jv-state')!; chip = root.querySelector('.jv-chip')!;
   mic = root.querySelector('.jv-mic')!; comp = root.querySelector('.jv-comp')!; input = comp.querySelector('input')!;
   mic.onclick = () => { if (voice.state === 'speaking') { voice.interrupt(); return; } if (voice.active) { voice.stop(); return; } start(); };
   (root.querySelector('.jv-k') as HTMLElement).onclick = () => { comp.hidden = !comp.hidden; if (!comp.hidden) { voice.stop(); setTimeout(() => input.focus(), 50); } };
   (root.querySelector('.jv-x') as HTMLElement).onclick = close;
-  const send = () => { const v = input.value.trim(); if (!v) return; input.value = ''; me.textContent = v; ask(v, false); };
+  const send = () => { const v = input.value.trim(); if (!v) return; input.value = ''; ask(v, false); };
   comp.querySelector('button')!.onclick = send;
   input.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); send(); } });
 }
 function start() { note.textContent = ''; if (!canListen()) { note.textContent = 'Pas de reconnaissance vocale ici : touche le clavier pour écrire.'; comp.hidden = false; return; } fresh = true; sessionAt = Date.now(); voice.start(); }
 export function open() {
   if (!root) build();
-  root.hidden = false; orb.wave(true); me.textContent = ''; rep.textContent = ''; comp.hidden = true;
+  root.hidden = false; orb.wave(true); me.textContent = ''; log.replaceChildren(); root.classList.remove('is-talk'); sugg.hidden = false; comp.hidden = true;
   chip.textContent = srv.linked() ? 'Claude · ' + ({rapide: 'Haiku', equilibre: 'Sonnet', profond: 'Opus'} as Record<string, string>)[store.settings.model] : 'réponses locales';
   set('idle'); start();
 }

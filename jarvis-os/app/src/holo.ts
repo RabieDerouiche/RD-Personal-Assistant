@@ -49,13 +49,14 @@ export function createHolo(o: HoloOpts = {}): Orb {
     live = state === 'speaking' ? lerp(live, 0.35 + Math.random() * 0.8, 0.25) : lerp(live, L.amp, k);
     t += dt * cur.spd;
     const W = cv.width, H = cv.height, A = cur.a, B = cur.b;
-    const R = Math.min(W, H * (ped ? 0.78 : 1)) * (ped ? 0.3 : 0.34) * (1 + live * 0.04 * Math.sin(t * 9));
+    const R = Math.min(W, H * (ped ? 0.78 : 1)) * (ped ? 0.3 : ring ? 0.31 : 0.36) * (1 + live * 0.04 * Math.sin(t * 9));
     const cx = W / 2, cy = ped ? H * 0.42 : H / 2;
     g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, W, H); g.globalCompositeOperation = 'lighter';
     /* halo autour du globe */
-    let gr = g.createRadialGradient(cx, cy, R * 0.6, cx, cy, R * 1.9);
+    const halo = Math.min(R * 1.9, Math.min(W, H) * 0.5 - 1);
+    let gr = g.createRadialGradient(cx, cy, R * 0.6, cx, cy, Math.max(R * 0.7, halo));
     gr.addColorStop(0, rgba(A, 0.22 + live * 0.12)); gr.addColorStop(1, rgba(B, 0));
-    g.fillStyle = gr; g.fillRect(0, 0, W, H);
+    g.fillStyle = gr; g.beginPath(); g.arc(cx, cy, Math.max(R * 0.7, halo), 0, Math.PI * 2); g.fill();
     /* socle : anneaux concentriques et faisceau */
     if (ped) {
       const py = cy + R * 1.42, pr = R * 1.55;

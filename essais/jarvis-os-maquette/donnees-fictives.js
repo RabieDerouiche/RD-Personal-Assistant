@@ -180,6 +180,8 @@
   const CAL = {};
   CAL[PRES] = [allDay(-5, 'Congé', 2), allDay(-2, 'Hors Domicile'), allDay(-1, 'Télétravail'), allDay(3, 'Télétravail')];
   CAL.primary = [
+    {id: 'imp6', summary: 'Dentiste', status: 'confirmed', colorId: '11', start: {dateTime: isoD(D(0)) + 'T09:00:00+01:00'}, end: {dateTime: isoD(D(0)) + 'T09:45:00+01:00'}, location: 'Cabinet'},
+    {id: 'imp7', summary: 'Réunion parents', status: 'confirmed', colorId: '11', start: {dateTime: isoD(D(0)) + 'T18:00:00+01:00'}, end: {dateTime: isoD(D(0)) + 'T19:00:00+01:00'}, location: 'École'},
     {id: 'imp1', summary: 'Rendez-vous notaire', status: 'confirmed', colorId: '11', start: {dateTime: isoD(D(6)) + 'T14:30:00+01:00'}, end: {dateTime: isoD(D(6)) + 'T15:30:00+01:00'}, location: 'Étude'},
     {id: 'imp2', summary: 'Anniversaire', status: 'confirmed', colorId: '11', start: {date: isoD(D(30))}, end: {date: isoD(D(31))}, recurrence: ['RRULE:FREQ=YEARLY']},
     {id: 'imp3', summary: 'Visite médicale', status: 'confirmed', colorId: '11', start: {date: isoD(D(9))}, end: {date: isoD(D(10))}},
