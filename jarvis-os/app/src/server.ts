@@ -129,11 +129,12 @@ export async function ttsUrl(text: string): Promise<string | null> {
   return URL.createObjectURL(await r.blob());
 }
 export const serverVoice = () => linked() && store.settings.voiceEngine === 'serveur' && last.tts === true;
+export let installTail = '';
 export async function installVoice(): Promise<string> {
   try { await call('/api/voice/install', {method: 'POST'}); } catch { return 'error'; }
   for (let i = 0; i < 120; i++) {   /* jusqu'à 10 minutes */
     await new Promise((r) => setTimeout(r, 5000));
-    try { const b = await (await call('/api/voice/install')).json(); if (b.state !== 'running') { await status(); return b.state; } } catch { /* on réessaie */ }
+    try { const b = await (await call('/api/voice/install')).json(); if (b.state !== 'running') { await status(); installTail = String(b.tail || ''); return b.state; } } catch { /* on réessaie */ }
   }
   return 'running';
 }

@@ -6,11 +6,13 @@ D="${JARVIS_PIPER_DIR:-$HOME/piper}"
 mkdir -p "$D/voices"
 export PATH="$HOME/.local/bin:$PATH"
 if ! command -v uv >/dev/null; then curl -LsSf https://astral.sh/uv/install.sh | sh; fi
-if [ ! -x "$D/bin/python" ]; then uv venv --python 3.12 "$D"; fi
-uv pip install --python "$D/bin/python" piper-tts
+# environnement Python à part (dossier « venv »), voix dans « voices » : uv refuse de créer un environnement dans un dossier déjà rempli
+V="$D/venv"
+if [ ! -x "$V/bin/python" ]; then rm -rf "$V"; uv venv --python 3.12 "$V"; fi
+uv pip install --python "$V/bin/python" piper-tts
 B=https://huggingface.co/rhasspy/piper-voices/resolve/main/fr/fr_FR/upmc/medium
 for f in fr_FR-upmc-medium.onnx.json fr_FR-upmc-medium.onnx; do
   if [ ! -s "$D/voices/$f" ]; then curl -fsSL -o "$D/voices/$f.part" "$B/$f"; mv "$D/voices/$f.part" "$D/voices/$f"; fi
 done
-"$D/bin/python" -c "import piper; print('piper prêt')"
+"$V/bin/python" -c "import piper; print('piper prêt')"
 echo "Voix installée."
