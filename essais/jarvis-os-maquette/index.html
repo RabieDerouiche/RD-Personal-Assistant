@@ -761,6 +761,34 @@
   .lg-chip b { font: 600 11px var(--sans); color: var(--muted); }
   .lg-chip.is-on { border-color: rgba(255, 255, 255, .6); background: rgba(255, 255, 255, .1); }
 
+  /* JARVIS OS : Papiers lus dans le Drive (16/11/2026) */
+  .pap-top { position: relative; } .pap-top .pap-search { padding-left: 40px; } .pap-ic { position: absolute; left: 13px; top: 50%; transform: translateY(-50%); color: var(--muted); display: inline-flex; pointer-events: none; }
+  .pap-quick { flex-wrap: wrap; overflow: visible; }
+  .pap-n { margin: 2px 0 0; font: 500 12.5px var(--sans); color: var(--muted); }
+  .pt-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .pt { --pc: #60a5fa; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; min-height: 104px; padding: 14px; border-radius: 20px; border: 1px solid color-mix(in srgb, var(--pc) 40%, transparent); background: linear-gradient(160deg, color-mix(in srgb, var(--pc) 16%, transparent), rgba(4, 12, 34, .7)); color: var(--fg); text-align: left; min-width: 0; }
+  .pt b { font: 700 16px var(--display); overflow-wrap: anywhere; } .pt small { color: var(--muted); font-size: 12px; }
+  .pt-ic { display: inline-grid; place-items: center; width: 38px; height: 38px; border-radius: 12px; color: var(--pc); background: color-mix(in srgb, var(--pc) 16%, transparent); box-shadow: 0 0 14px color-mix(in srgb, var(--pc) 35%, transparent); }
+  .pt.is-ghost { min-height: 104px; opacity: .35; animation: blink 1.4s ease-in-out infinite; }
+  .pap-h { --pc: #60a5fa; display: flex; align-items: center; gap: 12px; } .pap-h b { display: block; font: 700 22px var(--display); } .pap-h small { color: var(--muted); font-size: 12.5px; }
+  .pap-sec { display: flex; flex-direction: column; gap: 6px; scroll-margin-top: 120px; }
+  .pap-st { margin: 6px 0 0; display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font: 600 12px var(--display); letter-spacing: .1em; text-transform: uppercase; color: #7dd3fc; } .pap-st small { color: var(--dim); font: 500 11px var(--sans); letter-spacing: 0; }
+  .pf-list { display: flex; flex-direction: column; border-radius: 18px; border: 1px solid var(--line); background: var(--glass); overflow: hidden; }
+  .pf { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 10px 12px; border-top: 1px solid var(--line); color: var(--fg); text-decoration: none; min-height: 52px; }
+  .pf:first-child { border-top: 0; } .pf:active { background: rgba(56, 189, 248, .08); }
+  .pf-x { font: 700 10px var(--display); letter-spacing: .06em; text-align: center; padding: 6px 0; border-radius: 9px; color: #fecaca; background: rgba(248, 113, 113, .14); box-shadow: inset 0 0 0 1px rgba(248, 113, 113, .35); }
+  .pf-x[data-x="JPG"], .pf-x[data-x="PNG"], .pf-x[data-x="IMG"], .pf-x[data-x="HEIC"] { color: #a5f3fc; background: rgba(34, 211, 238, .12); box-shadow: inset 0 0 0 1px rgba(34, 211, 238, .35); }
+  .pf-x[data-x="DOC"], .pf-x[data-x="DOCX"] { color: #bfdbfe; background: rgba(96, 165, 250, .14); box-shadow: inset 0 0 0 1px rgba(96, 165, 250, .35); }
+  .pf-t { min-width: 0; display: flex; flex-direction: column; } .pf-t b { font-size: 14px; font-weight: 600; overflow-wrap: anywhere; } .pf-t small { color: var(--dim); font-size: 11.5px; overflow-wrap: anywhere; }
+  .pf-y { color: var(--dim); font: 500 11.5px var(--display); }
+  .pap-note { display: flex; flex-direction: column; gap: 8px; padding: 14px; border-radius: 18px; } .pap-note p { margin: 0; }
+  .pap-priv { display: inline-flex; align-items: center; gap: 6px; align-self: flex-start; font-size: 13px; }
+  .pap-dates { border-top: 1px solid var(--line); padding-top: 8px; }
+  .pap-dates > summary { list-style: none; display: flex; align-items: center; gap: 8px; min-height: 42px; cursor: pointer; font: 600 12px var(--display); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+  .pap-dates > summary::-webkit-details-marker { display: none; } .pap-dates > summary small { font: 500 11px var(--sans); letter-spacing: 0; text-transform: none; color: var(--dim); }
+  .pap-dates > summary .lg-chev { margin-left: auto; display: inline-flex; transition: transform .2s; } .pap-dates[open] > summary .lg-chev { transform: rotate(90deg); }
+  html.theme-holo .pf-list { background: linear-gradient(180deg, rgba(10, 30, 72, .5), rgba(4, 12, 34, .8)); border-color: rgba(56, 189, 248, .24); }
+  html.theme-holo .pf { border-top-color: rgba(56, 189, 248, .12); }
   /* JARVIS OS : Équipe harmonisée (16/11/2026) : cartes toutes pareilles (néon arrondi), Oxanium pour les titres et chiffres, Exo 2 pour le texte, l'ambre seulement sur « attend ta réponse » */
   html.theme-holo .unit[data-mode="demande"], html.theme-holo .mate[data-mode="demande"], html.theme-holo .hero[data-mode="demande"] {
     background: linear-gradient(180deg, rgba(12, 38, 92, .55), rgba(4, 12, 34, .82)) padding-box, linear-gradient(135deg, rgba(251, 191, 36, .8), rgba(99, 102, 241, .28) 40%, rgba(168, 85, 247, .55)) border-box; border: 1px solid transparent; }
@@ -3370,7 +3398,7 @@ void main(){
   const PAP_CATS = [['Voiture', /voiture|véhicule|carte grise|auto\b|contrôle technique|immatricul/], ['Appartement et immobilier', /appartement|logement|bail|loyer|syndic|copro|foncière|notaire|immobili|prêt|habitation|edf|eau\b/], ['Fille', /\bfille\b|bébé|enfant|naissance|carnet de santé/], ['Entourage de la fille', /crèche|nounou|assistante maternelle|école|pédiatre|garde/], ['Épouse', /épouse|femme\b|conjointe/]];
   const papCat = (q) => { const t = [q.name, q.who, q.use, q.note].join(' ').toLowerCase(); const c = PAP_CATS.find(([, re]) => re.test(t)); return c ? c[0] : /^rabie$/i.test(q.who || '') ? 'Moi' : /^foyer$/i.test(q.who || '') ? 'Foyer' : q.who ? q.who : 'Autres'; };
   let PAPQ = '', PAPC = 'Tout';
-  VIEWS.papiers = (el) => {
+  const papPilotage = (el) => {
     const all = (S.papiers || []).map((q) => ({q, cat: papCat(q)})), cats = ['Tout', ...new Set(all.map((x) => x.cat))], people = [...new Set(all.map((x) => x.q.who).filter(Boolean))];
     const list = h('div', {class: 'stack'});
     const draw = () => {
@@ -3385,6 +3413,114 @@ void main(){
     const input = h('input', {class: 'pap-search', type: 'search', placeholder: 'Chercher : carte grise, bail, passeport…', value: PAPQ, oninput: (e) => { PAPQ = e.target.value; draw(); }});
     const chips = h('div', {class: 'pap-chips'}, [...cats, ...people.filter((p) => !cats.includes(p))].map((c) => h('button', {type: 'button', class: 'chip' + (c === PAPC ? ' is-on' : ''), onclick: (e) => { PAPC = c; chips.querySelectorAll('.chip').forEach((b) => b.classList.toggle('is-on', b === e.currentTarget)); draw(); }}, c)));
     el.append(input, chips, list); draw();
+  };
+
+  /* ---------- JARVIS OS : Papiers lus dans le Drive (16/11/2026) ----------
+     Le dossier RD Assistant/Papiers est rangé par personne et par thème ; « Papiers privés » (banque, impôts, salaires) est hors de RD Assistant
+     et ne s'affiche que si on le demande (réglage gardé dans le téléphone). Lecture seule : un appui ouvre le fichier dans Drive. */
+  ICONS.lock = '<rect x="5" y="10.5" width="14" height="9.5" rx="2"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/>';
+  ICONS.user = '<circle cx="12" cy="8.5" r="3.5"/><path d="M5 20c.8-3.6 3.6-5.5 7-5.5s6.2 1.9 7 5.5"/>';
+  ICONS.users = '<circle cx="9" cy="9" r="3"/><path d="M3.5 19.5c.6-3 2.7-4.6 5.5-4.6s4.9 1.6 5.5 4.6"/><circle cx="16.5" cy="8" r="2.5"/><path d="M15.5 13.6c2.4-.2 4.4 1.2 5 4"/>';
+  ICONS.inbox = '<path d="M4 13.5 6.5 5h11l2.5 8.5V19H4z"/><path d="M4 13.5h4.5l1.2 2.2h4.6l1.2-2.2H20"/>';
+  ICONS.search = '<circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/>';
+  ICONS.brief = '<rect x="4" y="7.5" width="16" height="11.5" rx="2"/><path d="M9 7.5V6a1.5 1.5 0 0 1 1.5-1.5h3A1.5 1.5 0 0 1 15 6v1.5M4 12.5h16"/>';
+  const PAP_ROOT = '1huMsPD8I81buG4GWhuoGmsOafvy4HrE4';
+  const PT = {state: 'idle', data: null, err: '', at: 0, priv: false, key: ''};
+  const PAPS = {q: '', open: null};
+  try { PT.priv = localStorage.getItem('jarvis.papiers.prive') === '1'; } catch (e) { /* rien */ }
+  const papNorm = (t) => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  const papClean = (n) => String(n || '').replace(/\.(pdf|jpe?g|png|heic|docx?|xlsx?|zip|txt)$/i, '').replace(/_/g, ' ').replace(/\s{2,}/g, ' ').trim();
+  const papExt = (f) => { const m = String(f.name || '').match(/\.([a-z0-9]{2,4})$/i); return m ? m[1].toUpperCase().replace('JPEG', 'JPG') : /image/.test(f.mimeType) ? 'IMG' : /pdf/.test(f.mimeType) ? 'PDF' : /document|word/.test(f.mimeType) ? 'DOC' : 'FICH'; };
+  const papLook = (name) => { const n = papNorm(name);
+    return /voiture|auto\b/.test(n) ? ['car', '#f87171'] : /logement|appart|immobil|maison/.test(n) ? ['home', '#34d399'] : /voyage/.test(n) ? ['plane', '#22d3ee'] : /famille|proches/.test(n) ? ['users', '#fb923c']
+      : /trier|vrac/.test(n) ? ['inbox', '#94a3b8'] : /prive/.test(n) ? ['lock', '#d6b48a'] : /sante|medical/.test(n) ? ['pulse', '#f472b6'] : /travail|work|salaire/.test(n) ? ['brief', '#a78bfa'] : /impot|banque|credit/.test(n) ? ['lock', '#d6b48a'] : ['user', null]; };
+  const PERSON_COLORS = ['#60a5fa', '#c084fc', '#f472b6', '#2dd4bf'];
+  function papLoad(force) {
+    const key = PT.priv ? 'priv' : 'pub';
+    if (!LV.mcp || (!force && (PT.state === 'loading' || (PT.state === 'ok' && PT.key === key && Date.now() - PT.at < 600000)))) return;
+    PT.state = 'loading'; PT.key = key;
+    const roots = [{id: PAP_ROOT, key: 'papiers'}].concat(PT.priv ? [{name: 'Papiers privés', parent: 'root', key: 'prive'}] : []);
+    lvCall('Google Drive', 'folder_tree', {roots}).then((res) => {
+      const d = lvPayload(res) || {}; PT.data = papIndex(d); PT.state = 'ok'; PT.at = Date.now(); PT.err = '';
+      if (TAB === 'papiers') renderView(true);
+    }, (e) => { PT.state = 'error'; PT.err = (e && (e.code === 'not_in_manifest' ? 'not_in_manifest' : e.message)) || 'erreur'; if (TAB === 'papiers') renderView(true); });
+  }
+  function papIndex(d) {
+    const F = {}, kids = {}, files = {};
+    (d.roots || []).filter((r) => r.id).forEach((r) => { F[r.id] = {id: r.id, name: r.key === 'prive' ? 'Papiers privés' : 'Papiers', parent: '', root: r.key}; });
+    (d.folders || []).forEach((f) => { F[f.id] = {id: f.id, name: f.name, parent: f.parent}; });
+    Object.values(F).forEach((f) => { if (f.parent && F[f.parent]) (kids[f.parent] = kids[f.parent] || []).push(f); });
+    (d.files || []).forEach((f) => { if (F[f.parent]) (files[f.parent] = files[f.parent] || []).push(f); });
+    const path = (id) => { const out = []; for (let x = F[id]; x && x.parent && F[x.parent]; x = F[x.parent]) out.unshift(x.name); return out; };
+    const count = (id) => (files[id] || []).length + (kids[id] || []).reduce((n, k) => n + count(k.id), 0);
+    const all = (d.files || []).filter((f) => F[f.parent]).map((f) => ({...f, path: path(f.parent), top: path(f.parent)[0] || ''}));
+    const byName = (a, b) => a.name.localeCompare(b.name, 'fr', {numeric: true, sensitivity: 'base'});
+    Object.values(kids).forEach((l) => l.sort(byName)); Object.values(files).forEach((l) => l.sort(byName));
+    return {F, kids, files, path, count, all, roots: (d.roots || []).filter((r) => r.id)};
+  }
+  function papRow(f, showPath) {
+    const yr = (f.modifiedTime || '').slice(0, 4);
+    return h('a', {class: 'pf', href: f.viewUrl, target: '_blank', rel: 'noopener'},
+      h('span', {class: 'pf-x', 'data-x': papExt(f), text: papExt(f)}),
+      h('span', {class: 'pf-t'}, h('b', {text: papClean(f.name)}), showPath && f.path.length ? h('small', {text: f.path.join(' › ')}) : null),
+      yr ? h('small', {class: 'pf-y', text: yr}) : null);
+  }
+  function papTile(f, D, i) {
+    const [ic, col] = papLook(f.name), c = col || PERSON_COLORS[i % PERSON_COLORS.length];
+    return h('button', {type: 'button', class: 'pt', style: '--pc:' + c, onclick: () => { PAPS.open = f.id; NAV.up = false; renderView(false); }},
+      h('span', {class: 'pt-ic', html: icon(ic, 22)}), h('b', {text: f.name}), h('small', {text: D.count(f.id) + ' document' + (D.count(f.id) > 1 ? 's' : '')}));
+  }
+  VIEWS.papiers = (el) => {
+    papLoad(false);
+    const D = PT.data;
+    const input = h('input', {class: 'pap-search', type: 'search', placeholder: 'Chercher : passeport, quittance, carte Vitale…', value: PAPS.q, 'aria-label': 'Chercher un papier'});
+    const res = h('div', {class: 'stack pap-res'}), body = h('div', {class: 'stack'});
+    const QUICK = ['Passeport', 'Titre de séjour', 'Carte Vitale', 'Permis', 'Acte de naissance', 'Quittance'];
+    const quick = h('div', {class: 'pap-chips pap-quick'}, QUICK.map((q) => h('button', {type: 'button', class: 'chip' + (papNorm(PAPS.q) === papNorm(q) ? ' is-on' : ''), onclick: () => { PAPS.q = papNorm(PAPS.q) === papNorm(q) ? '' : q; input.value = PAPS.q; draw(); quick.querySelectorAll('.chip').forEach((b) => b.classList.toggle('is-on', papNorm(b.textContent) === papNorm(PAPS.q))); }}, q)));
+    const draw = () => {
+      const words = papNorm(PAPS.q).split(/\s+/).filter(Boolean);
+      body.hidden = !!words.length; res.hidden = !words.length;
+      if (!words.length || !D) { res.replaceChildren(); return; }
+      const hits = D.all.filter((f) => { const t = papNorm(f.name + ' ' + f.path.join(' ')); return words.every((w) => t.includes(w)); });
+      res.replaceChildren(h('p', {class: 'pap-n', text: hits.length ? hits.length + ' document' + (hits.length > 1 ? 's' : '') + (hits.length > 80 ? ' · les 80 premiers' : '') : 'Aucun document ne correspond.'}),
+        h('div', {class: 'pf-list'}, hits.slice(0, 80).map((f) => papRow(f, true))));
+    };
+    input.addEventListener('input', () => { PAPS.q = input.value; draw(); quick.querySelectorAll('.chip').forEach((b) => b.classList.toggle('is-on', papNorm(b.textContent) === papNorm(PAPS.q))); });
+    el.append(h('div', {class: 'pap-top'}, h('span', {class: 'pap-ic', html: icon('search', 18)}), input), quick, res, body);
+    if (PT.state === 'error' && !D) {
+      body.append(h('div', {class: 'card pap-note'}, h('b', {text: PT.err === 'not_in_manifest' ? 'Ton serveur ne lit pas encore le Drive' : 'Drive illisible pour l’instant'}),
+        h('p', {class: 'muted', text: PT.err === 'not_in_manifest' ? 'Mets-le à jour (Réglages, « Mettre à jour le serveur ») : tes dossiers apparaîtront ici.' : PT.err}),
+        btn('Réessayer', () => papLoad(true), 'sm', 'refresh')));
+    } else if (!D) {
+      body.append(h('div', {class: 'pt-grid is-wait'}, [0, 1, 2, 3, 4, 5].map(() => h('span', {class: 'pt is-ghost'}))), h('p', {class: 'muted', text: 'Lecture de tes dossiers Drive…'}));
+    } else if (PAPS.open && D.F[PAPS.open]) {
+      const f = D.F[PAPS.open], [ic, col] = papLook(f.name), sub = D.kids[f.id] || [];
+      const sections = [];
+      const walk = (id, rel) => { if ((D.files[id] || []).length) sections.push([rel, D.files[id]]); (D.kids[id] || []).forEach((k) => walk(k.id, rel.concat(k.name))); };
+      walk(f.id, []);
+      body.append(h('button', {type: 'button', class: 'link back', onclick: () => { PAPS.open = D.F[f.parent] && D.F[f.parent].parent ? f.parent : null; renderView(false); }}, '‹ ' + (D.F[f.parent] && D.F[f.parent].parent ? D.F[f.parent].name : 'Tous les papiers')),
+        h('header', {class: 'pap-h', style: '--pc:' + (col || '#60a5fa')}, h('span', {class: 'pt-ic', html: icon(ic, 22)}), h('div', {}, h('b', {text: f.name}), h('small', {text: D.count(f.id) + ' documents' + (sub.length ? ' · ' + sub.length + ' dossier' + (sub.length > 1 ? 's' : '') : '')}))),
+        sub.length > 1 ? h('div', {class: 'pap-chips pap-quick'}, sub.map((k) => h('button', {type: 'button', class: 'chip', onclick: () => { const t = document.getElementById('ps-' + k.id); if (t) t.scrollIntoView({behavior: 'smooth', block: 'start'}); }}, k.name + ' · ' + D.count(k.id)))) : null,
+        ...(sections.length ? sections.map(([rel, fs]) => { const first = rel[0] && (sub.find((k) => k.name === rel[0]) || {}).id;
+          return h('section', {class: 'pap-sec', id: rel.length === 1 && first ? 'ps-' + first : null}, h('h3', {class: 'pap-st', text: rel.length ? rel.join(' › ') : 'Dans ce dossier'}, h('small', {text: String(fs.length)})), h('div', {class: 'pf-list'}, fs.map((x) => papRow(x, false)))); })
+          : [h('p', {class: 'muted', text: 'Ce dossier est vide.'})]));
+    } else {
+      const root = D.roots.find((r) => r.key === 'papiers'), priv = D.roots.find((r) => r.key === 'prive');
+      const tops = root ? (D.kids[root.id] || []) : [], loose = root ? (D.files[root.id] || []) : [];
+      const people = tops.filter((t) => papLook(t.name)[0] === 'user'), others = tops.filter((t) => papLook(t.name)[0] !== 'user').sort((a, b) => (papLook(a.name)[0] === 'inbox') - (papLook(b.name)[0] === 'inbox'));
+      body.append(h('p', {class: 'pap-n', text: D.all.length + ' documents · ' + tops.length + ' dossiers'}));
+      if (people.length) body.append(hsec('Par personne', null, h('div', {class: 'pt-grid'}, people.map((t, i) => papTile(t, D, i)))));
+      if (others.length) body.append(hsec('Par thème', null, h('div', {class: 'pt-grid'}, others.map((t, i) => papTile(t, D, i)))));
+      if (loose.length) body.append(hsec('En vrac', h('span', {class: 'aside', text: loose.length + ' à ranger'}), h('div', {class: 'pf-list'}, loose.slice(0, 12).map((x) => papRow(x, false))),
+        loose.length > 12 ? h('p', {class: 'muted', text: '… et ' + (loose.length - 12) + ' autres : cherche-les par leur nom.'}) : null));
+      if (priv) body.append(hsec('Papiers privés', h('span', {class: 'aside', text: 'banque, impôts, salaires'}), h('div', {class: 'pt-grid'}, papTile(D.F[priv.id], D, 0), ...(D.kids[priv.id] || []).map((t, i) => papTile(t, D, i + 1)))));
+      body.append(h('button', {type: 'button', class: 'link pap-priv', onclick: () => { PT.priv = !PT.priv; try { localStorage.setItem('jarvis.papiers.prive', PT.priv ? '1' : '0'); } catch (e) { /* rien */ } papLoad(true); renderView(true); }},
+        h('span', {html: icon('lock', 14)}), PT.priv ? 'Masquer les papiers privés' : 'Afficher les papiers privés (banque, impôts, salaires)'));
+    }
+    const pil = h('div', {class: 'stack'}); papPilotage(pil);
+    const dates = h('details', {class: 'pap-dates'}, h('summary', {}, h('span', {text: 'Dates de validité et pièces à fournir'}), h('small', {text: 'onglet Papiers de Pilotage'}), h('span', {class: 'lg-chev', html: icon('next', 14)})), pil);
+    body.append(dates);
+    draw();
   };
 
   function boot() {

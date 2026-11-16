@@ -16,7 +16,8 @@ Dépôt **public** : n'y écris et n'y commit jamais de donnée personnelle (nom
 | `RD Assistant/Finances/` | `1rd9YnCy79oYv421qVEM66vIzwi8NBpED` |
 | `RD Assistant/CV/` | `1e6bZxtgR4Tk21Vpf7losMoUfomyghK8r` |
 | `RD Assistant/Grok Bot/` | `1BaHpB9pTbVZLVkGPLRjguqHoA524Anm7` |
-| `RD Assistant/Papiers/` (documents rangés par Iris, un sous-dossier par année) | `1huMsPD8I81buG4GWhuoGmsOafvy4HrE4` |
+| `RD Assistant/Papiers/` (rangé par catégorie depuis le 16/11/2026 : un dossier par personne du foyer, Famille et proches, Logement, Voiture, Voyages, À trier ; Iris y range ce qu'il dépose ; affiché dans JARVIS OS, rubrique Papiers) | `1huMsPD8I81buG4GWhuoGmsOafvy4HrE4` |
+| `Papiers privés/` (racine du Drive, hors RD Assistant : banque et crédit, impôts, salaires ; jamais lu par les bots ; JARVIS OS ne l'affiche que sur demande) | `13nqA3G6noT67bIneaxBhiJ4TzEWHMHSN` |
 | `Grok Bot/Pilotage Grok Bot` (Google Sheet) | `1kIu7U1X28RCVO_SAF2l9IMt9QWiOWbGWcRX5bV1-7z0` |
 | `Grok Bot/Charte commune`, `Fiche <Bot>`, `Plan Grok Bot v2` (Google Docs) | retrouvés par titre dans `Grok Bot/` |
 | `RD Assistant/Jarvis (sources de la page)/` (code complet de la page Jarvis, un fichier `jarvis-page-v<version>.html` par version publiée) | `1LO_y3DbvXjQQtuSQPlQfbnMU5Mlyzz3X` |

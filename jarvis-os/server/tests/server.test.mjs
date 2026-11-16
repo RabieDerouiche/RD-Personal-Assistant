@@ -107,6 +107,13 @@ try {
     r = await T('Google Calendar', 'update_event', {eventId: 'ev1', startTime: '2026-11-21T09:00:00', notificationLevel: 'NONE'}); c = FG.calls.filter((x) => x.method === 'PATCH').pop();
     ok('Agenda update_event : durée gardée en déplaçant', r.status === 200 && c.body.start.dateTime === '2026-11-21T09:00:00+01:00' && Date.parse(c.body.end.dateTime) - Date.parse(c.body.start.dateTime) === 3600e3 && c.q.sendUpdates === 'none', JSON.stringify(c.body));
     r = await T('Google Calendar', 'delete_event', {eventId: 'ev1', notificationLevel: 'NONE'}); ok('Agenda delete_event', r.status === 200);
+    /* Drive : arborescence de Papiers (JARVIS OS, 16/11/2026), lecture seule */
+    r = await T('Google Drive', 'folder_tree', {roots: [{id: 'pap', key: 'papiers'}, {name: 'Papiers privés', parent: 'root', key: 'prive'}, {name: 'Absent', parent: 'root', key: 'x'}]}); const tr = r.body.payload || {};
+    const fn = (tr.files || []).map((f) => f.name), fo = (tr.folders || []).map((f) => f.id).sort().join(',');
+    ok('Drive folder_tree : racines par id et par nom, absente signalée', r.status === 200 && tr.roots[0].id === 'pap' && tr.roots[1].id === 'priv' && tr.roots[1].found && !tr.roots[2].found, JSON.stringify(tr.roots));
+    ok('Drive folder_tree : tous les sous-dossiers (niveau par niveau, pagination)', fo === 'f-id,f-imp,f-loc,f-log,f-lui', fo);
+    ok('Drive folder_tree : fichiers avec parent, lien et date, sans corbeille ni dossier étranger', fn.length === 5 && fn.includes("Titre de séjour l'ancien.jpg") && !fn.includes('Ne doit pas sortir.pdf') && !fn.includes('Supprimé.pdf') && tr.files.find((f) => f.id === 'd3').parent === 'f-loc' && /drive\.example\/d1/.test(tr.files.find((f) => f.id === 'd1').viewUrl), fn.join(' | '));
+    ok('Drive folder_tree : requêtes en lecture seule', FG.calls.filter((x) => x.path.startsWith('/drive')).every((x) => x.method === 'GET'));
     r = await T('Gmail', 'search_threads', {query: 'in:inbox category:primary newer_than:7d', pageSize: 50, view: 'THREAD_VIEW_SUMMARY'}); const m0 = r.body.payload.threads[0].messages[0];
     ok('Gmail search_threads : forme du connecteur (expéditeur, nom, objet, date)', m0.sender === 'gestion@syndic.example' && m0.addressDisplayNames[0].displayName === 'Syndic Dupont' && m0.subject === 'RE: Dégât des eaux' && m0.internalDate === '1763290000000' && m0.labelIds.includes('INBOX'), JSON.stringify(m0).slice(0, 160));
     r = await T('Gmail', 'search_threads', {query: 'in:sent newer_than:14d'}); ok('Gmail search_threads vide : réponse vide', r.status === 200 && !r.body.payload.threads);

@@ -7,9 +7,9 @@
 import crypto from 'node:crypto';
 
 const FAKE = process.env.JARVIS_GOOGLE_FAKE || '';   /* banc d'essai : toutes les adresses Google vers un faux serveur */
-const URLS = FAKE ? {auth: FAKE + '/auth', token: FAKE + '/token', revoke: FAKE + '/revoke', sheets: FAKE + '/sheets', cal: FAKE + '/calendar', gmail: FAKE + '/gmail'}
+const URLS = FAKE ? {auth: FAKE + '/auth', token: FAKE + '/token', revoke: FAKE + '/revoke', sheets: FAKE + '/sheets', cal: FAKE + '/calendar', gmail: FAKE + '/gmail', drive: FAKE + '/drive'}
   : {auth: 'https://accounts.google.com/o/oauth2/v2/auth', token: 'https://oauth2.googleapis.com/token', revoke: 'https://oauth2.googleapis.com/revoke',
-    sheets: 'https://sheets.googleapis.com', cal: 'https://www.googleapis.com/calendar/v3', gmail: 'https://gmail.googleapis.com/gmail/v1'};
+    sheets: 'https://sheets.googleapis.com', cal: 'https://www.googleapis.com/calendar/v3', gmail: 'https://gmail.googleapis.com/gmail/v1', drive: 'https://www.googleapis.com/drive/v3'};
 export const SCOPES = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/calendar.events', 'https://www.googleapis.com/auth/calendar.readonly',
   'https://www.googleapis.com/auth/gmail.modify', 'https://www.googleapis.com/auth/drive.readonly'];
 const TZ = 'Europe/Paris';
@@ -201,6 +201,43 @@ export function createGoogle({S, save, log = () => {}}) {
       send_message: (i) => i.draftId ? api('POST', `${URLS.gmail}/users/me/drafts/send`, {id: i.draftId}) : api('POST', `${URLS.gmail}/users/me/messages/send`, {raw: rawMail(i)}),
       delete_draft: (i) => api('DELETE', `${URLS.gmail}/users/me/drafts/${enc(i.draftId)}`),
       unlabel_thread: (i) => api('POST', `${URLS.gmail}/users/me/threads/${enc(i.threadId)}/modify`, {removeLabelIds: [].concat(i.labelIds || [])})
+    },
+    'Google Drive': {
+      /* JARVIS OS (16/11/2026) : l'arborescence complète de dossiers (Papiers), en lecture seule et en peu d'appels :
+         les dossiers niveau par niveau, puis les fichiers par lots de 40 dossiers parents. Une racine se donne par id, ou par nom et parent ('root' = Mon Drive). */
+      folder_tree: async (i) => {
+        const FOLDER = 'application/vnd.google-apps.folder', qs = (v) => "'" + String(v).replace(/\\/g, '\\\\').replace(/'/g, "\\'") + "'";
+        const chunks = (a, n) => { const o = []; for (let k = 0; k < a.length; k += n) o.push(a.slice(k, k + n)); return o; };
+        const inParents = (ids) => '(' + ids.map((x) => qs(x) + ' in parents').join(' or ') + ')';
+        const list = async (q, fields) => {
+          const out = []; let page = '';
+          do {
+            const p = new URLSearchParams({q, pageSize: '1000', fields: 'nextPageToken,files(' + fields + ')'}); if (page) p.set('pageToken', page);
+            const j = await api('GET', `${URLS.drive}/files?${p}`); out.push(...(j.files || [])); page = j.nextPageToken || '';
+          } while (page && out.length < 20000);
+          return out;
+        };
+        const roots = [];
+        for (const r of [].concat(i.roots || []).slice(0, 5)) {
+          if (r.id) { roots.push({key: r.key || r.id, id: String(r.id), name: r.name || '', found: true}); continue; }
+          const f = r.name ? (await list(`name = ${qs(r.name)} and ${qs(r.parent || 'root')} in parents and mimeType = '${FOLDER}' and trashed = false`, 'id,name'))[0] : null;
+          roots.push({key: r.key || r.name || '', id: f ? f.id : '', name: r.name || '', found: !!f});
+        }
+        const seen = new Set(roots.map((r) => r.id).filter(Boolean)), folders = []; let level = [...seen];
+        for (let depth = 0; level.length && depth < 8; depth++) {
+          const next = [];
+          for (const c of chunks(level, 40)) for (const f of await list(`mimeType = '${FOLDER}' and trashed = false and ${inParents(c)}`, 'id,name,parents')) {
+            if (seen.has(f.id)) continue;
+            seen.add(f.id); next.push(f.id); folders.push({id: f.id, name: f.name, parent: (f.parents || []).find((p) => c.includes(p)) || (f.parents || [])[0] || ''});
+          }
+          level = next;
+        }
+        const files = [];
+        for (const c of chunks([...seen], 40)) for (const f of await list(`mimeType != '${FOLDER}' and trashed = false and ${inParents(c)}`, 'id,name,mimeType,parents,modifiedTime,size,webViewLink')) {
+          files.push({id: f.id, name: f.name, mimeType: f.mimeType || '', parent: (f.parents || []).find((p) => seen.has(p)) || (f.parents || [])[0] || '', modifiedTime: f.modifiedTime || '', size: f.size ? +f.size : null, viewUrl: f.webViewLink || 'https://drive.google.com/file/d/' + f.id + '/view'});
+        }
+        return {roots, folders, files};
+      }
     }
   };
   async function tool(server, name, input) {
