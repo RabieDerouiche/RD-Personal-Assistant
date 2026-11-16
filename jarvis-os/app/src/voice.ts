@@ -9,6 +9,9 @@ const SILENT = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAA
 const SR: (new () => Rec) | null = W.SpeechRecognition || W.webkitSpeechRecognition || null;
 const synth: SpeechSynthesis | null = W.speechSynthesis || null;
 export const canListen = () => !!SR;
+/* Safari (iOS 17+) : le mode audio de la page. Pendant l'écoute, l'iPhone passe en mode « appel » (micro + son, volume faible) ;
+   s'il y reste quand JARVIS parle, la voix baisse. On le remet en « lecture » pour parler, en « appel » pour écouter. */
+function audioMode(t: 'playback' | 'play-and-record' | 'auto') { try { const s = (navigator as any).audioSession; if (s && s.type !== t) s.type = t; } catch { /* navigateur sans réglage : rien */ } }
 export const canSpeak = () => !!(synth && W.SpeechSynthesisUtterance);
 
 export function frenchVoices(): SpeechSynthesisVoice[] {
@@ -56,7 +59,7 @@ export class Voice {
   stop() {
     this.on = false; clearTimeout(this.timer);
     const r = this.rec; this.rec = null; try { if (r) r.abort(); } catch { /* rien */ }
-    this.hush(); this.set('off');
+    this.hush(); this.set('off'); audioMode('auto');
   }
   /* coupe la parole de JARVIS et réécoute */
   interrupt() { this.hush(); if (this.on) this.listen(true); }
@@ -71,6 +74,7 @@ export class Voice {
     let rec: Rec;
     try { rec = new SR(); } catch (e: any) { this.fail('création impossible : ' + (e && e.message)); return; }
     this.rec = rec; this.buf = ''; this.tmp = ''; this.startedAt = Date.now();
+    audioMode('play-and-record');
     rec.lang = 'fr-FR'; rec.interimResults = true; rec.continuous = this.o.mode() === 'continu'; rec.maxAlternatives = 1;
     let started = false, err = '';
     const wd = window.setTimeout(() => { if (this.rec === rec && !started) { this.rec = null; try { rec.abort(); } catch { /* rien */ } if (auto) this.autoRestartFail(); this.fail("l'écoute ne démarre pas"); } }, 4000);
@@ -122,10 +126,10 @@ export class Voice {
     if (next === undefined) {
       if (this.qOpen) return;   /* la suite n'est pas encore arrivée */
       const cb = this.qEnd; this.qEnd = null; this.speakingNow = false; if (cb) cb();
-      if (this.on) window.setTimeout(() => this.listen(true), 250);
+      if (this.on) window.setTimeout(() => this.listen(true), 450);
       return;
     }
-    this.qBusy = true; this.speakingNow = true; this.set('speaking');
+    this.qBusy = true; this.speakingNow = true; this.set('speaking'); audioMode('playback');
     const g = this.gen;
     this.utter(next, () => { if (g !== this.gen) return; this.qBusy = false; this.pump(); });
   }
@@ -163,7 +167,7 @@ export class Voice {
   /* lit la réponse, puis réécoute si la conversation est ouverte */
   speak(text: string, then?: () => void) {
     if (this.o.tts && this.o.tts()) { const g = this.streamStart(); this.streamPart(text, g); this.streamEnd(g, then); return; }
-    const after = () => { this.speakingNow = false; if (then) then(); if (this.on) window.setTimeout(() => this.listen(true), 250); };
+    const after = () => { this.speakingNow = false; if (then) then(); if (this.on) window.setTimeout(() => this.listen(true), 450); };
     if (!canSpeak() || !text.trim()) { after(); return; }
     const u = new W.SpeechSynthesisUtterance(text.replace(/[*_#>`]/g, ' '));
     const v = frenchVoices().find((x) => (x.voiceURI || x.name) === this.o.voiceURI());
@@ -171,8 +175,10 @@ export class Voice {
     u.rate = Math.min(1.5, Math.max(0.7, this.o.rate()));
     let done = false; const fin = () => { if (done) return; done = true; after(); };
     u.onend = fin; u.onerror = fin;
-    this.speakingNow = true; this.set('speaking');
+    this.speakingNow = true; this.set('speaking'); audioMode('playback');
     try { synth!.cancel(); synth!.speak(u); } catch { fin(); return; }
-    window.setTimeout(() => { if (!done && synth && !synth.speaking) fin(); }, Math.max(5000, text.length * 110));
+    /* filet de sécurité large, comme pour la lecture au fil de l'eau : sur iPhone, « speaking » peut être faux pendant que la voix parle ;
+       finir à 5 s rouvrait le micro en pleine phrase et l'iPhone baissait le son (retour du 16/11/2026) */
+    window.setTimeout(fin, Math.max(9000, text.length * 140));
   }
 }
