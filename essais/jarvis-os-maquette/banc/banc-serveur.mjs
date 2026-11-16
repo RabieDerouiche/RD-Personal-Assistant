@@ -28,7 +28,7 @@ try {
   await p.goto(BASE + '/?serveur#reglages'); await p.waitForTimeout(2500);
   ok('Réglages : compte Google affiché', await p.evaluate(() => /proprietaire@example\.org/.test(document.querySelector('.set-wrap').textContent)));
   await p.tap('button:has-text("Tester mes données")'); await p.waitForTimeout(1500);
-  const t = await p.evaluate(() => document.querySelector('.set-card .set-msg').textContent); ok('test des données : Pilotage lu par le serveur', /Pilotage lu : 1 lignes/.test(t), t);
+  const t = await p.evaluate(() => document.querySelector('.set-card .set-msg').textContent); ok('test des données : Pilotage lu par le serveur', /Pilotage lu : 1 ligne dans/.test(t), t);
   await p.screenshot({path: SH + 'set-2.png'});
   const before = FG.calls.length;
   await p.goto(BASE + '/?serveur'); await p.waitForTimeout(6000);

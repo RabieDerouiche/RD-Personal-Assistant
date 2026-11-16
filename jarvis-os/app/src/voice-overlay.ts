@@ -56,12 +56,12 @@ const CSS = `
 .theme-holo .jv-btn { background: radial-gradient(circle, rgba(2, 8, 24, .95) 55%, rgba(2, 8, 24, 0) 72%); }
 .theme-holo .jv-btn::after { box-shadow: 0 0 0 1px rgba(56, 189, 248, .5), 0 0 22px rgba(56, 189, 248, .45); animation: jvholo 2.6s ease-in-out infinite; }
 @keyframes jvholo { 50% { box-shadow: 0 0 0 1px rgba(103, 232, 249, .75), 0 0 36px rgba(56, 189, 248, .7); } }
-.theme-holo .jv { background: radial-gradient(90% 46% at 50% 26%, #0b2d63 0, #04112b 45%, #02040d 100%); }
+.theme-holo .jv { background: radial-gradient(90% 46% at 50% 26%, #0b2d63 0, #04112b 45%, #02040d 100%); font-family: 'Exo 2', system-ui, sans-serif; }
 .theme-holo .jv::before { content: ""; position: absolute; inset: 0; pointer-events: none; background-image: radial-gradient(1px 1px at 12% 18%, rgba(255,255,255,.55), transparent 60%), radial-gradient(1px 1px at 78% 12%, rgba(255,255,255,.4), transparent 60%), radial-gradient(1.5px 1.5px at 88% 46%, rgba(125,211,252,.6), transparent 60%), radial-gradient(1px 1px at 22% 62%, rgba(255,255,255,.35), transparent 60%), radial-gradient(1px 1px at 60% 80%, rgba(255,255,255,.3), transparent 60%), radial-gradient(1.5px 1.5px at 40% 8%, rgba(168,85,247,.6), transparent 60%); }
 .theme-holo .jv > * { position: relative; }
-.theme-holo .jv-top { font: 600 11px Orbitron, Inter, sans-serif; letter-spacing: .18em; text-transform: uppercase; color: #7dd3fc; }
+.theme-holo .jv-top { font: 600 11px Orbitron, Oxanium, sans-serif; letter-spacing: .18em; text-transform: uppercase; color: #7dd3fc; }
 .theme-holo .jv-dot { background: #22d3ee; box-shadow: 0 0 12px #22d3ee; }
-.theme-holo .jv-chip { font-family: Inter, sans-serif; letter-spacing: 0; text-transform: none; color: #67e8f9; border-color: rgba(103, 232, 249, .4); }
+.theme-holo .jv-chip { font-family: 'Exo 2', sans-serif; letter-spacing: 0; text-transform: none; color: #67e8f9; border-color: rgba(103, 232, 249, .4); }
 .theme-holo .jv-me { color: #e0f2fe; }
 .theme-holo .jv-rep, .theme-holo .jv-a { color: #bfdbfe; }
 .theme-holo .jv-q { background: rgba(14, 165, 233, .2); border: 1px solid rgba(56, 189, 248, .35); }

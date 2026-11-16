@@ -116,6 +116,22 @@ srv.listen(0, async () => {
     p = await page('#voyages');
     await p.evaluate(() => document.querySelector('.voy .fam-hit').click()); await p.waitForTimeout(800);
     ok('voyage sans réseau : la page reste entière (photo de secours, pas de météo)', await p.evaluate(() => !!document.querySelector('.vh.is-big') && !!document.querySelector('.vp-codes')));
+    /* check-up du 16/11/2026 : défauts 1 à 13 corrigés */
+    p = await page('#equipe');
+    await p.evaluate(() => document.querySelector('.team .mate').click()); await p.waitForTimeout(800);
+    ok('check-up : page d\'un bot, prochain passage calculé (jamais une date passée)', await p.evaluate(() => { const d = [...document.querySelectorAll('.pgrid > div')].find((x) => /Prochain passage/.test(x.textContent)); return !!d && /^(aujourd'hui|demain|lun|mar|mer|jeu|ven|sam|dim|\d\d\/\d\d) \d\dh\d\d · /.test(d.querySelector('dd').textContent); }));
+    ok('check-up : « Toi » dans le fil d\'un bot, « en attente du … »', await p.evaluate(() => { const t = document.getElementById('view').innerText; return !/\brabie →/.test(t) && !/en attente de (le|les) /.test(t) && /Toi → /.test(t); }));
+    ok('check-up : page profonde, la date laisse la place au logo', await p.evaluate(() => getComputedStyle(document.getElementById('today')).display === 'none' && document.querySelector('.brand').scrollWidth <= document.querySelector('.brand').clientWidth + 1));
+    p = await page('#automatisations');
+    ok('check-up : automatisations, dernier passage repris de l\'onglet État', await p.evaluate(() => !/pas encore vu dans le journal/.test(document.querySelector('.auto.card').textContent)));
+    ok('check-up : en-tête qui défile avec un fondu au lieu d\'être coupé', await p.evaluate(() => { const s = document.getElementById('status'); return getComputedStyle(s).overflowX === 'auto' && (s.scrollWidth <= s.clientWidth + 2 || s.classList.contains('is-more')); }));
+    p = await page('');
+    ok('check-up : frise, aucun repère horaire sous l\'heure actuelle', await p.evaluate(() => { const n = document.querySelector('.tl-now small').getBoundingClientRect(); return [...document.querySelectorAll('.tl-tick small')].every((t) => { const r = t.getBoundingClientRect(); return r.right < n.left || r.left > n.right; }); }));
+    ok('check-up : texte secondaire lisible (gris assez clair)', await p.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--dim').trim().toLowerCase() === '#8aa9d1'));
+    await p.tap('.talk-slot .jv-btn'); await p.waitForTimeout(900);
+    ok('check-up : page vocale dans les polices de la charte (plus d\'Inter)', await p.evaluate(() => [...document.querySelectorAll('.jv, .jv *')].filter((e) => [...e.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim())).every((e) => /^("?Exo 2|"?Oxanium|Orbitron)/.test(getComputedStyle(e).fontFamily))));
+    p = await page('#demandes');
+    ok('check-up : phrase des oui groupés sans police machine à écrire', await p.evaluate(() => [...document.querySelectorAll('.yes-p')].every((e) => /Exo 2/.test(getComputedStyle(e).fontFamily))));
     /* aucune rubrique n'affiche de texte cassé */
     const broken = [];
     for (const t of ['accueil', 'demandes', 'agenda', 'suivi', 'achats', 'voyages', 'sorties', 'papiers', 'equipe', 'automatisations', 'reglages']) {

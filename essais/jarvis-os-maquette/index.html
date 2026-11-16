@@ -1251,6 +1251,17 @@
   .smart.is-plain { display: block; }
   .brand.is-deep .demo { display: none; }
   .sa-main .btn .cost { margin-left: auto; }
+
+  /* JARVIS OS, check-up du 16/11/2026 : lisibilité */
+  .top .status { overflow-x: auto; overscroll-behavior-x: contain; }
+  .top .status.is-more { -webkit-mask-image: linear-gradient(90deg, #000 86%, transparent); mask-image: linear-gradient(90deg, #000 86%, transparent); }
+  .brand.is-deep + .top-meta #today { display: none; }
+  .tl-now.is-l small { left: 0; transform: none; } .tl-now.is-r small { left: auto; right: 0; transform: none; }
+  html.theme-holo { --muted: #a3c1e4; --dim: #8aa9d1; }
+  html.theme-holo .lf-av { color: #03122e; }
+  html.theme-holo .yes-p { font-family: var(--sans); font-size: 13px; }
+  .sa-grid { grid-template-columns: 1fr; }
+  .sa-grid .btn { min-height: 46px; }
 </style>
 
 <div class="scroller" id="scroller">
@@ -1290,6 +1301,8 @@
   const eur = (v) => new Intl.NumberFormat('fr-FR', {style: 'currency', currency: 'EUR', maximumFractionDigits: 0}).format(v);
   const dayDiff = (iso) => { const p = iso.split('-').map(Number); const d = new Date(p[0], p[1] - 1, p[2], 12); return Math.round((d - TODAY) / 86400000); };
 
+  /* JARVIS OS (check-up du 16/11) : « en attente de le support » → « en attente du support » */
+  const deQui = (w) => { w = String(w || '').trim(); return /^le\s/i.test(w) ? 'du ' + w.slice(3) : /^les\s/i.test(w) ? 'des ' + w.slice(4) : /^[aeiouyéèêàâîôûh]/i.test(w) ? "d'" + w : 'de ' + w; };
   const BOTS = [
     {id: 'hydra', name: 'Hydra', role: 'Courrier, agenda, dossiers', obj: 'un classeur', room: 'Le courrier', c: '#14b8a6', d: '#0f766e', s: '#ccfbf1'},
     {id: 'medusa', name: 'Medusa', role: 'Notes de frais et CRA', obj: 'un ticket de caisse', room: 'La comptabilité', c: '#8b5cf6', d: '#6d28d9', s: '#ede9fe'},
@@ -2341,12 +2354,12 @@ void main(){
   const SHEETCFG = {
     demande: (d) => ({bot: d.bot, kicker: BOT[d.bot].name + ' · ' + KIND[d.kind], title: d.title, say: d.ask, facts: [['Pourquoi', d.why], ['Où trouver', d.where], ['Sinon', d.ifnot], ['Détail', d.detail], ['Avant le', d.due != null ? longDay(d.due) : '']], actions: ACTIONS.demande(d)}),
     echeance: (e) => ({bot: e.bot, kicker: NATURE[e.nature] + ' · ' + e.domain, title: e.title, say: NATSAY(e), facts: [['Quand', longDay(e.n) + ' (' + late(e.n) + ')'], ['Suivi par', BOT[e.bot].name]], actions: ACTIONS.echeance(e)}),
-    dossier: (k) => ({bot: k.bot, kicker: 'Dossier · en attente de ' + k.who, title: k.title, say: "J'attends " + k.who + ' depuis ' + (-k.since) + ' jours.', facts: [['Prochaine étape', k.step], ['Dernier contact', longDay(k.since)]], actions: ACTIONS.dossier(k)}),
+    dossier: (k) => ({bot: k.bot, kicker: 'Dossier · en attente ' + deQui(k.who), title: k.title, say: "J'attends " + k.who + ' depuis ' + (-k.since) + ' jours.', facts: [['Prochaine étape', k.step], ['Dernier contact', longDay(k.since)]], actions: ACTIONS.dossier(k)}),
     prix: (p) => ({bot: 'unicorn', kicker: 'Prix suivi', title: p.name, say: p.now <= p.buy ? 'Il est à ' + eur(p.now) + ', sous ton seuil : c\'est le moment.' : p.now <= p.good ? 'Bon prix : ' + eur(p.now) + ', mais pas encore ton seuil.' : 'Il est à ' + eur(p.now) + '. Ton seuil : ' + eur(p.buy) + '.', facts: [['Prix public', eur(p.ref)], ['Aujourd\'hui', eur(p.now)], ['Tu achètes sous', eur(p.buy)], ['Chez', p.seller]], actions: ACTIONS.prix(p)}),
     papier: (q) => ({bot: 'hydra', kicker: 'Papier · ' + q.who, title: q.name, say: q.until == null ? 'Il ne périme pas.' : q.until < 0 ? 'Il est périmé.' : 'Valable jusqu\'au ' + fmt(day(q.until), {day: 'numeric', month: 'long', year: 'numeric'}) + '.', facts: [['Où', q.where], ['Sert pour', q.use]], actions: ACTIONS.papier(q)}),
     tache: (t) => ({bot: 'hydra', kicker: 'Ta tâche', title: t.title, say: t.n == null ? 'Ta tâche, sans date. Je peux t\'aider ?' : 'Ta tâche, ' + rel(t.n) + '. Je peux t\'aider ?', facts: [['Pour', t.n == null ? '' : longDay(t.n)]], actions: ACTIONS.tache(t)}),
     ordre: (o) => ({bot: o.bot, kicker: 'Ordre · ' + o.status, title: o.text, say: o.status === 'Fait' ? o.reply : o.status === 'Annulé' ? 'Annulé.' : 'Je suis dessus.', facts: [['Envoyé', rel(o.n)]], actions: ACTIONS.ordre(o)}),
-    bot: (b) => ({bot: b, kicker: BOT[b].role, title: BOT[b].name, say: b === 'claude' ? S.doing.claude : sayOf(b), facts: [['Dernier passage', S.last[b]], ['Prochain passage', S.next[b]], ['Ses passages', (ROUTINES[b] || []).join(' ; ')]], actions: ACTIONS.bot(b)}),
+    bot: (b) => ({bot: b, kicker: BOT[b].role, title: BOT[b].name, say: b === 'claude' ? S.doing.claude : sayOf(b), facts: [['Dernier passage', S.last[b]], ['Prochain passage', b === 'claude' ? S.next[b] : nextOf(b)], ['Ses passages', (ROUTINES[b] || []).join(' ; ')]], actions: ACTIONS.bot(b)}),
     jour: (n) => { const iso = isoOf(day(n)), hol = holiday(iso), code = S.presence[iso]; return {bot: 'medusa', kicker: 'Ma présence', title: longDay(n), say: hol && code ? 'Jour férié (' + hol + ') : une présence y est notée, retire-la.' : hol ? 'Jour férié (' + hol + ') : rien à noter.' : code ? 'Noté : ' + CODE[code] + '. Tu changes ?' : 'Rien de noté. Tu étais où ?', actions: ACTIONS.jour(n)}; }
   };
   const openItem = (type, item, pickNow) => { const cfg = SHEETCFG[type](item); cfg.ctx = {type, item}; openSheet(cfg, pickNow); };
@@ -2461,7 +2474,7 @@ void main(){
       const list = S.taches.slice().sort((a, b) => (a.n == null ? 999 : a.n) - (b.n == null ? 999 : b.n));
       el.append(sec('En cours', list.length ? list.map((t) => simpleCard('tache', t, t.title, null, t.n == null ? 'sans date' : (t.n < 0 ? 'en retard, prévue ' : 'pour ') + short(t.n), 'hydra', 2)) : emptyState('Aucune tâche en cours.')));
     },
-    dossiers(el) { el.append(S.dossiers.length ? S.dossiers.map((k) => simpleCard('dossier', k, k.title, k.step, BOT[k.bot].name + ' · en attente de ' + k.who + ' depuis ' + (-k.since) + ' jours', k.bot, 2)) : emptyState('Aucun dossier ouvert.')); },
+    dossiers(el) { el.append(S.dossiers.length ? S.dossiers.map((k) => simpleCard('dossier', k, k.title, k.step, BOT[k.bot].name + ' · en attente ' + deQui(k.who) + ' depuis ' + (-k.since) + ' jours', k.bot, 2)) : emptyState('Aucun dossier ouvert.')); },
     prix(el) {
       S.prix.forEach((p) => { const c = simpleCard('prix', p, p.name, null, p.now <= p.buy ? 'Achat : sous ton seuil' : p.now <= p.good ? 'Bon prix' : 'À surveiller', 'unicorn', 2); c.insertBefore(h('div', {class: 'price-line'}, spark(p), h('div', {class: 'price-nums'}, h('b', {text: eur(p.now)}), h('span', {text: 'seuil ' + eur(p.buy)}), h('span', {text: 'public ' + eur(p.ref)}))), c.querySelector('.row-actions')); el.append(c); });
       if (!S.prix.length) el.append(emptyState('Aucun prix suivi.'));
@@ -2675,7 +2688,7 @@ void main(){
   wrapCfg('evenement');
   wrapCfg('ordre');
   wrapCfg('jour', (cfg, n) => { const iso = isoOf(day(n)); cfg.kicker = 'Ce jour-là'; cfg.extra = () => dayExtra(iso); });
-  wrapCfg('bot', (cfg, b) => { cfg.facts = [['Rôle', BOT[b].title], ['Mission', BOT[b].mission], ['Dernier passage', S.last[b]], ['Prochain passage', S.next[b]]]; cfg.actions = [act('Ouvrir sa page', {tone: 'main', go: () => { setTimeout(() => openAgent(b), 280); return null; }})].concat(cfg.actions || []); });
+  wrapCfg('bot', (cfg, b) => { cfg.facts = [['Rôle', BOT[b].title], ['Mission', BOT[b].mission], ['Dernier passage', S.last[b]], ['Prochain passage', b === 'claude' ? S.next[b] : nextOf(b)]]; cfg.actions = [act('Ouvrir sa page', {tone: 'main', go: () => { setTimeout(() => openAgent(b), 280); return null; }})].concat(cfg.actions || []); });
 
   /* ---------- la discussion : avec Claude en direct, ou avec un bot par le Canal ---------- */
   const CHAT = {open: false, mode: 'claude', bot: 'hydra', type: '', item: null, key: '', msgs: [], turns: [], busy: false, ctl: null, tier: 'quick', prev: null};
@@ -3010,7 +3023,7 @@ void main(){
     const lines = S.canal.filter((l) => l.to === b || l.from === b).slice(0, limit || 6);
     if (!lines.length) return emptyState('Aucun échange avec ' + BOT[b].name + ' dans le Canal.');
     return h('div', {class: 'thread'}, lines.map((l) => h('article', {class: 'tl', style: botVars(b)},
-      h('div', {class: 'tl-h'}, h('b', {text: (BOT[l.from] ? BOT[l.from].name : l.from) + ' → ' + (BOT[l.to] ? BOT[l.to].name : l.to === 'rabie' ? 'toi' : l.to)}), h('time', {text: l.date}), h('span', {class: 'pill' + (l.status === 'À faire' ? ' is-demande' : ''), text: l.status})),
+      h('div', {class: 'tl-h'}, h('b', {text: (BOT[l.from] ? BOT[l.from].name : l.from === 'rabie' ? 'Toi' : l.from) + ' → ' + (BOT[l.to] ? BOT[l.to].name : l.to === 'rabie' ? 'toi' : l.to)}), h('time', {text: l.date}), h('span', {class: 'pill' + (l.status === 'À faire' ? ' is-demande' : ''), text: l.status})),
       h('p', {class: 'tl-subj', text: l.subject}), h('p', {class: 'tl-msg', text: l.msg}),
       l.reply ? h('div', {class: 'tl-reply'}, h('span', {class: 'pick-label', text: 'Réponse de ' + BOT[l.to === 'rabie' ? l.from : l.to].name}), h('p', {text: l.reply})) : null)));
   };
@@ -3327,7 +3340,7 @@ void main(){
     suivi(el) {
       el.append(panel('Dossiers en attente d\'un tiers', null, S.dossiers.map((k) => {
         const c = h('article', {class: 'card item', style: botVars(k.bot)},
-          h('span', {class: 'item-meta', text: BOT[k.bot].name + ' · en attente de ' + k.who + ' · ' + ageOf(k.since)}),
+          h('span', {class: 'item-meta', text: BOT[k.bot].name + ' · en attente ' + deQui(k.who) + ' · ' + ageOf(k.since)}),
           h('h3', {class: 'item-title', text: k.title}), h('p', {class: 'item-ask', text: k.step}), k.pour ? h('p', {class: 'item-why', text: k.pour}) : null, actionRow('dossier', k, 2));
         return c;
       })));
@@ -3344,13 +3357,13 @@ void main(){
     el.append(h('button', {type: 'button', class: 'link back', onclick: () => { NAV.up = true; AGENT = null; renderView(false); }}, '‹ Équipe'));
     el.append(h('section', {class: 'hero', style: botVars(b), 'data-mode': modeOf(b)}, ch.el,
       h('div', {class: 'hero-id'}, h('b', {text: bt.name}), h('span', {class: 'hero-t', text: bt.title}), PROPOSED ? h('span', {class: 'mate-m', text: bt.myth + ' : ' + bt.why + ' · ex-' + OLDNAME[b]}) : null, pill(b), h('p', {class: 'hero-m', text: bt.mission}))));
-    el.append(panel('Maintenant', null, nowLine, h('dl', {class: 'pgrid'}, h('div', {}, h('dt', {text: 'Dernier passage'}), h('dd', {text: S.last[b]})), h('div', {}, h('dt', {text: 'Prochain passage'}), h('dd', {text: S.next[b]})), h('div', {}, h('dt', {text: 'Te demande'}), h('dd', {text: String(w.length)})))));
+    el.append(panel('Maintenant', null, nowLine, h('dl', {class: 'pgrid'}, h('div', {}, h('dt', {text: 'Dernier passage'}), h('dd', {text: S.last[b]})), h('div', {}, h('dt', {text: 'Prochain passage'}), h('dd', {text: nextOf(b)})), h('div', {}, h('dt', {text: 'Te demande'}), h('dd', {text: String(w.length)})))));
     el.append(h('div', {class: 'talk'}, h('button', {type: 'button', class: 'btn talk-bot', style: botVars(b), onclick: () => openChat('bot', b, 'bot', b)}, C(b, 26).el, h('span', {}, h('b', {text: 'Écrire à ' + bt.name}), h('small', {text: 'par le Canal'}))), h('button', {type: 'button', class: 'btn talk-claude', onclick: () => openChat('claude', b, 'bot', b)}, C('claude', 26).el, h('span', {}, h('b', {text: 'Parler de ' + bt.name + ' avec Claude'}), h('small', {text: 'en direct'})))));
     el.append(panel('Commandes rapides', null, h('div', {class: 'row-actions'}, (PRESETS[b] || []).map(([label, rep]) => btn(label, () => finish(ord(label, b, label, "J'y vais.", rep).go()), 'sm')))));
     if (w.length) el.append(panel('Ce qu\'il attend de toi', null, w.map((d) => dCard(d, {char: false, n: 2}))));
     const ech = S.echeances.filter((e) => e.bot === b && e.n >= -30 && e.n <= 60).sort((x, y) => x.n - y.n);
     const dos = S.dossiers.filter((k) => k.bot === b);
-    if (ech.length || dos.length || b === 'unicorn') el.append(panel('Ce qu\'il suit', null, ech.map((e) => eRow(e, {n: 1})), dos.map((k) => h('button', {type: 'button', class: 'canal-row', style: botVars(b), onclick: () => openItem('dossier', k)}, h('time', {text: 'Dossier'}), h('span', {text: k.title + ' · en attente de ' + k.who}))), b === 'unicorn' ? S.prix.map((p) => h('button', {type: 'button', class: 'canal-row', style: botVars(b), onclick: () => openItem('prix', p)}, h('time', {text: 'Prix'}), h('span', {text: p.name + ' · achat sous ' + eur2(p.buy)}))) : null));
+    if (ech.length || dos.length || b === 'unicorn') el.append(panel('Ce qu\'il suit', null, ech.map((e) => eRow(e, {n: 1})), dos.map((k) => h('button', {type: 'button', class: 'canal-row', style: botVars(b), onclick: () => openItem('dossier', k)}, h('time', {text: 'Dossier'}), h('span', {text: k.title + ' · en attente ' + deQui(k.who)}))), b === 'unicorn' ? S.prix.map((p) => h('button', {type: 'button', class: 'canal-row', style: botVars(b), onclick: () => openItem('prix', p)}, h('time', {text: 'Prix'}), h('span', {text: p.name + ' · achat sous ' + eur2(p.buy)}))) : null));
     el.append(panel('Ses passages', h('span', {class: 'aside', text: 'Onglet Routines'}), h('ul', {class: 'routines'}, (ROUTINES[b] || []).map((r) => h('li', {text: r})))));
     el.append(panel('Fil avec ' + bt.name, h('span', {class: 'aside', text: 'Canal'}), thread(b)));
     paintUnit(b, true);
@@ -3471,6 +3484,8 @@ void main(){
   VIEWS.automatisations = (el) => {
     const rows = (S.rout || []).filter((r) => r['Routine']), last = {};
     (S.activite || []).forEach((a) => { if (a.bot && a.s && (!last[a.bot] || a.s > last[a.bot])) last[a.bot] = a.s; });
+    /* JARVIS OS (check-up du 16/11) : sinon, le dernier passage noté dans l'onglet État, comme sur la page du bot */
+    (S.etatRows || []).forEach((r) => { const b = lvBot(r['Bot']), t = lvStamp(r['Dernier passage']); if (BOT[b] && t && (!last[b] || +t > +new Date(last[b]))) last[b] = +t; });
     el.append(h('p', {class: 'lead', text: rows.length ? rows.length + ' automatisations, suivies comme une livraison : programmée, dernier passage, prochain passage.' : 'Aucune routine lue dans Pilotage.'}));
     const by = {}; rows.forEach((r) => (by[r['Bot']] = by[r['Bot']] || []).push(r));
     /* JARVIS OS : raccourcis vers chaque bot (bandeau qui reste visible), un appui = ses routines */
@@ -5658,8 +5673,11 @@ void main(){
   header = function () {
     HD0();
     const box = $('status');
-    if (GP.on && box) box.prepend(h('span', {class: 'st is-pause'}, h('i'), 'Grok en pause' + (GP.until ? " jusqu'à " + fmt(GP.until, {weekday: 'short'}).replace('.', '') + ' ' + hmFr(GP.until) : '')));
+    if (GP.on && box) box.prepend(h('span', {class: 'st is-pause'}, h('i'), 'Grok en pause' + (GP.until ? ' → ' + fmt(GP.until, {weekday: 'short'}).replace('.', '') + ' ' + hmFr(GP.until) : '')));
+    /* JARVIS OS (check-up du 16/11) : la ligne défile au doigt et s'estompe à droite quand elle dépasse, au lieu d'être coupée net */
+    if (box) requestAnimationFrame(() => box.classList.toggle('is-more', box.scrollWidth > box.clientWidth + 2 && box.scrollLeft + box.clientWidth < box.scrollWidth - 2));
   };
+  { const sb = $('status'); if (sb) sb.addEventListener('scroll', () => sb.classList.toggle('is-more', sb.scrollLeft + sb.clientWidth < sb.scrollWidth - 2), {passive: true}); }
   const BR1 = pilotageBrief;
   pilotageBrief = () => {
     const o = BR1();
@@ -6424,7 +6442,8 @@ void main(){
     el.append(hsec('À faire maintenant', more('Tout voir', 'demandes'), nowRows(D)));
     const today = D.ag.filter((a) => a.n === 0), H0 = 7, H1 = 23, nowH = new Date().getHours() + new Date().getMinutes() / 60, pos = (x) => Math.max(0, Math.min(100, (x - H0) / (H1 - H0) * 100));
     const axis = h('div', {class: 'tl-axis'}, h('span', {class: 'tl-now', style: 'left:' + pos(nowH) + '%'}, h('small', {text: hm(new Date())})));
-    [8, 12, 16, 20].forEach((x) => axis.append(h('span', {class: 'tl-tick', style: 'left:' + pos(x) + '%'}, h('small', {text: x + 'h'}))));
+    [8, 12, 16, 20].filter((x) => Math.abs(pos(x) - pos(nowH)) > 8).forEach((x) => axis.append(h('span', {class: 'tl-tick', style: 'left:' + pos(x) + '%'}, h('small', {text: x + 'h'})))); /* JARVIS OS (check-up du 16/11) : l'heure actuelle ne chevauche plus un repère */
+    if (pos(nowH) < 6 || pos(nowH) > 94) axis.firstChild.classList.add(pos(nowH) < 6 ? 'is-l' : 'is-r');
     const allDay = [];
     today.forEach((a) => { const m = String(a.time || '').match(/(\d{1,2})h(\d{2})?/); if (!m) { allDay.push(a); return; } const x = +m[1] + (+m[2] || 0) / 60, p2 = pos(x);
       axis.append(h('button', {type: 'button', class: 'tl-ev' + (x < nowH ? ' is-past' : '') + (p2 < 22 ? ' is-l' : p2 > 78 ? ' is-r' : ''), style: 'left:' + p2 + '%', onclick: a.open}, h('small', {text: a.time + ' ' + a.title}), h('i'))); });
@@ -6462,7 +6481,7 @@ void main(){
   VIEWS.reglages = (el) => {
     const JS = window.JarvisServeur;
     if (!JS) {
-      el.append(h('section', {class: 'card set-card'}, h('b', {text: 'Maquette'}), h('p', {class: 'muted', text: "Ici, la page montre des données d'exemple. Sur ton serveur (adresse de ton serveur suivie de /os/), cet écran relie l'iPhone, crée l'accès Google et affiche tes vraies données."})));
+      el.append(h('section', {class: 'card set-card'}, h('b', {text: 'Maquette'}), h('p', {class: 'muted', text: "Ici, la page montre des données d'exemple. Sur ton serveur (son adresse, sans rien après), cet écran relie l'iPhone, crée l'accès Google et affiche tes vraies données."})));
       return;
     }
     const box = h('div', {class: 'set-wrap'}, h('p', {class: 'muted', text: 'Lecture des réglages…'}));
@@ -6488,7 +6507,7 @@ void main(){
         gcard.append(h('p', {class: 'muted', text: 'Relié' + (g.account ? ' au compte ' + g.account : '') + (g.linkedAt ? ' depuis le ' + fmt(new Date(g.linkedAt), {day: 'numeric', month: 'long'}) : '') + '. Pilotage, l’agenda et Gmail sont lus et écrits directement, sans Claude.'}));
         const out = h('p', {class: 'set-msg'});
         gcard.append(h('div', {class: 'row-actions'},
-          h('button', {type: 'button', class: 'btn main', onclick: async () => { out.textContent = 'Lecture de Pilotage…'; try { const m = await window.claude.use('mcp'); const r = lvPayload(await m.callTool(LV.SHEETS, 'get_values', {spreadsheetId: LV.SHEET, range: 'Canal!A1:H3000'})); const n = ((r && r.values) || []).length; out.textContent = 'Pilotage lu : ' + Math.max(0, n - 1) + ' lignes dans le Canal.'; out.classList.remove('is-bad'); } catch (e) { out.textContent = 'Échec : ' + ((e && e.message) || e); out.classList.add('is-bad'); } }}, 'Tester mes données'),
+          h('button', {type: 'button', class: 'btn main', onclick: async () => { out.textContent = 'Lecture de Pilotage…'; try { const m = await window.claude.use('mcp'); const r = lvPayload(await m.callTool(LV.SHEETS, 'get_values', {spreadsheetId: LV.SHEET, range: 'Canal!A1:H3000'})); const n = ((r && r.values) || []).length; const k = Math.max(0, n - 1); out.textContent = 'Pilotage lu : ' + k + (k > 1 ? ' lignes' : ' ligne') + ' dans le Canal.'; out.classList.remove('is-bad'); } catch (e) { out.textContent = 'Échec : ' + ((e && e.message) || e); out.classList.add('is-bad'); } }}, 'Tester mes données'),
           h('button', {type: 'button', class: 'btn', onclick: async () => { const r = await JS.googleLink(); if (r && r.url) location.href = r.url; else draw(msg((r && r.error) || 'Lien impossible.', true)); }}, 'Reconnecter'),
           h('button', {type: 'button', class: 'btn ghost danger', onclick: () => confirmSheet({bot: 'claude', title: 'Déconnecter Google ?', ok: 'Oui, déconnecter', cost: 'free', say: "JARVIS ne lira plus tes données jusqu'à la prochaine connexion.", run: async () => { await JS.googleUnlink(); draw(); }})}, 'Déconnecter')), out);
         if (g.missing && g.missing.length) gcard.append(msg('Des accès n’ont pas été cochés : « Reconnecter » et coche tout.', true));

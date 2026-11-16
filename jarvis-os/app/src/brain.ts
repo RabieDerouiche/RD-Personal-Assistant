@@ -1,5 +1,5 @@
 /* Le cerveau de la phase 2 : il comprend les demandes simples sur l'iPhone, sans IA. Il prépare les missions
-   et dit franchement ce qui n'est pas encore relié. En phase 3, les phrases qu'il ne comprend pas iront à Claude. */
+   et dit franchement ce qui n'est pas encore relié. Une fois l'iPhone relié au serveur, les phrases qu'il ne comprend pas vont à Claude. */
 import {AGENTS, agent, type AgentId} from './agents';
 import {store, uid, type Mission, type RouteMode} from './store';
 
@@ -24,7 +24,7 @@ export function route(text: string, mode: RouteMode): AgentId {
 
 const mission = (a: AgentId, text: string, group?: string): Mission => ({id: uid(), agent: a, text: text.trim(), status: store.settings.approveAll ? 'a_approuver' : 'approuvee', at: Date.now(), group});
 const join = (xs: string[]) => xs.length < 2 ? xs.join('') : xs.slice(0, -1).join(', ') + ' et ' + xs[xs.length - 1];
-const waitTxt = (n = 1) => store.settings.approveAll ? (n > 1 ? 'Elles attendent' : 'Elle attend') + ' ton accord dans Missions.' : (n > 1 ? 'Je les enverrai' : "Je l'enverrai") + ' dès que je serai relié, en phase 3.';
+const waitTxt = (n = 1) => store.settings.approveAll ? (n > 1 ? 'Elles attendent' : 'Elle attend') + ' ton accord dans Missions.' : (n > 1 ? 'Je les enverrai' : "Je l'enverrai") + ' dès que cet iPhone sera relié au serveur JARVIS (Réglages).';
 
 export function think(raw: string, mode: RouteMode): BrainOut {
   const t = clean(raw), l = low(t);
@@ -50,7 +50,7 @@ export function think(raw: string, mode: RouteMode): BrainOut {
 
   if (/(r[ée]sum|fais(-moi)? le point|point du jour|ma journ[ée]e|mon agenda|[ée]v[ée]nements (importants|du jour))/.test(l) && !/\b(demande|dis) (à|a)\b/.test(l)) {
     const open = store.missions.filter((m) => m.status === 'a_approuver').length;
-    return {reply: "Je ne suis pas encore relié à ton agenda ni à Pilotage : je te lirai ta journée en phase 3." + (open ? ' En attendant, ' + open + ' mission' + (open > 1 ? 's attendent' : ' attend') + ' ton accord.' : '')};
+    return {reply: "Je ne suis pas relié à ton serveur JARVIS ici : relie cet iPhone dans Réglages et je te lirai ta journée." + (open ? ' En attendant, ' + open + ' mission' + (open > 1 ? 's attendent' : ' attend') + ' ton accord.' : '')};
   }
 
   /* « fais travailler Claude et Grok ensemble sur ce projet » */
@@ -73,10 +73,10 @@ export function think(raw: string, mode: RouteMode): BrainOut {
     if (ms.length) return {reply: (ms.length > 1 ? ms.length + ' missions créées : ' : 'Mission créée : ') + join(ms.map((m) => agent(m.agent).name)) + '. ' + waitTxt(ms.length), missions: ms, agent: ms[0].agent};
   }
 
-  /* le reste : en phase 3, Claude répondra. D'ici là, je propose d'en faire une mission. */
+  /* le reste : hors serveur, je propose d'en faire une mission (relié, c'est Claude qui répond). */
   const who = route(t, mode);
   pending = {agent: who, text: t};
-  return {reply: 'Je ne suis pas encore relié à Claude pour te répondre moi-même : ça arrive en phase 3. Veux-tu que j\'en fasse une mission pour ' + agent(who).name + ' ?', agent: who};
+  return {reply: 'Je ne suis pas relié à Claude ici : relie cet iPhone au serveur JARVIS (Réglages) et il te répondra en direct. Veux-tu que j\'en fasse une mission pour ' + agent(who).name + ' ?', agent: who};
 }
 
 export const resetBrain = () => { pending = null; };
