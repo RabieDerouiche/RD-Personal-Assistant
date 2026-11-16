@@ -156,7 +156,8 @@ export class Voice {
     u.onend = end; u.onerror = end;
     /* Safari sur iPhone : la voix peut rester bloquée après l'écoute du micro ; une remise à zéro juste avant de parler la débloque */
     try { if (!synth!.speaking) synth!.cancel(); synth!.speak(u); } catch { end(); return; }
-    window.setTimeout(() => { if (!fin && synth && !synth.speaking) end(); }, Math.max(5000, text.length * 110));
+    /* filet de sécurité large : sur iPhone, « speaking » peut être faux pendant que la voix parle ; finir trop tôt rouvrait le micro et l'iPhone baissait le son */
+    window.setTimeout(end, Math.max(9000, text.length * 140));
   }
 
   /* lit la réponse, puis réécoute si la conversation est ouverte */
