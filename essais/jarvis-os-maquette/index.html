@@ -288,6 +288,16 @@
   .view-in.is-enter { animation: vin2 .32s cubic-bezier(.2, .8, .2, 1) !important; }
   @keyframes vin2 { from { opacity: 0; transform: translateY(10px) scale(.995); } to { opacity: 1; transform: none; } }
   @media (prefers-reduced-motion: reduce) { .all-panel, .fav-ind, .fav-bar .tab { transition: none !important; } .fav-bar .tab[aria-current="page"] .ic { animation: none; } }
+
+  /* JARVIS OS : automatisations, raccourcis par bot */
+  .auto-jump { position: sticky; top: var(--toph, 96px); z-index: 30; display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; margin: 0 -16px; padding: 8px 16px; background: linear-gradient(var(--bg) 70%, transparent); }
+  .auto-jump::-webkit-scrollbar { display: none; }
+  .aj { flex: 0 0 auto; display: flex; align-items: center; gap: 8px; padding: 5px 12px 5px 6px; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--bc, #38bdf8) 55%, transparent); background: color-mix(in srgb, var(--bc, #38bdf8) 12%, var(--bg-2)); color: var(--fg); text-align: left; }
+  .aj .chr { width: 30px !important; height: 30px !important; }
+  .aj span { display: flex; flex-direction: column; line-height: 1.15; } .aj b { font: 600 13px var(--display); } .aj small { font-size: 11px; color: var(--muted); white-space: nowrap; }
+  .aj:active { transform: scale(.95); }
+  .aj { transition: box-shadow .25s ease, transform .14s ease; } .aj.is-on { box-shadow: 0 0 0 2px var(--bc, #38bdf8), 0 0 18px color-mix(in srgb, var(--bc, #38bdf8) 45%, transparent); }
+  [id^="auto-"] { scroll-margin-top: calc(var(--toph, 96px) + 64px); }
 </style></head><body>
 <title>Jarvis v17 copie</title>
 <meta name="claude:viewport-fit-sides" content="cover">
@@ -3159,12 +3169,25 @@ void main(){
     return null;
   }
   const whenTxt = (d) => { const n = new Date(), diff = Math.round((new Date(d.getFullYear(), d.getMonth(), d.getDate()) - new Date(n.getFullYear(), n.getMonth(), n.getDate())) / 864e5); return (diff === 0 ? "aujourd'hui" : diff === 1 ? 'demain' : fmt(d, {weekday: 'long', day: 'numeric', month: 'short'})) + ' à ' + hm(d); };
+  const shortWhen = (d) => { const n = Math.round((new Date(d.getFullYear(), d.getMonth(), d.getDate()) - new Date(TODAY.getFullYear(), TODAY.getMonth(), TODAY.getDate())) / 864e5), t = pad2(d.getHours()) + 'h' + pad2(d.getMinutes());
+    return (n === 0 ? "aujourd'hui " : n === 1 ? 'demain ' : n < 7 ? ['dim', 'lun', 'mar', 'mer', 'jeu', 'ven', 'sam'][d.getDay()] + ' ' : pad2(d.getDate()) + '/' + pad2(d.getMonth() + 1) + ' ') + t; };
   VIEWS.automatisations = (el) => {
     const rows = (S.rout || []).filter((r) => r['Routine']), last = {};
     (S.activite || []).forEach((a) => { if (a.bot && a.s && (!last[a.bot] || a.s > last[a.bot])) last[a.bot] = a.s; });
     el.append(h('p', {class: 'lead', text: rows.length ? rows.length + ' automatisations, suivies comme une livraison : programmée, dernier passage, prochain passage.' : 'Aucune routine lue dans Pilotage.'}));
     const by = {}; rows.forEach((r) => (by[r['Bot']] = by[r['Bot']] || []).push(r));
-    Object.entries(by).forEach(([bot, rs]) => el.append(panel(bot, null, rs.map((r) => {
+    /* JARVIS OS : raccourcis vers chaque bot (bandeau qui reste visible), un appui = ses routines */
+    const top = document.querySelector('.top'); if (top) document.documentElement.style.setProperty('--toph', top.offsetHeight + 'px');
+    const soon = (rs) => rs.map((r) => nextRun(r['Moment'])).filter((x) => x && x !== 'event').sort((a, b) => a - b)[0];
+    el.append(h('nav', {class: 'auto-jump', 'aria-label': 'Aller aux routines d’un bot'}, Object.entries(by).map(([bot, rs]) => { const id = lvBot(bot), nx = soon(rs);
+      return h('button', {type: 'button', class: 'aj', style: BOT[id] ? botVars(id) : null, onclick: () => { const t = document.getElementById('auto-' + id); if (t) t.scrollIntoView({behavior: 'smooth', block: 'start'}); }},
+        BOT[id] ? C(id, 30).el : null, h('span', {}, h('b', {text: bot}), h('small', {text: (rs.length > 1 ? rs.length + ' routines · ' : '') + (nx ? shortWhen(nx) : 'à l’arrivée')})));
+    })));
+    /* la pastille du bot affiché à l'écran s'allume */
+    setTimeout(() => { if (!('IntersectionObserver' in window)) return; const chips = [...el.querySelectorAll('.aj')], ids = Object.keys(by).map((b) => 'auto-' + lvBot(b));
+      const io = new IntersectionObserver((es) => { es.forEach((e) => { if (e.isIntersecting) { const i = ids.indexOf(e.target.id); chips.forEach((c, k) => c.classList.toggle('is-on', k === i)); const row = chips[i] && chips[i].parentElement; if (row) row.scrollTo({left: chips[i].offsetLeft - row.clientWidth / 2 + chips[i].clientWidth / 2, behavior: 'smooth'}); } }); }, {rootMargin: '-45% 0px -50% 0px'});
+      ids.forEach((id) => { const t = document.getElementById(id); if (t) io.observe(t); }); }, 50);
+    Object.entries(by).forEach(([bot, rs]) => el.append(Object.assign(panel(bot, null, rs.map((r) => {
       const id = lvBot(r['Bot']), nx = nextRun(r['Moment']), lt = last[id], st = r['État'] || 'En place', ok = /en place/i.test(st);
       const step = (label, txt, cls) => h('li', {class: 'trk ' + cls}, h('span', {class: 'trk-dot'}), h('div', {}, h('b', {text: label}), h('small', {text: txt})));
       return h('article', {class: 'auto card'},
@@ -3174,7 +3197,7 @@ void main(){
           step('Dernier passage ' + (/^[aeiouyéèêàâîôû]/i.test(r['Bot']) ? "d'" : 'de ') + r['Bot'], lt ? whenTxt(new Date(lt)) : 'pas encore vu dans le journal', lt ? 'done' : 'todo'),
           step('Prochain passage', nx === 'event' ? 'à chaque ' + (/mail/i.test(r['Déclencheur'] || '') ? 'mail reçu' : 'événement') : nx ? whenTxt(nx) : 'horaire à préciser', 'next')),
         r['But'] && r['But'] !== 'x' ? h('p', {class: 'muted', text: r['But']}) : null);
-    }))));
+    })), {id: 'auto-' + lvBot(bot)})));
   };
   /* papiers : catégories déduites du document, de la personne et de l'usage */
   const PAP_CATS = [['Voiture', /voiture|véhicule|carte grise|auto\b|contrôle technique|immatricul/], ['Appartement et immobilier', /appartement|logement|bail|loyer|syndic|copro|foncière|notaire|immobili|prêt|habitation|edf|eau\b/], ['Fille', /\bfille\b|bébé|enfant|naissance|carnet de santé/], ['Entourage de la fille', /crèche|nounou|assistante maternelle|école|pédiatre|garde/], ['Épouse', /épouse|femme\b|conjointe/]];
