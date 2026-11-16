@@ -37,6 +37,9 @@ try {
   ok('page en direct : Pilotage, agenda et Gmail lus par l’accès Google', uniq.some((u) => /sheets values Canal/.test(u)) && uniq.some((u) => /calendar events/.test(u)) && uniq.some((u) => /gmail threads/.test(u)), uniq.length + ' sources : ' + uniq.slice(0, 8).join(' | '));
   ok('aucune donnée d’exemple chargée', await p.evaluate(() => !document.querySelector('script[src="donnees-fictives.js"]')));
   await p.screenshot({path: SH + 'os-live.png'});
+  await p.goto(BASE + '/?serveur#agenda'); await p.waitForTimeout(4000);
+  ok('agenda en direct : carte Aujourd\'hui, 7 prochains jours, grille', await p.evaluate(() => !!document.querySelector('.agt .agt-date') && document.querySelectorAll('.agw-d').length === 7 && !!document.querySelector('.mgrid .mg-d.is-today')));
+  await p.screenshot({path: SH + 'os-live-agenda.png'});
 } catch (e) { ok('exception', false, e.stack); }
 ok('aucune erreur de page', !errs.length, errs.join(' | '));
 console.log(out.join('\n')); const bad = out.filter((l) => l.startsWith('ÉCHEC')).length; console.log(bad ? bad + ' échec(s)' : 'Tout passe (' + out.length + ' vérifications).');
