@@ -11,15 +11,27 @@ async function call(path: string, init: RequestInit = {}, ms = 15000) {
   finally { clearTimeout(t); }
 }
 
+/* l'adresse du serveur : une IP (celle du mail OVH) devient https://a-b-c-d.sslip.io ; le port interne est retiré */
 export function normalizeUrl(u: string) {
-  let s = u.trim(); if (!s) return '';
-  if (!/^https?:\/\//i.test(s)) s = 'https://' + s;
-  return s.replace(/\/+$/, '');
+  let s = u.trim().replace(/\s+/g, ''); if (!s) return '';
+  s = s.replace(/^https?:\/\//i, '').replace(/\/.*$/, '').replace(/:\d+$/, '');
+  const ip = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(s);
+  if (ip) s = ip.slice(1).join('-') + '.sslip.io';
+  return 'https://' + s.toLowerCase();
 }
+const isLocal = (u: string) => /^http:\/\/(127\.0\.0\.1|localhost)(:\d+)?$/i.test(u.trim().replace(/\/+$/, ''));
 
 export async function pair(url: string, code: string): Promise<string | null> {
-  const u = normalizeUrl(url);
-  if (!u) return 'Indique l\'adresse du serveur.';
+  const u = isLocal(url) ? url.trim().replace(/\/+$/, '') : normalizeUrl(url);
+  if (!u) return 'Indique l\'adresse du serveur (ou son adresse IP, reçue par mail d\'OVH).';
+  if (!code.trim()) return 'Indique le code d\'appairage affiché sur le serveur.';
+  try {
+    const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 10000);
+    const hr = await fetch(u + '/api/health', {signal: ctl.signal}).finally(() => clearTimeout(t));
+    if (!hr.ok) return 'Un serveur répond à ' + u + ', mais pas JARVIS (' + hr.status + ').';
+  } catch {
+    return 'Aucun serveur JARVIS ne répond à ' + u + '. Vérifie que l\'installation est finie (« Installation terminée » dans Termius) et que l\'adresse est celle affichée par le serveur.';
+  }
   try {
     const r = await fetch(u + '/api/pair', {method: 'POST', headers: {'content-type': 'application/json'}, body: JSON.stringify({code, device: 'iPhone'})});
     const b = await r.json().catch(() => ({}));
@@ -28,7 +40,7 @@ export async function pair(url: string, code: string): Promise<string | null> {
     await call('/api/import', {method: 'POST', body: JSON.stringify({msgs: store.msgs.slice(-200), missions: store.missions})}).catch(() => null);
     await sync();
     return null;
-  } catch { return 'Serveur injoignable à cette adresse.'; }
+  } catch { return 'Le serveur ' + u + ' n\'a pas répondu à l\'appairage. Réessaie dans une minute.'; }
 }
 export function unpair() { store.settings.serverToken = ''; store.save(); }
 
