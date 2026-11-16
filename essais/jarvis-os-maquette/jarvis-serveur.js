@@ -75,6 +75,11 @@
     googleConfig: (clientId, clientSecret) => req('/api/google/config', {clientId, clientSecret}).then((r) => r.j),
     googleLink: () => req('/api/google/link', {}).then((r) => r.j),
     googleUnlink: () => req('/api/google/unlink', {}).then((r) => r.j),
-    status: () => req('/api/status').then((r) => (r.status === 200 ? r.j : null)).catch(() => null)
+    status: () => req('/api/status').then((r) => (r.status === 200 ? r.j : null)).catch(() => null),
+    update: () => req('/api/update', {}).then((r) => r.j).catch(() => ({ok: false, message: 'Serveur injoignable.'})),
+    voiceInstall: () => req('/api/voice/install', {}).then((r) => r.j).catch(() => null),
+    /* réglages de la voix, partagés avec la page vocale (même stockage que l'app JARVIS) */
+    setting: (k) => settings()[k],
+    set(k, v) { const s = settings(); s[k] = v; try { localStorage.setItem(KEY, JSON.stringify(s)); } catch (e) { /* rien */ } }
   };
 })();

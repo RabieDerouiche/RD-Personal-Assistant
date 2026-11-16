@@ -2,7 +2,7 @@
 /* JARVIS OS : sur le serveur du propriétaire, ses vraies données (jarvis-serveur.js) ; sur GitHub ou en local, les exemples. ?maquette ou ?serveur pour forcer. */
 (function () { var q = location.search, srv = /[?&]serveur\b/.test(q) || (location.protocol === 'https:' && !/github\.io$/i.test(location.hostname) && !/[?&]maquette\b/.test(q)); window.__JARVIS_MODE = srv ? 'serveur' : 'maquette'; document.write('<script src="' + (srv ? 'jarvis-serveur.js' : 'donnees-fictives.js') + '"><\/script>'); })();</script><script>/* JARVIS OS : thème « hologramme » par défaut (choisi le 16/11/2026) ; ?theme=actuel ou « Thème » dans Toutes les rubriques pour l'ancien, gardé dans le téléphone */
 (function () { var q = (location.search.match(/[?&]theme=(\w+)/) || [])[1], t = null; try { if (q) localStorage.setItem('jarvis.theme', q); t = localStorage.getItem('jarvis.theme'); } catch (e) { t = q; }
-  if (t !== 'actuel') { document.documentElement.classList.add('theme-holo'); var l = document.createElement('link'); l.rel = 'stylesheet'; l.href = 'https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700&family=Oxanium:wght@500;600;700&family=Exo+2:wght@400;500;600;700&display=swap'; document.head.appendChild(l); } })();</script><script src="jarvis-voix.js"></script><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><link rel="apple-touch-icon" href="icon-180.png"><link rel="icon" type="image/png" href="icon-192.png"><meta name="apple-mobile-web-app-title" content="JARVIS"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}
+  if (t !== 'actuel') { document.documentElement.classList.add('theme-holo'); var l = document.createElement('link'); l.rel = 'stylesheet'; l.href = 'https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700&family=Oxanium:wght@500;600;700&family=Exo+2:wght@400;500;600;700&display=swap'; document.head.appendChild(l); } })();</script><script src="jarvis-voix.js"></script><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><link rel="manifest" href="manifest.webmanifest"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="theme-color" content="#02040e"><link rel="apple-touch-icon" href="icon-180.png"><link rel="icon" type="image/png" href="icon-192.png"><meta name="apple-mobile-web-app-title" content="JARVIS"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}
   /* ---------- JARVIS OS : navigation et écrans ajoutés ---------- */
   .fab-talk { display: none !important; }
   /* barre à tes favoris (bas) et toutes les rubriques */
@@ -122,7 +122,7 @@
   html.theme-holo .trk.next .trk-dot { border-color: #22d3ee; box-shadow: 0 0 12px #22d3ee; }
   html.theme-holo .fav-bar { background: rgba(2, 6, 20, .98) !important; border-top: 1px solid rgba(56, 189, 248, .4) !important; box-shadow: 0 -1px 0 rgba(56, 189, 248, .12), 0 -14px 34px rgba(14, 165, 233, .12) !important; }
   html.theme-holo .fav-bar .tab { color: var(--muted) !important; }
-  html.theme-holo .fav-bar .tab[aria-current="page"] { color: #67e8f9 !important; background: rgba(56, 189, 248, .12) !important; box-shadow: inset 0 -2px 0 #22d3ee, 0 0 14px rgba(56, 189, 248, .2); }
+  html.theme-holo .fav-bar .tab[aria-current="page"] { color: #67e8f9 !important; }
   html.theme-holo .fav-bar .tab[aria-current="page"] .ic { filter: drop-shadow(0 0 6px rgba(103, 232, 249, .9)); }
   html.theme-holo .fav-handle .grip { background: linear-gradient(90deg, #22d3ee, #6366f1); box-shadow: 0 0 8px rgba(56, 189, 248, .7); }
   html.theme-holo .all-panel { background: linear-gradient(180deg, #06143a, #030a1e); border-top: 1px solid rgba(56, 189, 248, .45); box-shadow: 0 -20px 50px rgba(14, 165, 233, .15); }
@@ -258,11 +258,36 @@
   .set-card > b { font: 600 16px var(--display); }
   .set-msg { margin: 0; font-size: 13.5px; color: var(--green); } .set-msg.is-bad { color: var(--danger); } .set-msg:empty { display: none; }
   .set-small { font-size: 12px; }
+  .set-seg { display: flex; flex-wrap: wrap; gap: 6px; } .set-seg button { flex: 1 1 auto; }
   .set-guide summary { cursor: pointer; color: var(--accent); font-weight: 600; min-height: 32px; display: flex; align-items: center; }
   .set-guide ol { margin: 8px 0; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; font-size: 13.5px; line-height: 1.45; }
   .set-guide a { color: var(--accent); white-space: nowrap; }
   .set-uri { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 10px; border-radius: 12px; border: 1px dashed var(--line-2); }
   .set-uri small { width: 100%; color: var(--muted); } .set-uri code { flex: 1; min-width: 0; overflow-wrap: anywhere; font: 12.5px var(--mono); }
+
+  /* JARVIS OS : barre du bas fluide (16/11/2026) */
+  .all-sheet { transition: background .28s ease; background: rgba(0, 0, 0, 0) !important; }
+  .all-sheet.is-open { background: rgba(0, 0, 0, .5) !important; }
+  .all-panel { transform: translateY(105%); transition: transform .34s cubic-bezier(.2, .9, .25, 1); will-change: transform; max-height: 86vh; overflow-y: auto; overscroll-behavior: contain; }
+  .all-sheet.is-open .all-panel { transform: translateY(0); }
+  .all-panel::before { content: ""; display: block; width: 38px; height: 4px; border-radius: 2px; margin: -4px auto 4px; background: var(--line-2); }
+  .fav-row { position: relative; }
+  .fav-ind::after { content: ""; position: absolute; left: 50%; bottom: -2px; width: 22px; height: 3px; margin-left: -11px; border-radius: 2px; background: var(--accent); box-shadow: 0 0 10px var(--accent); }
+  .fav-ind { position: absolute; left: 0; top: 0; width: 56px; height: 60px; border-radius: 16px; pointer-events: none; opacity: 0;
+    background: radial-gradient(46% 34% at 50% 34%, rgba(56, 189, 248, .30), rgba(56, 189, 248, 0) 100%);
+    transition: transform .38s cubic-bezier(.3, 1.3, .4, 1), opacity .25s ease; }
+  .fav-bar .tab { transition: transform .14s ease, color .25s ease !important; -webkit-tap-highlight-color: transparent; }
+  .fav-bar .tab:active, .all-grid .tab:active { transform: scale(.9); }
+  .fav-bar .tab[aria-current="page"] { background: none !important; box-shadow: none !important; }
+  .fav-bar .tab[aria-current="page"] .ic { animation: tabpop .38s cubic-bezier(.3, 1.4, .5, 1); }
+  @keyframes tabpop { 0% { transform: scale(.8) translateY(2px); } 60% { transform: scale(1.15) translateY(-2px); } 100% { transform: none; } }
+  .fav-bar.is-elsewhere .fav-handle { color: var(--accent); }
+  .fav-bar.is-elsewhere .fav-handle .grip { background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+  .all-grid .tab { transition: transform .14s ease, border-color .2s ease !important; }
+  .all-grid .tab[aria-current="page"] { border-color: var(--accent) !important; }
+  .view-in.is-enter { animation: vin2 .32s cubic-bezier(.2, .8, .2, 1) !important; }
+  @keyframes vin2 { from { opacity: 0; transform: translateY(10px) scale(.995); } to { opacity: 1; transform: none; } }
+  @media (prefers-reduced-motion: reduce) { .all-panel, .fav-ind, .fav-bar .tab { transition: none !important; } .fav-bar .tab[aria-current="page"] .ic { animation: none; } }
 </style></head><body>
 <title>Jarvis v17 copie</title>
 <meta name="claude:viewport-fit-sides" content="cover">
@@ -3175,14 +3200,23 @@ void main(){
   function boot() {
     const nav = $('tabs');
     /* JARVIS OS : barre à tes 4 favoris, l'orbe au centre ; la poignée (ou un geste vers le haut) montre toutes les rubriques */
-    const ALL = [['reglages', 'Réglages', 'gear'], ['accueil', 'Accueil', 'pulse'], ['demandes', 'Demandes', 'chat'], ['agenda', 'Agenda', 'cal'], ['achats', 'Achats', 'tag'], ['sorties', 'Sorties', 'map'], ['voyages', 'Voyages', 'plane'], ['papiers', 'Papiers', 'doc'], ['automatisations', 'Automatisations', 'clock'], ['equipe', 'Équipe', 'pulse'], ['suivi', 'Suivi', 'folder']];
-    let FAV = null; try { FAV = JSON.parse(localStorage.getItem('jarvis.fav')); } catch (e) { /* rien */ }
-    if (!Array.isArray(FAV) || FAV.length !== 4 || FAV.some((f) => !ALL.find((a) => a[0] === f))) FAV = ['demandes', 'achats', 'agenda', 'sorties'];
+    /* ordre du 16/11/2026 : le quotidien d'abord (accueil, ce qui attend sa réponse, agenda, ce qui est en cours), puis les domaines, puis l'équipe et les réglages */
+    ICONS.home = '<path d="M4 11.5 12 5l8 6.5"/><path d="M6.5 10v9.5h11V10"/><path d="M10 19.5v-5h4v5"/>';
+    const ALL = [['accueil', 'Accueil', 'home'], ['demandes', 'Pour moi', 'chat'], ['agenda', 'Agenda', 'cal'], ['suivi', 'Suivi', 'folder'], ['achats', 'Achats', 'tag'], ['voyages', 'Voyages', 'plane'], ['sorties', 'Sorties', 'map'], ['papiers', 'Papiers', 'doc'], ['equipe', 'Équipe', 'pulse'], ['automatisations', 'Automatisations', 'clock'], ['reglages', 'Réglages', 'gear']];
+    const FAV0 = ['accueil', 'demandes', 'agenda', 'achats'];
+    let FAV = null; try { FAV = JSON.parse(localStorage.getItem('jarvis.fav')); if (localStorage.getItem('jarvis.fav.v') !== '2') { FAV = null; localStorage.setItem('jarvis.fav.v', '2'); } } catch (e) { /* rien */ }
+    if (!Array.isArray(FAV) || FAV.length !== 4 || FAV.some((f) => !ALL.find((a) => a[0] === f))) FAV = FAV0.slice();
     const sheet = h('div', {class: 'all-sheet', hidden: true, role: 'dialog', 'aria-label': 'Toutes les rubriques'});
     let editFav = false;
     const navBtn = ([id, label, ic], extra) => h('button', {type: 'button', class: 'tab', 'data-tab': id, onclick: () => { closeAll(); go(id); }, ...(extra || {})}, h('span', {class: 'ic', html: icon(ic, 20)}), h('span', {class: 'lbl', text: label}), id === 'demandes' ? h('span', {class: 'badge', hidden: true}) : null);
-    const openAll = () => { drawSheet(); sheet.hidden = false; document.body.classList.add('all-open'); };
-    function closeAll() { sheet.hidden = true; editFav = false; document.body.classList.remove('all-open'); }
+    /* ouverture et fermeture animées ; la feuille suit le doigt quand on la tire vers le bas */
+    let closeT = 0;
+    const openAll = () => { clearTimeout(closeT); drawSheet(); sheet.hidden = false; document.body.classList.add('all-open'); requestAnimationFrame(() => requestAnimationFrame(() => sheet.classList.add('is-open'))); };
+    function closeAll() { if (sheet.hidden) return; sheet.classList.remove('is-open'); const pn = sheet.querySelector('.all-panel'); if (pn) pn.style.transform = ''; editFav = false; document.body.classList.remove('all-open'); closeT = setTimeout(() => { sheet.hidden = true; }, 300); }
+    let dy0 = null, dyN = 0;
+    sheet.addEventListener('touchstart', (e) => { const pn = e.target.closest && e.target.closest('.all-panel'); if (pn && pn.scrollTop <= 0) { dy0 = e.touches[0].clientY; dyN = 0; pn.style.transition = 'none'; } }, {passive: true});
+    sheet.addEventListener('touchmove', (e) => { if (dy0 == null) return; dyN = Math.max(0, e.touches[0].clientY - dy0); const pn = sheet.querySelector('.all-panel'); if (pn) pn.style.transform = 'translateY(' + dyN + 'px)'; }, {passive: true});
+    sheet.addEventListener('touchend', () => { if (dy0 == null) return; dy0 = null; const pn = sheet.querySelector('.all-panel'); if (pn) { pn.style.transition = ''; if (dyN > 90) closeAll(); else pn.style.transform = ''; } }, {passive: true});
     function drawSheet() {
       sheet.replaceChildren(h('div', {class: 'all-panel'},
         h('div', {class: 'all-h'}, h('b', {text: editFav ? 'Choisis 4 favoris' : 'Toutes les rubriques'}), h('button', {type: 'button', class: 'link', onclick: () => { editFav = !editFav; drawSheet(); }}, editFav ? 'Terminé' : 'Modifier mes favoris')),
@@ -3196,10 +3230,22 @@ void main(){
     function drawBar() {
       const fav = FAV.map((f) => ALL.find((a) => a[0] === f));
       nav.replaceChildren(h('button', {type: 'button', class: 'fav-handle', 'aria-label': 'Toutes les rubriques', onclick: openAll}, h('span', {class: 'grip'}), h('span', {text: 'Tout'})),
-        h('div', {class: 'fav-row'}, navBtn(fav[0]), navBtn(fav[1]), h('div', {class: 'talk-slot'}), navBtn(fav[2]), navBtn(fav[3])));
+        h('div', {class: 'fav-row'}, h('span', {class: 'fav-ind', 'aria-hidden': 'true'}), navBtn(fav[0]), navBtn(fav[1]), h('div', {class: 'talk-slot'}), navBtn(fav[2]), navBtn(fav[3])));
       if (window.JarvisVoice) try { window.JarvisVoice.mountButton(nav.querySelector('.talk-slot')); } catch (e) { /* rien */ }
       try { renderView(true); } catch (e) { /* rien */ }
+      placeInd();
     }
+    /* l'indicateur lumineux glisse jusqu'à la rubrique ouverte ; hors de la barre, c'est « Tout » qui s'allume */
+    function placeInd() {
+      const ind = nav.querySelector('.fav-ind'), row = nav.querySelector('.fav-row'); if (!ind || !row) return;
+      const t = row.querySelector('.tab[aria-current="page"]');
+      nav.classList.toggle('is-elsewhere', !t);
+      if (!t) { ind.style.opacity = '0'; return; }
+      const r = row.getBoundingClientRect(), b = t.getBoundingClientRect();
+      ind.style.opacity = '1'; ind.style.transform = 'translateX(' + (b.left - r.left + b.width / 2 - 28) + 'px)';
+    }
+    new MutationObserver(() => requestAnimationFrame(placeInd)).observe(nav, {subtree: true, attributes: true, attributeFilter: ['aria-current']});
+    window.addEventListener('resize', placeInd);
     let y0 = null;
     nav.addEventListener('touchstart', (e) => { y0 = e.touches[0].clientY; }, {passive: true});
     nav.addEventListener('touchend', (e) => { if (y0 != null && y0 - e.changedTouches[0].clientY > 30) openAll(); y0 = null; }, {passive: true});
@@ -5880,6 +5926,17 @@ void main(){
           h('p', {class: 'muted set-small', text: "L'identifiant et le secret restent sur ton serveur (fichier protégé) : ni Claude ni l'app ne les relisent."}));
       }
       parts.push(gcard);
+      /* 3. JARVIS : version, mise à jour du serveur, voix et modèle (repris de l'ancienne app) */
+      const st = await JS.status(), upd = h('p', {class: 'set-msg'});
+      const seg = (k, opts, def) => h('div', {class: 'seg set-seg', role: 'group'}, opts.map(([v, l]) => h('button', {type: 'button', 'aria-pressed': String((JS.setting(k) || def) === v), onclick: () => { JS.set(k, v); location.reload(); }}, l)));
+      parts.push(h('section', {class: 'card set-card'}, h('b', {text: 'JARVIS'}),
+        h('p', {class: 'muted', text: st ? 'Serveur ' + st.version + (st.commit ? ' (' + String(st.commit).slice(0, 7) + ')' : '') + ' · Claude ' + (st.claude && st.claude.loggedIn ? 'connecté' : 'non connecté') + ' · voix du serveur ' + (st.tts ? 'prête' : 'absente') : 'État du serveur indisponible.'}),
+        h('button', {type: 'button', class: 'btn main', onclick: async () => { upd.textContent = 'Mise à jour…'; const r = await JS.update(); upd.textContent = (r && r.message) || 'Réponse illisible.'; upd.classList.toggle('is-bad', !(r && r.ok)); if (r && r.changed) setTimeout(() => location.reload(), 6000); }}, 'Mettre à jour le serveur'), upd,
+        h('small', {class: 'pick-label', text: 'Voix de JARVIS'}), seg('voiceEngine', [['serveur', 'Pierre (ton serveur)'], ['iphone', "Voix de l'iPhone"]], 'serveur'),
+        h('small', {class: 'pick-label', text: 'Claude dans la conversation'}), seg('model', [['rapide', 'Rapide'], ['equilibre', 'Équilibré'], ['profond', 'Profond']], 'equilibre'),
+        h('small', {class: 'pick-label', text: 'Écoute'}), seg('listenMode', [['continu', 'Conversation continue'], ['phrase', 'Une phrase']], 'phrase'),
+        st && !st.tts ? h('button', {type: 'button', class: 'btn sm', onclick: async () => { const r = await JS.voiceInstall(); upd.textContent = r ? 'Installation de la voix : ' + r.state + '. Reviens dans quelques minutes.' : 'Installation impossible.'; }}, 'Installer la voix Pierre') : null,
+        h('a', {class: 'link', href: '/ancienne/', text: 'Ancienne app (réglages avancés, diagnostic)'})));
       box.replaceChildren(...parts);
     };
     draw(/[?&#]google=ok/.test(location.href) ? msg('Google est relié.') : null);
@@ -5890,5 +5947,6 @@ void main(){
 </script>
 
 <script>/* comparaison des dispositions : ?nav=grille ou ?nav=dock */ (function () { var v = (location.search.match(/nav=(grille|dock)/) || [])[1]; if (!v) return; document.documentElement.classList.add('nav-' + v); if (v === 'dock') { var n = document.getElementById('tabs'); var d = document.createElement('nav'); d.className = 'dock-nav'; d.setAttribute('aria-label', 'Rubriques'); setTimeout(function () { Array.prototype.slice.call(n.children).forEach(function (b) { d.appendChild(b); }); document.body.appendChild(d); }, 0); } })();</script>
+<script>/* JARVIS OS : app installable (écran d'accueil), hors données d'exemple */ try { if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js'); } catch (e) { /* rien */ }</script>
 <script>/* JARVIS OS : l'orbe au centre de la barre ouvre la page vocale */ try { var slot = document.querySelector('.talk-slot'); if (slot && !slot.querySelector('.jv-btn')) window.JarvisVoice.mountButton(slot); } catch (e) { /* rien */ }</script>
 </body></html>
