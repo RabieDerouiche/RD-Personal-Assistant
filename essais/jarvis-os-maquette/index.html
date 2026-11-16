@@ -5145,7 +5145,7 @@ void main(){
   const DOS_IGN = 'jarvis.dossiers.ignores';
   const unent = (s) => { try { const t = document.createElement('textarea'); t.innerHTML = String(s || ''); return t.value; } catch (e) { return String(s || ''); } };
   const GENERIC = /^(gmail|googlemail|outlook|hotmail|live|yahoo|icloud|orange|free|sfr|laposte|wanadoo|mailinblack|invitations)\./i;
-  const STOP = new Set(['support', 'service', 'services', 'client', 'clients', 'mme', 'madame', 'monsieur', 'mairie', 'rabie', 'kamar', 'iris', 'les', 'des', 'pour', 'avec']);
+  const STOP = new Set(['support', 'service', 'services', 'client', 'clients', 'mme', 'madame', 'monsieur', 'mairie', 'rabie', 'iris', 'les', 'des', 'pour', 'avec']);
   function dosKeys(k, row) {
     const txt = (row['Références et contexte'] || '') + ' ' + (row['En attente de'] || '');
     const mails = Array.from(new Set((txt.match(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/gi) || []).map((x) => x.toLowerCase())));

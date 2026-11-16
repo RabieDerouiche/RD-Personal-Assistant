@@ -6,9 +6,9 @@ Tenu à la demande du propriétaire (15/11/2026) : **chaque modification de la p
 
 | Page | Lien | État |
 |---|---|---|
-| En service (v16), premier compte | `https://claude.ai/artifact/QwLf64Ggstzu4p3uznZrr8` | Ne pas toucher : aucun report dessus (décision du 15/11/2026) |
-| Essai (v17.5), premier compte, partagée | `https://claude.ai/artifact/UDFVL3TQ2RUeYMq1JBtT4m` | En retard sur la copie : il lui manque les modifications notées « copie seulement » |
-| Copie de travail (v17.15), second compte | `https://claude.ai/artifact/NMAqUak7A5JYsLsc12VyaZ` | C'est ici que l'on modifie et que le propriétaire valide |
+| En service (v17.4 depuis le 14/11/2026), premier compte | `https://claude.ai/artifact/QwLf64Ggstzu4p3uznZrr8` | Plus maintenue (16/11/2026). Gardée pour consultation, à supprimer plus tard sur demande. Ne pas modifier |
+| Essai (v17.5), premier compte, partagée | `https://claude.ai/artifact/UDFVL3TQ2RUeYMq1JBtT4m` | Plus maintenue (16/11/2026). Il lui manque les modifications notées « copie seulement » |
+| Copie de travail (v17.15), second compte | `https://claude.ai/artifact/NMAqUak7A5JYsLsc12VyaZ` | Plus maintenue (16/11/2026). Source de la dernière version dans Drive |
 
 ## Où est le code de la page
 
@@ -149,6 +149,12 @@ Suite de la demande « ajoute tout ce qui en fait un vrai centre de commandes »
 - Le micro **ne marche pas** dans l'app Claude sur iPhone : la page le dit et ouvre le clavier ; la réponse est lue. Cause exacte non relevée par le propriétaire.
 - Conséquence : sur iPhone, la conversation à la voix se fait avec le micro du clavier (un appui par question), la réponse étant lue toute seule. Une conversation mains libres en continu n'y est possible que sur ordinateur (dictée de Claude), ou avec le mode vocal de l'app Claude elle-même, hors de la page.
 - Ne plus chercher à faire marcher le micro de la page dans l'app iPhone sans un changement de la plateforme.
+
+### 16/11/2026 : état réel des pages, fin de la maintenance (premier compte, rien de modifié dans les pages)
+- **La page en service n'était pas en v16** : le premier compte y a publié la v17.4 le 14/11/2026 (version `1794656965-b7aa`, après le oui du propriétaire), sans que le second compte le sache. Vérifié le 16/11 : la page en ligne est identique, octet pour octet, à la v17.4. La décision du 15/11 (« aucun report sur la page en service ») avait été prise en la croyant en v16.
+- Défaut connu de la v17.4, corrigé en v17.5 : après la remise à zéro du mardi 12h, elle ne voit pas seule la reprise de Grok (annonce une reprise une semaine plus tard, garde les sonnettes jusqu'au prochain passage d'un bot). Contournement : « Grok est reparti ».
+- **Décision du propriétaire (QCM du 16/11/2026)** : il utilise JARVIS OS sur son serveur OVH ; plus besoin de maintenir les pages Jarvis de Claude. Elles restent en ligne pour consultation et seront supprimées plus tard, sur sa demande seulement. Aucune nouvelle version, aucun report.
+- Dépôt public : prénoms de la famille retirés des données fictives (`essais/jarvis/mock.js`, `essais/jarvis-os-maquette/donnees-fictives.js` : enfant fictive « Léa » ; liste `STOP` de la maquette sans le prénom de l'épouse). La page réelle (source dans Drive) garde sa liste. Testé : banc de la maquette (19 vérifications) et `t1_smoke.js` sur la v17.4, sans erreur.
 
 ### À venir
 
