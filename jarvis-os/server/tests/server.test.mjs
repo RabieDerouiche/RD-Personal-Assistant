@@ -130,6 +130,7 @@ try {
     sp = await call('/api/sample', {method: 'POST', body: JSON.stringify({input: 'x'})}); ok('Claude ponctuel refusé sans appairage', sp.status === 401);
     let os1 = await fetch(BASE + '/os', {redirect: 'manual'}); ok('/os redirige vers /os/', os1.status === 302 && os1.headers.get('location') === '/os/');
     os1 = await fetch(BASE + '/os/'); const ht = await os1.text(); ok('nouvelle app servie à /os/ (choix des données au chargement)', os1.status === 200 && /jarvis-serveur\.js/.test(ht) && /donnees-fictives\.js/.test(ht));
+    { const pc = await fetch(BASE + '/confidentialite.html'); ok('règles de confidentialité publiques (déclarées à Google)', pc.status === 200 && /règles de confidentialité/.test(await pc.text())); }
     os1 = await fetch(BASE + '/os/jarvis-serveur.js'); ok('pont vers le serveur servi', os1.status === 200 && /api\/tool/.test(await os1.text())); }
   const pre = await fetch(BASE + '/api/chat', {method: 'OPTIONS', headers: {origin: 'https://rabiederouiche.github.io', 'access-control-request-method': 'POST'}});
   ok('CORS : app GitHub Pages acceptée', pre.headers.get('access-control-allow-origin') === 'https://rabiederouiche.github.io');
