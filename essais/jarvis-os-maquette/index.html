@@ -204,22 +204,84 @@
   .trk.is-amber .trk-dot { border-color: var(--amber) !important; background: var(--amber) !important; box-shadow: 0 0 10px rgba(251, 191, 36, .6) !important; }
   .trk.is-amber b { color: var(--amber); }
 
-  /* JARVIS OS : accueil, tuiles d'accès rapide */
-  .home-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
-  .htile { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 0; min-height: 96px; padding: 10px 11px; border-radius: 18px; border: 1px solid var(--line); background: linear-gradient(180deg, var(--glass-2), var(--glass)); color: var(--fg); text-align: left; overflow: hidden; }
-  .htile-ic { color: var(--accent); display: inline-flex; margin-bottom: 4px; }
-  .htile-n { font: 700 24px/1.1 var(--display); font-variant-numeric: tabular-nums; }
-  .htile-l { font: 600 12.5px var(--sans); margin-top: 2px; }
-  .htile small { color: var(--muted); font-size: 11px; line-height: 1.25; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; max-width: 100%; }
-  .htile.is-amber .htile-n { color: var(--amber); }
-  .htile.is-amber { border-color: rgba(251, 191, 36, .4); }
-  .htile:active { transform: scale(.97); }
-  html.theme-holo .htile { background: linear-gradient(180deg, rgba(12, 38, 92, .55), rgba(4, 12, 34, .82)) padding-box, linear-gradient(135deg, rgba(103, 232, 249, .55), rgba(99, 102, 241, .22) 45%, rgba(168, 85, 247, .45)) border-box; border: 1px solid transparent; box-shadow: 0 0 16px rgba(37, 99, 235, .14); }
-  html.theme-holo .htile.is-amber { background: linear-gradient(180deg, rgba(251, 191, 36, .1), rgba(4, 12, 34, .82)) padding-box, linear-gradient(135deg, rgba(251, 191, 36, .7), rgba(251, 191, 36, .15) 50%, rgba(168, 85, 247, .4)) border-box; }
-  html.theme-holo .htile-ic { filter: drop-shadow(0 0 6px rgba(103, 232, 249, .7)); }
-  html.theme-holo .htile-n { text-shadow: 0 0 12px rgba(56, 189, 248, .45); }
-  html.theme-holo .htile.is-amber .htile-n { text-shadow: 0 0 12px rgba(251, 191, 36, .4); }
-  html.theme-holo .holo-hero { width: min(240px, 64vw) !important; height: min(200px, 54vw) !important; margin: -14px auto -10px !important; }
+
+  /* JARVIS OS : trois accueils à l'essai */
+  .home-seg { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--dim); }
+  .home-seg button { border: 1px solid var(--line); background: transparent; color: var(--muted); border-radius: 999px; padding: 5px 11px; font: 500 12.5px var(--sans); }
+  .home-seg button[aria-pressed="true"] { color: var(--fg); border-color: var(--accent); background: var(--glass-2); }
+  .pause-pill { display: flex; align-items: center; gap: 8px; width: 100%; border: 1px solid var(--line); background: var(--glass); color: var(--fg); border-radius: 999px; padding: 7px 14px; font: 500 13px var(--sans); text-align: left; }
+  .pause-pill i { flex: 0 0 8px; height: 8px; border-radius: 50%; background: var(--danger); box-shadow: 0 0 8px var(--danger); }
+  .pause-pill span { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pause-pill b { color: var(--accent); font-weight: 500; font-size: 12.5px; }
+  .is-urgent { color: var(--amber) !important; }
+  .hm-sec { display: flex; flex-direction: column; gap: 8px; }
+  .hm-h { display: flex; justify-content: space-between; align-items: baseline; }
+  .hm-h h2 { margin: 0; font: 600 13px var(--display); letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+  .hm-rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+  .hm-row { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 60px; padding: 10px 12px; border-radius: 18px; border: 1px solid var(--line); background: var(--glass); color: var(--fg); text-align: left; }
+  .hm-ic { flex: 0 0 36px; height: 36px; border-radius: 12px; display: grid; place-items: center; border: 1px solid var(--line); color: var(--accent); }
+  .hm-tx { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .hm-tx b { font-size: 14.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .hm-tx small { color: var(--muted); font-size: 12.5px; }
+  .hm-go { color: var(--dim); display: inline-flex; }
+  .hm-day { flex: 0 0 40px; height: 40px; border-radius: 12px; border: 1px solid var(--line); display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1; }
+  .hm-day small { font-size: 9.5px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); } .hm-day b { font: 700 16px var(--display); }
+  .hm-hello { display: flex; align-items: center; gap: 12px; }
+  .hm-hello b { display: block; font: 700 22px var(--display); } .hm-hello small { color: var(--muted); font-size: 13px; }
+  .hm-glb { flex: 0 0 56px; width: 56px; height: 56px; position: relative; display: block; }
+  .hm-glb .orb-stage, .hm-glb .chr { position: absolute !important; inset: 0; width: 100% !important; height: 100% !important; }
+  .hm-glb canvas { width: 100% !important; height: 100% !important; }
+  /* cockpit */
+  .ck { position: relative; width: min(100%, 380px); aspect-ratio: 1; margin: 0 auto; }
+  .ck-lines, .ck-lines svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .ck-ring { fill: none; stroke: var(--line-2); stroke-width: .3; stroke-dasharray: 1 1.6; }
+  .ck-line { stroke: var(--line-2); stroke-width: .25; }
+  .ck-core { position: absolute; left: 50%; top: 50%; width: 46%; height: 46%; transform: translate(-50%, -50%); border: 0; padding: 0; background: none; border-radius: 50%; }
+  .ck-core .orb-stage, .ck-core .chr { position: absolute !important; inset: 0; width: 100% !important; height: 100% !important; }
+  .ck-core canvas { width: 100% !important; height: 100% !important; }
+  .ck-sat { position: absolute; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: 1px; border: 0; background: none; color: var(--fg); padding: 0; width: 84px; }
+  .ck-dot { width: 54px; height: 54px; border-radius: 50%; display: grid; place-items: center; border: 1px solid var(--line-2); background: var(--bg-2); color: var(--accent); box-shadow: 0 0 0 4px var(--bg); }
+  .ck-sat b { font: 700 17px var(--display); margin-top: 3px; } .ck-sat small { font-size: 11.5px; color: var(--muted); }
+  .ck-hello { margin: -6px 0 0; text-align: center; font: 600 18px var(--display); color: var(--muted); }
+  /* widgets */
+  .wg-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .wg { display: flex; flex-direction: column; gap: 8px; min-height: 132px; padding: 12px; border-radius: 20px; border: 1px solid var(--line); background: var(--glass); color: var(--fg); text-align: left; min-width: 0; overflow: hidden; }
+  .wg.is-full { grid-column: 1 / -1; min-height: 0; }
+  .wg-h { display: flex; align-items: center; gap: 6px; font: 600 11.5px var(--display); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+  .wg-h .ic { color: var(--accent); display: inline-flex; } .wg-h b { margin-left: auto; font: 700 15px var(--display); color: var(--fg); letter-spacing: 0; text-transform: none; }
+  .wg-li { display: flex; flex-direction: column; min-width: 0; }
+  .wg-li span { font-size: 13.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .wg-li small { font-size: 11.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .wg .vp-wrap { margin-top: 0; } .wg .vp { padding: 6px 10px 6px; } .wg .vp-svg { height: 44px; }
+  .wg .pc { margin-top: auto; }
+  .wg-sor { display: flex; gap: 10px; align-items: center; min-width: 0; } .wg-sor .sor-date { width: 42px; min-height: 46px; }
+  .wg-bots { display: flex; justify-content: space-between; gap: 4px; }
+  .wg-bot { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 0; } .wg-bot small { font-size: 10.5px; color: var(--muted); }
+  .wg-bot.is-veille .chr { opacity: .55; } .wg-bot.is-demande small { color: var(--amber); }
+  /* fil du jour */
+  .tl-axis { position: relative; height: 72px; margin: 0 12px; }
+  .tl-axis::before { content: ""; position: absolute; left: 0; right: 0; top: 40px; height: 2px; border-radius: 1px; background: var(--line-2); }
+  .tl-tick { position: absolute; top: 50px; transform: translateX(-50%); } .tl-tick small { font-size: 10.5px; color: var(--dim); }
+  .tl-now { position: absolute; top: 33px; width: 2px; height: 16px; background: var(--accent); box-shadow: 0 0 10px var(--accent); transform: translateX(-50%); }
+  .tl-now small { position: absolute; top: 18px; left: 50%; transform: translateX(-50%); font-size: 10.5px; font-weight: 600; color: var(--accent); white-space: nowrap; }
+  .tl-ev { position: absolute; top: 4px; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 6px; border: 0; background: none; color: var(--fg); padding: 0; max-width: 60%; }
+  .tl-ev.is-l { transform: translateX(-14px); align-items: flex-start; } .tl-ev.is-r { transform: translateX(calc(-100% + 14px)); align-items: flex-end; }
+  .tl-ev i { width: 12px; height: 12px; border-radius: 50%; background: var(--accent); border: 2px solid var(--bg); flex: 0 0 auto; margin: 0 8px; }
+  .tl-ev small { font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; padding: 2px 8px; border-radius: 8px; border: 1px solid var(--line); background: var(--glass-2); }
+  .tl-ev.is-past { opacity: .5; }
+  .tl-day { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; } .tl-day small { color: var(--muted); font-size: 12px; margin-right: 2px; }
+  .tl-chip { border: 1px solid var(--line); background: var(--glass); color: var(--fg); border-radius: 999px; padding: 6px 12px; font: 600 13px var(--sans); }
+  html.theme-holo .tl-chip { border-color: rgba(56, 189, 248, .3); }
+  .soon-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .soon { display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto; column-gap: 8px; align-items: center; padding: 10px 12px; border-radius: 18px; border: 1px solid var(--line); background: var(--glass); color: var(--fg); text-align: left; min-width: 0; }
+  .soon .ic { grid-row: 1 / 3; color: var(--accent); display: inline-flex; } .soon b { font: 700 16px var(--display); } .soon small { color: var(--muted); font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  /* thème hologramme : mêmes formes, bords lumineux discrets */
+  html.theme-holo .hm-row, html.theme-holo .wg, html.theme-holo .soon, html.theme-holo .pause-pill { background: linear-gradient(180deg, rgba(10, 30, 72, .5), rgba(4, 12, 34, .78)); border-color: rgba(56, 189, 248, .22); box-shadow: inset 0 1px 0 rgba(150, 220, 255, .08); }
+  html.theme-holo .hm-ic, html.theme-holo .hm-day { border-color: rgba(56, 189, 248, .3); box-shadow: 0 0 10px rgba(56, 189, 248, .12); }
+  html.theme-holo .hm-h h2 { color: #7dd3fc; }
+  html.theme-holo .ck-dot { border-color: rgba(56, 189, 248, .55); background: #030a1e; box-shadow: 0 0 0 4px #02040e, 0 0 16px rgba(56, 189, 248, .35); }
+  html.theme-holo .ck-ring, html.theme-holo .ck-line { stroke: rgba(56, 189, 248, .35); }
+  html.theme-holo .ck-sat b { text-shadow: 0 0 10px rgba(56, 189, 248, .5); }
 </style></head><body>
 <title>Jarvis v17 copie</title>
 <meta name="claude:viewport-fit-sides" content="cover">
@@ -5708,35 +5770,114 @@ void main(){
     if (!mcp) { try { renderView(true); } catch (e) { /* rien */ } return; }
     Object.keys(LV_SOURCES).forEach(lvWatch);
   })();
-  /* ---------- JARVIS OS : l'accueil réorganisé. Rien n'est retiré : le champ « Demande à Claude » sous le bonjour,
-     six tuiles qui ouvrent chaque rubrique en un appui, puis l'urgent avant le reste ---------- */
-  function homeTiles() {
-    const w = weekend(), wk = (S.sorties || []).filter((x) => x.status === 'proposee' && !sorExpired(x) && sorInWeekend(x)).length;
-    const hot = (S.ach || []).filter((f) => ACH_HOT.includes(famState(f))).length, live = (S.ach || []).filter((f) => !['achete', 'retire'].includes(famState(f))).length;
-    const trip = (S.voyages || []).filter((v) => !v.gone && !v.demo && v.depart != null && v.depart >= 0).sort((a, b) => a.depart - b.depart)[0];
-    const soon = (S.echeances || []).filter((e) => e.n >= 0 && e.n <= 7).length, today = (S.echeances || []).filter((e) => e.n === 0).length;
-    const bots = (S.ordres || []).filter((o) => !/^(fait|annul)/i.test(o.status) && o.n >= -2).length;
-    const T = [
-      ['demandes', 'chat', S.demandes.length, 'Demandes', S.demandes.length ? 'à traiter' : 'rien à décider', S.demandes.length > 0],
-      ['agenda', 'cal', soon, 'Agenda', today ? today + " aujourd'hui" : 'sur 7 jours', today > 0],
-      ['achats', 'tag', hot || live, 'Achats', hot ? 'à décider' : 'suivis', hot > 0],
-      ['sorties', 'map', wk, 'Sorties', 'ce week-end', false],
-      ['voyages', 'plane', trip ? 'J-' + trip.depart : (S.voyages || []).filter((v) => !v.gone).length, 'Voyages', trip ? trip.title : 'projets', false],
-      ['suivi', 'pulse', bots, 'Chez tes bots', 'en cours', false]];
-    return h('nav', {class: 'home-tiles', 'aria-label': 'Accès rapides'}, T.map(([id, ic, n, l, sub, amber]) => h('button', {type: 'button', class: 'htile' + (amber ? ' is-amber' : ''), onclick: () => go(id)},
-      h('span', {class: 'htile-ic', html: icon(ic, 18)}), h('b', {class: 'htile-n', text: String(n)}), h('span', {class: 'htile-l', text: l}), h('small', {text: sub}))));
+  /* ---------- JARVIS OS : trois accueils à comparer (16/11/2026) : Cockpit, Widgets, Fil du jour.
+     Dans les trois : « Grok en pause » en pastille (détail d'un appui), cartes de même forme, couleurs sobres. ---------- */
+  const HOMES = [['cockpit', 'Cockpit'], ['widgets', 'Widgets'], ['fil', 'Fil du jour']];
+  const homeKind = () => { const q = (location.search.match(/[?&]accueil=(\w+)/) || [])[1]; let k = q; try { if (q) localStorage.setItem('jarvis.home', q); k = k || localStorage.getItem('jarvis.home'); } catch (e) { /* rien */ } return HOMES.some((x) => x[0] === k) ? k : 'cockpit'; };
+  const ACC_ORIG = VIEWS.accueil;
+  const hpanel = (src, t) => Array.prototype.slice.call(src.children).find((k) => { const x = k.querySelector('.panel-h h2'); return x && k.classList.contains('panel') && x.textContent.trim().indexOf(t) === 0; }) || null;
+  const dueTxt = (n) => n == null ? '' : n < 0 ? 'en retard de ' + (-n) + ' j' : n === 0 ? "aujourd'hui" : n === 1 ? 'demain' : 'dans ' + n + ' j';
+  const dayTile = (n) => { const d = new Date(TODAY); d.setDate(d.getDate() + n); return h('span', {class: 'hm-day'}, h('small', {text: ['dim', 'lun', 'mar', 'mer', 'jeu', 'ven', 'sam'][d.getDay()]}), h('b', {text: String(d.getDate())})); };
+  function homeData() {
+    const dem = S.demandes.slice().sort((a, b) => (a.due == null ? 999 : a.due) - (b.due == null ? 999 : b.due));
+    const ag = [].concat((S.evenements || []).filter((e) => e.n >= 0 && e.n <= 7).map((e) => ({n: e.n, time: e.time, title: e.title, who: 'Agenda', open: () => openItem('evenement', e)})),
+      (S.echeances || []).filter((e) => e.n >= 0 && e.n <= 7).map((e) => ({n: e.n, time: null, title: e.title, who: BOT[e.bot] ? BOT[e.bot].name : '', open: () => openItem('echeance', e)})))
+      .sort((a, b) => a.n - b.n || String(a.time || '99').localeCompare(String(b.time || '99')))
+      .filter((a, i, arr) => { const k = (x) => lvLow(x.title).replace(/\s*\(.*\)\s*$/, ''); return !arr.slice(0, i).some((b) => b.n === a.n && k(b) === k(a)); });
+    const hot = (S.ach || []).filter((f) => ACH_HOT.includes(famState(f))).sort((a, b) => ST_RANK[famState(a)] - ST_RANK[famState(b)]);
+    const liveA = (S.ach || []).filter((f) => !['achete', 'retire'].includes(famState(f)));
+    const fam = hot[0] || liveA[0], lead = fam ? (bestOf(famProducts(fam)) || famProducts(fam)[0]) : null;
+    const wk = (S.sorties || []).filter((x) => x.status === 'proposee' && !sorExpired(x)).sort((a, b) => (a.from == null ? 999 : a.from) - (b.from == null ? 999 : b.from));
+    const trip = (S.voyages || []).filter((v) => !v.gone && !v.demo).sort((a, b) => (a.depart == null ? 9999 : a.depart) - (b.depart == null ? 9999 : b.depart))[0];
+    const bots = (S.ordres || []).filter((o) => !/^(fait|annul)/i.test(o.status) && o.n >= -2);
+    const openFam = (f) => { SEL.achats = f.id; go('achats'); };
+    const now = [];
+    dem.slice(0, 2).forEach((d) => now.push({ic: 'chat', t: d.title, sub: (BOT[d.bot] ? BOT[d.bot].name : '') + (d.due != null ? ' · ' + dueTxt(d.due) : ''), urgent: d.due != null && d.due <= 2, open: () => openItem('demande', d)}));
+    const past = (a) => { const m = String(a.time || '').match(/(\d{1,2})h(\d{2})?/), d = new Date(); return !!m && (+m[1] * 60 + (+m[2] || 0)) < d.getHours() * 60 + d.getMinutes(); };
+    ag.filter((a) => a.n === 0 && !past(a)).slice(0, 1).forEach((a) => now.push({ic: 'cal', t: a.title, sub: "Aujourd'hui" + (a.time ? ' à ' + a.time : ''), open: a.open}));
+    if (hot[0] && lead && lead.last) now.push({ic: 'tag', t: hot[0].title + ' à ' + eur2(lead.last.price), sub: ST_TXT[famState(hot[0])] || 'À décider', open: () => openFam(hot[0])});
+    return {dem, ag, hot, liveA, fam, lead, wk, trip, bots, now: now.slice(0, 4), openFam};
   }
-  const ACC_OS = VIEWS.accueil;
+  function homeTop(src) {
+    const kind = homeKind();
+    const seg = h('div', {class: 'home-seg', role: 'group', 'aria-label': "Disposition de l'accueil (essai)"}, h('span', {text: 'Essai :'}), HOMES.map(([k, l]) => h('button', {type: 'button', 'aria-pressed': String(k === kind), onclick: () => { try { localStorage.setItem('jarvis.home', k); } catch (e) { /* rien */ } if (/[?&]accueil=/.test(location.search)) history.replaceState(null, '', location.pathname); renderView(true); }}, l)));
+    const pb = src.querySelector('.pause-b'), items = [seg];
+    if (pb) {
+      const t = (pb.querySelector('p') || {}).textContent || '', m = t.match(/Reprise attendue ([^.]+)/);
+      items.push(h('button', {type: 'button', class: 'pause-pill', onclick: () => openSheet({bot: 'cyclops', kicker: 'Grok Bot', title: 'Grok Bot est en pause', say: 'Tes ordres sont écrits tout de suite ; la sonnette part à la reprise.', extra: () => pb, actions: []})},
+        h('i'), h('span', {text: 'Grok en pause' + (m ? ' · reprise ' + m[1] : '')}), h('b', {text: 'Détail'})));
+    }
+    return items;
+  }
+  const globe = (o) => (document.documentElement.classList.contains('theme-holo') && window.JarvisVoice && window.JarvisVoice.holo) ? window.JarvisVoice.holo(o).el : C('claude', o.size || 90).el;
+  const hello = () => { const hr = new Date().getHours(); return (hr >= 5 && hr < 12 ? 'Bonjour' : hr >= 12 && hr < 18 ? 'Bon après-midi' : 'Bonsoir'); };
+  const nowRows = (D) => h('ul', {class: 'hm-rows'}, D.now.length ? D.now.map((x) => h('li', {}, h('button', {type: 'button', class: 'hm-row', onclick: x.open},
+    h('span', {class: 'hm-ic', html: icon(x.ic, 17)}), h('span', {class: 'hm-tx'}, h('b', {text: x.t}), h('small', {class: x.urgent ? 'is-urgent' : '', text: x.sub})), h('span', {class: 'hm-go', html: icon('next', 16)})))) : [h('li', {class: 'muted', text: 'Rien d\'urgent. Profite.'})]);
+  const hsec = (t, aside, ...kids) => h('section', {class: 'hm-sec'}, h('header', {class: 'hm-h'}, h('h2', {text: t}), aside || null), ...kids);
+  const more = (label, id) => h('button', {type: 'button', class: 'link', onclick: () => go(id)}, label);
+
+  /* 1. Cockpit : le globe au centre, les rubriques en orbite, « Maintenant », le champ */
+  function homeCockpit(el, D, bar) {
+    const sats = [['demandes', 'chat', 'Demandes', S.demandes.length, S.demandes.some((d) => d.due != null && d.due <= 2)], ['agenda', 'cal', 'Agenda', D.ag.length, false], ['achats', 'tag', 'Achats', D.hot.length || D.liveA.length, D.hot.length > 0],
+      ['voyages', 'plane', 'Voyages', D.trip && D.trip.depart != null ? 'J-' + D.trip.depart : (S.voyages || []).length, false], ['sorties', 'map', 'Sorties', D.wk.length, false], ['suivi', 'pulse', 'Bots', D.bots.length, false]];
+    const orbit = h('div', {class: 'ck'});
+    const lines = h('div', {class: 'ck-lines', 'aria-hidden': 'true'});
+    let svg = '<svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="38" class="ck-ring"/>';
+    sats.forEach((x, i) => { const a = (-90 + i * 60) * Math.PI / 180; svg += '<line x1="50" y1="50" x2="' + (50 + 38 * Math.cos(a)).toFixed(1) + '" y2="' + (50 + 38 * Math.sin(a)).toFixed(1) + '" class="ck-line"/>'; });
+    lines.innerHTML = svg + '</svg>';
+    orbit.append(lines, h('button', {type: 'button', class: 'ck-core', 'aria-label': 'Parler à Claude', onclick: () => openChat('claude', 'hydra', 'equipe', 'equipe')}, globe({nodes: 90, size: 96})));
+    sats.forEach(([id, ic, l, n, urgent], i) => { const a = (-90 + i * 60) * Math.PI / 180;
+      orbit.append(h('button', {type: 'button', class: 'ck-sat', style: 'left:' + (50 + 38 * Math.cos(a)).toFixed(1) + '%;top:' + (50 + 38 * Math.sin(a)).toFixed(1) + '%', onclick: () => go(id)},
+        h('span', {class: 'ck-dot'}, h('span', {class: 'ic', html: icon(ic, 18)})), h('b', {class: urgent ? 'is-urgent' : '', text: String(n)}), h('small', {text: l}))); });
+    el.append(orbit, h('p', {class: 'ck-hello', text: hello() + ', Rabie.'}), hsec('Maintenant', null, nowRows(D)), bar);
+  }
+  /* 2. Widgets : chaque carte montre déjà son contenu */
+  function homeWidgets(el, D, bar) {
+    const wg = (id, ic, t, n, full, ...kids) => h('button', {type: 'button', class: 'wg' + (full ? ' is-full' : ''), onclick: () => go(id)}, h('span', {class: 'wg-h'}, h('span', {class: 'ic', html: icon(ic, 15)}), h('span', {text: t}), n != null ? h('b', {text: String(n)}) : null), ...kids);
+    const li = (a, b2, urgent) => h('span', {class: 'wg-li'}, h('span', {text: a}), b2 ? h('small', {class: urgent ? 'is-urgent' : '', text: b2}) : null);
+    el.append(h('header', {class: 'hm-hello'}, h('span', {class: 'hm-glb'}, globe({nodes: 60, size: 52, ring: false})), h('div', {}, h('b', {text: hello() + ', Rabie'}), h('small', {text: S.demandes.length + ' demandes · ' + D.ag.filter((a) => a.n === 0).length + " aujourd'hui"}))), bar);
+    const grid = h('div', {class: 'wg-grid'});
+    grid.append(
+      wg('demandes', 'chat', 'Demandes', S.demandes.length, false, D.dem.slice(0, 2).map((d) => li(d.title, (BOT[d.bot] ? BOT[d.bot].name : '') + (d.due != null ? ' · ' + dueTxt(d.due) : ''), d.due != null && d.due <= 2))),
+      wg('agenda', 'cal', 'Agenda', null, false, D.ag.slice(0, 3).map((a) => li(a.title, (a.n === 0 ? "aujourd'hui" : dueTxt(a.n)) + (a.time ? ' · ' + a.time : '')))));
+    if (D.trip) grid.append(wg('voyages', 'plane', 'Voyage · ' + D.trip.title, null, true, voyPass(D.trip)));
+    grid.append(
+      wg('achats', 'tag', 'Achats', D.hot.length ? D.hot.length + ' à décider' : D.liveA.length, false, D.fam ? li(D.fam.title, D.lead && D.lead.last ? eur2(D.lead.last.price) : 'pas encore relevé') : li('Rien de suivi'), D.lead ? priceChart(D.lead, false) : null),
+      wg('sorties', 'map', 'Sorties', D.wk.length, false, D.wk[0] ? h('span', {class: 'wg-sor'}, sorDate(D.wk[0]), li(D.wk[0].title, D.wk[0].where || '')) : li('Aucune idée en attente')));
+    grid.append(wg('equipe', 'pulse', 'Tes bots', D.bots.length + ' en cours', true, h('span', {class: 'wg-bots'}, BOTS.map((b) => h('span', {class: 'wg-bot is-' + modeOf(b.id)}, C(b.id, 34).el, h('small', {text: BOT[b.id].name}))))));
+    el.append(grid);
+  }
+  /* 3. Fil du jour : à faire, la journée en frise horaire, la semaine, bientôt */
+  function homeFil(el, D, bar) {
+    el.append(h('header', {class: 'hm-hello'}, h('span', {class: 'hm-glb'}, globe({nodes: 60, size: 52, ring: false})), h('div', {}, h('b', {text: hello() + ', Rabie'}), h('small', {text: D.now.length + ' choses à faire · ' + D.ag.filter((a) => a.n === 0).length + " aujourd'hui"}))), bar);
+    el.append(hsec('À faire maintenant', more('Tout voir', 'demandes'), nowRows(D)));
+    const today = D.ag.filter((a) => a.n === 0), H0 = 7, H1 = 23, nowH = new Date().getHours() + new Date().getMinutes() / 60, pos = (x) => Math.max(0, Math.min(100, (x - H0) / (H1 - H0) * 100));
+    const axis = h('div', {class: 'tl-axis'}, h('span', {class: 'tl-now', style: 'left:' + pos(nowH) + '%'}, h('small', {text: hm(new Date())})));
+    [8, 12, 16, 20].forEach((x) => axis.append(h('span', {class: 'tl-tick', style: 'left:' + pos(x) + '%'}, h('small', {text: x + 'h'}))));
+    const allDay = [];
+    today.forEach((a) => { const m = String(a.time || '').match(/(\d{1,2})h(\d{2})?/); if (!m) { allDay.push(a); return; } const x = +m[1] + (+m[2] || 0) / 60, p2 = pos(x);
+      axis.append(h('button', {type: 'button', class: 'tl-ev' + (x < nowH ? ' is-past' : '') + (p2 < 22 ? ' is-l' : p2 > 78 ? ' is-r' : ''), style: 'left:' + p2 + '%', onclick: a.open}, h('small', {text: a.time + ' ' + a.title}), h('i'))); });
+    el.append(hsec("Aujourd'hui", h('span', {class: 'aside', text: today.length ? today.length + ' au programme' : 'rien de prévu'}), axis,
+      allDay.length ? h('div', {class: 'tl-day'}, h('small', {text: 'Toute la journée'}), allDay.map((a) => h('button', {type: 'button', class: 'tl-chip', onclick: a.open}, a.title))) : null));
+    const week = D.ag.filter((a) => a.n >= 1);
+    el.append(hsec('Cette semaine', more('Agenda', 'agenda'), h('ul', {class: 'hm-rows'}, week.length ? week.slice(0, 5).map((a) => h('li', {}, h('button', {type: 'button', class: 'hm-row', onclick: a.open}, dayTile(a.n), h('span', {class: 'hm-tx'}, h('b', {text: a.title}), h('small', {text: a.who + (a.time ? ' · ' + a.time : '')})), h('span', {class: 'hm-go', html: icon('next', 16)})))) : [h('li', {class: 'muted', text: 'Semaine calme.'})])));
+    const soon = [D.trip ? h('button', {type: 'button', class: 'soon', onclick: () => go('voyages')}, h('span', {class: 'ic', html: icon('plane', 16)}), h('b', {text: D.trip.depart != null ? 'J-' + D.trip.depart : '—'}), h('small', {text: D.trip.title})) : null,
+      D.wk[0] ? h('button', {type: 'button', class: 'soon', onclick: () => go('sorties')}, h('span', {class: 'ic', html: icon('map', 16)}), h('b', {text: D.wk[0].from != null && D.wk[0].from >= 0 ? (D.wk[0].from === 0 ? "Aujourd'hui" : 'J-' + D.wk[0].from) : 'En ce moment'}), h('small', {text: D.wk[0].title})) : null,
+      D.fam ? h('button', {type: 'button', class: 'soon', onclick: () => D.openFam(D.fam)}, h('span', {class: 'ic', html: icon('tag', 16)}), h('b', {text: D.lead && D.lead.last ? eur(D.lead.last.price) : '—'}), h('small', {text: D.fam.title})) : null,
+      h('button', {type: 'button', class: 'soon', onclick: () => go('suivi')}, h('span', {class: 'ic', html: icon('pulse', 16)}), h('b', {text: String(D.bots.length)}), h('small', {text: 'chez tes bots'}))].filter(Boolean);
+    el.append(hsec('Bientôt', null, h('div', {class: 'soon-row'}, soon)));
+  }
   VIEWS.accueil = (el) => {
-    ACC_OS(el);
-    const kids = Array.prototype.slice.call(el.children);
-    const q = (sel) => kids.find((k) => k.matches && k.matches(sel)) || null;
-    const byH = (t) => kids.find((k) => { const x = k.querySelector('.panel-h h2'); return x && k.classList.contains('panel') && x.textContent.trim().indexOf(t) === 0; }) || null;
-    const order = [q('.home-hero'), q('.intent'), homeTiles(), q('.new-banner'), q('.pause-b'), q('.brief-card'), byH('Ce qui demande ton attention'), byH('Réponses reçues'), byH('Arrivés depuis'),
-      byH('En cours chez tes bots'), byH('Les 7 prochains jours'), q('.sor-acc'), byH('Ton équipe'), q('.stats'), q('.cost-chip'), byH('Journal')].filter(Boolean);
-    const rest = kids.filter((k) => !order.includes(k) && !k.classList.contains('ver-foot')), foot = q('.ver-foot');
-    el.replaceChildren.apply(el, order.concat(rest, foot ? [foot] : []));
+    const src = h('div'); ACC_ORIG(src);
+    const bar = src.querySelector('.intent'), D = homeData();
+    el.append.apply(el, homeTop(src));
+    ({cockpit: homeCockpit, widgets: homeWidgets, fil: homeFil})[homeKind()](el, D, bar || h('div'));
   };
+  /* rien n'est perdu : ce que l'ancien accueil montrait va dans sa rubrique */
+  const VDM_OS = VIEWS.demandes;
+  VIEWS.demandes = (el) => { VDM_OS(el); const src = h('div'); ACC_ORIG(src); ['Réponses reçues', 'Arrivés depuis'].forEach((t) => { const p2 = hpanel(src, t); if (p2) el.append(p2); }); };
+  const VEQ_OS = VIEWS.equipe;
+  VIEWS.equipe = (el) => { VEQ_OS(el); if (AGENT) return; const src = h('div'); ACC_ORIG(src); ['Journal'].forEach((t) => { const p2 = hpanel(src, t); if (p2) el.append(p2); }); const st = src.querySelector('.stats'); if (st) el.append(st); };
 
   boot();
 })();
