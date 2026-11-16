@@ -92,6 +92,29 @@ srv.listen(0, async () => {
     await p.evaluate(() => document.querySelector('.pap-priv').click()); await p.waitForTimeout(800);
     ok('papiers : papiers privés affichés à la demande (gardé dans le téléphone)', await p.evaluate(() => [...document.querySelectorAll('.hm-h h2')].some((x) => x.textContent === 'Papiers privés') && localStorage.getItem('jarvis.papiers.prive') === '1'));
     ok('papiers : dates de validité de Pilotage gardées', await p.evaluate(() => !!document.querySelector('.pap-dates') && document.querySelectorAll('.pap-dates .pap').length > 0));
+    /* voyages plus riches (16/11/2026) : Wikipédia et Open-Meteo simulés, aucun appel réel */
+    { const ctx = await b.newContext({...devices['iPhone 15 Pro Max']}); const q = await ctx.newPage(); q.on('pageerror', (e) => errs.push('voyages : ' + e.message));
+      await q.route('https://fr.wikipedia.org/**', (r) => r.fulfill({status: 200, headers: {'access-control-allow-origin': '*'}, contentType: 'application/json', body: JSON.stringify({type: 'standard', originalimage: {source: 'https://photo.essai/img.png', width: 960}})}));
+      await q.route('https://photo.essai/**', (r) => r.fulfill({status: 200, contentType: 'image/png', body: fs.readFileSync(path.join(ROOT, 'icon-192.png'))}));
+      await q.route('https://geocoding-api.open-meteo.com/**', (r) => r.fulfill({status: 200, headers: {'access-control-allow-origin': '*'}, contentType: 'application/json', body: JSON.stringify({results: [{name: new URL(r.request().url()).searchParams.get('name') || 'Tunis', latitude: 36.8, longitude: 10.18}]})}));
+      await q.route('https://archive-api.open-meteo.com/**', (r) => r.fulfill({status: 200, headers: {'access-control-allow-origin': '*'}, contentType: 'application/json', body: JSON.stringify({daily: {time: Array.from({length: 16}, (_, i) => '2026-03-' + String(5 + i).padStart(2, '0')), temperature_2m_max: Array(16).fill(19), temperature_2m_min: Array(16).fill(11), precipitation_sum: [0, 0, 3, 0, 0, 0, 1.5, 0, 0, 0, 0, 0, 0, 2, 0, 0]}})}));
+      await q.goto(base + '#voyages'); await q.waitForTimeout(3500);
+      ok('voyages : photo de la destination en bandeau sur chaque projet', await q.evaluate(() => document.querySelectorAll('.voy .vh').length >= 2 && document.querySelectorAll('.voy .vh.has-img').length >= 1));
+      await q.evaluate(() => document.querySelector('.voy .fam-hit').click()); await q.waitForTimeout(1200);
+      ok('voyage : photo en grand, carte d\'embarquement, carnet à préparer', await q.evaluate(() => !!document.querySelector('.vh.is-big h2') && /TUNIS/i.test(document.querySelector('.vh-k').textContent) && !!document.querySelector('.vp-codes') && !!document.querySelector('.cn-cta .btn')));
+      ok('voyage : météo attendue (l\'an dernier aux mêmes dates)', await q.evaluate(() => { const c = document.querySelector('.clim'); return !!c && !c.hidden && /11° à 19°/.test(c.textContent) && /3 jours de pluie/.test(c.textContent); }));
+      await q.evaluate(() => document.querySelector('.cn-cta .btn').click()); await q.waitForTimeout(1200);
+      ok('voyage : carnet préparé par Claude (temps forts, itinéraire, à savoir)', await q.evaluate(() => document.querySelectorAll('.tf').length >= 4 && document.querySelectorAll('.it > li').length >= 3 && document.querySelectorAll('.as li').length >= 3 && (window.__samples || []).some((x) => /agent de voyage/.test(x.first))));
+      await q.screenshot({path: path.join(SH, 'voyage.png'), fullPage: true});
+      await q.reload(); await q.waitForTimeout(3000); await q.evaluate(() => document.querySelector('.voy .fam-hit').click()); await q.waitForTimeout(800);
+      ok('voyage : carnet gardé dans le téléphone', await q.evaluate(() => document.querySelectorAll('.tf').length >= 4 && !document.querySelector('.cn-cta')));
+      await q.reload(); await q.waitForTimeout(3000);
+      await q.evaluate(() => document.querySelectorAll('.voy .fam-hit')[1].click()); await q.waitForTimeout(800);
+      ok('voyage : budget par poste face au maximum', await q.evaluate(() => document.querySelectorAll('.bd-l li').length >= 2 && /Total .*reste/.test(document.querySelector('.bd-t').textContent) && !!document.querySelector('.bd-max')));
+      await ctx.close(); }
+    p = await page('#voyages');
+    await p.evaluate(() => document.querySelector('.voy .fam-hit').click()); await p.waitForTimeout(800);
+    ok('voyage sans réseau : la page reste entière (photo de secours, pas de météo)', await p.evaluate(() => !!document.querySelector('.vh.is-big') && !!document.querySelector('.vp-codes')));
     /* aucune rubrique n'affiche de texte cassé */
     const broken = [];
     for (const t of ['accueil', 'demandes', 'agenda', 'suivi', 'achats', 'voyages', 'sorties', 'papiers', 'equipe', 'automatisations', 'reglages']) {
