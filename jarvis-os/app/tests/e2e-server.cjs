@@ -74,6 +74,27 @@ const ok = (n, c, i) => { out.push((c ? 'OK   ' : 'ÉCHEC') + ' ' + n + (i ? ' :
     await p.reload(); await p.waitForTimeout(800);
     ok('après rechargement : toujours relié, mémoire du serveur', await p.evaluate(() => window.__jarvis.srv.linked() && window.__jarvis.store.msgs.length >= 8));
     ok('aucune erreur dans la page', errs.length === 0, errs.join(' | '));
+    /* iPhone : voix bloquée après l'écoute, et reprise d'une session coupée en pleine réponse */
+    const ls = await p.evaluate(() => JSON.stringify(localStorage)); await p.close();
+    const q = await b.newPage({viewport: {width: 390, height: 844}});
+    await q.addInitScript((ls) => { const o = JSON.parse(ls); for (const k in o) localStorage.setItem(k, o[k]); }, ls);
+    await q.addInitScript(MOCK({iosStuck: true})); await q.goto(BASE + '/'); await q.waitForTimeout(500);
+    await q.click('.home-ask .ask-ic'); await q.waitForTimeout(300);
+    let m0 = await q.evaluate(() => window.__spoken.length);
+    await q.evaluate(() => window.__say.push('Bonjour JARVIS'));
+    await q.waitForTimeout(3000);
+    ok('iPhone : la réponse est dite malgré la voix bloquée par le micro', /Tu as dit : Bonjour JARVIS/.test(await q.evaluate((n) => window.__spoken.slice(n).join(' '), m0)));
+    await q.evaluate(() => window.__say.push('Et ensuite'));
+    await q.waitForTimeout(700);
+    await q.click('.v-bar .v-side:last-child'); await q.waitForTimeout(200);
+    await q.click('.home-ask .ask-ic'); await q.waitForTimeout(300);
+    m0 = await q.evaluate(() => window.__spoken.length);
+    await q.evaluate(() => window.__say.push('Quelle heure est-il'));
+    await q.waitForTimeout(4000);
+    const after = await q.evaluate((n) => window.__spoken.slice(n).join(' '), m0);
+    ok('session coupée en pleine réponse puis reprise : il écoute et répond', /Quelle heure est-il/.test(after) && !/Et ensuite/.test(after), after.slice(0, 80));
+    ok('jamais deux micros ouverts en même temps', (await q.evaluate(() => window.__maxActive)) === 1, 'maximum : ' + (await q.evaluate(() => window.__maxActive)));
+    ok('toujours à l\'écoute ensuite', await q.evaluate(() => window.__jarvis.voice.state === 'listening'));
   } catch (e) { ok('exception', false, e.message); }
   await b.close(); srv.kill(); fs.rmSync(DATA, {recursive: true, force: true});
   console.log(out.join('\n')); console.log(fails ? fails + ' échec(s)' : 'Tout passe (' + out.length + ' vérifications).');
