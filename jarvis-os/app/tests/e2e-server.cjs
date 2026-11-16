@@ -34,21 +34,25 @@ const ok = (n, c, i) => { out.push((c ? 'OK   ' : 'ÉCHEC') + ' ' + n + (i ? ' :
     await p.click('.tabs button:nth-child(1)'); await p.waitForTimeout(150);
     await p.click('.home-ask .ask-ic'); await p.waitForTimeout(250);
     ok('début de session : pas d\'ancienne réponse, Claude indiqué', await p.evaluate(() => !document.querySelector('.cap-j') && /Claude t'écoute/.test(document.querySelector('.cap-hint').textContent) && /Claude · Sonnet/.test(document.querySelector('.v-model').textContent)));
+    let n0 = await p.evaluate(() => window.__spoken.length);
     await p.evaluate(() => window.__say.push('Bonjour JARVIS'));
-    const seen = new Set();
-    for (let i = 0; i < 50; i++) { const t = await p.evaluate(() => (document.querySelector('[data-stream]') || {}).textContent || ''); if (t && t !== '…') seen.add(t); await p.waitForTimeout(50); }
+    const seen = new Set(); let firstPartWhileStreaming = '';
+    for (let i = 0; i < 50; i++) { const t = await p.evaluate(() => (document.querySelector('[data-stream]') || {}).textContent || ''); if (t && t !== '…') { seen.add(t); if (!firstPartWhileStreaming) firstPartWhileStreaming = await p.evaluate((n) => window.__spoken[n] || '', n0); } await p.waitForTimeout(50); }
     const mid = [...seen].sort((x, y) => x.length - y.length)[0] || '';
     await p.waitForTimeout(1500);
-    const spoken = await p.evaluate(() => window.__spoken.slice(-1)[0] || '');
+    const parts = await p.evaluate((n) => window.__spoken.slice(n), n0), spoken = parts.join(' ');
     ok('réponse de Claude via le serveur, lue à voix haute', /Tu as dit : Bonjour JARVIS\. Session : nouvelle, modèle : sonnet/.test(spoken), spoken);
+    ok('première phrase dite avant la fin de la réponse', firstPartWhileStreaming === 'Tu as dit : Bonjour JARVIS.' && parts.length >= 2, parts.length + ' morceaux, premier pendant le flux : « ' + firstPartWhileStreaming + ' »');
     ok('texte affiché pendant qu\'il arrive', seen.size >= 3 && !/modèle/.test(mid), seen.size + ' états, premier : ' + mid.slice(0, 40));
     ok('écoute repartie après la réponse', await p.evaluate(() => window.__jarvis.voice.state === 'listening'));
+    n0 = await p.evaluate(() => window.__spoken.length);
     await p.evaluate(() => window.__say.push('Et ensuite'));
     await p.waitForTimeout(2500);
-    ok('même conversation côté Claude', /Session : reprise/.test(await p.evaluate(() => window.__spoken.slice(-1)[0])));
+    ok('même conversation côté Claude', /Session : reprise/.test(await p.evaluate((n) => window.__spoken.slice(n).join(' '), n0)));
+    n0 = await p.evaluate(() => window.__spoken.length);
     await p.evaluate(() => window.__say.push('Demande à Kairos de vérifier le prix du robot'));
     await p.waitForTimeout(2500);
-    const sp2 = await p.evaluate(() => window.__spoken.slice(-1)[0]);
+    const sp2 = await p.evaluate((n) => window.__spoken.slice(n).join(' '), n0);
     ok('mission proposée par Claude, sans la ligne technique', /attend ton accord/.test(sp2) && !/MISSIONS/.test(sp2), sp2);
     if (process.env.SHOTS) await p.screenshot({path: process.env.SHOTS + '/session-serveur.png'});
     await p.evaluate(() => window.__say.push('Prépare un rapport sur la veille .NET'));

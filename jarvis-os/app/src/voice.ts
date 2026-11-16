@@ -34,6 +34,7 @@ export class Voice {
   private quick = 0;
   private startedAt = 0;
   private speakingNow = false;
+  private q: string[] = []; private qBusy = false; private qOpen = false; private qEnd: (() => void) | null = null;
   state: VoiceState = 'off';
   autoRestarts = 0;
   constructor(private o: VoiceOpts) {}
@@ -59,7 +60,7 @@ export class Voice {
   /* entre deux tours (pendant que le cerveau réfléchit) */
   pause() { clearTimeout(this.timer); const r = this.rec; this.rec = null; try { if (r) r.abort(); } catch { /* rien */ } if (this.on) this.set('waiting'); }
 
-  private hush() { this.speakingNow = false; try { if (synth) synth.cancel(); } catch { /* rien */ } }
+  private hush() { this.speakingNow = false; this.q = []; this.qBusy = false; this.qOpen = false; this.qEnd = null; try { if (synth) synth.cancel(); } catch { /* rien */ } }
 
   listen(auto: boolean) {
     if (!this.on || this.speakingNow || !SR) return;
@@ -99,6 +100,34 @@ export class Voice {
   }
   private autoRestartFail() { this.log('relance sans appui refusée'); }
   private fail(why: string) { this.on = false; this.rec = null; this.hush(); this.set('error', why); }
+
+  /* lecture au fil de l'eau : chaque phrase est dite dès qu'elle arrive ; l'écoute reprend quand tout est dit */
+  streamStart() { this.q = []; this.qBusy = false; this.qOpen = true; this.qEnd = null; }
+  streamPart(text: string) { if (!this.qOpen || !text.trim() || !canSpeak()) return; this.q.push(text); this.pump(); }
+  streamEnd(then?: () => void) { this.qOpen = false; this.qEnd = then || null; this.pump(); }
+  get streaming() { return this.qOpen || this.qBusy || this.q.length > 0; }
+  private pump() {
+    if (this.qBusy) return;
+    const next = this.q.shift();
+    if (next === undefined) {
+      if (this.qOpen) return;   /* la suite n'est pas encore arrivée */
+      const cb = this.qEnd; this.qEnd = null; this.speakingNow = false; if (cb) cb();
+      if (this.on) window.setTimeout(() => this.listen(true), 250);
+      return;
+    }
+    this.qBusy = true; this.speakingNow = true; this.set('speaking');
+    this.utter(next, () => { this.qBusy = false; this.pump(); });
+  }
+  private utter(text: string, done: () => void) {
+    const u = new W.SpeechSynthesisUtterance(text.replace(/[*_#>`]/g, ' '));
+    const v = frenchVoices().find((x) => (x.voiceURI || x.name) === this.o.voiceURI());
+    u.lang = v ? v.lang : 'fr-FR'; if (v) u.voice = v;
+    u.rate = Math.min(1.5, Math.max(0.7, this.o.rate()));
+    let fin = false; const end = () => { if (fin) return; fin = true; done(); };
+    u.onend = end; u.onerror = end;
+    try { synth!.speak(u); } catch { end(); return; }
+    window.setTimeout(() => { if (!fin && synth && !synth.speaking) end(); }, Math.max(5000, text.length * 110));
+  }
 
   /* lit la réponse, puis réécoute si la conversation est ouverte */
   speak(text: string, then?: () => void) {

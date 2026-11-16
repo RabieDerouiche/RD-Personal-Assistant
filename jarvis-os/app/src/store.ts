@@ -8,7 +8,7 @@ export type Priority = 'haute' | 'normale' | 'basse';
 export interface Mission { id: string; agent: AgentId; text: string; status: MissionStatus; at: number; result?: string; group?: string; priority?: Priority; done?: number; source?: string }
 export type RouteMode = 'auto' | 'claude' | 'grok';
 export interface Settings { voiceURI: string; rate: number; listenMode: 'phrase' | 'continu'; route: RouteMode; approveAll: boolean; name: string; salle: 'copie' | 'service'; serverUrl: string; serverToken: string; model: 'rapide' | 'equilibre' | 'profond' }
-export interface Stats { turns: number; voiceTurns: number; autoRestarts: number; autoRestartFails: number; errors: number; replyMs: number[] }
+export interface Stats { turns: number; voiceTurns: number; autoRestarts: number; autoRestartFails: number; errors: number; replyMs: number[]; firstMs?: number[] }
 
 const K = {msgs: 'jarvis.msgs', missions: 'jarvis.missions', settings: 'jarvis.settings', stats: 'jarvis.stats'};
 const read = <T>(k: string, d: T): T => { try { const v = localStorage.getItem(k); return v ? {...d as object, ...JSON.parse(v)} as T : d; } catch { return d; } };
