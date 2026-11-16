@@ -10,10 +10,15 @@ import {Voice, canListen, canSpeak, frenchVoices, type VoiceState} from './voice
 import {createOrb, type OrbState} from './orb';
 import {charOf, setModeSource, talkAll, refreshModes, type Mode} from './chars';
 import * as srv from './server';
+import {dashboard, modulePage} from './modules';
 
 const PHASE = 2;
-const VERSION = '0.8.1';
-type View = 'home' | 'command' | 'agents' | 'agent' | 'missions' | 'more' | 'memory' | 'automations' | 'intelligence' | 'settings';
+const VERSION = '0.9.0';
+/* les modules de la page Jarvis : gardés aussi sur l'iPhone pour s'afficher tout de suite à l'ouverture */
+let snapData: Record<string, srv.Mod> = (() => { try { return JSON.parse(localStorage.getItem('jarvis.snap') || '{}'); } catch { return {}; } })();
+let modSel = 'mails', modFrom: string = 'home';
+const keepSnap = (m: Record<string, srv.Mod> | null) => { if (!m) return; snapData = m; try { localStorage.setItem('jarvis.snap', JSON.stringify(m)); } catch { /* rien */ } };
+type View = 'home' | 'command' | 'agents' | 'agent' | 'missions' | 'more' | 'memory' | 'automations' | 'intelligence' | 'settings' | 'module';
 let view: View = 'home';
 let live = '', note = '', clearArm = 0, orbState: OrbState = 'idle', agentFilter = 'tous', agentQuery = '', agentSel: AgentId = 'claude', missionCol = 'a_approuver', draftNext = '', streaming = '', fresh = true, pairMsg = '', pairUrl = '', pairCode = '', sessionAt = 0, lastTiming: any = null, voiceMsg = '', updMsg = '', grokArm = 0, diagTxt = '';
 
@@ -30,7 +35,7 @@ const modeOf = (id: AgentId): Mode => store.missions.some((m) => m.agent === id 
 setModeSource(modeOf);
 const MODE_TXT: Record<Mode, string> = {veille: 'Non relié', travail: 'Au travail', demande: 'Attend ton accord'};
 const claudeOn = () => srv.linked() && !!srv.lastStatus().claude?.loggedIn;
-const stateTxt = (id: AgentId, m: Mode) => m === 'veille' && id === 'claude' && claudeOn() ? 'Prêt' : MODE_TXT[m];
+const stateTxt = (id: AgentId, m: Mode) => m !== 'veille' ? MODE_TXT[m] : id === 'claude' ? (claudeOn() ? 'Prêt' : MODE_TXT[m]) : srv.linked() && srv.lastStatus().connectors?.sheets ? (srv.grokPaused() ? 'En pause' : 'Prêt') : MODE_TXT[m];
 const sph = (id: AgentId, size: number, slot = '') => charOf(id, size, slot);
 
 const ST: Record<MissionStatus, string> = {brouillon: 'Brouillon', a_approuver: 'À approuver', approuvee: 'Approuvée', refusee: 'Refusée', envoyee: 'En cours', terminee: 'Terminée', echouee: 'Échouée'};
@@ -124,7 +129,7 @@ const askBox = (id: string, ph: string, cls: string) => {
     h('button', {type: 'button', class: 'ask-send', 'aria-label': 'Envoyer', html: icon('send', 17), onclick: send}));
 };
 const dock = () => h('div', {class: 'dock', 'aria-label': 'Ton équipe'}, AGENTS.map((a) => { const m = modeOf(a.id);
-  return h('button', {type: 'button', class: 'dock-b', 'data-mode': m, onclick: () => { agentSel = a.id; show('agent'); }}, sph(a.id, 54, 'dock'), h('b', {text: short(a.id)}), h('span', {text: m === 'demande' ? 'Attend' : m === 'travail' ? 'Travaille' : 'Non relié'})); }));
+  return h('button', {type: 'button', class: 'dock-b', 'data-mode': m, onclick: () => { agentSel = a.id; show('agent'); }}, sph(a.id, 54, 'dock'), h('b', {text: short(a.id)}), h('span', {text: m === 'demande' ? 'Attend' : m === 'travail' ? 'Travaille' : stateTxt(a.id, m)})); }));
 
 /* ---------- accueil : l'orbe et « Comment puis-je vous aider ? » ---------- */
 function home(): HTMLElement {
@@ -137,6 +142,7 @@ function home(): HTMLElement {
     note ? h('p', {class: 'note', text: note}) : null,
     n ? h('button', {type: 'button', class: 'nudge', onclick: () => show('missions')}, n + ' mission' + (n > 1 ? 's attendent' : ' attend') + ' ton accord ›') : null,
     dock(),
+    srv.linked() ? dashboard(snapData, openMod) : null,
     recent ? h('button', {type: 'button', class: 'last glass', onclick: () => show('command')}, h('small', {text: 'Toi : ' + last[0].text}), h('span', {text: last[1].text})) : null,
     h('div', {class: 'home-glow'}), askBox('in', 'Demandez quelque chose…', 'home-ask'));
 }
@@ -257,6 +263,7 @@ function more(): HTMLElement {
       h('div', {class: 'mods'}, mods.map((m) => h('span', {class: 'pill', text: m}))),
       h('a', {class: 'btn main', href: SALLE[store.settings.salle], target: '_blank', rel: 'noopener'}, h('span', {html: icon('ext', 16)}), ' Ouvrir la salle de contrôle'),
       h('small', {class: 'muted small', text: 'Ces modules arriveront ici, dans JARVIS OS, avec le serveur de la phase 3. D\'ici là, la page Jarvis reste ton tableau de bord.'})),
+    srv.linked() ? [h('div', {class: 'panel-h'}, h('h3', {text: 'Tes données'})), dashboard(snapData, openMod)] : null,
     h('div', {class: 'tiles'}, tile('automations', 'flow', 'Workflows', 'Le circuit des missions'), tile('intelligence', 'gauge', 'Intelligence', 'Activité et services'), tile('memory', 'memory', 'Mémoire', 'Tout ce qui a été dit'), tile('settings', 'gear', 'Réglages', 'Voix, prénom, écoute')),
     h('p', {class: 'small', text: 'JARVIS OS ' + VERSION + ' · phase ' + PHASE + ' (prototype) · ' + (matchMedia('(display-mode: standalone)').matches || (navigator as any).standalone ? "ouvert depuis l'écran d'accueil" : 'ouvert dans le navigateur')}),
     h('p', {class: 'small', text: 'Silhouettes des agents : game-icons.net (Lorc, Delapouite et contributeurs), licence CC BY 3.0.'}));
@@ -338,7 +345,7 @@ function settings(): HTMLElement {
     : h('div', {class: 'card glass'}, h('p', {class: 'kpi-l', text: 'Relier ton serveur JARVIS'}),
         h('p', {class: 'muted small', text: 'D\'abord installer le serveur (guide dans docs/jarvis-os.md). Ensuite : son adresse IP (mail d\'OVH) ou l\'adresse https://…sslip.io affichée par le serveur, et le code donné par « sudo cat /root/jarvis-code.txt ».'}), url, code,
         pairMsg ? h('p', {class: 'note', text: pairMsg}) : null,
-        h('button', {type: 'button', class: 'btn main', onclick: async () => { pairUrl = url.value; pairCode = code.value; pairMsg = 'Connexion…'; render(); const e = await srv.pair(pairUrl, pairCode); pairMsg = e || ''; if (!e) { pairUrl = ''; pairCode = ''; await srv.status(); refreshModes(); } render(); }}, 'Relier'));
+        h('button', {type: 'button', class: 'btn main', onclick: async () => { pairUrl = url.value; pairCode = code.value; pairMsg = 'Connexion…'; render(); const e = await srv.pair(pairUrl, pairCode); pairMsg = e || ''; if (!e) { pairUrl = ''; pairCode = ''; await srv.status(); refreshModes(); pullSnap(); } render(); }}, 'Relier'));
   return h('section', {class: 'page'}, back(), head('Réglages', 'Ta façon de travailler'),
     server,
     srv.linked() ? [h('label', {class: 'lbl', text: 'Claude répond'}), seg('model', [['rapide', 'Vite (Haiku)'], ['equilibre', 'Bien (Sonnet)'], ['profond', 'À fond (Opus)']])] : null,
@@ -359,13 +366,24 @@ function settings(): HTMLElement {
 
 /* ---------- la navigation ---------- */
 const TABS: [View, string, string][] = [['home', 'Accueil', 'home'], ['command', 'Commandes', 'chat'], ['agents', 'Équipe', 'agents'], ['missions', 'Missions', 'missions'], ['more', 'Plus', 'more']];
-const PARENT: Partial<Record<View, View>> = {agent: 'agents', memory: 'more', automations: 'more', intelligence: 'more', settings: 'more'};
+const PARENT: Partial<Record<View, View>> = {module: 'home', agent: 'agents', memory: 'more', automations: 'more', intelligence: 'more', settings: 'more'};
 function nav(): HTMLElement {
   const cur = PARENT[view] || view, n = pending();
   return h('nav', {class: 'tabs', id: 'tabs', 'aria-label': 'Modules'}, TABS.map(([v, l, ic]) => h('button', {type: 'button', 'aria-current': cur === v ? 'page' : null, onclick: () => show(v)}, h('span', {class: 'ti', html: icon(ic, 21)}), h('span', {text: l}), v === 'missions' && n ? h('b', {class: 'badge', text: String(n)}) : null)));
 }
 const toEnd = () => { if (view === 'command') window.scrollTo(0, document.documentElement.scrollHeight); };
-function show(v: View) { view = v; render(); window.scrollTo(0, 0); toEnd(); }
+function openMod(id: string) { modSel = id; modFrom = view === 'module' ? modFrom : view; show('module'); watchMod(); }
+/* tant qu'un module affiché est en lecture, on regarde toutes les 4 s */
+let watchT = 0;
+function watchMod() { clearTimeout(watchT); watchT = window.setTimeout(async () => { if (view !== 'module') return; const m = await srv.snap(); keepSnap(m); render(); if (m && m[modSel]?.running) watchMod(); }, 4000); }
+let pullT = 0;
+async function pullSnap() {
+  if (!srv.linked() || document.hidden) return;
+  const m = await srv.snap(); if (!m) return; keepSnap(m);
+  if (view === 'module' || view === 'more') render(); else if (view === 'home' && !voice.active) paint();
+  clearTimeout(pullT); if (Object.values(m).some((x) => x.running)) pullT = window.setTimeout(pullSnap, 5000);   /* lectures en cours : on suit de près */
+}
+function show(v: View) { view = v; render(); window.scrollTo(0, 0); toEnd(); if (v === 'home' || v === 'more') pullSnap(); }
 function paint() {
   if (view !== 'home' && view !== 'command') { const n = document.getElementById('tabs'); if (n) n.replaceWith(nav()); return; }
   const old = document.querySelector('.ask-in') as HTMLInputElement | null; const draft = old ? old.value : '', focus = !!old && document.activeElement === old;
@@ -377,13 +395,17 @@ function render() {
   const inVoice = view === 'home' && voice.active;
   document.body.className = 'v-' + view + (inVoice ? ' in-voice' : '');
   orb.wave(inVoice);
-  const views: Record<View, () => HTMLElement> = {home: inVoice ? voiceView : home, command, agents, agent: agentPage, missions, more, memory, automations, intelligence, settings};
+  const views: Record<View, () => HTMLElement> = {home: inVoice ? voiceView : home, command, agents, agent: agentPage, missions, more, memory, automations, intelligence, settings,
+    module: () => modulePage(modSel, snapData[modSel], () => show(modFrom as View), () => { srv.refresh([modSel]).then((m) => { keepSnap(m); render(); watchMod(); }); })};
   app.replaceChildren(...[h('main', {class: 'main'}, views[view]()), inVoice ? null : nav()].filter((x): x is HTMLElement => !!x));
 }
 
 render();
 /* phase 3 : au lancement, l'état du serveur et la mémoire qu'il garde ; les missions en cours sont suivies */
 if (srv.linked()) { srv.status().then(() => { refreshModes(); render(); }); srv.sync().then((okk) => { if (okk) { refreshModes(); if (!(view === 'home' && voice.active)) paint(); } }); }
+/* à l'ouverture puis toutes les minutes tant que l'app est visible : le serveur relit ce qui est trop vieux (mails : 3 min) */
+setTimeout(pullSnap, 1500); setInterval(pullSnap, 60000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) pullSnap(); });
 setInterval(() => { if (srv.linked() && store.missions.some((m) => m.status === 'envoyee') && !document.hidden) srv.sync().then((okk) => { if (okk && (view === 'missions' || view === 'agent')) render(); }); }, 10000);
 if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
 try { (window as any).speechSynthesis?.addEventListener?.('voiceschanged', () => { if (view === 'settings') render(); }); } catch { /* rien */ }

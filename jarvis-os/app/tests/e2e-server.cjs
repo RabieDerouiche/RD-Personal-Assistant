@@ -75,6 +75,17 @@ const ok = (n, c, i) => { out.push((c ? 'OK   ' : 'ÉCHEC') + ' ' + n + (i ? ' :
     if (process.env.SHOTS) await p.screenshot({path: process.env.SHOTS + '/commandes-serveur.png'});
     await p.reload(); await p.waitForTimeout(800);
     ok('après rechargement : toujours relié, mémoire du serveur', await p.evaluate(() => window.__jarvis.srv.linked() && window.__jarvis.store.msgs.length >= 8));
+    await p.click('.tabs button:nth-child(1)'); let filled = 0;
+    for (let i = 0; i < 60 && filled < 9; i++) { await p.waitForTimeout(500); filled = await p.evaluate(() => [...document.querySelectorAll('.dash-tile em')].filter((e) => /\d/.test(e.textContent)).length); if (filled < 9 && i % 6 === 5) await p.evaluate(() => window.dispatchEvent(new Event('focus'))); }
+    ok('tableau de bord rempli par le serveur (9 modules)', filled === 9, filled + ' modules');
+    if (process.env.SHOTS) await p.screenshot({path: process.env.SHOTS + '/tableau-de-bord.png', fullPage: true});
+    await p.click('.dash-tile:has-text("Achats")'); await p.waitForTimeout(300);
+    ok('page Achats', /Robot cuiseur/.test(await p.textContent('.page')) && /Lu /.test(await p.textContent('.page .small')), (await p.textContent('.page .row-h b')));
+    await p.click('.p-head .ic-btn'); await p.waitForTimeout(300);
+    let txt = await p.textContent('.page .small');
+    for (let i = 0; i < 30 && /Lecture en cours/.test(txt); i++) { await p.waitForTimeout(500); txt = await p.textContent('.page .small'); }
+    ok('actualiser ce module', /Lu à l'instant/.test(txt), txt.slice(0, 40));
+    await p.click('.back'); await p.waitForTimeout(200);
     ok('aucune erreur dans la page', errs.length === 0, errs.join(' | '));
     /* iPhone : voix bloquée après l'écoute, et reprise d'une session coupée en pleine réponse */
     const ls = await p.evaluate(() => JSON.stringify(localStorage)); await p.close();

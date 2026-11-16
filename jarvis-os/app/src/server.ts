@@ -138,3 +138,7 @@ export async function installVoice(): Promise<string> {
   }
   return 'running';
 }
+/* les modules de la page Jarvis, lus par le serveur en arrière-plan */
+export interface Mod { at?: number; data?: any; error?: string; running?: boolean }
+export async function snap(): Promise<Record<string, Mod> | null> { try { const r = await call('/api/snap'); if (!r.ok) return null; return (await r.json()).modules; } catch { return null; } }
+export async function refresh(modules: string[]): Promise<Record<string, Mod> | null> { try { const r = await call('/api/snap/refresh', {method: 'POST', body: JSON.stringify({modules})}); return (await r.json()).modules; } catch { return null; } }
