@@ -44,7 +44,8 @@ export async function pair(url: string, code: string): Promise<string | null> {
 }
 export function unpair() { store.settings.serverToken = ''; store.save(); }
 
-export interface Status { ok: boolean; claude?: {installed: boolean; loggedIn: boolean; method: string}; version?: string; commit?: string; error?: string }
+export interface Conn { checked: boolean; gmail: boolean; calendar: boolean; sheets: boolean; drive: boolean; read: number }
+export interface Status { ok: boolean; claude?: {installed: boolean; loggedIn: boolean; method: string}; version?: string; commit?: string; connectors?: Conn; grokPauseUntil?: string; error?: string }
 let last: Status = {ok: false};
 export const lastStatus = () => last;
 export async function status(): Promise<Status> {
@@ -52,7 +53,7 @@ export async function status(): Promise<Status> {
   try {
     const r = await call('/api/status');
     if (r.status === 401) return (last = {ok: false, error: 'appareil plus reconnu : relie-le de nouveau'});
-    const b = await r.json(); return (last = {ok: true, claude: b.claude, version: b.version, commit: b.commit});
+    const b = await r.json(); return (last = {ok: true, claude: b.claude, version: b.version, commit: b.commit, connectors: b.connectors, grokPauseUntil: b.grokPauseUntil});
   } catch { return (last = {ok: false, error: 'serveur injoignable'}); }
 }
 
@@ -106,3 +107,5 @@ export async function updateServer(): Promise<string> {
   try { const r = await call('/api/update', {method: 'POST'}, 90000); const b = await r.json(); return b.message || 'Réponse inattendue.'; }
   catch { return 'Le serveur n\'a pas répondu.'; }
 }
+export async function setGrokPause(until: string) { try { await call('/api/config', {method: 'POST', body: JSON.stringify({grokPauseUntil: until})}); } catch { /* rien */ } await status(); }
+export const grokPaused = () => { const u = last.grokPauseUntil; return !!u && Date.parse(u) > Date.now(); };

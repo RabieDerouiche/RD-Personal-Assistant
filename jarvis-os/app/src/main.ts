@@ -12,10 +12,10 @@ import {charOf, setModeSource, talkAll, refreshModes, type Mode} from './chars';
 import * as srv from './server';
 
 const PHASE = 2;
-const VERSION = '0.6.0';
+const VERSION = '0.7.0';
 type View = 'home' | 'command' | 'agents' | 'agent' | 'missions' | 'more' | 'memory' | 'automations' | 'intelligence' | 'settings';
 let view: View = 'home';
-let live = '', note = '', clearArm = 0, orbState: OrbState = 'idle', agentFilter = 'tous', agentQuery = '', agentSel: AgentId = 'claude', missionCol = 'a_approuver', draftNext = '', streaming = '', fresh = true, pairMsg = '', pairUrl = '', pairCode = '', sessionAt = 0, updMsg = '';
+let live = '', note = '', clearArm = 0, orbState: OrbState = 'idle', agentFilter = 'tous', agentQuery = '', agentSel: AgentId = 'claude', missionCol = 'a_approuver', draftNext = '', streaming = '', fresh = true, pairMsg = '', pairUrl = '', pairCode = '', sessionAt = 0, updMsg = '', grokArm = 0;
 
 const SALLE = {copie: 'https://claude.ai/artifact/NMAqUak7A5JYsLsc12VyaZ', service: 'https://claude.ai/artifact/QwLf64Ggstzu4p3uznZrr8'};
 const app = document.getElementById('app')!;
@@ -64,20 +64,29 @@ async function handleRemote(text: string, byVoice: boolean) {
   const t0 = performance.now();
   store.add({who: 'me', text, at: Date.now()}); store.stats.turns++;
   setOrb('thinking'); streaming = '…'; live = ''; paint();
-  let reply = '', agentId: AgentId | undefined;
+  let reply = '', agentId: AgentId | undefined, said = 0, firstSpoken = 0, failed = false;
+  const speakLive = (byVoice || voice.active) && canSpeak();
+  if (speakLive) voice.streamStart();
+  /* dès qu'une phrase est complète, elle est dite : on n'attend plus toute la réponse */
+  const feed = (t: string, final: boolean) => {
+    if (!speakLive) return;
+    const rest = t.slice(said);
+    const m = final ? rest.length : (() => { let cut = -1; const re = /[.!?…](\s|$)/g; let x; while ((x = re.exec(rest))) { if (x.index >= 2) cut = x.index + 1; } return cut; })();
+    if (m > 0) { const part = rest.slice(0, m).trim(); said += m; if (part) { if (!firstSpoken) { firstSpoken = Math.round(performance.now() - t0); store.stats.firstMs = [...(store.stats.firstMs || []), firstSpoken].slice(-50); } voice.streamPart(part); } }
+  };
   try {
-    const out = await srv.chat(text, {newSession: fresh, model: store.settings.model}, (t) => { streaming = t || '…'; document.querySelectorAll('[data-stream]').forEach((n) => { n.textContent = streaming; }); });
+    const out = await srv.chat(text, {newSession: fresh, model: store.settings.model}, (t) => { streaming = t || '…'; document.querySelectorAll('[data-stream]').forEach((n) => { n.textContent = streaming; }); feed(t, false); });
     fresh = false; reply = out.reply; agentId = (out.agent as AgentId) || 'claude';
     if (out.missions.length) { store.missions.push(...out.missions); setOrb('executing'); }
   } catch (e) {
-    reply = (e as Error).message || 'Le serveur ne répond pas.'; store.stats.errors++;
+    reply = (e as Error).message || 'Le serveur ne répond pas.'; store.stats.errors++; failed = true;
   }
   streaming = '';
   store.add({who: 'jarvis', text: reply, at: Date.now(), agent: agentId});
   store.stats.replyMs.push(Math.round(performance.now() - t0)); store.save();
   if (agentId) talkAll(agentId, Math.min(8, 1 + reply.length / 16));
   refreshModes(); paint();
-  if ((byVoice || voice.active) && canSpeak()) voice.speak(reply);
+  if (speakLive) { if (failed) voice.streamPart(reply); else feed(reply, true); voice.streamEnd(); }
   else setTimeout(() => { if (orbState === 'thinking' || orbState === 'executing') setOrb('idle'); }, 900);
 }
 function handleLocal(text: string, byVoice: boolean) {
@@ -225,7 +234,7 @@ function missions(): HTMLElement {
       h('div', {class: 'unit-hit'}, sph(m.agent, 40, 'm-' + m.id), h('span', {class: 'unit-id'}, h('b', {text: short(m.agent)}), h('span', {text: ago(m.at) + (m.group ? ' · mission commune' : '')})),
         h('button', {type: 'button', class: 'pill prio p-' + (m.priority || 'normale'), 'aria-label': 'Priorité', onclick: () => { m.priority = nextPrio(m.priority); store.save(); render(); if (srv.linked()) srv.missionUpdate(m.id, {priority: m.priority}).catch(() => {}); }}, PRIO[m.priority || 'normale'])),
       h('p', {class: 'm-text', text: m.text}),
-      m.status === 'approuvee' ? h('p', {class: 'muted small', text: agent(m.agent).provider === 'claude' ? (srv.linked() ? 'Claude va s\'en charger.' : 'Envoi réel quand le serveur sera relié.') : 'Envoi aux bots Grok en phase 4.'}) : null,
+      m.status === 'approuvee' && !m.result ? h('p', {class: 'muted small', text: !srv.linked() ? 'Envoi réel quand le serveur sera relié.' : agent(m.agent).provider === 'claude' ? 'Claude va s\'en charger.' : 'JARVIS l\'écrit dans le Canal de Pilotage' + (srv.grokPaused() ? ' ; sonnette à la reprise de Grok.' : ', puis sonne le bot.')}) : null,
       m.status === 'envoyee' ? h('p', {class: 'muted small', text: short(m.agent) + ' y travaille…'}) : null,
       m.result ? h('div', {class: 'result'}, h('p', {class: 'kpi-l', text: m.status === 'echouee' ? 'Échec' : 'Compte rendu'}), h('p', {text: m.result})) : null,
       h('div', {class: 'acts'},
@@ -290,7 +299,8 @@ function intelligence(): HTMLElement {
   const voiceOk = s.voiceTurns + s.errors ? s.voiceTurns / (s.voiceTurns + s.errors) : 0;
   const approved = store.missions.length ? store.missions.filter((m) => ['approuvee', 'envoyee', 'terminee'].includes(m.status)).length / store.missions.length : 0;
   const st3 = srv.lastStatus(), cl = claudeOn();
-  const llm: [string, string, boolean][] = [['Serveur JARVIS', srv.linked() ? (st3.ok ? 'relié · version ' + st3.version : st3.error || 'vérification…') : 'pas encore relié (Réglages)', srv.linked() && st3.ok], ['Claude (en direct)', cl ? 'abonnement Claude, sur ton serveur' : 'connecte Claude sur le serveur', cl], ['Claude (missions)', cl ? 'faites sur ton serveur après ton accord' : 'avec le serveur', cl], ['Grok Bot', 'phase 4 · webhooks', false], ['Reconnaissance vocale', canListen() ? 'disponible sur cet appareil' : 'absente ici', canListen()], ['Voix de JARVIS', canSpeak() ? 'disponible' : 'absente ici', canSpeak()]];
+  const cn = st3.connectors, data = !!(cn && (cn.gmail || cn.sheets || cn.calendar));
+  const llm: [string, string, boolean][] = [['Tes données Google', !srv.linked() ? 'avec le serveur' : !cn?.checked ? 'vérification au prochain « Vérifier »' : data ? [cn.gmail && 'Gmail', cn.calendar && 'Agenda', cn.sheets && 'Pilotage', cn.drive && 'Drive'].filter(Boolean).join(', ') + ' · lecture seule' : 'aucun connecteur vu par Claude Code sur le serveur', srv.linked() && data], ['Serveur JARVIS', srv.linked() ? (st3.ok ? 'relié · version ' + st3.version : st3.error || 'vérification…') : 'pas encore relié (Réglages)', srv.linked() && st3.ok], ['Claude (en direct)', cl ? 'abonnement Claude, sur ton serveur' : 'connecte Claude sur le serveur', cl], ['Claude (missions)', cl ? 'faites sur ton serveur après ton accord' : 'avec le serveur', cl], ['Bots Grok', !srv.linked() ? 'avec le serveur' : !cn?.sheets ? 'il faut le connecteur Google Sheets' : srv.grokPaused() ? 'Canal prêt · Grok en pause jusqu\'au ' + new Date(st3.grokPauseUntil || '').toLocaleString('fr-FR', {weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'}) : 'missions par le Canal et la sonnette', srv.linked() && !!cn?.sheets && !srv.grokPaused()], ['Reconnaissance vocale', canListen() ? 'disponible sur cet appareil' : 'absente ici', canListen()], ['Voix de JARVIS', canSpeak() ? 'disponible' : 'absente ici', canSpeak()]];
   return h('section', {class: 'page'}, back(), head('Intelligence', 'Activité et services'),
     h('div', {class: 'gauges'}, gauge(Math.min(1, s.turns / 50), 'Échanges', String(s.turns), '#67e8f9'), gauge(voiceOk, 'Micro réussi', Math.round(voiceOk * 100) + '%', '#a5b4fc'), gauge(approved, 'Missions approuvées', Math.round(approved * 100) + '%', '#e9a8fb'), gauge(Math.min(1, avg / 1000), 'Réponse locale', avg + 'ms', '#fcd6a4')),
     h('div', {class: 'panel-h'}, h('h3', {text: 'État des modèles et services'})),
@@ -313,6 +323,8 @@ function settings(): HTMLElement {
     ? h('div', {class: 'card glass'}, h('p', {class: 'kpi-l', text: 'Serveur JARVIS'}), h('b', {class: 'srv-url', text: st.serverUrl}),
         h('p', {class: 'muted small', text: st3.ok ? 'Relié · version ' + st3.version + (st3.commit ? ' (' + st3.commit + ')' : '') + ' · Claude ' + (st3.claude?.loggedIn ? 'connecté à ton abonnement' : 'pas encore connecté : sur le serveur, « sudo -iu jarvis claude auth login »') : (st3.error || 'Vérification…')}),
         updMsg ? h('p', {class: 'note', text: updMsg}) : null,
+        srv.grokPaused() ? h('div', {class: 'acts'}, h('p', {class: 'muted small', text: 'Grok en pause jusqu\'au ' + new Date(st3.grokPauseUntil || '').toLocaleString('fr-FR', {weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit'}) + ' : les ordres aux bots vont dans le Canal, sans sonnette.'}),
+          h('button', {type: 'button', class: 'btn ghost', onclick: async (e: Event) => { if (!grokArm) { grokArm = window.setTimeout(() => { grokArm = 0; render(); }, 5000); (e.target as HTMLElement).textContent = 'Confirmer : Grok est reparti'; return; } clearTimeout(grokArm); grokArm = 0; await srv.setGrokPause(''); render(); }}, 'Grok est reparti')) : null,
         h('div', {class: 'acts'}, h('button', {type: 'button', class: 'btn', onclick: () => { srv.status().then(render); }}, 'Vérifier'),
           h('button', {type: 'button', class: 'btn', onclick: async () => { updMsg = 'Mise à jour…'; render(); updMsg = await srv.updateServer(); render(); if (/redémarre/.test(updMsg)) setTimeout(async () => { await srv.status(); updMsg = 'Serveur à jour : version ' + (srv.lastStatus().version || '?') + '.' + (srv.servedByServer() ? ' Ferme et rouvre l\'app pour avoir la nouvelle version de l\'écran.' : ''); render(); }, 6000); }}, 'Mettre à jour le serveur'),
           h('button', {type: 'button', class: 'btn ghost', onclick: () => { srv.unpair(); render(); }}, 'Délier cet iPhone')))
