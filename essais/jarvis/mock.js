@@ -119,7 +119,7 @@
   ];
   G['Faits'] = [
     ['Domaine', 'Fait', 'Valeur', 'Mis à jour le', 'Source'],
-    ['Foyer', 'Fille', 'Maya, née le 03/02/2023', fr(D(-9)), ''],
+    ['Foyer', 'Fille', 'Léa, née le 03/02/2023', fr(D(-9)), ''],
     ['Voyages', 'Vols', 'Directs de préférence', fr(D(-9)), ''],
     ['Voyages', 'Destinations envisagées', 'Japon (printemps), Sicile, Maroc (Marrakech, Essaouira)', fr(D(-9)), ''],
     ['Assistants', 'Sonnette Jarvis', 'bots+jarvis@mail.grokbot.com', fr(D(-3)), ''],
@@ -150,7 +150,7 @@
   ];
   const wk = (() => { const d = new Date().getDay(); return d === 0 ? [-1, 0] : d === 6 ? [0, 1] : [6 - d, 7 - d]; })();
   G['Sorties'] = [
-    ['Sortie', 'Où', 'Début', 'Fin', 'Prix total TTC (2 adultes et Maya)', 'Trajet', 'Âge conseillé', 'Lien', 'Statut', 'Proposée le', 'Bot', 'Remarque'],
+    ['Sortie', 'Où', 'Début', 'Fin', 'Prix total TTC (2 adultes et Léa)', 'Trajet', 'Âge conseillé', 'Lien', 'Statut', 'Proposée le', 'Bot', 'Remarque'],
     ["Boucle d'or (spectacle)", 'La Clef', fr(D(wk[0])), fr(D(wk[1])), '', '', '', '', 'Proposée', fr(D(-2)), 'Ulysse', 'À compléter'],
     ['Ferme pédagogique', 'Gally', fr(D(wk[0])), fr(D(wk[1])), '24', '25 min en voiture', 'dès 2 ans', 'https://example.org/ferme', 'Proposée', fr(D(-2)), 'Ulysse', ''],
     ['Marché de Noël', 'La Défense', fr(D(12)), fr(D(40)), '0', '30 min', 'tous', '', 'Proposée', fr(D(-2)), 'Ulysse', ''],
