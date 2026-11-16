@@ -8,7 +8,8 @@ import * as srv from './server';
 
 const CSS = `
 .jv-btn { position: fixed; left: 50%; bottom: calc(14px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 60; width: 74px; height: 74px; border: 0; padding: 0; border-radius: 50%; background: radial-gradient(circle, rgba(10, 10, 30, .9) 55%, rgba(10, 10, 30, 0) 72%); cursor: pointer; }
-.jv-btn .orb-stage { position: absolute; inset: -10px; pointer-events: none; }
+.jv-btn .orb-stage { position: absolute; inset: -10px; pointer-events: none; overflow: hidden; border-radius: 50%; }
+.jv-btn .orb-stage canvas, .jv-stage canvas { display: block; width: 100% !important; height: 100% !important; }
 .jv-btn::after { content: ""; position: absolute; inset: 2px; border-radius: 50%; box-shadow: 0 0 0 1px rgba(180, 192, 255, .25), 0 8px 30px rgba(99, 102, 241, .45); animation: jvpulse 2.6s ease-in-out infinite; pointer-events: none; }
 @keyframes jvpulse { 50% { box-shadow: 0 0 0 1px rgba(180, 192, 255, .35), 0 8px 44px rgba(124, 92, 255, .7); } }
 .jv { position: fixed; inset: 0; z-index: 9999; display: flex; flex-direction: column; background: radial-gradient(120% 60% at 20% 0, #0b2027 0, #050509 50%); color: #eef1fb; font: 400 15px/1.5 Inter, system-ui, -apple-system, sans-serif; padding: calc(10px + env(safe-area-inset-top, 0px)) 16px calc(10px + env(safe-area-inset-bottom, 0px)); }

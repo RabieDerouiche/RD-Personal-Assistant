@@ -1,6 +1,19 @@
 <!doctype html><html><head><script>window.__SCEN = {};</script><script src="donnees-fictives.js"></script><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}
   /* ---------- JARVIS OS : navigation et écrans ajoutés ---------- */
   .fab-talk { display: none !important; }
+  /* variante « grille » : les 10 rubriques en deux rangées fixes sous l'en-tête, sans défilement */
+  html.nav-grille .top .tabs { display: grid !important; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; overflow: visible; padding: 6px 10px 8px !important; }
+  html.nav-grille .top .tab { flex-direction: column !important; gap: 2px !important; min-height: 46px !important; padding: 4px 2px !important; border-radius: 12px !important; font: 500 10.5px var(--sans) !important; justify-content: center; }
+  html.nav-grille .top .tab .badge { position: absolute !important; top: 2px; right: 8px; }
+  /* variante « dock » : les 10 rubriques en deux rangées fixes en bas, l'orbe au-dessus */
+  html.nav-dock .top .tabs { display: none !important; }
+  html.nav-dock .dock-nav { position: fixed; left: 0; right: 0; bottom: 0; z-index: 50; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 2px; padding: 8px 8px calc(8px + env(safe-area-inset-bottom, 0px)); background: rgba(6, 9, 18, .92); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); border-top: 1px solid var(--line); }
+  html.nav-dock .dock-nav .tab { position: relative; flex-direction: column !important; gap: 2px !important; min-height: 46px !important; padding: 4px 2px !important; border-radius: 12px !important; border: 0 !important; background: none !important; color: var(--muted) !important; font: 500 10.5px var(--sans) !important; display: flex; align-items: center; justify-content: center; }
+  html.nav-dock .dock-nav .tab[aria-current="page"] { color: #fff !important; background: rgba(255, 255, 255, .08) !important; }
+  html.nav-dock .dock-nav .tab .badge { position: absolute !important; top: 2px; right: 10px; }
+  html.nav-dock .jv-btn { bottom: calc(118px + env(safe-area-inset-bottom, 0px)) !important; }
+  html.nav-dock .dir { padding-bottom: calc(200px + env(safe-area-inset-bottom, 0px)) !important; }
+  .top .status { flex-wrap: nowrap; overflow: hidden; white-space: nowrap; }
   /* bandeau de rubriques en haut (remplace la barre du bas) */
   .top .tabs { position: static !important; transform: none !important; left: auto !important; bottom: auto !important; width: auto !important; display: flex !important; gap: 6px; overflow-x: auto; scrollbar-width: none; padding: 8px max(16px, env(safe-area-inset-left, 0px)) 10px !important; margin: 0 auto; max-width: 980px; background: none !important; border: 0 !important; box-shadow: none !important; border-radius: 0 !important; backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
   .top .tabs::-webkit-scrollbar { display: none; }
@@ -5374,6 +5387,7 @@ void main(){
 })();
 </script>
 
+<script>/* comparaison des dispositions : ?nav=grille ou ?nav=dock */ (function () { var v = (location.search.match(/nav=(grille|dock)/) || [])[1]; if (!v) return; document.documentElement.classList.add('nav-' + v); if (v === 'dock') { var n = document.getElementById('tabs'); var d = document.createElement('nav'); d.className = 'dock-nav'; d.setAttribute('aria-label', 'Rubriques'); setTimeout(function () { Array.prototype.slice.call(n.children).forEach(function (b) { d.appendChild(b); }); document.body.appendChild(d); }, 0); } })();</script>
 <script src="jarvis-voix.js"></script>
 <script>/* JARVIS OS : le grand bouton orbe du bas ouvre la page vocale */ try { window.JarvisVoice.mountButton(document.body); } catch (e) { /* rien */ }</script>
 </body></html>
