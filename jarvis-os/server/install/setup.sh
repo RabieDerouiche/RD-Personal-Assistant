@@ -1,12 +1,12 @@
 #!/bin/bash
-# JARVIS OS — installation du serveur (Ubuntu 24.04). À lancer en root ; relançable sans risque (mise à jour).
+# JARVIS OS — installation du serveur (Ubuntu 26.04 ou 24.04 LTS). À lancer en root ; relançable sans risque (mise à jour).
 # Installe Node 22, Claude Code (programme officiel), le serveur JARVIS (service « jarvis »), Caddy pour le HTTPS
 # avec une adresse <ip>.sslip.io, et un pare-feu (SSH, 80, 443). Aucune clé d'API n'est installée ni demandée.
 set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
 REPO=https://github.com/RabieDerouiche/RD-Personal-Assistant.git
 apt-get update -y
-apt-get install -y curl git ca-certificates gnupg ufw debian-keyring debian-archive-keyring apt-transport-https
+apt-get install -y curl git ca-certificates gnupg ufw
 if ! command -v node >/dev/null || ! node -v | grep -qE '^v(2[2-9]|[3-9][0-9])'; then
   curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
   apt-get install -y nodejs
