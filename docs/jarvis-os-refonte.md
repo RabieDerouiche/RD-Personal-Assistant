@@ -44,3 +44,19 @@ Ses demandes, dans ses mots (résumées) :
 ## État
 
 - 16/11/2026 : décisions prises, plan écrit. Panneaux relevés dans le code de la page (extrait) : Ce qui demande ton attention, Les 7 prochains jours, Journal, Ton équipe, À décider maintenant, Tes oui à donner dans Grok, Brouillons prêts à partir, Arrivés depuis le dernier tour d'Iris, En cours chez tes bots, Réponses reçues sur tes dossiers, Dossiers en attente, Mes tâches, Mes événements importants, Dates clés, Ajouter une échéance, Tous mes achats, Autres veilles de Kairos, Tes projets, Le plan, Le fil du voyage, Les options, Tes règles de voyage, Ce week-end, Tes envies, Déjà faites, Papiers, Déposer un document, Coût de la semaine, Commandes rapides, Pour Claude, Tes ordres, Échanges récents dans le Canal, Temps forts, Expirées, Reportées, Plus tard, Maintenant, En ce moment.
+
+## Maquette : méthode et base (16/11/2026)
+
+- **Base posée** : `essais/jarvis-os-maquette/` = la page Jarvis v17.15 telle quelle (`index.html`) + le faux `window.claude` du banc (`donnees-fictives.js`, données fictives, vrais en-têtes de Pilotage), injecté en tête de page. Vérifié dans Chromium (iPhone 390 px) : 7 onglets (Accueil, Demandes, Agenda, Achats, Voyages, Sorties, Suivi), « En direct · Pilotage lu », aucune erreur. Adresse une fois fusionnée : `https://rabiederouiche.github.io/RD-Personal-Assistant/essais/jarvis-os-maquette/`.
+- La page passe par `window.claude.use('mcp' | 'sample' | …)` → `callTool`, `watchTool`, `listTools`, `sample`, voix. **Version réelle** : même page, avec un `window.claude` qui appelle le serveur (`POST /api/tool`, accès Google direct) ; **maquette** : le faux. Le code de la page est dans une fonction englobante : les nouveaux écrans s'ajoutent en modifiant sa source (`TABS`, `TITLES`, `VIEWS`).
+
+## Conception de la nouvelle disposition (à montrer en maquette, puis à valider écran par écran)
+
+- **Navigation** : barre du bas à 5 entrées : Accueil, Demandes (pastille), **Parler** (bouton central, grand, ouvre la conversation vocale plein écran), Agenda, **Menu**. Le Menu ouvre une grille complète : Achats, Voyages, Sorties, Papiers, Automatisations, Équipe, Suivi (dossiers, tâches, coût de la semaine), Conversations (historique écrit), Missions, Réglages. Plus de barre de saisie flottante sur le contenu.
+- **Saisie** : un bouton clavier dans l'en-tête et dans la page vocale ouvre un panneau du bas (champ, envoi, micro) qui se referme après l'envoi.
+- **Accueil** : Claude chef d'équipe et le point du jour (la carte de la page), « À faire maintenant » (demandes, oui à donner, brouillons), la journée en frise (agenda d'aujourd'hui et demain), mails importants, état de l'équipe ; tout cliquable vers l'écran détaillé.
+- **Page vocale** : orbe et voile, sous-titres complets, indicateur clair (écoute, réflexion, parole), boutons Clavier, Couper, Terminer ; l'historique de la conversation accessible d'un geste.
+- **Automatisations** : une carte par routine, en frise de suivi de livraison (programmée → lancée → terminée ou en erreur), dernier passage, prochain passage calculé depuis l'horaire (onglet Routines), dernier résultat (État, Journal).
+- **Achats** : liste avec mini-courbe et dernier prix, fiche avec la courbe complète (Relevés), seuil, vendeurs ; « + Suivre un produit » (écrit dans Prix) et « Ne plus suivre » (statut « Plus suivi »).
+- **Papiers** : recherche plein texte, puces de catégories (Voiture, Moi, Épouse, Fille, Appartement et immobilier, Entourage de la fille, Autres), groupes par catégorie puis année, ouverture du fichier Drive ; « Déposer un document » (Iris range).
+- **Voyages** et **Sorties** : la présentation de la page (projets, plan, fil, options ; ce week-end, envies, déjà faites), mise en valeur.
