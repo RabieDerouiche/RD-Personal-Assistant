@@ -761,6 +761,26 @@
   .lg-chip b { font: 600 11px var(--sans); color: var(--muted); }
   .lg-chip.is-on { border-color: rgba(255, 255, 255, .6); background: rgba(255, 255, 255, .1); }
 
+  /* JARVIS OS : « En ce moment », fil en direct (16/11/2026) */
+  .lf { display: flex; flex-direction: column; gap: 8px; }
+  .lf-top { display: flex; flex-direction: column; gap: 4px; }
+  .lf-live { display: inline-flex; align-items: center; gap: 8px; font: 600 12px var(--display); letter-spacing: .14em; text-transform: uppercase; color: #67e8f9; }
+  .lf-live i { width: 8px; height: 8px; border-radius: 50%; background: #22d3ee; box-shadow: 0 0 10px #22d3ee; animation: blink 1.6s ease-in-out infinite; }
+  .lf-pause { color: #fda4af; font-size: 12.5px; }
+  .lf-h { margin: 8px 0 0; font: 600 11.5px var(--display); letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+  .lf-l { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+  .lf-r { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; gap: 10px; align-items: center; width: 100%; padding: 9px 12px 9px 9px; border-radius: 16px; border: 1px solid var(--line); background: var(--glass); color: var(--fg); text-align: left; }
+  .lf-av { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; font: 700 14px var(--display); color: #fff; background: radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--bc, #64748b) 80%, #fff), var(--bc, #64748b)); box-shadow: 0 0 12px color-mix(in srgb, var(--bc, #64748b) 55%, transparent); }
+  .lf-t { min-width: 0; display: flex; flex-direction: column; } .lf-t b { font-size: 14px; font-weight: 600; overflow-wrap: anywhere; } .lf-t small { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+  .lf-w { font: 600 11.5px var(--display); color: var(--dim); white-space: nowrap; }
+  .lf-r.is-work { border-color: rgba(103, 232, 249, .45); box-shadow: 0 0 14px rgba(34, 211, 238, .15); } .lf-r.is-work .lf-w { color: #67e8f9; }
+  .lf-r.is-wait { border-color: rgba(251, 191, 36, .5); } .lf-r.is-wait .lf-w { color: var(--amber); }
+  .lf-r.is-late { border-color: rgba(251, 113, 133, .55); } .lf-r.is-late .lf-w { color: #fda4af; }
+  .lf-r.is-soon .lf-w { color: #a5b4fc; }
+  .lf-r.is-past { background: transparent; } .lf-r.is-past .lf-t b { font-weight: 500; font-size: 13.5px; } .lf-r.is-fresh .lf-av { outline: 2px solid rgba(103, 232, 249, .7); outline-offset: 2px; }
+  .lf-calm { margin: 0; color: var(--muted); font-size: 13px; }
+  html.theme-holo .lf-r { background: linear-gradient(180deg, rgba(10, 30, 72, .5), rgba(4, 12, 34, .78)); border-color: rgba(56, 189, 248, .22); }
+  html.theme-holo .lf-r.is-past { background: transparent; border-color: rgba(56, 189, 248, .12); }
   /* JARVIS OS : voyages plus riches (16/11/2026) */
   .vh { --vh-img: none; position: relative; overflow: hidden; display: flex; align-items: flex-end; min-height: 130px; padding: 14px 16px; border-radius: 22px; color: #fff;
     background: var(--vh-img) center / cover no-repeat, radial-gradient(420px 220px at 85% 10%, rgba(168, 85, 247, .45), transparent 70%), linear-gradient(135deg, #0c4a6e, #1e1b4b 55%, #3b0764); }
@@ -2475,7 +2495,7 @@ void main(){
       if (LINK.on) {
         /* v17.5 : en direct, la page n'a aucun moyen d'envoyer un fichier dans Drive. Elle ne fait plus semblant : le fichier part du téléphone, Iris range ensuite. */
         el.append(h('div', {class: 'card depot', style: botVars('hydra')}, h('div', {class: 'cmd-head'}, C('hydra', 64).el, h('div', {}, h('b', {text: 'Iris range tes documents'}), h('span', {text: "Jarvis ne peut pas envoyer un fichier lui-même. Dépose-le depuis ton téléphone, puis demande à Iris de le ranger."}))),
-          h('ol', {class: 'yes-l'}, h('li', {text: "Sur l'iPhone : ouvre la photo ou le PDF, touche Partager, puis Drive (dossier RD Assistant/Papiers) ou Grok Bot (Iris)."}), h('li', {text: 'Ensuite : « Iris range ce que j\'ai déposé » ci-dessous. Elle le nomme, le range par année, remplit l\'onglet Papiers et note l\'échéance.'})),
+          h('ol', {class: 'yes-l'}, h('li', {text: "Sur l'iPhone : ouvre la photo ou le PDF, touche Partager, puis Drive (dossier RD Assistant/Papiers) ou Grok Bot (Iris)."}), h('li', {text: 'Ensuite : « Iris range ce que j\'ai déposé » ci-dessous. Elle le nomme, le range dans sa catégorie, remplit l\'onglet Papiers et note l\'échéance.'})),
           h('div', {class: 'row-actions'}, h('button', {type: 'button', class: 'btn main', onclick: () => finish({title: 'Rangement demandé à Iris', bot: 'hydra', order: LV_DRIVE_ORDER, effect: 'Une ligne pour Iris dans le Canal, puis la sonnette : un passage d\'Iris.', say: 'Je range ce que tu as déposé.'})}, "Iris range ce que j'ai déposé", costTag({cost: 'bot'})))),
           h('p', {class: 'muted', text: 'Jamais de relevé bancaire, de RIB, de bulletin de paie ni d\'avis d\'imposition : Iris ne les ouvre pas.'}));
         return;
@@ -2484,7 +2504,7 @@ void main(){
       const file = h('input', {class: 'inp', type: 'file', id, accept: 'image/*,application/pdf'});
       const note = h('textarea', {class: 'inp', id: id2, rows: '2', placeholder: 'Facultatif : ce que c\'est, ce que tu veux en faire'});
       el.append(h('div', {class: 'card depot', style: botVars('hydra')}, h('div', {class: 'cmd-head'}, C('hydra', 64).el, h('div', {}, h('b', {text: 'Iris range tout'}), h('span', {text: "Photo d'un courrier, PDF, capture : il le range, le nomme, note l'échéance et prépare la suite."}))),
-        h('form', {class: 'pick-form', onsubmit: (ev) => { ev.preventDefault(); const f = file.files && file.files[0]; finish({title: 'Document déposé', effect: (f ? '« ' + f.name + ' »' : 'Le fichier') + ' part dans ton Drive, dossier Papiers ; Iris le range par année, ajoute sa ligne Papiers et son échéance, puis te dit en 4 lignes ce que c\'est.' + (note.value.trim() ? ' Ta note : « ' + note.value.trim() + ' ».' : ''), bot: 'hydra', order: 'Range le document déposé' + (note.value.trim() ? ' : ' + note.value.trim() : '.'), say: 'Je le range et je te dis ce que c\'est.', reply: 'Rangé dans Papiers, échéance ajoutée au 15 du mois prochain.'}); }},
+        h('form', {class: 'pick-form', onsubmit: (ev) => { ev.preventDefault(); const f = file.files && file.files[0]; finish({title: 'Document déposé', effect: (f ? '« ' + f.name + ' »' : 'Le fichier') + ' part dans ton Drive, dossier Papiers ; Iris le range dans sa catégorie, ajoute sa ligne Papiers et son échéance, puis te dit en 4 lignes ce que c\'est.' + (note.value.trim() ? ' Ta note : « ' + note.value.trim() + ' ».' : ''), bot: 'hydra', order: 'Range le document déposé' + (note.value.trim() ? ' : ' + note.value.trim() : '.'), say: 'Je le range et je te dis ce que c\'est.', reply: 'Rangé dans Papiers, échéance ajoutée au 15 du mois prochain.'}); }},
           h('label', {for: id, class: 'pick-label', text: 'Le fichier'}), file, h('label', {for: id2, class: 'pick-label', text: 'Une note'}), note, h('button', {type: 'submit', class: 'btn main'}, h('span', {class: 'ic', html: icon('up', 16)}), 'Envoyer à Iris'))),
         h('p', {class: 'muted', text: 'Jamais de relevé bancaire, de RIB, de bulletin de paie ni d\'avis d\'imposition : Iris ne les ouvre pas.'}));
     }
@@ -2910,6 +2930,44 @@ void main(){
     paintUnit(b, true);
     return card;
   }
+
+  /* JARVIS OS : « En ce moment », un fil en direct de toute l'équipe (16/11/2026) : maintenant (au travail, attend ta réponse, en retard),
+     bientôt (passages des 24 heures, d'après Routines), plus tôt (Journal). Redessiné toutes les 30 s tant qu'il est à l'écran. */
+  const LIVE_FIL = {box: null, draw: null, timer: 0};
+  const inTxt = (ms) => { const m = Math.round(ms / 60000); return m < 1 ? 'maintenant' : m < 60 ? 'dans ' + m + ' min' : 'dans ' + Math.floor(m / 60) + ' h' + (m % 60 ? ' ' + pad2(m % 60) : ''); };
+  const agoTxt = (ms) => { const m = Math.round(ms / 60000); return m < 1 ? "à l'instant" : m < 60 ? 'il y a ' + m + ' min' : m < 1440 ? 'il y a ' + Math.round(m / 60) + ' h' : 'il y a ' + Math.round(m / 1440) + ' j'; };
+  function lfRow(id, cls, title, sub, when) {
+    const b = BOT[id] || BOT.toi;
+    return h('li', {}, h('button', {type: 'button', class: 'lf-r ' + cls, style: botVars(BOT[id] ? id : 'toi'), onclick: () => { if (BOT[id] && id !== 'toi' && id !== 'claude') openAgent(id); }},
+      h('span', {class: 'lf-av', text: (b.name || '?').charAt(0)}), h('span', {class: 'lf-t'}, h('b', {text: title}), sub ? h('small', {text: sub}) : null), when ? h('small', {class: 'lf-w', text: when}) : null));
+  }
+  function liveFil() {
+    const box = h('div', {class: 'lf'});
+    const draw = () => {
+      const now = new Date();
+      const cur = BOTS.map((b) => b.id).map((id) => ({id, m: modeOf(id), late: !!(S.late && S.late[id])})).filter((x) => x.m !== 'veille' || x.late);
+      const nowRows = cur.map((x) => { const w = waitingFor(x.id);
+        return x.late ? lfRow(x.id, 'is-late', BOT[x.id].name + ' est en retard', 'Passage prévu ' + S.next[x.id] + ', rien depuis', 'en retard')
+          : x.m === 'demande' && w.length ? lfRow(x.id, 'is-wait', BOT[x.id].name + ' attend ta réponse', w[0].title + (w.length > 1 ? ' (+' + (w.length - 1) + ')' : ''), w.length + ' pour toi')
+          : lfRow(x.id, 'is-work', BOT[x.id].name + ' travaille', unitText(x.id), 'en cours'); });
+      const soon = (S.rout || []).filter((r) => r['Routine']).map((r) => ({id: lvBot(r['Bot']), r: r['Routine'], d: nextRun(r['Moment'])}))
+        .filter((x) => x.d && x.d !== 'event' && x.d - now < 24 * 3600e3).sort((a, b) => a.d - b.d).slice(0, 6);
+      const past = (S.activite || []).slice(0, 8);
+      const until = GP.until ? new Date(GP.until) : null;
+      box.replaceChildren(
+        h('div', {class: 'lf-top'}, h('span', {class: 'lf-live'}, h('i'), 'En direct · ' + hm(now)), GP.on ? h('small', {class: 'lf-pause', text: 'Grok en pause' + (until && !isNaN(until) ? " jusqu'à " + fmt(until, {weekday: 'short', hour: '2-digit', minute: '2-digit'}) : '') + ' : les passages attendent la reprise'}) : null),
+        h('h3', {class: 'lf-h', text: 'Maintenant'}),
+        nowRows.length ? h('ul', {class: 'lf-l'}, nowRows) : h('p', {class: 'lf-calm', text: "Personne ne travaille en ce moment : l'équipe est en veille."}),
+        h('h3', {class: 'lf-h', text: 'Bientôt'}),
+        soon.length ? h('ul', {class: 'lf-l'}, soon.map((x) => lfRow(x.id, 'is-soon', x.r, (BOT[x.id] ? BOT[x.id].name : '') + ' · ' + shortWhen(x.d), inTxt(x.d - now)))) : h('p', {class: 'lf-calm', text: 'Aucun passage prévu dans les 24 heures.'}),
+        h('h3', {class: 'lf-h', text: 'Plus tôt'}),
+        past.length ? h('ul', {class: 'lf-l'}, past.map((a) => lfRow(a.bot, 'is-past' + (a.fresh ? ' is-fresh' : ''), a.text, (BOT[a.bot] ? BOT[a.bot].name : 'Toi') + ' · ' + a.when, a.s ? agoTxt(now - a.s) : ''))) : h('p', {class: 'lf-calm', text: 'Rien dans le Journal.'}));
+    };
+    draw();
+    LIVE_FIL.box = box; LIVE_FIL.draw = draw;
+    if (!LIVE_FIL.timer) LIVE_FIL.timer = setInterval(() => { if (LIVE_FIL.box && LIVE_FIL.box.isConnected && !document.hidden) LIVE_FIL.draw(); }, 30000);
+    return box;
+  }
   const unitText = (b) => {
     if (S.late && S.late[b]) return 'En retard : passage prévu ' + S.next[b] + ', rien depuis';
     const m = b === 'claude' ? 'veille' : modeOf(b);
@@ -3252,6 +3310,7 @@ void main(){
         h('div', {class: 'row-actions center'}, btn("Mission pour l'équipe", () => openChat('claude', 'hydra', 'equipe', 'equipe'), 'main', 'send'), btn('Qui est en retard ?', () => { openChat('claude', 'hydra', 'equipe', 'equipe'); const ta = $('chat-in'); if (ta && SAMPLE) { ta.value = 'Qui est en retard dans l\'équipe, et que faut-il faire ?'; sendChat(); } }, '', 'pulse'))));
       /* JARVIS OS : une seule grille, cartes identiques ; « En ce moment » (activité en direct, prochain passage) est dans chaque carte */
       el.append(panel('Ton équipe', h('span', {class: 'aside', text: 'Touche un bot pour sa page'}), h('div', {class: 'team'}, BOTS.map((b) => mateCard(b.id)))));
+      el.append(panel('En ce moment', h('span', {class: 'aside', text: 'fil en direct'}), liveFil())); /* JARVIS OS : fil en direct (remplace le panneau Journal) */
       el.append(panel('Échanges récents dans le Canal', null, h('div', {class: 'stack'}, S.canal.slice(0, 4).map((l) => {
         const b = BOT[l.to] && l.to !== 'claude' ? l.to : l.from;
         return h('button', {type: 'button', class: 'canal-row', onclick: () => BOT[b] && b !== 'claude' ? openAgent(b) : null}, h('time', {text: l.date}), h('span', {text: (BOT[l.from] ? BOT[l.from].name : l.from === 'rabie' ? 'Toi' : l.from) + ' → ' + (BOT[l.to] ? BOT[l.to].name : 'toi') + ' · ' + l.subject}), h('span', {class: 'pill' + (l.status === 'À faire' ? ' is-demande' : ''), text: l.status}));
@@ -4559,7 +4618,7 @@ void main(){
     const tach = rows('tach');
     if (tach) S.taches = tach.filter((r) => r['Tâche'] && !/^(fait|annul)/.test(lvLow(r['Statut']))).map((r) => ({id: 't:' + r._row, _row: r._row, title: r['Tâche'], n: lvFrIso(r['Pour le']) ? N(lvFrIso(r['Pour le'])) : null}));
     const jour = rows('jour');
-    if (jour) S.activite = jour.slice(-40).map((r, i) => ({r, i, s: lvStamp(r['Date et heure'])})).sort((a, b) => (b.s && a.s ? b.s - a.s : 0) || b.i - a.i).slice(0, 15).map(({r, s}) => { return {bot: lvBot(r['Bot']), when: s ? fmt(s, {day: '2-digit', month: '2-digit'}) + ' · ' + pad2(s.getHours()) + 'h' + pad2(s.getMinutes()) : r['Date et heure'], text: (r['Sujet'] ? r['Sujet'] + ' : ' : '') + r['Détail'], fresh: !!(s && now - s < 86400000)}; });
+    if (jour) S.activite = jour.slice(-40).map((r, i) => ({r, i, s: lvStamp(r['Date et heure'])})).sort((a, b) => (b.s && a.s ? b.s - a.s : 0) || b.i - a.i).slice(0, 15).map(({r, s}) => { return {bot: lvBot(r['Bot']), when: s ? fmt(s, {day: '2-digit', month: '2-digit'}) + ' · ' + pad2(s.getHours()) + 'h' + pad2(s.getMinutes()) : r['Date et heure'], text: (r['Sujet'] ? r['Sujet'] + ' : ' : '') + r['Détail'], fresh: !!(s && now - s < 86400000), s: s ? s.getTime() : null}; }); /* JARVIS OS : s = heure exacte */
     /* achats : une famille par marque, ses modèles, leur dernier prix (onglet Prix, sinon onglet Relevés) */
     const prix = rows('prix'), rel = rows('rel') || [];
     if (prix) {
@@ -6389,7 +6448,7 @@ void main(){
   const VDM_OS = VIEWS.demandes;
   VIEWS.demandes = (el) => { VDM_OS(el); const src = h('div'); ACC_ORIG(src); ['Réponses reçues', 'Arrivés depuis'].forEach((t) => { const p2 = hpanel(src, t); if (p2) el.append(p2); }); };
   const VEQ_OS = VIEWS.equipe;
-  VIEWS.equipe = (el) => { VEQ_OS(el); if (AGENT) return; const src = h('div'); ACC_ORIG(src); ['Journal'].forEach((t) => { const p2 = hpanel(src, t); if (p2) el.append(p2); }); const st = src.querySelector('.stats'); if (st) el.append(st); };
+  VIEWS.equipe = (el) => { VEQ_OS(el); if (AGENT) return; const src = h('div'); ACC_ORIG(src); /* le Journal est dans « En ce moment » */ const st = src.querySelector('.stats'); if (st) el.append(st); };
 
   /* ---------- JARVIS OS : Réglages. Relier cet iPhone au serveur, créer et relier l'accès Google, tester les données ---------- */
   ICONS.gear = '<circle cx="12" cy="12" r="3"/><path d="M12 2.5v2.2M12 19.3v2.2M4.6 4.6l1.6 1.6M17.8 17.8l1.6 1.6M2.5 12h2.2M19.3 12h2.2M4.6 19.4l1.6-1.6M17.8 6.2l1.6-1.6"/>';
