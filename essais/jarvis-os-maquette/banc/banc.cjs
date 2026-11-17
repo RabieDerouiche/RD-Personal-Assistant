@@ -92,6 +92,7 @@ srv.listen(0, async () => {
     /* papiers lus dans le Drive (16/11/2026) */
     p = await page('#papiers');
     ok('papiers : tuiles par personne et par thème, lues dans le Drive', await p.evaluate(() => { const h = [...document.querySelectorAll('.hm-h h2')].map((x) => x.textContent); return h.includes('Par personne') && h.includes('Par thème') && document.querySelectorAll('.pt').length >= 8 && /\d+ documents/.test(document.querySelector('.pap-n').textContent); }));
+    ok('papiers : le propriétaire en premier, puis les autres personnes par ordre alphabétique', await p.evaluate(() => { const h2 = [...document.querySelectorAll('.hm-h h2')].find((x) => x.textContent === 'Par personne'); const names = [...h2.closest('section').querySelectorAll('.pt b')].map((x) => x.textContent); return names.join(',') === 'Lui,Léa,Sarah'; }), await p.evaluate(() => [...document.querySelectorAll('.pt b')].map((x) => x.textContent).join(',')));
     ok('papiers : papiers privés masqués par défaut', await p.evaluate(() => ![...document.querySelectorAll('.hm-h h2')].some((x) => x.textContent === 'Papiers privés') && /Afficher les papiers privés/.test(document.querySelector('.pap-priv').textContent)));
     await p.fill('.pap-search', 'passeport'); await p.waitForTimeout(300);
     ok('papiers : recherche instantanée avec le chemin du dossier', await p.evaluate(() => { const r = [...document.querySelectorAll('.pap-res .pf')]; return r.length >= 3 && r.every((x) => /passeport/i.test(x.textContent)) && r.some((x) => / › /.test(x.textContent)) && r.every((x) => /^https:\/\/drive\.google\.com\//.test(x.href)); }));
@@ -163,6 +164,11 @@ srv.listen(0, async () => {
       await drag(p, box.x - 80, box.y + 30, 170, 15, 300);
       const sideOk = await p.evaluate(() => !document.getElementById('sheet').hidden);
       await drag(p, box.x, box.y, 0, 220, 350);
+      /* boutons d'une feuille tous pareils (retour du 17/11/2026) */
+      { const q = await page('#demandes');
+        await q.evaluate(() => { const c = [...document.querySelectorAll('article')].find((x) => /Passeport/.test(x.textContent) && /Plus/.test(x.textContent)); [...c.querySelectorAll('button')].find((x) => /^Plus/.test(x.textContent.trim())).click(); }); await q.waitForTimeout(900);
+        const m = await q.evaluate(() => [...document.querySelectorAll('#sheet .sheet-actions .btn')].map((x) => { const r = x.getBoundingClientRect(), cs = getComputedStyle(x), c = x.querySelector('.cost'); return {rad: cs.borderRadius, pl: cs.paddingLeft, gap: c ? r.right - c.getBoundingClientRect().right : 0}; }));
+        ok('feuille : boutons de même forme et même marge, coût calé à droite', m.length >= 5 && new Set(m.map((x) => x.rad + x.pl)).size === 1 && m.every((x) => x.gap <= 40), JSON.stringify(m)); }
       ok('glisser : la feuille du bas se ferme (pas sur un petit glissé ni un glissé de côté)', shortOk && sideOk && await p.evaluate(() => document.getElementById('sheet').hidden), shortOk + ' ' + sideOk + ' ' + box.tag);
       p = await page(''); await p.fill('.intent-input', 'Bonjour'); await p.press('.intent-input', 'Enter'); await p.waitForTimeout(900);
       const opened = await p.evaluate(() => !document.getElementById('chat').hidden);

@@ -1266,6 +1266,12 @@
   .verdict-go { display: block; margin-top: 6px; padding: 0; font-weight: 600; }
   .pap-go { width: 100%; text-align: left; }
   .pap-dates.panel { border-top: 0; padding-top: 0; }
+  /* JARVIS OS (17/11/2026, retour du propriétaire sur capture) : boutons d'une feuille et de « Toutes les actions » tous pareils.
+     Même pilule, même marge, texte à gauche, pastille de coût calée à droite, chevron après elle ; texte long sur deux lignes sans toucher les bords. */
+  .sa-main .btn, .sa-grid .btn { min-height: 48px; padding: 10px 18px; border-radius: 999px; justify-content: flex-start; gap: 8px; font-size: 15px; line-height: 1.25; text-align: left; }
+  .sa-main .btn .cost, .sa-grid .btn .cost { margin-left: auto; flex: 0 0 auto; }
+  .sa-main .btn .chev, .sa-grid .btn .chev { margin-left: auto; flex: 0 0 auto; } .sa-main .btn .cost + .chev, .sa-grid .btn .cost + .chev { margin-left: 2px; }
+  .sa-main .btn .sugg-tag, .sa-grid .btn .sugg-tag { flex: 0 0 auto; }
 </style>
 
 <div class="scroller" id="scroller">
@@ -3666,7 +3672,9 @@ void main(){
     } else {
       const root = D.roots.find((r) => r.key === 'papiers'), priv = D.roots.find((r) => r.key === 'prive');
       const tops = root ? (D.kids[root.id] || []) : [], loose = root ? (D.files[root.id] || []) : [];
-      const people = tops.filter((t) => papLook(t.name)[0] === 'user'), others = tops.filter((t) => papLook(t.name)[0] !== 'user').sort((a, b) => (papLook(a.name)[0] === 'inbox') - (papLook(b.name)[0] === 'inbox'));
+      /* JARVIS OS (17/11/2026, demande du propriétaire) : lui d'abord, puis les autres personnes par ordre alphabétique */
+      const me = (t) => /^(rabie|moi|lui)$/.test(papNorm(t.name).trim()) ? 0 : 1;
+      const people = tops.filter((t) => papLook(t.name)[0] === 'user').sort((a, b) => me(a) - me(b) || papNorm(a.name).localeCompare(papNorm(b.name))), others = tops.filter((t) => papLook(t.name)[0] !== 'user').sort((a, b) => (papLook(a.name)[0] === 'inbox') - (papLook(b.name)[0] === 'inbox'));
       body.append(h('p', {class: 'pap-n', text: D.all.length + ' documents · ' + tops.length + ' dossiers'}));
       if (people.length) body.append(hsec('Par personne', null, h('div', {class: 'pt-grid'}, people.map((t, i) => papTile(t, D, i)))));
       if (others.length) body.append(hsec('Par thème', null, h('div', {class: 'pt-grid'}, others.map((t, i) => papTile(t, D, i)))));
