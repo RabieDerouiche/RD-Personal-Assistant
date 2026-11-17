@@ -127,6 +127,8 @@ srv.listen(0, async () => {
     const R = report[S.id] = {console: [], errors: [], failed: []};
     const ctx = await b.newContext({...devices['iPhone 15 Pro Max'], ...(SCALE ? {deviceScaleFactor: SCALE} : {})}); await ctx.addInitScript(SPY); if (S.web) await web(ctx);
     const open = async () => { const p = await ctx.newPage();
+      /* SAFE=1 : marges d'un vrai iPhone 15 Pro Max (barre d'état 59 px, barre d'accueil 34 px), que l'émulation seule n'a pas */
+      if (process.env.SAFE === '1') { const c = await ctx.newCDPSession(p); await c.send('Emulation.setSafeAreaInsetsOverride', {insets: {top: 59, bottom: 34, left: 0, right: 0}}); }
       p.on('console', (m) => { if (/error|warning/.test(m.type())) R.console.push(m.type() + ' ' + m.text().slice(0, 200)); });
       p.on('pageerror', (e) => R.errors.push(e.message.slice(0, 200))); p.on('requestfailed', (q) => R.failed.push(q.url().slice(0, 100) + ' ' + (q.failure() || {}).errorText));
       await p.goto(base + S.url); await p.waitForTimeout(+(process.env.WAIT || 3200)); if (S.go) await S.go(p); await p.waitForTimeout(300); return p; };

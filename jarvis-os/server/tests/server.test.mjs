@@ -151,7 +151,7 @@ try {
     const before = (await G('/api/status')).body.usage.taches; r = await T('Claude Code Remote', 'fire_trigger', {trigger_id: 'trig_x'}); const t2 = await waitT();
     ok('tâche Claude : aucune ligne pour Claude, aucun appel à Claude', t2 && t2.last.lignes === 0 && (await G('/api/status')).body.usage.taches === before, JSON.stringify(t2));
     /* notifications (0.12.0) : faux service de notifications ; le « téléphone » déchiffre lui-même chaque message (RFC 8291) et vérifie la signature (VAPID) */
-    { const got = []; const PS = http.createServer((q, res) => { const ch = []; q.on('data', (d) => ch.push(d)); q.on('end', () => { got.push({path: q.url, h: q.headers, body: Buffer.concat(ch)}); res.writeHead(q.url.includes('gone') ? 410 : 201); res.end(); }); });
+    { const got = []; const PS = http.createServer((q, res) => { const ch = []; q.on('data', (d) => ch.push(d)); q.on('end', () => { got.push({path: q.url, h: q.headers, body: Buffer.concat(ch)}); if (q.url.includes('refus')) { res.writeHead(403, {'content-type': 'application/json'}); res.end(JSON.stringify({reason: 'BadJwtToken'})); return; } res.writeHead(q.url.includes('gone') ? 410 : 201); res.end(); }); });
       await new Promise((z) => PS.listen(0, '127.0.0.1', z)); const PURL = 'http://127.0.0.1:' + PS.address().port;
       const b64 = (b) => Buffer.from(b).toString('base64url'), ub = (s) => Buffer.from(s, 'base64url');
       const ua = crypto.createECDH('prime256v1'); ua.generateKeys(); const auth = crypto.randomBytes(16);
@@ -186,6 +186,10 @@ try {
       r = await G('/api/push/prefs', {heure: '25:00', rappels: false}); ok('notifications : préférences (heure invalide refusée, rappels coupés)', r.body.prefs.heure === '08:00' && r.body.prefs.rappels === false);
       r = await G('/api/push/subscribe', {subscription: {...sub, endpoint: PURL + '/push/gone'}}); await G('/api/push/test', {}); r = await G('/api/push');
       ok('notifications : abonnement expiré (410) retiré seul', r.body.count === 1);
+      { const sj = JSON.parse(Buffer.from(jwt[1], 'base64url').toString()); ok('notifications : sujet VAPID en https (Apple refuse un sujet http)', /^https:\/\/127\.0\.0\.1$/.test(sj.sub), sj.sub); }
+      await G('/api/push/subscribe', {subscription: {...sub, endpoint: PURL + '/push/refus'}}); r = await G('/api/push/test', {}); const rf = (r.body.results || []).find((x) => !x.ok); const pst = await G('/api/push');
+      ok('notifications : refus du service gardé avec sa raison (ex. Apple 403 BadJwtToken), montré dans Réglages', rf && rf.status === 403 && rf.reason === 'BadJwtToken' && /^403 BadJwtToken \(127\.0\.0\.1\)$/.test(pst.body.last.detail || ''), JSON.stringify([rf, pst.body.last]));
+      await G('/api/push/unsubscribe', {endpoint: PURL + '/push/refus'});
       r = await G('/api/push/unsubscribe', {endpoint: sub.endpoint}); r = await G('/api/push'); ok('notifications : désabonnement', r.body.count === 0);
       PS.close(); }
     /* Raccourcis de l'iPhone (0.13.0) : clé à part, réponse en texte, données lues à l'instant */

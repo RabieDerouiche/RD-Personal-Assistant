@@ -157,6 +157,16 @@ srv.listen(0, async () => {
     ok('doublon 15 : « Valider ces dates » une seule fois, le conseil renvoie aux dates proposées', await p.evaluate(() => [...document.querySelectorAll('#view button')].filter((x) => /Valider ces dates/.test(x.innerText)).length === 1 && !!document.querySelector('.verdict .verdict-go') && !!document.getElementById('plan-dates')));
     p = await page('#suivi');
     ok('doublon 16 : Suivi garde une ligne vers Papiers ; Équipe sans dépôt ; Papiers avec le dépôt', await p.evaluate(() => /papiers? suivis?/.test((document.querySelector('.pap-go') || {}).textContent || '') && !document.querySelector('#view .pap-search, #view input[type="search"]')) && await (async () => { const q = await page('#equipe'); const e = await q.evaluate(() => ![...document.querySelectorAll('#view .panel h2')].some((x) => /Déposer un document/.test(x.textContent))); const r = await page('#papiers'); return e && await r.evaluate(() => [...document.querySelectorAll('#view .panel h2')].some((x) => /Déposer un document/.test(x.textContent))); })());
+    /* marges d'un vrai iPhone (capture du 17/11/2026) : barre d'état 59 px, barre d'accueil 34 px. L'en-tête ne cache plus le haut de la page. */
+    { const ctx = await b.newContext({...devices['iPhone 15 Pro Max']}); const q = await ctx.newPage(); q.on('pageerror', (e) => errs.push('marges : ' + e.message));
+      const c = await ctx.newCDPSession(q); await c.send('Emulation.setSafeAreaInsetsOverride', {insets: {top: 59, bottom: 34, left: 0, right: 0}});
+      await q.goto(base + '?theme=holo#accueil'); await q.waitForTimeout(3000);
+      const m = await q.evaluate(() => { const t = document.querySelector('.top').getBoundingClientRect(), v = document.getElementById('view'), first = {getBoundingClientRect: () => ({top: v.getBoundingClientRect().top + parseFloat(getComputedStyle(v).paddingTop || '0')})}, fav = document.querySelector('.fav-bar').getBoundingClientRect();
+        return {top: Math.round(t.top), bottom: Math.round(t.bottom), first: Math.round(first.getBoundingClientRect().top), fav: Math.round(fav.bottom), ih: innerHeight}; });
+      ok('iPhone réel : l\'en-tête sous la barre d\'état ne cache pas le haut de la page ; barre du bas au ras de l\'écran', m.top === 59 && m.first >= m.bottom && m.fav === m.ih, JSON.stringify(m));
+      await q.evaluate(() => { document.getElementById('scroller').scrollTop = 400; }); await q.waitForTimeout(300);
+      ok('iPhone réel : en défilant, l\'en-tête reste sous la barre d\'état', await q.evaluate(() => Math.round(document.querySelector('.top').getBoundingClientRect().top) === 59));
+      await ctx.close(); }
     /* glisser vers le bas ferme la fenêtre (demande du 16/11/2026) : vrais gestes tactiles */
     { const drag = async (q, x, y, dx, dy, ms) => { const c = await q.context().newCDPSession(q); await c.send('Input.dispatchTouchEvent', {type: 'touchStart', touchPoints: [{x, y}]}); for (let i = 1; i <= 8; i++) { await c.send('Input.dispatchTouchEvent', {type: 'touchMove', touchPoints: [{x: x + dx * i / 8, y: y + dy * i / 8}]}); await q.waitForTimeout(ms / 8); } await c.send('Input.dispatchTouchEvent', {type: 'touchEnd', touchPoints: []}); await q.waitForTimeout(900); };
       p = await page('#agenda'); await p.tap('.agw-d'); await p.waitForTimeout(700);

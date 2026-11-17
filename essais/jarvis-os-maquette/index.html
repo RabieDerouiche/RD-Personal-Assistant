@@ -6,7 +6,7 @@
   /* ---------- JARVIS OS : navigation et écrans ajoutés ---------- */
   .fab-talk { display: none !important; }
   /* barre à tes favoris (bas) et toutes les rubriques */
-  .fav-bar { position: fixed !important; left: 0 !important; right: 0 !important; bottom: 0 !important; top: auto !important; transform: none !important; width: auto !important; z-index: 50; display: block !important; padding: 0 8px calc(6px + env(safe-area-inset-bottom, 0px)) !important; background: rgba(5, 8, 16, .98) !important; -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); border: 0 !important; border-top: 1px solid var(--line) !important; border-radius: 0 !important; box-shadow: none !important; }
+  .fav-bar { position: fixed !important; left: 0 !important; right: 0 !important; bottom: 0 !important; top: auto !important; transform: none !important; width: auto !important; z-index: 50; display: block !important; padding: 0 8px max(6px, env(safe-area-inset-bottom, 0px)) !important; background: rgba(5, 8, 16, .98) !important; -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); border: 0 !important; border-top: 1px solid var(--line) !important; border-radius: 0 !important; box-shadow: none !important; }
   .fav-handle { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; border: 0; background: none; color: var(--dim); font: 500 10.5px var(--sans); padding: 5px 0 2px; }
   .fav-handle .grip { width: 36px; height: 4px; border-radius: 2px; background: var(--line-2); }
   .fav-row { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); align-items: end; }
@@ -331,7 +331,7 @@
   .glass, .card, .unit, .kpi, .key, .mate, .hero, .feed, .canal-row, .tl, .routines, .intent-row, .brief-card { background: linear-gradient(180deg, var(--glass-2), var(--glass)); border: 1px solid var(--line); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .05); -webkit-backdrop-filter: blur(18px) saturate(140%); backdrop-filter: blur(18px) saturate(140%); }
 
   /* ---- en-tête ---- */
-  .top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 40; background: rgba(6, 9, 18, .62); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); border-bottom: 1px solid var(--line); }
+  .top { position: sticky; top: 0; z-index: 40; background: rgba(6, 9, 18, .62); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); border-bottom: 1px solid var(--line); }
   .top-in { max-width: 980px; margin: 0 auto; padding-block: 10px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; align-items: center; }
   .brand { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
   .brand b { font: 700 17px var(--display); letter-spacing: .02em; background: var(--iris); -webkit-background-clip: text; background-clip: text; color: transparent; }
@@ -971,6 +971,16 @@
   html, body { height: 100%; }
   body { overflow: hidden; }
   .scroller { position: fixed; inset: 0; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; overscroll-behavior-y: contain; }
+  /* iPhone (17/11/2026, capture du propriétaire) : l'en-tête collé sous la barre d'état descendait de sa hauteur (59 px) et cachait le haut de la page ;
+     le contenu commence donc sous la barre d'état, et l'en-tête reste à sa place en défilant. */
+  .scroller { padding-top: env(safe-area-inset-top, 0px); }
+  /* iOS 26, app de l'écran d'accueil : tant que la page est plus courte que l'écran, iOS la raccourcit de la hauteur de la barre d'état
+     (WebKit 301108) et la barre du bas s'arrête 59 px trop haut. Tout JARVIS défile dans .scroller : la page elle-même est vide, donc trop courte.
+     On lui donne la hauteur de l'écran (plafonnée à 100lvh pour ne jamais la faire défiler), et le fond rejoint celui de la barre du bas. */
+  @media (display-mode: standalone) {
+    html { min-height: min(100lvh, calc(100% + env(safe-area-inset-top, 0px))); background: #050810; }
+    html.theme-holo { background: #020614; }
+  }
   body.noscroll .scroller { overflow: hidden; }
   button, a, input, select, textarea, label { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
   .sheet-back:not(.on), .sheet:not(.on) { pointer-events: none; }
@@ -6632,6 +6642,10 @@ void main(){
       return card;
     }
     if (Notification.permission === 'denied') { card.append(h('p', {class: 'muted', text: "Refusées sur cet iPhone : Réglages de l'iPhone, Notifications, JARVIS, puis « Autoriser les notifications »."})); return card; }
+    /* abonnement fait avec une ancienne clé du serveur : Apple refuserait chaque envoi (403) ; on le retire pour en refaire un (17/11/2026) */
+    if (sub) { try { const ak = sub.options && sub.options.applicationServerKey, cur = key(st.publicKey); if (ak && (ak.byteLength !== cur.length || !new Uint8Array(ak).every((v, i) => v === cur[i]))) { await sub.unsubscribe(); sub = null; say('Ton abonnement datait d’une ancienne clé du serveur : touche « Activer » pour le refaire.', true); } } catch (e) { /* rien */ } }
+    /* l'abonnement de cet iPhone est redonné au serveur à chaque ouverture (sans doublon) : il garde la bonne adresse et le bon sujet */
+    if (sub) { try { await JS.push.subscribe(sub.toJSON()); } catch (e) { /* rien */ } }
     if (!sub) {
       card.append(h('p', {class: 'muted', text: "Ton serveur te prévient quand un bot répond ou te demande quelque chose, le matin pour tes échéances et papiers, et quand Grok repart après une pause. Gratuit : ni bot ni Claude. Le contenu est chiffré pour ton iPhone."}),
         h('button', {type: 'button', class: 'btn main', onclick: async () => {
@@ -6647,12 +6661,14 @@ void main(){
       return card;
     }
     const pr = st.prefs || {}, seg = (k, val, opts) => h('div', {class: 'seg set-seg', role: 'group'}, opts.map(([v, l]) => h('button', {type: 'button', 'aria-pressed': String(val === v), onclick: async () => { const p = {}; p[k] = v; await JS.push.prefs(p); redraw(); }}, l)));
-    card.append(h('p', {class: 'muted', text: 'Actives sur cet iPhone' + (st.count > 1 ? ' (' + st.count + ' appareils au total)' : '') + (st.last ? '. Dernière : « ' + st.last.title + ' », ' + fmt(new Date(st.last.at), {weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'}) : '') + '.'}),
+    const refus = (d) => 'Refusée par le service de notifications (' + d + '). ' + (/^403|BadJwt|Forbidden/i.test(d) ? 'Touche « Couper sur cet iPhone » puis « Activer » pour te réabonner ; si ça recommence, envoie-moi une capture de ce message.' : /^réseau/.test(d) ? 'Ton serveur n’arrive pas à joindre le service : réessaie dans quelques minutes.' : 'Envoie-moi une capture de ce message.');
+    card.append(h('p', {class: 'muted', text: 'Actives sur cet iPhone' + (st.count > 1 ? ' (' + st.count + ' appareils au total)' : '') + (st.last ? '. Dernière : « ' + st.last.title + ' », ' + fmt(new Date(st.last.at), {weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'}) + (st.last.detail ? ', refusée (' + st.last.detail + ')' : '') : '') + '.'}),
       h('small', {class: 'pick-label', text: 'Quand un bot répond ou te demande quelque chose'}), seg('bots', pr.bots !== false, [[true, 'Oui'], [false, 'Non']]),
       h('small', {class: 'pick-label', text: 'Rappels du matin (échéances, papiers)'}), seg('rappels', pr.rappels !== false, [[true, 'Oui'], [false, 'Non']]),
       pr.rappels !== false ? seg('heure', pr.heure || '08:00', [['07:00', '7h'], ['07:30', '7h30'], ['08:00', '8h'], ['08:30', '8h30'], ['09:00', '9h']]) : null,
       h('div', {class: 'row-actions'},
-        h('button', {type: 'button', class: 'btn', onclick: async () => { say('Envoi…'); const r = await JS.push.test(); say(r && r.ok ? 'Envoyée : elle arrive dans quelques secondes.' : 'Le service de notifications a refusé l’envoi.', !(r && r.ok)); }}, 'Envoyer un essai'),
+        h('button', {type: 'button', class: 'btn', onclick: async () => { say('Envoi…'); const r = await JS.push.test(); const res = (r && r.results) || [], bad = res.filter((x) => !x.ok), d = (x) => x.status ? x.status + (x.reason ? ' ' + x.reason : '') : 'réseau : ' + (x.error || '?');
+          if (r && r.ok && !bad.length) say('Envoyée : elle arrive dans quelques secondes.'); else if (r && r.ok) say('Envoyée sur ' + (res.length - bad.length) + ' appareil' + (res.length - bad.length > 1 ? 's' : '') + ' sur ' + res.length + '. ' + refus(d(bad[0])), true); else say(bad.length ? refus(d(bad[0])) : 'Aucun appareil abonné : touche « Activer ».', true); }}, 'Envoyer un essai'),
         h('button', {type: 'button', class: 'btn ghost danger', onclick: async () => { try { await JS.push.unsubscribe(sub.endpoint); await sub.unsubscribe(); } catch (e) { /* rien */ } redraw(); }}, 'Couper sur cet iPhone')), out);
     return card;
   }

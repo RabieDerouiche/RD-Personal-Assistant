@@ -15,7 +15,7 @@ import {createPush} from './push.mjs';
 import {createNotifier, paris, daysTo} from './notify.mjs';
 import {createSauvegarde} from './sauvegarde.mjs';
 
-const VERSION = '0.15.0';
+const VERSION = '0.15.1';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PORT = +(process.env.PORT || 8787);
 const HOST = process.env.HOST || '127.0.0.1';
@@ -656,7 +656,7 @@ const server = http.createServer(async (req, res) => {
       if (p === '/api/raccourci/cle' && req.method === 'POST') { const k = crypto.randomBytes(24).toString('base64url'); S.raccourci = {hash: sha(k), at: now(), uses: 0}; save(); return json(res, 200, {cle: k, url: publicBase(req) + '/api/raccourci'}); }
       if (p === '/api/raccourci/retirer' && req.method === 'POST') { S.raccourci = null; save(); return json(res, 200, {ok: true}); }
       if (p === '/api/raccourci/etat') return json(res, 200, {active: !!S.raccourci, at: S.raccourci && S.raccourci.at, uses: (S.raccourci && S.raccourci.uses) || 0, last: S.raccourci && S.raccourci.last, url: publicBase(req) + '/api/raccourci'});
-      if (p === '/api/push/subscribe' && req.method === 'POST') { const b = await readBody(req); const r = PUSH.subscribe(b.subscription, deviceOf(req), publicBase(req)); if (r.ok) NOTIFY.tick({only: 'canal', force: true}).catch(() => {}); return json(res, r.ok ? 200 : 400, r); }
+      if (p === '/api/push/subscribe' && req.method === 'POST') { const b = await readBody(req); const r = PUSH.subscribe(b.subscription, deviceOf(req), 'https://' + String(req.headers.host || 'jarvis.invalid').split(':')[0]);   /* sujet VAPID : toujours une adresse https (Apple refuse un sujet http) */ if (r.ok) NOTIFY.tick({only: 'canal', force: true}).catch(() => {}); return json(res, r.ok ? 200 : 400, r); }
       if (p === '/api/push/unsubscribe' && req.method === 'POST') { const b = await readBody(req); return json(res, 200, PUSH.unsubscribe(String(b.endpoint || ''))); }
       if (p === '/api/push/test' && req.method === 'POST') { const r = await PUSH.send({title: 'JARVIS', body: 'Les notifications marchent sur cet appareil.', url: '/#reglages', tag: 'essai'}); return json(res, 200, {ok: r.some((x) => x.ok), results: r}); }
       if (p === '/api/push/prefs' && req.method === 'POST') { const b = await readBody(req), pr = S.push.prefs;
