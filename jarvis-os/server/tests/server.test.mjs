@@ -182,6 +182,20 @@ try {
       ok('notifications : abonnement expiré (410) retiré seul', r.body.count === 1);
       r = await G('/api/push/unsubscribe', {endpoint: sub.endpoint}); r = await G('/api/push'); ok('notifications : désabonnement', r.body.count === 0);
       PS.close(); }
+    /* Raccourcis de l'iPhone (0.13.0) : clé à part, réponse en texte, données lues à l'instant */
+    { FG.sheet['Canal!A1:H3000'] = [['Date', 'De', 'Pour', 'Type', 'Message', 'Statut', 'Réponse', 'Objet'], ['17/11/2026', 'Iris', 'Rabie', 'Question', 'Oui/Non : je relance le syndic ?', 'À faire', '', ''], ['17/11/2026', 'Rabie', 'Kairos', 'Ordre', 'Suis la carte', 'À faire', '', '']];
+      r = await G('/api/raccourci/cle', {}); const cle = r.body && r.body.cle;
+      ok('Raccourcis : clé créée depuis l\'app reliée (montrée une fois)', r.status === 200 && cle && cle.length >= 30 && /\/api\/raccourci$/.test(r.body.url));
+      const rac = (k, body) => fetch(BASE + '/api/raccourci', {method: 'POST', headers: {'content-type': 'application/json', authorization: 'Bearer ' + k}, body: JSON.stringify(body)}).then(async (x) => ({status: x.status, type: x.headers.get('content-type'), text: await x.text()}));
+      let q = await rac(cle, {texte: 'Quoi de neuf aujourd\'hui ?'});
+      ok('Raccourcis : « Dis Siri, Jarvis » répond en texte à lire (Claude rapide, données lues à l\'instant)', q.status === 200 && /text\/plain/.test(q.type) && /Tu as dit : Quoi de neuf aujourd'hui \?/.test(q.text) && /modèle : haiku/.test(q.text) && /contexte : oui/.test(q.text), q.text.slice(0, 160));
+      q = await rac(cle, {texte: 'montre le contexte'});
+      ok('Raccourcis : données lues à l\'instant (date, agenda, ce qui t\'attend, bots en attente)', /^Nous sommes le /.test(q.text) && /Agenda principal : le \d\d\/\d\d\/\d{4} à \d\d h \d\d : \S/.test(q.text) && /Échéances des 7 jours : aujourd'hui : Rendez-vous notaire/.test(q.text) && /Ce qui attend sa réponse : Iris : Oui\/Non : je relance le syndic \?/.test(q.text) && /Lignes en attente chez ses bots : 1\./.test(q.text), q.text.slice(0, 300));
+      q = await rac(cle, {lien: 'https://exemple.fr/produit', texte: ''}); ok('Raccourcis : un lien partagé suffit', q.status === 200 && /Lien partagé : https:\/\/exemple\.fr\/produit/.test(q.text));
+      r = await call('/api/state', {headers: {authorization: 'Bearer ' + cle}}); ok('Raccourcis : la clé n\'ouvre rien d\'autre', r.status === 401);
+      r = await G('/api/raccourci/etat'); ok('Raccourcis : état (active, nombre de questions)', r.body.active === true && r.body.uses === 3);
+      await G('/api/raccourci/cle', {}); q = await rac(cle, {texte: 'x'}); ok('Raccourcis : recréer la clé retire l\'ancienne', q.status === 401 && /recrée-la/.test(q.text));
+      await G('/api/raccourci/retirer', {}); r = await G('/api/raccourci/etat'); ok('Raccourcis : clé retirée', r.body.active === false); }
     FG.valid.clear(); FG.refreshOk = false; r = await T('Google Sheets', 'get_values', {spreadsheetId: 'PIL', range: 'Canal!A1:H3'}); g = await G('/api/google');
     ok('accès retiré dans Google : « à reconnecter », plus relié', r.body.error && r.body.error.code === 'needs_reauth' && !g.body.linked, JSON.stringify(r.body.error));
     FG.refreshOk = true; r = await G('/api/google/link', {}); await fetch(BASE + '/api/google/callback?state=' + new URL(r.body.url).searchParams.get('state') + '&code=CODE-OK');

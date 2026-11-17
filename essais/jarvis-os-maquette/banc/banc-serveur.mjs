@@ -87,6 +87,19 @@ try {
     await q.evaluate(() => [...document.querySelectorAll('.notif-card button')].find((b) => /Couper/.test(b.textContent)).click()); await q.waitForTimeout(1500);
     ok('notifications : « Couper sur cet iPhone » retire l\'abonnement', await q.evaluate(() => /Activer les notifications/.test(document.querySelector('.notif-card').textContent)));
     PS.close(); }
+  /* Siri et bouton Action (0.13.0) : clé créée dans Réglages, question posée comme par le Raccourci */
+  { const q = await ctx.newPage(); q.on('pageerror', (e) => errs.push(e.message));
+    await q.goto(BASE + '/?serveur#reglages'); await q.waitForTimeout(2500);
+    ok('Réglages : carte « Siri et bouton Action »', await q.evaluate(() => /Créer la clé du Raccourci/.test((document.querySelector('.siri-card') || {}).textContent || '')));
+    await q.evaluate(() => [...document.querySelectorAll('.siri-card button')].find((b) => /Créer la clé/.test(b.textContent)).click()); await q.waitForTimeout(1200);
+    const k = await q.evaluate(() => (document.querySelector('.siri-key') || {}).textContent || '');
+    ok('Siri : clé montrée une fois, avec les étapes (adresse, en-tête, champ « texte »)', k.length >= 30 && await q.evaluate((kk) => { const c = document.querySelector('.siri-card').textContent; return c.includes('/api/raccourci') && c.includes('Bearer ' + kk) && /Dicter le texte/.test(c) && /Énoncer le texte/.test(c); }, k));
+    await q.evaluate(() => { const c = document.querySelector('.siri-card'), sc = document.getElementById('scroller'); sc.scrollTop += c.getBoundingClientRect().top - 90; }); await q.waitForTimeout(300);
+    await q.screenshot({path: SH + 'reglages-siri.png'});
+    const ans = await fetch(BASE + '/api/raccourci', {method: 'POST', headers: {'content-type': 'application/json', authorization: 'Bearer ' + k}, body: JSON.stringify({texte: 'Quoi de neuf ?'})}).then(async (x) => [x.status, await x.text()]);
+    ok('Siri : le Raccourci obtient une réponse à lire', ans[0] === 200 && /Tu as dit : Quoi de neuf/.test(ans[1]), ans.join(' '));
+    await q.reload(); await q.waitForTimeout(2500);
+    ok('Siri : clé active, nombre de questions affiché, « Essayer ici »', await q.evaluate(() => { const c = document.querySelector('.siri-card').textContent; return /Clé active/.test(c) && /1 question/.test(c) && /Essayer ici/.test(c) && !document.querySelector('.siri-key'); })); }
 } catch (e) { ok('exception', false, e.stack); }
 ok('aucune erreur de page', !errs.length, errs.join(' | '));
 console.log(out.join('\n')); const bad = out.filter((l) => l.startsWith('ÉCHEC')).length; console.log(bad ? bad + ' échec(s)' : 'Tout passe (' + out.length + ' vérifications).');
