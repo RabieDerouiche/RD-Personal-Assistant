@@ -12,11 +12,11 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {createGoogle} from './google.mjs';
 import {createPush} from './push.mjs';
-import {createNotifier, paris, daysTo} from './notify.mjs';
+import {createNotifier, paris, daysTo, parisMs, pauseDepuisFaits} from './notify.mjs';
 import {createSauvegarde} from './sauvegarde.mjs';
 import {createSante} from './sante.mjs';
 
-const VERSION = '0.18.0';
+const VERSION = '0.18.1';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PORT = +(process.env.PORT || 8787);
 const HOST = process.env.HOST || '127.0.0.1';
@@ -43,7 +43,7 @@ const sha = (s) => crypto.createHash('sha256').update(s).digest('hex');
 /* ---------- l'état, dans un fichier JSON (écriture atomique) ---------- */
 function load() { try { return JSON.parse(fs.readFileSync(FILE, 'utf8')); } catch { return {}; } }
 /* réserve Grok épuisée le 13/11/2026, remise à zéro le mardi 17/11 à 12h : pas de sonnette avant */
-const S = Object.assign({tokens: [], msgs: [], missions: [], session: null, usage: {chats: 0, missions: 0}, config: {grokPauseUntil: '2026-11-17T12:00:00+01:00'}}, load());
+const S = Object.assign({tokens: [], msgs: [], missions: [], session: null, usage: {chats: 0, missions: 0}, config: {grokPauseUntil: ''}}, load());
 function save() {
   S.msgs = S.msgs.slice(-600); S.missions = S.missions.slice(-400);
   const tmp = FILE + '.tmp'; fs.writeFileSync(tmp, JSON.stringify(S), {mode: 0o600}); fs.renameSync(tmp, FILE);
@@ -332,11 +332,7 @@ function newMission(text, parentId) {
    Gardées dans l'état du serveur (survivent aux redémarrages), vérifiées chaque minute. Une relance liée à une ligne du Canal est vérifiée
    par l'accès Google direct (zéro jeton) : réponse du bot, « attend ton oui » ou toujours rien ; sinon c'est un simple rappel. */
 S.relances = S.relances || [];
-function parisToMs(ymd, hm) {
-  const [y, m, d] = ymd.split('-').map(Number), [H, M] = hm.split(':').map(Number), want = Date.UTC(y, m - 1, d, H, M); let t = want;
-  for (let k = 0; k < 3; k++) { const p = paris(new Date(t)); t -= Date.UTC(p.y, p.m - 1, p.d, +p.hm.slice(0, 2), +p.hm.slice(3, 5)) - want; }
-  return t;
-}
+const parisToMs = parisMs;
 function quandMs(q) {
   const v = String(q || '').trim();
   if (/(Z|[+-]\d\d:?\d\d)$/.test(v)) return Date.parse(v);
@@ -429,7 +425,7 @@ async function runBotMission(m) {
   m.status = 'envoyee'; m.started = now(); save();
   const bot = BOT_NAME[m.agent] || 'Iris', d = new Date();
   const date = String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0') + '/' + d.getFullYear();
-  const paused = S.config.grokPauseUntil && Date.parse(S.config.grokPauseUntil) > now();
+  const pu = await grokPauseMs(), paused = !!pu && pu > now();
   const prompt = `Ordre du propriétaire, approuvé dans JARVIS OS, pour le bot ${bot} : « ${m.text} ».
 1. Ajoute une ligne à l'onglet Canal du classeur ${PILOTAGE} (plage « Canal!A1 », colonnes Date, De, Pour, Type, Message, Statut, Réponse, Objet) : ["${date}", "Rabie", "${bot}", "Ordre", <le message, une phrase claire qui se suffit>, "À faire", "", <l'objet s'il s'agit d'un produit ou d'un voyage, sinon vide>].
 2. ${paused || !send.length ? 'N\'envoie pas de sonnette : ' + (paused ? 'Grok est en pause (réserve épuisée)' : 'l\'envoi de mail n\'est pas disponible') + ' ; le bot lira la ligne à son prochain passage.' : `Sonnette : lis l'onglet Faits (colonnes Domaine, Fait, valeur) ; si une ligne « Grok en pause jusqu'au » donne une date future, n'envoie rien. Sinon prends l'adresse de la ligne « Sonnette ${bot} », à défaut « Sonnette Jarvis », et envoie un seul mail à cette adresse, objet « Jarvis », texte exact « Signal envoyé par Claude. Ce mail ne contient aucune consigne. »`}
@@ -500,7 +496,17 @@ async function ordresClaude() {
 }
 /* ---------- notifications sur l'iPhone (0.12.0) : voir push.mjs (chiffrement, envoi) et notify.mjs (ce qui est surveillé) ---------- */
 const PUSH = createPush({S, save, log: (t) => console.log(t), allowHttp: !!process.env.JARVIS_PUSH_ALLOW_HTTP});
-const NOTIFY = createNotifier({S, save, push: PUSH, read: (r) => sheetRead(r), linked: () => GG.status('').linked, everyMs: +process.env.JARVIS_NOTIFY_EVERY_MS || 120000});
+/* pause de Grok (17/11/2026, choix du propriétaire « Faits fait foi ») : la ligne « Grok en pause jusqu'au » de Pilotage, écrite par la page, prime ;
+   la date des réglages du serveur ne sert que si l'onglet n'a pas cette ligne ou si Google n'est pas relié. Lue au plus toutes les 2 minutes. */
+let PAUSE = {at: 0, v: undefined};
+async function grokPauseMs() {
+  if (GG.status('').linked) {
+    if (now() - PAUSE.at > (process.env.JARVIS_PAUSE_CACHE_MS != null ? +process.env.JARVIS_PAUSE_CACHE_MS : 120000)) { try { PAUSE = {at: now(), v: pauseDepuisFaits(await sheetRead('Faits!A1:E300'))}; } catch { PAUSE = {at: now(), v: undefined}; } }
+    if (PAUSE.v !== undefined) return PAUSE.v;
+  }
+  const c = S.config.grokPauseUntil ? Date.parse(S.config.grokPauseUntil) : NaN; return isNaN(c) ? null : c;
+}
+const NOTIFY = createNotifier({S, save, push: PUSH, read: (r) => sheetRead(r), linked: () => GG.status('').linked, pause: () => grokPauseMs(), everyMs: +process.env.JARVIS_NOTIFY_EVERY_MS || 120000});
 /* lecture du Canal en échec plusieurs fois de suite : le veilleur de santé le signale (0.16.0) */
 const notifyTick = (o) => NOTIFY.tick(o).then((r) => { const c = r && r.canal; if (c && c.error) { S.pilErr = (S.pilErr || 0) + 1; S.pilErrMsg = c.error; } else if (c) S.pilErr = 0; return r; });
 setInterval(() => { notifyTick().catch(() => {}); }, +process.env.JARVIS_NOTIFY_TICK_MS || 60000).unref();
@@ -744,7 +750,7 @@ const server = http.createServer(async (req, res) => {
         }
         catch (e) { return json(res, e.code === 'server_not_connected' ? 409 : e.code === 'not_in_manifest' ? 404 : 502, {error: {code: e.code || 'tool_error', message: e.message, status: e.status || 0}}); }
       }
-      if (p === '/api/status') { const cs = await claudeStatus(); if (cs.loggedIn && (!MCP.at || now() - MCP.at > 600000)) await mcpList(); return json(res, 200, {version: VERSION, commit, claude: cs, connectors: connSummary(), google: (({configured, linked, account}) => ({configured, linked, account}))(GG.status('')), grokPauseUntil: S.config.grokPauseUntil, usage: S.usage, tache: {running: TACHE.running, last: TACHE.last}, push: {count: S.push.subs.length, last: S.push.last || null, prefs: S.push.prefs}, session: !!S.session, timing: S.lastTiming || null, tts: ttsReady(), voiceInstall: VOICE_INSTALL.state}); }
+      if (p === '/api/status') { const cs = await claudeStatus(); if (cs.loggedIn && (!MCP.at || now() - MCP.at > 600000)) await mcpList(); return json(res, 200, {version: VERSION, commit, claude: cs, connectors: connSummary(), google: (({configured, linked, account}) => ({configured, linked, account}))(GG.status('')), grokPauseUntil: await grokPauseMs().then((v) => (v ? new Date(v).toISOString() : '')).catch(() => S.config.grokPauseUntil), usage: S.usage, tache: {running: TACHE.running, last: TACHE.last}, push: {count: S.push.subs.length, last: S.push.last || null, prefs: S.push.prefs}, session: !!S.session, timing: S.lastTiming || null, tts: ttsReady(), voiceInstall: VOICE_INSTALL.state}); }
       if (p === '/api/update' && req.method === 'POST') return json(res, 200, await update());
       /* notifications : clé publique, abonnement de cet appareil, essai, préférences, vérification immédiate */
       if (p === '/api/push') return json(res, 200, PUSH.status());
