@@ -20,6 +20,7 @@
     [fr(D(-1)), 'Iris', 'Attestation', "Brouillon : Demande d'attestation prête | À : agence@example.org | Objet : Demande d'attestation | Texte : Bonjour, pouvez-vous m'envoyer l'attestation ? Merci."],
     [fr(D(-2)), 'Argus', 'Installation', 'Ton oui dans le chat de Argus : appliquer les 3 routines. Phrase : Oui, applique les routines.'],
     [fr(D(-2)), 'Argus', 'Skill registre', 'Ton oui dans le chat de Argus : mettre le skill à jour. Phrase : Oui, mets le skill à jour.'],
+    [fr(D(-1)), 'Ulysse', 'Routines d\'Ulysse', 'Ton oui dans le chat de Ulysse : ma description dit « une seule routine ». Phrase : Oui, crée ta routine Sonnette Ulysse sur l\'alias ulysse.'],
     [fr(D(-3)), 'Ulysse', 'Dates du voyage', 'Quelles dates préfères-tu pour le voyage ?']
   ];
   G['Échéances'] = [
@@ -92,6 +93,7 @@
     [fr(D(-3)), 'Rabie', 'Iris', 'Info', 'Le syndic a appelé.', 'Fait', 'Dossier mis à jour.', ''],
     [fr(D(-2)), 'Argus', 'Rabie', 'Installation', 'Appliquer les 3 routines.', 'Attend ton oui', 'Il reste 3 routines. Phrase : Oui, applique les routines.', ''],
     [fr(D(-2)), 'Argus', 'Rabie', 'Skill registre', 'Mettre le skill à jour.', 'Attend ton oui', 'Phrase : Oui, mets le skill à jour.', ''],
+    [fr(D(-1)), 'Claude', 'Ulysse', 'Routines d\'Ulysse', 'Crée ta routine Sonnette Ulysse (oui d\'avance, routine conforme à ta fiche).', 'Attend ton oui', 'Ma description dit « une seule routine ». Phrase : Oui, crée ta routine Sonnette Ulysse sur l\'alias ulysse.', ''],
     [fr(D(-2)), 'Claude', 'Iris', 'Routine', 'Applique la section L de ta fiche.', 'À faire', '', ''],
     [fr(D(-2)), 'Claude', 'Ulysse', 'Routine', 'Applique le paragraphe Onglet Sorties.', 'À faire', '', ''],
     [fr(D(-1)), 'Rabie', 'Kairos', 'Ordre à Kairos', 'Vérifie maintenant le prix du Robot Alpha X7.', 'À faire', '', 'Prix : Robot Alpha X7'],

@@ -5210,7 +5210,8 @@ void main(){
     const noWhy = repText('Non, parce que…', 'Non pour ' + q + ', parce que : ');
     let list;
     switch (d.kind) {
-      case 'oui': list = [act('Donner mon oui à ' + who, {tone: 'main', go: () => { setTimeout(() => lvGiveYes(d), 280); return null; }}), repText('Non, plutôt…', 'Non pour ' + q + ' tel quel. Refais-le en tenant compte de ceci, puis redemande-moi mon oui : ', 'main2'), rep("Non, n'applique pas", 'Non pour ' + q + ' : ne l\'applique pas, ferme la ligne.'), why]; break;
+      case 'oui': list = isRoutineDem(d) ? [rep('Oui depuis JARVIS', yesFromJarvis([d]), 'main'), act('Oui dans son chat', {go: () => { setTimeout(() => lvGiveYes(d), 280); return null; }}), repText('Non, plutôt…', 'Non pour ' + q + ' tel quel. Refais-le en tenant compte de ceci, puis redemande-moi mon oui : ', 'main2'), rep("Non, n'applique pas", 'Non pour ' + q + ' : ne l\'applique pas, ferme la ligne.'), why]
+        : [act('Donner mon oui à ' + who, {tone: 'main', go: () => { setTimeout(() => lvGiveYes(d), 280); return null; }}), repText('Non, plutôt…', 'Non pour ' + q + ' tel quel. Refais-le en tenant compte de ceci, puis redemande-moi mon oui : ', 'main2'), rep("Non, n'applique pas", 'Non pour ' + q + ' : ne l\'applique pas, ferme la ligne.'), why]; break;
       case 'ouinon': list = [rep('Oui, vas-y', 'Oui, vas-y pour ' + q + ' : ' + d.ask, 'main'), no, noWhy, later, why]; break;
       case 'choix': list = d.options.map((o, i) => rep(o, 'Choix pour ' + q + ' : ' + o + '.', i === 0 ? 'main' : 'main2')).concat([repText('Autre chose…', 'Choix pour ' + q + ' : '), rep('Aucune, merci', 'Aucun choix pour ' + q + ' : ferme la demande.'), later, why]); break;
       case 'question': list = [repText('Répondre à ' + who, 'Réponse à ' + q + ' : ', 'main'), ord('Cherche toi-même', d.bot, 'Cherche toi-même la réponse à ' + q + ' (Drive, Gmail, agenda, Pilotage) ; si tu ne trouves pas, dis-moi où tu as cherché.', 'Je cherche.', '', 'main2'), later, why, rep('Pas concerné', 'Pas concerné par ' + q + ' : ferme la demande.')]; break;
@@ -5679,6 +5680,13 @@ void main(){
   }});
 
   /* ---------- tous les oui d'un même bot, en une seule phrase : un chat au lieu de plusieurs ---------- */
+  /* 17/11/2026 (choix du propriétaire) : un « Oui » depuis JARVIS vaut son oui pour une routine strictement conforme à la fiche ou à la Charte
+     (Charte, section 7) : pour ces demandes, une ligne « Réponse » dans le Canal et la sonnette remplacent la phrase à coller dans le chat */
+  function isRoutineDem(d) { return d.kind === 'oui' && /routine/i.test([d.title, d.ask, d.f && d.f.phrase].join(' ')); }
+  function yesFromJarvis(list) {
+    const one = (d) => '« ' + d.title + ' »' + (d.f && d.f.phrase ? ' (' + String(d.f.phrase).replace(/^\s*Oui[,.]?\s*/i, '').replace(/[.\s]+$/, '') + ')' : '');
+    return ('Oui pour ' + (list.length === 1 ? one(list[0]) : 'ces ' + list.length + ' demandes : ' + list.map((d, i) => (i + 1) + ') ' + one(d)).join(' ; ')) + '. Oui donné depuis JARVIS : il vaut pour une routine strictement conforme à ta fiche ou à la Charte (Charte, section 7).').slice(0, 900);
+  }
   function yesGroups() { const g = {}; (S.demandes || []).filter((d) => d.kind === 'oui').forEach((d) => { (g[d.bot] = g[d.bot] || []).push(d); }); return Object.keys(g).map((b) => ({bot: b, list: g[b]})); }
   const yesPhrase = (list) => list.length === 1 ? (list[0].f.phrase || ('Oui pour « ' + list[0].title + ' » : ' + list[0].ask)).slice(0, 600)
     : ('Oui pour ces ' + list.length + ' demandes : ' + list.map((d, i) => (i + 1) + ') ' + (d.f.phrase || '« ' + d.title + ' »')).join(' ; ') + '.').slice(0, 900);
@@ -5697,7 +5705,10 @@ void main(){
       h('div', {class: 'item-head'}, h('span', {class: 'item-bot', text: who}), h('span', {class: 'kind', text: gr.list.length + ' oui dans son chat'})),
       h('h3', {class: 'item-title', text: gr.list.length > 1 ? 'Un seul message à ' + who + ' pour ' + gr.list.length + ' oui' : 'Ton oui dans le chat de ' + who}),
       h('ul', {class: 'yes-l'}, gr.list.map((d) => h('li', {text: d.title}))), pre,
-      h('div', {class: 'row-actions'}, h('button', {type: 'button', class: 'btn main', onclick: copy}, link ? 'Copier et ouvrir ' + who : 'Copier la phrase', costTag({cost: 'chat'}))));
+      gr.list.every(isRoutineDem) ? h('p', {class: 'muted yes-note', text: 'Routine conforme à sa fiche : ton oui depuis JARVIS suffit (Charte, section 7). Le chat reste possible si Grok insiste.'}) : null,
+      h('div', {class: 'row-actions'},
+        gr.list.every(isRoutineDem) ? h('button', {type: 'button', class: 'btn main yes-jarvis', onclick: () => runAct('demande', gr.list[0], act('Oui depuis JARVIS', {tone: 'main', go: () => ({title: 'Oui à ' + who, effect: 'Une ligne « Réponse » pour ' + who + ' dans le Canal, puis la sonnette.', bot: gr.bot, order: yesFromJarvis(gr.list), canalType: 'Réponse', say: 'Merci, je m\'en occupe.', mutate: () => gr.list.forEach((d) => drop('demandes', d.id))})}))}, 'Oui depuis JARVIS', costTag({cost: 'bot'})) : null,
+        h('button', {type: 'button', class: 'btn' + (gr.list.every(isRoutineDem) ? '' : ' main'), onclick: copy}, link ? 'Copier et ouvrir ' + who : 'Copier la phrase', costTag({cost: 'chat'}))));
   }
 
   /* ---------- le CRA de la semaine : la présence à côté de la question, pour dire oui en connaissance de cause ---------- */
