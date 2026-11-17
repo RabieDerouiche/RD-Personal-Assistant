@@ -115,6 +115,12 @@ try {
     ok('Drive folder_tree : racines par id et par nom, absente signalée', r.status === 200 && tr.roots[0].id === 'pap' && tr.roots[1].id === 'priv' && tr.roots[1].found && !tr.roots[2].found, JSON.stringify(tr.roots));
     ok('Drive folder_tree : tous les sous-dossiers (niveau par niveau, pagination)', fo === 'f-id,f-imp,f-loc,f-log,f-lui', fo);
     ok('Drive folder_tree : fichiers avec parent, lien et date, sans corbeille ni dossier étranger', fn.length === 5 && fn.includes("Titre de séjour l'ancien.jpg") && !fn.includes('Ne doit pas sortir.pdf') && !fn.includes('Supprimé.pdf') && tr.files.find((f) => f.id === 'd3').parent === 'f-loc' && /drive\.example\/d1/.test(tr.files.find((f) => f.id === 'd1').viewUrl), fn.join(' | '));
+    /* recherche dans le texte des papiers (0.15.0) : Papiers et ses sous-dossiers seulement ; Papiers privés seulement s'ils sont demandés */
+    r = await T('Google Drive', 'search_text', {query: 'quittance', roots: [{id: 'pap', key: 'papiers'}]}); let sn = ((r.body.payload || {}).files || []).map((f) => f.id).sort().join(',');
+    ok('Drive search_text : dans le texte des papiers (ni dossier étranger, ni Papiers privés sans demande)', r.status === 200 && sn === 'd3' && r.body.payload.files[0].parent === 'f-loc' && FG.calls.some((c) => /fullText contains 'quittance' and \('pap' in parents or /.test((c.q || {}).q || '')), sn);
+    r = await T('Google Drive', 'search_text', {query: 'imposition', roots: [{id: 'pap', key: 'papiers'}, {id: 'priv', key: 'prive'}]}); sn = ((r.body.payload || {}).files || []).map((f) => f.id).join(',');
+    ok('Drive search_text : Papiers privés seulement quand ils sont demandés', sn === 'd5', sn);
+    r = await T('Google Drive', 'search_text', {query: 'qu', roots: [{id: 'pap'}]}); ok('Drive search_text : moins de 3 lettres, aucune requête', r.status === 200 && r.body.payload.files.length === 0);
     ok('Drive folder_tree : requêtes en lecture seule', FG.calls.filter((x) => x.path.startsWith('/drive')).every((x) => x.method === 'GET'));
     r = await T('Gmail', 'search_threads', {query: 'in:inbox category:primary newer_than:7d', pageSize: 50, view: 'THREAD_VIEW_SUMMARY'}); const m0 = r.body.payload.threads[0].messages[0];
     ok('Gmail search_threads : forme du connecteur (expéditeur, nom, objet, date)', m0.sender === 'gestion@syndic.example' && m0.addressDisplayNames[0].displayName === 'Syndic Dupont' && m0.subject === 'RE: Dégât des eaux' && m0.internalDate === '1763290000000' && m0.labelIds.includes('INBOX'), JSON.stringify(m0).slice(0, 160));
@@ -207,6 +213,40 @@ try {
       ok('sauvegarde : fichier lisible par le seul service', f && (fs.statSync(path.join(DATA, 'sauvegardes', f)).mode & 0o777) === 0o600);
       r = await G('/api/sauvegarde'); const c = (r.body.changements.onglets || []).find((x) => x.nom === 'Canal'), t = (r.body.changements.onglets || []).find((x) => x.nom === 'Tâches');
       ok('sauvegarde : ce qui a changé (ligne ajoutée, cellule modifiée avec avant et après, ligne retirée)', r.body.copies.length === 2 && c && c.ajoutees === 1 && c.modifiees === 1 && c.exemples.some((e) => e.genre === 'modifiée' && e.champs.some((x) => x.col === 'Statut' && x.avant === 'À faire' && x.apres === 'Fait')) && t && t.retirees === 1, JSON.stringify(r.body.changements).slice(0, 300)); }
+    /* missions notifiées et tour de Claude (0.15.0) : faux service de notifications, déchiffré par le « téléphone » */
+    { const got = []; const PS = http.createServer((q, res) => { const ch = []; q.on('data', (d) => ch.push(d)); q.on('end', () => { got.push(Buffer.concat(ch)); res.writeHead(201); res.end(); }); });
+      await new Promise((z) => PS.listen(0, '127.0.0.1', z));
+      const ua = crypto.createECDH('prime256v1'); ua.generateKeys(); const auth = crypto.randomBytes(16), hm = (k, d) => crypto.createHmac('sha256', k).update(d).digest();
+      const open = (b) => { const salt = b.subarray(0, 16), idl = b[20], asPub = b.subarray(21, 21 + idl), ct = b.subarray(21 + idl);
+        const prk = hm(salt, hm(hm(auth, ua.computeSecret(asPub)), Buffer.concat([Buffer.from('WebPush: info\0'), ua.getPublicKey(), asPub, Buffer.from([1])])));
+        const d = crypto.createDecipheriv('aes-128-gcm', hm(prk, Buffer.from('Content-Encoding: aes128gcm\0\x01')).subarray(0, 16), hm(prk, Buffer.from('Content-Encoding: nonce\0\x01')).subarray(0, 12));
+        d.setAuthTag(ct.subarray(ct.length - 16)); const pt = Buffer.concat([d.update(ct.subarray(0, ct.length - 16)), d.final()]); return JSON.parse(pt.subarray(0, pt.lastIndexOf(2)).toString()).notification; };
+      await G('/api/push/subscribe', {subscription: {endpoint: 'http://127.0.0.1:' + PS.address().port + '/push/m', keys: {p256dh: ua.getPublicKey().toString('base64url'), auth: auth.toString('base64url')}}});
+      const until = async (f, ms = 8000) => { const t0 = Date.now(); for (;;) { const v = await f(); if (v || Date.now() - t0 > ms) return v; await new Promise((z) => setTimeout(z, 150)); } };
+      const rac = (body) => fetch(BASE + '/api/raccourci', {method: 'POST', headers: A, body: JSON.stringify(body)}).then((x) => x.text());
+      r = await G('/api/mission', {texte: 'x'}); ok('missions : mission vide refusée', r.status === 400);
+      r = await G('/api/mission', {texte: 'Compare trois assurances habitation'}); const mid = r.body.id;
+      let m = await until(async () => ((await G('/api/missions')).body.missions || []).find((x) => x.id === mid && x.status === 'terminee'));
+      ok('missions : lancée depuis JARVIS, faite par Claude (compte rendu gardé)', r.status === 200 && m && /Compte rendu : mission faite \(Compare trois assurances/.test(m.result), JSON.stringify(m));
+      let nm = await until(() => got.length ? open(got[got.length - 1]) : null);
+      ok('missions : notification « Mission terminée » avec le début du compte rendu, vers Suivi', nm && nm.title === 'Mission terminée' && /^Compare trois assurances habitation — Compte rendu/.test(nm.body) && nm.navigate === '/#suivi', JSON.stringify(nm));
+      r = await G('/api/mission', {texte: 'lente : une recherche qui prend du temps'}); const lid = r.body.id;
+      const t1 = Date.now(), q1 = await rac({texte: 'Quoi de neuf ?'}), m1 = ((await G('/api/missions')).body.missions || []).find((x) => x.id === lid);
+      ok('missions : à part, elles ne bloquent ni Siri ni la conversation', /Tu as dit : Quoi de neuf \?/.test(q1) && m1 && m1.status === 'envoyee', (Date.now() - t1) + ' ms, ' + (m1 && m1.status));
+      await until(async () => ((await G('/api/missions')).body.missions || []).find((x) => x.id === lid && x.status === 'terminee'));
+      const q2 = await rac({texte: 'Mission : prépare une liste de questions pour le notaire'});
+      m = await until(async () => ((await G('/api/missions')).body.missions || []).find((x) => /liste de questions pour le notaire/.test(x.text) && x.status === 'terminee'));
+      ok('missions : « Dis Siri, Jarvis, mission … » la lance et prévient', /^Mission lancée : prépare une liste/.test(q2) && /Je te préviens/.test(q2) && m, q2);
+      r = await G('/api/tour'); ok('tour de Claude : désactivé par défaut', r.status === 200 && r.body.every === 0 && !r.body.dernier);
+      r = await G('/api/tour', {every: 5}); const bad = r.body.tour.every; r = await G('/api/tour', {every: 3});
+      ok('tour de Claude : fréquence 3, 4 ou 6 heures seulement', bad === 0 && r.body.tour.every === 3);
+      let n0 = got.length; r = await G('/api/tour/maintenant', {}); nm = await until(() => got.length > n0 ? open(got[got.length - 1]) : null, 3000);
+      ok('tour de Claude : lit le courrier des 24 heures et notifie une décision', r.status === 200 && r.body.notifie === true && nm && nm.title === 'Syndic à confirmer' && /expert de mardi/.test(nm.body), JSON.stringify(r.body));
+      n0 = got.length; r = await G('/api/tour/maintenant', {}); await new Promise((z) => setTimeout(z, 300));
+      ok('tour de Claude : la même alerte n\'est pas redonnée', r.body.ok === true && r.body.notifie === false && got.length === n0, JSON.stringify(r.body));
+      r = await G('/api/tour'); const st1 = (await G('/api/status')).body.usage;
+      ok('tour de Claude : dernier tour et nombre de tours gardés', r.body.dernier && r.body.dernier.ok && r.body.last > 0 && st1.tours === 2, JSON.stringify(r.body));
+      await G('/api/tour', {every: 0}); await G('/api/push/unsubscribe', {endpoint: 'http://127.0.0.1:' + PS.address().port + '/push/m'}); PS.close(); }
     FG.valid.clear(); FG.refreshOk = false; r = await T('Google Sheets', 'get_values', {spreadsheetId: 'PIL', range: 'Canal!A1:H3'}); g = await G('/api/google');
     ok('accès retiré dans Google : « à reconnecter », plus relié', r.body.error && r.body.error.code === 'needs_reauth' && !g.body.linked, JSON.stringify(r.body.error));
     FG.refreshOk = true; r = await G('/api/google/link', {}); await fetch(BASE + '/api/google/callback?state=' + new URL(r.body.url).searchParams.get('state') + '&code=CODE-OK');

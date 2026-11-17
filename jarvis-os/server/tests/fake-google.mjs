@@ -12,6 +12,9 @@ export function startFakeGoogle() {
     dn('d1', 'Passeport - Identité.pdf', 'f-id', 'application/pdf'), dn('d2', "Titre de séjour l'ancien.jpg", 'f-id', 'image/jpeg'), dn('d3', 'Quittance 2019.pdf', 'f-loc', 'application/pdf'), dn('d4', 'Note en vrac.pdf', 'pap', 'application/pdf'),
     dn('priv', 'Papiers privés', 'root'), dn('f-imp', 'Impôts', 'priv'), dn('d5', 'Avis 2025.pdf', 'f-imp', 'application/pdf'),
     dn('autre', 'Autre dossier', 'root'), dn('d6', 'Ne doit pas sortir.pdf', 'autre', 'application/pdf'), {...dn('d7', 'Supprimé.pdf', 'f-id', 'application/pdf'), trashed: true}];
+  F.drive.find((f) => f.id === 'd3').text = 'Quittance de loyer, résidence Les Tilleuls, période de mai';
+  F.drive.find((f) => f.id === 'd6').text = 'quittance de loyer hors du dossier Papiers';
+  F.drive.find((f) => f.id === 'd5').text = 'avis d’imposition, quittance';
   F.drivePage = 2;
   const msgMeta = (id, th) => ({id, threadId: th, labelIds: ['INBOX', 'CATEGORY_PERSONAL'], snippet: 'L&#39;expert passera mardi', internalDate: '1763290000000',
     payload: {headers: [{name: 'From', value: '"Syndic Dupont" <gestion@syndic.example>'}, {name: 'To', value: 'moi@example.org'}, {name: 'Subject', value: 'RE: Dégât des eaux'}, {name: 'Date', value: 'Sun, 16 Nov 2026 10:00:00 +0100'}]}});
@@ -60,7 +63,8 @@ export function startFakeGoogle() {
         /* sous-ensemble de la syntaxe q de Drive : name = '…', '…' in parents (plusieurs, ou), mimeType = / != '…', trashed = false */
         const qq = q.q || '', un = (s) => s.replace(/\\'/g, "'").replace(/\\\\/g, '\\');
         const parents = [...qq.matchAll(/'((?:[^'\\]|\\.)*)' in parents/g)].map((x) => un(x[1])), nm = qq.match(/name = '((?:[^'\\]|\\.)*)'/), mt = qq.match(/mimeType (!?=) '([^']+)'/);
-        let rows = F.drive.filter((f) => !f.trashed && (!parents.length || f.parents.some((x) => parents.includes(x))) && (!nm || f.name === un(nm[1])) && (!mt || (mt[1] === '=' ? f.mimeType === mt[2] : f.mimeType !== mt[2])));
+        const ft = qq.match(/fullText contains '((?:[^'\\]|\\.)*)'/), norm = (t) => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+        let rows = F.drive.filter((f) => !f.trashed && (!ft || norm(f.name + ' ' + (f.text || '')).includes(norm(un(ft[1])))) && (!parents.length || f.parents.some((x) => parents.includes(x))) && (!nm || f.name === un(nm[1])) && (!mt || (mt[1] === '=' ? f.mimeType === mt[2] : f.mimeType !== mt[2])));
         const start = +(q.pageToken || 0), n = Math.min(+q.pageSize || 100, F.drivePage);
         const files = rows.slice(start, start + n).map((f) => ({id: f.id, name: f.name, mimeType: f.mimeType, parents: f.parents, modifiedTime: f.modifiedTime, size: f.size, webViewLink: 'https://drive.example/' + f.id}));
         return send(res, 200, start + n < rows.length ? {files, nextPageToken: String(start + n)} : {files});

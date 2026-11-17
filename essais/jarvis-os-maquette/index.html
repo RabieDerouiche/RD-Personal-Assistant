@@ -1273,6 +1273,15 @@
   /* JARVIS OS (17/11/2026, retour du propriétaire sur capture) : boutons d'une feuille et de « Toutes les actions » tous pareils.
      Même pilule, même marge, texte à gauche, pastille de coût calée à droite, chevron après elle ; texte long sur deux lignes sans toucher les bords. */
   .sa-main .btn, .sa-grid .btn { min-height: 48px; padding: 10px 18px; border-radius: 999px; justify-content: flex-start; gap: 8px; font-size: 15px; line-height: 1.25; text-align: left; }
+  .mis-inp { width: 100%; min-height: 64px; resize: vertical; font: 15px/1.4 var(--sans); }
+  .mis-list { display: grid; gap: 8px; margin-top: 10px; }
+  .mis-it { border: 1px solid var(--line-2); border-radius: 12px; padding: 10px 12px; }
+  .mis-it summary { display: flex; align-items: center; gap: 8px; cursor: pointer; list-style: none; min-width: 0; }
+  .mis-it summary::-webkit-details-marker { display: none; }
+  .mis-t { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mis-d { flex: 0 0 auto; color: var(--muted); }
+  .mis-r { margin-top: 8px; white-space: pre-wrap; overflow-wrap: anywhere; font: 14px/1.5 var(--sans); }
+  .mis-help { margin: 0 0 8px; }
   .sa-main .btn .cost, .sa-grid .btn .cost { margin-left: auto; flex: 0 0 auto; }
   .sa-main .btn .chev, .sa-grid .btn .chev { margin-left: auto; flex: 0 0 auto; } .sa-main .btn .cost + .chev, .sa-grid .btn .cost + .chev { margin-left: 2px; }
   .sa-main .btn .sugg-tag, .sa-grid .btn .sugg-tag { flex: 0 0 auto; }
@@ -3655,22 +3664,39 @@ void main(){
     return h('button', {type: 'button', class: 'pt', style: '--pc:' + c, onclick: () => { PAPS.open = f.id; NAV.up = false; renderView(false); }},
       h('span', {class: 'pt-ic', html: icon(ic, 22)}), h('b', {text: f.name}), h('small', {text: D.count(f.id) + ' document' + (D.count(f.id) > 1 ? 's' : '')}));
   }
+  const PAPX = {q: '', ids: []};
   VIEWS.papiers = (el) => {
     papLoad(false);
     const D = PT.data;
     const input = h('input', {class: 'pap-search', type: 'search', placeholder: 'Chercher : passeport, quittance, carte Vitale…', value: PAPS.q, 'aria-label': 'Chercher un papier'});
     const res = h('div', {class: 'stack pap-res'}), body = h('div', {class: 'stack'});
     const QUICK = ['Passeport', 'Titre de séjour', 'Carte Vitale', 'Permis', 'Acte de naissance', 'Quittance'];
-    const quick = h('div', {class: 'pap-chips pap-quick'}, QUICK.map((q) => h('button', {type: 'button', class: 'chip' + (papNorm(PAPS.q) === papNorm(q) ? ' is-on' : ''), onclick: () => { PAPS.q = papNorm(PAPS.q) === papNorm(q) ? '' : q; input.value = PAPS.q; draw(); quick.querySelectorAll('.chip').forEach((b) => b.classList.toggle('is-on', papNorm(b.textContent) === papNorm(PAPS.q))); }}, q)));
+    const quick = h('div', {class: 'pap-chips pap-quick'}, QUICK.map((q) => h('button', {type: 'button', class: 'chip' + (papNorm(PAPS.q) === papNorm(q) ? ' is-on' : ''), onclick: () => { PAPS.q = papNorm(PAPS.q) === papNorm(q) ? '' : q; input.value = PAPS.q; draw(); searchText(); quick.querySelectorAll('.chip').forEach((b) => b.classList.toggle('is-on', papNorm(b.textContent) === papNorm(PAPS.q))); }}, q)));
     const draw = () => {
       const words = papNorm(PAPS.q).split(/\s+/).filter(Boolean);
       body.hidden = !!words.length; res.hidden = !words.length;
       if (!words.length || !D) { res.replaceChildren(); return; }
       const hits = D.all.filter((f) => { const t = papNorm(f.name + ' ' + f.path.join(' ')); return words.every((w) => t.includes(w)); });
-      res.replaceChildren(h('p', {class: 'pap-n', text: hits.length ? hits.length + ' document' + (hits.length > 1 ? 's' : '') + (hits.length > 80 ? ' · les 80 premiers' : '') : 'Aucun document ne correspond.'}),
-        h('div', {class: 'pf-list'}, hits.slice(0, 80).map((f) => papRow(f, true))));
+      /* JARVIS OS 0.15.0 : ce que Google a lu dans le texte des documents (PDF, photos), en plus des noms */
+      const more = PAPX.q && papNorm(PAPX.q) === papNorm(PAPS.q) ? D.all.filter((f) => PAPX.ids.includes(f.id) && !hits.includes(f)) : [];
+      res.replaceChildren(...[h('p', {class: 'pap-n', text: hits.length ? hits.length + ' document' + (hits.length > 1 ? 's' : '') + (hits.length > 80 ? ' · les 80 premiers' : '') : more.length ? 'Aucun nom ne correspond.' : 'Aucun document ne correspond.'}),
+        hits.length ? h('div', {class: 'pf-list'}, hits.slice(0, 80).map((f) => papRow(f, true))) : null,
+        more.length ? h('p', {class: 'pap-n pap-txt-h', text: 'Dans le texte des documents · ' + more.length}) : null,
+        more.length ? h('div', {class: 'pf-list pap-res-txt'}, more.slice(0, 40).map((f) => papRow(f, true))) : null].filter(Boolean));
     };
-    input.addEventListener('input', () => { PAPS.q = input.value; draw(); quick.querySelectorAll('.chip').forEach((b) => b.classList.toggle('is-on', papNorm(b.textContent) === papNorm(PAPS.q))); });
+    let txT = 0;
+    const searchText = () => {
+      clearTimeout(txT); const q = String(PAPS.q || '').trim(); if (q.length < 3 || !LV.mcp) return;
+      txT = setTimeout(async () => {
+        try {
+          const roots = [{id: PAP_ROOT, key: 'papiers'}].concat(PT.priv && FACE.ok() ? [{name: 'Papiers privés', parent: 'root', key: 'prive'}] : []);
+          const r = lvPayload(await lvCall('Google Drive', 'search_text', {query: q, roots})) || {};
+          if (papNorm(PAPS.q).trim() !== papNorm(q)) return;
+          PAPX.q = q; PAPX.ids = (r.files || []).map((f) => f.id); draw();
+        } catch (e) { /* lecture du texte indisponible : la recherche dans les noms suffit */ }
+      }, 700);
+    };
+    input.addEventListener('input', () => { PAPS.q = input.value; draw(); searchText(); quick.querySelectorAll('.chip').forEach((b) => b.classList.toggle('is-on', papNorm(b.textContent) === papNorm(PAPS.q))); });
     el.append(h('div', {class: 'pap-top'}, h('span', {class: 'pap-ic', html: icon('search', 18)}), input), quick, res, body);
     if (PT.state === 'error' && !D) {
       body.append(h('div', {class: 'card pap-note'}, h('b', {text: PT.err === 'not_in_manifest' ? 'Ton serveur ne lit pas encore le Drive' : 'Drive illisible pour l’instant'}),
@@ -6425,6 +6451,35 @@ void main(){
   (() => { const d = $('demo'); if (!d) return; d.setAttribute('role', 'button'); d.setAttribute('tabindex', '0'); d.setAttribute('title', 'État des systèmes'); d.classList.add('is-tap'); d.addEventListener('click', sysSheet); d.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); sysSheet(); } }); })();
   const VSY = VIEWS.suivi;
   VIEWS.suivi = (el) => { VSY(el); el.append(h('section', {class: 'panel'}, h('header', {class: 'panel-h'}, h('h2', {text: 'État des systèmes'}), h('span', {class: 'aside', text: 'v' + VERSION})), sysBox())); };
+  /* JARVIS OS 0.15.0 : missions de Claude lancées d'ici ou par Siri (« mission … ») ; le serveur les fait à part et notifie quand c'est prêt */
+  function missionsPanel() {
+    const JS = window.JarvisServeur; if (!JS || !JS.mission || !JS.linked()) return null;
+    const ST = {envoyee: ['En cours', 'is-travail'], terminee: ['Terminée', 'st-achat'], echouee: ['En échec', 'st-exp']};
+    const list = h('div', {class: 'mis-list'}, h('p', {class: 'muted', text: 'Lecture des missions…'}));
+    const inp = h('textarea', {class: 'inp mis-inp', rows: '2', maxlength: '800', placeholder: 'Ex. compare trois assurances habitation pour un T3 et résume en cinq points'});
+    const out = h('p', {class: 'set-msg'});
+    let timer = 0;
+    const load = async () => {
+      const ms = await JS.missions();
+      if (!ms) { list.replaceChildren(h('p', {class: 'muted', text: 'Ton serveur ne les connaît pas encore : « Mettre à jour le serveur » dans Réglages.'})); return; }
+      list.replaceChildren(...(ms.length ? ms.map((m) => { const k = ST[m.status] || ST.envoyee; return h('details', {class: 'mis-it'},
+        h('summary', {}, h('span', {class: 'pill ' + k[1], text: k[0]}), h('span', {class: 'mis-t', text: m.text}), h('small', {class: 'mis-d', text: fmt(new Date(m.done || m.at), {weekday: 'short', hour: '2-digit', minute: '2-digit'})})),
+        m.result ? h('div', {class: 'mis-r', text: m.result}) : h('p', {class: 'muted', text: 'Claude y travaille : tu seras prévenu par une notification.'})); }) : [h('p', {class: 'muted', text: 'Aucune mission pour le moment.'})]));
+      clearTimeout(timer); if (ms.some((m) => m.status === 'envoyee')) timer = setTimeout(() => { if (TAB === 'suivi' && document.body.contains(list)) load(); }, 20000);
+    };
+    load();
+    const launch = h('button', {type: 'button', class: 'btn main', onclick: async () => {
+      const t = inp.value.trim(); if (t.length < 4) { out.textContent = 'Écris d’abord la mission.'; out.classList.add('is-bad'); return; }
+      launch.disabled = true; const r = await JS.mission(t); launch.disabled = false;
+      out.classList.toggle('is-bad', !(r && r.ok)); out.textContent = r && r.ok ? 'Mission lancée : je te préviens quand c’est prêt.' : (r && r.error) || 'Refusée.';
+      if (r && r.ok) { inp.value = ''; load(); }
+    }}, 'Lancer la mission', costTag({cost: 'claude'}));
+    return h('section', {class: 'panel mis-panel', id: 'missions'}, h('header', {class: 'panel-h'}, h('h2', {text: 'Missions de Claude'}), h('span', {class: 'aside', text: 'notifiées'})),
+      h('p', {class: 'muted mis-help', text: 'Une recherche ou une préparation qui prend du temps : Claude la fait sur ton serveur (web, tes données en lecture, brouillons Gmail au plus), sans bloquer la conversation. Aussi par Siri : « mission » puis ta demande.'}),
+      inp, h('div', {class: 'row-actions'}, launch), out, list);
+  }
+  const VSM = VIEWS.suivi;
+  VIEWS.suivi = (el) => { VSM(el); const mp = missionsPanel(); if (!mp) return; const sys = Array.from(el.querySelectorAll('.panel')).find((p) => /État des systèmes/.test((p.querySelector('h2') || {}).textContent || '')); if (sys) sys.before(mp); else el.append(mp); };
 
   /* v17.15 : alertes en direct. Pendant que Jarvis est ouvert : un son et un bandeau quand un bot répond à un de tes ordres
      ou qu'une nouvelle demande t'attend, avec « Écouter » et « Voir ». Rien n'est lu à la première lecture de Pilotage. */
@@ -6652,6 +6707,22 @@ void main(){
     card.append(h('div', {class: 'row-actions'}, h('button', {type: 'button', class: 'btn', onclick: async () => { out.textContent = 'Copie en cours…'; const r = await JS.sauvegarde.maintenant(); out.textContent = r && r.ok ? 'Copie faite (' + r.onglets + ' onglets).' : (r && r.error) || 'Copie impossible.'; out.classList.toggle('is-bad', !(r && r.ok)); if (r && r.ok) setTimeout(() => { if (TAB === 'reglages') renderView(true); }, 900); }}, 'Sauvegarder maintenant')), out);
     return card;
   }
+  /* JARVIS OS 0.15.0 : carte « Tour de Claude » : un agent « toujours actif », désactivé par défaut. Le serveur fait le tour, Claude décide s'il faut prévenir. */
+  async function tourCard(JS) {
+    const card = h('section', {class: 'card set-card tour-card'}, h('b', {text: 'Tour de Claude'}));
+    const out = h('p', {class: 'set-msg'}), say = (t, bad) => { out.textContent = t; out.classList.toggle('is-bad', !!bad); };
+    const st = await JS.tour.etat();
+    if (!st) { card.append(h('p', {class: 'muted', text: 'Ton serveur ne le connaît pas encore : touche « Mettre à jour le serveur » plus bas.'})); return card; }
+    const ps = JS.push ? await JS.push.status() : null;
+    card.append(h('p', {class: 'muted', text: 'Comme un agent toujours actif : de 8 h à 21 h, Claude relit ton courrier des dernières 24 heures, ton agenda, ce qui attend ta réponse et tes échéances, et te notifie seulement pour une décision du jour, un oubli ou une urgence. Il n’écrit et n’envoie rien. Un appel à Claude (rapide) par tour, sur ton forfait.'}));
+    if (!(ps && ps.count)) card.append(h('p', {class: 'set-msg is-bad', text: 'Active d’abord les notifications (carte du dessus) : sans elles, aucun tour ne part.'}));
+    card.append(h('small', {class: 'pick-label', text: 'Fréquence'}),
+      h('div', {class: 'seg set-seg', role: 'group'}, [[0, 'Non'], [3, '3 h'], [4, '4 h'], [6, '6 h']].map(([v, l]) => h('button', {type: 'button', 'aria-pressed': String((+st.every || 0) === v), onclick: async () => { await JS.tour.regler(v); VIEWS_RELOAD_SIRI(); }}, l))));
+    const d = st.dernier;
+    if (d) card.append(h('p', {class: 'muted tour-last', text: 'Dernier tour ' + fmt(new Date(d.at), {weekday: 'short', hour: '2-digit', minute: '2-digit'}) + ' : ' + (!d.ok ? (d.texte || 'échec') : d.notifie ? '« ' + (d.titre || 'JARVIS') + ' » ' + d.texte : 'rien à signaler.')}));
+    card.append(h('div', {class: 'row-actions'}, h('button', {type: 'button', class: 'btn', onclick: async () => { say('Claude fait le tour…'); const r = await JS.tour.maintenant(); if (!r || r.error || r.ok === false) { say((r && (r.error || r.texte)) || 'Tour impossible.', true); return; } say(r.notifie ? (ps && ps.count ? 'Notification envoyée : « ' : 'À signaler (notifications coupées) : « ') + (r.titre || 'JARVIS') + ' » ' + r.texte : 'Rien à signaler.'); }}, 'Faire un tour maintenant', costTag({cost: 'claude'}))), out);
+    return card;
+  }
   VIEWS.reglages = (el) => {
     const JS = window.JarvisServeur;
     if (!JS) {
@@ -6701,6 +6772,7 @@ void main(){
       /* JARVIS OS 0.12.0 : notifications envoyées par le serveur (un bot a répondu, rappels du matin, Grok reparti) */
       if (JS.push) parts.push(await notifCard(JS, msg, () => draw()));
       if (JS.raccourci) parts.push(await siriCard(JS)); /* JARVIS OS 0.13.0 : Siri et bouton Action */
+      if (JS.tour) parts.push(await tourCard(JS)); /* JARVIS OS 0.15.0 : tour de Claude */
       if (JS.sauvegarde) parts.push(await savCard(JS)); /* JARVIS OS 0.14.0 : sauvegarde de Pilotage */
       /* 3. JARVIS : version, mise à jour du serveur, voix et modèle (repris de l'ancienne app) */
       const st = await JS.status(), upd = h('p', {class: 'set-msg'});
