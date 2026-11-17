@@ -126,6 +126,8 @@ try {
     ok('tour de Claude : fréquence choisie gardée par le serveur', await q.evaluate(() => document.querySelector('.tour-card [aria-pressed="true"]').textContent === '4 h'));
     await q.evaluate(() => [...document.querySelectorAll('.tour-card button')].find((b) => /Faire un tour maintenant/.test(b.textContent)).click()); await q.waitForTimeout(2500);
     ok('tour de Claude : « Faire un tour maintenant » dit ce qu\'il a trouvé', await q.evaluate(() => /Syndic à confirmer/.test(document.querySelector('.tour-card').textContent)));
+    await q.evaluate(() => [...document.querySelectorAll('.tour-card button')].find((b) => /Faire un tour maintenant/.test(b.textContent)).click()); await q.waitForTimeout(2000);
+    ok('tour de Claude : second tour sans changement, Claude pas appelé (gratuit)', await q.evaluate(() => /Rien de nouveau depuis le tour précédent : Claude n’a pas été appelé/.test(document.querySelector('.tour-card').textContent)));
     await q.evaluate(() => { const c = document.querySelector('.tour-card'), sc = document.getElementById('scroller'); sc.scrollTop += c.getBoundingClientRect().top - 90; }); await q.waitForTimeout(300);
     await q.screenshot({path: SH + 'reglages-tour.png'});
     await q.evaluate(() => [...document.querySelectorAll('.tour-card .seg button')].find((b) => b.textContent === 'Non').click()); await q.waitForTimeout(1500);
