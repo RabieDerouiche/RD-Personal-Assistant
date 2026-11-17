@@ -74,6 +74,8 @@ Si un ID ne répond plus, retrouve le fichier avec `search_files` par titre.
 ## Format des réponses (iPhone)
 
 - Commence par la réponse ou la recommandation, pas par une introduction.
+- **Toujours en français**, QCM compris (rappel du 17/11/2026 : des QCM étaient partis en anglais).
+- **« De ton côté »** à la fin de chaque réponse où il reste quelque chose à faire pour lui (rappel du 17/11/2026) : quoi, où (app, écran, bouton), comment (étapes), et le texte exact à coller quand il y en a un (phrase pour un bot, prompt pour une autre session). Dis quand un nom de menu est deviné.
 - Phrases courtes, listes, tableaux de 3 colonnes maximum, liens cliquables.
 - Prix toujours en total TTC (bagages, frais, taxes compris), avec la date et la source du prix.
 - Livrable long (itinéraire, CV, bilan) → Google Doc dans le bon dossier Drive + lien dans la réponse.
