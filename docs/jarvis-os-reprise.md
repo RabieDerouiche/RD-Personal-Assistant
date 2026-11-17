@@ -37,7 +37,7 @@ L'assistant personnel du propriétaire sur iPhone : une app web (installable sur
 | Banc | Commande (depuis la racine du dépôt) |
 |---|---|
 | Serveur (147 vérifications, faux Claude, faux Google, faux Drive, faux service de notifications) | `node jarvis-os/server/tests/server.test.mjs` |
-| Nouvelle app, maquette (iPhone simulé, 72 vérifications, dont les marges d'un vrai iPhone ; Wikipédia et Open-Meteo simulés) | `NODE_PATH=/opt/node-tools/node_modules node essais/jarvis-os-maquette/banc/banc.cjs` |
+| Nouvelle app, maquette (iPhone simulé, 74 vérifications, dont les marges d'un vrai iPhone ; Wikipédia et Open-Meteo simulés) | `NODE_PATH=/opt/node-tools/node_modules node essais/jarvis-os-maquette/banc/banc.cjs` |
 | Check-up écran par écran (19 écrans : texte cassé, débordement, polices, contraste, doublons, chaque bouton, console ; rapport et captures dans le dossier temporaire `jarvis-os-audit`, environ 35 min avec les boutons) | `NODE_PATH=/opt/node-tools/node_modules node essais/jarvis-os-maquette/banc/audit.cjs [écran…]` (`CLICKS=0` : sans les boutons, 3 min) |
 | Nouvelle app sur le vrai serveur (faux Google, faux Claude), de bout en bout (40 vérifications, dont relances, reprises de mission, consommation, dont la santé du serveur, discussion avec propositions, tâche Claude, notifications, Siri, sauvegarde, missions, tour de Claude et recherche dans le texte des papiers) | `NODE_PATH=/opt/node-tools/node_modules node essais/jarvis-os-maquette/banc/banc-serveur.mjs` |
 | Ancienne app avec le serveur | `node jarvis-os/app/tests/e2e-server.cjs` (dans `jarvis-os/app`) |

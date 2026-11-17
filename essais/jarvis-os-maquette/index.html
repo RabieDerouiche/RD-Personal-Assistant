@@ -115,6 +115,9 @@
   html.theme-holo .btn.main { background: linear-gradient(90deg, #0ea5e9, #6366f1 62%, #a855f7); color: #fff; border-color: transparent; box-shadow: 0 0 18px rgba(56, 189, 248, .45); }
   html.theme-holo .btn.main2 { border-color: rgba(103, 232, 249, .65); box-shadow: 0 0 14px rgba(56, 189, 248, .25); }
   html.theme-holo .btn.ghost { background: transparent; border-color: transparent; }
+  /* 17/11/2026 (capture du propriétaire) : le fond bleu du thème effaçait le rouge de « Oui : supprimer » (texte sombre sur fond sombre) */
+  html.theme-holo .btn.danger-fill { background: linear-gradient(90deg, #e11d48, #fb7185); color: #fff; border-color: transparent; box-shadow: 0 0 16px rgba(244, 63, 94, .35); }
+  html.theme-holo .btn.ai-next { background: linear-gradient(90deg, rgba(245, 158, 11, .16), rgba(59, 7, 100, .35)); border-color: rgba(251, 191, 36, .45); }
   html.theme-holo .chip, html.theme-holo .pap-chips .chip { border-color: rgba(56, 189, 248, .35); }
   html.theme-holo .pill.is-travail { color: #67e8f9; border-color: rgba(103, 232, 249, .55); background: rgba(34, 211, 238, .1); box-shadow: 0 0 10px rgba(34, 211, 238, .25); }
   html.theme-holo .mate .chr, html.theme-holo .unit .chr { filter: drop-shadow(0 0 9px rgba(56, 189, 248, .45)); }
@@ -999,6 +1002,8 @@
   .toast { pointer-events: auto; display: flex; gap: 10px; align-items: center; }
   .toast-txt { flex: 1; min-width: 0; }
   .toast-undo { flex: 0 0 auto; }
+  .toast-x { flex: 0 0 auto; width: 32px; height: 32px; margin: -6px -8px -6px 2px; border: 0; border-radius: 50%; background: transparent; color: var(--muted); font: 400 22px/1 var(--sans); cursor: pointer; }
+  .toast-x:active { background: var(--glass-2); }
   .free-row { grid-column: 1 / -1; display: flex; gap: 8px; align-items: center; padding: 6px 6px 6px 8px; border-radius: 18px; border: 1px solid rgba(251, 191, 36, .35); background: linear-gradient(90deg, rgba(245, 158, 11, .08), var(--glass)); }
   .free-row .inp { flex: 1; min-width: 0; border: 0; background: transparent; padding: 8px 4px; font-size: 15px; }
   .free-row .inp:focus { outline: none; }
@@ -1980,11 +1985,18 @@ void main(){
 
   function toast(title, text, fromBot, undo) {
     const box = $('toasts');
-    const t = h('div', {class: 'toast' + (fromBot ? ' is-bot' : '') + (undo ? ' has-undo' : ''), role: 'status'}, h('div', {class: 'toast-txt'}, h('b', {text: title}), h('span', {text: (fromBot || LINK.on ? '' : 'En vrai : ') + text})),
-      undo ? h('button', {type: 'button', class: 'btn sm toast-undo', onclick: () => { undo(); t.remove(); }}, 'Annuler') : null);
+    /* 17/11/2026 (demande du propriétaire) : une notification se ferme d'un appui, d'un glissé vers le haut ou de sa croix, sans attendre */
+    const bye = () => { if (t.classList.contains('out')) return; t.classList.add('out'); setTimeout(() => t.remove(), 320); };
+    const t = h('div', {class: 'toast' + (fromBot ? ' is-bot' : '') + (undo ? ' has-undo' : ''), role: 'status'}, h('div', {class: 'toast-txt', onclick: bye}, h('b', {text: title}), h('span', {text: (fromBot || LINK.on ? '' : 'En vrai : ') + text})),
+      undo ? h('button', {type: 'button', class: 'btn sm toast-undo', onclick: () => { undo(); t.remove(); }}, 'Annuler') : null,
+      h('button', {type: 'button', class: 'toast-x', 'aria-label': 'Fermer', onclick: bye}, '×'));
+    let y0 = null;
+    t.addEventListener('touchstart', (e) => { y0 = e.touches[0].clientY; }, {passive: true});
+    t.addEventListener('touchmove', (e) => { if (y0 == null) return; const dy = e.touches[0].clientY - y0; if (dy < 0) t.style.transform = 'translateY(' + dy + 'px)'; if (dy < -28) { y0 = null; bye(); } }, {passive: true});
+    t.addEventListener('touchend', () => { if (y0 != null) t.style.transform = ''; y0 = null; }, {passive: true});
     box.append(t);
     while (box.children.length > 3) box.firstChild.remove();
-    setTimeout(() => { t.classList.add('out'); setTimeout(() => t.remove(), 320); }, fromBot ? 4800 : 7000);
+    setTimeout(bye, fromBot ? 4800 : 7000);
   }
 
   /* ---------- résultat d'une action : ce qui change, ce qui serait écrit en vrai, et le bot qui réagit ---------- */

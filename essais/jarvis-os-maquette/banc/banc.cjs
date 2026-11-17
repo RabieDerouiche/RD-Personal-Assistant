@@ -167,6 +167,17 @@ srv.listen(0, async () => {
       await q.evaluate(() => { document.getElementById('scroller').scrollTop = 400; }); await q.waitForTimeout(300);
       ok('iPhone réel : en défilant, l\'en-tête reste sous la barre d\'état', await q.evaluate(() => Math.round(document.querySelector('.top').getBoundingClientRect().top) === 59));
       await ctx.close(); }
+    /* 17/11/2026 (captures du propriétaire) : bouton rouge lisible en thème Hologramme ; notification fermée d'un appui */
+    { p = await page('?theme=holo#equipe');
+      const lum = (c) => { const m = c.match(/[\d.]+/g).map(Number).slice(0, 3).map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }); return 0.2126 * m[0] + 0.7152 * m[1] + 0.0722 * m[2]; };
+      const st = await p.evaluate(() => { const b = document.createElement('button'); b.className = 'btn danger-fill'; b.textContent = 'Oui : supprimer'; document.body.append(b); const cs = getComputedStyle(b); const r = {fg: cs.color, bg: cs.backgroundImage !== 'none' ? (cs.backgroundImage.match(/rgba?\([^)]+\)/) || [cs.backgroundColor])[0] : cs.backgroundColor}; b.remove(); return r; });
+      const L1 = lum(st.fg), L2 = lum(st.bg), ratio = (Math.max(L1, L2) + 0.05) / (Math.min(L1, L2) + 0.05);
+      ok('Hologramme : « Oui : supprimer » lisible (contraste ≥ 3)', ratio >= 3, JSON.stringify(st) + ' ' + ratio.toFixed(2));
+      await p.evaluate(() => [...document.querySelectorAll('.panel')].find((x) => /Tes ordres/.test(x.textContent)).querySelector('.canal-row').click()); await p.waitForTimeout(700);
+      for (let k = 0; k < 3 && !(await p.$('#toasts .toast')); k++) { await p.evaluate(() => { const b = document.querySelector('#sheet:not([hidden]) .sa-main .btn, #sheet:not([hidden]) .btn.main'); if (b) b.click(); }); await p.waitForTimeout(900); }
+      const had = !!(await p.$('#toasts .toast'));
+      if (had) { await p.click('#toasts .toast .toast-x'); await p.waitForTimeout(450); }
+      ok('notification de la page : croix « Fermer », fermée tout de suite', had && await p.evaluate(() => !document.querySelector('#toasts .toast:not(.out)')), 'toast vu : ' + had); }
     /* glisser vers le bas ferme la fenêtre (demande du 16/11/2026) : vrais gestes tactiles */
     { const drag = async (q, x, y, dx, dy, ms) => { const c = await q.context().newCDPSession(q); await c.send('Input.dispatchTouchEvent', {type: 'touchStart', touchPoints: [{x, y}]}); for (let i = 1; i <= 8; i++) { await c.send('Input.dispatchTouchEvent', {type: 'touchMove', touchPoints: [{x: x + dx * i / 8, y: y + dy * i / 8}]}); await q.waitForTimeout(ms / 8); } await c.send('Input.dispatchTouchEvent', {type: 'touchEnd', touchPoints: []}); await q.waitForTimeout(900); };
       p = await page('#agenda'); await p.tap('.agw-d'); await p.waitForTimeout(700);
