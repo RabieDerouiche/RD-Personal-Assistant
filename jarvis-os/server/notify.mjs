@@ -12,6 +12,22 @@ export function paris(d) {
   const p = Object.fromEntries(new Intl.DateTimeFormat('fr-FR', {timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23'}).formatToParts(d).map((x) => [x.type, x.value]));
   return {ymd: p.year + '-' + p.month + '-' + p.day, hm: p.hour + ':' + p.minute, y: +p.year, m: +p.month, d: +p.day};
 }
+/* une heure de Paris (AAAA-MM-JJ, HH:MM) en instant exact, changement d'heure compris */
+export function parisMs(ymd, hm) {
+  const [y, m, d] = ymd.split('-').map(Number), [H, M] = hm.split(':').map(Number), want = Date.UTC(y, m - 1, d, H, M); let t = want;
+  for (let k = 0; k < 3; k++) { const p = paris(new Date(t)); t -= Date.UTC(p.y, p.m - 1, p.d, +p.hm.slice(0, 2), +p.hm.slice(3, 5)) - want; }
+  return t;
+}
+/* ligne « Grok en pause jusqu'au » de l'onglet Faits (écrite par la page : « 17/11/2026 13h05 ») : instant de reprise, ou null
+   (pas de ligne, valeur illisible, ou « reprise » / « sonnée » écrit à la place de la date) ; undefined si l'onglet n'a pas la ligne */
+export function pauseDepuisFaits(rows) {
+  const hd = (rows[0] || []).map(low), iF = hd.indexOf('fait'), iV = hd.indexOf('valeur');
+  if (iF < 0 || iV < 0) return undefined;
+  const r = rows.slice(1).find((x) => low(x[iF]) === "grok en pause jusqu'au"); if (!r) return undefined;
+  const v = String(r[iV] || ''); if (/sonn|repris/i.test(v)) return null;
+  const m = v.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\D+?(\d{1,2})\s*[h:]\s*(\d{2})?)?/); if (!m) return null;
+  return parisMs(m[3] + '-' + m[2].padStart(2, '0') + '-' + m[1].padStart(2, '0'), (m[4] ? m[4].padStart(2, '0') : '12') + ':' + (m[5] || '00'));
+}
 /* nombre de jours entre aujourd'hui (Paris) et une date JJ/MM/AAAA trouvée dans le texte ; null si aucune */
 export function daysTo(text, today) {
   const m = String(text || '').match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/); if (!m) return null;
@@ -20,7 +36,7 @@ export function daysTo(text, today) {
 const cols = (rows) => { const hd = (rows[0] || []).map(low); return (name) => hd.indexOf(name); };
 const when = (n) => n === 0 ? "Aujourd'hui" : n === 1 ? 'Demain' : 'Dans ' + n + ' jours';
 
-export function createNotifier({S, save, push, read, linked, now = () => Date.now(), everyMs = 120000}) {
+export function createNotifier({S, save, push, read, linked, pause, now = () => Date.now(), everyMs = 120000}) {
   S.notify = Object.assign({canal: null, digest: '', resume: '', lastCanal: 0}, S.notify || {});
   const prefs = () => S.push.prefs || {};
   const ready = () => S.push.subs.length > 0 && linked();
@@ -81,10 +97,10 @@ export function createNotifier({S, save, push, read, linked, now = () => Date.no
     return {lines: lines.length, sent: true};
   }
 
-  /* 3. fin de la pause de Grok (date notée dans les réglages du serveur) : combien de lignes attendent les bots */
+  /* 3. fin de la pause de Grok (ligne « Grok en pause jusqu'au » de l'onglet Faits, sinon la date des réglages du serveur) : combien de lignes attendent les bots */
   async function checkResume(force) {
-    const until = S.config && S.config.grokPauseUntil, end = until ? Date.parse(until) : NaN;
-    if (!until || isNaN(end) || end > now() || now() - end > 24 * 3600000 || (!force && S.notify.resume === until)) return null;   /* une reprise de plus de 24 h n'est plus une nouvelle */
+    const end = pause ? await pause() : (S.config && S.config.grokPauseUntil ? Date.parse(S.config.grokPauseUntil) : NaN), until = String(end);
+    if (!end || isNaN(end) || end > now() || now() - end > 24 * 3600000 || (!force && S.notify.resume === until)) return null;   /* une reprise de plus de 24 h n'est plus une nouvelle */
     S.notify.resume = until; save();
     const rows = await read('Canal!A1:H3000'), c = cols(rows), iPour = c('pour'), iSt = c('statut');
     const per = {}; rows.slice(1).forEach((r) => { const p = low(r[iPour]); if (BOTS.includes(p) && low(r[iSt]) === 'a faire') per[String(r[iPour]).trim()] = (per[String(r[iPour]).trim()] || 0) + 1; });

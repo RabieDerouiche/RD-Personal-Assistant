@@ -4,12 +4,15 @@ import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path'
 const HERE = path.dirname(fileURLToPath(import.meta.url)), HOME0 = os.homedir();
 import {startFakeGoogle} from './fake-google.mjs';
 import http from 'node:http'; import crypto from 'node:crypto';
-import {paris} from '../notify.mjs';
+import {paris, pauseDepuisFaits} from '../notify.mjs';
 const FG = await startFakeGoogle();
 const DATA = fs.mkdtempSync(path.join(os.tmpdir(), 'jarvis-'));
 const PORT = 18000 + Math.floor(Math.random() * 1000), BASE = 'http://127.0.0.1:' + PORT;
-const env = {...process.env, JARVIS_PUSH_ALLOW_HTTP: '1', JARVIS_NOTIFY_TICK_MS: '3600000', JARVIS_SANTE_TICK_MS: '3600000', JARVIS_GOOGLE_FAKE: FG.url, PORT: String(PORT), JARVIS_DATA: DATA, CLAUDE_BIN: path.join(HERE, 'fake-claude.mjs'), ANTHROPIC_API_KEY: 'sk-ant-faux-pour-le-test', ANTHROPIC_BASE_URL: 'https://exemple.invalid', JARVIS_ORIGINS: 'https://rabiederouiche.github.io', JARVIS_REPO: os.tmpdir(), JARVIS_OS_DIR: path.join(HERE, '..', '..', '..', 'essais', 'jarvis-os-maquette'), JARVIS_TTS_HELPER: path.join(HERE, 'fake-tts.mjs'), JARVIS_VOICE_MODEL: path.join(HERE, 'fake-tts.mjs'), JARVIS_VOICE_SCRIPT: path.join(DATA, 'fausse-install.sh')};
+const env = {...process.env, JARVIS_PUSH_ALLOW_HTTP: '1', JARVIS_NOTIFY_TICK_MS: '3600000', JARVIS_SANTE_TICK_MS: '3600000', JARVIS_PAUSE_CACHE_MS: '0', JARVIS_GOOGLE_FAKE: FG.url, PORT: String(PORT), JARVIS_DATA: DATA, CLAUDE_BIN: path.join(HERE, 'fake-claude.mjs'), ANTHROPIC_API_KEY: 'sk-ant-faux-pour-le-test', ANTHROPIC_BASE_URL: 'https://exemple.invalid', JARVIS_ORIGINS: 'https://rabiederouiche.github.io', JARVIS_REPO: os.tmpdir(), JARVIS_OS_DIR: path.join(HERE, '..', '..', '..', 'essais', 'jarvis-os-maquette'), JARVIS_TTS_HELPER: path.join(HERE, 'fake-tts.mjs'), JARVIS_VOICE_MODEL: path.join(HERE, 'fake-tts.mjs'), JARVIS_VOICE_SCRIPT: path.join(DATA, 'fausse-install.sh')};
 const results = []; let fails = 0;
+{ const H = ['Domaine', 'Fait', 'Valeur'], v = (x) => pauseDepuisFaits([H, ['Grok Bot', "Grok en pause jusqu'au", x]]);
+  const okP = v('17/11/2026 13h05') === Date.parse('2026-11-17T13:05:00+01:00') && v('14/07/2027 12h47') === Date.parse('2027-07-14T12:47:00+02:00') && v('Reprise faite, sonnettes envoyées') === null && pauseDepuisFaits([H, ['x', 'Autre', 'y']]) === undefined;
+  results.push((okP ? 'OK    ' : 'ÉCHEC ') + 'pause de Grok : date de Faits lue à l\'heure de Paris (hiver comme été), « reprise » = plus de pause'); if (!okP) fails++; }
 const ok = (name, cond, info) => { results.push((cond ? 'OK   ' : 'ÉCHEC') + ' ' + name + (info ? ' :: ' + info : '')); if (!cond) fails++; };
 const code = execFileSync(process.execPath, [path.join(HERE, '..', 'server.mjs'), 'pair'], {env}).toString().match(/: ([A-Z0-9]{4}-[A-Z0-9]{4})/)[1];
 let srv;
@@ -198,7 +201,13 @@ try {
       ok('notifications : rappels du jour (aujourd\'hui, dans 7 jours, papier à 30 jours ; rien de fait ni à 3 jours)', got.length === n0 + 1 && last().title === '3 rappels du jour' && /Aujourd'hui : Rendez-vous notaire/.test(last().body) && /Dans 7 jours : Fin de la promo/.test(last().body) && /Passeport \(Lui\) : expire dans 30 jours/.test(last().body) && !/Déjà fait|Pas aujourd/.test(last().body), JSON.stringify(last()));
       FG.sheet['Canal!A1:H3000'].push(['17/11/2026', 'Rabie', 'Kairos', 'Ordre', 'Suis la carte', 'À faire', '', '']);
       await G('/api/config', {grokPauseUntil: new Date(Date.now() - 60000).toISOString()}); n0 = got.length; r = await check('resume');
-      ok('notifications : Grok est reparti, lignes en attente comptées (la sonnette reste un geste de l\'app)', got.length === n0 + 1 && last().title === 'Grok est reparti' && /1 ligne attend tes bots \(Kairos 1\)/.test(last().body) && !FG.calls.some((c) => c.path.endsWith('/messages/send') && c.at > Date.now() - 5000), last().body);
+      ok('notifications : Grok est reparti (réglage du serveur, sans ligne dans Faits), lignes en attente comptées (la sonnette reste un geste de l\'app)', got.length === n0 + 1 && last().title === 'Grok est reparti' && /1 ligne attend tes bots \(Kairos 1\)/.test(last().body) && !FG.calls.some((c) => c.path.endsWith('/messages/send') && c.at > Date.now() - 5000), last().body);
+      { /* 17/11/2026 : la ligne « Grok en pause jusqu'au » de l'onglet Faits (écrite par la page) prime sur le réglage du serveur */
+        const fr2 = (ms) => { const p = paris(new Date(ms)); return String(p.d).padStart(2, '0') + '/' + String(p.m).padStart(2, '0') + '/' + p.y + ' ' + p.hm.replace(':', 'h'); };
+        FG.sheet['Faits!A1:E300'] = [['Domaine', 'Fait', 'Valeur', 'Mis à jour le'], ['Grok Bot', "Grok en pause jusqu'au", fr2(Date.now() + 3600000), '17/11/2026']];
+        await G('/api/config', {grokPauseUntil: new Date(Date.now() - 120000).toISOString()}); await new Promise((z) => setTimeout(z, 50));
+        let st = (await G('/api/status')).body; n0 = got.length; r = await check('resume');
+        ok('pause de Grok : la date de Faits prime (encore en pause : pas de « Grok est reparti »)', got.length === n0 && Date.parse(st.grokPauseUntil) > Date.now(), st.grokPauseUntil); }
       r = await G('/api/push/prefs', {heure: '25:00', rappels: false}); ok('notifications : préférences (heure invalide refusée, rappels coupés)', r.body.prefs.heure === '08:00' && r.body.prefs.rappels === false);
       r = await G('/api/push/subscribe', {subscription: {...sub, endpoint: PURL + '/push/gone'}}); await G('/api/push/test', {}); r = await G('/api/push');
       ok('notifications : abonnement expiré (410) retiré seul', r.body.count === 1);
