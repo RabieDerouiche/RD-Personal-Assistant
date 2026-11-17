@@ -258,10 +258,33 @@ try {
       r = await G('/api/mission', {texte: 'lente : une seconde recherche longue'}); const kid = r.body.id; const r2 = await G('/api/mission', {texte: 'lente : une seconde recherche longue'});
       ok('missions : la même demande lancée deux fois de suite ne crée qu\'une mission', r2.body.id === kid);
       await new Promise((z) => setTimeout(z, 300)); const mk0 = ((await G('/api/missions')).body.missions || []).find((x) => x.id === kid);
+      const rp = await G('/api/relance', {quand: new Date(Date.now() + 30 * 864e5).toISOString(), quoi: 'Relance gardée malgré un redémarrage'});
       await restartSrv(); const n1 = got.length;
       const mk = await until(async () => ((await G('/api/missions')).body.missions || []).find((x) => x.id === kid && x.status === 'terminee'), 10000);
       nm = await until(() => got.length > n1 ? open(got[got.length - 1]) : null, 3000);
       ok('missions : interrompue par un arrêt du serveur, reprise à la relance et notifiée', mk0 && mk0.status === 'envoyee' && mk && mk.essais === 2 && mk.result === 'Compte rendu repris.' && nm && nm.title === 'Mission terminée', JSON.stringify([mk0 && mk0.status, mk]));
+      ok('relances : gardées sur disque malgré un arrêt brutal du serveur', rp.status === 200 && ((await G('/api/relances')).body.prevues || []).some((x) => x.id === rp.body.relance.id));
+      /* 0.18.0 : relances vérifiées par le serveur (ligne du Canal lue directement, zéro jeton), rappels simples, annulation */
+      FG.sheet['Canal!A1:H1'] = [['Date', 'De', 'Pour', 'Type', 'Message', 'Statut', 'Réponse', 'Objet']]; FG.sheet['Canal!A2:H2'] = [['17/11/2026', 'Rabie', 'Kairos', 'Ordre', 'Relève le prix de la carte', 'Fait', 'Prix relevé : sous ton seuil.', 'Prix : Carte']];
+      FG.sheet['Canal!A3:H3'] = [['17/11/2026', 'Rabie', 'Ulysse', 'Ordre', 'Propose deux sorties', 'À faire', '', 'Sorties']];
+      r = await G('/api/relance', {quand: '2020-01-01T09:00', quoi: 'Trop tard'}); ok('relances : date passée refusée', r.status === 400);
+      const soon = new Date(Date.now() + 1200).toISOString();
+      const ra = await G('/api/relance', {quand: soon, quoi: 'Voir si Kairos a répondu', ligne: 2}), rb = await G('/api/relance', {quand: soon, quoi: 'Voir si Ulysse a répondu', ligne: 3}), rc = await G('/api/relance', {quand: soon, quoi: 'Appeler la crèche'});
+      const rd = await G('/api/relance', {quand: soon, quoi: 'Relance annulée'}); await G('/api/relance/annuler', {id: rd.body.relance.id});
+      await new Promise((z) => setTimeout(z, 1400)); let n2 = got.length; r = await G('/api/relances/verifier', {});
+      const msgs = got.slice(n2).map((b) => open(b)), tt = msgs.map((x) => x.title + ' | ' + x.body);
+      ok('relances : réponse du bot lue dans le Canal, « toujours rien » sinon, rappel simple ; l\'annulée ne part pas', r.body.faites === 3 && msgs.length === 3 && tt.some((x) => /^Kairos a répondu \| Prix : Carte : Prix relevé/.test(x)) && tt.some((x) => /^Toujours rien de Ulysse \| Voir si Ulysse a répondu \(ligne 3 du Canal, À faire\)/.test(x)) && tt.some((x) => /^Rappel \| Appeler la crèche$/.test(x)), JSON.stringify(tt));
+      r = await G('/api/relances'); ok('relances : faites gardées avec leur résultat', r.body.faites.length >= 3 && r.body.faites.some((x) => /Kairos a répondu/.test(x.resultat)) && !r.body.prevues.some((x) => x.quoi === 'Relance annulée'));
+      const qs = await rac({texte: 'Rappelle-moi demain d\'appeler le notaire'}); r = await G('/api/relances');
+      ok('relances : « Dis Siri, rappelle-moi… » la note, sans lire la ligne technique', /C'est noté pour demain à 9 h\.$/.test(qs) && !/RELANCE/.test(qs) && r.body.prevues.some((x) => x.quoi === 'Appeler le notaire' && x.source === 'siri'), qs);
+      r = await G('/api/mission', {texte: 'vérifie la réponse du syndic demain'}); const sid1 = r.body.id;
+      let ms1 = await until(async () => ((await G('/api/missions')).body.missions || []).find((x) => x.id === sid1 && x.status === 'terminee')); r = await G('/api/relances');
+      ok('relances : une mission peut en fixer une (notée dans son compte rendu)', ms1 && /Relance prévue le .* : Voir si le syndic a répondu/.test(ms1.result) && !/RELANCE:/.test(ms1.result) && r.body.prevues.some((x) => x.source === 'mission'), ms1 && ms1.result);
+      /* « Non, plutôt… » sur une mission : elle reprend la précédente avec la consigne */
+      r = await G('/api/mission', {texte: 'Plus court, en trois points', parent: 'inconnue'}); ok('« Non, plutôt » : mission d\'origine inconnue refusée', r.status === 404);
+      r = await G('/api/mission', {texte: 'Plus court, en trois points', parent: mid}); const pid2 = r.body.id;
+      ms1 = await until(async () => ((await G('/api/missions')).body.missions || []).find((x) => x.id === pid2 && x.status === 'terminee'));
+      ok('« Non, plutôt » : la mission reprend la version précédente avec ta consigne', ms1 && ms1.parent === mid && /^Reprise : Compare trois assurances habitation/.test(ms1.text) && ms1.result === 'Version 2 : Plus court, en trois points', JSON.stringify(ms1));
       const q2 = await rac({texte: 'Mission : prépare une liste de questions pour le notaire'});
       m = await until(async () => ((await G('/api/missions')).body.missions || []).find((x) => /liste de questions pour le notaire/.test(x.text) && x.status === 'terminee'));
       ok('missions : « Dis Siri, Jarvis, mission … » la lance et prévient', /^Mission lancée : prépare une liste/.test(q2) && /Je te préviens/.test(q2) && m, q2);
@@ -277,6 +300,8 @@ try {
       FG.sheet["'Échéances'!A1:H1000"] = (FG.sheet["'Échéances'!A1:H1000"] || [['Date', 'Sujet', 'Statut']]).concat([[new Date().toLocaleDateString('fr-FR', {timeZone: 'Europe/Paris', day: '2-digit', month: '2-digit', year: 'numeric'}), 'Nouvelle échéance du jour', 'À venir']]);
       n0 = got.length; r = await G('/api/tour/maintenant', {}); st1 = (await G('/api/status')).body.usage;
       ok('tour de Claude : une donnée change, Claude est rappelé (et ne redonne pas l\'alerte déjà donnée)', !r.body.saute && r.body.notifie === false && st1.tours === 2 && got.length === n0, JSON.stringify([r.body, st1]));
+      r = await G('/api/conso'); const ty = Object.fromEntries((r.body.types || []).map((x) => [x.type, x]));
+      ok('consommation de Claude : jetons par type (conversation, missions, Siri, tour), part du cache, tours sautés', ['chat', 'mission', 'siri', 'tour'].every((k) => ty[k] && ty[k].appels > 0 && ty[k].total > 0) && ty.tour.appels === 2 && ty.mission.partCache === 83 && r.body.toursSautes === 1 && Math.round((r.body.types || []).reduce((a, x) => a + x.part, 0)) === 100, JSON.stringify(r.body).slice(0, 300));
       await G('/api/tour', {every: 0}); await G('/api/push/unsubscribe', {endpoint: 'http://127.0.0.1:' + PS.address().port + '/push/m'}); PS.close(); }
     FG.valid.clear(); FG.refreshOk = false; r = await T('Google Sheets', 'get_values', {spreadsheetId: 'PIL', range: 'Canal!A1:H3'}); g = await G('/api/google');
     ok('accès retiré dans Google : « à reconnecter », plus relié', r.body.error && r.body.error.code === 'needs_reauth' && !g.body.linked, JSON.stringify(r.body.error));
