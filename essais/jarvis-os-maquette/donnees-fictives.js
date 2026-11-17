@@ -272,6 +272,14 @@
       if (tool === 'unlabel_thread') { if (!input.threadId || !Array.isArray(input.labelIds)) throw {code: 'tool_error', server, message: 'arguments'}; const i = MAIL.inbox.findIndex((t) => t.id === input.threadId); if (i >= 0) MAIL.inbox.splice(i, 1); return {}; }
     }
     if (server === 'Claude Code Remote' && tool === 'fire_trigger') { /* scénario tasks : les seules tâches que ce compte possède */ if (SCEN.tasks && !SCEN.tasks.includes(input.trigger_id)) { const e = new Error('trigger not found'); e.code = 'tool_error'; throw e; } return {ok: true}; }
+    if (server === 'Google Drive' && tool === 'search_text') {
+      /* JARVIS OS : texte « lu » par Google dans quelques faux documents, limité aux racines demandées */
+      const TEXT = (f) => /quittance/i.test(f.name) ? 'quittance de loyer, résidence, période mensuelle' : /assurance/i.test(f.name) ? 'attestation d’assurance habitation, garantie' : '';
+      const ids = new Set((input.roots || []).map((r) => r.id || DRIVE.byName[r.name]).filter(Boolean)); let grew = true;
+      while (grew) { grew = false; DRIVE.folders.forEach((f) => { if (ids.has(f.parent) && !ids.has(f.id)) { ids.add(f.id); grew = true; } }); }
+      const n = (t) => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase(), q = n(input.query);
+      return {files: q.length < 3 ? [] : DRIVE.files.filter((f) => ids.has(f.parent) && n(f.name + ' ' + TEXT(f)).includes(q)).slice(0, 40)};
+    }
     if (server === 'Google Drive' && tool === 'folder_tree') {
       /* JARVIS OS : faux Drive de Papiers (noms fictifs), même forme que le serveur */
       const roots = (input.roots || []).map((r) => r.id ? {key: r.key || r.id, id: r.id, name: r.name || '', found: true} : (DRIVE.byName[r.name] ? {key: r.key || r.name, id: DRIVE.byName[r.name], name: r.name, found: true} : {key: r.key || r.name, id: '', name: r.name, found: false}));

@@ -113,6 +113,15 @@
       etat: () => req('/api/sauvegarde').then((r) => (r.status === 200 ? r.j : null)).catch(() => null),
       maintenant: () => req('/api/sauvegarde/maintenant', {}).then((r) => r.j).catch(() => ({ok: false, error: 'Serveur injoignable.'}))
     },
+    /* missions de Claude (0.15.0) : lancer une mission longue, suivre les dernières ; notification à la fin */
+    mission: (texte) => req('/api/mission', {texte}).then((r) => r.j).catch(() => ({ok: false, error: 'Serveur injoignable.'})),
+    missions: () => req('/api/missions').then((r) => (r.status === 200 ? r.j.missions : null)).catch(() => null),
+    /* tour de Claude (0.15.0) : réglage, dernier tour, tour immédiat */
+    tour: {
+      etat: () => req('/api/tour').then((r) => (r.status === 200 ? r.j : null)).catch(() => null),
+      regler: (every) => req('/api/tour', {every}).then((r) => r.j).catch(() => null),
+      maintenant: () => req('/api/tour/maintenant', {}).then((r) => r.j).catch(() => ({ok: false, texte: 'Serveur injoignable.'}))
+    },
     /* notifications (0.12.0) : abonnement de cet appareil, essai, préférences */
     push: {
       status: () => req('/api/push').then((r) => (r.status === 200 ? r.j : null)).catch(() => null),

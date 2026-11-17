@@ -142,6 +142,7 @@ export function createGoogle({S, save, log = () => {}}) {
   const enc = encodeURIComponent;
 
   /* ---------- les outils de la page, un par un ---------- */
+  const SEARCH_CACHE = new Map();
   const T = {
     'Google Sheets': {
       get_values: async (i) => { const j = await api('GET', `${URLS.sheets}/v4/spreadsheets/${enc(i.spreadsheetId)}/values/${enc(i.range)}?valueRenderOption=FORMATTED_VALUE`); return {range: j.range || i.range, values: j.values || []}; },
@@ -205,6 +206,31 @@ export function createGoogle({S, save, log = () => {}}) {
     'Google Drive': {
       /* JARVIS OS (16/11/2026) : l'arborescence complète de dossiers (Papiers), en lecture seule et en peu d'appels :
          les dossiers niveau par niveau, puis les fichiers par lots de 40 dossiers parents. Une racine se donne par id, ou par nom et parent ('root' = Mon Drive). */
+      /* JARVIS OS (17/11/2026) : chercher dans le TEXTE des documents (Google lit le texte des PDF et des photos), limité à l'arborescence des racines
+         données (le dossier Papiers ; Papiers privés seulement si la page l'a demandé). Lecture seule ; dossiers mis en cache 10 minutes. */
+      search_text: async (i) => {
+        const term = String(i.query || '').replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, 80);
+        if (term.length < 3) return {files: []};
+        const key = JSON.stringify(i.roots || []), c = SEARCH_CACHE.get(key);
+        const tree = c && Date.now() - c.at < 600000 ? c.tree : await T['Google Drive'].folder_tree({roots: i.roots, foldersOnly: true});
+        SEARCH_CACHE.set(key, {at: Date.now(), tree});
+        const inTree = new Set([...tree.roots.map((r) => r.id), ...tree.folders.map((f) => f.id)].filter(Boolean));
+        const qs = (v) => "'" + String(v).replace(/\\/g, '\\\\').replace(/'/g, "\\'") + "'";
+        /* la requête porte sur les seuls dossiers demandés (par lots de 30), pages suivies : un mot fréquent ailleurs dans le Drive ne cache pas les papiers */
+        const ids = [...inTree], found = [];
+        for (let k = 0; k < ids.length && found.length < 40; k += 30) {
+          const par = '(' + ids.slice(k, k + 30).map((x) => qs(x) + ' in parents').join(' or ') + ')';
+          let page = '', n = 0;
+          do {
+            const p = new URLSearchParams({q: `fullText contains ${qs(term)} and ${par} and trashed = false and mimeType != 'application/vnd.google-apps.folder'`, pageSize: '100', fields: 'nextPageToken,files(id,name,mimeType,parents,modifiedTime,size,webViewLink)'});
+            if (page) p.set('pageToken', page);
+            const j = await api('GET', `${URLS.drive}/files?${p}`); found.push(...(j.files || [])); page = j.nextPageToken || '';
+          } while (page && ++n < 5 && found.length < 40);
+        }
+        const files = found.filter((f) => (f.parents || []).some((x) => inTree.has(x))).slice(0, 40)
+          .map((f) => ({id: f.id, name: f.name, mimeType: f.mimeType || '', parent: (f.parents || []).find((x) => inTree.has(x)) || '', modifiedTime: f.modifiedTime || '', size: f.size ? +f.size : null, viewUrl: f.webViewLink || 'https://drive.google.com/file/d/' + f.id + '/view'}));
+        return {files};
+      },
       folder_tree: async (i) => {
         const FOLDER = 'application/vnd.google-apps.folder', qs = (v) => "'" + String(v).replace(/\\/g, '\\\\').replace(/'/g, "\\'") + "'";
         const chunks = (a, n) => { const o = []; for (let k = 0; k < a.length; k += n) o.push(a.slice(k, k + n)); return o; };
@@ -233,6 +259,7 @@ export function createGoogle({S, save, log = () => {}}) {
           level = next;
         }
         const files = [];
+        if (i.foldersOnly) return {roots, folders, files};
         for (const c of chunks([...seen], 40)) for (const f of await list(`mimeType != '${FOLDER}' and trashed = false and ${inParents(c)}`, 'id,name,mimeType,parents,modifiedTime,size,webViewLink')) {
           files.push({id: f.id, name: f.name, mimeType: f.mimeType || '', parent: (f.parents || []).find((p) => seen.has(p)) || (f.parents || [])[0] || '', modifiedTime: f.modifiedTime || '', size: f.size ? +f.size : null, viewUrl: f.webViewLink || 'https://drive.google.com/file/d/' + f.id + '/view'});
         }

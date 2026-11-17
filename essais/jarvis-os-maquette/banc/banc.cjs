@@ -96,6 +96,10 @@ srv.listen(0, async () => {
     ok('papiers : papiers privés masqués par défaut', await p.evaluate(() => ![...document.querySelectorAll('.hm-h h2')].some((x) => x.textContent === 'Papiers privés') && /Afficher les papiers privés/.test(document.querySelector('.pap-priv').textContent)));
     await p.fill('.pap-search', 'passeport'); await p.waitForTimeout(300);
     ok('papiers : recherche instantanée avec le chemin du dossier', await p.evaluate(() => { const r = [...document.querySelectorAll('.pap-res .pf')]; return r.length >= 3 && r.every((x) => /passeport/i.test(x.textContent)) && r.some((x) => / › /.test(x.textContent)) && r.every((x) => /^https:\/\/drive\.google\.com\//.test(x.href)); }));
+    /* 0.15.0 : recherche dans le texte des documents (lu par Google), sous les noms */
+    await p.fill('.pap-search', 'loyer'); await p.waitForTimeout(1400);
+    ok('papiers : recherche dans le texte des documents (« loyer » trouve les quittances)', await p.evaluate(() => { const hd = document.querySelector('.pap-txt-h'), r = [...document.querySelectorAll('.pap-res-txt .pf')]; return !!hd && /Dans le texte des documents · \d+/.test(hd.textContent) && r.length > 0 && r.every((x) => /quittance/i.test(x.textContent)) && !/null|undefined/.test(document.querySelector('.pap-res').textContent); }));
+    await p.screenshot({path: path.join(SH, 'papiers-texte.png')});
     await p.fill('.pap-search', ''); await p.waitForTimeout(200);
     await p.evaluate(() => [...document.querySelectorAll('.pt')].find((b) => /Logement/.test(b.textContent)).click()); await p.waitForTimeout(500);
     ok('papiers : un dossier montre ses sous-dossiers en sections', await p.evaluate(() => document.querySelectorAll('.pap-sec').length >= 3 && /Logement/.test(document.querySelector('.pap-h').textContent) && !/\[object/.test(document.getElementById('view').innerText)));

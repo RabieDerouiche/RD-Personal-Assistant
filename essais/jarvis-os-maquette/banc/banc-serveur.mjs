@@ -106,6 +106,32 @@ try {
     ok('Réglages : carte « Sauvegarde de Pilotage »', await q.evaluate(() => /Pas encore de copie|Dernière copie/.test((document.querySelector('.sav-card') || {}).textContent || '')));
     await q.evaluate(() => [...document.querySelectorAll('.sav-card button')].find((b) => /Sauvegarder maintenant/.test(b.textContent)).click()); await q.waitForTimeout(2500);
     ok('sauvegarde : « Sauvegarder maintenant » fait une copie des 19 onglets', await q.evaluate(() => /Dernière copie le|Copie faite \(19 onglets\)/.test(document.querySelector('.sav-card').textContent))); }
+  /* 0.15.0 : missions de Claude (Suivi), tour de Claude (Réglages), recherche dans le texte des papiers */
+  { const q = await ctx.newPage(); q.on('pageerror', (e) => errs.push(e.message));
+    await q.goto(BASE + '/?serveur#suivi'); await q.waitForTimeout(2500);
+    ok('Suivi : panneau « Missions de Claude » (avant l\'état des systèmes)', await q.evaluate(() => { const m = document.querySelector('.mis-panel'), hs = [...document.querySelectorAll('.panel h2')].map((x) => x.textContent); return !!m && /Aucune mission/.test(m.textContent) && hs.indexOf('Missions de Claude') === hs.indexOf('État des systèmes') - 1; }));
+    await q.fill('.mis-inp', 'Compare trois assurances habitation'); await q.evaluate(() => [...document.querySelectorAll('.mis-panel button')].find((b) => /Lancer la mission/.test(b.textContent)).click()); await q.waitForTimeout(2500);
+    await q.reload(); await q.waitForTimeout(2500); await q.evaluate(() => { const d = document.querySelector('.mis-it'); if (d) d.open = true; });
+    ok('missions : lancée depuis Suivi, terminée, compte rendu lisible', await q.evaluate(() => { const m = document.querySelector('.mis-it'); return !!m && /Terminée/.test(m.textContent) && /Compte rendu : mission faite/.test(m.textContent); }));
+    await q.evaluate(() => { const c = document.querySelector('.mis-panel'), sc = document.getElementById('scroller'); sc.scrollTop += c.getBoundingClientRect().top - 90; }); await q.waitForTimeout(300);
+    await q.screenshot({path: SH + 'suivi-missions.png'});
+    await q.goto(BASE + '/?serveur#reglages'); await q.waitForTimeout(2500);
+    ok('Réglages : carte « Tour de Claude », coupée par défaut, notifications demandées', await q.evaluate(() => { const c = document.querySelector('.tour-card'); return !!c && c.querySelector('[aria-pressed="true"]').textContent === 'Non' && /Active d’abord les notifications/.test(c.textContent); }));
+    await q.evaluate(() => [...document.querySelectorAll('.tour-card .seg button')].find((b) => b.textContent === '4 h').click()); await q.waitForTimeout(2500);
+    ok('tour de Claude : fréquence choisie gardée par le serveur', await q.evaluate(() => document.querySelector('.tour-card [aria-pressed="true"]').textContent === '4 h'));
+    await q.evaluate(() => [...document.querySelectorAll('.tour-card button')].find((b) => /Faire un tour maintenant/.test(b.textContent)).click()); await q.waitForTimeout(2500);
+    ok('tour de Claude : « Faire un tour maintenant » dit ce qu\'il a trouvé', await q.evaluate(() => /Syndic à confirmer/.test(document.querySelector('.tour-card').textContent)));
+    await q.evaluate(() => { const c = document.querySelector('.tour-card'), sc = document.getElementById('scroller'); sc.scrollTop += c.getBoundingClientRect().top - 90; }); await q.waitForTimeout(300);
+    await q.screenshot({path: SH + 'reglages-tour.png'});
+    await q.evaluate(() => [...document.querySelectorAll('.tour-card .seg button')].find((b) => b.textContent === 'Non').click()); await q.waitForTimeout(1500);
+    const DF = 'application/vnd.google-apps.folder', PAPR = '1huMsPD8I81buG4GWhuoGmsOafvy4HrE4';
+    FG.drive.push({id: PAPR, name: 'Papiers', parents: ['rda'], mimeType: DF, modifiedTime: '2025-01-02T10:00:00Z'}, {id: 'e-log', name: 'Logement', parents: [PAPR], mimeType: DF, modifiedTime: '2025-01-02T10:00:00Z'},
+      {id: 'e1', name: 'Bail 2024.pdf', parents: ['e-log'], mimeType: 'application/pdf', modifiedTime: '2025-01-02T10:00:00Z', size: '1234', text: 'contrat de location, loyer mensuel'});
+    await q.evaluate(() => { try { Object.keys(localStorage).filter((k) => /pap/i.test(k) && !/prive/.test(k)).forEach((k) => localStorage.removeItem(k)); } catch (e) { /* rien */ } });
+    await q.goto(BASE + '/?serveur#papiers'); await q.waitForTimeout(3500); await q.fill('.pap-search', 'loyer'); await q.waitForTimeout(2000);
+    ok('papiers en direct : « loyer » trouvé dans le texte du bail (Drive, lecture seule)', FG.calls.some((c) => c.path === '/drive/files' && /fullText contains 'loyer'/.test(c.q.q || '')) && await q.evaluate(() => /Dans le texte des documents · 1/.test(document.querySelector('.pap-res').textContent) && /Bail 2024/.test((document.querySelector('.pap-res-txt') || {}).textContent || '') && !/null|undefined/.test(document.querySelector('.pap-res').textContent)),
+      JSON.stringify(FG.calls.filter((c) => c.path === '/drive/files' && /fullText/.test(c.q.q || '')).map((c) => c.q.q)) + ' ' + await q.evaluate(() => document.querySelector('.pap-res').textContent.slice(0, 200)));
+    await q.screenshot({path: SH + 'papiers-texte-serveur.png'}); }
 } catch (e) { ok('exception', false, e.stack); }
 ok('aucune erreur de page', !errs.length, errs.join(' | '));
 console.log(out.join('\n')); const bad = out.filter((l) => l.startsWith('ÉCHEC')).length; console.log(bad ? bad + ' échec(s)' : 'Tout passe (' + out.length + ' vérifications).');
