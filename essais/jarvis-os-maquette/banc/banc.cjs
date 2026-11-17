@@ -9,7 +9,11 @@ const out = []; let fails = 0; const ok = (n, c, i) => { out.push((c ? 'OK    ' 
 srv.listen(0, async () => {
   const base = 'http://127.0.0.1:' + srv.address().port + '/';
   const b = await chromium.launch(); const errs = [];
-  const page = async (url) => { const ctx = await b.newContext({...devices['iPhone 15 Pro Max']}); const p = await ctx.newPage(); p.on('pageerror', (e) => errs.push(url + ' : ' + e.message)); await p.goto(base + url); await p.waitForTimeout(3500); return p; };
+  /* 17/11/2026 : la pause de Grok de la maquette se déduisait d'une activité « d'hier » ; du mardi 12h47 au mercredi, elle était donc « finie »
+     et la sonnette automatique de reprise masquait des boutons. Le banc pose une pause explicite (onglet Faits), la même quel que soit le jour. */
+  const PAUSE_INIT = () => { let v; const d = new Date(Date.now() + 2 * 864e5), p2 = (n) => String(n).padStart(2, '0'); const until = p2(d.getDate()) + '/' + p2(d.getMonth() + 1) + '/' + d.getFullYear() + ' 12h47';
+    Object.defineProperty(window, '__SCEN', {configurable: true, get: () => v, set: (x) => { v = Object.assign({pauseUntil: until}, x || {}); }}); };
+  const page = async (url) => { const ctx = await b.newContext({...devices['iPhone 15 Pro Max']}); await ctx.addInitScript(PAUSE_INIT); const p = await ctx.newPage(); p.on('pageerror', (e) => errs.push(url + ' : ' + e.message)); await p.goto(base + url); await p.waitForTimeout(3500); return p; };
   try {
     /* service worker (0.12.0) : notification reçue, pastille, appui qui ouvre la bonne rubrique ; exécuté hors navigateur avec un faux « self » */
     { const vm = require('vm'), H = {}, shown = [], badges = [], opened = [], waits = [];
