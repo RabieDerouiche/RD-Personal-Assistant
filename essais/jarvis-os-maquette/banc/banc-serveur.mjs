@@ -107,6 +107,14 @@ try {
     ok('Siri : le Raccourci obtient une réponse à lire', ans[0] === 200 && /Tu as dit : Quoi de neuf/.test(ans[1]), ans.join(' '));
     await q.reload(); await q.waitForTimeout(2500);
     ok('Siri : clé active, nombre de questions affiché, « Essayer ici »', await q.evaluate(() => { const c = document.querySelector('.siri-card').textContent; return /Clé active/.test(c) && /1 question/.test(c) && /Essayer ici/.test(c) && !document.querySelector('.siri-key'); })); }
+  /* 17/11/2026 : Réglages ne clignote plus quand les données de Pilotage arrivent (écran de chargement montré une seule fois) */
+  { const q = await ctx.newPage(); q.on('pageerror', (e) => errs.push(e.message));
+    await q.addInitScript(() => { window.__lect = 0; window.__vu = false; new MutationObserver((ms) => ms.forEach((m) => m.addedNodes.forEach((n) => { if (n.nodeType !== 1) return; const t = n.textContent || ''; window.__log = window.__log || []; if (n.matches && n.matches('.set-card') && /Serveur JARVIS/.test(t)) { if (!window.__vu) window.__log.push(Math.round(performance.now()) + ' vu ' + n.className); window.__vu = true; } else if (window.__vu && /Lecture des réglages/.test(t)) { window.__lect++; window.__log.push(Math.round(performance.now()) + ' lect ' + n.className + ' < ' + (n.parentNode && n.parentNode.className) + ' ' + t.slice(0, 60)); } }))).observe(document, {childList: true, subtree: true}); });   /* compte les retours à « Lecture des réglages… » une fois le contenu affiché */
+    await q.goto(BASE + '/?serveur#reglages'); await q.waitForTimeout(6000);
+    const n1 = await q.evaluate(() => window.__lect);
+    await q.evaluate(() => { window.dispatchEvent(new Event('focus')); document.dispatchEvent(new Event('visibilitychange')); }); await q.waitForTimeout(2500);
+    const n2 = await q.evaluate(() => window.__lect), has = await q.evaluate(() => /Serveur JARVIS/.test(document.querySelector('.set-wrap').textContent));
+    ok('Réglages sans clignotement : plus de retour à « Lecture des réglages… » une fois le contenu affiché, même quand les données arrivent', n1 === 0 && n2 === 0 && has, n1 + ' puis ' + n2 + ' ' + JSON.stringify(await q.evaluate(() => window.__log || []))); }
   /* sauvegarde de Pilotage (0.14.0) : carte de Réglages, copie immédiate */
   { const q = await ctx.newPage(); q.on('pageerror', (e) => errs.push(e.message));
     await q.goto(BASE + '/?serveur#reglages'); await q.waitForTimeout(2500);

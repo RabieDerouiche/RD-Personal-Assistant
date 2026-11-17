@@ -97,7 +97,8 @@
   html.theme-holo .kpi.is-amber, html.theme-holo .key.is-today {
     background: linear-gradient(180deg, rgba(251, 191, 36, .12), rgba(4, 12, 34, .82)) padding-box, linear-gradient(135deg, rgba(251, 191, 36, .75), rgba(251, 191, 36, .2) 50%, rgba(168, 85, 247, .45)) border-box; box-shadow: 0 0 18px rgba(251, 191, 36, .12); }
   html.theme-holo .hero.boss { background: radial-gradient(420px 220px at 50% 0%, rgba(56, 189, 248, .16), transparent 70%) padding-box, linear-gradient(180deg, rgba(12, 38, 92, .55), rgba(4, 12, 34, .82)) padding-box, linear-gradient(135deg, rgba(103, 232, 249, .65), rgba(99, 102, 241, .28) 45%, rgba(168, 85, 247, .55)) border-box; }
-  html.theme-holo .top { background: rgba(2, 6, 20, .82); border-bottom: 1px solid rgba(56, 189, 248, .3); box-shadow: 0 1px 0 rgba(56, 189, 248, .12), 0 10px 30px rgba(14, 165, 233, .08); }
+  /* 17/11/2026 (retour du propriétaire : « le bandeau en haut est assombri ») : même teinte que la bande de la barre d'état (rgb 4, 11, 31), un seul bandeau */
+  html.theme-holo .top { background: rgba(4, 11, 31, .94); border-bottom: 1px solid rgba(56, 189, 248, .3); box-shadow: 0 1px 0 rgba(56, 189, 248, .12), 0 10px 30px rgba(14, 165, 233, .08); }
   html.theme-holo .brand b { font: 700 19px var(--logo); letter-spacing: .2em; background: linear-gradient(90deg, #a5f3fc, #e0f2fe 45%, #60a5fa); -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 0 8px rgba(56, 189, 248, .65)); }
   html.theme-holo .view-title { font: 600 12px var(--tech); letter-spacing: .2em; color: #7dd3fc; }
   html.theme-holo .view-title::after { content: ""; display: block; height: 1px; margin-top: 8px; background: linear-gradient(90deg, rgba(56, 189, 248, .8), rgba(168, 85, 247, .35) 50%, transparent); box-shadow: 0 0 8px rgba(56, 189, 248, .5); }
@@ -6806,7 +6807,8 @@ void main(){
         h('button', {type: 'button', class: 'btn ghost danger', onclick: async () => { await JS.raccourci.retirer(); VIEWS_RELOAD_SIRI(); }}, 'Retirer')), out);
     return card;
   }
-  const VIEWS_RELOAD_SIRI = () => { if (TAB === 'reglages') renderView(true); };
+  const SETV = {box: null, at: 0, html: '', force: false};   /* dernier rendu de Réglages (voir VIEWS.reglages) */
+  const VIEWS_RELOAD_SIRI = () => { SETV.force = true; if (TAB === 'reglages') renderView(true); };
   /* JARVIS OS 0.14.0 : carte « Sauvegarde de Pilotage » : la copie de la nuit, et ce qui a changé d'une copie à l'autre (valeurs avant et après) */
   async function savCard(JS) {
     const card = h('section', {class: 'card set-card sav-card'}, h('b', {text: 'Sauvegarde de Pilotage'}));
@@ -6821,7 +6823,7 @@ void main(){
       ong.forEach((o) => card.append(h('details', {class: 'sav-tab'}, h('summary', {text: o.nom + ' : ' + [o.ajoutees && o.ajoutees + ' ajoutée' + (o.ajoutees > 1 ? 's' : ''), o.modifiees && o.modifiees + ' modifiée' + (o.modifiees > 1 ? 's' : ''), o.retirees && o.retirees + ' retirée' + (o.retirees > 1 ? 's' : '')].filter(Boolean).join(', ')}),
         h('ul', {}, o.exemples.map((e) => h('li', {text: 'Ligne ' + e.ligne + ' ' + e.genre + (e.genre === 'modifiée' ? ' : ' + e.champs.map((c) => c.col + ' « ' + (c.avant || '—') + ' » → « ' + (c.apres || '—') + ' »').join(' ; ') : ' : ' + (e.apres || e.avant || ''))}))))));
     }
-    card.append(h('div', {class: 'row-actions'}, h('button', {type: 'button', class: 'btn', onclick: async () => { out.textContent = 'Copie en cours…'; const r = await JS.sauvegarde.maintenant(); out.textContent = r && r.ok ? 'Copie faite (' + r.onglets + ' onglets).' : (r && r.error) || 'Copie impossible.'; out.classList.toggle('is-bad', !(r && r.ok)); if (r && r.ok) setTimeout(() => { if (TAB === 'reglages') renderView(true); }, 900); }}, 'Sauvegarder maintenant')), out);
+    card.append(h('div', {class: 'row-actions'}, h('button', {type: 'button', class: 'btn', onclick: async () => { out.textContent = 'Copie en cours…'; const r = await JS.sauvegarde.maintenant(); out.textContent = r && r.ok ? 'Copie faite (' + r.onglets + ' onglets).' : (r && r.error) || 'Copie impossible.'; out.classList.toggle('is-bad', !(r && r.ok)); if (r && r.ok) setTimeout(VIEWS_RELOAD_SIRI, 900); }}, 'Sauvegarder maintenant')), out);
     return card;
   }
   /* JARVIS OS 0.15.0 : carte « Tour de Claude » : un agent « toujours actif », désactivé par défaut. Le serveur fait le tour, Claude décide s'il faut prévenir. */
@@ -6846,8 +6848,14 @@ void main(){
       el.append(h('section', {class: 'card set-card'}, h('b', {text: 'Maquette'}), h('p', {class: 'muted', text: "Ici, la page montre des données d'exemple. Sur ton serveur (son adresse, sans rien après), cet écran relie l'iPhone, crée l'accès Google et affiche tes vraies données."})));
       return;
     }
-    const box = h('div', {class: 'set-wrap'}, h('p', {class: 'muted', text: 'Lecture des réglages…'}));
-    el.append(box);
+    /* 17/11/2026 (capture du propriétaire : « elle clignote 2-3 fois ») : la page est redessinée à chaque arrivée de données de Pilotage ;
+       Réglages, qui se construit en différé, repassait alors par « Lecture des réglages… ». Le dernier rendu est gardé et réaffiché tout de suite ;
+       on ne le redessine qu'après 30 s ou sur un geste de Réglages, et on ne remplace l'écran que si son contenu a changé. */
+    const fresh = !SETV.box, box = SETV.box || h('div', {class: 'set-wrap'}, h('p', {class: 'muted', text: 'Lecture des réglages…'}));
+    SETV.box = box; el.append(box);
+    if (!fresh && !SETV.force && Date.now() - SETV.at < 30000) return;
+    SETV.force = false;
+    const swap = (parts) => { const html = parts.map((x) => x.outerHTML).join(''); if (html !== SETV.html || box.childElementCount !== parts.length) { box.replaceChildren(...parts); SETV.html = html; } SETV.at = Date.now(); };
     const msg = (t, bad) => h('p', {class: 'set-msg' + (bad ? ' is-bad' : ''), text: t});
     const draw = async (note) => {
       const parts = [];
@@ -6857,13 +6865,13 @@ void main(){
         const code = h('input', {class: 'inp', type: 'text', placeholder: 'Code affiché par le serveur, ex. AB12-CD34', autocomplete: 'off', autocapitalize: 'characters'});
         parts.push(h('section', {class: 'card set-card'}, h('b', {text: 'Relier cet iPhone au serveur'}), h('p', {class: 'muted', text: "Sur le serveur, lance « sudo -iu jarvis node /opt/rd/jarvis-os/server/server.mjs pair » : il affiche un code valable 30 minutes. Si l'app JARVIS de ce serveur est déjà reliée sur ce téléphone, rien à faire."}), code,
           h('button', {type: 'button', class: 'btn main', onclick: async () => { const r = await JS.pair(code.value); if (r.ok) location.reload(); else draw(msg(r.error, true)); }}, 'Relier')));
-        box.replaceChildren(...parts); return;
+        swap(parts); return;
       }
       parts.push(h('section', {class: 'card set-card'}, h('b', {text: 'Serveur JARVIS'}), h('p', {class: 'muted', text: 'Cet iPhone est relié à ' + JS.base + '.'}),
         h('button', {type: 'button', class: 'btn sm ghost danger', onclick: () => confirmSheet({bot: 'claude', title: 'Délier cet iPhone ?', ok: 'Oui, délier', cost: 'free', say: 'Il faudra un nouveau code pour le relier.', run: () => { JS.unpair(); location.reload(); }})}, 'Délier cet iPhone')));
       /* 2. l'accès Google */
       const g = await JS.google();
-      if (!g) { parts.push(msg('Serveur injoignable ou version trop ancienne : mets-le à jour depuis l’app JARVIS (Réglages, Mettre à jour).', true)); box.replaceChildren(...parts); return; }
+      if (!g) { parts.push(msg('Serveur injoignable ou version trop ancienne : mets-le à jour depuis l’app JARVIS (Réglages, Mettre à jour).', true)); swap(parts); return; }
       const gcard = h('section', {class: 'card set-card'}, h('b', {text: 'Accès Google direct'}));
       if (g.linked) {
         gcard.append(h('p', {class: 'muted', text: 'Relié' + (g.account ? ' au compte ' + g.account : '') + (g.linkedAt ? ' depuis le ' + fmt(new Date(g.linkedAt), {day: 'numeric', month: 'long'}) : '') + '. Pilotage, l’agenda et Gmail sont lus et écrits directement, sans Claude.'}));
@@ -6902,7 +6910,7 @@ void main(){
         h('small', {class: 'pick-label', text: 'Écoute'}), seg('listenMode', [['continu', 'Conversation continue'], ['phrase', 'Une phrase']], 'phrase'),
         st && !st.tts ? h('button', {type: 'button', class: 'btn sm', onclick: async () => { const r = await JS.voiceInstall(); upd.textContent = r ? 'Installation de la voix : ' + r.state + '. Reviens dans quelques minutes.' : 'Installation impossible.'; }}, 'Installer la voix Pierre') : null,
         h('a', {class: 'link', href: '/ancienne/', text: 'Ancienne app (réglages avancés, diagnostic)'})));
-      box.replaceChildren(...parts);
+      swap(parts);
     };
     draw(/[?&#]google=ok/.test(location.href) ? msg('Google est relié.') : null);
   };
