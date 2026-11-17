@@ -11,6 +11,16 @@ srv.listen(0, async () => {
   const b = await chromium.launch(); const errs = [];
   const page = async (url) => { const ctx = await b.newContext({...devices['iPhone 15 Pro Max']}); const p = await ctx.newPage(); p.on('pageerror', (e) => errs.push(url + ' : ' + e.message)); await p.goto(base + url); await p.waitForTimeout(3500); return p; };
   try {
+    /* service worker (0.12.0) : notification reçue, pastille, appui qui ouvre la bonne rubrique ; exécuté hors navigateur avec un faux « self » */
+    { const vm = require('vm'), H = {}, shown = [], badges = [], opened = [], waits = [];
+      const self = {addEventListener: (t, f) => { H[t] = f; }, registration: {scope: 'https://jarvis.essai/', showNotification: (t, o) => { shown.push([t, o]); return Promise.resolve(); }},
+        navigator: {setAppBadge: (n) => { badges.push(n); return Promise.resolve(); }, clearAppBadge: () => { badges.push(0); return Promise.resolve(); }},
+        clients: {matchAll: () => Promise.resolve([]), openWindow: (u) => { opened.push(u); return Promise.resolve(); }, claim: () => Promise.resolve()}, skipWaiting: () => Promise.resolve()};
+      vm.runInNewContext(fs.readFileSync(path.join(ROOT, 'sw.js'), 'utf8'), {self, caches: {open: () => Promise.resolve({add: () => Promise.resolve()}), keys: () => Promise.resolve([])}, fetch: () => Promise.reject(new Error('x')), URL, Promise});
+      H.push({data: {json: () => ({web_push: 8030, notification: {title: 'Iris a répondu', body: 'Prix relevés', navigate: '/#demandes', app_badge: '2', tag: 'canal'}})}, waitUntil: (p) => waits.push(p)});
+      await Promise.all(waits);
+      H.notificationclick({notification: {close: () => {}, data: shown[0] && shown[0][1].data}, waitUntil: (p) => waits.push(p)}); await Promise.all(waits);
+      ok('service worker : notification affichée, pastille à 2, un appui ouvre « Pour moi »', shown.length === 1 && shown[0][0] === 'Iris a répondu' && shown[0][1].body === 'Prix relevés' && badges[0] === 2 && opened[0] === 'https://jarvis.essai/#demandes', JSON.stringify({shown, badges, opened})); }
     /* accueil et thème */
     let p = await page('');
     ok('mode maquette sur un serveur local', await p.evaluate(() => window.__JARVIS_MODE === 'maquette'));
@@ -145,13 +155,15 @@ srv.listen(0, async () => {
     /* glisser vers le bas ferme la fenêtre (demande du 16/11/2026) : vrais gestes tactiles */
     { const drag = async (q, x, y, dx, dy, ms) => { const c = await q.context().newCDPSession(q); await c.send('Input.dispatchTouchEvent', {type: 'touchStart', touchPoints: [{x, y}]}); for (let i = 1; i <= 8; i++) { await c.send('Input.dispatchTouchEvent', {type: 'touchMove', touchPoints: [{x: x + dx * i / 8, y: y + dy * i / 8}]}); await q.waitForTimeout(ms / 8); } await c.send('Input.dispatchTouchEvent', {type: 'touchEnd', touchPoints: []}); await q.waitForTimeout(900); };
       p = await page('#agenda'); await p.tap('.agw-d'); await p.waitForTimeout(700);
-      const box = await p.evaluate(() => { const r = document.getElementById('sheet').getBoundingClientRect(); return {x: r.left + r.width / 2, y: r.top + 40}; });
+      /* attendre la fin de l'animation d'ouverture : sinon le point de départ, mesuré trop tôt, tombe sur le champ du bas (où le geste est ignoré exprès) */
+      await p.waitForFunction(() => { const s = document.getElementById('sheet'), t = s.getBoundingClientRect().top; const ok = s.classList.contains('on') && t < innerHeight * 0.6 && window.__sheetTop === t; window.__sheetTop = t; return ok; }, null, {polling: 150, timeout: 5000});
+      const box = await p.evaluate(() => { const r = document.getElementById('sheet').getBoundingClientRect(); return {x: r.left + r.width / 2, y: r.top + 40, tag: (document.elementFromPoint(r.left + r.width / 2, r.top + 40) || {}).tagName}; });
       await drag(p, box.x, box.y, 0, 35, 500);
       const shortOk = await p.evaluate(() => !document.getElementById('sheet').hidden && !document.getElementById('sheet').style.transform);
       await drag(p, box.x - 80, box.y + 30, 170, 15, 300);
       const sideOk = await p.evaluate(() => !document.getElementById('sheet').hidden);
       await drag(p, box.x, box.y, 0, 220, 350);
-      ok('glisser : la feuille du bas se ferme (pas sur un petit glissé ni un glissé de côté)', shortOk && sideOk && await p.evaluate(() => document.getElementById('sheet').hidden), shortOk + ' ' + sideOk);
+      ok('glisser : la feuille du bas se ferme (pas sur un petit glissé ni un glissé de côté)', shortOk && sideOk && await p.evaluate(() => document.getElementById('sheet').hidden), shortOk + ' ' + sideOk + ' ' + box.tag);
       p = await page(''); await p.fill('.intent-input', 'Bonjour'); await p.press('.intent-input', 'Enter'); await p.waitForTimeout(900);
       const opened = await p.evaluate(() => !document.getElementById('chat').hidden);
       await drag(p, 215, 40, 0, 260, 350);

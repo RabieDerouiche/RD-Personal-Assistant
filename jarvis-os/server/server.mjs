@@ -11,8 +11,10 @@ import os from 'node:os';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {createGoogle} from './google.mjs';
+import {createPush} from './push.mjs';
+import {createNotifier} from './notify.mjs';
 
-const VERSION = '0.11.0';
+const VERSION = '0.12.0';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PORT = +(process.env.PORT || 8787);
 const HOST = process.env.HOST || '127.0.0.1';
@@ -82,6 +84,7 @@ function pair(code, device) {
   return {status: 200, body: {token, version: VERSION}};
 }
 const authed = (req) => { const m = /^Bearer (.+)$/.exec(req.headers.authorization || ''); if (!m) return false; const h = sha(m[1]); return S.tokens.some((t) => t.hash === h); };
+const deviceOf = (req) => { const m = /^Bearer (.+)$/.exec(req.headers.authorization || ''); const t = m && S.tokens.find((x) => x.hash === sha(m[1])); return t ? t.hash.slice(0, 12) : ''; };
 
 /* ---------- Claude Code ---------- */
 const childEnv = () => { const e = {...process.env}; for (const k of PAID_ENV) delete e[k]; return e; };
@@ -365,6 +368,11 @@ async function ordresClaude() {
   }
   return done({ok: true, lignes: todo.length, ecrites, faites, note: skipped.length ? 'Lignes modifiées entre-temps, laissées telles quelles : ' + skipped.join(', ') + '.' : ''});
 }
+/* ---------- notifications sur l'iPhone (0.12.0) : voir push.mjs (chiffrement, envoi) et notify.mjs (ce qui est surveillé) ---------- */
+const PUSH = createPush({S, save, log: (t) => console.log(t), allowHttp: !!process.env.JARVIS_PUSH_ALLOW_HTTP});
+const NOTIFY = createNotifier({S, save, push: PUSH, read: (r) => sheetRead(r), linked: () => GG.status('').linked, everyMs: +process.env.JARVIS_NOTIFY_EVERY_MS || 120000});
+setInterval(() => { NOTIFY.tick().catch(() => {}); }, +process.env.JARVIS_NOTIFY_TICK_MS || 60000).unref();
+
 function startTache() {
   if (!GG.status('').linked) { const e = new GG.ToolError('server_not_connected', 'Google n’est pas relié au serveur JARVIS (Réglages) : la tâche Claude ne peut pas lire le Canal.'); throw e; }
   if (TACHE.running) { TACHE.again = true; return {started: true, queued: true, message: 'La tâche Claude tourne déjà : elle repassera sur le Canal juste après.'}; }
@@ -536,8 +544,16 @@ const server = http.createServer(async (req, res) => {
         }
         catch (e) { return json(res, e.code === 'server_not_connected' ? 409 : e.code === 'not_in_manifest' ? 404 : 502, {error: {code: e.code || 'tool_error', message: e.message, status: e.status || 0}}); }
       }
-      if (p === '/api/status') { const cs = await claudeStatus(); if (cs.loggedIn && (!MCP.at || now() - MCP.at > 600000)) await mcpList(); return json(res, 200, {version: VERSION, commit, claude: cs, connectors: connSummary(), google: (({configured, linked, account}) => ({configured, linked, account}))(GG.status('')), grokPauseUntil: S.config.grokPauseUntil, usage: S.usage, tache: {running: TACHE.running, last: TACHE.last}, session: !!S.session, timing: S.lastTiming || null, tts: ttsReady(), voiceInstall: VOICE_INSTALL.state}); }
+      if (p === '/api/status') { const cs = await claudeStatus(); if (cs.loggedIn && (!MCP.at || now() - MCP.at > 600000)) await mcpList(); return json(res, 200, {version: VERSION, commit, claude: cs, connectors: connSummary(), google: (({configured, linked, account}) => ({configured, linked, account}))(GG.status('')), grokPauseUntil: S.config.grokPauseUntil, usage: S.usage, tache: {running: TACHE.running, last: TACHE.last}, push: {count: S.push.subs.length, last: S.push.last || null, prefs: S.push.prefs}, session: !!S.session, timing: S.lastTiming || null, tts: ttsReady(), voiceInstall: VOICE_INSTALL.state}); }
       if (p === '/api/update' && req.method === 'POST') return json(res, 200, await update());
+      /* notifications : clé publique, abonnement de cet appareil, essai, préférences, vérification immédiate */
+      if (p === '/api/push') return json(res, 200, PUSH.status());
+      if (p === '/api/push/subscribe' && req.method === 'POST') { const b = await readBody(req); const r = PUSH.subscribe(b.subscription, deviceOf(req), publicBase(req)); if (r.ok) NOTIFY.tick({only: 'canal', force: true}).catch(() => {}); return json(res, r.ok ? 200 : 400, r); }
+      if (p === '/api/push/unsubscribe' && req.method === 'POST') { const b = await readBody(req); return json(res, 200, PUSH.unsubscribe(String(b.endpoint || ''))); }
+      if (p === '/api/push/test' && req.method === 'POST') { const r = await PUSH.send({title: 'JARVIS', body: 'Les notifications marchent sur cet appareil.', url: '/#reglages', tag: 'essai'}); return json(res, 200, {ok: r.some((x) => x.ok), results: r}); }
+      if (p === '/api/push/prefs' && req.method === 'POST') { const b = await readBody(req), pr = S.push.prefs;
+        if (typeof b.bots === 'boolean') pr.bots = b.bots; if (typeof b.rappels === 'boolean') pr.rappels = b.rappels; if (/^([01]\d|2[0-3]):[0-5]\d$/.test(String(b.heure || ''))) pr.heure = b.heure; save(); return json(res, 200, {prefs: pr}); }
+      if (p === '/api/push/check' && req.method === 'POST') { const b = await readBody(req); return json(res, 200, await NOTIFY.tick({only: ['canal', 'digest', 'resume'].includes(b.only) ? b.only : undefined, force: true})); }
       if (p === '/api/snap') { refreshStale(); return json(res, 200, {modules: snapView()}); }
       if (p === '/api/snap/refresh' && req.method === 'POST') { const b = await readBody(req); for (const n of (Array.isArray(b.modules) ? b.modules : Object.keys(MODULES))) refreshModule(n); return json(res, 200, {modules: snapView()}); }
       if (p === '/api/voice/install' && req.method === 'POST') return json(res, 200, installVoice());
