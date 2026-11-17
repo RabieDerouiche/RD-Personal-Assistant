@@ -16,7 +16,7 @@ import {createNotifier, paris, daysTo, parisMs, pauseDepuisFaits} from './notify
 import {createSauvegarde} from './sauvegarde.mjs';
 import {createSante} from './sante.mjs';
 
-const VERSION = '0.18.1';
+const VERSION = '0.18.2';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PORT = +(process.env.PORT || 8787);
 const HOST = process.env.HOST || '127.0.0.1';
