@@ -13,8 +13,9 @@ import {fileURLToPath} from 'node:url';
 import {createGoogle} from './google.mjs';
 import {createPush} from './push.mjs';
 import {createNotifier, paris, daysTo} from './notify.mjs';
+import {createSauvegarde} from './sauvegarde.mjs';
 
-const VERSION = '0.13.0';
+const VERSION = '0.14.0';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PORT = +(process.env.PORT || 8787);
 const HOST = process.env.HOST || '127.0.0.1';
@@ -372,6 +373,9 @@ async function ordresClaude() {
 const PUSH = createPush({S, save, log: (t) => console.log(t), allowHttp: !!process.env.JARVIS_PUSH_ALLOW_HTTP});
 const NOTIFY = createNotifier({S, save, push: PUSH, read: (r) => sheetRead(r), linked: () => GG.status('').linked, everyMs: +process.env.JARVIS_NOTIFY_EVERY_MS || 120000});
 setInterval(() => { NOTIFY.tick().catch(() => {}); }, +process.env.JARVIS_NOTIFY_TICK_MS || 60000).unref();
+/* sauvegarde de Pilotage (0.14.0) : une copie par nuit, gardée 30 jours, et ce qui a changé ; voir sauvegarde.mjs */
+const SAV = createSauvegarde({S, save, read: (r) => sheetRead(r), linked: () => GG.status('').linked, dir: path.join(DATA, 'sauvegardes')});
+setInterval(() => { SAV.tick().catch(() => {}); }, +process.env.JARVIS_NOTIFY_TICK_MS || 60000).unref();
 
 /* ---------- Raccourcis de l'iPhone (0.13.0) : « Dis Siri, Jarvis », bouton Action, menu Partager ----------
    Le Raccourci envoie la phrase dictée (et un lien partagé) à POST /api/raccourci avec sa propre clé, qui n'ouvre rien d'autre ;
@@ -591,6 +595,8 @@ const server = http.createServer(async (req, res) => {
       if (p === '/api/update' && req.method === 'POST') return json(res, 200, await update());
       /* notifications : clé publique, abonnement de cet appareil, essai, préférences, vérification immédiate */
       if (p === '/api/push') return json(res, 200, PUSH.status());
+      if (p === '/api/sauvegarde') return json(res, 200, {...SAV.status(), changements: SAV.diff()});
+      if (p === '/api/sauvegarde/maintenant' && req.method === 'POST') return json(res, 200, await SAV.run());
       /* clé des Raccourcis : créée ici depuis l'app reliée, montrée une seule fois, jamais stockée en clair ; recréer retire l'ancienne */
       if (p === '/api/raccourci/cle' && req.method === 'POST') { const k = crypto.randomBytes(24).toString('base64url'); S.raccourci = {hash: sha(k), at: now(), uses: 0}; save(); return json(res, 200, {cle: k, url: publicBase(req) + '/api/raccourci'}); }
       if (p === '/api/raccourci/retirer' && req.method === 'POST') { S.raccourci = null; save(); return json(res, 200, {ok: true}); }

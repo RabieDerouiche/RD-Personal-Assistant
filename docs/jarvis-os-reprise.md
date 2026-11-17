@@ -36,10 +36,10 @@ L'assistant personnel du propriétaire sur iPhone : une app web (installable sur
 
 | Banc | Commande (depuis la racine du dépôt) |
 |---|---|
-| Serveur (109 vérifications, faux Claude, faux Google, faux Drive, faux service de notifications) | `node jarvis-os/server/tests/server.test.mjs` |
-| Nouvelle app, maquette (iPhone simulé, 68 vérifications ; Wikipédia et Open-Meteo simulés) | `NODE_PATH=/opt/node-tools/node_modules node essais/jarvis-os-maquette/banc/banc.cjs` |
+| Serveur (112 vérifications, faux Claude, faux Google, faux Drive, faux service de notifications) | `node jarvis-os/server/tests/server.test.mjs` |
+| Nouvelle app, maquette (iPhone simulé, 69 vérifications ; Wikipédia et Open-Meteo simulés) | `NODE_PATH=/opt/node-tools/node_modules node essais/jarvis-os-maquette/banc/banc.cjs` |
 | Check-up écran par écran (19 écrans : texte cassé, débordement, polices, contraste, doublons, chaque bouton, console ; rapport et captures dans le dossier temporaire `jarvis-os-audit`, environ 35 min avec les boutons) | `NODE_PATH=/opt/node-tools/node_modules node essais/jarvis-os-maquette/banc/audit.cjs [écran…]` (`CLICKS=0` : sans les boutons, 3 min) |
-| Nouvelle app sur le vrai serveur (faux Google, faux Claude), de bout en bout (23 vérifications, dont discussion avec propositions, tâche Claude, notifications et Siri) | `NODE_PATH=/opt/node-tools/node_modules node essais/jarvis-os-maquette/banc/banc-serveur.mjs` |
+| Nouvelle app sur le vrai serveur (faux Google, faux Claude), de bout en bout (25 vérifications, dont discussion avec propositions, tâche Claude, notifications, Siri et sauvegarde) | `NODE_PATH=/opt/node-tools/node_modules node essais/jarvis-os-maquette/banc/banc-serveur.mjs` |
 | Ancienne app avec le serveur | `node jarvis-os/app/tests/e2e-server.cjs` (dans `jarvis-os/app`) |
 
 Playwright et Chromium sont préinstallés dans les sessions cloud (`NODE_PATH=/opt/node-tools/node_modules`). Captures dans le dossier temporaire `jarvis-os-banc`.

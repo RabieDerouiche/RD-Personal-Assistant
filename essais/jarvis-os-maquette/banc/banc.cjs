@@ -178,6 +178,19 @@ srv.listen(0, async () => {
       const vOpen = await p.evaluate(() => { const j = document.querySelector('.jv'); return !!j && !j.hidden && getComputedStyle(j).display !== 'none'; });
       await drag(p, 215, 60, 0, 300, 350);
       ok('glisser : la page vocale se ferme d\'un glissé vers le bas', vOpen && await p.evaluate(() => { const j = document.querySelector('.jv'); return !j || j.hidden || getComputedStyle(j).display === 'none'; })); }
+    /* Face ID pour les papiers privés (0.14.0) : authentificateur virtuel du navigateur, sur « localhost » (Face ID refuse une adresse IP) */
+    { const ctx = await b.newContext({...devices['iPhone 15 Pro Max']}); const q = await ctx.newPage(); q.on('pageerror', (e) => errs.push('faceid : ' + e.message));
+      const cdp = await ctx.newCDPSession(q); await cdp.send('WebAuthn.enable'); await cdp.send('WebAuthn.addVirtualAuthenticator', {options: {protocol: 'ctap2', transport: 'internal', hasResidentKey: true, hasUserVerification: true, isUserVerified: true, automaticPresenceSimulation: true}});
+      const lb = base.replace('127.0.0.1', 'localhost');
+      await q.goto(lb + '#papiers'); await q.waitForTimeout(2500);
+      await q.evaluate(() => document.querySelector('.face-set').click()); await q.waitForTimeout(1200);
+      const on = await q.evaluate(() => !!localStorage.getItem('jarvis.faceid') && !!document.querySelector('.face-note'));
+      await q.evaluate(() => localStorage.setItem('jarvis.papiers.prive', '1')); await q.reload(); await q.waitForTimeout(2800);
+      const locked = await q.evaluate(() => !!document.querySelector('.face-open') && ![...document.querySelectorAll('.hm-h')].some((x) => /Papiers privés/.test(x.textContent) && x.parentElement.querySelector('.pt')));
+      await q.evaluate(() => document.querySelector('.face-open').click()); await q.waitForTimeout(1200);
+      const open = await q.evaluate(() => !document.querySelector('.face-open') && [...document.querySelectorAll('.hm-h h2')].some((x) => x.textContent === 'Papiers privés') && document.querySelectorAll('.pt').length > 8);
+      ok('Face ID : activé dans Papiers, papiers privés verrouillés au retour, ouverts après Face ID', on && locked && open, [on, locked, open].join(' '));
+      await ctx.close(); }
     /* aucune rubrique n'affiche de texte cassé */
     const broken = [];
     for (const t of ['accueil', 'demandes', 'agenda', 'suivi', 'achats', 'voyages', 'sorties', 'papiers', 'equipe', 'automatisations', 'reglages']) {

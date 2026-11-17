@@ -196,6 +196,17 @@ try {
       r = await G('/api/raccourci/etat'); ok('Raccourcis : état (active, nombre de questions)', r.body.active === true && r.body.uses === 3);
       await G('/api/raccourci/cle', {}); q = await rac(cle, {texte: 'x'}); ok('Raccourcis : recréer la clé retire l\'ancienne', q.status === 401 && /recrée-la/.test(q.text));
       await G('/api/raccourci/retirer', {}); r = await G('/api/raccourci/etat'); ok('Raccourcis : clé retirée', r.body.active === false); }
+    /* sauvegarde de Pilotage (0.14.0) : copie maintenant, comparée à une copie plus ancienne */
+    { const H = ['Date', 'De', 'Pour', 'Type', 'Message', 'Statut', 'Réponse', 'Objet'];
+      fs.mkdirSync(path.join(DATA, 'sauvegardes'), {recursive: true});
+      fs.writeFileSync(path.join(DATA, 'sauvegardes', '2026-01-01.json'), JSON.stringify({at: 1, onglets: {Canal: [H, ['16/11/2026', 'Rabie', 'Iris', 'Ordre', 'Relève les prix', 'À faire', '', '']], 'Tâches': [['Date', 'Tâche'], ['16/11/2026', 'Appeler le plombier']]}}));
+      FG.sheet["'Canal'!A1:H3000"] = [H, ['16/11/2026', 'Rabie', 'Iris', 'Ordre', 'Relève les prix', 'Fait', 'Prix relevés.', ''], ['17/11/2026', 'Iris', 'Rabie', 'Question', 'Je relance ?', 'À faire', '', '']];
+      FG.sheet["'Tâches'!A1:E500"] = [['Date', 'Tâche']];
+      r = await G('/api/sauvegarde/maintenant', {}); ok('sauvegarde : copie de Pilotage faite maintenant', r.body.ok === true && r.body.onglets === 19, JSON.stringify(r.body).slice(0, 120));
+      const f = fs.readdirSync(path.join(DATA, 'sauvegardes')).filter((x) => x !== '2026-01-01.json')[0];
+      ok('sauvegarde : fichier lisible par le seul service', f && (fs.statSync(path.join(DATA, 'sauvegardes', f)).mode & 0o777) === 0o600);
+      r = await G('/api/sauvegarde'); const c = (r.body.changements.onglets || []).find((x) => x.nom === 'Canal'), t = (r.body.changements.onglets || []).find((x) => x.nom === 'Tâches');
+      ok('sauvegarde : ce qui a changé (ligne ajoutée, cellule modifiée avec avant et après, ligne retirée)', r.body.copies.length === 2 && c && c.ajoutees === 1 && c.modifiees === 1 && c.exemples.some((e) => e.genre === 'modifiée' && e.champs.some((x) => x.col === 'Statut' && x.avant === 'À faire' && x.apres === 'Fait')) && t && t.retirees === 1, JSON.stringify(r.body.changements).slice(0, 300)); }
     FG.valid.clear(); FG.refreshOk = false; r = await T('Google Sheets', 'get_values', {spreadsheetId: 'PIL', range: 'Canal!A1:H3'}); g = await G('/api/google');
     ok('accès retiré dans Google : « à reconnecter », plus relié', r.body.error && r.body.error.code === 'needs_reauth' && !g.body.linked, JSON.stringify(r.body.error));
     FG.refreshOk = true; r = await G('/api/google/link', {}); await fetch(BASE + '/api/google/callback?state=' + new URL(r.body.url).searchParams.get('state') + '&code=CODE-OK');
