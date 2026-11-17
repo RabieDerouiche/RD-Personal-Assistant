@@ -56,6 +56,13 @@ try {
   if (!(await p.evaluate(() => /Confier à la tâche Claude/.test(document.getElementById('chat').textContent)))) { await p.evaluate(() => { const f = document.querySelector('#chat form'); if (f) f.requestSubmit(); }); await p.waitForTimeout(2500); }
   ok('discussion : proposition de tâche Claude (entourée de ``` par Claude) affichée proprement', await p.evaluate(() => { const c = document.getElementById('chat').textContent; return /Confier à la tâche Claude/.test(c) && !/⟦|```/.test(c); }));
   await p.screenshot({path: SH + 'discussion-tache.png'});
+  /* 0.18.0 : Claude propose une relance dans la discussion ; programmée sur son bouton */
+  await p.fill('#chat-in', 'Programme une relance demain pour Iris'); await p.press('#chat-in', 'Enter').catch(() => {}); await p.waitForTimeout(2500);
+  if (!(await p.evaluate(() => /Relance proposée/.test(document.getElementById('chat').textContent)))) { await p.evaluate(() => { const f = document.querySelector('#chat form'); if (f) f.requestSubmit(); }); await p.waitForTimeout(2500); }
+  ok('discussion : Claude propose une relance liée à une ligne du Canal', await p.evaluate(() => /Relance proposée · ligne 2 du Canal/.test(document.getElementById('chat').textContent) && /Voir si Iris a répondu au syndic/.test(document.getElementById('chat').textContent)));
+  await p.evaluate(() => [...document.querySelectorAll('#chat .msg.proposal .btn.main')].pop().click()); await p.waitForTimeout(1500);
+  { const tk = await p.evaluate(() => JSON.parse(localStorage.getItem('jarvis.settings')).serverToken); const rl = await fetch(BASE + '/api/relances', {headers: {authorization: 'Bearer ' + tk}}).then((x) => x.json());
+    ok('discussion : la relance confirmée est programmée sur le serveur', rl.prevues.some((x) => x.source === 'conversation' && x.ligne === 2 && /Iris a répondu au syndic/.test(x.quoi)), JSON.stringify(rl.prevues)); }
   n0 = FG.calls.length;
   await p.evaluate(() => [...document.querySelectorAll('#chat .msg.proposal.is-act .btn.main')].pop().click()); await p.waitForTimeout(19000);
   const puts = FG.calls.slice(n0).filter((c) => c.method === 'PUT').map((c) => c.path.split('/values/')[1]);
@@ -109,12 +116,24 @@ try {
   /* 0.15.0 : missions de Claude (Suivi), tour de Claude (Réglages), recherche dans le texte des papiers */
   { const q = await ctx.newPage(); q.on('pageerror', (e) => errs.push(e.message));
     await q.goto(BASE + '/?serveur#suivi'); await q.waitForTimeout(2500);
-    ok('Suivi : panneau « Missions de Claude » (avant l\'état des systèmes)', await q.evaluate(() => { const m = document.querySelector('.mis-panel'), hs = [...document.querySelectorAll('.panel h2')].map((x) => x.textContent); return !!m && /Aucune mission/.test(m.textContent) && hs.indexOf('Missions de Claude') === hs.indexOf('État des systèmes') - 1; }));
+    ok('Suivi : panneau « Missions de Claude » (avant l\'état des systèmes)', await q.evaluate(() => { const m = document.querySelector('.mis-panel'), hs = [...document.querySelectorAll('.panel h2')].map((x) => x.textContent); return !!m && /Aucune mission/.test(m.textContent) && hs.indexOf('Missions de Claude') >= 0 && hs.indexOf('Missions de Claude') < hs.indexOf('Relances') && hs.indexOf('Relances') < hs.indexOf('État des systèmes'); }));
     await q.fill('.mis-inp', 'Compare trois assurances habitation'); await q.evaluate(() => [...document.querySelectorAll('.mis-panel button')].find((b) => /Lancer la mission/.test(b.textContent)).click()); await q.waitForTimeout(2500);
     await q.reload(); await q.waitForTimeout(2500); await q.evaluate(() => { const d = document.querySelector('.mis-it'); if (d) d.open = true; });
     ok('missions : lancée depuis Suivi, terminée, compte rendu lisible', await q.evaluate(() => { const m = document.querySelector('.mis-it'); return !!m && /Terminée/.test(m.textContent) && /Compte rendu : mission faite/.test(m.textContent); }));
     await q.evaluate(() => { const c = document.querySelector('.mis-panel'), sc = document.getElementById('scroller'); sc.scrollTop += c.getBoundingClientRect().top - 90; }); await q.waitForTimeout(300);
     await q.screenshot({path: SH + 'suivi-missions.png'});
+    /* 0.18.0 : « Non, plutôt… » sur une mission, relances, consommation de Claude */
+    await q.evaluate(() => { const d = document.querySelector('.mis-it'); d.open = true; d.querySelector('.mis-plutot').open = true; d.querySelector('.mis-plutot textarea').value = 'Plus court, en trois points'; [...d.querySelectorAll('.mis-plutot button')].find((b) => /Refaire avec ça/.test(b.textContent)).click(); });
+    await q.waitForTimeout(3000); await q.reload(); await q.waitForTimeout(2500); await q.evaluate(() => { const d = document.querySelector('.mis-it'); if (d) d.open = true; });
+    ok('missions : aucune ligne plus large que l\'écran (titre long d\'une reprise)', await q.evaluate(() => [...document.querySelectorAll('.mis-it, .rel-it')].every((x) => x.getBoundingClientRect().right <= innerWidth - 8)));
+    ok('missions : « Non, plutôt… » relance Claude avec sa version précédente et ta consigne', await q.evaluate(() => { const t = (document.querySelector('.mis-it') || {}).textContent || ''; return /Reprise : Compare trois assurances/.test(t) && /Version 2 : Plus court, en trois points/.test(t); }));
+    await q.fill('.rel-panel input[type=text]', 'Voir si le syndic a répondu'); await q.evaluate(() => [...document.querySelectorAll('.rel-panel button')].find((b) => /Programmer/.test(b.textContent)).click()); await q.waitForTimeout(1500);
+    ok('Suivi : relance programmée (demain 9 h par défaut), visible dans la liste', await q.evaluate(() => /Programmée : /.test(document.querySelector('.rel-panel').textContent) && [...document.querySelectorAll('.rel-it:not(.is-done)')].some((x) => /Voir si le syndic a répondu/.test(x.textContent) && /09:00/.test(x.textContent))));
+    ok('Suivi : « Claude cette semaine » par usage (missions, conversation…)', await q.evaluate(() => { const t = (document.querySelector('.conso-panel') || {}).textContent || ''; return document.querySelectorAll('.conso-panel tbody tr').length >= 2 && /Missions/.test(t) && /jetons sur/.test(t); }));
+    await q.evaluate(() => { const c = document.querySelector('.rel-panel'), sc = document.getElementById('scroller'); sc.scrollTop += c.getBoundingClientRect().top - 140; }); await q.waitForTimeout(300);
+    await q.screenshot({path: SH + 'suivi-relances.png'});
+    await q.evaluate(() => [...document.querySelectorAll('.rel-it:not(.is-done)')].find((x) => /Voir si le syndic a répondu/.test(x.textContent)).querySelector('button').click()); await q.waitForTimeout(1500);
+    ok('Suivi : relance annulée', await q.evaluate(() => ![...document.querySelectorAll('.rel-it:not(.is-done)')].some((x) => /Voir si le syndic a répondu/.test(x.textContent))));
     /* 0.16.0 : santé du serveur dans « État des systèmes » */
     await q.evaluate(() => [...document.querySelectorAll('.sante-box button')].find((b) => /Vérifier maintenant/.test(b.textContent)).click()); await q.waitForTimeout(1500);
     ok('Suivi : santé du serveur (Google relié, Claude connecté), vérifiable à la demande', await q.evaluate(() => { const t = (document.querySelector('.sante-box') || {}).textContent || ''; return /Accès Google\s*relié/.test(t) && /Claude sur le serveur\s*connecté/.test(t) && document.querySelectorAll('.sante-box .sys-row.is-ok').length >= 2; }));

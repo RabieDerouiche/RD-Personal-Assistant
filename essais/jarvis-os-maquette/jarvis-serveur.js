@@ -117,7 +117,12 @@
     sante: () => req('/api/sante').then((r) => (r.status === 200 ? r.j : null)).catch(() => null),
     santeMaintenant: () => req('/api/sante/maintenant', {}).then((r) => (r.status === 200 ? r.j : null)).catch(() => null),
     /* missions de Claude (0.15.0) : lancer une mission longue, suivre les dernières ; notification à la fin */
-    mission: (texte) => req('/api/mission', {texte}).then((r) => r.j).catch(() => ({ok: false, error: 'Serveur injoignable.'})),
+    mission: (texte, parent) => req('/api/mission', parent ? {texte, parent} : {texte}).then((r) => r.j).catch(() => ({ok: false, error: 'Serveur injoignable.'})),
+    /* relances (0.18.0) et consommation de Claude (0.18.0) */
+    relances: () => req('/api/relances').then((r) => (r.status === 200 ? r.j : null)).catch(() => null),
+    relance: (o) => req('/api/relance', o).then((r) => r.j).catch(() => ({ok: false, error: 'Serveur injoignable.'})),
+    relanceAnnuler: (id) => req('/api/relance/annuler', {id}).then((r) => r.j).catch(() => null),
+    conso: () => req('/api/conso').then((r) => (r.status === 200 ? r.j : null)).catch(() => null),
     missions: () => req('/api/missions').then((r) => (r.status === 200 ? r.j.missions : null)).catch(() => null),
     /* tour de Claude (0.15.0) : réglage, dernier tour, tour immédiat */
     tour: {

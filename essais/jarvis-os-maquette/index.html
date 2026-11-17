@@ -1284,14 +1284,18 @@
      Même pilule, même marge, texte à gauche, pastille de coût calée à droite, chevron après elle ; texte long sur deux lignes sans toucher les bords. */
   .sa-main .btn, .sa-grid .btn { min-height: 48px; padding: 10px 18px; border-radius: 999px; justify-content: flex-start; gap: 8px; font-size: 15px; line-height: 1.25; text-align: left; }
   .mis-inp { width: 100%; min-height: 64px; resize: vertical; font: 15px/1.4 var(--sans); }
-  .mis-list { display: grid; gap: 8px; margin-top: 10px; }
-  .mis-it { border: 1px solid var(--line-2); border-radius: 12px; padding: 10px 12px; }
+  .mis-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; margin-top: 10px; }   /* un long titre ne doit pas élargir la liste (17/11/2026) */
+  .mis-it { min-width: 0; border: 1px solid var(--line-2); border-radius: 12px; padding: 10px 12px; }
   .mis-it summary { display: flex; align-items: center; gap: 8px; cursor: pointer; list-style: none; min-width: 0; }
   .mis-it summary::-webkit-details-marker { display: none; }
   .mis-t { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .mis-d { flex: 0 0 auto; color: var(--muted); }
   .mis-r { margin-top: 8px; white-space: pre-wrap; overflow-wrap: anywhere; font: 14px/1.5 var(--sans); }
   .mis-help { margin: 0 0 8px; }
+  .mis-plutot { margin-top: 8px; } .mis-plutot summary { cursor: pointer; color: var(--accent); font-size: 14px; } .mis-plutot .inp { margin-top: 8px; }
+  .rel-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; margin-top: 10px; } .rel-it { display: flex; gap: 10px; align-items: center; border: 1px solid var(--line-2); border-radius: 12px; padding: 10px 12px; } .rel-it.is-done { opacity: .75; }
+  .rel-tx { flex: 1 1 auto; min-width: 0; display: grid; gap: 2px; } .rel-tx b { font-size: 13px; color: var(--accent); } .rel-tx span { overflow-wrap: anywhere; font-size: 14px; }
+  .rel-panel .inp { width: 100%; margin-bottom: 8px; } .conso-t td:nth-child(n+2), .conso-t th:nth-child(n+2) { text-align: right; }
   .sante-box { margin-top: 12px; display: grid; gap: 8px; } .sante-sys dd { white-space: normal; }
   .sa-main .btn .cost, .sa-grid .btn .cost { margin-left: auto; flex: 0 0 auto; }
   .sa-main .btn .chev, .sa-grid .btn .chev { margin-left: auto; flex: 0 0 auto; } .sa-main .btn .cost + .chev, .sa-grid .btn .cost + .chev { margin-left: 2px; }
@@ -2953,7 +2957,7 @@ void main(){
         inputSchema: {type: 'object', properties: {demande: {type: 'string', description: 'La demande complète, telle que la tâche la lira'}}, required: ['demande']},
         execute: (input) => { const m = String(input.demande || '').trim(); if (!m) throw new Error('Demande vide');
           T.msgs.splice(T.msgs.indexOf(out), 0, {kind: 'act', label: SRV_OS ? 'Confier à la tâche Claude (sur ton serveur)' : 'Confier à la tâche Claude (session complète)', text: m, ok: 'Lancer la tâche', state: 'open', fin: () => ({title: 'Ordre à Claude', effect: 'Une ligne pour Claude dans le Canal, puis la tâche « Ordres Jarvis » lancée.', bot: 'claude', order: m, viaTask: true, say: 'Je lance la tâche.', reply: ''})});
-          renderChat(); return 'Proposée à Rabie ; en attente de son bouton.'; }}].concat(extraChatTools(T, out));
+          renderChat(); return 'Proposée à Rabie ; en attente de son bouton.'; }}].concat(extraChatTools(T, out), relanceChatTool(T, out));
     let canTools = false;
     try { const lim = await SAMPLE.limits(); canTools = !!(lim && lim.tools); } catch (e) { canTools = false; }
     try {
@@ -5194,12 +5198,12 @@ void main(){
     const noWhy = repText('Non, parce que…', 'Non pour ' + q + ', parce que : ');
     let list;
     switch (d.kind) {
-      case 'oui': list = [act('Donner mon oui à ' + who, {tone: 'main', go: () => { setTimeout(() => lvGiveYes(d), 280); return null; }}), rep("Non, n'applique pas", 'Non pour ' + q + ' : ne l\'applique pas, ferme la ligne.', 'main2'), why]; break;
+      case 'oui': list = [act('Donner mon oui à ' + who, {tone: 'main', go: () => { setTimeout(() => lvGiveYes(d), 280); return null; }}), repText('Non, plutôt…', 'Non pour ' + q + ' tel quel. Refais-le en tenant compte de ceci, puis redemande-moi mon oui : ', 'main2'), rep("Non, n'applique pas", 'Non pour ' + q + ' : ne l\'applique pas, ferme la ligne.'), why]; break;
       case 'ouinon': list = [rep('Oui, vas-y', 'Oui, vas-y pour ' + q + ' : ' + d.ask, 'main'), no, noWhy, later, why]; break;
       case 'choix': list = d.options.map((o, i) => rep(o, 'Choix pour ' + q + ' : ' + o + '.', i === 0 ? 'main' : 'main2')).concat([repText('Autre chose…', 'Choix pour ' + q + ' : '), rep('Aucune, merci', 'Aucun choix pour ' + q + ' : ferme la demande.'), later, why]); break;
       case 'question': list = [repText('Répondre à ' + who, 'Réponse à ' + q + ' : ', 'main'), ord('Cherche toi-même', d.bot, 'Cherche toi-même la réponse à ' + q + ' (Drive, Gmail, agenda, Pilotage) ; si tu ne trouves pas, dis-moi où tu as cherché.', 'Je cherche.', '', 'main2'), later, why, rep('Pas concerné', 'Pas concerné par ' + q + ' : ferme la demande.')]; break;
       case 'brouillon': list = [link('Ouvrir le brouillon'), rep("Je l'ai envoyé", "C'est envoyé pour " + q + '.', 'main'), repText('Modifie-le…', 'Modifie le brouillon pour ' + q + ' : ', 'main2'), rep("Non, n'envoie rien", 'Non pour ' + q + " : je n'envoie rien, ferme la demande."), later, why]; break;
-      default: list = [link('Ouvrir le lien'), rep("C'est fait", "C'est fait pour " + q + '.', 'main'), ord('Prépare-moi tout', d.bot, 'Prépare tout pour ' + q + ' : lien, pièces, créneaux libres dans mon agenda, brouillon.', 'Je prépare tout.', '', 'main2'), later, why, no];
+      default: list = [link('Ouvrir le lien'), rep("C'est fait", "C'est fait pour " + q + '.', 'main'), repText('Non, plutôt…', 'Pas comme ça pour ' + q + '. À la place : '), ord('Prépare-moi tout', d.bot, 'Prépare tout pour ' + q + ' : lien, pièces, créneaux libres dans mon agenda, brouillon.', 'Je prépare tout.', '', 'main2'), later, why, no];
     }
     return list.filter(Boolean).concat([act('Confier à un autre bot', {pick: {kind: 'bot', exclude: d.bot}, go: (v) => ({title: 'Confié à ' + BOT[v.id].name, effect: 'Une ligne pour ' + BOT[v.id].name + ' dans le Canal.', bot: v.id, order: 'Prends en charge ' + q + ' (demande d\'abord tenue par ' + who + ').', say: 'Je prends.'})})]);
   };
@@ -5889,6 +5893,16 @@ void main(){
     openChat('claude', x.k.bot || 'hydra', 'dosreply', x);
   }
   SUGG.dosreply = ['Que dois-je répondre ?', "Qu'est-ce que ça change pour moi ?", 'Faut-il relancer ?', 'Propose la mise à jour'];
+  /* JARVIS OS 0.18.0 : Claude peut proposer une relance (« je revérifie demain à 9 h si Iris a répondu ») ; programmée sur son bouton, gratuite */
+  function relanceChatTool(T, out) {
+    const JS = window.JarvisServeur; if (!SRV_OS || !JS || !JS.relance) return [];
+    return [{name: 'programmer_relance', description: "Propose à Rabie de programmer une relance : le serveur le préviendra à l'heure dite et, si tu donnes la ligne du Canal, regardera lui-même si le bot a répondu. Rien n'est programmé tant qu'il n'a pas touché « Programmer ». Aujourd'hui : " + new Date().toLocaleString('fr-FR', {timeZone: 'Europe/Paris'}) + '.',
+      inputSchema: {type: 'object', properties: {quand: {type: 'string', description: 'AAAA-MM-JJTHH:MM, heure de Paris'}, quoi: {type: 'string', description: 'Ce qu’il faudra revérifier, une phrase'}, ligne: {type: 'number', description: 'Numéro de la ligne du Canal à vérifier, facultatif'}}, required: ['quand', 'quoi']},
+      execute: (input) => { const q = String(input.quoi || '').trim(), w = String(input.quand || '').trim(), l = +input.ligne || 0; if (!q || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(w)) throw new Error('Relance incomplète');
+        const t = new Date(w.slice(0, 16)); T.msgs.splice(T.msgs.indexOf(out), 0, {kind: 'act', label: 'Relance proposée' + (l ? ' · ligne ' + l + ' du Canal' : ''), text: q + ' · ' + (isNaN(t) ? w : quandFr(t.getTime())), ok: 'Programmer', state: 'open',
+          fin: () => { JS.relance({quand: w.slice(0, 16), quoi: q, ligne: l || undefined, source: 'conversation'}).then((r) => toast(r && r.ok ? 'Relance programmée' : 'Relance refusée', r && r.ok ? quandFr(r.relance.quand) + ' : ' + q : (r && r.error) || '')); return null; }});
+        renderChat(); return 'Proposée à Rabie ; en attente de son bouton.'; }}];
+  }
   function extraChatTools(T, out) {
     if (CHAT.type !== 'dosreply' || !CHAT.item || !CHAT.item.k) return [];
     const x = CHAT.item;
@@ -6470,13 +6484,17 @@ void main(){
     const inp = h('textarea', {class: 'inp mis-inp', rows: '2', maxlength: '800', placeholder: 'Ex. compare trois assurances habitation pour un T3 et résume en cinq points'});
     const out = h('p', {class: 'set-msg'});
     let timer = 0;
+    /* « Non, plutôt… » : la consigne repart à Claude avec sa version précédente (une nouvelle mission, notifiée) */
+    const plutot = (m) => { const ta = h('textarea', {class: 'inp mis-inp', rows: '2', maxlength: '800', placeholder: 'Ex. plus court, en trois points ; ou : compare plutôt les offres sans engagement'}), o2 = h('p', {class: 'set-msg'});
+      return h('details', {class: 'mis-plutot'}, h('summary', {text: 'Non, plutôt…'}), ta, h('div', {class: 'row-actions'}, h('button', {type: 'button', class: 'btn sm main', onclick: async () => {
+        if (ta.value.trim().length < 4) { o2.textContent = 'Écris ce que tu veux à la place.'; return; } const r = await JS.mission(ta.value.trim(), m.id); o2.textContent = r && r.ok ? 'Relancée avec ta consigne : je te préviens quand c’est prêt.' : (r && r.error) || 'Refusée.'; if (r && r.ok) setTimeout(load, 600); }}, 'Refaire avec ça', costTag({cost: 'claude'}))), o2); };
     const load = async () => {
       const ms = await JS.missions();
       if (!ms) { list.replaceChildren(h('p', {class: 'muted', text: 'Ton serveur ne les connaît pas encore : « Mettre à jour le serveur » dans Réglages.'})); return; }
       list.replaceChildren(...(ms.length ? ms.map((m) => { const k = ST[m.status] || ST.envoyee; return h('details', {class: 'mis-it'},
         h('summary', {}, h('span', {class: 'pill ' + k[1], text: k[0]}), h('span', {class: 'mis-t', text: m.text}), h('small', {class: 'mis-d', text: fmt(new Date(m.done || m.at), {weekday: 'short', hour: '2-digit', minute: '2-digit'})})),
         m.essais > 1 ? h('p', {class: 'muted mis-rep', text: 'Reprise après un redémarrage du serveur.'}) : null,
-        m.result ? h('div', {class: 'mis-r', text: m.result}) : h('p', {class: 'muted', text: m.status === 'attente' ? 'En attente : une autre mission passe avant.' : 'Claude y travaille : tu seras prévenu par une notification.'})); }) : [h('p', {class: 'muted', text: 'Aucune mission pour le moment.'})]));
+        m.result ? h('div', {class: 'mis-r', text: m.result}) : null, m.status === 'terminee' ? plutot(m) : null, m.result ? null : h('p', {class: 'muted', text: m.status === 'attente' ? 'En attente : une autre mission passe avant.' : 'Claude y travaille : tu seras prévenu par une notification.'})); }) : [h('p', {class: 'muted', text: 'Aucune mission pour le moment.'})]));
       clearTimeout(timer); if (ms.some((m) => ['attente', 'envoyee'].includes(m.status))) timer = setTimeout(() => { if (TAB === 'suivi' && document.body.contains(list)) load(); }, 20000);
     };
     load();
@@ -6504,8 +6522,52 @@ void main(){
     JS.sante().then(draw);
     return box;
   }
+  /* JARVIS OS 0.18.0 : relances (le serveur prévient à l'heure dite ; une ligne du Canal est vérifiée sans Claude) */
+  const demain9 = () => { const d = new Date(Date.now() + 864e5); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0') + 'T09:00'; };
+  const quandFr = (ms) => fmt(new Date(ms), {weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'});
+  function relancesPanel() {
+    const JS = window.JarvisServeur; if (!JS || !JS.relances || !JS.linked()) return null;
+    const list = h('div', {class: 'rel-list'}, h('p', {class: 'muted', text: 'Lecture des relances…'})), out = h('p', {class: 'set-msg'});
+    const quoi = h('input', {class: 'inp', type: 'text', maxlength: '300', placeholder: 'Ex. voir si le syndic a répondu'}), quand = h('input', {class: 'inp rel-when', type: 'datetime-local', value: demain9()});
+    const load = async () => {
+      const r = await JS.relances();
+      if (!r) { list.replaceChildren(h('p', {class: 'muted', text: 'Ton serveur ne les connaît pas encore : « Mettre à jour le serveur » dans Réglages.'})); return; }
+      const row = (x, prev) => h('div', {class: 'rel-it' + (prev ? '' : ' is-done')}, h('div', {class: 'rel-tx'}, h('b', {text: prev ? quandFr(x.quand) : 'Faite ' + quandFr(x.fait)}), h('span', {text: prev ? x.quoi + (x.ligne ? ' · ligne ' + x.ligne + ' du Canal' : '') : x.resultat})),
+        prev ? h('button', {type: 'button', class: 'btn sm ghost', onclick: async () => { await JS.relanceAnnuler(x.id); load(); }}, 'Annuler') : null);
+      list.replaceChildren(...(r.prevues.length ? r.prevues.map((x) => row(x, true)) : [h('p', {class: 'muted', text: 'Aucune relance prévue.'})]), ...(r.faites.length ? [h('small', {class: 'pick-label', text: 'Dernières faites'})].concat(r.faites.slice(0, 3).map((x) => row(x, false))) : []));
+    };
+    load();
+    return h('section', {class: 'panel rel-panel', id: 'relances'}, h('header', {class: 'panel-h'}, h('h2', {text: 'Relances'}), h('span', {class: 'aside', text: 'gratuit'})),
+      h('p', {class: 'muted mis-help', text: 'Le serveur te prévient à l’heure dite. Si la relance vise une ligne du Canal, il regarde lui-même si le bot a répondu. Aussi par Siri (« rappelle-moi… ») et par Claude.'}),
+      quoi, quand, h('div', {class: 'row-actions'}, h('button', {type: 'button', class: 'btn main', onclick: async () => {
+        const t = new Date(quand.value); const r = await JS.relance({quoi: quoi.value, quand: isNaN(t) ? quand.value : t.toISOString()});   /* l'instant exact : juste même en voyage */ out.classList.toggle('is-bad', !(r && r.ok)); out.textContent = r && r.ok ? 'Programmée : ' + quandFr(r.relance.quand) + '.' : (r && r.error) || 'Refusée.'; if (r && r.ok) { quoi.value = ''; load(); }
+      }}, 'Programmer', costTag({cost: 'free'}))), out, list);
+  }
+  /* JARVIS OS 0.18.0 : ce que Claude a consommé cette semaine, par usage (jetons lus dans chaque réponse de Claude Code) */
+  const CONSO_NOM = {chat: 'Conversation', mission: 'Missions', tour: 'Tour de Claude', siri: 'Siri', tache: 'Tâche Claude', page: 'Questions de la page', bot: 'Ordres aux bots', module: 'Tableaux de bord', test: 'Tests', autre: 'Autre'};
+  function consoPanel() {
+    const JS = window.JarvisServeur; if (!JS || !JS.conso || !JS.linked()) return null;
+    const box = h('div', {}, h('p', {class: 'muted', text: 'Lecture…'}));
+    const k = (n) => n >= 1e6 ? (n / 1e6).toFixed(1).replace('.', ',') + ' M' : n >= 1e3 ? Math.round(n / 1e3) + ' k' : String(n);
+    JS.conso().then((r) => {
+      if (!r) { box.replaceChildren(h('p', {class: 'muted', text: 'Ton serveur ne la mesure pas encore : « Mettre à jour le serveur » dans Réglages.'})); return; }
+      if (!r.types.length) { box.replaceChildren(h('p', {class: 'muted', text: 'Rien de mesuré pour l’instant : la mesure commence avec cette version du serveur.'})); return; }
+      box.replaceChildren(h('div', {class: 'cost-t-wrap'}, h('table', {class: 'cost-t conso-t'}, h('thead', {}, h('tr', {}, h('th', {text: 'Usage'}), h('th', {text: 'Appels'}), h('th', {text: 'Part'}))),
+        h('tbody', {}, r.types.map((x) => h('tr', {}, h('td', {text: CONSO_NOM[x.type] || x.type}), h('td', {text: String(x.appels)}), h('td', {text: String(x.part).replace('.', ',') + ' %'})))))),
+        h('p', {class: 'muted', text: k(r.total) + ' jetons sur ' + r.jours.length + ' jour' + (r.jours.length > 1 ? 's' : '') + ', dont ' + Math.round(100 * r.types.reduce((a, x) => a + x.cacheLu, 0) / Math.max(1, r.total)) + ' % relus dans le cache (moins chers).' + (r.toursSautes ? ' Tours sautés faute de nouveauté : ' + r.toursSautes + '.' : '') + ' Ton forfait compte en jetons : c’est une mesure, pas ton solde.'}));
+    });
+    return h('section', {class: 'panel conso-panel'}, h('header', {class: 'panel-h'}, h('h2', {text: 'Claude cette semaine'}), h('span', {class: 'aside', text: '7 jours'})), box);
+  }
+  /* un ordre à un bot, pas encore fait : « Revérifier demain à 9 h » (relance liée à sa ligne du Canal, gratuite) */
+  const AORD = ACTIONS.ordre;
+  ACTIONS.ordre = (o) => {
+    const list = AORD(o), JS = window.JarvisServeur;
+    if (!SRV_OS || !JS || !JS.relance || o.status === 'Fait' || !/^o:\d+$/.test(String(o.id))) return list;
+    const who = BOT[o.bot] ? BOT[o.bot].name : 'le bot';
+    return list.concat([act('Revérifier demain à 9 h', {cost: 'free', go: () => { JS.relance({quand: new Date(demain9()).toISOString(), quoi: 'Voir si ' + who + ' a répondu : « ' + String(o.text).slice(0, 90) + ' »', ligne: +String(o.id).slice(2)}).then((r) => toast(r && r.ok ? 'Relance programmée' : 'Relance refusée', r && r.ok ? 'Demain à 9 h, le serveur regarde si ' + who + ' a répondu.' : (r && r.error) || '')); return null; }})]);
+  };
   const VSM = VIEWS.suivi;
-  VIEWS.suivi = (el) => { VSM(el); const sys = Array.from(el.querySelectorAll('.panel')).find((p) => /État des systèmes/.test((p.querySelector('h2') || {}).textContent || '')); const sb = santeBox(); if (sb && sys) sys.append(sb); const mp = missionsPanel(); if (!mp) return; if (sys) sys.before(mp); else el.append(mp); };
+  VIEWS.suivi = (el) => { VSM(el); const sys = Array.from(el.querySelectorAll('.panel')).find((p) => /État des systèmes/.test((p.querySelector('h2') || {}).textContent || '')); const sb = santeBox(); if (sb && sys) sys.append(sb); [missionsPanel(), relancesPanel(), consoPanel()].filter(Boolean).forEach((mp) => { if (sys) sys.before(mp); else el.append(mp); }); };
 
   /* v17.15 : alertes en direct. Pendant que Jarvis est ouvert : un son et un bandeau quand un bot répond à un de tes ordres
      ou qu'une nouvelle demande t'attend, avec « Écouter » et « Voir ». Rien n'est lu à la première lecture de Pilotage. */
