@@ -79,11 +79,15 @@ export function createPush({S, save, log = () => {}, allowHttp = false}) {
         const r = await fetch(s.endpoint, {method: 'POST', body, headers: {'content-encoding': 'aes128gcm', 'content-type': 'application/octet-stream', ttl: String(opts.ttl || 86400), urgency: opts.urgency || 'normal',
           ...(msg.tag ? {topic: String(msg.tag).replace(/[^A-Za-z0-9_-]/g, '').slice(0, 32) || 'jarvis'} : {}), authorization: vapidAuth({endpoint: s.endpoint, vapid: S.push.vapid, subject: S.push.subject || 'https://jarvis.invalid'})}});
         if (r.status === 404 || r.status === 410) unsubscribe(s.endpoint);
-        out.push({status: r.status, ok: r.status >= 200 && r.status < 300});
-      } catch (e) { out.push({status: 0, ok: false, error: String(e && e.message || e).slice(0, 120)}); }
+        const ok = r.status >= 200 && r.status < 300;
+        /* raison donnée par le service (Apple : {"reason":"BadJwtToken"} …), gardée pour la montrer dans Réglages */
+        let reason = ''; if (!ok) { try { const t = (await r.text()).slice(0, 300); try { reason = String(JSON.parse(t).reason || t); } catch { reason = t; } } catch { reason = ''; } }
+        out.push({status: r.status, ok, service: new URL(s.endpoint).hostname, ...(reason ? {reason: reason.replace(/\s+/g, ' ').trim().slice(0, 160)} : {})});
+      } catch (e) { out.push({status: 0, ok: false, service: (() => { try { return new URL(s.endpoint).hostname; } catch { return ''; } })(), error: (String(e && e.message || e) + (e && e.cause ? ' (' + (e.cause.code || e.cause.message || e.cause) + ')' : '')).slice(0, 160)}); }
     }
-    S.push.sent = (S.push.sent || 0) + out.filter((x) => x.ok).length; S.push.last = {at: Date.now(), title: msg.title, ok: out.filter((x) => x.ok).length, total: out.length}; save();
-    log('notification « ' + msg.title + ' » : ' + out.filter((x) => x.ok).length + '/' + out.length);
+    const bad = out.find((x) => !x.ok), detail = bad ? (bad.status ? bad.status + (bad.reason ? ' ' + bad.reason : '') : 'réseau : ' + (bad.error || '?')) + (bad.service ? ' (' + bad.service + ')' : '') : '';
+    S.push.sent = (S.push.sent || 0) + out.filter((x) => x.ok).length; S.push.last = {at: Date.now(), title: msg.title, ok: out.filter((x) => x.ok).length, total: out.length, ...(detail ? {detail} : {})}; save();
+    log('notification « ' + msg.title + ' » : ' + out.filter((x) => x.ok).length + '/' + out.length + (detail ? ' · refus : ' + detail : ''));
     return out;
   }
   return {publicKey, subscribe, unsubscribe, send, status: () => ({publicKey: publicKey(), count: S.push.subs.length, prefs: S.push.prefs, last: S.push.last || null})};
