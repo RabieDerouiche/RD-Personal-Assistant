@@ -7,7 +7,7 @@ const HERE = path.dirname(fileURLToPath(import.meta.url)), SRV = path.join(HERE,
 const {startFakeGoogle} = await import(SRV + '/tests/fake-google.mjs'); const FG = await startFakeGoogle();
 FG.sheet['Canal!A1:H3000'] = [['Date', 'De', 'Pour', 'Type', 'Message', 'Statut', 'Réponse', 'Objet'], ['15/11/2026', 'Rabie', 'Iris', 'Info', 'Le syndic a appelé.', 'Fait', 'Noté.', '']];
 const DATA = fs.mkdtempSync(path.join(os.tmpdir(), 'jarvis-e2e-')), PORT = 19000 + Math.floor(Math.random() * 900), BASE = 'http://127.0.0.1:' + PORT;
-const env = {...process.env, JARVIS_PUSH_ALLOW_HTTP: '1', JARVIS_NOTIFY_TICK_MS: '3600000', JARVIS_GOOGLE_FAKE: FG.url, PORT: String(PORT), JARVIS_DATA: DATA, CLAUDE_BIN: SRV + '/tests/fake-claude.mjs', JARVIS_TTS_HELPER: SRV + '/tests/fake-tts.mjs'};
+const env = {...process.env, JARVIS_PUSH_ALLOW_HTTP: '1', JARVIS_NOTIFY_TICK_MS: '3600000', JARVIS_SANTE_TICK_MS: '3600000', JARVIS_GOOGLE_FAKE: FG.url, PORT: String(PORT), JARVIS_DATA: DATA, CLAUDE_BIN: SRV + '/tests/fake-claude.mjs', JARVIS_TTS_HELPER: SRV + '/tests/fake-tts.mjs'};
 const code = execFileSync(process.execPath, [SRV + '/server.mjs', 'pair'], {env}).toString().match(/: ([A-Z0-9]{4}-[A-Z0-9]{4})/)[1];
 const srv = spawn(process.execPath, [SRV + '/server.mjs'], {env, stdio: ['ignore', 'pipe', 'pipe']}); await new Promise((r) => srv.stdout.once('data', r));
 const out = [], errs = []; const ok = (n, c, i) => out.push((c ? 'OK    ' : 'ÉCHEC ') + n + (i ? ' :: ' + i : ''));
@@ -115,6 +115,11 @@ try {
     ok('missions : lancée depuis Suivi, terminée, compte rendu lisible', await q.evaluate(() => { const m = document.querySelector('.mis-it'); return !!m && /Terminée/.test(m.textContent) && /Compte rendu : mission faite/.test(m.textContent); }));
     await q.evaluate(() => { const c = document.querySelector('.mis-panel'), sc = document.getElementById('scroller'); sc.scrollTop += c.getBoundingClientRect().top - 90; }); await q.waitForTimeout(300);
     await q.screenshot({path: SH + 'suivi-missions.png'});
+    /* 0.16.0 : santé du serveur dans « État des systèmes » */
+    await q.evaluate(() => [...document.querySelectorAll('.sante-box button')].find((b) => /Vérifier maintenant/.test(b.textContent)).click()); await q.waitForTimeout(1500);
+    ok('Suivi : santé du serveur (Google relié, Claude connecté), vérifiable à la demande', await q.evaluate(() => { const t = (document.querySelector('.sante-box') || {}).textContent || ''; return /Accès Google\s*relié/.test(t) && /Claude sur le serveur\s*connecté/.test(t) && document.querySelectorAll('.sante-box .sys-row.is-ok').length >= 2; }));
+    await q.evaluate(() => { const c = document.querySelector('.sante-box'), sc = document.getElementById('scroller'); sc.scrollTop += c.getBoundingClientRect().top - 200; }); await q.waitForTimeout(300);
+    await q.screenshot({path: SH + 'suivi-sante.png'});
     await q.goto(BASE + '/?serveur#reglages'); await q.waitForTimeout(2500);
     ok('Réglages : carte « Tour de Claude », coupée par défaut, notifications demandées', await q.evaluate(() => { const c = document.querySelector('.tour-card'); return !!c && c.querySelector('[aria-pressed="true"]').textContent === 'Non' && /Active d’abord les notifications/.test(c.textContent); }));
     await q.evaluate(() => [...document.querySelectorAll('.tour-card .seg button')].find((b) => b.textContent === '4 h').click()); await q.waitForTimeout(2500);

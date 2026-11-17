@@ -22,6 +22,7 @@ function answer(raw) {
     return {text: 'Voici : ' + JSON.stringify({items: [{module: mod, from: 'Banque', subject: 'Facture de novembre', title: 'Réunion', date: '2026-11-17', message: 'Exemple ' + mod, bot: 'Iris', objet: 'Robot cuiseur', sortie: 'Zoo', projet: 'Tunisie', statut: 'À faire'}]}) + ' Fin.', tools: ['mcp__claude_ai_Google_Sheets__get_values']};
   }
   if (/erreur/i.test(input)) return {error: 'Invalid API key · Please run /login'};
+  if (/outils refusés/.test(input)) return {text: 'refusés : ' + (args.includes('--disallowedTools') ? args.slice(args.indexOf('--disallowedTools') + 1).filter((x) => !x.startsWith('--')).join(',') : '')};
   if (/^Tour de JARVIS/.test(input)) {   /* tour de Claude (0.15.0) : prévient pour le mail du syndic, une seule fois */
     const before = raw.split('[Question]\n')[0], deja = /Alertes déjà données : .*Syndic à confirmer/.test(before);
     return {text: 'Voici : ' + JSON.stringify(/Courrier des 24 heures.*Dégât des eaux/.test(before) && !deja ? {notifier: true, titre: 'Syndic à confirmer', texte: "Le syndic attend ta confirmation pour l'expert de mardi."} : {notifier: false, titre: '', texte: ''})};
