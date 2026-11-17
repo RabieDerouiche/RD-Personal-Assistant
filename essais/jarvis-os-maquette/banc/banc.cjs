@@ -146,6 +146,12 @@ srv.listen(0, async () => {
     await p.tap('.talk-slot .jv-btn'); await p.waitForTimeout(900);
     ok('check-up : page vocale dans les polices de la charte (plus d\'Inter)', await p.evaluate(() => [...document.querySelectorAll('.jv, .jv *')].filter((e) => [...e.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim())).every((e) => /^("?Exo 2|"?Oxanium|Orbitron)/.test(getComputedStyle(e).fontFamily))));
     p = await page('#demandes');
+    /* 17/11/2026 : routine conforme à la fiche → « Oui depuis JARVIS » (ligne Réponse + sonnette) ; le reste garde la phrase à coller */
+    ok('oui groupés : « Oui depuis JARVIS » pour une demande de routine, phrase à coller pour le reste', await p.evaluate(() => { const cards = [...document.querySelectorAll('.card.item')].filter((c) => c.querySelector('.yes-l')); const u = cards.find((c) => /Ulysse/.test(c.textContent)), a = cards.find((c) => /Argus/.test(c.textContent)); return !!u && !!u.querySelector('.yes-jarvis') && /1 passage|à la reprise/.test(u.querySelector('.yes-jarvis').textContent) && !!a && !a.querySelector('.yes-jarvis') && /Copier/.test(a.textContent); }));
+    await p.evaluate(() => [...document.querySelectorAll('.yes-jarvis')].find((b) => /Oui depuis JARVIS/.test(b.textContent)).click()); await p.waitForTimeout(1200);
+    const ysheet = await p.evaluate(() => { const sh = document.getElementById('sheet'); return sh && !sh.hidden ? sh.textContent : ''; });
+    await p.waitForTimeout(5600);
+    ok('oui depuis JARVIS : une ligne pour Ulysse dans le Canal (5 s pour annuler), la demande quitte la liste', /Oui à Ulysse/.test(ysheet) && /une ligne pour Ulysse dans le Canal/.test(ysheet) && await p.evaluate(() => !(window.__S || {}).x) && await p.evaluate(() => !(document.getElementById('sheet').hidden ? [...document.querySelectorAll('.card.item')] : []).some((c) => c.querySelector('.yes-l') && /Ulysse/.test(c.textContent))), ysheet.slice(0, 120));
     ok('check-up : phrase des oui groupés sans police machine à écrire', await p.evaluate(() => [...document.querySelectorAll('.yes-p')].every((e) => /Exo 2/.test(getComputedStyle(e).fontFamily))));
     /* doublons 14 à 16 (choix du 16/11/2026) */
     p = await page('#achats');
