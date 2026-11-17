@@ -101,6 +101,14 @@
     status: () => req('/api/status').then((r) => (r.status === 200 ? r.j : null)).catch(() => null),
     update: () => req('/api/update', {}).then((r) => r.j).catch(() => ({ok: false, message: 'Serveur injoignable.'})),
     voiceInstall: () => req('/api/voice/install', {}).then((r) => r.j).catch(() => null),
+    /* notifications (0.12.0) : abonnement de cet appareil, essai, préférences */
+    push: {
+      status: () => req('/api/push').then((r) => (r.status === 200 ? r.j : null)).catch(() => null),
+      subscribe: (subscription) => req('/api/push/subscribe', {subscription}).then((r) => r.j).catch(() => ({ok: false, error: 'Serveur injoignable.'})),
+      unsubscribe: (endpoint) => req('/api/push/unsubscribe', {endpoint}).then((r) => r.j).catch(() => null),
+      test: () => req('/api/push/test', {}).then((r) => r.j).catch(() => ({ok: false})),
+      prefs: (p) => req('/api/push/prefs', p).then((r) => r.j).catch(() => null)
+    },
     /* réglages de la voix, partagés avec la page vocale (même stockage que l'app JARVIS) */
     setting: (k) => settings()[k],
     set(k, v) { const s = settings(); s[k] = v; try { localStorage.setItem(KEY, JSON.stringify(s)); } catch (e) { /* rien */ } }

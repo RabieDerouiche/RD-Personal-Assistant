@@ -14,3 +14,5 @@ Fait tourner Claude Code (`claude -p`, programme officiel) avec l'abonnement Cla
 - Bancs : `node tests/server.test.mjs` (faux Claude `tests/fake-claude.mjs`, faux Google `tests/fake-google.mjs`) ; de bout en bout avec l'app : `jarvis-os/app/tests/e2e-server.cjs`.
 
 Guide pas à pas pour l'iPhone : `docs/jarvis-os.md`, section « Phase 3 ».
+
+- **Notifications (0.12.0)** : `push.mjs` (Web Push chiffré, VAPID) et `notify.mjs` (Canal toutes les 2 minutes, rappels du matin, fin de pause de Grok ; lecture seule de Pilotage). Routes `GET /api/push`, `POST /api/push/subscribe`, `/api/push/unsubscribe`, `/api/push/test`, `/api/push/prefs` (`bots`, `rappels`, `heure`), `/api/push/check` (`only` : canal, digest, resume). Réglages du banc : `JARVIS_PUSH_ALLOW_HTTP=1` (service de notifications local), `JARVIS_NOTIFY_TICK_MS`, `JARVIS_NOTIFY_EVERY_MS`.

@@ -5724,6 +5724,7 @@ void main(){
   header = function () {
     HD0();
     const box = $('status');
+    try { if (window.__JARVIS_MODE === 'serveur' && 'setAppBadge' in navigator) { const n = (S.demandes || []).length; (n ? navigator.setAppBadge(n) : navigator.clearAppBadge()).catch(() => {}); } } catch (e) { /* rien */ } /* JARVIS OS 0.12.0 : pastille sur l'icône */
     if (GP.on && box) box.prepend(h('span', {class: 'st is-pause'}, h('i'), 'Grok en pause' + (GP.until ? ' → ' + fmt(GP.until, {weekday: 'short'}).replace('.', '') + ' ' + hmFr(GP.until) : '')));
     /* JARVIS OS (check-up du 16/11) : la ligne défile au doigt et s'estompe à droite quand elle dépasse, au lieu d'être coupée net */
     if (box) requestAnimationFrame(() => box.classList.toggle('is-more', box.scrollWidth > box.clientWidth + 2 && box.scrollLeft + box.clientWidth < box.scrollWidth - 2));
@@ -6529,6 +6530,45 @@ void main(){
     ["Ouvre « Google Auth Platform » (ancien nom : écran de consentement OAuth). Image de marque : nom JARVIS, ton adresse. Audience : type « Externe », puis « Publier l'application » (en production, sinon l'accès expire au bout de 7 jours).", 'https://console.cloud.google.com/auth/overview'],
     ['Clients : « Créer un client », type « Application Web », nom JARVIS. Dans « URI de redirection autorisés », colle l’adresse ci-dessous, puis Créer.', 'https://console.cloud.google.com/auth/clients'],
     ["Copie l'ID client et le code secret du client, colle-les ici, Enregistrer, puis « Connecter Google ». Google dira « application non validée » : c'est normal, c'est la tienne (Paramètres avancés, Accéder à JARVIS), et coche tous les accès.", '']];
+  /* JARVIS OS 0.12.0 : carte « Notifications » des Réglages. Sur l'iPhone, elles ne marchent que depuis l'icône de l'écran d'accueil. */
+  async function notifCard(JS, msg, redraw) {
+    const card = h('section', {class: 'card set-card notif-card'}, h('b', {text: 'Notifications'}));
+    const out = h('p', {class: 'set-msg'}), say = (t, bad) => { out.textContent = t; out.classList.toggle('is-bad', !!bad); };
+    const ok = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+    const home = (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
+    const st = await JS.push.status();
+    let sub = null; try { const reg = ok ? await navigator.serviceWorker.getRegistration() : null; sub = reg ? await reg.pushManager.getSubscription() : null; } catch (e) { sub = null; }
+    const key = (b) => { const s = atob(String(b).replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((String(b).length + 3) % 4)); return Uint8Array.from(s, (c) => c.charCodeAt(0)); };
+    if (!st) { card.append(h('p', {class: 'muted', text: 'Ton serveur ne les connaît pas encore : touche « Mettre à jour le serveur » plus bas.'})); return card; }
+    if (!ok || !home) {
+      card.append(h('p', {class: 'muted', text: "Sur l'iPhone, les notifications ne marchent que depuis l'icône de l'écran d'accueil : dans Safari, Partager, « Sur l'écran d'accueil », puis ouvre JARVIS depuis cette icône et reviens ici."}));
+      return card;
+    }
+    if (Notification.permission === 'denied') { card.append(h('p', {class: 'muted', text: "Refusées sur cet iPhone : Réglages de l'iPhone, Notifications, JARVIS, puis « Autoriser les notifications »."})); return card; }
+    if (!sub) {
+      card.append(h('p', {class: 'muted', text: "Ton serveur te prévient quand un bot répond ou te demande quelque chose, le matin pour tes échéances et papiers, et quand Grok repart après une pause. Gratuit : ni bot ni Claude. Le contenu est chiffré pour ton iPhone."}),
+        h('button', {type: 'button', class: 'btn main', onclick: async () => {
+          say('Autorisation…');
+          try {
+            const perm = await Notification.requestPermission(); if (perm !== 'granted') { say('Pas autorisées : rien n’est envoyé.', true); return; }
+            const reg = await navigator.serviceWorker.ready;
+            const s = await reg.pushManager.subscribe({userVisibleOnly: true, applicationServerKey: key(st.publicKey)});
+            const r = await JS.push.subscribe(s.toJSON());
+            if (r && r.ok) redraw(); else say((r && r.error) || 'Le serveur a refusé l’abonnement.', true);
+          } catch (e) { say('Impossible : ' + ((e && e.message) || e), true); }
+        }}, 'Activer les notifications'), out);
+      return card;
+    }
+    const pr = st.prefs || {}, seg = (k, val, opts) => h('div', {class: 'seg set-seg', role: 'group'}, opts.map(([v, l]) => h('button', {type: 'button', 'aria-pressed': String(val === v), onclick: async () => { const p = {}; p[k] = v; await JS.push.prefs(p); redraw(); }}, l)));
+    card.append(h('p', {class: 'muted', text: 'Actives sur cet iPhone' + (st.count > 1 ? ' (' + st.count + ' appareils au total)' : '') + (st.last ? '. Dernière : « ' + st.last.title + ' », ' + fmt(new Date(st.last.at), {weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'}) : '') + '.'}),
+      h('small', {class: 'pick-label', text: 'Quand un bot répond ou te demande quelque chose'}), seg('bots', pr.bots !== false, [[true, 'Oui'], [false, 'Non']]),
+      h('small', {class: 'pick-label', text: 'Rappels du matin (échéances, papiers)'}), seg('rappels', pr.rappels !== false, [[true, 'Oui'], [false, 'Non']]),
+      pr.rappels !== false ? seg('heure', pr.heure || '08:00', [['07:00', '7h'], ['07:30', '7h30'], ['08:00', '8h'], ['08:30', '8h30'], ['09:00', '9h']]) : null,
+      h('div', {class: 'row-actions'},
+        h('button', {type: 'button', class: 'btn', onclick: async () => { say('Envoi…'); const r = await JS.push.test(); say(r && r.ok ? 'Envoyée : elle arrive dans quelques secondes.' : 'Le service de notifications a refusé l’envoi.', !(r && r.ok)); }}, 'Envoyer un essai'),
+        h('button', {type: 'button', class: 'btn ghost danger', onclick: async () => { try { await JS.push.unsubscribe(sub.endpoint); await sub.unsubscribe(); } catch (e) { /* rien */ } redraw(); }}, 'Couper sur cet iPhone')), out);
+    return card;
+  }
   VIEWS.reglages = (el) => {
     const JS = window.JarvisServeur;
     if (!JS) {
@@ -6575,6 +6615,8 @@ void main(){
           h('p', {class: 'muted set-small', text: "L'identifiant et le secret restent sur ton serveur (fichier protégé) : ni Claude ni l'app ne les relisent."}));
       }
       parts.push(gcard);
+      /* JARVIS OS 0.12.0 : notifications envoyées par le serveur (un bot a répondu, rappels du matin, Grok reparti) */
+      if (JS.push) parts.push(await notifCard(JS, msg, () => draw()));
       /* 3. JARVIS : version, mise à jour du serveur, voix et modèle (repris de l'ancienne app) */
       const st = await JS.status(), upd = h('p', {class: 'set-msg'});
       const seg = (k, opts, def) => h('div', {class: 'seg set-seg', role: 'group'}, opts.map(([v, l]) => h('button', {type: 'button', 'aria-pressed': String((JS.setting(k) || def) === v), onclick: () => { JS.set(k, v); location.reload(); }}, l)));
