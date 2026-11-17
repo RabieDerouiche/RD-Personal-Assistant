@@ -1266,6 +1266,8 @@
   .verdict-go { display: block; margin-top: 6px; padding: 0; font-weight: 600; }
   .pap-go { width: 100%; text-align: left; }
   .pap-dates.panel { border-top: 0; padding-top: 0; }
+  .sav-tab summary { cursor: pointer; font-size: 14px; } .sav-tab ul { margin: 6px 0 0; padding-left: 18px; font-size: 13px; color: var(--muted); display: grid; gap: 4px; overflow-wrap: anywhere; }
+  .face-note { font-size: 13px; margin: 6px 0 0; } .face-open { margin-top: 4px; }
   .siri-steps { margin: 0; padding-left: 20px; display: grid; gap: 6px; font-size: 13.5px; color: var(--muted); } .siri-steps code, .siri-key { font: 600 12.5px var(--tech); color: var(--fg); overflow-wrap: anywhere; }
   .siri-key { display: block; padding: 10px 12px; border-radius: 12px; border: 1px dashed var(--line-2); -webkit-user-select: all; user-select: all; }
   /* JARVIS OS (17/11/2026, retour du propriétaire sur capture) : boutons d'une feuille et de « Toutes les actions » tous pareils.
@@ -3595,6 +3597,22 @@ void main(){
   const PT = {state: 'idle', data: null, err: '', at: 0, priv: false, key: ''};
   const PAPS = {q: '', open: null};
   try { PT.priv = localStorage.getItem('jarvis.papiers.prive') === '1'; } catch (e) { /* rien */ }
+  /* JARVIS OS 0.14.0 : Face ID pour les papiers privés. Clé d'accès liée à cet iPhone (WebAuthn, vérification de l'utilisateur exigée) :
+     un verrou d'affichage, valable 5 minutes après un déverrouillage, contre quelqu'un qui tiendrait le téléphone ouvert ; pas un chiffrement. */
+  const FACE = {key: 'jarvis.faceid', until: 0,
+    b64: (b) => btoa(String.fromCharCode(...new Uint8Array(b))), unb64: (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0)),
+    ready() { return !!(window.PublicKeyCredential && navigator.credentials && window.isSecureContext && !/^\d+\.\d+\.\d+\.\d+$/.test(location.hostname)); },
+    on() { try { return !!localStorage.getItem(this.key); } catch (e) { return false; } },
+    ok() { return !this.on() || Date.now() < this.until; },
+    async create() {
+      const c = await navigator.credentials.create({publicKey: {rp: {name: 'JARVIS', id: location.hostname}, user: {id: crypto.getRandomValues(new Uint8Array(16)), name: 'jarvis', displayName: 'JARVIS'}, challenge: crypto.getRandomValues(new Uint8Array(32)),
+        pubKeyCredParams: [{type: 'public-key', alg: -7}, {type: 'public-key', alg: -257}], authenticatorSelection: {authenticatorAttachment: 'platform', userVerification: 'required', residentKey: 'preferred'}, timeout: 60000}});
+      localStorage.setItem(this.key, this.b64(c.rawId)); this.until = Date.now() + 300000; return true; },
+    async unlock() {
+      if (this.ok()) return true;
+      const a = await navigator.credentials.get({publicKey: {challenge: crypto.getRandomValues(new Uint8Array(32)), allowCredentials: [{type: 'public-key', id: this.unb64(localStorage.getItem(this.key))}], userVerification: 'required', timeout: 60000}});
+      if (a) { this.until = Date.now() + 300000; return true; } return false; },
+    off() { try { localStorage.removeItem(this.key); } catch (e) { /* rien */ } this.until = 0; }};
   const papNorm = (t) => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
   const papClean = (n) => String(n || '').replace(/\.(pdf|jpe?g|png|heic|docx?|xlsx?|zip|txt)$/i, '').replace(/_/g, ' ').replace(/\s{2,}/g, ' ').trim();
   const papExt = (f) => { const m = String(f.name || '').match(/\.([a-z0-9]{2,4})$/i); return m ? m[1].toUpperCase().replace('JPEG', 'JPG') : /image/.test(f.mimeType) ? 'IMG' : /pdf/.test(f.mimeType) ? 'PDF' : /document|word/.test(f.mimeType) ? 'DOC' : 'FICH'; };
@@ -3682,9 +3700,13 @@ void main(){
       if (others.length) body.append(hsec('Par thème', null, h('div', {class: 'pt-grid'}, others.map((t, i) => papTile(t, D, i)))));
       if (loose.length) body.append(hsec('En vrac', h('span', {class: 'aside', text: loose.length + ' à ranger'}), h('div', {class: 'pf-list'}, loose.slice(0, 12).map((x) => papRow(x, false))),
         loose.length > 12 ? h('p', {class: 'muted', text: '… et ' + (loose.length - 12) + ' autres : cherche-les par leur nom.'}) : null));
-      if (priv) body.append(hsec('Papiers privés', h('span', {class: 'aside', text: 'banque, impôts, salaires'}), h('div', {class: 'pt-grid'}, papTile(D.F[priv.id], D, 0), ...(D.kids[priv.id] || []).map((t, i) => papTile(t, D, i + 1)))));
+      if (priv && !FACE.ok()) body.append(hsec('Papiers privés', h('span', {class: 'aside', text: 'protégés par Face ID'}), h('button', {type: 'button', class: 'btn main face-open', onclick: async () => { try { if (await FACE.unlock()) renderView(true); } catch (e) { toast('Face ID', 'Pas déverrouillé.', true); } }}, h('span', {class: 'ic', html: icon('lock', 16)}), 'Déverrouiller avec Face ID')));
+      else if (priv) body.append(hsec('Papiers privés', h('span', {class: 'aside', text: 'banque, impôts, salaires'}), h('div', {class: 'pt-grid'}, papTile(D.F[priv.id], D, 0), ...(D.kids[priv.id] || []).map((t, i) => papTile(t, D, i + 1)))));
       body.append(h('button', {type: 'button', class: 'link pap-priv', onclick: () => { PT.priv = !PT.priv; try { localStorage.setItem('jarvis.papiers.prive', PT.priv ? '1' : '0'); } catch (e) { /* rien */ } papLoad(true); renderView(true); }},
         h('span', {html: icon('lock', 14)}), PT.priv ? 'Masquer les papiers privés' : 'Afficher les papiers privés (banque, impôts, salaires)'));
+      if (FACE.ready()) body.append(FACE.on()
+        ? h('p', {class: 'muted face-note'}, 'Face ID actif sur cet iPhone pour les papiers privés · ', h('button', {type: 'button', class: 'link', onclick: () => { FACE.off(); renderView(true); }}, 'Retirer'))
+        : h('button', {type: 'button', class: 'link face-set', onclick: async () => { try { await FACE.create(); toast('Face ID', 'Les papiers privés demanderont Face ID.', true); renderView(true); } catch (e) { toast('Face ID', 'Pas activé : ' + ((e && e.message) || e), true); } }}, h('span', {html: icon('lock', 14)}), 'Protéger les papiers privés par Face ID'));
     }
     /* JARVIS OS (doublon 16, choix du 16/11/2026) : les papiers suivis de Pilotage avec leurs gestes (venus de Suivi), puis le dépôt pour Iris (venu d'Équipe) */
     const pil = h('div', {class: 'stack'}); SCREEN.papiers(pil, {bare: true});
@@ -6613,6 +6635,23 @@ void main(){
     return card;
   }
   const VIEWS_RELOAD_SIRI = () => { if (TAB === 'reglages') renderView(true); };
+  /* JARVIS OS 0.14.0 : carte « Sauvegarde de Pilotage » : la copie de la nuit, et ce qui a changé d'une copie à l'autre (valeurs avant et après) */
+  async function savCard(JS) {
+    const card = h('section', {class: 'card set-card sav-card'}, h('b', {text: 'Sauvegarde de Pilotage'}));
+    const out = h('p', {class: 'set-msg'}), st = await JS.sauvegarde.etat();
+    if (!st) { card.append(h('p', {class: 'muted', text: 'Ton serveur ne la connaît pas encore : touche « Mettre à jour le serveur » plus bas.'})); return card; }
+    const dfr = (ymd) => ymd ? ymd.split('-').reverse().join('/') : '';
+    card.append(h('p', {class: 'muted', text: (st.last ? 'Dernière copie le ' + dfr(st.last) : 'Pas encore de copie') + ' · ' + st.copies.length + ' gardée' + (st.copies.length > 1 ? 's' : '') + ' (30 jours) · chaque nuit vers 3 h. Rien n’est jamais réécrit dans Pilotage depuis une copie.' + (st.error ? ' ' + st.error : '')}));
+    const ch = st.changements || {}, ong = ch.onglets || [];
+    if (ch.dates && ch.dates.length === 2) {
+      card.append(h('small', {class: 'pick-label', text: 'Ce qui a changé du ' + dfr(ch.dates[0]) + ' au ' + dfr(ch.dates[1])}));
+      if (!ong.length) card.append(h('p', {class: 'muted', text: 'Rien.'}));
+      ong.forEach((o) => card.append(h('details', {class: 'sav-tab'}, h('summary', {text: o.nom + ' : ' + [o.ajoutees && o.ajoutees + ' ajoutée' + (o.ajoutees > 1 ? 's' : ''), o.modifiees && o.modifiees + ' modifiée' + (o.modifiees > 1 ? 's' : ''), o.retirees && o.retirees + ' retirée' + (o.retirees > 1 ? 's' : '')].filter(Boolean).join(', ')}),
+        h('ul', {}, o.exemples.map((e) => h('li', {text: 'Ligne ' + e.ligne + ' ' + e.genre + (e.genre === 'modifiée' ? ' : ' + e.champs.map((c) => c.col + ' « ' + (c.avant || '—') + ' » → « ' + (c.apres || '—') + ' »').join(' ; ') : ' : ' + (e.apres || e.avant || ''))}))))));
+    }
+    card.append(h('div', {class: 'row-actions'}, h('button', {type: 'button', class: 'btn', onclick: async () => { out.textContent = 'Copie en cours…'; const r = await JS.sauvegarde.maintenant(); out.textContent = r && r.ok ? 'Copie faite (' + r.onglets + ' onglets).' : (r && r.error) || 'Copie impossible.'; out.classList.toggle('is-bad', !(r && r.ok)); if (r && r.ok) setTimeout(() => { if (TAB === 'reglages') renderView(true); }, 900); }}, 'Sauvegarder maintenant')), out);
+    return card;
+  }
   VIEWS.reglages = (el) => {
     const JS = window.JarvisServeur;
     if (!JS) {
@@ -6662,6 +6701,7 @@ void main(){
       /* JARVIS OS 0.12.0 : notifications envoyées par le serveur (un bot a répondu, rappels du matin, Grok reparti) */
       if (JS.push) parts.push(await notifCard(JS, msg, () => draw()));
       if (JS.raccourci) parts.push(await siriCard(JS)); /* JARVIS OS 0.13.0 : Siri et bouton Action */
+      if (JS.sauvegarde) parts.push(await savCard(JS)); /* JARVIS OS 0.14.0 : sauvegarde de Pilotage */
       /* 3. JARVIS : version, mise à jour du serveur, voix et modèle (repris de l'ancienne app) */
       const st = await JS.status(), upd = h('p', {class: 'set-msg'});
       const seg = (k, opts, def) => h('div', {class: 'seg set-seg', role: 'group'}, opts.map(([v, l]) => h('button', {type: 'button', 'aria-pressed': String((JS.setting(k) || def) === v), onclick: () => { JS.set(k, v); location.reload(); }}, l)));

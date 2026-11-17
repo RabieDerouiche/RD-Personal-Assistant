@@ -108,6 +108,11 @@
       retirer: () => req('/api/raccourci/retirer', {}).then((r) => r.j).catch(() => null),
       essai: (texte) => fetch(BASE + '/api/raccourci', {method: 'POST', headers: {'content-type': 'application/json', authorization: 'Bearer ' + token()}, body: JSON.stringify({texte})}).then((r) => r.text()).catch(() => 'Serveur injoignable.')
     },
+    /* sauvegarde de Pilotage (0.14.0) : état, ce qui a changé, copie immédiate */
+    sauvegarde: {
+      etat: () => req('/api/sauvegarde').then((r) => (r.status === 200 ? r.j : null)).catch(() => null),
+      maintenant: () => req('/api/sauvegarde/maintenant', {}).then((r) => r.j).catch(() => ({ok: false, error: 'Serveur injoignable.'}))
+    },
     /* notifications (0.12.0) : abonnement de cet appareil, essai, préférences */
     push: {
       status: () => req('/api/push').then((r) => (r.status === 200 ? r.j : null)).catch(() => null),
