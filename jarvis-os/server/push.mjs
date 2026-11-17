@@ -76,8 +76,10 @@ export function createPush({S, save, log = () => {}, allowHttp = false}) {
     for (const s of subs) {
       try {
         const body = encrypt({payload, p256dh: s.keys.p256dh, auth: s.keys.auth});
-        const r = await fetch(s.endpoint, {method: 'POST', body, headers: {'content-encoding': 'aes128gcm', 'content-type': 'application/octet-stream', ttl: String(opts.ttl || 86400), urgency: opts.urgency || 'normal',
-          ...(msg.tag ? {topic: String(msg.tag).replace(/[^A-Za-z0-9_-]/g, '').slice(0, 32) || 'jarvis'} : {}), authorization: vapidAuth({endpoint: s.endpoint, vapid: S.push.vapid, subject: S.push.subject || 'https://jarvis.invalid'})}});
+        /* 17/11/2026 : Apple refusait chaque envoi (400 BadWebPushTopic) à cause de l'en-tête Topic : il n'est plus envoyé (facultatif ; le « tag » de la notification
+           suffit à remplacer la précédente). « Urgency: normal » est la valeur par défaut et a déjà été refusé par Apple (WebKit 247128) : seule « high » est envoyée. */
+        const r = await fetch(s.endpoint, {method: 'POST', body, headers: {'content-encoding': 'aes128gcm', 'content-type': 'application/octet-stream', ttl: String(opts.ttl || 86400),
+          ...(opts.urgency && opts.urgency !== 'normal' ? {urgency: opts.urgency} : {}), authorization: vapidAuth({endpoint: s.endpoint, vapid: S.push.vapid, subject: S.push.subject || 'https://jarvis.invalid'})}});
         if (r.status === 404 || r.status === 410) unsubscribe(s.endpoint);
         const ok = r.status >= 200 && r.status < 300;
         /* raison donnée par le service (Apple : {"reason":"BadJwtToken"} …), gardée pour la montrer dans Réglages */
