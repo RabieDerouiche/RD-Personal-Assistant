@@ -22,6 +22,7 @@ function answer(raw) {
     return {text: 'Voici : ' + JSON.stringify({items: [{module: mod, from: 'Banque', subject: 'Facture de novembre', title: 'Réunion', date: '2026-11-17', message: 'Exemple ' + mod, bot: 'Iris', objet: 'Robot cuiseur', sortie: 'Zoo', projet: 'Tunisie', statut: 'À faire'}]}) + ' Fin.', tools: ['mcp__claude_ai_Google_Sheets__get_values']};
   }
   if (/erreur/i.test(input)) return {error: 'Invalid API key · Please run /login'};
+  if (/montre le contexte/.test(input)) return {text: raw.split('[Question]\n')[0]};   /* banc des Raccourcis : renvoie les données reçues */
   /* tâche « Ordres Jarvis » faite par le serveur : répond aux lignes données, laisse « à valider » ce qui touche une fiche */
   if (/Lignes du Canal de Pilotage adressées à Claude/.test(input)) {
     const arr = JSON.parse(input.slice(input.indexOf('['), input.indexOf(']\n') + 1));
