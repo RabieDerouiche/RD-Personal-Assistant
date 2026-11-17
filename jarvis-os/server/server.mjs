@@ -16,7 +16,7 @@ import {createNotifier, paris, daysTo} from './notify.mjs';
 import {createSauvegarde} from './sauvegarde.mjs';
 import {createSante} from './sante.mjs';
 
-const VERSION = '0.16.0';
+const VERSION = '0.17.0';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PORT = +(process.env.PORT || 8787);
 const HOST = process.env.HOST || '127.0.0.1';
@@ -291,12 +291,13 @@ async function chat(body, send) {
 }
 
 /* une mission approuvée pour Claude : il la fait ici, avec le web, sans commande système */
-async function runMission(m) {
-  m.status = 'envoyee'; m.started = now(); save();
+async function runMission(m, reprise) {
+  /* 0.17.0 : « en attente » tant qu'une autre mission tourne, « en cours » (envoyee) dès qu'elle démarre ; l'état est écrit sur disque à chaque étape */
+  m.status = 'attente'; save();
   const dir = path.join(DATA, 'work', m.id); fs.mkdirSync(dir, {recursive: true});
   const drafts = [];   /* les brouillons passent par la règle du connecteur Gmail ; le garde-fou n'autorise que create_draft et update_draft */
   const sys = MISSION_SYSTEM + (readTools().length ? '\n' + DATA_RULES.replace('Lecture seule pendant la conversation : tu n\'écris, n\'envoies, ne modifies et ne supprimes rien ; pour agir, propose une mission (elle attend son accord).', 'Tu peux préparer des brouillons Gmail (jamais d\'envoi) ; tu ne modifies ni l\'agenda ni Pilotage.') : '');
-  const r = await serialMission(() => runClaude({prompt: 'Mission : ' + m.text, system: sys, model: MODELS.equilibre, tools: {allow: ['WebSearch', 'WebFetch', 'Read', 'Write', 'Edit', 'Glob', 'Grep', ...readTools(), ...drafts], deny: ['Bash', 'NotebookEdit']}, settings: guardSettings('mission'), cwd: dir, timeoutMs: 15 * 60000}));
+  const r = await serialMission(() => { m.status = 'envoyee'; m.started = now(); m.essais = (m.essais || 0) + 1; save(); return runClaude({prompt: 'Mission : ' + m.text + (reprise ? '\n\n(Reprise après un redémarrage du serveur : regarde d\'abord ce qui a déjà été fait, fichiers du dossier de travail et brouillons Gmail, et ne refais pas ce qui existe.)' : ''), system: sys, model: MODELS.equilibre, tools: {allow: ['WebSearch', 'WebFetch', 'Read', 'Write', 'Edit', 'Glob', 'Grep', ...readTools(), ...drafts], deny: ['Bash', 'NotebookEdit']}, settings: guardSettings('mission'), cwd: dir, timeoutMs: 15 * 60000}); });
   S.usage.missions++;
   m.status = r.ok ? 'terminee' : 'echouee'; m.done = now(); m.result = (r.ok ? r.text : r.error).slice(0, 6000); save();
   /* 0.15.0 : notification de fin, sur chaque appareil abonné */
@@ -304,7 +305,10 @@ async function runMission(m) {
 }
 /* 0.15.0 : une mission lancée par le propriétaire depuis JARVIS ou Siri (il l'a demandée : pas d'accord à redonner) */
 function newMission(text) {
-  const m = {id: uid(), agent: 'claude', text: String(text).trim().slice(0, 800), status: 'envoyee', at: now(), priority: 'normale', source: 'jarvis'};
+  /* même demande lancée deux fois de suite (double appui, Siri qui répète) : une seule mission */
+  const t = String(text).trim().slice(0, 800), same = S.missions.find((x) => x.source === 'jarvis' && x.text === t && ['attente', 'envoyee'].includes(x.status) && now() - x.at < 120000);
+  if (same) return same;
+  const m = {id: uid(), agent: 'claude', text: t, status: 'attente', at: now(), priority: 'normale', source: 'jarvis'};
   S.missions.push(m); save(); runMission(m).catch((e) => { m.status = 'echouee'; m.done = now(); m.result = String(e && e.message || e).slice(0, 300); save(); });
   return m;
 }
@@ -324,14 +328,21 @@ async function tourContext() {
   return parts.join('\n');
 }
 async function runTour() {
-  const ctx = await tourContext(), recent = (S.tour.recent || []).map((x) => x.titre).join(' ; ') || 'aucune';
+  const ctx = await tourContext();
+  /* 0.17.0 : rien de nouveau depuis le dernier tour (courrier, agenda, Canal, échéances ; même jour) : Claude n'est pas appelé, zéro jeton */
+  const empreinte = crypto.createHash('sha256').update(paris(new Date()).ymd + '\n' + ctx.split('\n').slice(1).join('\n')).digest('hex').slice(0, 20);
+  if (S.tour.empreinte === empreinte) {
+    S.tour.last = now(); S.usage.toursSautes = (S.usage.toursSautes || 0) + 1;
+    S.tour.dernier = {at: now(), ok: true, notifie: false, saute: true, titre: '', texte: 'Rien de nouveau depuis le tour précédent : Claude n’a pas été appelé.'}; save(); return S.tour.dernier;
+  }
+  const recent = (S.tour.recent || []).map((x) => x.titre).join(' ; ') || 'aucune';
   const box = path.join(DATA, 'tour'); fs.mkdirSync(box, {recursive: true});
   const r = await serial(() => runClaude({prompt: ctx + '\nAlertes déjà données : ' + recent + '\n\n[Question]\nTour de JARVIS : faut-il le prévenir maintenant ?', system: TOUR_SYSTEM, model: MODELS[S.tour.modele] || MODELS.rapide, cwd: box, timeoutMs: 90000, effort: 'low', settings: guardSettings('chat'),
     tools: {allow: [], deny: ['Bash', 'Read', 'Edit', 'Write', 'Glob', 'Grep', 'NotebookEdit', 'WebFetch', 'WebSearch', 'Task']}}));
   S.usage.tours = (S.usage.tours || 0) + 1; S.tour.last = now();
   let j = null; try { const t = String(r.text || ''); j = JSON.parse(t.slice(t.indexOf('{'), t.lastIndexOf('}') + 1)); } catch { j = null; }
   if (!r.ok || !j) { S.tour.dernier = {at: now(), ok: false, texte: r.ok ? 'Réponse illisible.' : r.error}; save(); return S.tour.dernier; }
-  S.tour.dernier = {at: now(), ok: true, notifie: !!j.notifier, titre: String(j.titre || '').slice(0, 60), texte: String(j.texte || '').slice(0, 300)};
+  S.tour.dernier = {at: now(), ok: true, notifie: !!j.notifier, titre: String(j.titre || '').slice(0, 60), texte: String(j.texte || '').slice(0, 300)}; S.tour.empreinte = empreinte;
   if (j.notifier && S.tour.dernier.texte) {
     S.tour.recent = (S.tour.recent || []).concat({at: now(), titre: S.tour.dernier.titre}).slice(-6);
     await PUSH.send({title: S.tour.dernier.titre || 'JARVIS', body: S.tour.dernier.texte, url: '/#demandes', tag: 'tour'}, {urgency: 'high'});
@@ -672,7 +683,7 @@ const server = http.createServer(async (req, res) => {
       if (p === '/api/sauvegarde') return json(res, 200, {...SAV.status(), changements: SAV.diff()});
       /* missions (0.15.0) : lancer, suivre ; tour de Claude : réglage, dernier tour, tour immédiat */
       if (p === '/api/mission' && req.method === 'POST') { const b = await readBody(req); const t = String(b.texte || '').trim(); if (t.length < 4) return json(res, 400, {error: 'Mission vide.'}); const m = newMission(t); return json(res, 200, {ok: true, id: m.id}); }
-      if (p === '/api/missions') return json(res, 200, {missions: S.missions.filter((m) => m.agent === 'claude').slice(-8).reverse().map(({id, text, status, at, done, result}) => ({id, text, status, at, done, result: result ? String(result).slice(0, 4000) : ''}))});
+      if (p === '/api/missions') return json(res, 200, {missions: S.missions.filter((m) => m.agent === 'claude').slice(-8).reverse().map(({id, text, status, at, done, result, essais}) => ({id, text, status, at, done, essais: essais || 0, result: result ? String(result).slice(0, 4000) : ''}))});
       if (p === '/api/tour' && req.method === 'POST') { const b = await readBody(req); S.tour = Object.assign({every: 0, debut: '08:00', fin: '21:00', modele: 'rapide', last: 0, recent: []}, S.tour || {}); if ([0, 3, 4, 6].includes(+b.every)) S.tour.every = +b.every; if (['rapide', 'equilibre'].includes(b.modele)) S.tour.modele = b.modele; save(); return json(res, 200, {tour: S.tour}); }
       if (p === '/api/tour') { const tr = Object.assign({every: 0, debut: '08:00', fin: '21:00', modele: 'rapide'}, S.tour || {}); return json(res, 200, {every: tr.every, debut: tr.debut, fin: tr.fin, modele: tr.modele, last: tr.last || 0, dernier: tr.dernier || null}); }
       if (p === '/api/tour/maintenant' && req.method === 'POST') { S.tour = Object.assign({every: 0, debut: '08:00', fin: '21:00', modele: 'rapide', last: 0, recent: []}, S.tour || {}); if (!GG.status('').linked) return json(res, 409, {error: 'Google n’est pas relié.'}); return json(res, 200, await runTour()); }
@@ -751,6 +762,15 @@ const server = http.createServer(async (req, res) => {
   } catch (e) { if (!res.headersSent) json(res, 500, {error: 'Erreur du serveur.'}); else res.end(); }
 });
 setTimeout(() => { mcpList().then(() => console.log('Connecteurs Google : ' + (readTools().join(', ') || 'aucun'))); }, 1500);
+/* 0.17.0 : missions interrompues par un arrêt du serveur (mise à jour, panne). L'état sur disque fait foi :
+   une mission de Claude reprend (deux essais au plus), un ordre à un bot ne repart pas tout seul (la ligne du Canal est peut-être déjà écrite). */
+{ const stuck = S.missions.filter((m) => ['attente', 'envoyee'].includes(m.status)).sort((a, b) => a.at - b.at);
+  for (const m of stuck) {
+    if (m.agent === 'claude' && (m.essais || 0) < 2) { runMission(m, (m.essais || 0) > 0).catch(() => {}); continue; }
+    m.status = 'echouee'; m.done = now();
+    m.result = m.agent === 'claude' ? 'Interrompue deux fois par un redémarrage du serveur : relance-la si elle est toujours utile.' : 'Interrompue par un redémarrage du serveur : regarde dans le Canal si la ligne est partie avant de redonner l\'ordre.';
+  }
+  if (stuck.length) save(); }
 server.listen(PORT, HOST, () => {
   console.log('JARVIS OS serveur ' + VERSION + ' sur http://' + HOST + ':' + PORT);
   if (!S.tokens.length && !fs.existsSync(PAIR)) console.log('Aucun appareil relié. Code d\'appairage : ' + newPairing() + ' (30 minutes)');

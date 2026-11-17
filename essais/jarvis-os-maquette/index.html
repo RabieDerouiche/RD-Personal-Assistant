@@ -6465,7 +6465,7 @@ void main(){
   /* JARVIS OS 0.15.0 : missions de Claude lancées d'ici ou par Siri (« mission … ») ; le serveur les fait à part et notifie quand c'est prêt */
   function missionsPanel() {
     const JS = window.JarvisServeur; if (!JS || !JS.mission || !JS.linked()) return null;
-    const ST = {envoyee: ['En cours', 'is-travail'], terminee: ['Terminée', 'st-achat'], echouee: ['En échec', 'st-exp']};
+    const ST = {attente: ['En attente', 'st-attendre'], envoyee: ['En cours', 'is-travail'], terminee: ['Terminée', 'st-achat'], echouee: ['En échec', 'st-exp']};
     const list = h('div', {class: 'mis-list'}, h('p', {class: 'muted', text: 'Lecture des missions…'}));
     const inp = h('textarea', {class: 'inp mis-inp', rows: '2', maxlength: '800', placeholder: 'Ex. compare trois assurances habitation pour un T3 et résume en cinq points'});
     const out = h('p', {class: 'set-msg'});
@@ -6475,8 +6475,9 @@ void main(){
       if (!ms) { list.replaceChildren(h('p', {class: 'muted', text: 'Ton serveur ne les connaît pas encore : « Mettre à jour le serveur » dans Réglages.'})); return; }
       list.replaceChildren(...(ms.length ? ms.map((m) => { const k = ST[m.status] || ST.envoyee; return h('details', {class: 'mis-it'},
         h('summary', {}, h('span', {class: 'pill ' + k[1], text: k[0]}), h('span', {class: 'mis-t', text: m.text}), h('small', {class: 'mis-d', text: fmt(new Date(m.done || m.at), {weekday: 'short', hour: '2-digit', minute: '2-digit'})})),
-        m.result ? h('div', {class: 'mis-r', text: m.result}) : h('p', {class: 'muted', text: 'Claude y travaille : tu seras prévenu par une notification.'})); }) : [h('p', {class: 'muted', text: 'Aucune mission pour le moment.'})]));
-      clearTimeout(timer); if (ms.some((m) => m.status === 'envoyee')) timer = setTimeout(() => { if (TAB === 'suivi' && document.body.contains(list)) load(); }, 20000);
+        m.essais > 1 ? h('p', {class: 'muted mis-rep', text: 'Reprise après un redémarrage du serveur.'}) : null,
+        m.result ? h('div', {class: 'mis-r', text: m.result}) : h('p', {class: 'muted', text: m.status === 'attente' ? 'En attente : une autre mission passe avant.' : 'Claude y travaille : tu seras prévenu par une notification.'})); }) : [h('p', {class: 'muted', text: 'Aucune mission pour le moment.'})]));
+      clearTimeout(timer); if (ms.some((m) => ['attente', 'envoyee'].includes(m.status))) timer = setTimeout(() => { if (TAB === 'suivi' && document.body.contains(list)) load(); }, 20000);
     };
     load();
     const launch = h('button', {type: 'button', class: 'btn main', onclick: async () => {
@@ -6745,13 +6746,13 @@ void main(){
     const st = await JS.tour.etat();
     if (!st) { card.append(h('p', {class: 'muted', text: 'Ton serveur ne le connaît pas encore : touche « Mettre à jour le serveur » plus bas.'})); return card; }
     const ps = JS.push ? await JS.push.status() : null;
-    card.append(h('p', {class: 'muted', text: 'Comme un agent toujours actif : de 8 h à 21 h, Claude relit ton courrier des dernières 24 heures, ton agenda, ce qui attend ta réponse et tes échéances, et te notifie seulement pour une décision du jour, un oubli ou une urgence. Il n’écrit et n’envoie rien. Un appel à Claude (rapide) par tour, sur ton forfait.'}));
+    card.append(h('p', {class: 'muted', text: 'Comme un agent toujours actif : de 8 h à 21 h, Claude relit ton courrier des dernières 24 heures, ton agenda, ce qui attend ta réponse et tes échéances, et te notifie seulement pour une décision du jour, un oubli ou une urgence. Il n’écrit et n’envoie rien. Un appel à Claude (rapide) par tour, sur ton forfait ; si rien n’a changé depuis le tour précédent, Claude n’est pas appelé.'}));
     if (!(ps && ps.count)) card.append(h('p', {class: 'set-msg is-bad', text: 'Active d’abord les notifications (carte du dessus) : sans elles, aucun tour ne part.'}));
     card.append(h('small', {class: 'pick-label', text: 'Fréquence'}),
       h('div', {class: 'seg set-seg', role: 'group'}, [[0, 'Non'], [3, '3 h'], [4, '4 h'], [6, '6 h']].map(([v, l]) => h('button', {type: 'button', 'aria-pressed': String((+st.every || 0) === v), onclick: async () => { await JS.tour.regler(v); VIEWS_RELOAD_SIRI(); }}, l))));
     const d = st.dernier;
-    if (d) card.append(h('p', {class: 'muted tour-last', text: 'Dernier tour ' + fmt(new Date(d.at), {weekday: 'short', hour: '2-digit', minute: '2-digit'}) + ' : ' + (!d.ok ? (d.texte || 'échec') : d.notifie ? '« ' + (d.titre || 'JARVIS') + ' » ' + d.texte : 'rien à signaler.')}));
-    card.append(h('div', {class: 'row-actions'}, h('button', {type: 'button', class: 'btn', onclick: async () => { say('Claude fait le tour…'); const r = await JS.tour.maintenant(); if (!r || r.error || r.ok === false) { say((r && (r.error || r.texte)) || 'Tour impossible.', true); return; } say(r.notifie ? (ps && ps.count ? 'Notification envoyée : « ' : 'À signaler (notifications coupées) : « ') + (r.titre || 'JARVIS') + ' » ' + r.texte : 'Rien à signaler.'); }}, 'Faire un tour maintenant', costTag({cost: 'claude'}))), out);
+    if (d) card.append(h('p', {class: 'muted tour-last', text: 'Dernier tour ' + fmt(new Date(d.at), {weekday: 'short', hour: '2-digit', minute: '2-digit'}) + ' : ' + (!d.ok ? (d.texte || 'échec') : d.saute ? 'rien de nouveau, Claude n’a pas été appelé.' : d.notifie ? '« ' + (d.titre || 'JARVIS') + ' » ' + d.texte : 'rien à signaler.')}));
+    card.append(h('div', {class: 'row-actions'}, h('button', {type: 'button', class: 'btn', onclick: async () => { say('Claude fait le tour…'); const r = await JS.tour.maintenant(); if (!r || r.error || r.ok === false) { say((r && (r.error || r.texte)) || 'Tour impossible.', true); return; } say(r.saute ? 'Rien de nouveau depuis le tour précédent : Claude n’a pas été appelé (gratuit).' : r.notifie ? (ps && ps.count ? 'Notification envoyée : « ' : 'À signaler (notifications coupées) : « ') + (r.titre || 'JARVIS') + ' » ' + r.texte : 'Rien à signaler.'); }}, 'Faire un tour maintenant', costTag({cost: 'claude'}))), out);
     return card;
   }
   VIEWS.reglages = (el) => {

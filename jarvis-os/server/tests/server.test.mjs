@@ -12,9 +12,11 @@ const env = {...process.env, JARVIS_PUSH_ALLOW_HTTP: '1', JARVIS_NOTIFY_TICK_MS:
 const results = []; let fails = 0;
 const ok = (name, cond, info) => { results.push((cond ? 'OK   ' : 'ÉCHEC') + ' ' + name + (info ? ' :: ' + info : '')); if (!cond) fails++; };
 const code = execFileSync(process.execPath, [path.join(HERE, '..', 'server.mjs'), 'pair'], {env}).toString().match(/: ([A-Z0-9]{4}-[A-Z0-9]{4})/)[1];
-const srv = spawn(process.execPath, [path.join(HERE, '..', 'server.mjs')], {env, stdio: ['ignore', 'pipe', 'pipe']});
-srv.stderr.on('data', (d) => process.stderr.write(d));
-await new Promise((r) => srv.stdout.once('data', r));
+let srv;
+const startSrv = async () => { srv = spawn(process.execPath, [path.join(HERE, '..', 'server.mjs')], {env, stdio: ['ignore', 'pipe', 'pipe']}); srv.stderr.on('data', (d) => process.stderr.write(d)); await new Promise((r) => srv.stdout.once('data', r)); };
+/* arrêt brutal puis relance (mise à jour, panne) : l'état sur disque doit suffire */
+const restartSrv = async () => { const old = srv; await new Promise((z) => { old.once('exit', z); old.kill('SIGKILL'); }); await startSrv(); };
+await startSrv();
 const call = async (p, o = {}) => { const r = await fetch(BASE + p, {...o, headers: {'content-type': 'application/json', ...(o.headers || {})}}); return {status: r.status, body: await r.json().catch(() => null), headers: r.headers}; };
 const sse = async (body, tok) => { const r = await fetch(BASE + '/api/chat', {method: 'POST', headers: {'content-type': 'application/json', authorization: 'Bearer ' + tok}, body: JSON.stringify(body)}); const t = await r.text(); const evs = []; for (const b of t.split('\n\n')) { const m = /^event: (\w+)\ndata: (.*)$/s.exec(b.trim()); if (m) evs.push({ev: m[1], d: JSON.parse(m[2])}); } return evs; };
 try {
@@ -68,6 +70,7 @@ try {
   ok('Claude non connecté : message clair', er && /claude auth login/.test(er.d.message), er && er.d.message);
   r = await call('/api/state', {headers: A}); ok('mémoire sur le serveur', r.body.msgs.length >= 9 && r.body.missions.length === 1, r.body.msgs.length + ' messages');
   const kid = d2.missions[0].id;
+  await call('/api/config', {method: 'POST', headers: A, body: JSON.stringify({grokPauseUntil: new Date(Date.now() + 864e5).toISOString()})});   /* pause de Grok en cours (date fixée par le banc, pas celle du jour) */
   r = await call('/api/missions/' + kid, {method: 'POST', headers: A, body: JSON.stringify({status: 'approuvee'})}); ok('mission pour un bot lancée', ['envoyee', 'approuvee', 'terminee'].includes(r.body.mission.status));
   const waitM = async (id) => { let x; for (let i = 0; i < 40; i++) { await new Promise((z) => setTimeout(z, 100)); x = (await call('/api/state', {headers: A})).body.missions.find((m) => m.id === id); if (x && ['terminee', 'echouee'].includes(x.status)) break; } return x; };
   let km = await waitM(kid);
@@ -80,7 +83,7 @@ try {
   await call('/api/memory', {method: 'DELETE', headers: A});
   await call('/api/import', {method: 'POST', headers: A, body: JSON.stringify({msgs: [{who: 'me', text: 'souvenir importé', at: 1}], missions: [cm]})});
   r = await call('/api/state', {headers: A}); ok('import de l\'historique du téléphone', r.body.msgs[0].text === 'souvenir importé' && r.body.missions[0].id === 'm-claude');
-  r = await call('/api/missions/m-claude', {method: 'POST', headers: A, body: JSON.stringify({status: 'approuvee'})}); ok('mission Claude lancée', ['envoyee', 'approuvee'].includes(r.body.mission.status));
+  r = await call('/api/missions/m-claude', {method: 'POST', headers: A, body: JSON.stringify({status: 'approuvee'})}); ok('mission Claude lancée', ['attente', 'envoyee', 'approuvee'].includes(r.body.mission.status), r.body.mission.status);
   let st; for (let i = 0; i < 40; i++) { await new Promise((x) => setTimeout(x, 100)); st = (await call('/api/state', {headers: A})).body.missions[0]; if (st.status === 'terminee') break; }
   ok('mission Claude terminée avec compte rendu', st.status === 'terminee' && /Compte rendu/.test(st.result), st.result);
   r = await call('/api/missions/m-claude', {method: 'DELETE', headers: A}); ok('suppression', r.status === 200);
@@ -251,6 +254,14 @@ try {
       const t1 = Date.now(), q1 = await rac({texte: 'Quoi de neuf ?'}), m1 = ((await G('/api/missions')).body.missions || []).find((x) => x.id === lid);
       ok('missions : à part, elles ne bloquent ni Siri ni la conversation', /Tu as dit : Quoi de neuf \?/.test(q1) && m1 && m1.status === 'envoyee', (Date.now() - t1) + ' ms, ' + (m1 && m1.status));
       await until(async () => ((await G('/api/missions')).body.missions || []).find((x) => x.id === lid && x.status === 'terminee'));
+      /* 0.17.0 : arrêt brutal du serveur pendant une mission : elle reprend à la relance, avec la consigne de reprise, puis prévient */
+      r = await G('/api/mission', {texte: 'lente : une seconde recherche longue'}); const kid = r.body.id; const r2 = await G('/api/mission', {texte: 'lente : une seconde recherche longue'});
+      ok('missions : la même demande lancée deux fois de suite ne crée qu\'une mission', r2.body.id === kid);
+      await new Promise((z) => setTimeout(z, 300)); const mk0 = ((await G('/api/missions')).body.missions || []).find((x) => x.id === kid);
+      await restartSrv(); const n1 = got.length;
+      const mk = await until(async () => ((await G('/api/missions')).body.missions || []).find((x) => x.id === kid && x.status === 'terminee'), 10000);
+      nm = await until(() => got.length > n1 ? open(got[got.length - 1]) : null, 3000);
+      ok('missions : interrompue par un arrêt du serveur, reprise à la relance et notifiée', mk0 && mk0.status === 'envoyee' && mk && mk.essais === 2 && mk.result === 'Compte rendu repris.' && nm && nm.title === 'Mission terminée', JSON.stringify([mk0 && mk0.status, mk]));
       const q2 = await rac({texte: 'Mission : prépare une liste de questions pour le notaire'});
       m = await until(async () => ((await G('/api/missions')).body.missions || []).find((x) => /liste de questions pour le notaire/.test(x.text) && x.status === 'terminee'));
       ok('missions : « Dis Siri, Jarvis, mission … » la lance et prévient', /^Mission lancée : prépare une liste/.test(q2) && /Je te préviens/.test(q2) && m, q2);
@@ -260,9 +271,12 @@ try {
       let n0 = got.length; r = await G('/api/tour/maintenant', {}); nm = await until(() => got.length > n0 ? open(got[got.length - 1]) : null, 3000);
       ok('tour de Claude : lit le courrier des 24 heures et notifie une décision', r.status === 200 && r.body.notifie === true && nm && nm.title === 'Syndic à confirmer' && /expert de mardi/.test(nm.body), JSON.stringify(r.body));
       n0 = got.length; r = await G('/api/tour/maintenant', {}); await new Promise((z) => setTimeout(z, 300));
-      ok('tour de Claude : la même alerte n\'est pas redonnée', r.body.ok === true && r.body.notifie === false && got.length === n0, JSON.stringify(r.body));
-      r = await G('/api/tour'); const st1 = (await G('/api/status')).body.usage;
-      ok('tour de Claude : dernier tour et nombre de tours gardés', r.body.dernier && r.body.dernier.ok && r.body.last > 0 && st1.tours === 2, JSON.stringify(r.body));
+      ok('tour de Claude : rien de nouveau, Claude n\'est pas appelé (zéro jeton), aucune notification', r.body.ok === true && r.body.saute === true && r.body.notifie === false && got.length === n0, JSON.stringify(r.body));
+      r = await G('/api/tour'); let st1 = (await G('/api/status')).body.usage;
+      ok('tour de Claude : dernier tour, tours faits et tours sautés gardés', r.body.dernier && r.body.dernier.saute && r.body.last > 0 && st1.tours === 1 && st1.toursSautes === 1, JSON.stringify(st1));
+      FG.sheet["'Échéances'!A1:H1000"] = (FG.sheet["'Échéances'!A1:H1000"] || [['Date', 'Sujet', 'Statut']]).concat([[new Date().toLocaleDateString('fr-FR', {timeZone: 'Europe/Paris', day: '2-digit', month: '2-digit', year: 'numeric'}), 'Nouvelle échéance du jour', 'À venir']]);
+      n0 = got.length; r = await G('/api/tour/maintenant', {}); st1 = (await G('/api/status')).body.usage;
+      ok('tour de Claude : une donnée change, Claude est rappelé (et ne redonne pas l\'alerte déjà donnée)', !r.body.saute && r.body.notifie === false && st1.tours === 2 && got.length === n0, JSON.stringify([r.body, st1]));
       await G('/api/tour', {every: 0}); await G('/api/push/unsubscribe', {endpoint: 'http://127.0.0.1:' + PS.address().port + '/push/m'}); PS.close(); }
     FG.valid.clear(); FG.refreshOk = false; r = await T('Google Sheets', 'get_values', {spreadsheetId: 'PIL', range: 'Canal!A1:H3'}); g = await G('/api/google');
     ok('accès retiré dans Google : « à reconnecter », plus relié', r.body.error && r.body.error.code === 'needs_reauth' && !g.body.linked, JSON.stringify(r.body.error));

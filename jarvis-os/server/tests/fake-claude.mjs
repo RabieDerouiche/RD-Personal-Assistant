@@ -27,7 +27,7 @@ function answer(raw) {
     const before = raw.split('[Question]\n')[0], deja = /Alertes déjà données : .*Syndic à confirmer/.test(before);
     return {text: 'Voici : ' + JSON.stringify(/Courrier des 24 heures.*Dégât des eaux/.test(before) && !deja ? {notifier: true, titre: 'Syndic à confirmer', texte: "Le syndic attend ta confirmation pour l'expert de mardi."} : {notifier: false, titre: '', texte: ''})};
   }
-  if (/^Mission : lente/.test(input)) return {text: 'Compte rendu lent. ' + 'x'.repeat(2400)};
+  if (/^Mission : lente/.test(input)) return {text: /Reprise après un redémarrage/.test(input) ? 'Compte rendu repris.' : 'Compte rendu lent. ' + 'x'.repeat(2400)};
   if (/montre le contexte/.test(input)) return {text: raw.split('[Question]\n')[0]};   /* banc des Raccourcis : renvoie les données reçues */
   /* tâche « Ordres Jarvis » faite par le serveur : répond aux lignes données, laisse « à valider » ce qui touche une fiche */
   if (/Lignes du Canal de Pilotage adressées à Claude/.test(input)) {
