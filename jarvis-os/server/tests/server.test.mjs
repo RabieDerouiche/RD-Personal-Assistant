@@ -1,14 +1,14 @@
 /* Banc du serveur : node tests/server.test.mjs (aucun vrai Claude, aucun coût). */
 import {spawn, execFileSync} from 'node:child_process';
 import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path'; import {fileURLToPath} from 'node:url';
-const HERE = path.dirname(fileURLToPath(import.meta.url));
+const HERE = path.dirname(fileURLToPath(import.meta.url)), HOME0 = os.homedir();
 import {startFakeGoogle} from './fake-google.mjs';
 import http from 'node:http'; import crypto from 'node:crypto';
 import {paris} from '../notify.mjs';
 const FG = await startFakeGoogle();
 const DATA = fs.mkdtempSync(path.join(os.tmpdir(), 'jarvis-'));
 const PORT = 18000 + Math.floor(Math.random() * 1000), BASE = 'http://127.0.0.1:' + PORT;
-const env = {...process.env, JARVIS_PUSH_ALLOW_HTTP: '1', JARVIS_NOTIFY_TICK_MS: '3600000', JARVIS_GOOGLE_FAKE: FG.url, PORT: String(PORT), JARVIS_DATA: DATA, CLAUDE_BIN: path.join(HERE, 'fake-claude.mjs'), ANTHROPIC_API_KEY: 'sk-ant-faux-pour-le-test', ANTHROPIC_BASE_URL: 'https://exemple.invalid', JARVIS_ORIGINS: 'https://rabiederouiche.github.io', JARVIS_REPO: os.tmpdir(), JARVIS_OS_DIR: path.join(HERE, '..', '..', '..', 'essais', 'jarvis-os-maquette'), JARVIS_TTS_HELPER: path.join(HERE, 'fake-tts.mjs'), JARVIS_VOICE_MODEL: path.join(HERE, 'fake-tts.mjs'), JARVIS_VOICE_SCRIPT: path.join(DATA, 'fausse-install.sh')};
+const env = {...process.env, JARVIS_PUSH_ALLOW_HTTP: '1', JARVIS_NOTIFY_TICK_MS: '3600000', JARVIS_SANTE_TICK_MS: '3600000', JARVIS_GOOGLE_FAKE: FG.url, PORT: String(PORT), JARVIS_DATA: DATA, CLAUDE_BIN: path.join(HERE, 'fake-claude.mjs'), ANTHROPIC_API_KEY: 'sk-ant-faux-pour-le-test', ANTHROPIC_BASE_URL: 'https://exemple.invalid', JARVIS_ORIGINS: 'https://rabiederouiche.github.io', JARVIS_REPO: os.tmpdir(), JARVIS_OS_DIR: path.join(HERE, '..', '..', '..', 'essais', 'jarvis-os-maquette'), JARVIS_TTS_HELPER: path.join(HERE, 'fake-tts.mjs'), JARVIS_VOICE_MODEL: path.join(HERE, 'fake-tts.mjs'), JARVIS_VOICE_SCRIPT: path.join(DATA, 'fausse-install.sh')};
 const results = []; let fails = 0;
 const ok = (name, cond, info) => { results.push((cond ? 'OK   ' : 'ÉCHEC') + ' ' + name + (info ? ' :: ' + info : '')); if (!cond) fails++; };
 const code = execFileSync(process.execPath, [path.join(HERE, '..', 'server.mjs'), 'pair'], {env}).toString().match(/: ([A-Z0-9]{4}-[A-Z0-9]{4})/)[1];
@@ -45,6 +45,19 @@ try {
   evs = await sse({text: 'Encore une'}, tok); const r3 = evs.find((e) => e.ev === 'done'); const pid = (x) => (x.match(/processus : (\d+)/) || [])[1];
   ok('Claude reste ouvert entre deux phrases (même processus, 2e tour)', pid(r3.d.reply) === pid(r2) && /tour : 2/.test(r3.d.reply), r3.d.reply.slice(-40));
   ok('chronométrage de la réponse', r3.d.timing && r3.d.timing.warm === true && r3.d.timing.first >= 0 && r3.d.timing.total >= r3.d.timing.first, JSON.stringify(r3.d.timing));
+  { const e2 = await sse({text: 'montre les outils refusés'}, tok); const rf = (e2.find((e) => e.ev === 'done') || {d: {}}).d.reply || '';
+    ok('conversation : aucun outil de fichiers (lecture comprise) ni commande système', ['Bash', 'Read', 'Glob', 'Grep', 'Edit', 'Write'].every((t) => rf.split(/[ ,]/).includes(t)), rf); }
+  /* 0.16.0 : le garde-fou bloque les outils de fichiers hors des dossiers de travail (secrets du serveur, identifiants de Claude Code, /proc, /etc) */
+  { const HOMEX = fs.mkdtempSync(path.join(os.tmpdir(), 'jarvis-home-')), DX = path.join(HOMEX, '.jarvis'), WK = path.join(DX, 'work', 'm1');
+    fs.mkdirSync(WK, {recursive: true}); fs.mkdirSync(path.join(HOMEX, '.claude'), {recursive: true}); fs.writeFileSync(path.join(DX, 'state.json'), '{}'); fs.symlinkSync(path.join(DX, 'state.json'), path.join(WK, 'lien.json'));
+    const gd = (mode, tool_name, tool_input) => new Promise((z) => { const c = spawn(process.execPath, [path.join(HERE, '..', 'hooks', 'guard.mjs'), mode], {env: {...process.env, HOME: HOMEX, JARVIS_DATA: DX}}); c.on('close', (code) => z(code)); c.stdin.end(JSON.stringify({tool_name, tool_input, cwd: WK})); });
+    const cas = [['Read', {file_path: path.join(DX, 'state.json')}, 2], ['Read', {file_path: path.join(HOMEX, '.claude', '.credentials.json')}, 2], ['Read', {file_path: '~/.ssh/id_ed25519'}, 2],
+      ['Glob', {pattern: '../../*.json'}, 2], ['Glob', {pattern: '**/*.md'}, 0], ['Grep', {pattern: 'refresh', path: DX}, 2], ['Grep', {pattern: 'state.json'}, 0], ['Read', {file_path: '/proc/self/environ'}, 2],
+      ['Read', {file_path: path.join(WK, 'lien.json')}, 2], ['Read', {file_path: path.join(WK, 'notes.md')}, 0], ['Write', {file_path: path.join(WK, 'rapport.md'), content: 'x'}, 0], ['Write', {file_path: path.join(DX, 'state.json'), content: '{}'}, 2],
+      ['Edit', {file_path: path.join(HOMEX, 'x.txt')}, 2], ['Read', {file_path: '/tmp/page.html'}, 0]];
+    const got = []; for (const [t, i, want] of cas) { const code = await gd('mission', t, i); if (code !== want) got.push(t + ' ' + JSON.stringify(i) + ' → ' + code); }
+    ok('garde-fou : fichiers secrets, dossier personnel, /proc bloqués (lien symbolique compris) ; dossier de travail ouvert', !got.length, got.join(' | '));
+    fs.rmSync(HOMEX, {recursive: true, force: true}); }
   evs = await sse({text: 'Nouvelle conversation', newSession: true}, tok); ok('nouvelle session sur demande', /Session : nouvelle/.test(evs.find((e) => e.ev === 'done').d.reply));
   evs = await sse({text: 'Demande à Kairos de vérifier le prix'}, tok);
   const d2 = evs.find((e) => e.ev === 'done').d, deltas = evs.filter((e) => e.ev === 'delta').map((e) => e.d.text);
@@ -253,7 +266,18 @@ try {
       await G('/api/tour', {every: 0}); await G('/api/push/unsubscribe', {endpoint: 'http://127.0.0.1:' + PS.address().port + '/push/m'}); PS.close(); }
     FG.valid.clear(); FG.refreshOk = false; r = await T('Google Sheets', 'get_values', {spreadsheetId: 'PIL', range: 'Canal!A1:H3'}); g = await G('/api/google');
     ok('accès retiré dans Google : « à reconnecter », plus relié', r.body.error && r.body.error.code === 'needs_reauth' && !g.body.linked, JSON.stringify(r.body.error));
-    FG.refreshOk = true; r = await G('/api/google/link', {}); await fetch(BASE + '/api/google/callback?state=' + new URL(r.body.url).searchParams.get('state') + '&code=CODE-OK');
+    /* veilleur de santé (0.16.0) : l'accès Google retiré est dit une fois, sans Claude */
+    { const got = []; const PS = http.createServer((q, res) => { q.resume(); q.on('end', () => { got.push(q.url); res.writeHead(201); res.end(); }); }); await new Promise((z) => PS.listen(0, '127.0.0.1', z));
+      const ua = crypto.createECDH('prime256v1'); ua.generateKeys(); const ep = 'http://127.0.0.1:' + PS.address().port + '/push/sante';
+      await G('/api/push/subscribe', {subscription: {endpoint: ep, keys: {p256dh: ua.getPublicKey().toString('base64url'), auth: crypto.randomBytes(16).toString('base64url')}}});
+      let n0 = got.length; r = await G('/api/sante/maintenant', {}); const it = (k) => (r.body.items || []).find((x) => x.cle === k) || {};
+      ok('santé : accès Google retiré signalé par une notification, Claude connecté', it('google').ok === false && /Reconnecter/.test(it('google').detail) && it('claude').ok === true && got.length === n0 + 1, JSON.stringify(r.body.items));
+      n0 = got.length; await G('/api/sante/maintenant', {}); ok('santé : pas de seconde notification pour le même problème', got.length === n0);
+      FG.refreshOk = true; r = await G('/api/google/link', {}); await fetch(BASE + '/api/google/callback?state=' + new URL(r.body.url).searchParams.get('state') + '&code=CODE-OK');
+      n0 = got.length; r = await G('/api/sante/maintenant', {}); ok('santé : retour à la normale noté, sans notification', it('google').ok === true && got.length === n0, JSON.stringify(r.body.items));
+      const gs = JSON.parse(fs.readFileSync(path.join(DATA, 'guard-mission.json'), 'utf8'));
+      ok('missions : Claude Code refuse les chemins secrets (état du serveur, ~/.claude, /proc) et le garde-fou voit les outils de fichiers', /Read/.test(gs.hooks.PreToolUse[0].matcher) && gs.permissions.deny.includes('Read(//' + path.resolve(DATA).replace(/^\/+/, '') + '/*.json)') && gs.permissions.deny.some((x) => /^Read\(\/\/.*\/\.claude\/\*\*\)$/.test(x)) && gs.permissions.deny.includes('Read(//proc/**)'), JSON.stringify(gs.permissions.deny.slice(0, 4)));
+      await G('/api/push/unsubscribe', {endpoint: ep}); PS.close(); }
     r = await G('/api/google/unlink', {}); g = await G('/api/google'); ok('déconnexion : jeton révoqué chez Google', r.body.ok && !g.body.linked && FG.revoked === 'RT1'); }
   { let sp = await call('/api/sample', {method: 'POST', headers: A, body: JSON.stringify({input: [{role: 'user', content: 'Explique en clair'}], tier: 'quick'})});
     ok('Claude ponctuel pour la page : modèle rapide, aucun outil', sp.status === 200 && /Tu as dit : Explique en clair\. Session : nouvelle, modèle : haiku, outils : , garde : chat/.test(sp.body.text), sp.body.text && sp.body.text.slice(0, 120));

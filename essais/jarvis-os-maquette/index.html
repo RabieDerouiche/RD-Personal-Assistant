@@ -1292,6 +1292,7 @@
   .mis-d { flex: 0 0 auto; color: var(--muted); }
   .mis-r { margin-top: 8px; white-space: pre-wrap; overflow-wrap: anywhere; font: 14px/1.5 var(--sans); }
   .mis-help { margin: 0 0 8px; }
+  .sante-box { margin-top: 12px; display: grid; gap: 8px; } .sante-sys dd { white-space: normal; }
   .sa-main .btn .cost, .sa-grid .btn .cost { margin-left: auto; flex: 0 0 auto; }
   .sa-main .btn .chev, .sa-grid .btn .chev { margin-left: auto; flex: 0 0 auto; } .sa-main .btn .cost + .chev, .sa-grid .btn .cost + .chev { margin-left: 2px; }
   .sa-main .btn .sugg-tag, .sa-grid .btn .sugg-tag { flex: 0 0 auto; }
@@ -6488,8 +6489,22 @@ void main(){
       h('p', {class: 'muted mis-help', text: 'Une recherche ou une préparation qui prend du temps : Claude la fait sur ton serveur (web, tes données en lecture, brouillons Gmail au plus), sans bloquer la conversation. Aussi par Siri : « mission » puis ta demande.'}),
       inp, h('div', {class: 'row-actions'}, launch), out, list);
   }
+  /* JARVIS OS 0.16.0 : santé du serveur dans « État des systèmes » (veilleur sans Claude, toutes les 10 minutes) */
+  function santeBox() {
+    const JS = window.JarvisServeur; if (!JS || !JS.sante || !JS.linked()) return null;
+    const box = h('div', {class: 'sante-box'}, h('p', {class: 'muted', text: 'Lecture de l’état du serveur…'}));
+    const draw = (st) => {
+      if (!st) { box.replaceChildren(h('p', {class: 'muted', text: 'Ton serveur ne le connaît pas encore : « Mettre à jour le serveur » dans Réglages.'})); return; }
+      const items = st.items || [];
+      box.replaceChildren(h('small', {class: 'pick-label', text: 'Ton serveur' + (st.at ? ' · vérifié ' + fmt(new Date(st.at), {hour: '2-digit', minute: '2-digit'}) : '')}),
+        items.length ? h('dl', {class: 'sys sante-sys'}, items.map((it) => h('div', {class: 'sys-row is-' + (it.ok ? 'ok' : 'bad')}, h('i', {'aria-hidden': 'true'}), h('dt', {text: it.nom}), h('dd', {text: it.detail})))) : h('p', {class: 'muted', text: 'Pas encore vérifié.'}),
+        h('div', {class: 'row-actions'}, h('button', {type: 'button', class: 'btn sm', onclick: async () => { box.querySelector('.btn').disabled = true; draw(await JS.santeMaintenant()); }}, 'Vérifier maintenant', costTag({cost: 'free'}))));
+    };
+    JS.sante().then(draw);
+    return box;
+  }
   const VSM = VIEWS.suivi;
-  VIEWS.suivi = (el) => { VSM(el); const mp = missionsPanel(); if (!mp) return; const sys = Array.from(el.querySelectorAll('.panel')).find((p) => /État des systèmes/.test((p.querySelector('h2') || {}).textContent || '')); if (sys) sys.before(mp); else el.append(mp); };
+  VIEWS.suivi = (el) => { VSM(el); const sys = Array.from(el.querySelectorAll('.panel')).find((p) => /État des systèmes/.test((p.querySelector('h2') || {}).textContent || '')); const sb = santeBox(); if (sb && sys) sys.append(sb); const mp = missionsPanel(); if (!mp) return; if (sys) sys.before(mp); else el.append(mp); };
 
   /* v17.15 : alertes en direct. Pendant que Jarvis est ouvert : un son et un bandeau quand un bot répond à un de tes ordres
      ou qu'une nouvelle demande t'attend, avec « Écouter » et « Voir ». Rien n'est lu à la première lecture de Pilotage. */

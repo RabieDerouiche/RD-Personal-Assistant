@@ -113,6 +113,9 @@
       etat: () => req('/api/sauvegarde').then((r) => (r.status === 200 ? r.j : null)).catch(() => null),
       maintenant: () => req('/api/sauvegarde/maintenant', {}).then((r) => r.j).catch(() => ({ok: false, error: 'Serveur injoignable.'}))
     },
+    /* veilleur de santé du serveur (0.16.0) : accès Google, Claude, sauvegarde, lecture de Pilotage, notifications */
+    sante: () => req('/api/sante').then((r) => (r.status === 200 ? r.j : null)).catch(() => null),
+    santeMaintenant: () => req('/api/sante/maintenant', {}).then((r) => (r.status === 200 ? r.j : null)).catch(() => null),
     /* missions de Claude (0.15.0) : lancer une mission longue, suivre les dernières ; notification à la fin */
     mission: (texte) => req('/api/mission', {texte}).then((r) => r.j).catch(() => ({ok: false, error: 'Serveur injoignable.'})),
     missions: () => req('/api/missions').then((r) => (r.status === 200 ? r.j.missions : null)).catch(() => null),
