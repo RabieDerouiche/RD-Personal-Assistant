@@ -27,6 +27,7 @@
     [fr(D(0)), 'Iris', 'Résiliation StreamPlus', 'Envoyer la relance préparée dans tes brouillons Gmail (fil StreamPlus)'],
     [fr(D(-6)), 'Iris', 'Offre de bienvenue', "À faire : Activer l'offre de bienvenue | Avant le : " + fr(D(-2))],
     [fr(D(-5)), 'Iris', 'Formulaire de la mutuelle', 'À faire : Renvoyer le formulaire signé | Avant le : ' + fr(D(-1))],
+    [fr(D(0)), 'Chronos', 'CRA Allegis', 'Ton oui dans le chat de Chronos : '],
     [fr(D(-1)), 'Iris', "Rachat de l'abonnement", "À faire : Offre Alpha terminée le " + fr(D(-3)) + " (simulation non connue). Simuler chez Beta (offre jusqu'au " + fr(D(12)) + ')'],
     [fr(D(0)), 'Iris', 'Garde pendant la fermeture de la crèche le ' + fr(D(60)), "Choix : Qui garde l'enfant ? | Options : Toi / Ton épouse / Partage | Avant le : " + fr(D(45))]
   ];
@@ -393,6 +394,7 @@
       stop: async () => { window.__ear.push('dict:stop'); live = false; clearInterval(poll); st('idle', 'stopped'); }};
   }
   window.claude = {use: async (name) => { await delay(null, 10); if (SCEN.offline) return null; return name === 'mcp' ? mcp : name === 'sample' ? (SCEN.noSample ? null : sample) : name === 'tts' ? tts : name === 'dictation' ? dict : null; }};
+  G['Canal'].push([fr(D(0)), 'Chronos', 'Rabie', 'CRA Allegis', 'Oui/Non : Soumettre le CRA Allegis de la semaine du ' + fr(D(-2)).slice(0, 5) + ' | Jours : télétravail et congés selon Présence | Pourquoi : congés confirmés dans Présence ; aucun férié | Avant le : ' + fr(D(2)), 'Attend ton oui', '', '']);
   /* scénario pending : n ordres du propriétaire encore « À faire », datés d'aujourd'hui */
   if (SCEN.pending) for (let i = 1; i <= SCEN.pending; i++) G['Canal'].push([fr(D(0)), 'Rabie', 'Iris', 'Ordre', 'Ordre numéro ' + i, 'À faire', '', '']);
   window.__G = G; window.__MAIL = MAIL; window.__CAL = CAL;
