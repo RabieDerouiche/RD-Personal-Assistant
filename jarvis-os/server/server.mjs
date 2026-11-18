@@ -18,7 +18,7 @@ import {createSante} from './sante.mjs';
 import {createComparatifs} from './comparatif.mjs';
 import {createEcoute, wavOk, intention, quand, meteoPhrase, meteoUrl, heurePhrase, datePhrase, nrm, diction} from './voix.mjs';
 
-const VERSION = '0.23.0';
+const VERSION = '0.23.1';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PORT = +(process.env.PORT || 8787);
 const HOST = process.env.HOST || '127.0.0.1';

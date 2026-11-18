@@ -2,7 +2,7 @@
 /* JARVIS OS : sur le serveur du propriétaire, ses vraies données (jarvis-serveur.js) ; sur GitHub ou en local, les exemples. ?maquette ou ?serveur pour forcer. */
 (function () { var q = location.search, srv = /[?&]serveur\b/.test(q) || (location.protocol === 'https:' && !/github\.io$/i.test(location.hostname) && !/[?&]maquette\b/.test(q)); window.__JARVIS_MODE = srv ? 'serveur' : 'maquette'; document.write('<script src="' + (srv ? 'jarvis-serveur.js' : 'donnees-fictives.js') + '"><\/script>'); })();</script><script>/* JARVIS OS : thème « hologramme » par défaut (choisi le 16/11/2026) ; ?theme=actuel ou « Thème » dans Toutes les rubriques pour l'ancien, gardé dans le téléphone */
 (function () { var q = (location.search.match(/[?&]theme=(\w+)/) || [])[1], t = null; try { if (q) localStorage.setItem('jarvis.theme', q); t = localStorage.getItem('jarvis.theme'); } catch (e) { t = q; }
-  if (t !== 'actuel') { document.documentElement.classList.add('theme-holo'); var l = document.createElement('link'); l.rel = 'stylesheet'; l.href = 'https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700&family=Oxanium:wght@500;600;700&family=Exo+2:wght@400;500;600;700&display=swap'; document.head.appendChild(l); } })();</script><script src="jarvis-voix.js"></script><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><link rel="manifest" href="manifest.webmanifest"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="theme-color" content="#02040e"><link rel="apple-touch-icon" href="icon-180.png"><link rel="icon" type="image/png" href="icon-192.png"><meta name="apple-mobile-web-app-title" content="JARVIS"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}
+  if (t !== 'actuel') { document.documentElement.classList.add('theme-holo'); var l = document.createElement('link'); l.rel = 'stylesheet'; l.href = 'https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700&family=Oxanium:wght@500;600;700&family=Exo+2:wght@400;500;600;700&display=swap'; document.head.appendChild(l); } })();</script><script src="jarvis-voix.js"></script><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><link rel="manifest" href="manifest.webmanifest"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black"><meta name="theme-color" content="#02040e"><link rel="apple-touch-icon" href="icon-180.png"><link rel="icon" type="image/png" href="icon-192.png"><meta name="apple-mobile-web-app-title" content="JARVIS"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}
   /* ---------- JARVIS OS : navigation et écrans ajoutés ---------- */
   .fab-talk { display: none !important; }
   /* barre à tes favoris (bas) et toutes les rubriques */
@@ -327,7 +327,13 @@
   body::after { content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
     background: radial-gradient(900px 600px at 10% -5%, rgba(79, 70, 229, .32), transparent 60%), radial-gradient(700px 500px at 105% 20%, rgba(6, 182, 212, .20), transparent 60%), radial-gradient(800px 600px at 50% 110%, rgba(192, 38, 211, .18), transparent 60%); }
   body.noscroll { overflow: hidden; }
-  body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 45; background: var(--bg-2); }
+  /* 18/11/2026 (retour du propriétaire, capture : « le haut du bandeau est flouté, c'est moche ») : depuis iOS 26.1, une app de l'écran
+     d'accueil en barre d'état translucide reçoit un flou du système sur la barre d'état ET le haut de la page, qu'aucun style ne retire.
+     La barre d'état passe en opaque (« black », prise en compte à la prochaine installation de l'app) ; d'ici là, une bande opaque
+     couvre la zone floutée (1,4 fois la barre d'état) et l'en-tête commence dessous. Sans barre translucide, l'encoche vaut 0 : rien ne change. */
+  :root { --sat: calc(env(safe-area-inset-top, 0px) * 1.4); }
+  body::before { content: ""; position: fixed; inset: 0 0 auto; height: var(--sat); z-index: 45; background: var(--bg-2); }
+  html.theme-holo body::before { background: rgb(4, 11, 31); }
   .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
   button, input, select, textarea { font: inherit; color: inherit; }
   button { -webkit-tap-highlight-color: transparent; cursor: pointer; }
@@ -560,7 +566,7 @@
 
   /* ---- rubriques plein écran (dépôt) ---- */
   .app { --fg: var(--app-fg); position: fixed; inset: 0; z-index: 50; overflow-y: auto; background: var(--bg); color: var(--fg); padding-bottom: calc(40px + env(safe-area-inset-bottom, 0px)); }
-  .app-head { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: 10px; padding-block: calc(10px + env(safe-area-inset-top, 0px)) 10px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); background: var(--bg-2); border-bottom: 1px solid var(--line); }
+  .app-head { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: 10px; padding-block: calc(10px + var(--sat, 0px)) 10px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); background: var(--bg-2); border-bottom: 1px solid var(--line); }
   .app-head h2 { margin: 0; font: 600 18px var(--display); }
   .app-body { padding-block: 14px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; gap: 12px; max-width: 720px; margin: 0 auto; }
   .app-lead { margin: 0; color: var(--muted); }
@@ -623,7 +629,7 @@
 
   /* ---- discussion ---- */
   .chat { position: fixed; inset: 0; z-index: 70; display: flex; flex-direction: column; color: var(--fg); background: radial-gradient(700px 500px at 50% -10%, rgba(79, 70, 229, .3), transparent 60%), var(--bg); }
-  .chat-head { display: flex; align-items: center; gap: 10px; padding-block: calc(8px + env(safe-area-inset-top, 0px)) 8px; padding-left: max(8px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); border-bottom: 1px solid var(--line); background: rgba(6, 9, 18, .6); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); }
+  .chat-head { display: flex; align-items: center; gap: 10px; padding-block: calc(8px + var(--sat, 0px)) 8px; padding-left: max(8px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); border-bottom: 1px solid var(--line); background: rgba(6, 9, 18, .6); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); }
   .chat-id { display: flex; flex-direction: column; min-width: 0; }
   .chat-id b { font: 600 15px var(--display); }
   .chat-id span { font-size: 12.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -653,7 +659,7 @@
   .tab .badge { position: absolute; top: 3px; left: calc(50% + 6px); min-width: 16px; height: 16px; padding: 0 4px; box-sizing: border-box; border-radius: 8px; background: var(--amber); color: #1a1003; font: 700 10px/16px var(--sans); text-align: center; }
 
   /* ---- messages ---- */
-  .toasts { position: fixed; left: 50%; top: calc(env(safe-area-inset-top, 0px) + 12px); transform: translateX(-50%); z-index: 80; width: min(calc(100vw - 32px), 460px); display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
+  .toasts { position: fixed; left: 50%; top: calc(var(--sat, 0px) + 12px); transform: translateX(-50%); z-index: 80; width: min(calc(100vw - 32px), 460px); display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
   .toast { background: rgba(16, 22, 40, .94); -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); color: var(--fg); border: 1px solid var(--line-2); border-radius: 18px; padding: 11px 14px; box-shadow: 0 16px 40px rgba(0, 0, 0, .5); font-size: 13px; line-height: 1.4; pointer-events: auto; animation: tin .25s ease-out; transition: opacity .3s, transform .3s; }
   .toast.is-bot { border-color: rgba(110, 231, 183, .45); }
   .toast b { display: block; font-size: 13.5px; font-weight: 600; margin-bottom: 2px; }
@@ -981,7 +987,7 @@
   .scroller { position: fixed; inset: 0; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; overscroll-behavior-y: contain; }
   /* iPhone (17/11/2026, capture du propriétaire) : l'en-tête collé sous la barre d'état descendait de sa hauteur (59 px) et cachait le haut de la page ;
      le contenu commence donc sous la barre d'état, et l'en-tête reste à sa place en défilant. */
-  .scroller { padding-top: env(safe-area-inset-top, 0px); }
+  .scroller { padding-top: var(--sat, 0px); }
   /* iOS 26, app de l'écran d'accueil : tant que la page est plus courte que l'écran, iOS la raccourcit de la hauteur de la barre d'état
      (WebKit 301108) et la barre du bas s'arrête 59 px trop haut. Tout JARVIS défile dans .scroller : la page elle-même est vide, donc trop courte.
      On lui donne la hauteur de l'écran (plafonnée à 100lvh pour ne jamais la faire défiler), et le fond rejoint celui de la barre du bas. */
@@ -1330,7 +1336,7 @@
   .pm-sec > summary::-webkit-details-marker { display: none; } .pm-sec > summary h2 { margin: 0; } .pm-sec > summary .aside { margin-left: auto; }
   .pm-list { display: grid; gap: 12px; }
   /* 0.23.0 : l'accueil en tableau de bord */
-  .kpi-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .kpi-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
   .kpi-t { font: inherit; color: var(--fg); text-align: left; display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-rows: auto auto auto; column-gap: 8px; row-gap: 1px; align-items: center; padding: 11px 12px; border-radius: 16px; border: 1px solid var(--line); background: linear-gradient(180deg, var(--glass-2), var(--glass)); cursor: pointer; min-width: 0; }
   .kpi-ic { grid-row: 1; color: var(--accent); display: grid; } .kpi-n { grid-row: 1; font-size: 22px; line-height: 1.1; font-variant-numeric: tabular-nums; }
   .kpi-l { grid-column: 1 / -1; font-size: 13px; font-weight: 600; } .kpi-s { grid-column: 1 / -1; font-size: 11.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -1350,6 +1356,8 @@
   .cmp-pic { margin: 0; display: grid; gap: 4px; justify-items: center; text-align: center; padding: 8px; border-radius: 14px; background: rgba(255, 255, 255, .92); }
   .cmp-pic figcaption { display: grid; color: #0b1222; } .cmp-pic figcaption b { font-size: 12.5px; overflow-wrap: anywhere; } .cmp-pic figcaption small { font-size: 11.5px; color: #334155; }
   .cmp-img { width: 100%; max-width: 120px; aspect-ratio: 1; object-fit: contain; display: block; }
+  .cmp-pic.is-none { background: rgba(255, 255, 255, .06); border: 1px dashed var(--line); } .cmp-pic.is-none figcaption { color: var(--fg); } .cmp-pic.is-none figcaption small { color: var(--muted); }
+  .cmp-noimg { width: 100%; max-width: 120px; aspect-ratio: 1; display: grid; place-items: center; color: var(--muted); }
   .cmp-crit { display: grid; gap: 6px; } .cmp-ch { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; } .cmp-ch b { font-size: 13.5px; } .cmp-ch small { color: var(--muted); font-size: 12px; }
   .cmp-bar { display: grid; grid-template-columns: minmax(0, 7.5em) minmax(0, 1fr) auto; gap: 8px; align-items: center; font-size: 13px; }
   .cmp-n { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); } .cmp-v { font-variant-numeric: tabular-nums; min-width: 3.4em; text-align: right; }
@@ -7189,13 +7197,12 @@ void main(){
     const pm = pourMoiN(), urg = D.dem.filter((d) => d.due != null && d.due <= 2).length, mails = (S.mailAfter && S.mailAfter.items) || [];
     const reps = recentReplies().filter((x) => x.n >= -1), wait = (S.ordres || []).filter((o) => !/^(fait|annul)/i.test(o.status)), oldW = wait.length ? Math.max(...wait.map((o) => -o.n)) : 0;
     const dos = S.dossiers || [], oldD = dos.length ? Math.max(...dos.map((k) => -(k.since || 0))) : 0, deals = (S.ach || []).filter((f) => ['achat', 'bon'].includes(famState(f)));
+    /* 19/11/2026 (retour du propriétaire : « à part pour toi, nouveaux mails et bon prix, le reste ne sert à rien », et « réponses des bots » était faux) */
     const T = [
       [pm, 'pour toi', urg ? urg + (urg > 1 ? ' urgentes' : ' urgente') : pm ? 'à décider ou à faire' : 'rien ne t’attend', 'chat', () => go('demandes'), pm ? 'is-amber' : ''],
       [mails.length, mails.length > 1 ? 'nouveaux mails' : 'nouveau mail', mails.length ? 'dont ' + mails[0].from : 'depuis la veille d’Iris', 'inbox', () => voirUrl('#voir-courrier'), ''],
-      [reps.length, reps.length > 1 ? 'réponses des bots' : 'réponse des bots', reps.length ? lvName(reps[0].bot) + ' : ' + String(reps[0].a).replace(/\s+/g, ' ').slice(0, 42) : 'depuis hier', 'bot', () => voirUrl('#voir-recent'), ''],
-      [wait.length, wait.length > 1 ? 'ordres en cours' : 'ordre en cours', wait.length ? 'le plus ancien : ' + ago(oldW) : 'chez tes bots', 'hourglass', () => go('equipe'), oldW >= 3 ? 'is-amber' : ''],
-      [dos.length, dos.length > 1 ? 'dossiers chez un tiers' : 'dossier chez un tiers', dos.length ? 'le plus ancien : ' + oldD + ' j' : 'rien en attente', 'folder', () => go('suivi'), ''],
       [deals.length, deals.length > 1 ? 'bons prix' : 'bon prix', deals.length ? deals.map((f) => f.title).join(', ').slice(0, 44) : 'rien sous tes seuils', 'tag', () => go('achats'), deals.length ? 'is-green' : '']];
+    void reps; void wait; void oldW; void dos; void oldD;
     return h('div', {class: 'kpi-grid'}, T.map(([n, l, sub, ic, fn, cls]) => h('button', {type: 'button', class: 'kpi-t ' + cls, onclick: fn},
       h('span', {class: 'kpi-ic', html: icon(ic, 16)}), h('b', {class: 'kpi-n', text: String(n)}), h('span', {class: 'kpi-l', text: l}), h('small', {class: 'kpi-s', text: sub}))));
   }
@@ -7233,6 +7240,7 @@ void main(){
     el.append(h('header', {class: 'hm-hello'}, h('span', {class: 'hm-glb'}, globe({nodes: 60, size: 52, ring: false})),
       h('div', {}, h('b', {text: hello() + ', Rabie'}), h('small', {text: cap1(fmt(TODAY, {weekday: 'long', day: 'numeric', month: 'long'})) + (pr ? ' · ' + CODE[pr] : '') + (ml ? ' · ' + ml : '')}),
         !ml && !window.__METEO ? h('button', {type: 'button', class: 'link hm-met', onclick: () => metLoad(true)}, 'Afficher la météo') : null)));
+    el.append(bar);   /* 19/11/2026 : « Demander » repasse en haut (en bas, il ne servait à rien) */
     el.append(hsec('En un coup d’œil', null, homeKpis(D)));
     if (D.now.length) el.append(hsec('À faire maintenant', more('Tout voir', 'demandes'), nowRows(D)));
     const today = D.ag.filter((a) => a.n === 0), H0 = 7, H1 = 23, nowH = new Date().getHours() + new Date().getMinutes() / 60, pos = (x) => Math.max(0, Math.min(100, (x - H0) / (H1 - H0) * 100));
@@ -7251,7 +7259,6 @@ void main(){
     const wt = homeWatch();
     if (wt.length) el.append(hsec('À surveiller', null, h('ul', {class: 'hm-rows'}, wt.map((x) => h('li', {}, h('button', {type: 'button', class: 'hm-row', onclick: x.open}, h('span', {class: 'hm-ic', html: icon(x.ic, 17)}), h('span', {class: 'hm-tx'}, h('b', {text: x.t}), h('small', {text: x.sub})), h('span', {class: 'hm-go', html: icon('next', 16)})))))));
     const tr = homeTrip(D); if (tr) el.append(hsec('Voyage en préparation', more('Voyages', 'voyages'), tr));
-    el.append(hsec('Demander', null, bar));
   }
   VIEWS.accueil = (el) => {
     const src = h('div'); ACC_ORIG(src);
@@ -7484,13 +7491,22 @@ void main(){
     const old = namesKey(c.produits) !== namesKey(live.map((p) => p.name));
     const kids = [h('p', {class: 'cmp-resume', text: d.resume})];
     if (d.difference_cle) kids.push(h('div', {class: 'cmp-key'}, h('span', {class: 'ic', html: icon('bolt', 15)}), h('div', {}, h('b', {text: V.length > 1 ? 'La différence qui compte' : 'L’essentiel'}), h('p', {text: d.difference_cle}))));
-    const pics = V.filter((v) => v.photo).map((v) => h('figure', {class: 'cmp-pic'}, compImg(v.photo, v.nom), h('figcaption', {}, h('b', {text: shortOf(v.nom, f)}), h('small', {text: P(v) && P(v).last ? eur(P(v).last.price) : ''}))));
-    if (pics.length) kids.push(h('div', {class: 'cmp-pics'}, pics));
-    if (V.length > 1) d.criteres.forEach((k) => {
-      const vals = V.map((v) => v.valeurs[k.nom]).filter((x) => x != null); if (vals.length < 2) return;
-      const max = Math.max(...vals), min = Math.min(...vals), best = k.plus_haut_mieux ? max : min;
-      kids.push(compBars(k.nom + (k.unite ? ' (' + k.unite + ')' : ''), k.plus_haut_mieux ? '' : 'plus bas = mieux', V.map((v) => { const x = v.valeurs[k.nom]; return {n: shortOf(v.nom, f), v: x == null ? '?' : nb(x), best: x === best && max !== min, w: x == null ? 0 : Math.max(8, Math.round((k.plus_haut_mieux ? x / max : min / x) * 100))}; })));
-    });
+    /* 19/11/2026 (« plusieurs variantes, mais des images pour deux seulement ») : une case par variante, même sans photo */
+    const pics = V.map((v) => h('figure', {class: 'cmp-pic' + (v.photo ? '' : ' is-none')}, v.photo ? compImg(v.photo, v.nom) : h('span', {class: 'cmp-noimg', html: icon('tag', 30)}), h('figcaption', {}, h('b', {text: shortOf(v.nom, f)}), h('small', {text: (P(v) && P(v).last ? eur(P(v).last.price) : '') + (v.photo ? '' : ' · pas de photo')}))));
+    if (V.some((v) => v.photo)) kids.push(h('div', {class: 'cmp-pics'}, pics));
+    /* 19/11/2026 (« ça dit plus bas = mieux mais c'est inversé ») : la longueur de la barre est la valeur ; le meilleur est en vert (le plus court
+       quand « moins = mieux »). Le prix et la remise ne viennent plus de Claude : ils sont calculés avec les prix du jour. */
+    const row = (title, plusMieux, vals) => {
+      const xs = vals.map((x) => x.x).filter((x) => x != null); if (xs.length < 2) return;
+      const max = Math.max(...xs), min = Math.min(...xs), best = plusMieux ? max : min;
+      kids.push(compBars(title, plusMieux ? '' : 'le moins est le mieux', vals.map((x) => ({n: x.n, v: x.x == null ? '?' : nb(x.x) + (x.suf || ''), best: x.x === best && max !== min, w: x.x == null || max <= 0 ? 0 : Math.max(6, Math.round(x.x / max * 100))}))));
+    };
+    if (V.length > 1) {
+      const PRIXC = /prix|remise|r[ée]duction|tarif|co[uû]t|€|%|note|qualit/i;
+      row('Prix du jour (€)', false, V.map((v) => ({n: shortOf(v.nom, f), x: P(v) && P(v).last ? P(v).last.price : null})));
+      row('Remise sur le prix public (%)', true, V.map((v) => { const p = P(v); return {n: shortOf(v.nom, f), x: p && p.last && p.ref ? Math.max(0, Math.round((1 - p.last.price / p.ref) * 100)) : null}; }));
+      d.criteres.filter((k) => !PRIXC.test(k.nom + ' ' + (k.unite || ''))).forEach((k) => row(k.nom + (k.unite ? ' (' + k.unite + ')' : ''), k.plus_haut_mieux, V.map((v) => ({n: shortOf(v.nom, f), x: v.valeurs[k.nom]}))));
+    }
     const rq = V.map((v) => ({v, r: rqpNow(v, P(v))})).filter((x) => x.r != null), rBest = rq.length > 1 ? Math.max(...rq.map((x) => x.r)) : null;
     if (rq.length) kids.push(compBars('Rapport qualité/prix', 'au prix du jour, sur 10', rq.map((x) => ({n: shortOf(x.v.nom, f), v: nb(x.r) + '/10', best: x.r === rBest, w: Math.max(8, x.r * 10)}))));
     const qs = V.filter((v) => v.qualite != null);
