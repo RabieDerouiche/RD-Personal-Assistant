@@ -3324,7 +3324,7 @@ void main(){
     const code = S.presence[iso]; if (code) out.push({k: 'pr', code, label: 'Présence : ' + CODE[code]});
     S.anniv.forEach((a) => { if (a.m === mm && a.d === dd) { const age = a.year ? +iso.slice(0, 4) - a.year : null; out.push({k: 'an', label: 'Anniversaire de ' + a.who + (age != null && age > 0 ? ' (' + age + ' ans)' : ''), open: () => openItem('anniv', a)}); } });
     S.evenements.forEach((v) => { if (isoOf(day(v.n)) === iso) out.push({k: 'ev', label: v.title + (v.time ? ' · ' + v.time : ''), title: v.title, time: v.time, open: () => openItem('evenement', v)}); });
-    S.echeances.forEach((e) => { if (isoOfItem(e) === iso) out.push({k: e.nature === 'bot' || e.nature === 'suivi' ? 'b-' + e.bot : 'e-' + e.nature, label: e.title, bot: e.bot, open: () => openItem('echeance', e)}); });
+    S.echeances.forEach((e) => { if (isoOfItem(e) === iso) out.push({k: e.nature === 'bot' || e.nature === 'suivi' ? 'b-' + e.bot : 'e-' + e.nature, label: e.doneBy ? e.title + ' · fait ✓' : e.title, bot: e.bot, open: () => openItem('echeance', e)}); });   /* JARVIS OS (18/11/2026) : fait par le bot d'après le Journal ou le Canal */
     return out;
   }
   const openDay = (iso) => openItem('jour', dayDiff(iso));
@@ -6298,8 +6298,42 @@ void main(){
       act("J'ai fait…", {tone: 'main2', cost: 'next', pick: {kind: 'text', label: 'Ce que tu as fait', placeholder: 'Sans montant ni taux : ils restent dans le chat du bot'}, go: (v) => ({title: 'Échéance faite', bot: e.bot, canalType: 'Réponse', noRing: true, say: 'Noté, merci.',
         order: "Pour l'échéance " + q + ' du ' + short(e.n) + ", voici ce que j'ai fait : " + v.txt, effect: q + ' passe à « Fait » dans Pilotage, et une ligne « Réponse » pour ' + who + ' dans le Canal, lue à son prochain passage (sans sonnette).', mutate: () => drop('echeances', e.id)})})];
   };
+  /* JARVIS OS (18/11/2026, retour du propriétaire : « l'événement CRA Allegis s'affiche comme à faire alors que Chronos l'a déjà fait ») :
+     une échéance « Un bot s'en occupe / suit » que le bot a faite sans passer sa ligne à « Fait » est reconnue d'après son Journal
+     ou sa ligne du Canal (mêmes mots, même date dans le titre, mot d'achèvement, à quelques jours de la date). Gratuit : rien n'est relu. */
+  const ECH_FAIT = /\b(soumise?s?|faite?s?|envoyee?s?|payee?s?|terminee?s?|reglee?s?|validee?s?|approuvee?s?|deposee?s?|saisie?s?|transmise?s?|signee?s?|confirmee?s?)\b/;
+  const ECH_VIDES = new Set(['semaine', 'mois', 'avant', 'apres', 'conge', 'conges', 'pour', 'avec', 'dans', 'jour', 'jours', 'prochain', 'prochaine']);
+  function echDone(e) {
+    if (!e || !BOT[e.bot] || !['bot', 'suivi'].includes(e.nature) || e.n > 3) return null;
+    const ttl = nrm(String(e.title).replace(/\([^)]*\)/g, ' ')), ws = (ttl.match(/[a-z0-9]{4,}/g) || []).filter((w) => !ECH_VIDES.has(w) && !HIST_VIDES.has(w) && !/^\d+$/.test(w));
+    const dm = String(e.title).match(/\b(\d{1,2})\/(\d{1,2})\b/), date = dm ? +dm[1] + '/' + +dm[2] : null;
+    const test = (txt, at) => {
+      if (at == null || at < e.n - 7 || at > e.n + 3) return false;
+      const t = ' ' + nrm(txt).replace(/\b0(\d)\//g, '$1/').replace(/\/0(\d)\b/g, '/$1').replace(/[^a-z0-9/]+/g, ' ') + ' ';
+      const hits = ws.filter((w) => t.indexOf(' ' + w + ' ') >= 0).length, sameDate = date ? t.indexOf(' ' + date + ' ') >= 0 || t.indexOf(' ' + date + '/') >= 0 : false;
+      if (date && !sameDate) return false;
+      if (hits < (sameDate ? 1 : Math.min(2, ws.length)) || !ws.length) return false;
+      return ECH_FAIT.test(nrm(txt));
+    };
+    const dayOf = (ms) => ms ? Math.round((new Date(ms).setHours(12, 0, 0, 0) - day(0).setHours(12, 0, 0, 0)) / 864e5) : null;
+    const jr = LV.t && LV.t.jour && LV.t.jour.rows ? LV.t.jour.rows.map((r) => ({bot: lvBot(r['Bot']), text: (r['Sujet'] ? r['Sujet'] + ' : ' : '') + (r['Détail'] || ''), s: lvStamp(r['Date et heure'])})) : (S.activite || []).map((a) => ({bot: a.bot, text: a.text, s: a.s ? new Date(a.s) : null}));
+    const j = jr.filter((r) => r.bot === e.bot && r.s && test(r.text, dayOf(r.s.getTime()))).sort((a, b) => b.s - a.s)[0];
+    if (j) return {when: fmt(j.s, {day: '2-digit', month: '2-digit'}) + ' à ' + pad2(j.s.getHours()) + 'h' + pad2(j.s.getMinutes()), text: j.text, src: 'Journal de ' + lvName(e.bot)};
+    const l = (S.canal || []).find((x) => (x.from === e.bot || x.to === e.bot) && /^fait/i.test(x.status || '') && test([x.subject, x.msg, x.reply].join(' '), lvFrIso(x.date) ? N(lvFrIso(x.date)) : null));
+    if (l) return {when: l.date, text: l.reply || l.msg, src: 'Canal (' + lvName(e.bot) + ')'};
+    return null;
+  }
+  const LVA_ECH = lvApply;
+  lvApply = function () { LVA_ECH(); let any = false; try { (S.echeances || []).forEach((e) => { const was = !!e.doneBy; e.doneBy = echDone(e); if (!!e.doneBy !== was) any = true; }); } catch (err) { /* jamais bloquant */ } if (any) lvRefresh(); };   /* redessine si une échéance change d'état */
+  const AEX_DONE = ACTIONS.echeance;
+  ACTIONS.echeance = (e) => {
+    if (!e.doneBy) return AEX_DONE(e);
+    const who = lvName(e.bot), q = '« ' + e.title + ' »';
+    return [act("Oui, c'est fait", {tone: 'main', cost: 'free', go: () => ({title: 'Échéance faite', effect: q + ' passe à « Fait » dans Pilotage (' + who + " ne l'avait pas fait).", bot: e.bot, work: false, mutate: () => drop('echeances', e.id), say: 'Noté.'})}),
+      act('Pas fait : demander à ' + who, {tone: 'main2', cost: 'bot', go: () => ({title: 'Question à ' + who, bot: e.bot, order: 'Pour ' + q + ' : ton Journal dit « ' + String(e.doneBy.text).slice(0, 140) + ' ». Est-ce bien fait ? Si oui, passe la ligne Échéances à « Fait ».', effect: 'Une ligne pour ' + who + ' dans le Canal, puis la sonnette.', say: 'Je vérifie.'})})];
+  };
   const SEX = SHEETCFG.echeance;
-  SHEETCFG.echeance = (e) => { const c = SEX(e); if (echExp(e)) { const w = e.nature === 'date' ? 'Passée' : 'Expirée'; c.kicker += ' · ' + w; c.say = w + ' depuis le ' + short(e.n) + ' : clôture-la, ou dis ce que tu as fait.'; } return c; };
+  SHEETCFG.echeance = (e) => { const c = SEX(e); if (e.doneBy) { c.kicker = 'Fait par ' + lvName(e.bot) + ' · ' + e.doneBy.when; c.say = "C'est fait : " + String(e.doneBy.text).slice(0, 220); c.facts = [['Prévu', longDay(e.n)], ['Fait', e.doneBy.when + ' (' + e.doneBy.src + ')'], ['Dans Pilotage', "encore « À venir » : « Oui, c'est fait » la passe à « Fait », gratuitement"]]; return c; } if (echExp(e)) { const w = e.nature === 'date' ? 'Passée' : 'Expirée'; c.kicker += ' · ' + w; c.say = w + ' depuis le ' + short(e.n) + ' : clôture-la, ou dis ce que tu as fait.'; } return c; };
   const LN1 = lvNews;
   lvNews = function () { try { buildDosReplies(); } catch (err) { /* ne bloque jamais l'affichage */ } LN1(); };
   const BR2 = pilotageBrief;
