@@ -7,8 +7,16 @@ import http from 'node:http'; import crypto from 'node:crypto';
 import {paris, pauseDepuisFaits, paliers} from '../notify.mjs';
 const FG = await startFakeGoogle();
 const DATA = fs.mkdtempSync(path.join(os.tmpdir(), 'jarvis-'));
+/* 0.22.0 : faux Open-Meteo (prévisions de 8 jours à partir d'aujourd'hui, heure de Paris) */
+const METEO_REQ = [];
+const MET = http.createServer((q, r) => { METEO_REQ.push(q.url); const t = paris(new Date()), days = [...Array(8)].map((_, i) => new Date(Date.UTC(t.y, t.m - 1, t.d + i)).toISOString().slice(0, 10)), hours = [];
+  days.forEach((d) => { for (let hh = 0; hh < 24; hh++) hours.push(d + 'T' + String(hh).padStart(2, '0') + ':00'); });
+  r.writeHead(200, {'content-type': 'application/json'}); r.end(JSON.stringify({current: {temperature_2m: 9.4, apparent_temperature: 6.2, weather_code: 3}, daily: {time: days, weather_code: [3, 61, 0, 0, 0, 0, 0, 0], temperature_2m_min: [4, 2, 1, 1, 1, 1, 1, 1], temperature_2m_max: [11, 7, 12, 12, 12, 12, 12, 12], precipitation_probability_max: [10, 70, 0, 0, 0, 0, 0, 0]},
+    hourly: {time: hours, temperature_2m: hours.map((x) => (+x.slice(11, 13) >= 18 ? 6 : 9)), precipitation_probability: hours.map(() => 0), weather_code: hours.map(() => 2)}})); });
+await new Promise((z) => MET.listen(0, '127.0.0.1', z));
 const PORT = 18000 + Math.floor(Math.random() * 1000), BASE = 'http://127.0.0.1:' + PORT;
 const env = {...process.env, JARVIS_PUSH_ALLOW_HTTP: '1', JARVIS_NOTIFY_TICK_MS: '3600000', JARVIS_SANTE_TICK_MS: '3600000', JARVIS_PAUSE_CACHE_MS: '0', JARVIS_PAPIERS_ID: 'pap', JARVIS_BELL_DEDUP_MS: '0', JARVIS_GOOGLE_FAKE: FG.url, PORT: String(PORT), JARVIS_DATA: DATA, CLAUDE_BIN: path.join(HERE, 'fake-claude.mjs'), ANTHROPIC_API_KEY: 'sk-ant-faux-pour-le-test', ANTHROPIC_BASE_URL: 'https://exemple.invalid', JARVIS_ORIGINS: 'https://rabiederouiche.github.io', JARVIS_REPO: os.tmpdir(), JARVIS_OS_DIR: path.join(HERE, '..', '..', '..', 'essais', 'jarvis-os-maquette'), JARVIS_TTS_HELPER: path.join(HERE, 'fake-tts.mjs'), JARVIS_VOICE_MODEL: path.join(HERE, 'fake-tts.mjs'), JARVIS_VOICE_SCRIPT: path.join(DATA, 'fausse-install.sh')};
+Object.assign(env, {JARVIS_STT_HELPER: path.join(HERE, 'fake-stt.mjs'), JARVIS_METEO_URL: 'http://127.0.0.1:' + MET.address().port + '/v1/forecast', JARVIS_ECOUTE_SCRIPT: path.join(DATA, 'fausse-install.sh')});
 const results = []; let fails = 0;
 { const H = ['Domaine', 'Fait', 'Valeur'], v = (x) => pauseDepuisFaits([H, ['Grok Bot', "Grok en pause jusqu'au", x]]);
   const okP = v('17/11/2026 13h05') === Date.parse('2026-11-17T13:05:00+01:00') && v('14/07/2027 12h47') === Date.parse('2027-07-14T12:47:00+02:00') && v('Reprise faite, sonnettes envoyées') === null && pauseDepuisFaits([H, ['x', 'Autre', 'y']]) === undefined;
@@ -237,6 +245,35 @@ try {
       r = await G('/api/raccourci/etat'); ok('Raccourcis : état (active, nombre de questions)', r.body.active === true && r.body.uses === 3);
       await G('/api/raccourci/cle', {}); q = await rac(cle, {texte: 'x'}); ok('Raccourcis : recréer la clé retire l\'ancienne', q.status === 401 && /recrée-la/.test(q.text));
       await G('/api/raccourci/retirer', {}); r = await G('/api/raccourci/etat'); ok('Raccourcis : clé retirée', r.body.active === false); }
+    /* 0.22.0 : la voix refaite — écoute Whisper (fausse ici), réponses instantanées, météo du bon jour, date donnée à Claude, Haiku, coupure */
+    { const wav = (said) => { const data = Buffer.from(said ? 'DIT:' + said : '', 'utf8'), hd = Buffer.alloc(44); hd.write('RIFF', 0); hd.writeUInt32LE(36 + data.length, 4); hd.write('WAVE', 8); hd.write('fmt ', 12); hd.writeUInt32LE(16, 16); hd.writeUInt16LE(1, 20); hd.writeUInt16LE(1, 22); hd.writeUInt32LE(16000, 24); hd.writeUInt32LE(32000, 28); hd.writeUInt16LE(2, 32); hd.writeUInt16LE(16, 34); hd.write('data', 36); hd.writeUInt32LE(data.length, 40); return Buffer.concat([hd, data, Buffer.alloc(64)]); };
+      const stt = (b) => fetch(BASE + '/api/stt', {method: 'POST', headers: {'content-type': 'audio/wav', authorization: 'Bearer ' + tok}, body: b}).then(async (x) => ({status: x.status, body: await x.json().catch(() => null)}));
+      const V = async (body, signal) => { const rr = await fetch(BASE + '/api/voix', {method: 'POST', headers: {'content-type': 'application/json', authorization: 'Bearer ' + tok}, body: JSON.stringify(body), signal}); const tx = await rr.text(); const evs = []; for (const bl of tx.split('\n\n')) { const m = /^event: (\w+)\ndata: (.*)$/s.exec(bl.trim()); if (m) evs.push({ev: m[1], d: JSON.parse(m[2])}); } return (evs.find((e) => e.ev === 'done') || {d: {}}).d; };
+      r = await stt(wav('quel temps fait-il demain')); ok('écoute : le son de l\'iPhone devient du texte (Whisper sur le serveur)', r.status === 200 && r.body.text === 'quel temps fait-il demain' && r.body.ms >= 0, JSON.stringify(r.body));
+      r = await stt(wav('')); ok('écoute : la phrase inventée par Whisper sur un silence (« Amara.org ») n\'est jamais envoyée', r.status === 200 && r.body.text === '', JSON.stringify(r.body));
+      r = await stt(Buffer.from('pas un son')); ok('écoute : un envoi qui n\'est pas un WAV est refusé', r.status === 400);
+      r = await G('/api/status'); ok('écoute : état dans /api/status', r.body.ecoute === true && r.body.version === '0.22.0', JSON.stringify({e: r.body.ecoute, v: r.body.version}));
+      { const ei = await G('/api/ecoute/install', {}); let st = ei.body.state; for (let i = 0; i < 30 && st === 'running'; i++) { await new Promise((z) => setTimeout(z, 100)); st = (await G('/api/ecoute/install')).body.state; } ok('écoute : installation lancée par le serveur (bouton de Réglages)', st === 'done', st); }
+      let d = await V({text: 'Quelle heure est-il ?'}); ok('voix : l\'heure tout de suite, sans Claude', d.instant === 'heure' && /^Il est \d{1,2} h( \d\d)?\.$/.test(d.reply) && d.timing.instant === true, JSON.stringify(d).slice(0, 160));
+      d = await V({text: 'On est quel jour ?'}); ok('voix : la date, sans Claude', d.instant === 'date' && /^Nous sommes le \S+ \d{1,2} \S+ \d{4}\.$/.test(d.reply), d.reply);
+      d = await V({text: 'Il fait frais dehors ?'}); ok('voix : météo sans position : il le dit (pas d\'invention)', d.instant === 'meteo' && /pas ta position/.test(d.reply), d.reply);
+      d = await V({text: 'Il fait frais dehors ?', lat: 48.86123, lon: 2.34456}); ok('voix : « il fait frais » = la météo d\'aujourd\'hui (Open-Meteo), maintenant et sur la journée', d.instant === 'meteo' && /^En ce moment 9 degrés, ressenti 6, ciel couvert\. Aujourd'hui : entre 4 et 11 degrés, ciel couvert\./.test(d.reply), d.reply);
+      ok('voix : position arrondie au kilomètre avant d\'aller chez Open-Meteo', METEO_REQ.some((u) => /latitude=48\.86&longitude=2\.34/.test(u)) && !METEO_REQ.some((u) => /48\.861/.test(u)), METEO_REQ[0]);
+      d = await V({text: 'Et demain, il va pleuvoir ?'}); ok('voix : la météo de demain (pas celle de lundi), avec le conseil', d.instant === 'meteo' && /^Demain : entre 2 et 7 degrés, pluie faible, pluie probable à 70 %\. Prends un parapluie\./.test(d.reply), d.reply);
+      d = await V({text: 'Quel temps ce soir ?'}); ok('voix : la météo de ce soir (heures de 18 h à 23 h)', /^Ce soir : entre 6 et 6 degrés, partiellement nuageux\./.test(d.reply), d.reply);
+      d = await V({text: 'Où en sont mes notes de frais ?'}); ok('voix : « notes de frais » n\'est pas la météo : Claude Haiku répond', !d.instant && /modèle : haiku/.test(d.reply), String(d.reply).slice(0, 120));
+      d = await V({text: 'montre le contexte'}); ok('voix : Claude reçoit la date et l\'heure de Paris à chaque phrase', /^\[Maintenant : \S+ \d{1,2} \S+ \d{4} (à )?\d\d:\d\d, heure de Paris\]/.test(d.reply), String(d.reply).slice(0, 100));
+      d = await V({text: 'Réfléchis bien : que penses-tu de ma semaine ?'}); ok('voix : « réfléchis » passe à Sonnet', /modèle : sonnet/.test(d.reply), String(d.reply).slice(-160));
+      d = await V({text: "Qu'est-ce que j'ai demain ?"}); ok('voix : l\'agenda de demain, lu par le serveur sans Claude', d.instant === 'agenda' && /^Demain : 14 h 30, (Notaire|Rendez-vous)\.$/.test(d.reply), d.reply);
+      FG.sheet["'À toi'!A3:D300"] = [['Depuis le', 'Bot', 'Sujet', "Ce qu'on attend de toi"], ['', 'Iris', 'Quittance de mai', 'Retrouve la date'], ['', 'Iris', 'Passeport', 'Prendre rendez-vous'], ['', 'Iris', 'Assurance scolaire', 'Envoie l’attestation'], ['', 'Iris', 'Dégât des eaux', 'Confirme au syndic']];
+      await G('/api/cote', {id: 'a:Passeport', titre: 'Passeport', bot: 'Iris'});
+      d = await V({text: "Qu'est-ce qui m'attend ?"}); ok('voix : ce qui attend sa réponse (sans les cartes mises de côté)', d.instant === 'pourmoi' && /^3 choses pour toi : Quittance de mai ; Assurance scolaire ; Dégât des eaux\./.test(d.reply), d.reply);
+      await G('/api/cote/retirer', {id: 'a:Passeport'});
+      FG.sheet['Canal!A1:H3000'] = [['Date', 'De', 'Pour', 'Type', 'Message', 'Statut', 'Réponse', 'Objet'], ['17/11/2026', 'Rabie', 'Iris', 'Ordre', 'Cherche la quittance de mai', 'Fait', 'Quittance trouvée dans Logement.', ''], ['18/11/2026', 'Rabie', 'Iris', 'Ordre', 'Relance le syndic', 'À faire', '', '']];
+      d = await V({text: 'Où en est Iris ?'}); ok('voix : où en est un bot (sa dernière ligne du Canal), sans Claude', d.instant === 'bot' && /^Dernière demande à Iris, le 18\/11 : « Relance le syndic »\. Pas encore traitée\./.test(d.reply), d.reply);
+      { const ctl = new AbortController(), t0 = Date.now(); const slow = V({text: 'Raconte lentement ta journée'}, ctl.signal).catch(() => 'coupé'); await new Promise((z) => setTimeout(z, 400)); ctl.abort(); await slow;
+        const d2 = await V({text: 'Bonjour encore'}); const dt = Date.now() - t0;
+        ok('voix : couper JARVIS pendant qu\'il répond libère tout de suite la suite (pas d\'attente de la réponse coupée)', /Tu as dit : Bonjour encore\./.test(d2.reply) && dt < 4000, dt + ' ms · ' + String(d2.reply).slice(0, 60)); } }
     /* sauvegarde de Pilotage (0.14.0) : copie maintenant, comparée à une copie plus ancienne */
     { const H = ['Date', 'De', 'Pour', 'Type', 'Message', 'Statut', 'Réponse', 'Objet'];
       fs.mkdirSync(path.join(DATA, 'sauvegardes'), {recursive: true});

@@ -45,7 +45,7 @@ export async function pair(url: string, code: string): Promise<string | null> {
 export function unpair() { store.settings.serverToken = ''; store.save(); }
 
 export interface Conn { checked: boolean; gmail: boolean; calendar: boolean; sheets: boolean; drive: boolean; read: number }
-export interface Status { ok: boolean; claude?: {installed: boolean; loggedIn: boolean; method: string}; version?: string; commit?: string; connectors?: Conn; grokPauseUntil?: string; tts?: boolean; timing?: {total: number; first: number | null; tools: number; warm: boolean; model: string} | null; error?: string }
+export interface Status { ok: boolean; claude?: {installed: boolean; loggedIn: boolean; method: string}; version?: string; commit?: string; connectors?: Conn; grokPauseUntil?: string; tts?: boolean; ecoute?: boolean; version2?: string; timing?: {total: number; first: number | null; tools: number; warm: boolean; model: string} | null; error?: string }
 let last: Status = {ok: false};
 export const lastStatus = () => last;
 export async function status(): Promise<Status> {
@@ -53,7 +53,7 @@ export async function status(): Promise<Status> {
   try {
     const r = await call('/api/status');
     if (r.status === 401) return (last = {ok: false, error: 'appareil plus reconnu : relie-le de nouveau'});
-    const b = await r.json(); return (last = {ok: true, claude: b.claude, version: b.version, commit: b.commit, connectors: b.connectors, grokPauseUntil: b.grokPauseUntil, tts: !!b.tts, timing: b.timing});
+    const b = await r.json(); return (last = {ok: true, claude: b.claude, version: b.version, commit: b.commit, connectors: b.connectors, grokPauseUntil: b.grokPauseUntil, tts: !!b.tts, ecoute: !!b.ecoute, timing: b.timing});
   } catch { return (last = {ok: false, error: 'serveur injoignable'}); }
 }
 
@@ -93,6 +93,44 @@ export async function chat(text: string, opts: {newSession?: boolean; model: str
   return out;
 }
 
+/* 0.22.0 : une phrase dite à JARVIS (réponse instantanée ou Claude Haiku), coupable à tout moment (signal) ; position pour la météo */
+export interface VoixOut extends ChatOut { instant?: string }
+export async function voix(text: string, opts: {newSession?: boolean; lat?: number; lon?: number}, onDelta: (t: string) => void, signal: AbortSignal): Promise<VoixOut> {
+  const r = await fetch(base() + '/api/voix', {method: 'POST', headers: headers(), body: JSON.stringify({text, newSession: opts.newSession, lat: opts.lat, lon: opts.lon}), signal});
+  if (r.status === 404) return chat(text, {newSession: opts.newSession, model: 'rapide'}, onDelta);   /* serveur pas encore à jour */
+  if (r.status === 401) throw new Error('Cet iPhone n\'est plus reconnu par le serveur : relie-le de nouveau dans Réglages.');
+  if (!r.ok || !r.body) throw new Error('Le serveur a répondu ' + r.status + '.');
+  const rd = r.body.getReader(), dec = new TextDecoder();
+  let buf = '', out: VoixOut | null = null, err = '';
+  for (;;) {
+    const {value, done} = await rd.read(); if (done) break;
+    buf += dec.decode(value, {stream: true}); let i;
+    while ((i = buf.indexOf('\n\n')) >= 0) {
+      const block = buf.slice(0, i); buf = buf.slice(i + 2);
+      const m = /^event: (\w+)\ndata: (.*)$/s.exec(block.trim()); if (!m) continue;
+      const d = JSON.parse(m[2]);
+      if (m[1] === 'delta') onDelta(d.text); else if (m[1] === 'done') out = d; else if (m[1] === 'error') err = d.message;
+    }
+  }
+  if (err) throw new Error(err);
+  if (!out) throw new Error('Réponse interrompue.');
+  return out;
+}
+/* l'écoute Whisper du serveur : un WAV 16 kHz → le texte ('' si rien d'audible) */
+export async function stt(wav: Blob, signal: AbortSignal): Promise<string> {
+  const r = await fetch(base() + '/api/stt', {method: 'POST', headers: {'content-type': 'audio/wav', authorization: 'Bearer ' + store.settings.serverToken}, body: wav, signal});
+  if (!r.ok) throw new Error('écoute ' + r.status);
+  return String(((await r.json()) || {}).text || '');
+}
+export const serverEar = () => linked() && store.settings.ecoute !== 'iphone' && last.ecoute === true;
+export async function installEcoute(): Promise<string> {
+  try { await call('/api/ecoute/install', {method: 'POST'}); } catch { return 'error'; }
+  for (let i = 0; i < 180; i++) {   /* jusqu'à 15 minutes (modèle de 500 Mo) */
+    await new Promise((r) => setTimeout(r, 5000));
+    try { const b = await (await call('/api/ecoute/install')).json(); if (b.state !== 'running') { await status(); installTail = String(b.tail || ''); return b.state; } } catch { /* on réessaie */ }
+  }
+  return 'running';
+}
 export async function missionUpdate(id: string, patch: {status?: string; priority?: string}) {
   const r = await call('/api/missions/' + encodeURIComponent(id), {method: 'POST', body: JSON.stringify(patch)});
   if (!r.ok) throw new Error('Le serveur a refusé.');

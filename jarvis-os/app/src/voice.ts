@@ -1,6 +1,8 @@
 /* La boucle vocale, validée sur l'iPhone le 15/11/2026 (essais/voix-pwa) : écoute, envoi quand on se tait,
    réponse lue, écoute qui repart seule. Ajouts : relance après une coupure du micro, coupure de la parole, choix de la voix. */
-export type VoiceState = 'off' | 'listening' | 'waiting' | 'speaking' | 'error';
+import {Ecoute, canEar} from './ecoute';
+/* 0.22.0 : « hearing » (il t'entend parler), « transcribing » (Whisper écrit ta phrase), « paused » (micro coupé par toi) */
+export type VoiceState = 'off' | 'listening' | 'hearing' | 'transcribing' | 'paused' | 'waiting' | 'speaking' | 'error';
 interface Rec { lang: string; interimResults: boolean; continuous: boolean; maxAlternatives: number; start(): void; stop(): void; abort(): void;
   onstart: (() => void) | null; onresult: ((e: any) => void) | null; onerror: ((e: any) => void) | null; onend: (() => void) | null; }
 
@@ -26,7 +28,10 @@ export interface VoiceOpts {
   onPartial: (text: string) => void;
   onUtterance: (text: string) => void;   /* une phrase complète de l'utilisateur */
   onLog?: (t: string) => void;
-  tts?: () => ((text: string) => Promise<string | null>) | null }
+  tts?: () => ((text: string) => Promise<string | null>) | null;
+  /* 0.22.0 : l'écoute Whisper du serveur (micro continu, coupure à la voix) ; sinon la reconnaissance de l'iPhone */
+  engine?: () => 'whisper' | 'iphone';
+  stt?: (wav: Blob, signal: AbortSignal) => Promise<string> }
 
 export class Voice {
   private rec: Rec | null = null;
@@ -41,10 +46,44 @@ export class Voice {
   private q: {text: string; url: Promise<string | null> | null}[] = []; private qBusy = false; private qOpen = false; private qEnd: (() => void) | null = null; private gen = 0; private audio: HTMLAudioElement | null = null;
   state: VoiceState = 'off';
   autoRestarts = 0;
+  private ear: Ecoute | null = null; private ducked = false;
   constructor(private o: VoiceOpts) {}
 
   get active() { return this.on; }
-  private set(s: VoiceState, why?: string) { this.state = s; this.o.onState(s, why); }
+  get whisper() { return !!this.ear; }
+  get paused() { return !!(this.ear && this.ear.paused); }
+  private set(s: VoiceState, why?: string) {
+    this.state = s;
+    if (this.ear) this.ear.busy = s === 'speaking' ? 'speaking' : s === 'waiting' ? 'thinking' : this.speakingNow ? 'speaking' : 'idle';
+    this.o.onState(s, why);
+  }
+  /* l'écoute Whisper : ses états, et ta voix qui coupe JARVIS */
+  private makeEar() {
+    return new Ecoute({
+      stt: (w, sig) => this.o.stt!(w, sig),
+      onState: (s, why) => {
+        if (s === 'off') return;
+        if (s === 'error') { this.ear = null; this.log('écoute Whisper : ' + (why || 'erreur') + ' ; écoute de l\'iPhone à la place'); if (SR && this.on) this.listen(false); else this.fail(why || 'micro indisponible'); return; }
+        if (s === 'paused') { this.set('paused'); return; }
+        if (s === 'hearing') { if (!this.speakingNow || this.ducked) this.set('hearing'); return; }
+        if (s === 'transcribing') { if (this.state === 'hearing' || this.state === 'listening') this.set('transcribing'); return; }
+        if (s === 'listening' && !this.speakingNow && ['hearing', 'transcribing', 'paused', 'listening', 'off'].includes(this.state)) this.set('listening');
+      },
+      onBargeStart: () => { if (this.speakingNow) this.duck(); },
+      onBargeCancel: () => { if (this.ducked) this.unduck(); },
+      onUtterance: (t) => { if (this.ducked || this.speakingNow || this.streaming) this.hush(); this.ducked = false; this.set('waiting'); this.o.onUtterance(t); }
+    });
+  }
+  /* sa voix commence pendant que JARVIS parle : on suspend la phrase ; si ce n'était qu'un bruit, elle reprend */
+  private duck() { this.ducked = true; try { if (this.audio && !this.audio.paused) this.audio.pause(); } catch { /* rien */ } try { if (synth && synth.speaking) synth.pause(); } catch { /* rien */ } this.set('hearing'); }
+  private unduck() {
+    this.ducked = false;
+    try { const t = this.audio && this.audio.dataset.token; if (this.audio && this.audio.paused && t && t !== 'stop' && t !== 'unlock') this.audio.play().catch(() => {}); } catch { /* rien */ }
+    try { if (synth && synth.paused) synth.resume(); } catch { /* rien */ }
+    this.set(this.speakingNow ? 'speaking' : 'listening');
+  }
+  /* ton appui sur le micro pendant l'écoute : coupe ou rouvre le micro, sans fermer la conversation */
+  toggleMic() { if (!this.ear) return false; this.ear.pause(!this.ear.paused); return true; }
   private log(t: string) { if (this.o.onLog) this.o.onLog(t); }
 
   /* à appeler depuis un appui : ouvre le micro et la voix du téléphone */
@@ -54,21 +93,31 @@ export class Voice {
     try { if (synth) { synth.cancel(); const u = new W.SpeechSynthesisUtterance(' '); u.volume = 0; synth.speak(u); } } catch { /* rien */ }
     /* la voix du serveur passe par un lecteur audio, débloqué ici, pendant l'appui */
     try { if (!this.audio) this.audio = new Audio(); this.audio.dataset.token = 'unlock'; this.audio.src = SILENT; this.audio.play().catch(() => {}); } catch { /* rien */ }
+    if (this.o.engine && this.o.engine() === 'whisper' && this.o.stt && canEar()) {
+      if (!this.ear) this.ear = this.makeEar();
+      const ear = this.ear;
+      ear.start().then((ok) => { if (!ok && this.ear === ear) { this.ear = null; if (this.on && SR) this.listen(false); } });
+      return;
+    }
     this.listen(false);
   }
   stop() {
     this.on = false; clearTimeout(this.timer);
+    if (this.ear) { const e = this.ear; this.ear = null; e.stop(); }
     const r = this.rec; this.rec = null; try { if (r) r.abort(); } catch { /* rien */ }
     this.hush(); this.set('off'); audioMode('auto');
   }
   /* coupe la parole de JARVIS et réécoute */
-  interrupt() { this.hush(); if (this.on) this.listen(true); }
+  interrupt() { this.hush(); if (this.ear) { this.ear.cancelSend(); if (this.ear.paused) this.ear.pause(false); this.set('listening'); return; } if (this.on) this.listen(true); }
   /* entre deux tours (pendant que le cerveau réfléchit) */
-  pause() { clearTimeout(this.timer); const r = this.rec; this.rec = null; try { if (r) r.abort(); } catch { /* rien */ } if (this.on) this.set('waiting'); }
+  pause() { clearTimeout(this.timer); if (this.ear) { if (this.on) this.set('waiting'); return; } const r = this.rec; this.rec = null; try { if (r) r.abort(); } catch { /* rien */ } if (this.on) this.set('waiting'); }
+  /* la réponse est finie (ou coupée) sans rien à dire : on réécoute */
+  idle() { if (!this.on) return; if (this.ear) { if (!this.speakingNow) this.set(this.ear.paused ? 'paused' : 'listening'); return; } this.listen(true); }
 
-  private hush() { try { if (this.audio) { this.audio.dataset.token = 'stop'; this.audio.pause(); } } catch { /* rien */ } this.gen++; this.speakingNow = false; this.q = []; this.qBusy = false; this.qOpen = false; this.qEnd = null; try { if (synth) synth.cancel(); } catch { /* rien */ } }
+  hush() { this.ducked = false; try { if (this.audio) { this.audio.dataset.token = 'stop'; this.audio.pause(); } } catch { /* rien */ } this.gen++; this.speakingNow = false; this.q = []; this.qBusy = false; this.qOpen = false; this.qEnd = null; try { if (synth) synth.cancel(); } catch { /* rien */ } }
 
   listen(auto: boolean) {
+    if (this.ear) { if (this.on && !this.speakingNow) this.set(this.ear.paused ? 'paused' : 'listening'); return; }   /* Whisper : le micro est déjà ouvert */
     if (!this.on || this.speakingNow || !SR || this.rec) return;   /* jamais deux micros à la fois */
     clearTimeout(this.timer);
     let rec: Rec;
@@ -106,7 +155,7 @@ export class Voice {
     try { rec.start(); } catch (e: any) { clearTimeout(wd); this.rec = null; this.fail('démarrage refusé (' + ((e && e.name) || 'erreur') + ')'); }
   }
   private autoRestartFail() { this.log('relance sans appui refusée'); }
-  private fail(why: string) { this.on = false; this.rec = null; this.hush(); this.set('error', why); }
+  private fail(why: string) { this.on = false; this.rec = null; if (this.ear) { const e = this.ear; this.ear = null; e.stop(); } this.hush(); this.set('error', why); }
 
   /* lecture au fil de l'eau : chaque phrase est dite dès qu'elle arrive ; l'écoute reprend quand tout est dit */
   /* chaque réponse a son numéro : ce qui reste d'une session coupée ou d'une ancienne réponse n'a plus d'effet */
@@ -129,7 +178,7 @@ export class Voice {
       if (this.on) window.setTimeout(() => this.listen(true), 450);
       return;
     }
-    this.qBusy = true; this.speakingNow = true; this.set('speaking'); audioMode('playback');
+    this.qBusy = true; this.speakingNow = true; this.set('speaking'); if (!this.ear) audioMode('playback');   /* Whisper : le micro reste ouvert (« lecture et enregistrement ») */
     const g = this.gen;
     this.utter(next, () => { if (g !== this.gen) return; this.qBusy = false; this.pump(); });
   }
@@ -175,7 +224,7 @@ export class Voice {
     u.rate = Math.min(1.5, Math.max(0.7, this.o.rate()));
     let done = false; const fin = () => { if (done) return; done = true; after(); };
     u.onend = fin; u.onerror = fin;
-    this.speakingNow = true; this.set('speaking'); audioMode('playback');
+    this.speakingNow = true; this.set('speaking'); if (!this.ear) audioMode('playback');
     try { synth!.cancel(); synth!.speak(u); } catch { fin(); return; }
     /* filet de sécurité large, comme pour la lecture au fil de l'eau : sur iPhone, « speaking » peut être faux pendant que la voix parle ;
        finir à 5 s rouvrait le micro en pleine phrase et l'iPhone baissait le son (retour du 16/11/2026) */

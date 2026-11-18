@@ -7,11 +7,11 @@ const HERE = path.dirname(fileURLToPath(import.meta.url)), SRV = path.join(HERE,
 const {startFakeGoogle} = await import(SRV + '/tests/fake-google.mjs'); const FG = await startFakeGoogle();
 FG.sheet['Canal!A1:H3000'] = [['Date', 'De', 'Pour', 'Type', 'Message', 'Statut', 'Réponse', 'Objet'], ['15/11/2026', 'Rabie', 'Iris', 'Info', 'Le syndic a appelé.', 'Fait', 'Noté.', '']];
 const DATA = fs.mkdtempSync(path.join(os.tmpdir(), 'jarvis-e2e-')), PORT = 19000 + Math.floor(Math.random() * 900), BASE = 'http://127.0.0.1:' + PORT;
-const env = {...process.env, JARVIS_PUSH_ALLOW_HTTP: '1', JARVIS_NOTIFY_TICK_MS: '3600000', JARVIS_SANTE_TICK_MS: '3600000', JARVIS_GOOGLE_FAKE: FG.url, PORT: String(PORT), JARVIS_DATA: DATA, CLAUDE_BIN: SRV + '/tests/fake-claude.mjs', JARVIS_TTS_HELPER: SRV + '/tests/fake-tts.mjs'};
+const env = {...process.env, JARVIS_PUSH_ALLOW_HTTP: '1', JARVIS_NOTIFY_TICK_MS: '3600000', JARVIS_SANTE_TICK_MS: '3600000', JARVIS_GOOGLE_FAKE: FG.url, PORT: String(PORT), JARVIS_DATA: DATA, CLAUDE_BIN: SRV + '/tests/fake-claude.mjs', JARVIS_TTS_HELPER: SRV + '/tests/fake-tts.mjs', JARVIS_STT_HELPER: SRV + '/tests/fake-stt.mjs'};
 const code = execFileSync(process.execPath, [SRV + '/server.mjs', 'pair'], {env}).toString().match(/: ([A-Z0-9]{4}-[A-Z0-9]{4})/)[1];
 const srv = spawn(process.execPath, [SRV + '/server.mjs'], {env, stdio: ['ignore', 'pipe', 'pipe']}); await new Promise((r) => srv.stdout.once('data', r));
 const out = [], errs = []; const ok = (n, c, i) => out.push((c ? 'OK    ' : 'ÉCHEC ') + n + (i ? ' :: ' + i : ''));
-const b = await chromium.launch(); const ctx = await b.newContext({...devices['iPhone 15 Pro Max']}); const p = await ctx.newPage();
+const b = await chromium.launch({args: ['--autoplay-policy=no-user-gesture-required']}); const ctx = await b.newContext({...devices['iPhone 15 Pro Max']}); const p = await ctx.newPage();
 p.on('pageerror', (e) => errs.push(e.message));
 await p.route(FG.url + '/auth**', (route) => { const u = new URL(route.request().url()); route.fulfill({status: 302, headers: {location: BASE + '/api/google/callback?state=' + u.searchParams.get('state') + '&code=CODE-OK'}}); });
 try {
@@ -196,6 +196,32 @@ try {
     await p.evaluate(() => [...document.querySelectorAll('.cote-it')].find((x) => /Date du bail/.test(x.textContent)).querySelector('button').click()); await p.waitForTimeout(1200);
     const l2 = await p.evaluate(() => window.JarvisServeur.cote.liste());
     ok('« Plus tard » (dans une semaine) gardé par le serveur, gratuit, carte cachée, puis « Remettre »', (l1 || []).some((x) => x.id === 'a:Date du bail' && x.jusqu > Date.now() + 6 * 864e5) && !shown && Array.isArray(l2) && !l2.some((x) => x.id === 'a:Date du bail'), JSON.stringify([l1, shown, l2])); }
+  /* 0.22.0 : la voix refaite. Faux micro (un son que le banc allume), écoute Whisper du serveur (fausse), réponses instantanées,
+     ta voix qui coupe JARVIS pendant qu'il répond, le bouton qui ne ferme jamais la conversation */
+  { const v = await ctx.newPage(); v.on('pageerror', (e) => errs.push('voix : ' + e.message));
+    await v.addInitScript(() => {
+      const AC = window.AudioContext || window.webkitAudioContext; const ac = new AC(), osc = ac.createOscillator(), g = ac.createGain(), dest = ac.createMediaStreamDestination();
+      g.gain.value = 0; osc.frequency.value = 220; osc.connect(g); g.connect(dest); osc.start();
+      window.__talk = (ms) => { ac.resume(); const t0 = ac.currentTime + 0.02; g.gain.setValueAtTime(0.6, t0); g.gain.setValueAtTime(0, t0 + ms / 1000); };
+      window.__gum = 0; navigator.mediaDevices.getUserMedia = async (c) => { window.__gum++; window.__gumC = c; await ac.resume(); return dest.stream; };
+    });
+    await v.goto(BASE + '/?serveur#accueil'); await v.waitForTimeout(3000);
+    const st = () => v.evaluate(() => ({s: (document.querySelector('.jv-state') || {}).textContent, q: [...document.querySelectorAll('.jv-q')].map((x) => x.textContent), a: [...document.querySelectorAll('.jv-a')].map((x) => x.textContent), chip: (document.querySelector('.jv-chip') || {}).textContent, open: !document.querySelector('.jv').hidden}));
+    await v.tap('.talk-slot .jv-btn'); await v.waitForTimeout(1500);
+    let s0 = await st(), c0 = await v.evaluate(() => window.__gumC && window.__gumC.audio);
+    ok('voix : micro ouvert pour toute la conversation, avec l\'annulation d\'écho, écoute Whisper du serveur', s0.open && /^Je t'écoute/.test(s0.s) && /Whisper/.test(s0.chip) && c0 && c0.echoCancellation === true, JSON.stringify([s0.s, s0.chip, c0]));
+    await v.evaluate(() => window.__talk(900)); await v.waitForTimeout(3500); s0 = await st();
+    ok('voix : ta phrase est écrite par Whisper et l\'heure répond tout de suite, sans Claude', s0.q[0] === 'quelle heure est-il' && /^Il est \d{1,2} h/.test(s0.a[0] || ''), JSON.stringify([s0.q, s0.a]));
+    await v.evaluate(() => window.__talk(1800)); await v.waitForTimeout(3600); const s1 = await st();
+    await v.evaluate(() => window.__talk(900)); await v.waitForTimeout(4000); const s2 = await st();
+    ok('voix : parler pendant qu\'il répond le coupe (réponse longue arrêtée) et ta nouvelle question est traitée', s1.q[1] === 'raconte lentement ta journée' && s2.q[2] === 'quelle heure est-il' && /^Il est/.test(s2.a[2] || '') && (s2.a[1] || '').length < 6000 && /^Je t'écoute/.test(s2.s), JSON.stringify([s1.s, s2.q, (s2.a[1] || '').length, s2.s]));
+    await v.evaluate(() => window.__talk(1800)); await v.waitForTimeout(3300); const s3 = await st();
+    await v.tap('.jv-mic'); await v.waitForTimeout(700); const s4 = await st();
+    ok('voix : un appui sur le micro pendant qu\'il réfléchit ou parle le coupe et t\'écoute, sans fermer la conversation', /^(Je réfléchis|Je réponds)/.test(s3.s) && /^Je t'écoute/.test(s4.s) && s4.open, JSON.stringify([s3.s, s4.s, s4.open]));
+    await v.tap('.jv-mic'); await v.waitForTimeout(400); const s5 = await st(); await v.tap('.jv-mic'); await v.waitForTimeout(400); const s6 = await st();
+    ok('voix : à l\'écoute, le micro se coupe et se rouvre d\'un appui', /^Micro coupé/.test(s5.s) && /^Je t'écoute/.test(s6.s) && s6.open, JSON.stringify([s5.s, s6.s]));
+    await v.screenshot({path: SH + 'voix-whisper.png'});
+    await v.tap('.jv-x'); await v.waitForTimeout(500); await v.close(); }
 } catch (e) { ok('exception', false, e.stack); }
 ok('aucune erreur de page', !errs.length, errs.join(' | '));
 console.log(out.join('\n')); const bad = out.filter((l) => l.startsWith('ÉCHEC')).length; console.log(bad ? bad + ' échec(s)' : 'Tout passe (' + out.length + ' vérifications).');

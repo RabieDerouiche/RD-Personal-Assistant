@@ -82,14 +82,21 @@ const isHolo = () => document.documentElement.classList.contains('theme-holo');
 const makeOrb = (o: HoloOpts) => (isHolo() ? createHolo(o) : createOrb());
 let root: HTMLElement, orb: ReturnType<typeof createOrb>, me: HTMLElement, rep: HTMLElement, note: HTMLElement, stateEl: HTMLElement, mic: HTMLButtonElement, comp: HTMLElement, input: HTMLInputElement, chip: HTMLElement, log: HTMLElement, cap: HTMLElement, sugg: HTMLElement;
 const SUGG = ["Quoi de neuf aujourd'hui ?", "Qu'est-ce qui m'attend cette semaine ?", 'Où en sont mes achats ?', 'Une idée de sortie ce week-end ?'];
-let fresh = true, sessionAt = 0, busy = false;
+let fresh = true, sessionAt = 0, busy = false, gen = 0, ctl: AbortController | null = null;
+/* 0.22.0 : ce que montre la pastille, selon l'écoute */
+const VTXT: Record<string, string> = {listening: "Je t'écoute…", hearing: "Je t'entends…", transcribing: "J'écris ta phrase…", paused: 'Micro coupé · touche le micro', waiting: 'Je réfléchis…', speaking: 'Je réponds… (parle pour me couper)'};
 const voice = new Voice({
   mode: () => store.settings.listenMode, voiceURI: () => store.settings.voiceURI, rate: () => store.settings.rate,
   tts: () => (srv.serverVoice() ? srv.ttsUrl : null),
+  engine: () => (srv.serverEar() ? 'whisper' : 'iphone'), stt: (w, sig) => srv.stt(w, sig),
   onState: (s, why) => {
-    const map: Record<string, OrbState> = {off: 'idle', listening: 'listening', waiting: 'thinking', speaking: 'speaking', error: 'error'};
-    set(map[s]); if (s === 'error' && why) note.textContent = 'Micro : ' + why + '. Touche le clavier pour écrire.'; if (s === 'listening') note.textContent = '';
-    mic.className = 'jv-mic' + (s === 'listening' ? ' on' : s === 'speaking' ? ' say' : ''); mic.innerHTML = SVG(s === 'speaking' ? I.speaker : voice.active ? I.stop : I.mic, 30);
+    const map: Record<string, OrbState> = {off: 'idle', listening: 'listening', hearing: 'listening', transcribing: 'thinking', paused: 'idle', waiting: 'thinking', speaking: 'speaking', error: 'error'};
+    set(map[s]); if (VTXT[s] && voice.active) stateEl.textContent = VTXT[s];
+    if (s === 'error' && why) note.textContent = 'Micro : ' + why + '. Touche le clavier pour écrire.'; if (s === 'listening' || s === 'hearing') note.textContent = '';
+    if (s === 'hearing' || s === 'transcribing') { me.textContent = s === 'hearing' ? '…' : me.textContent || '…'; down(); }
+    mic.className = 'jv-mic' + (s === 'listening' || s === 'hearing' ? ' on' : s === 'speaking' ? ' say' : '');
+    mic.innerHTML = SVG(s === 'speaking' ? I.speaker : s === 'paused' || !voice.active ? I.mic : I.stop, 30);
+    mic.setAttribute('aria-label', s === 'speaking' || s === 'waiting' ? 'Couper JARVIS' : s === 'paused' ? 'Rouvrir le micro' : voice.whisper ? 'Couper le micro' : 'Arrêter');
   },
   onPartial: (t) => { me.textContent = t; down(); },
   onUtterance: (t) => { ask(t, true); }
@@ -99,21 +106,38 @@ const down = () => { cap.scrollTop = cap.scrollHeight; };
 /* chaque échange reste à l'écran : ta question, puis la réponse complète (sous-titres) */
 function turn(q: string) { sugg.hidden = true; root.classList.add('is-talk'); const t = document.createElement('div'); t.className = 'jv-turn'; const a = document.createElement('p'); a.className = 'jv-q'; a.textContent = q; const b = document.createElement('p'); b.className = 'jv-a'; b.textContent = '…'; t.append(a, b); log.append(t); me.textContent = ''; rep = b; down(); }
 
+/* 0.22.0 : « stop », « tais-toi » : JARVIS se tait et écoute ; « c'est tout », « au revoir » : la conversation se ferme */
+const STOP = /^(stop|stoppe|chut|tais[- ]toi|silence|arr[eê]te|attends|pause)( jarvis)?[.!]*$/i, BYE = /^(merci,? )?(c'est tout|au revoir|bonne nuit|on arr[eê]te|termin[ée]e?|ferme)( merci)?( jarvis)?[.!]*$/i;
+/* couper JARVIS : la réponse en cours (lue ou attendue) s'arrête, l'écoute reprend ; jamais la conversation entière */
+function interrupt() { gen++; if (ctl) { ctl.abort(); ctl = null; } busy = false; voice.interrupt(); if (rep && rep.textContent === '…') rep.textContent = '(coupé)'; }
+/* la position pour la météo : demandée une fois, arrondie au kilomètre, gardée sur l'iPhone 6 heures */
+let pos: {lat: number; lon: number; at: number} | null = null;
+try { pos = JSON.parse(localStorage.getItem('jarvis.pos') || 'null'); } catch { pos = null; }
+function askPos() {
+  if (pos && Date.now() - pos.at < 6 * 3600000) return;
+  try { navigator.geolocation.getCurrentPosition((p) => { pos = {lat: Math.round(p.coords.latitude * 100) / 100, lon: Math.round(p.coords.longitude * 100) / 100, at: Date.now()}; try { localStorage.setItem('jarvis.pos', JSON.stringify(pos)); } catch { /* rien */ } }, () => { /* refusée : la météo le dira */ }, {maximumAge: 3600000, timeout: 10000, enableHighAccuracy: false}); } catch { /* rien */ }
+}
 async function ask(text: string, byVoice: boolean) {
-  if (busy) return; busy = true;
+  const t0 = text.trim();
+  if (BYE.test(t0)) { voice.speak('À plus tard.', () => close()); return; }
+  if (STOP.test(t0)) { interrupt(); me.textContent = ''; return; }
+  if (busy || ctl) interrupt();   /* une nouvelle phrase remplace la réponse en cours */
+  const my = ++gen; busy = true; const c = new AbortController(); ctl = c;
   store.add({who: 'me', text, at: Date.now()});
-  turn(text); set('thinking');
+  turn(text); set('thinking'); if (voice.active) voice.pause();   /* le micro Whisper reste ouvert : ta voix peut le couper pendant qu'il réfléchit */
   const live = (byVoice || voice.active) && (canSpeak() || srv.serverVoice());
   let said = 0, reply = '';
   if (srv.linked()) {
     const g = live ? voice.streamStart() : 0;
     const feed = (t: string, final: boolean) => { if (!live) return; const rest = t.slice(said); let cut = final ? rest.length : -1; if (!final) { const re = /[.!?…](\s|$)/g; let x; while ((x = re.exec(rest))) if (x.index >= 2) cut = x.index + 1; } if (cut > 0) { const part = rest.slice(0, cut).trim(); said += cut; if (part) voice.streamPart(part, g); } };
     try {
-      const out = await srv.chat(text, {newSession: fresh, model: store.settings.model}, (t) => { rep.textContent = t; down(); feed(t, false); });
-      fresh = false; reply = out.reply; if (out.missions.length) store.missions.push(...out.missions);
+      const out = await srv.voix(text, {newSession: fresh, lat: pos ? pos.lat : undefined, lon: pos ? pos.lon : undefined}, (t) => { if (my !== gen) return; rep.textContent = t; down(); feed(t, false); }, c.signal);
+      if (my !== gen) return;
+      fresh = false; reply = out.reply; if (out.missions && out.missions.length) store.missions.push(...out.missions);
       rep.textContent = reply; down(); feed(reply, true);
-    } catch (e) { reply = (e as Error).message; rep.textContent = reply; if (live) voice.streamPart(reply, g); }
-    if (live) voice.streamEnd(g); else set('idle');
+    } catch (e) { if (my !== gen || c.signal.aborted) return; reply = (e as Error).message; rep.textContent = reply; if (live) voice.streamPart(reply, g); }
+    if (ctl === c) ctl = null;
+    if (live) voice.streamEnd(g); else { set('idle'); voice.idle(); }
   } else {
     const out = think(text, store.settings.route);
     if (out.missions?.length) store.missions.push(...out.missions);
@@ -122,7 +146,7 @@ async function ask(text: string, byVoice: boolean) {
     if (live) voice.speak(reply); else set('idle');
   }
   store.add({who: 'jarvis', text: reply, at: Date.now()});
-  busy = false;
+  if (my === gen) busy = false;
 }
 
 function build() {
@@ -138,21 +162,33 @@ function build() {
   me = root.querySelector('.jv-me')!; log = root.querySelector('.jv-log')!; cap = root.querySelector('.jv-cap')!; sugg = root.querySelector('.jv-sugg')!; rep = document.createElement('p');
   SUGG.forEach((q) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = q; b.onclick = () => ask(q, voice.active); sugg.append(b); }); note = root.querySelector('.jv-note')!; stateEl = root.querySelector('.jv-state')!; chip = root.querySelector('.jv-chip')!;
   mic = root.querySelector('.jv-mic')!; comp = root.querySelector('.jv-comp')!; input = comp.querySelector('input')!;
-  mic.onclick = () => { if (voice.state === 'speaking') { voice.interrupt(); return; } if (voice.active) { voice.stop(); return; } start(); };
+  /* 0.22.0 : le micro n'est jamais bloqué. Il parle ou réfléchit : un appui le coupe et t'écoute. Il écoute : un appui coupe ou rouvre le micro
+     (Whisper) ; la conversation ne se ferme qu'avec la croix ou « c'est tout ». */
+  mic.onclick = () => {
+    if (voice.state === 'speaking' || voice.state === 'waiting' || busy || voice.streaming) { interrupt(); return; }
+    if (voice.active && voice.toggleMic()) return;
+    if (voice.active) { voice.stop(); return; }
+    start();
+  };
+  /* un appui n'importe où sur l'orbe ou le texte, pendant qu'il parle ou réfléchit : il se tait et t'écoute */
+  const tapCut = (ev: Event) => { if ((ev.target as HTMLElement).closest('button, input, a')) return; if (voice.state === 'speaking' || voice.state === 'waiting' || busy || voice.streaming) interrupt(); };
+  (root.querySelector('.jv-stage') as HTMLElement).addEventListener('click', tapCut); cap.addEventListener('click', tapCut);
   (root.querySelector('.jv-k') as HTMLElement).onclick = () => { comp.hidden = !comp.hidden; if (!comp.hidden) { voice.stop(); setTimeout(() => input.focus(), 50); } };
   (root.querySelector('.jv-x') as HTMLElement).onclick = close;
+  /* l'iPhone verrouillé ou une autre app : le micro se ferme (l'iPhone le couperait de toute façon) */
+  document.addEventListener('visibilitychange', () => { if (document.hidden && root && !root.hidden && voice.active) { interrupt(); voice.stop(); set('idle'); stateEl.textContent = 'En veille · touche le micro'; } });
   const send = () => { const v = input.value.trim(); if (!v) return; input.value = ''; ask(v, false); };
   comp.querySelector('button')!.onclick = send;
   input.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); send(); } });
 }
-function start() { note.textContent = ''; if (!canListen()) { note.textContent = 'Pas de reconnaissance vocale ici : touche le clavier pour écrire.'; comp.hidden = false; return; } fresh = true; sessionAt = Date.now(); voice.start(); }
+function start() { note.textContent = ''; askPos(); if (!canListen() && !srv.serverEar()) { note.textContent = 'Pas de reconnaissance vocale ici : touche le clavier pour écrire.'; comp.hidden = false; return; } fresh = true; sessionAt = Date.now(); voice.start(); }
 export function open() {
   if (!root) build();
   root.hidden = false; orb.wave(true); me.textContent = ''; log.replaceChildren(); root.classList.remove('is-talk'); sugg.hidden = false; comp.hidden = true;
-  chip.textContent = srv.linked() ? 'Claude · ' + ({rapide: 'Haiku', equilibre: 'Sonnet', profond: 'Opus'} as Record<string, string>)[store.settings.model] : 'réponses locales';
+  chip.textContent = srv.linked() ? (srv.serverEar() ? 'Whisper · ' : '') + 'instantané + Haiku' : 'réponses locales';
   set('idle'); start();
 }
-export function close() { voice.stop(); resetBrain(); if (root) { root.hidden = true; orb.wave(false); } busy = false; void sessionAt; }
+export function close() { gen++; if (ctl) { ctl.abort(); ctl = null; } voice.stop(); resetBrain(); if (root) { root.hidden = true; orb.wave(false); } busy = false; void sessionAt; }
 /* le grand bouton orbe du bas */
 export function mountButton(host: HTMLElement = document.body) {
   const b = document.createElement('button'); b.type = 'button'; b.className = 'jv-btn'; b.setAttribute('aria-label', 'Parler à JARVIS');
