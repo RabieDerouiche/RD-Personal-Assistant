@@ -14,9 +14,21 @@ const MET = http.createServer((q, r) => { METEO_REQ.push(q.url); const t = paris
   r.writeHead(200, {'content-type': 'application/json'}); r.end(JSON.stringify({current: {temperature_2m: 9.4, apparent_temperature: 6.2, weather_code: 3}, daily: {time: days, weather_code: [3, 61, 0, 0, 0, 0, 0, 0], temperature_2m_min: [4, 2, 1, 1, 1, 1, 1, 1], temperature_2m_max: [11, 7, 12, 12, 12, 12, 12, 12], precipitation_probability_max: [10, 70, 0, 0, 0, 0, 0, 0]},
     hourly: {time: hours, temperature_2m: hours.map((x) => (+x.slice(11, 13) >= 18 ? 6 : 9)), precipitation_probability: hours.map(() => 0), weather_code: hours.map(() => 2)}})); });
 await new Promise((z) => MET.listen(0, '127.0.0.1', z));
+/* 0.23.2 : faux vendeurs (bannière promo en og:image, vraie photo dans la fiche JSON-LD), fausse boutique Shopify, faux Steam */
+const png = (w, h, mark) => { const hd = Buffer.alloc(33); Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]).copy(hd, 0); hd.writeUInt32BE(13, 8); hd.write('IHDR', 12); hd.writeUInt32BE(w, 16); hd.writeUInt32BE(h, 20); return Buffer.concat([hd, Buffer.from(mark.repeat(400))]); };
+const IMGS = {'/promo-a.png': png(1200, 1200, 'PROMO'), '/bon-a.png': png(800, 800, 'BON-A'), '/bon-b.png': png(900, 900, 'BON-B'), '/petit.png': png(120, 120, 'BON-petit'), '/bon-steam.png': png(920, 430, 'BON-STEAM')};
+const VEND = http.createServer((q, rr) => { const VBx = 'http://127.0.0.1:' + VEND.address().port, u = q.url.split('?')[0];
+  if (IMGS[u]) { rr.writeHead(200, {'content-type': 'image/png'}); rr.end(IMGS[u]); return; }
+  const html = (b) => { rr.writeHead(200, {'content-type': 'text/html'}); rr.end('<html><head>' + b + '</head></html>'); };
+  if (u === '/produit-a') return html('<meta property="og:image" content="/promo-a.png"><script type="application/ld+json">{"@type":"Product","image":["' + VBx + '/bon-a.png","' + VBx + '/petit.png"]}</script>');
+  if (u === '/produit-b') return html('<script type="application/ld+json">{"@type":"Product","image":["http:\\/\\/127.0.0.1:' + VEND.address().port + '\\/bon-b.png"]}</script>');
+  if (u === '/api/storesearch/') { rr.writeHead(200, {'content-type': 'application/json'}); rr.end(JSON.stringify({items: [{id: 42, name: 'Phantom Blade Zero'}]})); return; }
+  if (u === '/api/appdetails') { rr.writeHead(200, {'content-type': 'application/json'}); rr.end(JSON.stringify({42: {data: {header_image: VBx + '/bon-steam.png'}}})); return; }
+  html('rien'); });
+await new Promise((z) => VEND.listen(0, '127.0.0.1', z)); const VB = 'http://127.0.0.1:' + VEND.address().port;
 const PORT = 18000 + Math.floor(Math.random() * 1000), BASE = 'http://127.0.0.1:' + PORT;
 const env = {...process.env, JARVIS_PUSH_ALLOW_HTTP: '1', JARVIS_NOTIFY_TICK_MS: '3600000', JARVIS_SANTE_TICK_MS: '3600000', JARVIS_PAUSE_CACHE_MS: '0', JARVIS_PAPIERS_ID: 'pap', JARVIS_BELL_DEDUP_MS: '0', JARVIS_GOOGLE_FAKE: FG.url, PORT: String(PORT), JARVIS_DATA: DATA, CLAUDE_BIN: path.join(HERE, 'fake-claude.mjs'), ANTHROPIC_API_KEY: 'sk-ant-faux-pour-le-test', ANTHROPIC_BASE_URL: 'https://exemple.invalid', JARVIS_ORIGINS: 'https://rabiederouiche.github.io', JARVIS_REPO: os.tmpdir(), JARVIS_OS_DIR: path.join(HERE, '..', '..', '..', 'essais', 'jarvis-os-maquette'), JARVIS_TTS_HELPER: path.join(HERE, 'fake-tts.mjs'), JARVIS_VOICE_MODEL: path.join(HERE, 'fake-tts.mjs'), JARVIS_VOICE_SCRIPT: path.join(DATA, 'fausse-install.sh')};
-Object.assign(env, {JARVIS_STT_HELPER: path.join(HERE, 'fake-stt.mjs'), JARVIS_METEO_URL: 'http://127.0.0.1:' + MET.address().port + '/v1/forecast', JARVIS_ECOUTE_SCRIPT: path.join(DATA, 'fausse-install.sh')});
+Object.assign(env, {JARVIS_STEAM_URL: VB, JARVIS_STT_HELPER: path.join(HERE, 'fake-stt.mjs'), JARVIS_METEO_URL: 'http://127.0.0.1:' + MET.address().port + '/v1/forecast', JARVIS_ECOUTE_SCRIPT: path.join(DATA, 'fausse-install.sh')});
 const results = []; let fails = 0;
 { const H = ['Domaine', 'Fait', 'Valeur'], v = (x) => pauseDepuisFaits([H, ['Grok Bot', "Grok en pause jusqu'au", x]]);
   const okP = v('17/11/2026 13h05') === Date.parse('2026-11-17T13:05:00+01:00') && v('14/07/2027 12h47') === Date.parse('2027-07-14T12:47:00+02:00') && v('Reprise faite, sonnettes envoyées') === null && pauseDepuisFaits([H, ['x', 'Autre', 'y']]) === undefined;
@@ -279,23 +291,26 @@ try {
         const d2 = await V({text: 'Bonjour encore'}); const dt = Date.now() - t0;
         ok('voix : couper JARVIS pendant qu\'il répond libère tout de suite la suite (pas d\'attente de la réponse coupée)', /Tu as dit : Bonjour encore\./.test(d2.reply) && dt < 4000, dt + ' ms · ' + String(d2.reply).slice(0, 60)); } }
     /* 0.23.0 : comparatif automatique des produits suivis (Claude avec le web, photos des pages des vendeurs, gardé) */
-    { const PNG = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(2000, 7)]);
-      const VEND = http.createServer((q, rr) => { if (q.url === '/produit-a') { rr.writeHead(200, {'content-type': 'text/html'}); rr.end('<html><head><meta property="og:image" content="/img-a.png"></head></html>'); } else if (q.url === '/img-a.png' || q.url === '/img-b.png') { rr.writeHead(200, {'content-type': 'image/png'}); rr.end(q.url === '/img-b.png' ? Buffer.concat([PNG, Buffer.alloc(10, 1)]) : PNG); } else if (q.url === '/produit-b') { rr.writeHead(200, {'content-type': 'text/html'}); rr.end('<html><script type="application/ld+json">{"@type":"Product","image":["http:\\/\\/127.0.0.1:' + VEND.address().port + '\\/img-b.png"]}</script></html>'); } else { rr.writeHead(200, {'content-type': 'text/html'}); rr.end('<html>rien</html>'); } });
-      await new Promise((z) => VEND.listen(0, '127.0.0.1', z)); const VB = 'http://127.0.0.1:' + VEND.address().port;
+    {
       const body = {famille: 'Roborock Saros', produits: [{nom: 'Roborock Saros 20', prix: 799, ref: 1289, lien: 'Roborock — ' + VB + '/produit-a'}, {nom: 'Roborock Saros 20 Sonic', prix: 899, ref: 1049, lien: 'Boulanger — ' + VB + '/produit-b'}], conditions: 'Le Saros 20 Neo est exclu'};
       r = await G('/api/comparatif', body); ok('comparatif : demandé par la page, préparé en arrière-plan', r.status === 200 && ['en_cours', 'pret'].includes(r.body.comparatif.statut), JSON.stringify(r.body).slice(0, 120));
       let cp = null; for (let i = 0; i < 60 && !(cp && cp.statut === 'pret'); i++) { await new Promise((z) => setTimeout(z, 150)); cp = ((await G('/api/comparatifs')).body.comparatifs || []).find((x) => x.famille === 'Roborock Saros'); }
       const v0 = cp && cp.data && cp.data.variantes[0];
       ok('comparatif : différence clé, critères chiffrés, pour qui, utilité, points forts, limites, qualité et rapport qualité/prix par variante', cp && cp.statut === 'pret' && /serpillière/.test(cp.data.difference_cle) && cp.data.criteres.length === 2 && cp.data.variantes.length === 2 && v0.nom === 'Roborock Saros 20' && v0.valeurs.Aspiration === 20000 && v0.qualite === 7 && v0.rqp === 8 && v0.prix === 799 && /appartement/.test(v0.pour_qui), JSON.stringify(cp && cp.data).slice(0, 200));
-      ok('comparatif : photo de chaque variante, prise sur la page du vendeur (og:image, ou fiche produit JSON-LD), gardée sur le serveur', /^[0-9a-f]{24}\.png$/.test(v0.photo) && /^[0-9a-f]{24}\.png$/.test(cp.data.variantes[1].photo) && cp.data.variantes[1].photo !== v0.photo, JSON.stringify(cp.data.variantes.map((x) => x.photo)));
+      const im = async (id) => (await fetch(BASE + '/api/image/' + id, {headers: {authorization: 'Bearer ' + tok}}).then((x) => x.arrayBuffer()).then((b) => Buffer.from(b).toString('latin1')).catch(() => ''));
+      const p0 = await im(v0.photo), p1 = await im(cp.data.variantes[1].photo);
+      ok('comparatif : photos choisies EN LES REGARDANT parmi plusieurs candidates (la vraie photo, pas la bannière promo de l\'og:image ni la miniature), une par variante', /BON-A/.test(p0) && !/PROMO/.test(p0) && /BON-B/.test(p1), [p0.slice(33, 38), p1.slice(33, 38)].join(' '));
       ok('comparatif : aucun critère de prix venu de Claude (la page calcule prix et remise avec les prix du jour)', cp.data.criteres.length === 2 && !cp.data.criteres.some((k) => /prix/i.test(k.nom)), JSON.stringify(cp.data.criteres));
       { const ir = await fetch(BASE + '/api/image/' + v0.photo, {headers: {authorization: 'Bearer ' + tok}}); const nb = (await ir.arrayBuffer()).byteLength;
-        const ir2 = await fetch(BASE + '/api/image/' + v0.photo); ok('comparatif : la photo est servie à l\'iPhone relié seulement', ir.status === 200 && ir.headers.get('content-type') === 'image/png' && nb === PNG.length && ir2.status === 401, ir.status + ' ' + nb + ' ' + ir2.status); }
+        const ir2 = await fetch(BASE + '/api/image/' + v0.photo); ok('comparatif : la photo est servie à l\'iPhone relié seulement', ir.status === 200 && ir.headers.get('content-type') === 'image/png' && nb === IMGS['/bon-a.png'].length && ir2.status === 401, ir.status + ' ' + nb + ' ' + ir2.status); }
+      r = await G('/api/comparatif', {famille: 'Phantom Blade Zero PS5', produits: [{nom: 'Phantom Blade Zero PS5', prix: 69.99, ref: 69.99, lien: 'PlayStation Store — ' + VB + '/rien'}]});
+      let cg = null; for (let i = 0; i < 60 && !(cg && cg.statut === 'pret'); i++) { await new Promise((z) => setTimeout(z, 150)); cg = ((await G('/api/comparatifs')).body.comparatifs || []).find((x) => x.famille === 'Phantom Blade Zero PS5'); }
+      ok('comparatif : un jeu vidéo sans image sur la page du magasin prend son image officielle Steam', cg && cg.statut === 'pret' && /BON-STEAM/.test(await im(cg.data.variantes[0].photo)), JSON.stringify(cg && cg.data && cg.data.variantes.map((x) => x.photo)));
       const n0 = (await G('/api/comparatifs')).body.comparatifs.length; r = await G('/api/comparatif', body);
       ok('comparatif : gardé (pas de nouvel appel à Claude tant que les variantes ne changent pas)', r.body.comparatif.statut === 'pret' && (await G('/api/comparatifs')).body.comparatifs.length === n0);
       r = await G('/api/comparatif', {famille: 'Roborock Saros', produits: body.produits.concat([{nom: 'Roborock Saros 20X', prix: 799, ref: 1289, lien: ''}])}); ok('comparatif : une variante de plus = un nouveau comparatif', r.body.comparatif.statut === 'en_cours');
       r = await G('/api/comparatif', {famille: '', produits: []}); ok('comparatif : demande vide refusée', r.status === 400);
-      VEND.close(); }
+      }
     /* sauvegarde de Pilotage (0.14.0) : copie maintenant, comparée à une copie plus ancienne */
     { const H = ['Date', 'De', 'Pour', 'Type', 'Message', 'Statut', 'Réponse', 'Objet'];
       fs.mkdirSync(path.join(DATA, 'sauvegardes'), {recursive: true});

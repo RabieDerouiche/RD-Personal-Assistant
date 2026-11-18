@@ -347,6 +347,8 @@ srv.listen(0, async () => {
     /* 0.23.0 : comparatif des variantes (préparé par Claude ; ici, celui des données d'exemple) */
     { p = await page('#achats');
       const lead = await p.evaluate(() => [...document.querySelectorAll('.fam-rqp')].map((x) => x.textContent).join(' | '));
+      const pic = await p.evaluate(() => { const c = [...document.querySelectorAll('.fam-hit')].find((x) => /Beta/.test(x.textContent)); return !!(c && c.querySelector('.fam-ic.has-pic img')); });
+      ok('Achats : la carte d\'un produit montre sa photo', pic);
       await p.evaluate(() => [...document.querySelectorAll('.fam-hit')].find((x) => /Beta/.test(x.textContent)).click()); await p.waitForTimeout(1200);
       const cp = await p.evaluate(() => { const pn = [...document.querySelectorAll('.panel')].find((x) => /^Le comparatif/.test((x.querySelector('h2') || {}).textContent || '')); return pn ? {t: pn.innerText, bars: pn.querySelectorAll('.cmp-bar').length, best: pn.querySelectorAll('.cmp-bar.is-best').length, pics: pn.querySelectorAll('.cmp-pic img').length, ex: document.querySelectorAll('.var-x').length, exT: (document.querySelector('.var-x') || {}).innerText || ''} : null; });
       ok('Achats : chaque produit dit son meilleur rapport qualité/prix', /Meilleur rapport qualité\/prix : (Absolute|Submarine) \(\d/.test(lead), lead);
