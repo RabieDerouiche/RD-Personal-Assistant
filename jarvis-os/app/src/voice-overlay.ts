@@ -129,7 +129,7 @@ async function ask(text: string, byVoice: boolean) {
   let said = 0, reply = '';
   if (srv.linked()) {
     const g = live ? voice.streamStart() : 0;
-    const feed = (t: string, final: boolean) => { if (!live) return; const rest = t.slice(said); let cut = final ? rest.length : -1; if (!final) { const re = /[.!?…](\s|$)/g; let x; while ((x = re.exec(rest))) if (x.index >= 2) cut = x.index + 1; } if (cut > 0) { const part = rest.slice(0, cut).trim(); said += cut; if (part) voice.streamPart(part, g); } };
+    const feed = (t: string, final: boolean) => { if (!live) return; const rest = t.slice(said); let cut = final ? rest.length : -1; if (!final) { const re = /[.!?…](\s|$)/g; let x; while ((x = re.exec(rest))) if (x.index >= 2) cut = x.index + 1; if (cut < 0 && said === 0 && rest.length > 70) { const k = rest.indexOf(', ', 35); if (k > 0 && k < 140) cut = k + 1; } }   /* 0.22.1 : une première phrase longue est dite dès sa première virgule */ if (cut > 0) { const part = rest.slice(0, cut).trim(); said += cut; if (part) voice.streamPart(part, g); } };
     try {
       const out = await srv.voix(text, {newSession: fresh, lat: pos ? pos.lat : undefined, lon: pos ? pos.lon : undefined}, (t) => { if (my !== gen) return; rep.textContent = t; down(); feed(t, false); }, c.signal);
       if (my !== gen) return;
@@ -181,7 +181,7 @@ function build() {
   comp.querySelector('button')!.onclick = send;
   input.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); send(); } });
 }
-function start() { note.textContent = ''; askPos(); if (!canListen() && !srv.serverEar()) { note.textContent = 'Pas de reconnaissance vocale ici : touche le clavier pour écrire.'; comp.hidden = false; return; } fresh = true; sessionAt = Date.now(); voice.start(); }
+function start() { note.textContent = ''; askPos(); if (srv.linked()) srv.prechauffe(); if (!canListen() && !srv.serverEar()) { note.textContent = 'Pas de reconnaissance vocale ici : touche le clavier pour écrire.'; comp.hidden = false; return; } fresh = true; sessionAt = Date.now(); voice.start(); }
 export function open() {
   if (!root) build();
   root.hidden = false; orb.wave(true); me.textContent = ''; log.replaceChildren(); root.classList.remove('is-talk'); sugg.hidden = false; comp.hidden = true;

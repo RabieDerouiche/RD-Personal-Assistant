@@ -136,3 +136,15 @@ export function meteoUrl(base, lat, lon) {
 /* l'heure et la date, dites comme on les dit */
 export const heurePhrase = (t) => { const [H, M] = t.hm.split(':').map(Number); return 'Il est ' + H + ' h' + (M ? ' ' + String(M).padStart(2, '0') : '') + '.'; };
 export const datePhrase = (d) => 'Nous sommes le ' + new Intl.DateTimeFormat('fr-FR', {timeZone: 'Europe/Paris', weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'}).format(d) + '.';
+
+/* 0.22.1 : la diction de Pierre (Piper lit « 18 h 49 » « dix-huit ache », « 7° », « 30 % », « 18/11 » chiffre par chiffre) : écrit comme on le dit */
+const MOIS_DIT = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
+export const diction = (t) => String(t || '')
+  .replace(/(\d),00(?!\d)/g, '$1')
+  .replace(/\b(\d{1,2})\s*h\s*(\d{2})\b/g, (m, H, M) => H + (+H > 1 ? ' heures' : ' heure') + (M === '00' ? '' : ' ' + +M))
+  .replace(/\b(\d{1,2})\s*h\b(?![\wÀ-ÿ'])/g, (m, H) => H + (+H > 1 ? ' heures' : ' heure'))
+  .replace(/\b(\d{1,2})\/(\d{1,2})\/(\d{4})\b/g, (m, d, mo, y) => (+mo >= 1 && +mo <= 12 ? (+d === 1 ? '1er' : +d) + ' ' + MOIS_DIT[+mo - 1] + ' ' + y : m))
+  .replace(/\b(\d{1,2})\/(\d{1,2})\b/g, (m, d, mo) => (+mo >= 1 && +mo <= 12 && +d <= 31 ? (+d === 1 ? '1er' : +d) + ' ' + MOIS_DIT[+mo - 1] : m))
+  .replace(/(\d)\s*°\s*C?\b/g, '$1 degrés').replace(/(\d)\s*%/g, '$1 pour cent').replace(/(\d)\s*€/g, '$1 euros')
+  .replace(/\bJ-(\d+)\b/g, 'dans $1 jours').replace(/\bRDV\b/gi, 'rendez-vous').replace(/(\d)\s*km\b/g, '$1 kilomètres').replace(/(\d)\s*min\b/g, '$1 minutes')
+  .replace(/(\d)[\s\u202f\u00a0](?=\d{3}\b)/g, '$1').replace(/[«»"]/g, ' ').replace(/\s*;\s*/g, '. ').replace(/\s+([.,:!?])/g, '$1').replace(/\s{2,}/g, ' ').trim();

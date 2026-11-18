@@ -103,6 +103,10 @@
     voiceInstall: () => req('/api/voice/install', {}).then((r) => r.j).catch(() => null),
     /* 0.22.0 : l'écoute Whisper du serveur (bouton de Réglages) et son état */
     ecouteInstall: () => req('/api/ecoute/install', {}).then((r) => r.j).catch(() => null),
+    /* 0.23.0 : comparatif des produits suivis (Claude sur le serveur), et ses photos (servies à l'iPhone relié seulement) */
+    comparatifs: () => req('/api/comparatifs').then((r) => (r.status === 200 ? r.j : null)).catch(() => null),
+    comparatif: (b) => req('/api/comparatif', b).then((r) => r.j).catch(() => null),
+    image: (id) => fetch(BASE + '/api/image/' + encodeURIComponent(id), {headers: {authorization: 'Bearer ' + token()}}).then((r) => (r.ok ? r.blob() : null)).then((b) => (b ? URL.createObjectURL(b) : null)).catch(() => null),
     ecouteEtat: () => req('/api/ecoute/install').then((r) => (r.status === 200 ? r.j : null)).catch(() => null),
     /* Raccourcis de l'iPhone (0.13.0) : clé à part pour « Dis Siri, Jarvis » et le bouton Action */
     raccourci: {

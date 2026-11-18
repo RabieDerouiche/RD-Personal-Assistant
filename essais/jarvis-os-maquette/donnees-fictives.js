@@ -397,5 +397,16 @@
   G['Canal'].push([fr(D(0)), 'Chronos', 'Rabie', 'CRA Allegis', 'Oui/Non : Soumettre le CRA Allegis de la semaine du ' + fr(D(-2)).slice(0, 5) + ' | Jours : télétravail et congés selon Présence | Pourquoi : congés confirmés dans Présence ; aucun férié | Avant le : ' + fr(D(2)), 'Attend ton oui', '', '']);
   /* scénario pending : n ordres du propriétaire encore « À faire », datés d'aujourd'hui */
   if (SCEN.pending) for (let i = 1; i <= SCEN.pending; i++) G['Canal'].push([fr(D(0)), 'Rabie', 'Iris', 'Ordre', 'Ordre numéro ' + i, 'À faire', '', '']);
+  /* 0.23.0 : un comparatif déjà préparé par Claude (en vrai : sur le serveur, avec le web) pour le produit à deux variantes */
+  const pic = (c) => 'data:image/svg+xml;utf8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120"><rect x="53" y="8" width="14" height="74" rx="7" fill="' + c + '"/><circle cx="60" cy="20" r="13" fill="#94a3b8"/><rect x="28" y="80" width="64" height="20" rx="9" fill="#334155"/></svg>');
+  window.__COMPARATIFS = [{key: 'demo-beta', famille: 'Aspirateur Beta V9', produits: ['Aspirateur Beta V9 Absolute', 'Aspirateur Beta V9 Submarine'], at: Date.now() - 864e5, statut: 'pret', prix: {},
+    data: {resume: 'Le même aspirateur sans fil ; le Submarine ajoute une brosse qui lave les sols durs.', difference_cle: 'Le Submarine lave en plus d’aspirer : utile seulement avec beaucoup de carrelage ou de parquet vitrifié.',
+      criteres: [{nom: 'Aspiration', unite: 'AW', plus_haut_mieux: true}, {nom: 'Autonomie', unite: 'min', plus_haut_mieux: true}, {nom: 'Poids', unite: 'kg', plus_haut_mieux: false}],
+      variantes: [
+        {nom: 'Aspirateur Beta V9 Absolute', pour_qui: 'Un logement avec tapis et sols mixtes.', utilite: 'Aspiration quotidienne, poils et miettes.', points_forts: ['Léger', 'Très bonne aspiration'], limites: ['Ne lave pas'], valeurs: {Aspiration: 230, Autonomie: 60, Poids: 2.9}, qualite: 8, rqp: 8, verdict: 'Le bon choix si tu n’as pas besoin de laver.', prix: 749, photo: pic('#a78bfa')},
+        {nom: 'Aspirateur Beta V9 Submarine', pour_qui: 'Beaucoup de sols durs à laver.', utilite: 'Aspire puis lave les sols durs.', points_forts: ['Brosse de lavage', 'Même moteur'], limites: ['Plus lourd', '100 € de plus'], valeurs: {Aspiration: 230, Autonomie: 60, Poids: 3.2}, qualite: 8.5, rqp: 7, verdict: 'À prendre seulement pour le lavage.', prix: 849, photo: pic('#38bdf8')}],
+      conseil: 'Prends l’Absolute, sauf si tu laves souvent des sols durs.', certitude: 'likely', sources: ['https://example.org/test-beta']}}];
+  /* 0.23.0 : la météo de l'accueil (en vrai : Open-Meteo, à la position de l'iPhone) */
+  window.__METEO = {current: {temperature_2m: 9.4, apparent_temperature: 6.2, weather_code: 3}, daily: {time: [fr(D(0)), fr(D(1))], weather_code: [3, 61], temperature_2m_min: [4, 2], temperature_2m_max: [11, 7], precipitation_probability_max: [10, 70]}};
   window.__G = G; window.__MAIL = MAIL; window.__CAL = CAL;
 })();

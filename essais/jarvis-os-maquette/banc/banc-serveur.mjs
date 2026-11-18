@@ -193,7 +193,7 @@ try {
     await p.evaluate(() => [...document.querySelectorAll('#sheet .sheet-pick .btn')].find((x) => /^Dans une semaine/.test(x.textContent)).click()); await p.waitForTimeout(1500);
     const l1 = await p.evaluate(() => window.JarvisServeur.cote.liste());
     const shown = await p.evaluate(() => [...document.querySelectorAll('article')].some((x) => /Date du bail/.test(x.textContent) && /Plus…|Ouvrir ›/.test(x.textContent)));
-    await p.evaluate(() => [...document.querySelectorAll('.cote-it')].find((x) => /Date du bail/.test(x.textContent)).querySelector('button').click()); await p.waitForTimeout(1200);
+    await p.evaluate(() => [...[...document.querySelectorAll('.cote-it')].find((x) => /Date du bail/.test(x.textContent)).querySelectorAll('button')].find((b) => b.textContent === 'Remettre').click()); await p.waitForTimeout(1200);   /* le premier bouton ouvre la carte (0.23.0) */
     const l2 = await p.evaluate(() => window.JarvisServeur.cote.liste());
     ok('« Plus tard » (dans une semaine) gardé par le serveur, gratuit, carte cachée, puis « Remettre »', (l1 || []).some((x) => x.id === 'a:Date du bail' && x.jusqu > Date.now() + 6 * 864e5) && !shown && Array.isArray(l2) && !l2.some((x) => x.id === 'a:Date du bail'), JSON.stringify([l1, shown, l2])); }
   /* 0.22.0 : la voix refaite. Faux micro (un son que le banc allume), écoute Whisper du serveur (fausse), réponses instantanées,
