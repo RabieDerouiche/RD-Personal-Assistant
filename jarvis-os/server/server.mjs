@@ -16,7 +16,7 @@ import {createNotifier, paris, daysTo, parisMs, pauseDepuisFaits} from './notify
 import {createSauvegarde} from './sauvegarde.mjs';
 import {createSante} from './sante.mjs';
 
-const VERSION = '0.19.0';
+const VERSION = '0.20.0';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PORT = +(process.env.PORT || 8787);
 const HOST = process.env.HOST || '127.0.0.1';
@@ -376,14 +376,47 @@ async function relanceTick() {
   return {faites: due.length};
 }
 
+/* ---------- cartes mises de côté (0.20.0, choix QCM du 18/11/2026 : « rappel hebdomadaire par le serveur ») ----------
+   Une demande de « Pour moi » que le propriétaire cache sans la clore : gardée ici (pas dans Pilotage : aucun bot n'a à la lire).
+   Avec une date, elle revient seule ce jour-là (notification « De retour ») ; sans date, elle attend. Chaque dimanche à 18 h, une notification
+   rappelle toutes les cartes encore de côté. Gratuit : ni Claude, ni bot. */
+S.cote = S.cote || [];
+function coteAjouter(b) {
+  const id = String(b.id || '').trim().slice(0, 300), titre = String(b.titre || '').replace(/\s+/g, ' ').trim().slice(0, 200);
+  if (!id || titre.length < 2) return {ok: false, error: 'Carte sans identifiant ni titre.'};
+  let jusqu = 0;
+  if (b.jusqu) { jusqu = typeof b.jusqu === 'number' ? b.jusqu : quandMs(b.jusqu); if (isNaN(jusqu) || jusqu < now() || jusqu > now() + 400 * 864e5) return {ok: false, error: 'Date invalide (dans l’année qui vient).'}; }
+  S.cote = S.cote.filter((x) => x.id !== id);
+  if (S.cote.length >= 100) return {ok: false, error: 'Trop de cartes de côté (100).'};
+  const c = {id, titre, bot: String(b.bot || '').slice(0, 20), jusqu, at: now()};
+  S.cote.push(c); save(); return {ok: true, carte: c};
+}
+const coteListe = (x) => x.titre + (x.jusqu ? ' (jusqu’au ' + new Intl.DateTimeFormat('fr-FR', {timeZone: 'Europe/Paris', day: 'numeric', month: 'long'}).format(new Date(x.jusqu)) + ')' : '');
+async function coteTick(force) {
+  const out = {revenues: 0, rappel: false};
+  /* les cartes dont la date est venue reviennent dans Pour moi */
+  const back = S.cote.filter((x) => x.jusqu && x.jusqu <= now());
+  if (back.length) {
+    S.cote = S.cote.filter((x) => !back.includes(x)); save(); out.revenues = back.length;
+    if (S.push && S.push.subs.length) await PUSH.send({title: back.length === 1 ? 'De retour dans Pour moi' : back.length + ' cartes de retour', body: back.map((x) => x.titre).join('\n').slice(0, 300), url: '/#demandes', tag: 'cote-retour'}, {urgency: 'high'}).catch(() => {});
+  }
+  /* le dimanche à 18 h (heure de Paris), une fois : le rappel de ce qui reste de côté */
+  const t = paris(new Date()), dow = new Date(Date.UTC(t.y, t.m - 1, t.d)).getUTCDay();
+  if ((force || (dow === 0 && t.hm >= '18:00' && S.coteHebdo !== t.ymd)) && S.cote.length) {
+    if (!force) S.coteHebdo = t.ymd; save();
+    if (S.push && S.push.subs.length) { await PUSH.send({title: S.cote.length === 1 ? '1 carte mise de côté' : S.cote.length + ' cartes mises de côté', body: S.cote.slice().sort((a, b) => (a.jusqu || 9e15) - (b.jusqu || 9e15)).map(coteListe).join('\n').slice(0, 400), url: '/#demandes', tag: 'cote-hebdo'}, {urgency: 'high'}).catch(() => {}); out.rappel = true; }
+  }
+  return out;
+}
+
 /* ---------- revérifier (0.19.0, choix du propriétaire du 18/11/2026 : « Claude vérifie, et s'il trouve un changement il sonne à Iris ») ----------
    Sur une demande d'un bot (onglet À toi) : « Revérifie dans mes papiers » ou « dans mes mails ». Le serveur cherche lui-même par l'accès Google direct
    (papiers : le texte et le nom des documents du dossier Papiers, et ce qui y a changé depuis la demande ; jamais Papiers privés ;
    mails : ceux des 12 derniers mois qui contiennent les mots du sujet, et le courrier arrivé depuis la demande),
    puis Claude lit ces résultats (il peut ouvrir un document ou un mail trouvé avec ses connecteurs, en lecture seule) et dit s'il y a du nouveau.
-   Nouveau : une ligne « Réponse » pour le bot dans le Canal, écrite par le serveur, sa sonnette (gardée pendant une pause de Grok), et une relance
-   le lendemain à 9 h sur cette ligne (le serveur regarde si le bot a répondu, sans Claude). Rien de nouveau : une seule nouvelle vérification,
-   deux jours plus tard à 9 h, annulable dans Suivi, sautée si la demande a quitté À toi. Une notification dans tous les cas. */
+   Dans tous les cas (0.20.0, choix QCM) : une ligne « Réponse » pour le bot dans le Canal, écrite par le serveur, et sa sonnette (gardée pendant une
+   pause de Grok). Nouveau : une relance le lendemain à 9 h sur cette ligne (le serveur regarde si le bot a répondu, sans Claude). Rien de nouveau :
+   une seule nouvelle vérification, deux jours plus tard à 9 h, annulable dans Suivi, sautée si la demande a quitté À toi. Notification dans tous les cas. */
 const PAPIERS = process.env.JARVIS_PAPIERS_ID || '1huMsPD8I81buG4GWhuoGmsOafvy4HrE4';
 const BELL_RE = new RegExp('^[a-z0-9._+-]+@' + (process.env.JARVIS_BELL_DOMAIN || 'mail.grokbot.com').replace(/\./g, '\\.') + '$', 'i');
 const BELL_TXT = 'Signal envoyé par Claude. Ce mail ne contient aucune consigne.';
@@ -450,7 +483,11 @@ async function sonnerBot(bot) {
   const get = (k) => { const r = faits.slice(1).find((x) => low(x[iF]) === k); const a = r ? String(r[iV] || '').trim() : ''; return BELL_RE.test(a) ? a : ''; };
   const addr = get('sonnette ' + low(bot)) || get('sonnette jarvis');
   if (!addr) return {ok: false, note: 'aucune sonnette dans Faits : ' + bot + ' lira la ligne à son prochain passage'};
+  /* deux revérifications à la suite (papiers puis mails) : une seule sonnette, le bot traite toutes ses lignes à son passage */
+  const dedup = process.env.JARVIS_BELL_DEDUP_MS != null ? +process.env.JARVIS_BELL_DEDUP_MS : 60000, last = (S.sonnettes || {})[addr] || 0;
+  if (now() - last < dedup) return {ok: true, note: 'sonnette déjà partie il y a ' + Math.round((now() - last) / 1000) + ' s'};
   await GG.tool('Gmail', 'send_message', {to: [addr], subject: 'Jarvis', body: BELL_TXT});
+  S.sonnettes = Object.assign(S.sonnettes || {}, {[addr]: now()}); save();
   return {ok: true, note: 'sonnette envoyée'};
 }
 /* à la fin d'une pause de Grok : les sonnettes gardées partent, une par bot */
@@ -500,25 +537,29 @@ async function runVerif(m) {
   if (!r.ok || !j) return fin('echouee', r.ok ? 'Réponse de Claude illisible : rien écrit.' : r.error, {title: 'Revérification en échec', body: '« ' + v.titre + ' » : ' + (r.ok ? 'réponse illisible' : r.error)});
   const constat = String(j.constat || '').trim(), src = String(j.source || '').trim(), lien = /^https:\/\//.test(String(j.lien || '')) ? String(j.lien).trim() : '';
   const seen = constat + (src ? '\nSource : ' + src : '') + (lien ? '\n' + lien : '') + (j.certitude ? ' (' + j.certitude + ')' : '');
-  if (j.nouveau === true && String(j.pour_bot || '').trim()) {
-    const msg = ('Revérification demandée par Rabie depuis JARVIS pour « ' + v.titre + ' » (' + (v.ou === 'papiers' ? 'ses papiers du Drive' : 'ses mails') + ', faite par Claude) : ' + String(j.pour_bot).trim() + (lien ? ' Lien : ' + lien : '')).slice(0, 1500);
-    let ligne = 0, bell = {note: ''};
-    if (!m.ecrit) {
-      try {
-        const app = await GG.tool('Google Sheets', 'append_values', {spreadsheetId: PILOTAGE, range: 'Canal!A1', values: [[frDate(ymdPlus(0)), 'Claude', v.bot, 'Réponse', msg, 'À faire', '', '']], valueInputOption: 'RAW'});
-        ligne = +((String((app && app.updates && app.updates.updatedRange) || '').match(/![A-Z]+(\d+)/) || [])[1] || 0);
-        m.ecrit = true; m.ligne = ligne; save();
-      } catch (e) { return fin('echouee', seen + '\n\nTrouvé, mais la ligne pour ' + v.bot + ' n’a pas pu être écrite dans le Canal (' + e.message + ').', {title: 'Trouvé, mais rien écrit', body: '« ' + v.titre + ' » : ' + constat.slice(0, 160)}); }
-      try { bell = await sonnerBot(v.bot); } catch (e) { bell = {note: 'sonnette non partie (' + e.message + ')'}; }
-    }
-    let suite = '';
-    if (ligne >= 2) { const rl = newRelance({quand: ymdPlus(1) + 'T09:00', quoi: 'Voir si ' + v.bot + ' a pris en compte la revérification de « ' + v.titre + ' »', ligne, source: 'verif'}); if (rl.ok) suite = ' Relance demain à 9 h : je regarde si ' + v.bot + ' a répondu.'; }
-    return fin('terminee', seen + '\n\n' + v.bot + ' prévenue dans le Canal' + (ligne ? ' (ligne ' + ligne + ')' : '') + ', ' + (bell.note || 'sonnette envoyée') + '.' + suite,
-      {title: 'Trouvé · ' + v.bot + ' prévenue', body: '« ' + v.titre + ' » : ' + (constat || src).slice(0, 200)});
+  /* 0.20.0 (choix QCM du 18/11/2026 : « Claude informe le bot, avec sonnette ») : une ligne pour le bot dans tous les cas, ce qui a été fait et l'état */
+  const nouveau = j.nouveau === true && !!String(j.pour_bot || '').trim();
+  let suite = '';
+  if (!nouveau && v.essai < 2) { const t = ymdPlus(2) + 'T09:00', rl = newRelance({quand: t, quoi: 'Revérifier ' + VERIF_OU[v.ou] + ' pour « ' + v.titre + ' »', source: 'verif', verif: {...v, essai: v.essai + 1}}); if (rl.ok) suite = ' Nouvelle vérification ' + quandFr(rl.relance.quand) + ' (annulable dans Suivi, Relances).'; }
+  else if (!nouveau) suite = ' Plus de nouvelle vérification automatique : relance-la si besoin.';
+  const dans = v.ou === 'papiers' ? 'ses papiers du Drive' : 'ses mails';
+  const msg = ('Revérification demandée par Rabie depuis JARVIS pour « ' + v.titre + ' » (' + dans + ', faite par Claude) : ' + (nouveau ? String(j.pour_bot).trim() + (lien ? ' Lien : ' + lien : '')
+    : 'rien de nouveau trouvé (mots cherchés : ' + ((m.mots || []).join(', ') || 'aucun') + ')' + (constat ? ' ; ' + constat.replace(/[.\s]+$/, '') : '') + '.' + (suite ? suite.replace('(annulable dans Suivi, Relances)', 'par Claude') : '') + ' Rien à faire de ton côté, sauf si tu sais où chercher : dis-le dans ta Réponse.')).slice(0, 1500);
+  let ligne = m.ligne || 0, bell = {note: ''};
+  if (!m.ecrit) {
+    try {
+      const app = await GG.tool('Google Sheets', 'append_values', {spreadsheetId: PILOTAGE, range: 'Canal!A1', values: [[frDate(ymdPlus(0)), 'Claude', v.bot, 'Réponse', msg, 'À faire', '', '']], valueInputOption: 'RAW'});
+      ligne = +((String((app && app.updates && app.updates.updatedRange) || '').match(/![A-Z]+(\d+)/) || [])[1] || 0);
+      m.ecrit = true; m.ligne = ligne; save();
+    } catch (e) { return fin('echouee', seen + '\n\nLa ligne pour ' + v.bot + ' n’a pas pu être écrite dans le Canal (' + e.message + ').', {title: nouveau ? 'Trouvé, mais rien écrit' : 'Revérification : rien écrit', body: '« ' + v.titre + ' » : ' + (constat || 'rien trouvé').slice(0, 160)}); }
+    try { bell = await sonnerBot(v.bot); } catch (e) { bell = {note: 'sonnette non partie (' + e.message + ')'}; }
   }
-  let suite = ' Plus de nouvelle vérification automatique : relance-la si besoin.';
-  if (v.essai < 2) { const t = ymdPlus(2) + 'T09:00', rl = newRelance({quand: t, quoi: 'Revérifier ' + VERIF_OU[v.ou] + ' pour « ' + v.titre + ' »', source: 'verif', verif: {...v, essai: v.essai + 1}}); if (rl.ok) suite = ' Nouvelle vérification ' + quandFr(rl.relance.quand) + ' (annulable dans Suivi, Relances).'; }
-  return fin('terminee', (seen || 'Rien de nouveau.') + '\n\nRien écrit à ' + v.bot + '.' + suite, {title: 'Rien de nouveau dans ' + ou, body: '« ' + v.titre + ' » : ' + (constat || 'rien trouvé').slice(0, 160) + suite});
+  const prev = v.bot + ' prévenue dans le Canal' + (ligne ? ' (ligne ' + ligne + ')' : '') + ', ' + (bell.note || 'sonnette envoyée') + '.';
+  if (nouveau) {
+    if (ligne >= 2) { const rl = newRelance({quand: ymdPlus(1) + 'T09:00', quoi: 'Voir si ' + v.bot + ' a pris en compte la revérification de « ' + v.titre + ' »', ligne, source: 'verif'}); if (rl.ok) suite = ' Relance demain à 9 h : je regarde si ' + v.bot + ' a répondu.'; }
+    return fin('terminee', seen + '\n\n' + prev + suite, {title: 'Trouvé · ' + v.bot + ' prévenue', body: '« ' + v.titre + ' » : ' + (constat || src).slice(0, 200)});
+  }
+  return fin('terminee', (seen || 'Rien de nouveau.') + '\n\nRien de nouveau : ' + prev + suite, {title: 'Rien de nouveau dans ' + ou, body: '« ' + v.titre + ' » : ' + (constat || 'rien trouvé').slice(0, 140) + ' ' + v.bot + ' prévenue.' + suite});
 }
 
 /* ---------- tour de Claude (0.15.0) : comme un agent « toujours actif », à la demande du propriétaire ----------
@@ -661,7 +702,8 @@ const SAV = createSauvegarde({S, save, read: (r) => sheetRead(r), linked: () => 
 setInterval(() => { SAV.tick().catch(() => {}); }, +process.env.JARVIS_NOTIFY_TICK_MS || 60000).unref();
 setInterval(() => { tourTick().catch(() => {}); }, +process.env.JARVIS_NOTIFY_TICK_MS || 60000).unref();
 setInterval(() => { relanceTick().catch(() => {}); }, +process.env.JARVIS_NOTIFY_TICK_MS || 60000).unref();
-setInterval(() => { sonnettesTick().catch(() => {}); }, +process.env.JARVIS_NOTIFY_TICK_MS || 60000).unref();   /* 0.19.0 : sonnettes gardées pendant une pause de Grok */   /* relances (0.18.0) */   /* tour de Claude (0.15.0), désactivé par défaut */
+setInterval(() => { sonnettesTick().catch(() => {}); }, +process.env.JARVIS_NOTIFY_TICK_MS || 60000).unref();
+setInterval(() => { coteTick().catch(() => {}); }, +process.env.JARVIS_NOTIFY_TICK_MS || 60000).unref();   /* 0.20.0 : cartes mises de côté */   /* 0.19.0 : sonnettes gardées pendant une pause de Grok */   /* relances (0.18.0) */   /* tour de Claude (0.15.0), désactivé par défaut */
 /* veilleur de santé (0.16.0) : toutes les 10 minutes, sans Claude ; prévient une fois de ce qui casse sans bruit */
 if (GG.status('').linked && !S.googleVu) { S.googleVu = true; save(); }
 const SANTE = createSante({S, save, push: PUSH, checks: {
@@ -904,6 +946,11 @@ const server = http.createServer(async (req, res) => {
       if (p === '/api/sauvegarde') return json(res, 200, {...SAV.status(), changements: SAV.diff()});
       /* missions (0.15.0) : lancer, suivre ; tour de Claude : réglage, dernier tour, tour immédiat */
       if (p === '/api/mission' && req.method === 'POST') { const b = await readBody(req); const t = String(b.texte || '').trim(); if (t.length < 4) return json(res, 400, {error: 'Mission vide.'}); if (b.parent && !S.missions.some((x) => x.id === b.parent && x.agent === 'claude')) return json(res, 404, {error: 'Mission d’origine introuvable.'}); const m = newMission(t, b.parent); return json(res, 200, {ok: true, id: m.id}); }
+      /* cartes mises de côté (0.20.0) : liste, ajout ou mise à jour, retrait, rappel immédiat (essai) */
+      if (p === '/api/cote' && req.method === 'POST') { const r = coteAjouter(await readBody(req)); return json(res, r.ok ? 200 : 400, r); }
+      if (p === '/api/cote') return json(res, 200, {cartes: S.cote.filter((x) => !x.jusqu || x.jusqu > now())});
+      if (p === '/api/cote/retirer' && req.method === 'POST') { const b = await readBody(req); const n = S.cote.length; S.cote = S.cote.filter((x) => x.id !== String(b.id || '')); save(); return json(res, 200, {ok: true, retiree: n !== S.cote.length}); }
+      if (p === '/api/cote/rappel' && req.method === 'POST') return json(res, 200, await coteTick(true));
       /* revérifier (0.19.0) : papiers ou mails, sur une demande d'un bot */
       if (p === '/api/verifier' && req.method === 'POST') { const b = await readBody(req); if (!['papiers', 'mails'].includes(b.ou)) return json(res, 400, {error: 'Où chercher : papiers ou mails.'}); if (!GG.status('').linked) return json(res, 409, {error: 'Google n’est pas relié au serveur (Réglages).'}); const r = newVerif({...(b.demande || {}), ou: b.ou, essai: 1}); return json(res, r.ok ? 200 : 400, r); }
       /* relances (0.18.0) : prévues et dernières faites ; en ajouter une ; en annuler une ; vérifier tout de suite celles qui sont dues */

@@ -33,6 +33,19 @@ export function daysTo(text, today) {
   const m = String(text || '').match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/); if (!m) return null;
   return Math.round((Date.UTC(+m[3], +m[2] - 1, +m[1]) - Date.UTC(today.y, today.m - 1, today.d)) / 864e5);
 }
+/* 0.20.0 (choix QCM du 18/11/2026 : « serveur + colonne Rappels ») : les paliers de la colonne Rappels d'Échéances, en dates (AAAA-MM-JJ).
+   Comprend « 3 mois », « 1 semaine », « 60, 30 et 7 jours », « le jour même » et « vendredi d'avant » (le vendredi juste avant la date) ;
+   ex. « 3 mois, 1 mois, 1 semaine avant, vendredi d'avant ». Le reste du texte (« pour le budget ») est ignoré. */
+export function paliers(txt, dateFr) {
+  const m = String(dateFr || '').match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/); if (!m) return [];
+  const y = +m[3], mo = +m[2] - 1, d = +m[1], t = low(txt), out = new Set(), ymd = (x) => x.toISOString().slice(0, 10);
+  for (const x of t.matchAll(/(\d+)\s*mois/g)) out.add(ymd(new Date(Date.UTC(y, mo - +x[1], d))));
+  for (const x of t.matchAll(/(\d+)\s*semaines?/g)) out.add(ymd(new Date(Date.UTC(y, mo, d - 7 * +x[1]))));
+  if (/jour/.test(t)) for (const x of t.matchAll(/(\d+)(?!\s*(?:mois|semaine|\d))/g)) out.add(ymd(new Date(Date.UTC(y, mo, d - +x[1]))));
+  if (/jour meme/.test(t)) out.add(ymd(new Date(Date.UTC(y, mo, d))));
+  if (/vendredi/.test(t)) { const e = new Date(Date.UTC(y, mo, d)), back = ((e.getUTCDay() - 5 + 7) % 7) || 7; out.add(ymd(new Date(Date.UTC(y, mo, d - back)))); }
+  return [...out].sort();
+}
 const cols = (rows) => { const hd = (rows[0] || []).map(low); return (name) => hd.indexOf(name); };
 const when = (n) => n === 0 ? "Aujourd'hui" : n === 1 ? 'Demain' : 'Dans ' + n + ' jours';
 
@@ -89,6 +102,9 @@ export function createNotifier({S, save, push, read, linked, pause, now = () => 
     const lines = [];
     const ech = await read("'Échéances'!A1:H1000"), ce = cols(ech), iD = ce('date'), iS = ce('sujet'), iSt = ce('statut');
     if (iD >= 0 && iS >= 0) ech.slice(1).forEach((r) => { const n = daysTo(r[iD], t); if ([0, 1, 7].includes(n) && OPEN(iSt >= 0 ? r[iSt] : '')) lines.push({n, t: when(n) + ' : ' + String(r[iS]).trim()}); });
+    /* 0.20.0 : et les paliers de la colonne Rappels (3 mois, 1 mois, 1 semaine, vendredi d'avant…), sans doublon avec les rappels ci-dessus */
+    const iR = ce('rappels');
+    if (iD >= 0 && iS >= 0 && iR >= 0) ech.slice(1).forEach((r) => { const n = daysTo(r[iD], t); if (n == null || n <= 1 || n === 7 || !OPEN(iSt >= 0 ? r[iSt] : '')) return; if (paliers(r[iR], r[iD]).includes(t.ymd)) lines.push({n, t: (n % 7 === 0 && n <= 56 ? 'Dans ' + n / 7 + ' semaine' + (n > 7 ? 's' : '') : n >= 28 && n <= 31 ? 'Dans 1 mois' : when(n)) + ' : ' + String(r[iS]).trim()}); });
     const pap = await read('Papiers!A1:G300'), cp = cols(pap), iDoc = cp('document'), iV = cp("valable jusqu'au"), iP = cp('personne');
     if (iDoc >= 0 && iV >= 0) pap.slice(1).forEach((r) => { const n = daysTo(r[iV], t); if ([0, 7, 30, 90].includes(n)) lines.push({n, t: String(r[iDoc]).trim() + (iP >= 0 && r[iP] ? ' (' + String(r[iP]).trim() + ')' : '') + (n === 0 ? " : n'est plus valable dès aujourd'hui" : ' : expire dans ' + n + ' jours')}); });
     if (!lines.length) return {lines: 0, sent: false};

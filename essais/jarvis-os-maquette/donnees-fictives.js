@@ -22,10 +22,17 @@
     [fr(D(-2)), 'Argus', 'Skill registre', 'Ton oui dans le chat de Argus : mettre le skill à jour. Phrase : Oui, mets le skill à jour.'],
     [fr(D(-1)), 'Ulysse', 'Routines d\'Ulysse', 'Ton oui dans le chat de Ulysse : ma description dit « une seule routine ». Phrase : Oui, crée ta routine Sonnette Ulysse sur l\'alias ulysse.'],
     [fr(D(-3)), 'Ulysse', 'Dates du voyage', 'Quelles dates préfères-tu pour le voyage ?'],
-    [fr(D(-1)), 'Iris', 'Date du bail', "À faire : Retrouve la date de début du bail pour l'assureur | Pourquoi : il la demande pour le contrat habitation | Conseil : retrouver cette date sur l'un de ces deux documents | Temps : 5 min"]
+    [fr(D(-1)), 'Iris', 'Date du bail', "À faire : Retrouve la date de début du bail pour l'assureur | Pourquoi : il la demande pour le contrat habitation | Conseil : retrouver cette date sur l'un de ces deux documents | Temps : 5 min"],
+    /* 18/11/2026 : brouillon lié à son dossier (une seule carte), demande dépassée, offre terminée dans le texte, décision liée à une fermeture de crèche */
+    [fr(D(0)), 'Iris', 'Résiliation StreamPlus', 'Envoyer la relance préparée dans tes brouillons Gmail (fil StreamPlus)'],
+    [fr(D(-6)), 'Iris', 'Offre de bienvenue', "À faire : Activer l'offre de bienvenue | Avant le : " + fr(D(-2))],
+    [fr(D(-1)), 'Iris', "Rachat de l'abonnement", "À faire : Offre Alpha terminée le " + fr(D(-3)) + " (simulation non connue). Simuler chez Beta (offre jusqu'au " + fr(D(12)) + ')'],
+    [fr(D(0)), 'Iris', 'Garde pendant la fermeture de la crèche le ' + fr(D(60)), "Choix : Qui garde l'enfant ? | Options : Toi / Ton épouse / Partage | Avant le : " + fr(D(45))]
   ];
   G['Échéances'] = [
     ['Date', 'Sujet', 'Domaine', 'Rappels', 'Statut', 'Bot', 'Remarque', 'Nature'],
+    [fr(D(60)), "Fermeture de la crèche (vacances d'hiver)", 'Famille', "3 mois, 1 mois, 1 semaine avant, vendredi d'avant", 'À venir', 'Iris', 'Source : mail de la crèche', 'Date à retenir'],
+    [fr(D(-3)), "Fin de l'offre de lancement", 'Achats', '3 jours avant', 'À venir', 'Kairos', 'Offre vue chez le fabricant', 'Offre'],
     [fr(D(-2)), "Envoyer l'attestation à l'école", 'Famille', '', 'À venir', 'Iris', 'Demandée par la directrice', 'À faire par moi'],
     [fr(D(6)), 'Rendez-vous notaire (14h30)', 'Famille', '', 'À venir', 'Iris', 'Événement important ajouté depuis la page', 'Date à retenir'],
     [fr(D(0)), 'Rendez-vous médecin', 'Famille', '', 'À venir', 'Iris', 'Cabinet du centre', 'Date à retenir'],
@@ -43,7 +50,9 @@
     ['Dégât des eaux', 'En attente', 'Attendre la réponse du syndic', '', 'Syndic Dupont', fr(D(-12)), 'Contact : gestion@syndic-dupont.example ; réf 123', 'Iris', fr(D(-12)), ''],
     ['Facture sans TVA', 'En attente', 'Recevoir la facture corrigée', fr(D(6)), 'le support', fr(D(-4)), '', 'Iris', fr(D(-4)), ''],
     ['Ancien dossier', 'Clos', 'x', '', 'la mairie', fr(D(-30)), '', 'Iris', fr(D(-30)), ''],
-    ['Relance syndic', 'En attente', 'Envoyer la relance', fr(D(5)), 'Rabie', fr(D(-10)), '', 'Iris', fr(D(-1)), 'Pourquoi : sans réponse | Si oui : la relance part']
+    ['Relance syndic', 'En attente', 'Envoyer la relance', fr(D(5)), 'Rabie', fr(D(-10)), '', 'Iris', fr(D(-1)), 'Pourquoi : sans réponse | Si oui : la relance part'],
+    ['Résiliation StreamPlus', 'En attente', 'Envoyer la relance préparée dans tes brouillons Gmail (fil StreamPlus)', fr(D(0)), 'Rabie', fr(D(-19)), 'Ticket #4521 ; résiliation demandée ; aucune confirmation écrite depuis l\'accusé de réception ; brouillon de relance créé dans le fil Gmail.', 'Iris', fr(D(0)),
+      "Brouillon. Pourquoi : StreamPlus n'a envoyé que l'accusé de réception automatique | Si oui : StreamPlus confirme la résiliation | Si non : pas de preuve écrite | Déjà prêt : brouillon de relance dans le fil « Votre demande a bien été reçue » de StreamPlus, dans tes brouillons Gmail | Conseil : l'envoyer aujourd'hui | Temps : 1 minute"]
   ];
   G['Prix'] = [
     ["Remise qui déclenche l'alerte Bon prix", '10%', 'Source'], [],
@@ -206,7 +215,8 @@
     sent: [thr('s1', msg('ms1', 's1', 'moi@example.org', 'Moi', 'Relance syndic', new Date(now - 3600000 * 2), ['SENT']))],
     drafts: [
       {id: 'DRAFT1', threadId: 'dth1', toRecipients: ['gestion@syndic-dupont.example'], ccRecipients: [], date: new Date(now - 3600000 * 20).toISOString(), subject: 'Relance syndic', plaintextBody: 'Bonjour,\nJe me permets de vous relancer.\nCordialement', viewUrl: 'https://mail.google.com/mail/#drafts?compose=DRAFT1'},
-      {id: 'DRAFT2', threadId: 'dth2', toRecipients: [], date: new Date(now - 3600000 * 40).toISOString(), subject: '', plaintextBody: 'Texte sans destinataire'}
+      {id: 'DRAFT2', threadId: 'dth2', toRecipients: [], date: new Date(now - 3600000 * 40).toISOString(), subject: '', plaintextBody: 'Texte sans destinataire'},
+      {id: 'DRAFT3', threadId: 'dth3', toRecipients: ['contact@streamplus.example'], ccRecipients: [], date: new Date(now - 3600000 * 3).toISOString(), subject: 'Re: Votre demande a bien été reçue (#4521)', plaintextBody: "Bonjour,\nJ'ai demandé la résiliation de mon abonnement (requête #4521) et je n'ai reçu qu'un accusé de réception. Pouvez-vous me confirmer la résiliation et sa date d'effet ?\nCordialement", viewUrl: 'https://mail.google.com/mail/#drafts?compose=DRAFT3'}
     ]
   };
 
