@@ -181,6 +181,16 @@ try {
     const ms = await p.evaluate(() => window.JarvisServeur.missions()), mv = (ms || []).find((x) => /^Revérifie dans tes papiers : « Date du bail »/.test(x.text));
     ok('revérifier : « Revérifie dans mes papiers » en haut de la feuille, lancé sur le serveur, ligne pour Iris dans le Canal, mission suivie', vis.includes('Revérifie dans mes papiers') && /Claude revérifie tes papiers/.test(ts) && ln && ln.values[0][1] === 'Claude' && ln.values[0][2] === 'Iris' && /Bail 2024\.pdf/.test(ln.values[0][4]) && mv && /Iris prévenue dans le Canal/.test(mv.result || ''), JSON.stringify([vis, ts.slice(0, 120), ln && ln.values[0][4], mv && mv.status]));
     await p.screenshot({path: SH + 'demande-reverifie-serveur.png'}); }
+  /* 0.20.0 (18/11/2026) : « Mettre de côté » gardé par le serveur (rappel du dimanche), puis « Remettre » */
+  { await p.evaluate(() => document.querySelectorAll('#toasts .toast').forEach((t) => t.remove()));
+    await p.evaluate(() => { const c = [...document.querySelectorAll('article')].find((x) => /Date du bail/.test(x.textContent) && /Plus…/.test(x.textContent)); [...c.querySelectorAll('button')].find((x) => x.textContent.trim() === 'Plus…').click(); }); await p.waitForTimeout(900);
+    await p.evaluate(() => { document.querySelector('#sheet .sa-more').open = true; [...document.querySelectorAll('#sheet .sa-more .btn')].find((x) => /^Mettre de côté/.test(x.textContent)).click(); }); await p.waitForTimeout(600);
+    await p.evaluate(() => [...document.querySelectorAll('#sheet .sheet-pick .btn')].find((x) => /^Une semaine/.test(x.textContent)).click()); await p.waitForTimeout(1500);
+    const l1 = await p.evaluate(() => window.JarvisServeur.cote.liste());
+    const shown = await p.evaluate(() => [...document.querySelectorAll('article')].some((x) => /Date du bail/.test(x.textContent) && /Plus…/.test(x.textContent)));
+    await p.evaluate(() => [...document.querySelectorAll('.cote-it')].find((x) => /Date du bail/.test(x.textContent)).querySelector('button').click()); await p.waitForTimeout(1200);
+    const l2 = await p.evaluate(() => window.JarvisServeur.cote.liste());
+    ok('de côté : « Mettre de côté » (une semaine) gardé par le serveur, carte cachée, puis « Remettre »', (l1 || []).some((x) => x.id === 'a:Date du bail' && x.jusqu > Date.now() + 6 * 864e5) && !shown && Array.isArray(l2) && !l2.some((x) => x.id === 'a:Date du bail'), JSON.stringify([l1, shown, l2])); }
 } catch (e) { ok('exception', false, e.stack); }
 ok('aucune erreur de page', !errs.length, errs.join(' | '));
 console.log(out.join('\n')); const bad = out.filter((l) => l.startsWith('ÉCHEC')).length; console.log(bad ? bad + ' échec(s)' : 'Tout passe (' + out.length + ' vérifications).');

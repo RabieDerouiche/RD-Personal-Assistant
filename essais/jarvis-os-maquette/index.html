@@ -1236,7 +1236,7 @@
   .cost { flex: 0 0 auto; margin-left: auto; padding: 1px 7px; border-radius: 8px; border: 1px solid var(--line-2); background: rgba(255, 255, 255, .04); color: var(--muted); font: 600 10px/16px var(--sans); letter-spacing: .02em; white-space: nowrap; }
   .sugg-tag + .cost { margin-left: 0; }
   .row-actions .btn .cost, .tri-b .cost, .sa-grid .btn .cost { margin-left: 6px; }
-  .cost-free { color: #6ee7b7; border-color: rgba(110, 231, 183, .35); }
+  .cost-free, .cost-next { color: #6ee7b7; border-color: rgba(110, 231, 183, .35); }
   .cost-bot { color: #fde68a; border-color: rgba(251, 191, 36, .4); }
   .cost-chat { color: #fda4af; border-color: rgba(251, 113, 133, .45); }
   .cost-claude, .cost-task { color: #fdba74; border-color: rgba(251, 146, 60, .45); }
@@ -1318,6 +1318,18 @@
   .sa-more[open] > summary::after { transform: rotate(90deg); }
   .sa-more > .sa-grid { padding: 0 0 8px; }
   .sa-main .btn .verif-tag, .sa-grid .btn .verif-tag { flex: 0 0 auto; }
+  /* JARVIS OS (18/11/2026) : cartes de côté et en rappel */
+  .cote-panel > summary { list-style: none; cursor: pointer; display: flex; align-items: baseline; gap: 10px; padding: 4px 0 8px; }
+  .cote-panel > summary::-webkit-details-marker { display: none; }
+  .cote-panel > summary h2 { margin: 0; } .cote-panel > summary .aside { margin-left: auto; }
+  .cote-l { display: grid; gap: 8px; } .cote-it { display: flex; gap: 10px; align-items: center; border: 1px solid var(--line); border-radius: 16px; padding: 10px 12px; }
+  .cote-tx { flex: 1 1 auto; min-width: 0; display: grid; gap: 2px; } .cote-tx b { font-size: 14.5px; overflow-wrap: anywhere; } .cote-tx small { color: var(--muted); font-size: 12.5px; overflow-wrap: anywhere; }
+  /* JARVIS OS (18/11/2026) : historique d'une demande */
+  .hist { border: 1px solid var(--line); border-radius: 16px; padding: 0 12px; margin-top: 10px; }
+  .hist > summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; color: var(--accent); font-size: 14px; }
+  .hist-l { list-style: none; margin: 0; padding: 0 0 10px; display: grid; gap: 8px; }
+  .hist-l li { display: grid; grid-template-columns: 78px minmax(0, 1fr); gap: 8px; font-size: 13.5px; line-height: 1.4; }
+  .hist-l li b { color: var(--muted); font-weight: 500; } .hist-l li span { overflow-wrap: anywhere; }
 </style>
 
 <div class="scroller" id="scroller">
@@ -2204,7 +2216,7 @@ void main(){
       s.append(renderPicker(picking, (v) => finish(picking.go(v), cfg.ctx), () => renderSheet(null)));
     }
   }
-  const pickAsk = (a) => a.confirm ? 'Tu es sûr ? « ' + a.label + ' ».' : ({snooze: 'Je te le représente quand ?', slot: 'Quel créneau je bloque dans ton agenda ?', bot: 'À qui je le confie ?', date: 'Quelle date ?', text: 'Dis-moi.', number: 'Quel montant ?', choice: 'Lequel ?', info: 'Voilà le détail.'})[a.pick.kind] || 'Dis-moi.';
+  const pickAsk = (a) => a.confirm ? 'Tu es sûr ? « ' + a.label + ' ».' : ({cote: "Je la mets de côté jusqu'à quand ?", snooze: 'Je te le représente quand ?', slot: 'Quel créneau je bloque dans ton agenda ?', bot: 'À qui je le confie ?', date: 'Quelle date ?', text: 'Dis-moi.', number: 'Quel montant ?', choice: 'Lequel ?', info: 'Voilà le détail.'})[a.pick.kind] || 'Dis-moi.';
   function renderActions(list, onPick) {
     const wrap = h('div', {class: 'sheet-actions'});
     /* JARVIS OS (18/11/2026) : les actions marquées « more » sont repliées sous « Autres réponses » */
@@ -2241,6 +2253,7 @@ void main(){
       case 'snooze': box.append(choices(snoozeChoices()), dateInput('Ou choisis une date', 2, done)); break;
       case 'slot': box.append(choices(slotChoices())); break;
       case 'choice': box.append(choices(p.options)); break;
+      case 'cote': box.append(choices([{label: 'Une semaine', n: 7, txt: 'le ' + short(7)}, {label: 'Un mois', n: 30, txt: 'le ' + short(30)}, {label: 'Sans date (rappel chaque dimanche)', n: null, txt: ''}]), dateInput("Ou jusqu'à une date", 14, done)); break;
       case 'bot': box.append(h('div', {class: 'sa-grid'}, BOTS.concat([BOT.claude]).filter((b) => b.id !== p.exclude).map((b) => h('button', {type: 'button', class: 'btn pick-bot', style: botVars(b.id), onclick: () => done({id: b.id})}, h('i', {class: 'dot'}), b.name, h('small', {text: b.role}))))); break;
       case 'date': box.append(dateInput(p.label || 'Date', p.init, done)); break;
       case 'number': {
@@ -2448,7 +2461,8 @@ void main(){
     const card = h('article', {class: 'card item', style: botVars(d.bot)});
     const top = h('div', {class: 'item-top'});
     if (o.char !== false) top.append(h('button', {type: 'button', class: 'item-chr', 'aria-label': 'Voir ' + b.name, onclick: () => openBot(d.bot)}, C(d.bot, o.size || 46).el));
-    top.append(h('div', {class: 'item-head'}, h('span', {class: 'item-bot', text: b.name}), d.isNew ? h('span', {class: 'pill is-new', text: 'Nouveau'}) : null, h('span', {class: 'kind', text: KIND[d.kind] || 'À faire'}), h('span', {class: 'item-when', text: d.since === 0 ? "aujourd'hui" : 'depuis ' + (d.since === -1 ? 'hier' : (-d.since) + ' jours')})));
+    const exd = d.live ? expOf(d) : null;   /* JARVIS OS (18/11/2026) */
+    top.append(h('div', {class: 'item-head'}, h('span', {class: 'item-bot', text: b.name}), d.isNew ? h('span', {class: 'pill is-new', text: 'Nouveau'}) : null, exd ? h('span', {class: 'pill st-exp', text: exd.whole ? 'Expirée le ' + exd.date : 'Expirée en partie (' + exd.date + ')'}) : null, h('span', {class: 'kind', text: KIND[d.kind] || 'À faire'}), h('span', {class: 'item-when', text: d.since === 0 ? "aujourd'hui" : 'depuis ' + (d.since === -1 ? 'hier' : (-d.since) + ' jours')})));
     card.append(top, h('h3', {class: 'item-title', text: d.title}), h('p', {class: 'item-ask', text: d.ask}));
     if (o.why !== false && d.why) card.append(h('p', {class: 'item-why'}, h('b', {text: 'Pourquoi : '}), d.why));
     card.append(actionRow('demande', d, o.n || 3));
@@ -4691,8 +4705,9 @@ void main(){
   function lvParse(text) {
     const parts = String(text || '').split(/\s*\|\s*/), f = {};
     let head = parts.shift() || '', kind = null;
-    const m = head.match(/^(oui\s*\/\s*non|choix|question|brouillon|à faire)\s*:\s*/i);
-    if (m) { kind = LV_KINDS[m[1].toLowerCase().replace(/\s/g, '')] || LV_KINDS[m[1].toLowerCase()]; head = head.slice(m[0].length); }
+    /* JARVIS OS (18/11/2026) : le genre suivi d'un point (« Brouillon. Pourquoi : … ») comptait comme texte, et « Pourquoi » s'affichait en double */
+    const m = head.match(/^(oui\s*\/\s*non|choix|question|brouillon|à faire)\s*[:.]\s*/i);
+    if (m) { kind = LV_KINDS[m[1].toLowerCase().replace(/\s/g, '')] || LV_KINDS[m[1].toLowerCase()]; head = head.slice(m[0].length); if (/^(pourquoi|si oui|si non|options|conseil|déjà prêt|temps|avant le|lien)\s*:/i.test(head)) { parts.unshift(head); head = ''; } }
     parts.forEach((p) => { const mm = p.match(/^(pourquoi|si oui|si tu le fais|si non|sinon|déjà prêt|conseil|temps|avant le|options|lien|phrase|où trouver|à|objet|texte)\s*:\s*([\s\S]*)$/i); if (mm) f[LV_FIELDS[mm[1].toLowerCase()]] = mm[2].trim(); else head += ' | ' + p; });
     return {kind, body: head.trim(), f};
   }
@@ -4785,6 +4800,7 @@ void main(){
         if (d.bot === 'toi') d.bot = 'hydra';
         return d;
       });
+      coteApply(true);   /* JARVIS OS (18/11/2026) : cartes mises de côté ou en rappel */
     }
     const pap = rows('pap');
     if (pap) S.papiers = pap.filter((r) => r['Document']).map((r) => { const where = r['Où il est (lien Drive, ou « papier »)'] || ''; const url = (where.match(/https?:\/\/\S+/) || [])[0]; const q = P(r['Document'], r['Personne'], lvFrIso(r['Valable jusqu\'au']), where, r['Sert pour'], r['Remarque'], url); q.id = 'q:' + r._row; return q; });
@@ -5237,6 +5253,53 @@ void main(){
       return null;
     }});
   }
+  /* JARVIS OS (18/11/2026, demande du propriétaire ; choix QCM « rappel hebdomadaire par le serveur ») : « Mettre de côté » cache une carte sans la clore,
+     jusqu'à une date ou sans date ; le serveur la garde et rappelle chaque dimanche à 18 h celles qui restent de côté. Une demande liée à une échéance
+     à paliers de rappel (fermeture de crèche, vacances : colonne Rappels) reste « en rappel » jusqu'à 1 mois avant, puis revient seule. */
+  const COTE_LS = 'jarvis.cote', RAPPEL_SORTIS = 'jarvis.rappels.sortis', COTE = {items: [], lu: false};
+  const coteInit = () => { if (!COTE.lu) { COTE.lu = true; COTE.items = lsGet(COTE_LS, []) || []; } };   /* lu au premier besoin : lsGet est défini plus bas */
+  const coteJS = () => { const JS = window.JarvisServeur; return SRV_OS && JS && JS.cote && JS.linked && JS.linked() ? JS : null; };
+  function coteLoad() { const JS = coteJS(); if (!JS) return; JS.cote.liste().then((l) => { if (!Array.isArray(l)) return; COTE.lu = true; COTE.items = l; lsSet(COTE_LS, l); coteApply(false); refresh(); }); }
+  setTimeout(coteLoad, 1500); setInterval(coteLoad, 300000);
+  const coteOf = (d) => coteInit() || COTE.items.find((x) => x.id === d.id && (!x.jusqu || x.jusqu > Date.now())) || null;
+  function rappelOf(d) {
+    if (!d || lsGet(RAPPEL_SORTIS, []).includes(d.id)) return null;
+    const t = String(d.title) + ' ' + String(d.ask || ''), m = t.match(/(\d{1,2})(?:\/(\d{1,2}))?\s+au\s+\d{1,2}\/(\d{1,2})\/(\d{4})/), k = m ? null : t.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+    const iso = m ? m[4] + '-' + pad2(+(m[2] || m[3])) + '-' + pad2(+m[1]) : k ? k[3] + '-' + pad2(+k[2]) + '-' + pad2(+k[1]) : null;
+    const e = iso && (S.echeances || []).find((x) => x.iso === iso && /fermeture|vacances|\bpont\b|crèche/i.test(x.title) && /mois|semaine|vendredi/i.test(x.rem || ''));
+    if (!e) return null;
+    const back = new Date(iso + 'T12:00:00'); back.setMonth(back.getMonth() - 1);
+    return back > TODAY ? {e, back} : null;
+  }
+  function coteApply(fresh) {
+    const all = (S.demandes || []).concat(fresh ? [] : (S.coteVis || []).map((x) => x.d)), seen = new Set(), vis = [], keep = [];
+    all.forEach((d) => { if (!d || seen.has(d.id)) return; seen.add(d.id); const c = d.live ? coteOf(d) : null, r = d.live && !c ? rappelOf(d) : null; if (c || r) vis.push({d, c, r}); else keep.push(d); });
+    S.demandes = keep; S.coteVis = vis;
+  }
+  function coteSet(d, v) {
+    coteInit();
+    const jusqu = v && v.n != null ? new Date(isoOf(day(v.n)) + 'T08:00:00').getTime() : 0, JS = coteJS();
+    COTE.items = COTE.items.filter((x) => x.id !== d.id).concat([{id: d.id, titre: d.title, bot: lvName(d.bot), jusqu, at: Date.now()}]); lsSet(COTE_LS, COTE.items);
+    if (JS) JS.cote.ajouter({id: d.id, titre: d.title, bot: lvName(d.bot), jusqu: jusqu ? new Date(jusqu).toISOString() : 0}).then((r) => { if (!r || !r.ok) toast('Pas gardée sur le serveur', (r && r.error) || 'Serveur injoignable.', true); });
+    coteApply(false); refresh();
+    toast('Mise de côté', '« ' + d.title + ' » ' + (jusqu ? 'revient ' + v.txt : 'attend, sans date') + '. ' + (JS ? 'Rappel de tes cartes de côté chaque dimanche à 18 h.' : '(Maquette : gardée sur cet appareil.)'), true);
+  }
+  function coteRemettre(x) {
+    coteInit();
+    if (x.c) { COTE.items = COTE.items.filter((y) => y.id !== x.d.id); lsSet(COTE_LS, COTE.items); const JS = coteJS(); if (JS) JS.cote.retirer(x.d.id); }
+    else lsSet(RAPPEL_SORTIS, lsGet(RAPPEL_SORTIS, []).concat([x.d.id]).slice(-100));
+    S.demandes = (S.demandes || []).concat([x.d]); S.coteVis = (S.coteVis || []).filter((y) => y !== x); refresh();
+  }
+  const coteAct = (d) => act('Mettre de côté', {cost: 'free', pick: {kind: 'cote'}, go: (v) => { coteSet(d, v); return null; }});
+  function cotePanel() {
+    const v = S.coteVis || [];
+    if (!v.length) return null;
+    const when = (t) => fmt(new Date(t), {weekday: 'short', day: 'numeric', month: 'long'});
+    return h('details', {class: 'panel cote-panel'}, h('summary', {}, h('h2', {text: 'De côté et en rappel'}), h('span', {class: 'aside', text: v.length + ' carte' + (v.length > 1 ? 's' : '')})),
+      h('div', {class: 'cote-l'}, v.map((x) => h('div', {class: 'cote-it', style: botVars(x.d.bot)}, h('div', {class: 'cote-tx'}, h('b', {text: x.d.title}),
+        h('small', {text: x.c ? (x.c.jusqu ? 'De côté · revient le ' + when(x.c.jusqu) : 'De côté, sans date · rappel chaque dimanche à 18 h') : 'En rappel · revient le ' + when(x.r.back) + ' · rappels : ' + x.r.e.rem})),
+        h('button', {type: 'button', class: 'btn sm', onclick: () => coteRemettre(x)}, 'Remettre')))));
+  }
   const AD0 = ACTIONS.demande;
   ACTIONS.demande = (d) => {
     if (!d.live) return AD0(d);
@@ -5267,8 +5330,32 @@ void main(){
         rest = [ord('Prépare-moi tout', d.bot, 'Prépare tout pour ' + q + ' : lien, pièces, créneaux libres dans mon agenda, brouillon.', 'Je prépare tout.', ''), no, repText('Non, plutôt…', 'Pas comme ça pour ' + q + '. À la place : ')];
     }
     const deleg = act('Confier à un autre bot', {pick: {kind: 'bot', exclude: d.bot}, go: (v) => ({title: 'Confié à ' + BOT[v.id].name, effect: 'Une ligne pour ' + BOT[v.id].name + ' dans le Canal.', bot: v.id, order: 'Prends en charge ' + q + ' (demande d\'abord tenue par ' + who + ').', say: 'Je prends.'})});
-    return top.filter(Boolean).concat(rest.concat(vRest, [deleg]).filter(Boolean).map(more));
+    /* JARVIS OS (18/11/2026, retour du propriétaire) : une demande dépassée, ou dont l'offre est terminée, porte « Expirée » : C'est fait, Clôturer
+       ou J'ai fait…, sans « Plus tard » ; le bot l'apprend à son prochain passage, sans sonnette (choix QCM) */
+    const ex = expOf(d);
+    if (ex) {
+      const quiet = (label, txt, tone, pick) => act(label, Object.assign({tone, cost: 'next', go: (v) => ({title: 'Réponse à ' + who, bot: d.bot, order: txt + (v && v.txt ? v.txt.trim().replace(/[.\s]*$/, '.') : ''), canalType: 'Réponse', noRing: true, say: 'Noté, merci.',
+        effect: 'Une ligne « Réponse » pour ' + who + ' dans le Canal, lue à son prochain passage (sans sonnette).', mutate: () => { expAck(d, ex); if (ex.whole) drop('demandes', d.id); }})}, pick ? {pick} : {}));
+      const what = ex.whole ? q + ' (dépassée depuis le ' + ex.date + ')' : '« ' + ex.part + ' » (dans ' + q + ')';
+      const exTop = [ex.whole ? quiet("C'est fait", "C'est fait pour " + what + '.', 'main') : null, quiet(ex.whole ? 'Clôturer' : 'Clôturer la partie expirée', 'Clôturé par Rabie : ' + what + (ex.whole ? ' est passé, rien de plus à faire : ferme la demande.' : ' est passé, rien de plus à faire sur cette partie ; garde la suite si elle reste utile.'), ex.whole ? 'main2' : 'main'),
+        quiet("J'ai fait…", "Pour " + what + ", voici ce que j'ai fait : ", 'main2', {kind: 'text', label: "Ce que tu as fait", placeholder: 'Sans montant ni taux : ils restent dans le chat du bot'})].filter(Boolean);
+      const keep = top.filter((a) => a && a !== later);
+      return exTop.concat(ex.whole ? [] : keep.map((a) => { if (a.tone === 'main') a.tone = 'main2'; return a; })).concat(rest.concat(vRest, [coteAct(d), deleg]).filter((a) => a && a !== later).map(more));
+    }
+    return top.filter(Boolean).concat(rest.concat(vRest, [coteAct(d), deleg]).filter(Boolean).map(more));
   };
+  function expOf(d) {
+    if (!d || !d.live || expAcked(d)) return null;
+    if (d.due != null && d.due < 0) return {whole: true, date: short(d.due), label: 'Expirée'};
+    const m = String(d.ask || '').match(/([^.;|()]*?\b(?:terminée?s?|expirée?s?|finie?s?|close|échue|achevée?)\s+le\s+(\d{1,2})\/(\d{1,2})(?:\/(\d{4}))?)/i);
+    if (!m) return null;
+    const dt = new Date(m[4] ? +m[4] : TODAY.getFullYear(), +m[3] - 1, +m[2], 12);
+    return dt < TODAY ? {whole: false, date: pad2(+m[2]) + '/' + pad2(+m[3]), part: m[1].trim(), label: 'Expirée'} : null;
+  }
+  const EXP_ACK = 'jarvis.expirees.vues';
+  const expKey = (d) => d.id + '|' + String(d.ask || '').slice(0, 120);
+  function expAcked(d) { return lsGet(EXP_ACK, []).includes(expKey(d)); }
+  function expAck(d) { lsSet(EXP_ACK, lsGet(EXP_ACK, []).concat([expKey(d)]).slice(-100)); }
   /* la fiche d'une demande : ce qu'on te demande, si oui, si non, ce qui est prêt, le conseil, le temps */
   const SD0 = SHEETCFG.demande;
   SHEETCFG.demande = (d) => {
@@ -5276,7 +5363,9 @@ void main(){
     if (!d.live) return cfg;
     const f = d.f || {}, who = lvName(d.bot);
     cfg.say = d.kind === 'oui' ? who + ' attend ton oui dans son chat.' : d.ask.length > 150 ? d.ask.slice(0, 147) + '…' : d.ask;
-    cfg.facts = [['Ce qu\'on te demande', d.ask], ['Pourquoi', d.why], [d.kind === 'afaire' ? 'Si tu le fais' : 'Si tu dis oui', f.si_oui], ['Si tu dis non ou rien', f.si_non], ['Déjà prêt', f.deja], ['Options', d.options.length ? d.options.join(' · ') : ''], ['Conseil de ' + who, f.conseil], ['Temps pour toi', f.temps], ['Avant le', d.due != null ? longDay(d.due) : ''], ['Source', d.src]];
+    const ex = expOf(d);
+    if (ex) cfg.kicker += ' · Expirée';
+    cfg.facts = [ex ? ['Expirée', ex.whole ? 'Date dépassée depuis le ' + ex.date : '« ' + ex.part + ' » : c\'est passé. Clôture cette partie, ou dis ce que tu as fait.'] : ['', ''], ['Ce qu\'on te demande', d.ask], ['Pourquoi', d.why], [d.kind === 'afaire' ? 'Si tu le fais' : 'Si tu dis oui', f.si_oui], ['Si tu dis non ou rien', f.si_non], ['Déjà prêt', f.deja], ['Options', d.options.length ? d.options.join(' · ') : ''], ['Conseil de ' + who, f.conseil], ['Temps pour toi', f.temps], ['Avant le', d.due != null ? longDay(d.due) : ''], ['Source', d.src]];
     const prev = cfg.extra;
     cfg.extra = () => h('div', {class: 'stack'}, prev ? prev() : null, lvAidBox(d));
     return cfg;
@@ -5313,7 +5402,8 @@ void main(){
   SMART = (cfg) => {
     const c = cfg.ctx, d = c && c.item;
     if (c && c.type === 'demande' && d && d.live) {
-      const A = cfg.actions || [], con = lvLow(d.f && d.f.conseil);
+      const A = cfg.actions || [], con = lvLow(d.f && d.f.conseil), ex = expOf(d);
+      if (ex && ex.whole) return {act: A.find((x) => x.label === 'Clôturer') || null, text: 'Dépassée depuis le ' + ex.date + " : clôture-la, ou dis ce que tu as fait (rien n'est jamais perdu : " + lvName(d.bot) + ' garde l\'historique).'};
       if (con) {
         const a = /^(oui|accepte|vas-y|range|go)/.test(con) ? A.find((x) => /^Oui|^Donner mon oui|^C'est fait/.test(x.label)) : /^(non|refuse|inutile|pas besoin)/.test(con) ? A.find((x) => /^Non/.test(x.label)) : /plus tard|attend/.test(con) ? A.find((x) => x.label === 'Plus tard') : A.find((x) => con.includes(lvLow(x.label)));
         return {act: a || null, text: 'Conseil de ' + lvName(d.bot) + ' : ' + d.f.conseil};
@@ -5427,8 +5517,8 @@ void main(){
   function costCount(k) { const b = costBook(); b.n[k] = (b.n[k] || 0) + 1; lsSet(COST_KEY, b); }
 
   /* ce que coûte un bouton : gratuit (Jarvis écrit seul), 1 passage d'un bot (sonnette), un chat Grok, Claude */
-  const COST_TXT = {free: 'gratuit', bot: '1 passage', chat: 'chat Grok', claude: 'Claude', task: 'session Claude'};
-  const COST_HELP = {free: 'Jarvis écrit lui-même : ni Grok ni Claude', bot: 'Une ligne dans le Canal et la sonnette : un passage du bot', chat: 'Il faut ouvrir le chat du bot dans Grok Bot', claude: 'Claude répond dans la page, sur ton forfait Claude', task: SRV_OS ? 'Ton serveur fait répondre Claude aux lignes du Canal qui lui sont adressées : un appel sur ton forfait' : 'La tâche Claude « Ordres Jarvis » : une session complète'};
+  const COST_TXT = {next: 'prochain passage', free: 'gratuit', bot: '1 passage', chat: 'chat Grok', claude: 'Claude', task: 'session Claude'};
+  const COST_HELP = {next: 'Une ligne dans le Canal, lue au prochain passage prévu du bot : aucun passage en plus', free: 'Jarvis écrit lui-même : ni Grok ni Claude', bot: 'Une ligne dans le Canal et la sonnette : un passage du bot', chat: 'Il faut ouvrir le chat du bot dans Grok Bot', claude: 'Claude répond dans la page, sur ton forfait Claude', task: SRV_OS ? 'Ton serveur fait répondre Claude aux lignes du Canal qui lui sont adressées : un appel sur ton forfait' : 'La tâche Claude « Ordres Jarvis » : une session complète'};
   function costOf(a) {
     if (!a) return null;
     if (a.cost) return a.cost;
@@ -5649,11 +5739,25 @@ void main(){
   const opSendMail = (m) => ({label: 'le mail « ' + m.subject + ' » à ' + m.to.join(', '), sig: 'mail|' + m.to.join(',') + '|' + m.subject, src: 'sent', server: LV.MAIL, run: () => { costCount('mails'); return lvCall(LV.MAIL, 'send_message', {to: m.to, subject: m.subject, body: m.body}); }});
   /* la demande du bot liée à ce brouillon : sa ligne du Canal reçoit la réponse et passe à « Fait », sans sonnette */
   const closeOps = (ln) => ln ? [opCell('canal', 'Canal', ln, 'Type', ln.subject, 'Réponse', (ln.reply ? ln.reply + ' | ' : '') + 'Envoyé par Rabie depuis Jarvis le ' + stampFr(new Date()), 'la réponse sur la ligne du Canal'), opCell('canal', 'Canal', ln, 'Type', ln.subject, 'Statut', 'Fait', 'la demande close dans le Canal')] : [];
-  const demandeOfDraft = (dr) => (S.demandes || []).find((x) => x.live && x.kind === 'brouillon' && x.link && x.link.indexOf(dr.draftId) >= 0) || null;
+  const demandeOfDraft = (dr) => (S.demandes || []).find((x) => x.live && draftMatch(x, dr)) || null;
+  /* JARVIS OS (18/11/2026, choix QCM : « si j'envoie un brouillon, tout de suite avec sonnette ») : le mail part, le dossier passe en attente
+     de la réponse (la carte quitte « À toi »), et le bot qui suit reçoit une ligne « Réponse » et sa sonnette */
+  function sentEvent(d, dr, tm, ln) {
+    const bot = d && BOT[d.bot] && d.bot !== 'toi' ? d.bot : 'hydra', who = lvName(bot), subj = (dr ? dr.subject : tm.subject) || 'sans objet', to = (dr ? dr.to : tm.to).join(', '), when = lvToday();
+    const ops = closeOps(ln), k = dosRowOf(d);
+    if (k && k._row && lvCol('dos', 'En attente de')) {
+      const W = (col, val, label) => opCell('dos', 'Dossiers', k, 'Dossier', k['Dossier'], col, val, label);
+      ops.push(W('En attente de', to, 'le dossier « ' + k['Dossier'] + ' » en attente de ' + to), W('Prochaine étape', 'Attendre la réponse au mail du ' + when + ' (« ' + subj + ' »)', 'la prochaine étape du dossier'));
+      if (lvCol('dos', 'Dernier contact')) ops.push(W('Dernier contact', when, 'le dernier contact (' + when + ')'));
+      if (lvCol('dos', 'Mis à jour le')) ops.push(W('Mis à jour le', when, 'la date de mise à jour du dossier'));
+    }
+    const msg = 'Brouillon envoyé par Rabie depuis JARVIS le ' + stampFr(new Date()) + ' : « ' + subj + ' » à ' + to + (d ? ' (« ' + d.title + ' »)' : '') + '.' + (k ? ' Dossier mis à jour par la page : en attente de ' + to + ', dernier contact le ' + when + '.' : '') + ' Suis la réponse et préviens Rabie quand elle arrive.';
+    return {title: 'Mail envoyé', bot, canalType: 'Réponse', order: msg, say: 'Parti. ' + who + ' suit la réponse.',
+      effect: '« ' + subj + ' » part de ta boîte à ' + to + ', tel quel, pièces jointes comprises.' + (k ? ' Le dossier passe en attente de la réponse.' : '') + ' ' + who + ' reçoit une ligne dans le Canal et sa sonnette.',
+      draftSend: dr || null, mailSend: tm || null, extraOps: ops, mutate: () => { if (d) drop('demandes', d.id); if (dr) { V17.sentIds.push(dr.draftId); buildDrafts(); } }};
+  }
   ACTIONS.draft = (d) => [
-    d.to.length ? act('Envoyer ce mail', {tone: 'main', confirm: true, showExtra: true, cost: 'free', go: () => { const dem = demandeOfDraft(d), ln = dem ? canalLineOf(dem) : null; return {title: 'Mail envoyé', work: false, say: 'Parti.',
-      effect: '« ' + (d.subject || 'sans objet') + ' » part de ta boîte à ' + d.to.join(', ') + ', tel quel, pièces jointes comprises' + (dem ? ', et la demande de ' + lvName(dem.bot) + ' est close, sans sonnette.' : '.'),
-      draftSend: d, extraOps: closeOps(ln), mutate: () => { if (dem) drop('demandes', dem.id); }}; }}) : null,
+    d.to.length ? act('Envoyer ce mail', {tone: 'main', confirm: true, showExtra: true, cost: 'bot', go: () => { const dem = demandeOfDraft(d); return sentEvent(dem, d, null, dem ? canalLineOf(dem) : null); }}) : null,
     d.url ? act('Ouvrir dans Gmail', {tone: d.to.length ? 'main2' : 'main', cost: 'free', go: () => { try { window.open(d.url, '_blank'); } catch (e) { /* lien non pris en charge */ } return null; }}) : null,
     act('Demander une correction à Iris', {pick: {kind: 'text', label: 'Ce qui doit changer', placeholder: 'ex. plus court, ajoute la référence du dossier'}, go: (v) => ({title: 'Correction demandée', bot: 'hydra', canalType: 'Brouillon',
       order: 'Corrige le brouillon Gmail « ' + (d.subject || 'sans objet') + ' »' + (d.url ? ' (' + d.url + ')' : '') + ' : ' + v.txt + '. Remplace le brouillon dans Gmail, ne l\'envoie pas.', effect: 'Une ligne pour Iris dans le Canal, puis la sonnette.', say: 'Je le corrige.'})}),
@@ -5676,19 +5780,32 @@ void main(){
   /* un brouillon écrit en texte dans le Canal (« À : … | Objet : … | Texte : … »), quand le bot n'a pas pu le créer dans Gmail */
   const EMAIL = /^[^\s@<>(),;]+@[^\s@<>(),;]+\.[a-z]{2,}$/i;
   function textMail(d) { const f = d.f || {}; const to = String(f.a || '').split(/[,;\s]+/).filter((x) => EMAIL.test(x)); return to.length && f.texte ? {to, subject: f.objet || d.title, body: f.texte} : null; }
-  const draftOf = (d) => (S.drafts || []).find((x) => d.link && d.link.indexOf(x.draftId) >= 0) || null;
+  /* JARVIS OS (18/11/2026, retour du propriétaire : le brouillon et la carte du même sujet font une seule carte, avec son historique).
+     Un brouillon appartient à une demande si la demande donne son lien, cite son fil, reprend son objet ou son numéro de ticket (#8238). */
+  const dosRowOf = (d) => (d && ((LV.t.dos && LV.t.dos.rows) || []).find((r) => r['Dossier'] === d.title)) || null;
+  const nrm = (t) => String(t == null ? '' : t).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  const draftKey = (t) => nrm(String(t || '').replace(/^\s*((re|tr|fwd?)\s*:\s*)+/i, '').replace(/\(\s*#?\s*\d+\s*\)/g, ' ')).replace(/[^a-z0-9]+/g, ' ').trim();
+  function draftMatch(d, x) {
+    if (!d || !x) return false;
+    if (d.link && x.draftId && d.link.indexOf(x.draftId) >= 0) return true;
+    const k = dosRowOf(d), raw = [d.title, d.ask, d.why, d.link, Object.values(d.f || {}).join(' '), k ? [k['Références et contexte'], k['Prochaine étape'], k['Pour Rabie']].join(' ') : ''].join(' ');
+    if (x.th && raw.indexOf(x.th) >= 0) return true;
+    const key = draftKey(x.subject);
+    if (key.length >= 12 && (' ' + draftKey(raw) + ' ').indexOf(' ' + key + ' ') >= 0) return true;
+    const tick = (String(x.subject || '').match(/#\s?(\d{3,})/) || [])[1];
+    return !!tick && new RegExp('#\\s?' + tick + '(?!\\d)').test(raw);
+  }
+  const draftOf = (d) => (S.drafts || []).find((x) => draftMatch(d, x)) || null;
   const canalLineOf = (d) => (S.canal || []).find((l) => l.subject === d.title && (l.to === 'rabie' || /attend/i.test(l.status || '')) && !/^(fait|annul)/i.test(l.status || '')) || null;
   const AD1 = ACTIONS.demande;
   ACTIONS.demande = (d) => {
-    const list = AD1(d);
-    if (!d.live || d.kind !== 'brouillon') return list;
-    const dr = draftOf(d), tm = dr ? null : textMail(d), ln = canalLineOf(d);
+    const dr0 = d.live ? draftOf(d) : null;
+    const list = AD1(dr0 && d.kind !== 'brouillon' ? Object.assign({}, d, {kind: 'brouillon', link: d.link || dr0.url}) : d);
+    if (!d.live || (d.kind !== 'brouillon' && !dr0)) return list;
+    const dr = dr0, tm = dr ? null : textMail(d), ln = canalLineOf(d);
     if (!(dr && dr.to.length) && !tm) return list;
-    const close = closeOps(ln);
     list.forEach((a) => { if (a.tone === 'main') a.tone = 'main2'; });
-    list.unshift(act('Envoyer ce mail', {tone: 'main', confirm: true, showExtra: true, cost: 'free', go: () => ({title: 'Mail envoyé', work: false, say: 'Parti, je clos la demande.',
-      effect: '« ' + (dr ? dr.subject : tm.subject) + ' » part de ta boîte à ' + (dr ? dr.to : tm.to).join(', ') + ', et la demande de ' + lvName(d.bot) + ' est close, sans sonnette.',
-      draftSend: dr || null, mailSend: tm || null, extraOps: close, mutate: () => drop('demandes', d.id)})}));
+    list.unshift(act('Envoyer ce mail', {tone: 'main', confirm: true, showExtra: true, cost: 'bot', go: () => sentEvent(d, dr, tm, ln)}));
     return list;
   };
 
@@ -5781,11 +5898,41 @@ void main(){
     const cfg = SD1(d);
     if (!d.live) return cfg;
     const prev = cfg.extra;
-    const dr = d.kind === 'brouillon' ? draftOf(d) : null, tm = d.kind === 'brouillon' && !dr ? textMail(d) : null;
+    const dr = draftOf(d), tm = d.kind === 'brouillon' && !dr ? textMail(d) : null;
     const cra = /\bcra\b|allegis|feuille de temps|timesheet/i.test(d.title + ' ' + d.ask);
-    cfg.extra = () => h('div', {class: 'stack'}, cra ? craWeek(d) : null, dr ? mailBox(dr.to, dr.cc, dr.subject, dr.body, dr.dup) : tm ? mailBox(tm.to, [], tm.subject, tm.body, 0) : null, prev ? prev() : null);
+    if (dr && d.kind !== 'brouillon') cfg.say = 'Le brouillon est prêt : relis-le, il part tel quel de ta boîte.';
+    cfg.extra = () => h('div', {class: 'stack'}, cra ? craWeek(d) : null, dr ? mailBox(dr.to, dr.cc, dr.subject, dr.body, dr.dup) : tm ? mailBox(tm.to, [], tm.subject, tm.body, 0) : null, prev ? prev() : null, demHistory(d, dr));
     return cfg;
   };
+  /* JARVIS OS (18/11/2026, demande du propriétaire : « un historique complet ») : tout ce qui concerne le sujet, du plus ancien au plus récent :
+     lignes du Canal, contexte du dossier, échéances liées, brouillon et mails envoyés dans son fil */
+  const HIST_VIDES = new Set('dossier demande demandes relance relancer resiliation reponse rabie iris pour avec dans sans depuis votre notre fermeture offre pendant entre choisir faire'.split(' '));
+  function histWords(d) {
+    const ws = (String(d.title).match(/[\p{L}\p{N}]{3,}/gu) || []).filter((w) => !HIST_VIDES.has(nrm(w)));
+    return ws.map((w) => ({w: nrm(w), strong: (w.length >= 3 && w === w.toUpperCase() && /\p{L}/u.test(w)) || w.length >= 8}));
+  }
+  function histHit(d, text) {
+    const t = ' ' + nrm(text).replace(/[^a-z0-9]+/g, ' ') + ' ', hits = histWords(d).filter((x) => t.indexOf(' ' + x.w + ' ') >= 0);
+    return nrm(text).indexOf(nrm(d.title)) >= 0 || hits.some((x) => x.strong) || hits.length >= 2;
+  }
+  function demHistory(d, dr) {
+    const nm = (x) => (x === 'rabie' || x === 'toi' ? 'Toi' : lvName(x));
+    const ev = [], ms = (v) => { const iso = lvFrIso(v); return iso ? new Date(iso + 'T12:00:00').getTime() : 0; }, k = dosRowOf(d);
+    (S.canal || []).forEach((l) => { if (histHit(d, [l.subject, l.objet, l.msg].join(' '))) ev.push({at: ms(l.date), t: nm(l.from) + ' → ' + nm(l.to) + ' · ' + String(l.msg || '').slice(0, 160) + (l.status ? ' (' + l.status + ')' : '') + (l.reply ? ' — ' + String(l.reply).slice(0, 160) : '')}); });
+    if (k) {
+      if (k['Références et contexte']) ev.push({at: ms(k['Mis à jour le']) || ms(k['Dernier contact']), t: 'Dossier : ' + k['Références et contexte']});
+      if (k['Dernier contact']) ev.push({at: ms(k['Dernier contact']), t: 'Dernier contact noté par ' + lvName(lvBot(k['Bot'] || 'Iris'))});
+    }
+    (S.echeances || []).forEach((e) => { if (e.title !== d.title && histHit(d, e.title + ' ' + e.note)) ev.push({at: day(e.n).getTime(), t: 'Échéance : ' + e.title + (e.n < 0 ? ' (date passée)' : '') + (e.note ? ' — ' + e.note : '')}); });
+    if (dr) {
+      ev.push({at: dr.at, t: 'Brouillon prêt dans Gmail : « ' + (dr.subject || 'sans objet') + ' » à ' + (dr.to.join(', ') || 'personne')});
+      ((LV.t.sent && LV.t.sent.threads) || []).forEach((th) => { const m = (th.messages || []).slice(-1)[0] || {}; if (dr.th && (th.id === dr.th || m.threadId === dr.th)) ev.push({at: +m.internalDate || Date.parse(m.date || '') || 0, t: 'Envoyé dans ce fil : « ' + (m.subject || '') + ' »'}); });
+    }
+    if (!ev.length) return null;
+    ev.sort((a, b) => a.at - b.at);
+    return h('details', {class: 'hist'}, h('summary', {text: 'Historique (' + ev.length + ')'}),
+      h('ol', {class: 'hist-l'}, ev.map((x) => h('li', {}, h('b', {text: x.at ? dayFr(new Date(x.at)) : '—'}), h('span', {text: x.t})))));
+  }
 
   /* ---------- Claude répond dans la page : aux lignes du Canal qui lui sont adressées, et à tes ordres ---------- */
   const claudeLines = () => (S.canal || []).filter((l) => l.to === 'claude' && /^à faire/i.test(l.status || ''));
@@ -5853,7 +6000,10 @@ void main(){
     if (e.archive) extra.push(opArchive(e.archive));
     if (e.extraOps) e.extraOps.forEach((o) => extra.push(o));
     if (extra.length && !e.order) return extra;
-    return LP0(e, ctx, snap).concat(extra);
+    const all = LP0(e, ctx, snap).concat(extra);
+    /* JARVIS OS (18/11/2026) : une clôture n'est pas urgente : la ligne est lue au prochain passage du bot, sans sonnette */
+    if (e.noRing) all.forEach((o) => { if (o.ring) { o.ring = null; o.label += ', lue à son prochain passage (sans sonnette)'; } });
+    return all;
   };
   const RS0 = lvRingSoon;
   lvRingSoon = function (targets) { const t = GP.on ? targets.filter((b) => b === 'claude') : targets; if (t.length) RS0(t); };
@@ -5895,7 +6045,7 @@ void main(){
   const VD0 = VIEWS.demandes;
   VIEWS.demandes = (el) => {
     if (GP.on) el.append(pauseBanner());
-    const dr = S.drafts || [];
+    const dr = (S.drafts || []).filter((x) => !demandeOfDraft(x));   /* JARVIS OS (18/11/2026) : un brouillon qui a sa demande est dans sa carte */
     if (dr.length) el.append(panel('Brouillons prêts à partir', h('span', {class: 'aside', text: dr.length + ' · Gmail'}),
       h('p', {class: 'muted', text: "Relis-le, puis « Envoyer ce mail » : il part tel quel, de ta boîte. Rien ne part sans ton appui."}), dr.slice(0, 6).map(draftCard)));
     const yg = yesGroups();
@@ -6051,6 +6201,20 @@ void main(){
   const AECH = ACTIONS.echeance;
   ACTIONS.echeance = (e) => AECH(e).map((a) => /^Où en est-on/.test(a.label) ? claudeAct(a, () => askClaude('echeance', e, "Où en est cette échéance ? 3 lignes : qui s'en occupe, ce qui est fait d'après Pilotage et le Journal, ce que je dois faire.", e.bot))
     : /^Que préparer/.test(a.label) ? claudeAct(a, () => askClaude('echeance', e, 'Que faut-il préparer pour cette échéance ? 3 lignes, avec ce que je dois faire moi-même.', e.bot)) : a);
+  /* JARVIS OS (18/11/2026, retour du propriétaire) : une échéance passée (offre, fin de validité, date à retenir) est « Expirée » :
+     C'est fait, Clôturer ou J'ai fait…, sans « Reporter » ; le bot l'apprend à son prochain passage, sans sonnette */
+  const EXP_NAT = ['offre', 'fin', 'date'], echExp = (e) => !!(e && e._row && e.n < 0 && EXP_NAT.includes(e.nature));
+  const AEX = ACTIONS.echeance;
+  ACTIONS.echeance = (e) => {
+    if (!echExp(e)) return AEX(e);
+    const who = BOT[e.bot] ? BOT[e.bot].name : 'Iris', q = '« ' + e.title + ' »';
+    return [act("C'est fait", {tone: 'main', cost: 'free', go: () => ({title: 'Échéance faite', effect: q + ' passe à « Fait » dans Pilotage.', bot: e.bot, work: false, mutate: () => drop('echeances', e.id), say: 'Noté.'})}),
+      act('Clôturer : expirée', {tone: 'main2', cost: 'free', go: () => ({title: 'Échéance annulée', effect: q + " passe à « Annulé » dans Pilotage (expirée). Rien n'est effacé.", work: false, mutate: () => drop('echeances', e.id), say: 'Clôturée.'})}),
+      act("J'ai fait…", {tone: 'main2', cost: 'next', pick: {kind: 'text', label: 'Ce que tu as fait', placeholder: 'Sans montant ni taux : ils restent dans le chat du bot'}, go: (v) => ({title: 'Échéance faite', bot: e.bot, canalType: 'Réponse', noRing: true, say: 'Noté, merci.',
+        order: "Pour l'échéance " + q + ' du ' + short(e.n) + ", voici ce que j'ai fait : " + v.txt, effect: q + ' passe à « Fait » dans Pilotage, et une ligne « Réponse » pour ' + who + ' dans le Canal, lue à son prochain passage (sans sonnette).', mutate: () => drop('echeances', e.id)})})];
+  };
+  const SEX = SHEETCFG.echeance;
+  SHEETCFG.echeance = (e) => { const c = SEX(e); if (echExp(e)) { c.kicker += ' · Expirée'; c.say = 'Expirée depuis le ' + short(e.n) + ' : clôture-la, ou dis ce que tu as fait.'; } return c; };
   const LN1 = lvNews;
   lvNews = function () { try { buildDosReplies(); } catch (err) { /* ne bloque jamais l'affichage */ } LN1(); };
   const BR2 = pilotageBrief;
@@ -6764,7 +6928,7 @@ void main(){
   };
   /* rien n'est perdu : ce que l'ancien accueil montrait va dans sa rubrique */
   const VDM_OS = VIEWS.demandes;
-  VIEWS.demandes = (el) => { VDM_OS(el); const src = h('div'); ACC_ORIG(src); ['Réponses reçues', 'Arrivés depuis'].forEach((t) => { const p2 = hpanel(src, t); if (p2) el.append(p2); }); };
+  VIEWS.demandes = (el) => { VDM_OS(el); const cp = cotePanel(); if (cp) { const hp = el.querySelector('.hist-panel'); if (hp) hp.before(cp); else el.append(cp); } const src = h('div'); ACC_ORIG(src); ['Réponses reçues', 'Arrivés depuis'].forEach((t) => { const p2 = hpanel(src, t); if (p2) el.append(p2); }); };
   const VEQ_OS = VIEWS.equipe;
   VIEWS.equipe = (el) => { VEQ_OS(el); if (AGENT) return; const src = h('div'); ACC_ORIG(src); /* le Journal est dans « En ce moment » */ const st = src.querySelector('.stats'); if (st) el.append(st); };
 

@@ -118,6 +118,12 @@
     santeMaintenant: () => req('/api/sante/maintenant', {}).then((r) => (r.status === 200 ? r.j : null)).catch(() => null),
     /* missions de Claude (0.15.0) : lancer une mission longue, suivre les dernières ; notification à la fin */
     mission: (texte, parent) => req('/api/mission', parent ? {texte, parent} : {texte}).then((r) => r.j).catch(() => ({ok: false, error: 'Serveur injoignable.'})),
+    /* cartes mises de côté (0.20.0) : liste, ajout (avec ou sans date de retour), retrait */
+    cote: {
+      liste: () => req('/api/cote').then((r) => (r.status === 200 ? r.j.cartes : null)).catch(() => null),
+      ajouter: (o) => req('/api/cote', o).then((r) => r.j).catch(() => ({ok: false, error: 'Serveur injoignable.'})),
+      retirer: (id) => req('/api/cote/retirer', {id}).then((r) => r.j).catch(() => null)
+    },
     /* revérifier (0.19.0) : papiers ou mails, sur une demande d'un bot ; résultat par notification */
     verifier: (ou, demande) => req('/api/verifier', {ou, demande}).then((r) => r.j).catch(() => ({ok: false, error: 'Serveur injoignable.'})),
     /* relances (0.18.0) et consommation de Claude (0.18.0) */
