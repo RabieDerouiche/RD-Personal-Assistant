@@ -122,6 +122,8 @@ export async function stt(wav: Blob, signal: AbortSignal): Promise<string> {
   if (!r.ok) throw new Error('écoute ' + r.status);
   return String(((await r.json()) || {}).text || '');
 }
+/* 0.22.1 : Claude lancé d'avance à l'ouverture de la page vocale */
+export async function prechauffe() { try { await call('/api/voix/prechauffe', {method: 'POST'}, 20000); } catch { /* serveur plus ancien : rien */ } }
 export const serverEar = () => linked() && store.settings.ecoute !== 'iphone' && last.ecoute === true;
 export async function installEcoute(): Promise<string> {
   try { await call('/api/ecoute/install', {method: 'POST'}); } catch { return 'error'; }

@@ -40,18 +40,24 @@ export class Ecoute {
   /* ce que fait JARVIS : « speaking » (il parle : seuil plus haut, contre son écho), « thinking » (il réfléchit), « idle » */
   busy: 'idle' | 'speaking' | 'thinking' = 'idle';
   paused = false;
-  endMs = 800;   /* silence qui termine une phrase */
+  endMs = 700;   /* silence qui termine une phrase (0.22.1 : 0,7 s au lieu de 0,8) */
+  private closing = false;   /* fermé pendant que l'iPhone ouvrait le micro : le micro ne doit pas rester ouvert */
   constructor(private o: EarOpts) {}
   get on() { return !!this.stream; }
 
   /* à appeler pendant l'appui : l'iPhone n'ouvre le son et le micro qu'après un geste */
   async start(): Promise<boolean> {
     if (this.stream) return true;
+    this.closing = false;
     const AC = W.AudioContext || W.webkitAudioContext; if (!AC || !navigator.mediaDevices) return false;
     try { if (!this.ctx) this.ctx = new AC(); this.ctx!.resume().catch(() => {}); } catch { return false; }
     try { const s = W.navigator.audioSession; if (s) s.type = 'play-and-record'; } catch { /* Safari plus ancien */ }
-    try { this.stream = await navigator.mediaDevices.getUserMedia({audio: {echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1} as any}); }
-    catch (e: any) { this.o.onState('error', e && e.name === 'NotAllowedError' ? 'micro refusé' : 'micro indisponible'); return false; }
+    let st: MediaStream;
+    try { st = await navigator.mediaDevices.getUserMedia({audio: {echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1} as any}); }
+    catch (e: any) { if (!this.closing) this.o.onState('error', e && e.name === 'NotAllowedError' ? 'micro refusé' : 'micro indisponible'); return false; }
+    /* 0.22.1 : la page vocale a été fermée pendant que l'iPhone ouvrait le micro (autorisation, lenteur) : on le referme aussitôt */
+    if (this.closing) { try { st.getTracks().forEach((t) => t.stop()); } catch { /* rien */ } return false; }
+    this.stream = st;
     const ctx = this.ctx!;
     this.src = ctx.createMediaStreamSource(this.stream);
     this.node = ctx.createScriptProcessor(1024, 1, 1);
@@ -61,6 +67,7 @@ export class Ecoute {
     return true;
   }
   stop() {
+    this.closing = true;
     this.cancelSend(); this.reset();
     try { this.node && this.node.disconnect(); this.src && this.src.disconnect(); } catch { /* rien */ }
     try { this.stream && this.stream.getTracks().forEach((t) => t.stop()); } catch { /* rien */ }
@@ -70,6 +77,10 @@ export class Ecoute {
   }
   pause(p: boolean) { this.paused = p; this.reset(); this.o.onState(p ? 'paused' : 'listening'); }
   cancelSend() { if (this.sending) { this.sending.abort(); this.sending = null; } }
+  private tick() {
+    const c = this.ctx; if (!c) return;
+    try { const o = c.createOscillator(), g = c.createGain(); o.type = 'sine'; o.frequency.value = 1180; g.gain.setValueAtTime(0.0001, c.currentTime); g.gain.exponentialRampToValueAtTime(0.06, c.currentTime + 0.012); g.gain.exponentialRampToValueAtTime(0.0001, c.currentTime + 0.09); o.connect(g).connect(c.destination); o.start(); o.stop(c.currentTime + 0.1); } catch { /* rien */ }
+  }
   private reset() { this.inSpeech = false; this.voiced = 0; this.silence = 0; this.speechMs = 0; this.totalMs = 0; this.chunks = []; this.pre = []; this.preLen = 0; this.barge = false; }
 
   private frame(x: Float32Array, sr: number) {
@@ -104,6 +115,7 @@ export class Ecoute {
     this.reset();
     if (speech < 260) { if (wasBarge) this.o.onBargeCancel(); this.o.onState('listening'); return; }   /* un clic, une toux */
     const ctl = new AbortController(); this.cancelSend(); this.sending = ctl;
+    this.tick();   /* 0.22.1 : un petit son discret : « je t'ai entendu » */
     this.o.onState('transcribing');
     this.o.stt(toWav16k(chunks, sr), ctl.signal).then((t) => {
       if (this.sending !== ctl) return; this.sending = null;

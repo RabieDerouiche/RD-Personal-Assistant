@@ -15,9 +15,10 @@ import {createPush} from './push.mjs';
 import {createNotifier, paris, daysTo, parisMs, pauseDepuisFaits} from './notify.mjs';
 import {createSauvegarde} from './sauvegarde.mjs';
 import {createSante} from './sante.mjs';
-import {createEcoute, wavOk, intention, quand, meteoPhrase, meteoUrl, heurePhrase, datePhrase, nrm} from './voix.mjs';
+import {createComparatifs} from './comparatif.mjs';
+import {createEcoute, wavOk, intention, quand, meteoPhrase, meteoUrl, heurePhrase, datePhrase, nrm, diction} from './voix.mjs';
 
-const VERSION = '0.22.0';
+const VERSION = '0.23.0';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PORT = +(process.env.PORT || 8787);
 const HOST = process.env.HOST || '127.0.0.1';
@@ -287,19 +288,37 @@ async function chat(body, send) {
   if (!text) return send('error', {message: 'Demande vide.'});
   if (body.newSession || !S.session || now() - S.session.at > 30 * 60000) S.session = null;
   S.msgs.push({who: 'me', text, at: now()}); save();
-  const model = MODELS[body.model] || MODELS.equilibre;
-  const reads = readTools();
-  const sys = SYSTEM + '\n' + (reads.length ? 'Tu peux lire ses mails, son agenda et ses fichiers Google avec tes outils de connecteurs, en lecture seule.\n' + DATA_RULES : 'Tu n\'as pas accès à ses mails, à son agenda ni à Pilotage sur ce serveur : ne prétends jamais les avoir lus.');
-  const allow = ['WebSearch', 'WebFetch', ...reads], deny = ['Bash', 'Read', 'Glob', 'Grep', 'Edit', 'Write', 'NotebookEdit'];   /* 0.16.0 : aucun fichier du serveur dans la conversation */
+  const {model, sys, allow, deny} = sessionCfg(body.model);
   const t0 = now(); let warm = true;
   const r = await serial(async () => {
-    if (!S.session) closeSession();   /* nouvelle conversation */
+    if (!S.session && SESS && SESS.turns > 0) closeSession();   /* nouvelle conversation (une session préchauffée, encore vierge, est gardée) */
     if (SESS && SESS.key !== model + '|' + allow.join(',')) closeSession();   /* autre modèle : on rouvre en gardant la conversation */
     if (!SESS) { warm = false; SESS = openSession({model, system: sys, allow, deny, resume: S.session?.id}); }
     if (body.gone && body.gone()) return {ok: false, error: 'Interrompu.', aborted: true};   /* 0.22.0 : coupé par lui avant même de commencer */
     const sc = snapContext();
     return askSession(SESS, dateLigne() + (body.extra ? '[' + body.extra + ']\n' : '') + (sc || '[Question]\n') + text, (t) => send('delta', {text: visible(t)}), 180000, body.owner);
   });
+  return chatFin(r, t0, warm, model, send);
+}
+/* la configuration de la conversation (modèle, consigne, outils), commune à la conversation et au préchauffage */
+function sessionCfg(key) {
+  const model = MODELS[key] || MODELS.equilibre;
+  const reads = readTools();
+  const sys = SYSTEM + '\n' + (reads.length ? 'Tu peux lire ses mails, son agenda et ses fichiers Google avec tes outils de connecteurs, en lecture seule.\n' + DATA_RULES : 'Tu n\'as pas accès à ses mails, à son agenda ni à Pilotage sur ce serveur : ne prétends jamais les avoir lus.');
+  const allow = ['WebSearch', 'WebFetch', ...reads], deny = ['Bash', 'Read', 'Glob', 'Grep', 'Edit', 'Write', 'NotebookEdit'];   /* 0.16.0 : aucun fichier du serveur dans la conversation */
+  return {model, sys, allow, deny};
+}
+/* 0.22.1 : à l'ouverture de la page vocale, Claude Code est lancé d'avance (Haiku, connecteurs prêts) : la première question n'attend plus son démarrage */
+function prechauffe() {
+  return serial(async () => {
+    const c = sessionCfg('rapide');
+    if (SESS && (SESS.pending || (SESS.turns === 0 && SESS.key === c.model + '|' + c.allow.join(',')))) return {ok: true, deja: true};
+    closeSession(); S.session = null;
+    SESS = openSession({model: c.model, system: c.sys, allow: c.allow, deny: c.deny});
+    return {ok: true};
+  });
+}
+function chatFin(r, t0, warm, model, send) {
   S.usage.chats++;
   S.lastTiming = {at: now(), total: now() - t0, first: r.first ? r.first - t0 : null, tools: (r.used || []).length, warm, model};
   if (r.aborted) { save(); return; }
@@ -771,6 +790,8 @@ async function racContext() {
 const WHISPER_DIR = process.env.JARVIS_WHISPER_DIR || path.join(os.homedir(), 'whisper');
 const ECOUTE = createEcoute({dir: WHISPER_DIR, py: path.join(WHISPER_DIR, 'venv', 'bin', 'python'), helper: path.join(HERE, 'stt', 'whisper_helper.py'), model: process.env.JARVIS_WHISPER_MODEL || 'small', fakeHelper: process.env.JARVIS_STT_HELPER || '', log: (t) => { S.ecouteErr = {at: now(), t: String(t).slice(0, 300)}; }});
 let ECOUTE_INSTALL = {state: 'idle', at: 0, tail: ''};
+/* 0.23.0 : le comparatif des produits suivis (comparatif.mjs) */
+const COMP = createComparatifs({S, save, DATA, runClaude, model: MODELS.equilibre, settings: guardSettings('chat'), now, log: (t) => { S.compErr = {at: now(), t: String(t).slice(0, 300)}; }});
 function installEcoute() {
   if (ECOUTE_INSTALL.state === 'running') return ECOUTE_INSTALL;
   const log = path.join(DATA, 'ecoute-install.log');
@@ -937,7 +958,7 @@ const PIPER_PY = process.env.JARVIS_PIPER_PY || path.join(PIPER_DIR, 'venv', 'bi
 const TTS_HELPER = process.env.JARVIS_TTS_HELPER || path.join(HERE, 'tts', 'piper_helper.py');
 const VOICE = {model: process.env.JARVIS_VOICE_MODEL || path.join(PIPER_DIR, 'voices', 'fr_FR-upmc-medium.onnx'), speaker: process.env.JARVIS_VOICE_SPEAKER ?? '1'};
 const SAY = [[/\bJARVIS\b|\bJarvis\b/g, 'Djarviss'], [/\bKairos\b/g, 'Kaïross'], [/\bChronos\b/g, 'Kronoss'], [/\bArgus\b/g, 'Argusse'], [/\bIris\b/g, 'Iriss'], [/\bCRA\b/g, 'C.R.A.'], [/\bPDF\b/g, 'P.D.F.']];
-const pronounce = (t) => SAY.reduce((a, [re, r]) => a.replace(re, r), t).replace(/[*_#`>|]/g, ' ');
+const pronounce = (t) => SAY.reduce((a, [re, r]) => a.replace(re, r), diction(t)).replace(/[*_#`>|]/g, ' ');
 let TTS = null;
 const ttsReady = () => fs.existsSync(VOICE.model) && (fs.existsSync(PIPER_PY) || !!process.env.JARVIS_TTS_HELPER);
 function ttsHelper() {
@@ -1089,6 +1110,10 @@ const server = http.createServer(async (req, res) => {
         await voix(b, (ev, d) => { if (ev === 'delta') { if (d.text === last) return; last = d.text; } send(ev, d); }, () => cut, owner);
         if (!res.writableEnded) res.end(); return;
       }
+      if (p === '/api/comparatifs') return json(res, 200, {comparatifs: COMP.liste()});
+      if (p === '/api/comparatif' && req.method === 'POST') { const r = COMP.demander(await readBody(req)); return json(res, r.ok ? 200 : 400, r); }
+      { const mi = /^\/api\/image\/([\w.]+)$/.exec(p); if (mi) { const f = COMP.image(mi[1]); if (!f) return json(res, 404, {error: 'Image inconnue.'}); res.writeHead(200, {'content-type': /png$/.test(f) ? 'image/png' : /webp$/.test(f) ? 'image/webp' : 'image/jpeg', 'cache-control': 'private, max-age=2592000'}); fs.createReadStream(f).pipe(res); return; } }
+      if (p === '/api/voix/prechauffe' && req.method === 'POST') return json(res, 200, await prechauffe());
       if (p === '/api/stt' && req.method === 'POST') {
         if (!ECOUTE.ready()) return json(res, 503, {error: 'ecoute_absente', message: "L'écoute Whisper n'est pas installée sur le serveur (Réglages)."});
         const raw = await readRaw(req, 3e6); if (!wavOk(raw)) return json(res, 400, {error: 'Son illisible.'});

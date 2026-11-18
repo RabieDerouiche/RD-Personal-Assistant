@@ -252,7 +252,7 @@ try {
       r = await stt(wav('quel temps fait-il demain')); ok('écoute : le son de l\'iPhone devient du texte (Whisper sur le serveur)', r.status === 200 && r.body.text === 'quel temps fait-il demain' && r.body.ms >= 0, JSON.stringify(r.body));
       r = await stt(wav('')); ok('écoute : la phrase inventée par Whisper sur un silence (« Amara.org ») n\'est jamais envoyée', r.status === 200 && r.body.text === '', JSON.stringify(r.body));
       r = await stt(Buffer.from('pas un son')); ok('écoute : un envoi qui n\'est pas un WAV est refusé', r.status === 400);
-      r = await G('/api/status'); ok('écoute : état dans /api/status', r.body.ecoute === true && r.body.version === '0.22.0', JSON.stringify({e: r.body.ecoute, v: r.body.version}));
+      r = await G('/api/status'); ok('écoute : état dans /api/status', r.body.ecoute === true && /^0\.2[2-9]/.test(r.body.version), JSON.stringify({e: r.body.ecoute, v: r.body.version}));
       { const ei = await G('/api/ecoute/install', {}); let st = ei.body.state; for (let i = 0; i < 30 && st === 'running'; i++) { await new Promise((z) => setTimeout(z, 100)); st = (await G('/api/ecoute/install')).body.state; } ok('écoute : installation lancée par le serveur (bouton de Réglages)', st === 'done', st); }
       let d = await V({text: 'Quelle heure est-il ?'}); ok('voix : l\'heure tout de suite, sans Claude', d.instant === 'heure' && /^Il est \d{1,2} h( \d\d)?\.$/.test(d.reply) && d.timing.instant === true, JSON.stringify(d).slice(0, 160));
       d = await V({text: 'On est quel jour ?'}); ok('voix : la date, sans Claude', d.instant === 'date' && /^Nous sommes le \S+ \d{1,2} \S+ \d{4}\.$/.test(d.reply), d.reply);
@@ -261,6 +261,10 @@ try {
       ok('voix : position arrondie au kilomètre avant d\'aller chez Open-Meteo', METEO_REQ.some((u) => /latitude=48\.86&longitude=2\.34/.test(u)) && !METEO_REQ.some((u) => /48\.861/.test(u)), METEO_REQ[0]);
       d = await V({text: 'Et demain, il va pleuvoir ?'}); ok('voix : la météo de demain (pas celle de lundi), avec le conseil', d.instant === 'meteo' && /^Demain : entre 2 et 7 degrés, pluie faible, pluie probable à 70 %\. Prends un parapluie\./.test(d.reply), d.reply);
       d = await V({text: 'Quel temps ce soir ?'}); ok('voix : la météo de ce soir (heures de 18 h à 23 h)', /^Ce soir : entre 6 et 6 degrés, partiellement nuageux\./.test(d.reply), d.reply);
+      r = await G('/api/voix/prechauffe', {}); const r2b = await G('/api/voix/prechauffe', {});
+      d = await V({text: 'Où en sont mes notes de frais ?', newSession: true}); ok('voix : Claude lancé d\'avance à l\'ouverture de la page vocale (la 1re question ne l\'attend pas)', r.body.ok && r2b.body.deja === true && d.timing && d.timing.warm === true && /Session : nouvelle/.test(d.reply), JSON.stringify([r.body, r2b.body, d.timing]));
+      { const tr = await fetch(BASE + '/api/tts', {method: 'POST', headers: {authorization: 'Bearer ' + tok, 'content-type': 'application/json'}, body: JSON.stringify({text: 'Il est 18 h 49. Demain 7° et pluie à 70 %, le 18/11 : « Relance ».'})}); const tb = await tr.text();
+        ok('voix de Pierre : heures, degrés, pourcentages et dates écrits comme on les dit', /18 heures 49/.test(tb) && /7 degrés/.test(tb) && /70 pour cent/.test(tb) && /18 novembre/.test(tb) && !/«/.test(tb), tb.slice(44, 160)); }
       d = await V({text: 'Où en sont mes notes de frais ?'}); ok('voix : « notes de frais » n\'est pas la météo : Claude Haiku répond', !d.instant && /modèle : haiku/.test(d.reply), String(d.reply).slice(0, 120));
       d = await V({text: 'montre le contexte'}); ok('voix : Claude reçoit la date et l\'heure de Paris à chaque phrase', /^\[Maintenant : \S+ \d{1,2} \S+ \d{4} (à )?\d\d:\d\d, heure de Paris\]/.test(d.reply), String(d.reply).slice(0, 100));
       d = await V({text: 'Réfléchis bien : que penses-tu de ma semaine ?'}); ok('voix : « réfléchis » passe à Sonnet', /modèle : sonnet/.test(d.reply), String(d.reply).slice(-160));
@@ -274,6 +278,23 @@ try {
       { const ctl = new AbortController(), t0 = Date.now(); const slow = V({text: 'Raconte lentement ta journée'}, ctl.signal).catch(() => 'coupé'); await new Promise((z) => setTimeout(z, 400)); ctl.abort(); await slow;
         const d2 = await V({text: 'Bonjour encore'}); const dt = Date.now() - t0;
         ok('voix : couper JARVIS pendant qu\'il répond libère tout de suite la suite (pas d\'attente de la réponse coupée)', /Tu as dit : Bonjour encore\./.test(d2.reply) && dt < 4000, dt + ' ms · ' + String(d2.reply).slice(0, 60)); } }
+    /* 0.23.0 : comparatif automatique des produits suivis (Claude avec le web, photos des pages des vendeurs, gardé) */
+    { const PNG = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(2000, 7)]);
+      const VEND = http.createServer((q, rr) => { if (q.url === '/produit-a') { rr.writeHead(200, {'content-type': 'text/html'}); rr.end('<html><head><meta property="og:image" content="/img-a.png"></head></html>'); } else if (q.url === '/img-a.png') { rr.writeHead(200, {'content-type': 'image/png'}); rr.end(PNG); } else { rr.writeHead(200, {'content-type': 'text/html'}); rr.end('<html>rien</html>'); } });
+      await new Promise((z) => VEND.listen(0, '127.0.0.1', z)); const VB = 'http://127.0.0.1:' + VEND.address().port;
+      const body = {famille: 'Roborock Saros', produits: [{nom: 'Roborock Saros 20', prix: 799, ref: 1289, lien: 'Roborock — ' + VB + '/produit-a'}, {nom: 'Roborock Saros 20 Sonic', prix: 899, ref: 1049, lien: 'Boulanger — ' + VB + '/produit-b'}], conditions: 'Le Saros 20 Neo est exclu'};
+      r = await G('/api/comparatif', body); ok('comparatif : demandé par la page, préparé en arrière-plan', r.status === 200 && ['en_cours', 'pret'].includes(r.body.comparatif.statut), JSON.stringify(r.body).slice(0, 120));
+      let cp = null; for (let i = 0; i < 60 && !(cp && cp.statut === 'pret'); i++) { await new Promise((z) => setTimeout(z, 150)); cp = ((await G('/api/comparatifs')).body.comparatifs || []).find((x) => x.famille === 'Roborock Saros'); }
+      const v0 = cp && cp.data && cp.data.variantes[0];
+      ok('comparatif : différence clé, critères chiffrés, pour qui, utilité, points forts, limites, qualité et rapport qualité/prix par variante', cp && cp.statut === 'pret' && /serpillière/.test(cp.data.difference_cle) && cp.data.criteres.length === 2 && cp.data.variantes.length === 2 && v0.nom === 'Roborock Saros 20' && v0.valeurs.Aspiration === 20000 && v0.qualite === 7 && v0.rqp === 8 && v0.prix === 799 && /appartement/.test(v0.pour_qui), JSON.stringify(cp && cp.data).slice(0, 200));
+      ok('comparatif : photo prise sur la page du vendeur (og:image), gardée sur le serveur ; sans photo trouvée, rien', /^[0-9a-f]{24}\.png$/.test(v0.photo) && cp.data.variantes[1].photo === '', JSON.stringify(cp.data.variantes.map((x) => x.photo)));
+      { const ir = await fetch(BASE + '/api/image/' + v0.photo, {headers: {authorization: 'Bearer ' + tok}}); const nb = (await ir.arrayBuffer()).byteLength;
+        const ir2 = await fetch(BASE + '/api/image/' + v0.photo); ok('comparatif : la photo est servie à l\'iPhone relié seulement', ir.status === 200 && ir.headers.get('content-type') === 'image/png' && nb === PNG.length && ir2.status === 401, ir.status + ' ' + nb + ' ' + ir2.status); }
+      const n0 = (await G('/api/comparatifs')).body.comparatifs.length; r = await G('/api/comparatif', body);
+      ok('comparatif : gardé (pas de nouvel appel à Claude tant que les variantes ne changent pas)', r.body.comparatif.statut === 'pret' && (await G('/api/comparatifs')).body.comparatifs.length === n0);
+      r = await G('/api/comparatif', {famille: 'Roborock Saros', produits: body.produits.concat([{nom: 'Roborock Saros 20X', prix: 799, ref: 1289, lien: ''}])}); ok('comparatif : une variante de plus = un nouveau comparatif', r.body.comparatif.statut === 'en_cours');
+      r = await G('/api/comparatif', {famille: '', produits: []}); ok('comparatif : demande vide refusée', r.status === 400);
+      VEND.close(); }
     /* sauvegarde de Pilotage (0.14.0) : copie maintenant, comparée à une copie plus ancienne */
     { const H = ['Date', 'De', 'Pour', 'Type', 'Message', 'Statut', 'Réponse', 'Objet'];
       fs.mkdirSync(path.join(DATA, 'sauvegardes'), {recursive: true});

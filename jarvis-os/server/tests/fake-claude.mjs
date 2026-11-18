@@ -28,6 +28,13 @@ function answer(raw) {
     if (papiers && /"nom":"Bail 2024\.pdf"/.test(input)) return {text: JSON.stringify({nouveau: true, constat: 'La date de début du bail est sur Bail 2024.pdf.', source: 'Bail 2024.pdf', lien: 'https://drive.example/e1', pour_bot: 'La date de début du bail est en page 1 de Bail 2024.pdf (Papiers > Logement).', certitude: 'certain'})};
     return {text: (/Réponds UNIQUEMENT par ce JSON/.test(sys) ? '' : 'SANS CONSIGNE ') + JSON.stringify(hit ? {nouveau: true, constat: papiers ? 'La quittance de mai est dans Papiers, Logement.' : "Le syndic a répondu : l'expert passe mardi.", source: papiers ? 'Quittance 2019.pdf' : 'Syndic Dupont : RE: Dégât des eaux', lien: papiers ? 'https://drive.example/d3' : 'https://mail.google.com/mail/#all/th1', pour_bot: papiers ? 'La quittance de mai est dans Papiers > Logement > Locations (Quittance 2019.pdf).' : "Le syndic a répondu le 16/11 : l'expert passe mardi.", certitude: 'certain'} : {nouveau: false, constat: 'Rien de nouveau sur ce sujet. Outils : ' + allow, source: '', lien: '', pour_bot: '', certitude: 'certain'})};
   }
+  /* 0.23.0 : comparatif des variantes d'un produit suivi (JSON) */
+  if (/^Comparatif à préparer pour « /.test(input)) {
+    const arr = JSON.parse(input.split('données) :\n')[1].split('\n')[0]);
+    return {text: JSON.stringify({resume: 'Deux robots proches : le second lave mieux.', difference_cle: 'La serpillière vibrante du Sonic.', criteres: [{nom: 'Aspiration', unite: 'Pa', plus_haut_mieux: true}, {nom: 'Bruit', unite: 'dB', plus_haut_mieux: false}],
+      variantes: arr.map((p, i) => ({nom: p.nom, pour_qui: 'Pour un appartement ' + (i ? 'avec carrelage' : 'avec tapis'), utilite: 'Aspire et lave chaque jour', points_forts: ['Puissant', 'Station autonome'], limites: ['Bruyant'], valeurs: {Aspiration: 20000 + i * 2000, Bruit: 64 - i}, qualite: 7 + i, rapport_qualite_prix: 8 - i, verdict: 'Bon choix ' + (i + 1), image: ''})),
+      conseil: 'Prends le premier au prix du jour.', certitude: 'likely', sources: ['https://exemple.fr/test']})};
+  }
   if (/lentement/i.test(input)) return {text: 'Réponse lente. ' + 'bla '.repeat(1500)};   /* 0.22.0 : pour couper JARVIS pendant qu'il répond */
   if (/erreur/i.test(input)) return {error: 'Invalid API key · Please run /login'};
   if (/outils refusés/.test(input)) return {text: 'refusés : ' + (args.includes('--disallowedTools') ? args.slice(args.indexOf('--disallowedTools') + 1).filter((x) => !x.startsWith('--')).join(',') : '')};

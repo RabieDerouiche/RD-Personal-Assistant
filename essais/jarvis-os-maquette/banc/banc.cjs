@@ -29,7 +29,9 @@ srv.listen(0, async () => {
     let p = await page('');
     ok('mode maquette sur un serveur local', await p.evaluate(() => window.__JARVIS_MODE === 'maquette'));
     ok('thème Hologramme par défaut', await p.evaluate(() => document.documentElement.classList.contains('theme-holo')));
-    ok('accueil « Fil du jour » : à faire, aujourd\'hui, semaine, bientôt', await p.evaluate(() => ['À faire maintenant', "Aujourd'hui", 'Cette semaine', 'Bientôt'].every((t) => [...document.querySelectorAll('.hm-h h2')].some((x) => x.textContent === t))));
+    ok('accueil en tableau de bord : coup d\'œil, à faire, aujourd\'hui, 14 prochains jours, à surveiller (plus de « Bientôt »)', await p.evaluate(() => ['En un coup d’œil', 'À faire maintenant', "Aujourd'hui", 'Les 14 prochains jours', 'À surveiller'].every((t) => [...document.querySelectorAll('.hm-h h2')].some((x) => x.textContent === t)) && ![...document.querySelectorAll('.hm-h h2')].some((x) => x.textContent === 'Bientôt') && document.querySelectorAll('.kpi-t').length === 6));
+    ok('accueil : le résumé du jour donne la météo, et chaque chiffre ouvre sa rubrique', await p.evaluate(() => /(\d+° · \S+ · \d+ à \d+°|Demain : [^,]+, \d+ à \d+°)/.test((document.querySelector('.hm-hello small') || {}).textContent || '')));
+    { await p.evaluate(() => [...document.querySelectorAll('.kpi-t')].find((x) => /bons? prix/.test(x.textContent)).click()); await p.waitForTimeout(500); const tab = await p.evaluate(() => location.hash); await p.goto(base + '#accueil'); await p.waitForTimeout(1500); ok('accueil : la tuile « bon prix » ouvre Achats', tab === '#achats', tab); }
     ok('pastille « Grok en pause »', await p.evaluate(() => !!document.querySelector('.pause-pill')));
     await p.screenshot({path: path.join(SH, 'accueil.png')});
     /* barre du bas et toutes les rubriques */
@@ -135,7 +137,12 @@ srv.listen(0, async () => {
       await p.evaluate(() => [...document.querySelectorAll('#sheet .sheet-pick .btn')].find((x) => /Sans date/.test(x.textContent)).click()); await p.waitForTimeout(800);
       const c1 = await p.evaluate(() => ({card: [...document.querySelectorAll('article')].some((x) => /^IrisÀ faire/.test(x.textContent) && /Passeport/.test(x.textContent)), cote: [...document.querySelectorAll('.cote-it')].map((x) => x.textContent)}));
       ok('« Plus tard » sans date : la carte quitte Pour moi pour « En attente, plus tard, en rappel », sans ligne pour un bot', !c1.card && c1.cote.some((x) => /^Passeport/.test(x) && /Plus tard, sans date · rappel chaque dimanche à 18 h/.test(x)), JSON.stringify(c1));
-      await p.evaluate(() => [...document.querySelectorAll('.cote-it')].find((x) => /^Passeport/.test(x.textContent)).querySelector('button').click()); await p.waitForTimeout(500);
+      /* 18/11/2026 : un appui sur la carte de côté l'ouvre (rappel de ce que c'est), avec « Remettre dans Pour moi » */
+      await p.evaluate(() => [...document.querySelectorAll('.cote-it')].find((x) => /^Passeport/.test(x.textContent)).querySelector('.cote-tx').click()); await p.waitForTimeout(900);
+      const cs = await p.evaluate(() => { const s = document.getElementById('sheet'); return s && !s.hidden ? s.innerText : ''; });
+      ok('carte de côté : un appui l\'ouvre (de côté, pourquoi, « Remettre dans Pour moi »)', /De côté/i.test(cs) && /Passeport/.test(cs) && /Remettre dans Pour moi/.test(cs), cs.replace(/\s+/g, ' ').slice(0, 120));
+      await p.evaluate(() => document.getElementById('sheet-back').click()); await p.waitForTimeout(400);
+      await p.evaluate(() => [...[...document.querySelectorAll('.cote-it')].find((x) => /^Passeport/.test(x.textContent)).querySelectorAll('button')].find((b) => b.textContent === 'Remettre').click()); await p.waitForTimeout(500);
       /* réponse mémorisée : la carte ne revient pas à la relecture de Pilotage avant le passage du bot ; une tâche en retard n'est pas « Expirée » */
       await open('Formulaire de la mutuelle'); const v3 = await vis(), k3 = await p.evaluate(() => document.querySelector('#sheet .sheet-kicker').textContent);
       ok('tâche en retard (sans offre) : pas « Expirée », « Plus tard » toujours là', !/Expirée/.test(k3) && v3.includes('Plus tard') && v3.includes("C'est fait"), JSON.stringify([k3, v3]));
@@ -294,9 +301,9 @@ srv.listen(0, async () => {
     /* 18/11/2026, passe globale : notifications (lien profond, bandeau qui se ferme, « Voir »), compteurs, Équipe, champs date */
     { p = await page('#accueil');
       const row = await p.evaluate(() => { let k = -1; window.__G['Canal'].forEach((x, i) => { if (i && x[1] === 'Rabie' && x[6]) k = i; }); return k + 1; });
-      const nums = await p.evaluate(() => [(document.querySelector('#status .st.is-demande') || {}).textContent, (document.querySelector('.tab[data-tab="demandes"] .badge') || {}).textContent, (document.querySelector('.hm-hello small') || {}).textContent, document.getElementById('view').innerText]);
+      const nums = await p.evaluate(() => { const k = [...document.querySelectorAll('.kpi-t')].find((x) => /pour toi/.test(x.textContent)); return [(document.querySelector('#status .st.is-demande') || {}).textContent, (document.querySelector('.tab[data-tab="demandes"] .badge') || {}).textContent, k ? k.querySelector('.kpi-n').textContent : '', document.getElementById('view').innerText]; });
       const n0 = (nums[0].match(/^(\d+) pour toi$/) || [])[1];
-      ok('compteurs : un seul « pour toi », le même dans l\'en-tête, la pastille et l\'accueil', n0 != null && nums[1] === n0 && nums[2].indexOf(n0 + ' pour toi') === 0, nums.slice(0, 3).join(' / '));
+      ok('compteurs : un seul « pour toi », le même dans l\'en-tête, la pastille et l\'accueil', n0 != null && nums[1] === n0 && nums[2] === n0, nums.slice(0, 3).join(' / '));
       ok('accueil : jamais « J-- » (voyage en cours ou passé)', !/J--/.test(nums[3]));
       p = await page('#voir-' + row);
       const sh = await p.evaluate(() => { const s = document.getElementById('sheet'); return [location.hash, s && !s.hidden ? s.innerText : '']; });
@@ -337,6 +344,14 @@ srv.listen(0, async () => {
       await p.evaluate(() => { const x = [...document.querySelectorAll('#view .dl-row, #view .agt-row')].find((y) => /Timesheet Démo/.test(y.innerText)); if (x) x.click(); }); await p.waitForTimeout(1500);
       const sh = await p.evaluate(() => { const s = document.getElementById('sheet'); return s && !s.hidden ? s.innerText : ''; });
       ok('Agenda : une échéance qu\'un bot a faite (son Journal) s\'affiche « fait ✓ », sa feuille dit « Fait par Chronos » et propose « Oui, c\'est fait » (gratuit) ; une autre du même bot reste à venir', done && other && /Fait par Chronos/i.test(sh) && /Oui, c'est fait/.test(sh) && !/Fais-le maintenant/.test(sh), [done, other, sh.replace(/\s+/g, ' ').slice(0, 120)].join(' | ')); }
+    /* 0.23.0 : comparatif des variantes (préparé par Claude ; ici, celui des données d'exemple) */
+    { p = await page('#achats');
+      const lead = await p.evaluate(() => [...document.querySelectorAll('.fam-rqp')].map((x) => x.textContent).join(' | '));
+      await p.evaluate(() => [...document.querySelectorAll('.fam-hit')].find((x) => /Beta/.test(x.textContent)).click()); await p.waitForTimeout(1200);
+      const cp = await p.evaluate(() => { const pn = [...document.querySelectorAll('.panel')].find((x) => /^Le comparatif/.test((x.querySelector('h2') || {}).textContent || '')); return pn ? {t: pn.innerText, bars: pn.querySelectorAll('.cmp-bar').length, best: pn.querySelectorAll('.cmp-bar.is-best').length, pics: pn.querySelectorAll('.cmp-pic img').length, ex: document.querySelectorAll('.var-x').length, exT: (document.querySelector('.var-x') || {}).innerText || ''} : null; });
+      ok('Achats : chaque produit dit son meilleur rapport qualité/prix', /Meilleur rapport qualité\/prix : (Absolute|Submarine) \(\d/.test(lead), lead);
+      ok('Achats : comparatif clair (résumé, différence qui compte, photos, schéma par critère, qualité/prix au prix du jour, conseil, sources)', cp && /La différence qui compte/.test(cp.t) && /Rapport qualité\/prix/.test(cp.t) && /Le conseil de Claude/.test(cp.t) && cp.bars >= 8 && cp.best >= 2 && cp.pics === 2, JSON.stringify(cp && {bars: cp.bars, best: cp.best, pics: cp.pics}));
+      ok('Achats : sous chaque variante, pour qui, à quoi elle sert, forces et limites, les deux notes', cp && cp.ex === 2 && /Pour qui/.test(cp.exT) && /À quoi elle sert/.test(cp.exT) && /Qualité\/prix \d/.test(cp.exT) && /Qualité \d/.test(cp.exT), cp && cp.exT.replace(/\s+/g, ' ').slice(0, 140)); }
     /* aucune rubrique n'affiche de texte cassé */
     const broken = [];
     for (const t of ['accueil', 'demandes', 'agenda', 'suivi', 'achats', 'voyages', 'sorties', 'papiers', 'equipe', 'automatisations', 'reglages']) {
