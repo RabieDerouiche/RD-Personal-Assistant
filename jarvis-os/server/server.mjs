@@ -15,8 +15,9 @@ import {createPush} from './push.mjs';
 import {createNotifier, paris, daysTo, parisMs, pauseDepuisFaits} from './notify.mjs';
 import {createSauvegarde} from './sauvegarde.mjs';
 import {createSante} from './sante.mjs';
+import {createEcoute, wavOk, intention, quand, meteoPhrase, meteoUrl, heurePhrase, datePhrase, nrm} from './voix.mjs';
 
-const VERSION = '0.21.0';
+const VERSION = '0.22.0';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PORT = +(process.env.PORT || 8787);
 const HOST = process.env.HOST || '127.0.0.1';
@@ -237,6 +238,14 @@ const serialMission = (fn) => { const p = busyM.then(fn, fn); busyM = p.catch(()
 let SESS = null;
 function closeSession() { if (SESS) { try { SESS.child.stdin.end(); } catch { /* rien */ } const c = SESS.child; setTimeout(() => { try { c.kill('SIGTERM'); } catch { /* rien */ } }, 3000); SESS = null; } }
 setInterval(() => { if (SESS && !SESS.pending && now() - SESS.lastUse > 15 * 60000) closeSession(); }, 60000);
+/* 0.22.0 : il a coupé JARVIS (sa voix ou un appui) pendant que Claude répondait : on arrête ce tour-là ; la conversation reprend
+   au tour suivant (--resume), sans attendre la fin d'une réponse qu'il n'écoutera pas */
+function coupeSession(owner) {
+  const s = SESS; if (!s || !s.pending || (owner && s.pending.owner !== owner)) return false;
+  const p = s.pending; s.pending = null; clearTimeout(p.timer); p.resolve({ok: false, error: 'Interrompu.', aborted: true}); closeSession(); return true;
+}
+/* 0.22.0 : la date et l'heure de Paris à chaque tour (sans elles, Claude a donné la météo de lundi) */
+const dateLigne = () => '[Maintenant : ' + new Intl.DateTimeFormat('fr-FR', {timeZone: 'Europe/Paris', weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit'}).format(new Date(now())) + ', heure de Paris]\n';
 function openSession({model, system, allow, deny, resume}) {
   /* conversation à la voix : effort réduit, sans réflexion approfondie (les missions gardent l'effort normal) */
   const args = ['-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose', '--include-partial-messages', '--append-system-prompt', system, '--model', model, '--effort', 'low', '--settings', guardSettings('chat')];
@@ -264,10 +273,10 @@ function openSession({model, system, allow, deny, resume}) {
   });
   return s;
 }
-function askSession(s, text, onDelta, timeoutMs) {
+function askSession(s, text, onDelta, timeoutMs, owner) {
   return new Promise((resolve) => {
     s.lastUse = now(); s.turns++;
-    s.pending = {resolve, onDelta, text: '', used: [], first: 0, timer: setTimeout(() => { closeSession(); resolve({ok: false, error: 'Claude a mis trop de temps à répondre.'}); }, timeoutMs)};
+    s.pending = {resolve, onDelta, owner, text: '', used: [], first: 0, timer: setTimeout(() => { closeSession(); resolve({ok: false, error: 'Claude a mis trop de temps à répondre.'}); }, timeoutMs)};
     try { s.child.stdin.write(JSON.stringify({type: 'user', message: {role: 'user', content: [{type: 'text', text}]}, parent_tool_use_id: null}) + '\n'); }
     catch { s.pending = null; resolve({ok: false, error: 'Claude n\'a pas pu recevoir la demande.'}); }
   });
@@ -287,10 +296,13 @@ async function chat(body, send) {
     if (!S.session) closeSession();   /* nouvelle conversation */
     if (SESS && SESS.key !== model + '|' + allow.join(',')) closeSession();   /* autre modèle : on rouvre en gardant la conversation */
     if (!SESS) { warm = false; SESS = openSession({model, system: sys, allow, deny, resume: S.session?.id}); }
-    return askSession(SESS, snapContext() + text, (t) => send('delta', {text: visible(t)}), 180000);
+    if (body.gone && body.gone()) return {ok: false, error: 'Interrompu.', aborted: true};   /* 0.22.0 : coupé par lui avant même de commencer */
+    const sc = snapContext();
+    return askSession(SESS, dateLigne() + (body.extra ? '[' + body.extra + ']\n' : '') + (sc || '[Question]\n') + text, (t) => send('delta', {text: visible(t)}), 180000, body.owner);
   });
   S.usage.chats++;
   S.lastTiming = {at: now(), total: now() - t0, first: r.first ? r.first - t0 : null, tools: (r.used || []).length, warm, model};
+  if (r.aborted) { save(); return; }
   if (!r.ok) { save(); return send('error', {message: r.error}); }
   const {reply, missions} = splitMissions(r.text);
   S.session = {id: SESS?.sessionId || S.session?.id, at: now()};
@@ -755,6 +767,88 @@ async function racContext() {
   return out.join('\n');
 }
 
+/* ---------- 0.22.0 : la voix refaite (voix.mjs) — écoute Whisper, réponses instantanées, Haiku pour le reste ---------- */
+const WHISPER_DIR = process.env.JARVIS_WHISPER_DIR || path.join(os.homedir(), 'whisper');
+const ECOUTE = createEcoute({dir: WHISPER_DIR, py: path.join(WHISPER_DIR, 'venv', 'bin', 'python'), helper: path.join(HERE, 'stt', 'whisper_helper.py'), model: process.env.JARVIS_WHISPER_MODEL || 'small', fakeHelper: process.env.JARVIS_STT_HELPER || '', log: (t) => { S.ecouteErr = {at: now(), t: String(t).slice(0, 300)}; }});
+let ECOUTE_INSTALL = {state: 'idle', at: 0, tail: ''};
+function installEcoute() {
+  if (ECOUTE_INSTALL.state === 'running') return ECOUTE_INSTALL;
+  const log = path.join(DATA, 'ecoute-install.log');
+  ECOUTE_INSTALL = {state: 'running', at: now(), tail: ''};
+  ECOUTE.stop();
+  const child = spawn('bash', [process.env.JARVIS_ECOUTE_SCRIPT || path.join(HERE, 'install', 'ecoute.sh')], {env: {...childEnv(), JARVIS_WHISPER_DIR: WHISPER_DIR}, stdio: ['ignore', 'pipe', 'pipe']});
+  const out = fs.createWriteStream(log);
+  const keep = (d) => { out.write(d); ECOUTE_INSTALL.tail = (ECOUTE_INSTALL.tail + d).slice(-600); };
+  child.stdout.on('data', keep); child.stderr.on('data', keep);
+  child.on('close', (code) => { out.end(); ECOUTE_INSTALL.state = code === 0 && ECOUTE.ready() ? 'done' : 'error'; ECOUTE.warm(); });
+  child.on('error', () => { ECOUTE_INSTALL.state = 'error'; });
+  return ECOUTE_INSTALL;
+}
+const readRaw = (req, max) => new Promise((resolve) => { const ch = []; let n = 0; req.on('data', (d) => { n += d.length; if (n > max) { req.destroy(); resolve(null); return; } ch.push(d); }); req.on('end', () => resolve(Buffer.concat(ch))); req.on('error', () => resolve(null)); });
+/* météo : Open-Meteo (gratuit, sans clé), à la position de l'iPhone (arrondie au kilomètre, gardée sur le serveur seulement) */
+const METEO_URL = process.env.JARVIS_METEO_URL || 'https://api.open-meteo.com/v1/forecast';
+let METEO = {key: '', at: 0, j: null};
+async function meteoData(lat, lon) {
+  const key = lat + ',' + lon; if (METEO.key === key && now() - METEO.at < 600000) return METEO.j;
+  const r = await fetch(meteoUrl(METEO_URL, lat, lon), {signal: AbortSignal.timeout(8000)});
+  if (!r.ok) throw new Error('Open-Meteo ' + r.status);
+  const j = await r.json(); METEO = {key, at: now(), j}; return j;
+}
+const BOTNOMS = {iris: 'Iris', chronos: 'Chronos', kairos: 'Kairos', ulysse: 'Ulysse', athena: 'Athéna', argus: 'Argus'};
+const clip = (x, n) => { const t = String(x || '').replace(/\s+/g, ' ').trim(); return t.length > n ? t.slice(0, n - 1) + '…' : t; };
+async function instantReply(q, text) {
+  const t = paris(new Date(now())), dow = new Date(Date.UTC(t.y, t.m - 1, t.d)).getUTCDay(), w = quand(text, dow);
+  const ymd = (n) => new Date(Date.UTC(t.y, t.m - 1, t.d + n)).toISOString().slice(0, 10), cap = (x) => x.charAt(0).toUpperCase() + x.slice(1);
+  if (q.kind === 'heure') return heurePhrase(t);
+  if (q.kind === 'date') return datePhrase(new Date(now()));
+  if (q.kind === 'meteo') {
+    if (!S.pos) return "Je n'ai pas ta position pour la météo : autorise la localisation quand JARVIS te la demande, puis redemande.";
+    return meteoPhrase(await meteoData(S.pos.lat, S.pos.lon), w, t, text) || "Je n'ai la météo que pour les sept prochains jours.";
+  }
+  if (!GG.status('').linked) return null;   /* sans Google, Claude répond qu'il n'a pas les données */
+  if (q.kind === 'agenda') {
+    const span = w.we ? 2 : 1;
+    const ev = ((await GG.tool('Google Calendar', 'list_events', {calendarId: 'primary', startTime: ymd(w.jour) + 'T00:00:00', endTime: ymd(w.jour + span) + 'T00:00:00', pageSize: 25})).events || []).filter((e) => e.status !== 'cancelled');
+    const hm = (e) => { const st = e.start || {}; if (st.date) return null; const d = paris(new Date(st.dateTime)); return d.hm; };
+    const list = ev.filter((e) => w.jour !== 0 || !hm(e) || hm(e) >= t.hm).map((e) => { const h = hm(e); return (h ? h.replace(':', ' h ').replace(/ h 00$/, ' h') + ', ' : '') + (e.summary || 'sans titre') + (h ? '' : ', toute la journée'); });
+    const label = w.we ? 'Ce week-end' : w.jour === 0 ? "Aujourd'hui, encore" : cap(w.dit);
+    return list.length ? label + ' : ' + list.slice(0, 6).join(' ; ') + (list.length > 6 ? ', et ' + (list.length - 6) + ' autres.' : '.') : 'Rien dans ton agenda ' + (w.jour === 0 ? "pour le reste de la journée" : w.dit) + '.';
+  }
+  if (q.kind === 'pourmoi') {
+    const rows = await sheetRead("'À toi'!A3:D300"), hd = (rows[0] || []).map(low), iS = hd.indexOf('sujet');
+    const cote = new Set((S.cote || []).map((c) => low(c.titre))), subs = rows.slice(1).map((r) => String(r[iS] || '').trim()).filter((x) => x && !cote.has(low(x)));
+    if (!subs.length) return "Rien ne t'attend. Profite.";
+    return subs.length + (subs.length > 1 ? ' choses' : ' chose') + ' pour toi : ' + subs.slice(0, 3).map((x) => clip(x, 70)).join(' ; ') + (subs.length > 3 ? ', et ' + (subs.length - 3) + (subs.length - 3 > 1 ? ' autres' : ' autre') : '') + '. Le détail est dans Pour moi.';
+  }
+  if (q.kind === 'bot') {
+    const c = await sheetRead('Canal!A1:H3000'), hd = (c[0] || []).map(low), I = (k) => hd.indexOf(k), nom = BOTNOMS[q.bot];
+    const mine = c.slice(1).filter((r) => low(r[I('pour')]) === q.bot && ['rabie', 'claude'].includes(low(r[I('de')])));
+    if (!mine.length) return 'Rien de récent entre toi et ' + nom + ' dans le Canal.';
+    const r = mine[mine.length - 1], st = String(r[I('statut')] || 'À faire'), rep = clip(r[I('reponse')], 220), wait = mine.filter((x) => ['a faire', 'en cours', ''].includes(low(x[I('statut')]))).length;
+    return 'Dernière demande à ' + nom + ', le ' + String(r[I('date')] || '').slice(0, 5) + ' : « ' + clip(r[I('message')], 110) + ' ». ' + (rep ? nom + ' a répondu : « ' + rep + ' ».' : /attend ton oui/i.test(st) ? nom + ' attend ton oui.' : 'Pas encore traitée.') + (wait > 1 ? ' ' + wait + ' lignes attendent ' + nom + '.' : '');
+  }
+  return null;
+}
+/* une phrase dite à JARVIS : réponse instantanée si possible, sinon Claude (Haiku ; Sonnet s'il dit « réfléchis ») */
+async function voix(b, send, gone, owner) {
+  const text = String(b.text || '').trim().slice(0, 2000);
+  if (!text) return send('error', {message: 'Demande vide.'});
+  const la = Number(b.lat), lo = Number(b.lon);
+  if (b.lat != null && b.lon != null && isFinite(la) && isFinite(lo) && Math.abs(la) <= 90 && Math.abs(lo) <= 180) S.pos = {lat: Math.round(la * 100) / 100, lon: Math.round(lo * 100) / 100, at: now()};
+  const t0 = now(), q = intention(text);
+  if (q && !(q.kind === 'meteo' && !q.court)) {
+    let reply = null; try { reply = await instantReply(q, text); } catch { reply = null; }
+    if (reply) {
+      S.msgs.push({who: 'me', text, at: t0}, {who: 'jarvis', text: reply, at: now(), agent: 'claude'}); S.usage.instant = (S.usage.instant || 0) + 1; save();
+      return send('done', {reply, missions: [], agent: 'claude', instant: q.kind, timing: {total: now() - t0, first: now() - t0, instant: true}});
+    }
+  }
+  let extra = '';
+  if (q && q.kind === 'meteo' && S.pos) { try { const tt = paris(new Date(now())); extra = 'Météo à sa position (Open-Meteo, à l\'instant) : ' + (meteoPhrase(await meteoData(S.pos.lat, S.pos.lon), quand(text, new Date(Date.UTC(tt.y, tt.m - 1, tt.d)).getUTCDay()), tt, text) || 'indisponible'); } catch { /* sans météo */ } }
+  const profond = /\b(reflechis|reflechir|en detail|approfondi|analyse)\b/.test(nrm(text));
+  return chat({text, newSession: !!b.newSession, model: profond ? 'equilibre' : 'rapide', extra, gone, owner}, send);
+}
+
 function startTache() {
   if (!GG.status('').linked) { const e = new GG.ToolError('server_not_connected', 'Google n’est pas relié au serveur JARVIS (Réglages) : la tâche Claude ne peut pas lire le Canal.'); throw e; }
   if (TACHE.running) { TACHE.again = true; return {started: true, queued: true, message: 'La tâche Claude tourne déjà : elle repassera sur le Canal juste après.'}; }
@@ -940,7 +1034,7 @@ const server = http.createServer(async (req, res) => {
         }
         catch (e) { return json(res, e.code === 'server_not_connected' ? 409 : e.code === 'not_in_manifest' ? 404 : 502, {error: {code: e.code || 'tool_error', message: e.message, status: e.status || 0}}); }
       }
-      if (p === '/api/status') { const cs = await claudeStatus(); if (cs.loggedIn && (!MCP.at || now() - MCP.at > 600000)) await mcpList(); return json(res, 200, {version: VERSION, commit, claude: cs, connectors: connSummary(), google: (({configured, linked, account}) => ({configured, linked, account}))(GG.status('')), grokPauseUntil: await grokPauseMs().then((v) => (v ? new Date(v).toISOString() : '')).catch(() => S.config.grokPauseUntil), usage: S.usage, tache: {running: TACHE.running, last: TACHE.last}, push: {count: S.push.subs.length, last: S.push.last || null, prefs: S.push.prefs}, session: !!S.session, timing: S.lastTiming || null, tts: ttsReady(), voiceInstall: VOICE_INSTALL.state}); }
+      if (p === '/api/status') { const cs = await claudeStatus(); if (cs.loggedIn && (!MCP.at || now() - MCP.at > 600000)) await mcpList(); return json(res, 200, {version: VERSION, commit, claude: cs, connectors: connSummary(), google: (({configured, linked, account}) => ({configured, linked, account}))(GG.status('')), grokPauseUntil: await grokPauseMs().then((v) => (v ? new Date(v).toISOString() : '')).catch(() => S.config.grokPauseUntil), usage: S.usage, tache: {running: TACHE.running, last: TACHE.last}, push: {count: S.push.subs.length, last: S.push.last || null, prefs: S.push.prefs}, session: !!S.session, timing: S.lastTiming || null, tts: ttsReady(), voiceInstall: VOICE_INSTALL.state, ecoute: ECOUTE.ready(), ecouteInstall: ECOUTE_INSTALL.state}); }
       if (p === '/api/update' && req.method === 'POST') return json(res, 200, await update());
       /* notifications : clé publique, abonnement de cet appareil, essai, préférences, vérification immédiate */
       if (p === '/api/push') return json(res, 200, PUSH.status());
@@ -985,6 +1079,25 @@ const server = http.createServer(async (req, res) => {
       if (p === '/api/sante/maintenant' && req.method === 'POST') { await SANTE.tick(); return json(res, 200, SANTE.status()); }
       if (p === '/api/snap') { refreshStale(); return json(res, 200, {modules: snapView()}); }
       if (p === '/api/snap/refresh' && req.method === 'POST') { const b = await readBody(req); for (const n of (Array.isArray(b.modules) ? b.modules : Object.keys(MODULES))) refreshModule(n); return json(res, 200, {modules: snapView()}); }
+      /* 0.22.0 : la voix refaite — une phrase dite (SSE), l'écoute Whisper, son installation */
+      if (p === '/api/voix' && req.method === 'POST') {
+        const b = await readBody(req), owner = crypto.randomUUID();
+        res.writeHead(200, {'content-type': 'text/event-stream', 'cache-control': 'no-store', 'x-accel-buffering': 'no'});
+        let cut = false; res.on('close', () => { if (!res.writableEnded) { cut = true; coupeSession(owner); } });
+        const send = (ev, d) => { if (!res.writableEnded && !cut) res.write('event: ' + ev + '\ndata: ' + JSON.stringify(d) + '\n\n'); };
+        let last = '';
+        await voix(b, (ev, d) => { if (ev === 'delta') { if (d.text === last) return; last = d.text; } send(ev, d); }, () => cut, owner);
+        if (!res.writableEnded) res.end(); return;
+      }
+      if (p === '/api/stt' && req.method === 'POST') {
+        if (!ECOUTE.ready()) return json(res, 503, {error: 'ecoute_absente', message: "L'écoute Whisper n'est pas installée sur le serveur (Réglages)."});
+        const raw = await readRaw(req, 3e6); if (!wavOk(raw)) return json(res, 400, {error: 'Son illisible.'});
+        const r = await ECOUTE.transcribe(raw, path.join(DATA, 'stt'));
+        S.usage.stt = (S.usage.stt || 0) + 1;
+        return json(res, r.ok ? 200 : 502, r.ok ? {text: r.text, ms: r.ms} : {error: r.error});
+      }
+      if (p === '/api/ecoute/install' && req.method === 'POST') return json(res, 200, installEcoute());
+      if (p === '/api/ecoute/install') return json(res, 200, {...ECOUTE_INSTALL, ready: ECOUTE.ready()});
       if (p === '/api/voice/install' && req.method === 'POST') return json(res, 200, installVoice());
       if (p === '/api/voice/install') return json(res, 200, VOICE_INSTALL);
       if (p === '/api/tts' && req.method === 'POST') {
@@ -1058,5 +1171,6 @@ setTimeout(() => { mcpList().then(() => console.log('Connecteurs Google : ' + (r
   if (stuck.length) save(); }
 server.listen(PORT, HOST, () => {
   console.log('JARVIS OS serveur ' + VERSION + ' sur http://' + HOST + ':' + PORT);
+  ECOUTE.warm();   /* 0.22.0 : Whisper chargé une fois, pas à la première phrase */
   if (!S.tokens.length && !fs.existsSync(PAIR)) console.log('Aucun appareil relié. Code d\'appairage : ' + newPairing() + ' (30 minutes)');
 });

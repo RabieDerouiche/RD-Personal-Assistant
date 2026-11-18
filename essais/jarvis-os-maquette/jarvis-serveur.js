@@ -101,6 +101,9 @@
     status: () => req('/api/status').then((r) => (r.status === 200 ? r.j : null)).catch(() => null),
     update: () => req('/api/update', {}).then((r) => r.j).catch(() => ({ok: false, message: 'Serveur injoignable.'})),
     voiceInstall: () => req('/api/voice/install', {}).then((r) => r.j).catch(() => null),
+    /* 0.22.0 : l'écoute Whisper du serveur (bouton de Réglages) et son état */
+    ecouteInstall: () => req('/api/ecoute/install', {}).then((r) => r.j).catch(() => null),
+    ecouteEtat: () => req('/api/ecoute/install').then((r) => (r.status === 200 ? r.j : null)).catch(() => null),
     /* Raccourcis de l'iPhone (0.13.0) : clé à part pour « Dis Siri, Jarvis » et le bouton Action */
     raccourci: {
       etat: () => req('/api/raccourci/etat').then((r) => (r.status === 200 ? r.j : null)).catch(() => null),

@@ -48,7 +48,7 @@ const voice = new Voice({
   mode: () => store.settings.listenMode, voiceURI: () => store.settings.voiceURI, rate: () => store.settings.rate,
   tts: () => (srv.serverVoice() ? srv.ttsUrl : null),
   onState: (s, why) => {
-    const map: Record<VoiceState, OrbState> = {off: 'idle', listening: 'listening', waiting: 'thinking', speaking: 'speaking', error: 'error'};
+    const map: Record<VoiceState, OrbState> = {off: 'idle', listening: 'listening', hearing: 'listening', transcribing: 'thinking', paused: 'idle', waiting: 'thinking', speaking: 'speaking', error: 'error'};
     setOrb(map[s]);
     if (s === 'error' && why) { note = 'Micro : ' + why + '. Écris ta demande.'; store.stats.errors++; store.save(); }
     if (s === 'listening') note = '';
