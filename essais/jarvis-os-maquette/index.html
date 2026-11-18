@@ -4608,6 +4608,10 @@ void main(){
   const sorEffect = (s, st) => ({title: SOR_DONE[st][0], effect: '« ' + s.title + " » passe à « " + SOR_TXT[st] + " » dans l'onglet Sorties." + (st === 'supprimee' ? ' Ulysse ne la repropose pas, ni rien de semblable.' : ''),
     bot: 'mermaid', say: SOR_DONE[st][1], sorStatus: SOR_TXT[st], mutate: () => { s.status = st; }, work: false});
   const sorSet = (s, st) => finish(sorEffect(s, st), {type: 'sortie', item: s});
+  /* 19/11/2026 : le trajet en une ligne sur la carte (« Voiture 20 min (11,3 km) · transports 52 min ») ; le détail reste dans la fiche */
+  const trajetShort = (t) => { t = String(t || '').trim(); if (!t) return ''; const v = t.match(/voiture\s*:\s*([\d,.]+)\s*km,\s*(\d+)\s*min/i), tc = t.match(/(\d+)\s*min tout compris/i);
+    if (v || tc) return [v ? 'Voiture ' + v[2] + ' min (' + v[1] + ' km)' : '', tc ? 'transports ' + tc[1] + ' min' : ''].filter(Boolean).join(' · ');
+    const x = t.split(/\s*\(/)[0]; return x.length > 70 ? x.slice(0, 67) + '…' : x; };
   const sorMissing = (s) => [s.price == null ? 'prix total TTC' : null, !s.trajet ? 'trajet' : null, !s.age ? 'âge conseillé' : null, !s.link ? 'lien vérifié' : null].filter(Boolean);
 
   ACTIONS.sortie = (s) => {
@@ -4623,7 +4627,7 @@ void main(){
   };
   SHEETCFG.sortie = (s) => ({bot: 'mermaid', kicker: 'Sorties · Ulysse', title: s.title,
     say: s.status === 'faite' ? 'Déjà faite. Tu peux la remettre dans ta liste si tu veux y retourner.' : sorExpired(s) ? 'Sa période est passée : retire-la, ou garde-la si elle revient.' : sorMissing(s).length ? 'Il me manque encore : ' + sorMissing(s).join(', ') + '. Je peux compléter.' : 'Tout est prêt : il ne reste qu\'à y aller.',
-    facts: [['Quand', sorWhen(s)], ['Où', s.where], ['Prix total', s.price != null ? eur2(s.price) + ' TTC' : 'à compléter par Ulysse'], ['Trajet', s.trajet], ['Âge conseillé', s.age], ['Remarque', s.note], ['Proposée', (s.on ? 'le ' + s.on + ', ' : '') + 'par ' + BOT[s.bot || 'mermaid'].name]],
+    facts: [['Quand', sorWhen(s)], ['Où', s.where], ['Prix total', s.priceTxt ? s.priceTxt : s.price != null ? (s.price === 0 ? 'Gratuit' : eur2(s.price) + ' TTC') : 'à compléter par Ulysse'], ['Trajet', s.trajet], ['Âge conseillé', s.age], ['Remarque', s.note], ['Proposée', (s.on ? 'le ' + s.on + ', ' : '') + 'par ' + BOT[s.bot || 'mermaid'].name]],
     extra: s.link ? () => h('div', {class: 'links'}, h('a', {class: 'btn sm', href: s.link, target: '_blank', rel: 'noopener'}, h('span', {class: 'ic', html: icon('map', 16)}), 'Ouvrir la page de la sortie')) : null,
     actions: ACTIONS.sortie(s)});
   wrapCfg('sortie');
@@ -4671,12 +4675,12 @@ void main(){
     return h('span', {class: 'sor-date' + (sorInWeekend(s) ? ' is-wk' : '')}, h('small', {text: s.from != null && s.from < 0 ? "jusqu'au" : WD[d.getDay()]}), h('b', {text: String(d.getDate())}), h('small', {text: MO[d.getMonth()]}));
   }
   function sorCard(s) {
-    const exp = sorExpired(s), chips = [s.price != null ? eur(s.price) + ' TTC' : null, s.trajet, s.age].filter(Boolean);
+    const exp = sorExpired(s), chips = [s.price != null ? ['tag', priceShort(s.priceTxt, s.price)] : null, s.trajet ? ['car', trajetShort(s.trajet)] : null, s.age ? ['kid', s.age] : null].filter((x) => x && x[1]);
     const inner = h('button', {type: 'button', class: 'sor-in', 'aria-label': s.title + '. ' + sorWhen(s) + '. Ouvrir la fiche'},
       h('div', {class: 'sor-top'}, sorDate(s),
         h('div', {class: 'sor-id'}, h('b', {text: s.title}), h('small', {text: [s.where, sorWhen(s)].filter(Boolean).join(' · ')})),
         exp ? h('span', {class: 'pill st-exp', text: 'Expirée'}) : s.status === 'faite' ? h('span', {class: 'pill st-achat', text: 'Faite'}) : sorInWeekend(s) ? h('span', {class: 'pill st-wk', text: 'Ce week-end'}) : null),
-      chips.length ? h('div', {class: 'mchips'}, chips.map((c) => h('span', {class: 'mchip sor-chip'}, h('span', {class: 'ic', html: icon(c === s.trajet ? 'car' : c === s.age ? 'kid' : 'tag', 13)}), c))) : h('p', {class: 'sor-miss', text: 'Prix, trajet et lien : Ulysse complète.'}));
+      chips.length ? h('div', {class: 'mchips'}, chips.map(([ic, c]) => h('span', {class: 'mchip sor-chip'}, h('span', {class: 'ic', html: icon(ic, 13)}), c))) : h('p', {class: 'sor-miss', text: 'Prix, trajet et lien : Ulysse complète.'}));
     inner.addEventListener('click', () => { if (card._swiped) return; openItem('sortie', s); });
     const card = h('article', {class: 'sor' + (exp ? ' is-exp' : ''), style: botVars('mermaid')},
       s.status === 'proposee' ? h('div', {class: 'sor-bg', 'aria-hidden': 'true'}, h('span', {class: 'sor-l', html: icon('check', 18) + '<b>Faite</b>'}), h('span', {class: 'sor-r', html: '<b>' + (exp ? 'Retirer' : 'Supprimer') + '</b>' + icon('x', 18)})) : null, inner);
@@ -4796,6 +4800,18 @@ void main(){
   const lvFr = (iso) => iso.split('-').reverse().join('/');
   const lvToday = () => lvFr(isoOf(new Date()));
   const lvNum = (s) => { const v = parseFloat(String(s || '').replace(/[^\d,.-]/g, '').replace(/\s/g, '').replace(',', '.')); return isFinite(v) ? v : null; };
+  /* 19/11/2026 (capture du propriétaire : « 186 320 € TTC » pour une sortie à 18 €) : une colonne de prix écrite en phrase
+     (« 18 € TTC au guichet (6 € × 3) ou 19,50 € en ligne ») ; lvNum collait tous ses chiffres. On prend le premier montant en euros ;
+     « gratuit », « accès libre » = 0 ; un nombre seul reste un nombre. */
+  const lvPrice = (s) => {
+    const t = String(s == null ? '' : s).trim(); if (!t) return null;
+    const m = t.match(/(\d{1,3}(?:[\s\u202f\u00a0]\d{3})+|\d+)(?:[.,](\d{1,2}))?\s*(?:€|euros?\b|EUR\b)/i);
+    if (m) return parseFloat(m[1].replace(/[\s\u202f\u00a0]/g, '') + (m[2] ? '.' + m[2] : ''));
+    if (/gratuit|accès libre|entrée libre/i.test(t)) return 0;
+    return /^[\d\s\u202f\u00a0.,]+$/.test(t) ? lvNum(t) : null;
+  };
+  /* le prix dit comme dans la colonne, en court : « 18 € TTC au guichet » (avant la parenthèse ou le point-virgule) */
+  const priceShort = (t, v) => { if (v === 0) return 'Gratuit'; const x = String(t || '').split(/\s*[(;]/)[0].replace(/\s+/g, ' ').trim(); return x && x.length <= 48 && /€|euro/i.test(x) ? x : v != null ? eur(v) + ' TTC' : ''; };
   const lvBot = (name) => { const w = lvLow(name).split(/[\s,(]/)[0]; if (!w) return 'hydra'; if (w === 'rabie' || w === 'toi') return 'toi'; const id = idOf(w); return BOT[id] ? id : 'hydra'; };
   const lvName = (id) => id === 'claude' ? 'Claude' : BOT[id] && id !== 'toi' ? BOT[id].name : 'Iris';
   const NAT_LABEL = Object.fromEntries(Object.entries(NAT).map(([k, v]) => [v, k]));
@@ -4961,10 +4977,10 @@ void main(){
       S.voyages = voy.filter((r) => r['Projet'] && !/^(abandon|pass)/.test(lvLow(r['Statut']))).map((r) => {
         const st = lvLow(r['Statut']), dates = r['Dates'] || '', bot = lvBot(r['Bot'] || 'Ulysse');
         const v = {id: 'v:' + r._row, _row: r._row, title: r['Projet'], dest: '', step: STEP[st] != null ? STEP[st] : 1, paused: /^en pause/.test(st), bot: bot === 'toi' ? 'mermaid' : bot,
-          who: r['Qui part'] || '', when: dates || 'à fixer', budget: lvNum(r['Budget maximum TTC (€)']), recap: r['Récap (lien Drive)'] || '',
+          who: r['Qui part'] || '', when: dates || 'à fixer', budget: lvPrice(r['Budget maximum TTC (€)']), recap: r['Récap (lien Drive)'] || '',
           legs: (r['Trajets'] || '').split(';').map((x) => x.trim()).filter(Boolean).map((x) => { const m = x.match(/^(.+?)\s*:\s*(.+?)(?:\s*\((.+)\))?$/); return m ? [m[1], m[2], m[3] || ''] : ['', x, '']; }),
           checks: (r['Ce qui attend'] || '').split(/;|\.\s+(?=[A-ZÀ-Ü])/).map((x) => x.trim().replace(/\.$/, '')).filter(Boolean).map((t) => t.charAt(0).toUpperCase() + t.slice(1)).map((t) => ({t, who: /\brabie\b/i.test(t) || /rabie/i.test(r['En attente de'] || '') && /^rabie/i.test(t) ? 'toi' : bot, done: false})),
-          options: opt.filter((o) => o["Projet (nom exact de l'onglet Voyages)"] === r['Projet']).map((o) => ({id: 'o:' + o._row, _row: o._row, type: o['Type'] || 'Autre', label: o['Option (détail exact : compagnie, horaires, bagages ; hôtel, note, chambre)'] || '', price: lvNum(o['Prix total TTC (€)']), when: o['Relevé le'] || '', src: o['Source (lien)'] || '',
+          options: opt.filter((o) => o["Projet (nom exact de l'onglet Voyages)"] === r['Projet']).map((o) => ({id: 'o:' + o._row, _row: o._row, type: o['Type'] || 'Autre', label: o['Option (détail exact : compagnie, horaires, bagages ; hôtel, note, chambre)'] || '', price: lvPrice(o['Prix total TTC (€)']), when: o['Relevé le'] || '', src: o['Source (lien)'] || '',
             state: /^choisi|^réserv/.test(lvLow(o['Statut'])) ? 'choisie' : /^écart/.test(lvLow(o['Statut'])) ? 'ecartee' : 'proposee', why: o['Raison ou remarque'] || '', pros: o['Raison ou remarque'] || ''})),
           src: 'Onglet Voyages de Pilotage'};
         v.checks.forEach((c) => { if (/^rabie\b/i.test(c.t)) c.who = 'toi'; });
@@ -4983,7 +4999,7 @@ void main(){
       const ST = {'proposée': 'proposee', 'faite': 'faite', 'supprimée': 'supprimee', 'retirée': 'retiree'};
       S.sorties = sor.filter((r) => r['Sortie']).map((r) => {
         const a = lvFrIso(r['Début']), b = lvFrIso(r['Fin']), bt = lvBot(r['Bot'] || 'Ulysse');
-        return {id: 's:' + r._row, _row: r._row, title: r['Sortie'], where: r['Où'] || '', from: a ? N(a) : null, to: b ? N(b) : a ? N(a) : null, price: lvNum(get(r, 'Prix total')),
+        return {id: 's:' + r._row, _row: r._row, title: r['Sortie'], where: r['Où'] || '', from: a ? N(a) : null, to: b ? N(b) : a ? N(a) : null, price: lvPrice(get(r, 'Prix total')), priceTxt: String(get(r, 'Prix total') || '').trim(),
           trajet: get(r, 'Trajet'), age: get(r, 'Âge'), link: (String(get(r, 'Lien')).match(/https?:\/\/\S+/) || [])[0] || '', status: ST[lvLow(r['Statut'])] || 'proposee',
           on: r['Proposée le'] || '', bot: BOT[bt] && bt !== 'toi' ? bt : 'mermaid', note: r['Remarque'] || ''};
       });
