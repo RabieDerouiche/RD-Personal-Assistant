@@ -325,6 +325,18 @@ srv.listen(0, async () => {
       p = await page('#agenda');
       const di = await p.evaluate(() => { const x = document.querySelector('input.inp[type="date"]'); if (!x) return null; const c = getComputedStyle(x); return c.minWidth + ' ' + c.appearance; });
       ok('Agenda : le champ date ne peut plus sortir de sa carte sur iPhone (largeur min. 0, sans apparence native)', di === '0px none', String(di)); }
+    /* 18/11/2026 : une échéance « Un bot s'en occupe » que le bot a faite (son Journal) sans passer sa ligne à « Fait » s'affiche faite */
+    { p = await page('#agenda');
+      await p.evaluate(() => { const G = window.__G, d = new Date(), p2 = (n) => String(n).padStart(2, '0'), dd = p2(d.getDate()) + '/' + p2(d.getMonth() + 1), fr = dd + '/' + d.getFullYear();
+        G['Échéances'].push([fr, 'Timesheet Démo de la semaine du ' + dd, 'Travail', '', 'À venir', 'Chronos', '', "Un bot s'en occupe"], [fr, 'CRA Autre client du mois', 'Travail', '', 'À venir', 'Chronos', '', "Un bot s'en occupe"]);
+        G['Journal'].push([fr + ' ' + p2(Math.max(0, d.getHours() - 1)) + 'h05', 'Chronos', 'ETAT', 'CRA Démo semaine du ' + dd, 'Soumis, en attente de validation.']);
+        location.hash = '#voir-recent'; });
+      await p.waitForTimeout(2500); await p.evaluate(() => { location.hash = '#agenda'; }); await p.waitForTimeout(1500);
+      const rows = await p.evaluate(() => [...document.querySelectorAll('#view .dl-row, #view .agt-row')].map((x) => x.innerText.replace(/\s+/g, ' ')));
+      const done = rows.some((t) => /Timesheet Démo .* · fait ✓/.test(t)), other = rows.some((t) => /CRA Autre client du mois/.test(t) && !/fait ✓/.test(t));
+      await p.evaluate(() => { const x = [...document.querySelectorAll('#view .dl-row, #view .agt-row')].find((y) => /Timesheet Démo/.test(y.innerText)); if (x) x.click(); }); await p.waitForTimeout(1500);
+      const sh = await p.evaluate(() => { const s = document.getElementById('sheet'); return s && !s.hidden ? s.innerText : ''; });
+      ok('Agenda : une échéance qu\'un bot a faite (son Journal) s\'affiche « fait ✓ », sa feuille dit « Fait par Chronos » et propose « Oui, c\'est fait » (gratuit) ; une autre du même bot reste à venir', done && other && /Fait par Chronos/i.test(sh) && /Oui, c'est fait/.test(sh) && !/Fais-le maintenant/.test(sh), [done, other, sh.replace(/\s+/g, ' ').slice(0, 120)].join(' | ')); }
     /* aucune rubrique n'affiche de texte cassé */
     const broken = [];
     for (const t of ['accueil', 'demandes', 'agenda', 'suivi', 'achats', 'voyages', 'sorties', 'papiers', 'equipe', 'automatisations', 'reglages']) {
