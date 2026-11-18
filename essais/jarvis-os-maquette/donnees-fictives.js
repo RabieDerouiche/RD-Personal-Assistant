@@ -21,7 +21,8 @@
     [fr(D(-2)), 'Argus', 'Installation', 'Ton oui dans le chat de Argus : appliquer les 3 routines. Phrase : Oui, applique les routines.'],
     [fr(D(-2)), 'Argus', 'Skill registre', 'Ton oui dans le chat de Argus : mettre le skill à jour. Phrase : Oui, mets le skill à jour.'],
     [fr(D(-1)), 'Ulysse', 'Routines d\'Ulysse', 'Ton oui dans le chat de Ulysse : ma description dit « une seule routine ». Phrase : Oui, crée ta routine Sonnette Ulysse sur l\'alias ulysse.'],
-    [fr(D(-3)), 'Ulysse', 'Dates du voyage', 'Quelles dates préfères-tu pour le voyage ?']
+    [fr(D(-3)), 'Ulysse', 'Dates du voyage', 'Quelles dates préfères-tu pour le voyage ?'],
+    [fr(D(-1)), 'Iris', 'Date du bail', "À faire : Retrouve la date de début du bail pour l'assureur | Pourquoi : il la demande pour le contrat habitation | Conseil : retrouver cette date sur l'un de ces deux documents | Temps : 5 min"]
   ];
   G['Échéances'] = [
     ['Date', 'Sujet', 'Domaine', 'Rappels', 'Statut', 'Bot', 'Remarque', 'Nature'],
@@ -168,9 +169,10 @@
   G['Sorties'] = [
     ['Sortie', 'Où', 'Début', 'Fin', 'Prix total TTC (2 adultes et Léa)', 'Trajet', 'Âge conseillé', 'Lien', 'Statut', 'Proposée le', 'Bot', 'Remarque'],
     ["Boucle d'or (spectacle)", 'La Clef', fr(D(wk[0])), fr(D(wk[1])), '', '', '', '', 'Proposée', fr(D(-2)), 'Ulysse', 'À compléter'],
-    ['Ferme pédagogique', 'Gally', fr(D(wk[0])), fr(D(wk[1])), '24', '25 min en voiture', 'dès 2 ans', 'https://example.org/ferme', 'Proposée', fr(D(-2)), 'Ulysse', ''],
+    ['Ferme pédagogique', 'Gally', fr(D(wk[0])), fr(D(wk[1])), '24', '25 min en voiture par la nationale, parking gratuit devant l’entrée', 'dès 2 ans, poussette possible sur tout le parcours', 'https://example.org/ferme', 'Proposée', fr(D(-2)), 'Ulysse', ''],
     ['Marché de Noël', 'La Défense', fr(D(12)), fr(D(40)), '0', '30 min', 'tous', '', 'Proposée', fr(D(-2)), 'Ulysse', ''],
     ['Exposition finie', 'Paris', fr(D(-20)), fr(D(-3)), '12', '', '', '', 'Proposée', fr(D(-25)), 'Ulysse', ''],
+    ['Atelier citrouilles', 'Versailles', fr(D(-10)), fr(D(-10)), '18', '35 min', 'dès 4 ans', '', 'Proposée', fr(D(-15)), 'Ulysse', ''],
     ['Aquarium', 'Paris', '', '', '45', '40 min', 'dès 1 an', '', 'Faite', fr(D(-30)), 'Ulysse', ''],
     ['Idée refusée', 'x', '', '', '', '', '', '', 'Supprimée', '', 'Ulysse', '']
   ];

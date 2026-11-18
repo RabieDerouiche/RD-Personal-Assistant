@@ -37,7 +37,7 @@ export function startFakeGoogle() {
       if (p === '/gmail/users/me/profile') return send(res, 200, {emailAddress: 'proprietaire@example.org'});
       if ((m = p.match(/^\/sheets\/v4\/spreadsheets\/([^/]+)\/values\/(.+?)(:append)?$/))) {
         if (req.method === 'GET') return send(res, 200, {range: m[2], majorDimension: 'ROWS', values: F.sheet[m[2]] || []});
-        if (m[3]) return send(res, 200, {updates: {updatedRange: m[2], updatedRows: (body.values || []).length}});
+        if (m[3]) { F.appends = F.appends || []; F.appends.push({range: m[2], values: body.values || []}); const row = 100 + F.appends.length; return send(res, 200, {updates: {updatedRange: m[2].split('!')[0] + '!A' + row + ':H' + row, updatedRows: (body.values || []).length}}); }
         return send(res, 200, {updatedRange: m[2], updatedCells: 1});
       }
       if ((m = p.match(/^\/calendar\/calendars\/([^/]+)\/events(?:\/([^/]+))?$/))) {
