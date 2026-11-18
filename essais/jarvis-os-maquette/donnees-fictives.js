@@ -26,6 +26,7 @@
     /* 18/11/2026 : brouillon lié à son dossier (une seule carte), demande dépassée, offre terminée dans le texte, décision liée à une fermeture de crèche */
     [fr(D(0)), 'Iris', 'Résiliation StreamPlus', 'Envoyer la relance préparée dans tes brouillons Gmail (fil StreamPlus)'],
     [fr(D(-6)), 'Iris', 'Offre de bienvenue', "À faire : Activer l'offre de bienvenue | Avant le : " + fr(D(-2))],
+    [fr(D(-5)), 'Iris', 'Formulaire de la mutuelle', 'À faire : Renvoyer le formulaire signé | Avant le : ' + fr(D(-1))],
     [fr(D(-1)), 'Iris', "Rachat de l'abonnement", "À faire : Offre Alpha terminée le " + fr(D(-3)) + " (simulation non connue). Simuler chez Beta (offre jusqu'au " + fr(D(12)) + ')'],
     [fr(D(0)), 'Iris', 'Garde pendant la fermeture de la crèche le ' + fr(D(60)), "Choix : Qui garde l'enfant ? | Options : Toi / Ton épouse / Partage | Avant le : " + fr(D(45))]
   ];
