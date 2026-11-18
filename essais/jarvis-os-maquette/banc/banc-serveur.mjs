@@ -169,7 +169,7 @@ try {
   /* 0.19.0 (18/11/2026) : « Revérifie dans mes papiers » depuis la feuille d'une demande : le serveur cherche dans Papiers, Claude juge, une ligne pour Iris dans le Canal */
   { const today = new Date().toLocaleDateString('fr-FR', {timeZone: 'Europe/Paris'});
     FG.sheet["'À toi'!A3:D300"] = [['Depuis le', 'Bot', 'Sujet', "Ce qu'on attend de toi"], [today, 'Iris', 'Date du bail', "À faire : Retrouve la date de début du bail pour l'assureur | Conseil : retrouver cette date sur l'un de ces deux documents"]];
-    await p.goto(BASE + '/?serveur#demandes'); await p.waitForTimeout(4500);
+    await p.goto(BASE + '/?serveur#demandes'); await p.reload(); await p.waitForTimeout(4500);   /* même page, seul le # change : recharger pour relire Pilotage */
     const found = await p.evaluate(() => { const c = [...document.querySelectorAll('article')].find((x) => /Date du bail/.test(x.textContent) && /Plus…/.test(x.textContent)); if (!c) return false; [...c.querySelectorAll('button')].find((x) => x.textContent.trim() === 'Plus…').click(); return true; }); await p.waitForTimeout(900);
     if (!found) console.error('DIAG', JSON.stringify(await p.evaluate(() => ({h: location.href, title: (document.getElementById('view-title') || {}).textContent, arts: [...document.querySelectorAll('article')].map((x) => x.textContent.slice(0, 70)).slice(0, 14)}))), JSON.stringify(FG.calls.filter((c) => /toi/.test(c.path)).slice(-3).map((c) => [c.path, c.auth ? 'jeton' : 'sans', c.method])));
     const vis = await p.evaluate(() => [...document.querySelectorAll('#sheet .sheet-actions > div:not(.sa-more) .btn')].map((x) => x.firstChild.textContent.trim()));
