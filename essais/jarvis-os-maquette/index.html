@@ -1318,6 +1318,41 @@
   .sa-more[open] > summary::after { transform: rotate(90deg); }
   .sa-more > .sa-grid { padding: 0 0 8px; }
   .sa-main .btn .verif-tag, .sa-grid .btn .verif-tag { flex: 0 0 auto; }
+  /* JARVIS OS (18/11/2026) : « Pour moi » refait, cartes illustrées */
+  .pm-sum { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 6px; }
+  .pm-chip { font: inherit; color: var(--fg); background: var(--glass-2); border: 1px solid var(--line); border-radius: 999px; padding: 7px 14px; font-size: 14px; }
+  .pm-chip b { font-family: var(--display); color: var(--accent); }
+  .pm-sec > summary { list-style: none; cursor: pointer; display: flex; align-items: baseline; gap: 10px; padding: 4px 0 8px; }
+  .pm-sec > summary::-webkit-details-marker { display: none; } .pm-sec > summary h2 { margin: 0; } .pm-sec > summary .aside { margin-left: auto; }
+  .pm-list { display: grid; gap: 12px; }
+  .pm-card { cursor: pointer; display: grid; gap: 8px; padding: 14px; }
+  .pm-card.is-exp { border-color: rgba(248, 113, 113, .35); }
+  .pm-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12.5px; color: var(--muted); }
+  .pm-ic { display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 9px; background: var(--glass-2); color: var(--accent); border: 1px solid var(--line); }
+  .pm-kind { color: var(--accent); font-weight: 600; text-transform: uppercase; letter-spacing: .06em; font-size: 11.5px; }
+  .pm-head .pill { margin-left: auto; }
+  .pm-title { margin: 0; font-size: 17px; line-height: 1.3; }
+  .pm-ask { margin: 0; font-size: 14.5px; line-height: 1.45; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .pm-why { margin: 0; font-size: 13px; color: var(--muted); display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
+  .pm-why b { color: var(--fg); font-weight: 600; }
+  .pm-viz { display: grid; gap: 10px; }
+  .pm-expired { margin: 0; font-size: 13px; color: #fca5a5; } .pm-expired s { color: var(--muted); }
+  .pm-row { display: flex; gap: 8px; align-items: center; justify-content: flex-end; } .pm-row .btn.main { flex: 1 1 auto; justify-content: space-between; } .pm-row .btn.ghost { flex: 0 0 auto; }
+  .pm-mail, .pm-found { display: flex; gap: 10px; align-items: flex-start; border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; background: var(--glass-2); }
+  .pm-mail .ic, .pm-found .ic { color: var(--accent); margin-top: 2px; } .pm-mail > div, .pm-found > div { display: grid; gap: 3px; min-width: 0; }
+  .pm-mail b, .pm-mail span, .pm-mail small, .pm-found p { overflow-wrap: anywhere; } .pm-mail small { color: var(--muted); } .pm-found p { margin: 0; font-size: 13.5px; } .pm-found .btn { justify-self: start; margin-top: 4px; }
+  .pm-yn, .pm-opts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; } .pm-opts { grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); }
+  .pm-tile { font: inherit; color: var(--fg); text-align: left; display: grid; gap: 4px; align-content: start; border-radius: 14px; padding: 10px 12px; border: 1px solid var(--line); background: var(--glass-2); font-size: 13px; line-height: 1.35; min-height: 64px; }
+  .pm-tile b { font-size: 14px; } .pm-tile.is-yes { border-color: rgba(52, 211, 153, .45); } .pm-tile.is-yes b { color: #6ee7b7; } .pm-tile.is-no { border-color: rgba(251, 191, 36, .45); } .pm-tile.is-no b { color: #fde68a; }
+  .pm-opts .pm-tile b { font-family: var(--display); color: var(--accent); font-size: 16px; }
+  .pm-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; counter-reset: none; }
+  .pm-steps li { display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: 8px; align-items: start; font-size: 13.5px; line-height: 1.4; }
+  .pm-steps li i { font-style: normal; display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; border: 1px solid var(--accent); color: var(--accent); font-size: 12px; font-weight: 600; }
+  .pm-tl { list-style: none; margin: 0; padding: 2px 0 0 14px; display: grid; gap: 8px; border-left: 2px solid var(--line); margin-left: 6px; }
+  .pm-tl li { position: relative; display: grid; grid-template-columns: 74px minmax(0, 1fr); gap: 8px; font-size: 13px; line-height: 1.35; }
+  .pm-tl li i { position: absolute; left: -21px; top: 3px; width: 10px; height: 10px; border-radius: 50%; background: var(--line); border: 2px solid var(--bg, #02040e); }
+  .pm-tl li.is-now i { background: var(--accent); box-shadow: 0 0 8px var(--accent); } .pm-tl li.is-due i { background: #fbbf24; } .pm-tl li.is-end i { background: #f87171; }
+  .pm-tl li b { font-weight: 600; } .pm-tl li span { color: var(--muted); overflow-wrap: anywhere; } .pm-tl li.is-now b { color: var(--accent); }
   /* JARVIS OS (18/11/2026) : le détail d'une feuille, replié */
   .sheet-det { border: 1px solid var(--line); border-radius: 16px; padding: 0 12px; margin-top: 12px; }
   .sheet-det > summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; color: var(--accent); font-size: 14px; }
@@ -4808,7 +4843,9 @@ void main(){
         const ln = canal.slice().reverse().find((x) => x['Type'] === sub && (lvLow(x['Pour']) === 'rabie' || lvLow(x['Statut']) === 'attend ton oui'));
         const reply = ln ? ln['Réponse'] || '' : '';
         if (oui && !f.phrase) { const m = raw.match(/phrase\s*:\s*([^|]+)/i) || reply.match(/phrase\s*:\s*([^|]+)/i); if (m) f.phrase = m[1].trim().replace(/^[«"\s]+|[»"\s.]+$/g, ''); }
-        const body = oui ? raw.replace(/^Ton oui dans le chat de [^:]+:\s*/i, '').replace(/\s*phrase\s*:.*$/i, '') : P1.body;
+        let body = oui ? raw.replace(/^Ton oui dans le chat de [^:]+:\s*/i, '').replace(/\s*phrase\s*:.*$/i, '') : P1.body;
+        /* JARVIS OS (18/11/2026) : « À toi » n'affiche que « Ton oui dans le chat de … : » quand le bot n'a pas mis la phrase ; la demande est dans sa ligne du Canal */
+        if (oui && !String(body).trim() && ln && ln['Message']) { const P3 = lvParse(ln['Message']); body = P3.body; Object.keys(P3.f).forEach((k) => { if (!f[k]) f[k] = P3.f[k]; }); }
         const why = f.pourquoi || (k ? P2.body : '') || '';
         const d = {id: 'a:' + sub, live: true, bot: lvBot(r['Bot']), kind: oui ? 'oui' : P1.kind || P2.kind || lvGuessKind(body + ' ' + why), title: sub, ask: body, f, since: lvFrIso(r['Depuis le']) ? N(lvFrIso(r['Depuis le'])) : 0,
           due: f.avant && lvFrIso(f.avant) ? N(lvFrIso(f.avant)) : k && lvFrIso(k['Échéance']) ? N(lvFrIso(k['Échéance'])) : null, why, where: oui ? 'Le chat de ' + (r['Bot'] || 'Iris') + ' dans Grok Bot.' : (f.ou || ''), ifnot: f.si_non || '',
@@ -5326,7 +5363,7 @@ void main(){
   const AD0 = ACTIONS.demande;
   ACTIONS.demande = (d) => {
     if (!d.live) return AD0(d);
-    const who = BOT[d.bot] ? BOT[d.bot].name : 'Iris', q = '« ' + d.title + ' »';
+    const who = BOT[d.bot] ? BOT[d.bot].name : 'Iris', q = '« ' + d.title + ' »', f = d.f || {};
     const rep = (label, txt, tone, more) => act(label, Object.assign({tone, go: () => ({title: 'Réponse à ' + who, effect: 'Une ligne « Réponse » pour ' + who + ' dans le Canal : « ' + txt + ' », puis la sonnette.', bot: d.bot, order: txt, canalType: 'Réponse', say: 'Merci, je m\'en occupe.', mutate: () => drop('demandes', d.id)})}, more || {}));
     const repText = (label, prefix, tone) => act(label, {tone, pick: {kind: 'text', label: label, placeholder: 'Écris, ou dicte avec le micro du clavier'}, go: (v) => ({title: 'Réponse à ' + who, effect: 'Une ligne « Réponse » pour ' + who + ' dans le Canal, puis la sonnette.', bot: d.bot, order: prefix + v.txt, canalType: 'Réponse', say: 'Merci, je m\'en occupe.', mutate: () => drop('demandes', d.id)})});
     /* JARVIS OS (18/11/2026, retour du propriétaire : « Plus tard » réveillait le bot pour rien) : la carte est mise de côté par JARVIS, gratuitement, et revient à la date choisie */
@@ -5342,13 +5379,13 @@ void main(){
     const plutot = repText('Non, plutôt…', 'Non pour ' + q + ' tel quel. Refais-le en tenant compte de ceci, puis redemande-moi mon oui : ', 'main2');
     let top, rest;
     switch (d.kind) {
-      case 'oui': top = isRoutineDem(d) ? [rep('Oui depuis JARVIS', yesFromJarvis([d]), 'main'), act('Oui dans son chat', {go: () => { setTimeout(() => lvGiveYes(d), 280); return null; }}), plutot]
+      case 'oui': top = yesOk(d) ? [rep('Oui depuis JARVIS', yesFromJarvis([d]), 'main'), act('Oui dans son chat', {go: () => { setTimeout(() => lvGiveYes(d), 280); return null; }}), plutot]
         : [act('Donner mon oui à ' + who, {tone: 'main', go: () => { setTimeout(() => lvGiveYes(d), 280); return null; }}), plutot];
         rest = [rep("Non, n'applique pas", 'Non pour ' + q + ' : ne l\'applique pas, ferme la ligne.')]; break;
       case 'ouinon': top = [rep('Oui, vas-y', 'Oui, vas-y pour ' + q + ' : ' + d.ask, 'main'), no, later]; rest = [noWhy]; break;
       case 'choix': top = d.options.map((o, i) => rep(o, 'Choix pour ' + q + ' : ' + o + '.', i === 0 ? 'main' : 'main2')).concat([later]); rest = [repText('Autre chose…', 'Choix pour ' + q + ' : '), rep('Aucune, merci', 'Aucun choix pour ' + q + ' : ferme la demande.')]; break;
-      case 'question': top = [repText('Répondre à ' + who, 'Réponse à ' + q + ' : ', 'main')].concat(vTop, [later]);
-        rest = [ord('Cherche toi-même', d.bot, 'Cherche toi-même la réponse à ' + q + ' (Drive, Gmail, agenda, Pilotage) ; si tu ne trouves pas, dis-moi où tu as cherché.', 'Je cherche.', ''), rep('Pas concerné', 'Pas concerné par ' + q + ' : ferme la demande.')]; break;
+      case 'question': top = (f.si_oui && f.si_non ? [rep('Oui', 'Oui pour ' + q + ' : ' + d.ask, 'main'), repText('Non, plutôt…', 'Non pour ' + q + ', plutôt : ', 'main2')] : [repText('Répondre à ' + who, 'Réponse à ' + q + ' : ', 'main')]).concat(vTop, [later]);
+        rest = [f.si_oui && f.si_non ? repText('Répondre à ' + who, 'Réponse à ' + q + ' : ') : null, ord('Cherche toi-même', d.bot, 'Cherche toi-même la réponse à ' + q + ' (Drive, Gmail, agenda, Pilotage) ; si tu ne trouves pas, dis-moi où tu as cherché.', 'Je cherche.', ''), rep('Pas concerné', 'Pas concerné par ' + q + ' : ferme la demande.')]; break;
       case 'brouillon': top = [link('Ouvrir le brouillon'), rep("Je l'ai envoyé", "C'est envoyé pour " + q + '.', 'main'), repText('Modifie-le…', 'Modifie le brouillon pour ' + q + ' : ', 'main2'), later]; rest = [rep("Non, n'envoie rien", 'Non pour ' + q + " : je n'envoie rien, ferme la demande.")]; break;
       default: top = [link('Ouvrir le lien'), rep("C'est fait", "C'est fait pour " + q + '.', 'main')].concat(vTop, [later]);
         rest = [ord('Prépare-moi tout', d.bot, 'Prépare tout pour ' + q + ' : lien, pièces, créneaux libres dans mon agenda, brouillon.', 'Je prépare tout.', ''), no, repText('Non, plutôt…', 'Pas comme ça pour ' + q + '. À la place : ')];
@@ -5390,7 +5427,7 @@ void main(){
     const cfg = SD0(d);
     if (!d.live) return cfg;
     const f = d.f || {}, who = lvName(d.bot);
-    cfg.say = d.kind === 'oui' ? who + ' attend ton oui dans son chat.' : d.ask.length > 150 ? d.ask.slice(0, 147) + '…' : d.ask;
+    cfg.say = d.kind === 'oui' ? (yesOk(d) ? 'Ton oui depuis JARVIS suffit : ' + who + ' s\'en charge.' : who + ' attend ton oui dans son chat.') : d.ask.length > 150 ? d.ask.slice(0, 147) + '…' : d.ask;
     const ex = expOf(d);
     if (ex) cfg.kicker += ' · Expirée';
     cfg.facts = [ex ? ['Expirée', ex.whole ? 'Date dépassée depuis le ' + ex.date : '« ' + ex.part + ' » : c\'est passé. Clôture cette partie, ou dis ce que tu as fait.'] : ['', ''], ['Ce qu\'on te demande', d.ask], ['Pourquoi', d.why], [d.kind === 'afaire' ? 'Si tu le fais' : 'Si tu dis oui', f.si_oui], ['Si tu dis non ou rien', f.si_non], ['Déjà prêt', f.deja], ['Options', d.options.length ? d.options.join(' · ') : ''], ['Conseil de ' + who, f.conseil], ['Temps pour toi', f.temps], ['Avant le', d.due != null ? longDay(d.due) : ''], ['Source', d.src]];
@@ -5878,9 +5915,13 @@ void main(){
   /* 17/11/2026 (choix du propriétaire) : un « Oui » depuis JARVIS vaut son oui pour une routine strictement conforme à la fiche ou à la Charte
      (Charte, section 7) : pour ces demandes, une ligne « Réponse » dans le Canal et la sonnette remplacent la phrase à coller dans le chat */
   function isRoutineDem(d) { return d.kind === 'oui' && /routine/i.test([d.title, d.ask, d.f && d.f.phrase].join(' ')); }
+  /* JARVIS OS (18/11/2026, question du propriétaire « pourquoi dois-je encore donner mon oui dans Grok pour le CRA ? ») : depuis le 13/11 (Charte, section 7),
+     son « Oui » depuis JARVIS vaut confirmation du CRA Allegis de la semaine ; la page le proposait seulement pour les routines */
+  function isCraDem(d) { return d.kind === 'oui' && /\bcra\b|allegis/i.test([d.title, d.ask].join(' ')); }
+  const yesOk = (d) => isRoutineDem(d) || isCraDem(d);
   function yesFromJarvis(list) {
     const one = (d) => '« ' + d.title + ' »' + (d.f && d.f.phrase ? ' (' + String(d.f.phrase).replace(/^\s*Oui[,.]?\s*/i, '').replace(/[.\s]+$/, '') + ')' : '');
-    return ('Oui pour ' + (list.length === 1 ? one(list[0]) : 'ces ' + list.length + ' demandes : ' + list.map((d, i) => (i + 1) + ') ' + one(d)).join(' ; ')) + '. Oui donné depuis JARVIS : il vaut pour une routine strictement conforme à ta fiche ou à la Charte (Charte, section 7).').slice(0, 900);
+    return ('Oui pour ' + (list.length === 1 ? one(list[0]) : 'ces ' + list.length + ' demandes : ' + list.map((d, i) => (i + 1) + ') ' + one(d)).join(' ; ')) + '. Oui donné depuis JARVIS : ' + (list.every(isCraDem) ? 'il vaut confirmation du CRA Allegis de la semaine, tel que listé' : list.some(isCraDem) ? 'il vaut confirmation du CRA Allegis et pour une routine strictement conforme à ta fiche ou à la Charte' : 'il vaut pour une routine strictement conforme à ta fiche ou à la Charte') + ' (Charte, section 7).').slice(0, 900);
   }
   function yesGroups() { const g = {}; (S.demandes || []).filter((d) => d.kind === 'oui').forEach((d) => { (g[d.bot] = g[d.bot] || []).push(d); }); return Object.keys(g).map((b) => ({bot: b, list: g[b]})); }
   const yesPhrase = (list) => list.length === 1 ? (list[0].f.phrase || ('Oui pour « ' + list[0].title + ' » : ' + list[0].ask)).slice(0, 600)
@@ -5902,7 +5943,7 @@ void main(){
       h('ul', {class: 'yes-l'}, gr.list.map((d) => h('li', {text: d.title}))), pre,
       gr.list.every(isRoutineDem) ? h('p', {class: 'muted yes-note', text: 'Routine conforme à sa fiche : ton oui depuis JARVIS suffit (Charte, section 7). Le chat reste possible si Grok insiste.'}) : null,
       h('div', {class: 'row-actions'},
-        gr.list.every(isRoutineDem) ? h('button', {type: 'button', class: 'btn main yes-jarvis', onclick: () => runAct('demande', gr.list[0], act('Oui depuis JARVIS', {tone: 'main', go: () => ({title: 'Oui à ' + who, effect: 'Une ligne « Réponse » pour ' + who + ' dans le Canal, puis la sonnette.', bot: gr.bot, order: yesFromJarvis(gr.list), canalType: 'Réponse', say: 'Merci, je m\'en occupe.', mutate: () => gr.list.forEach((d) => drop('demandes', d.id))})}))}, 'Oui depuis JARVIS', costTag({cost: 'bot'})) : null,
+        gr.list.every(yesOk) ? h('button', {type: 'button', class: 'btn main yes-jarvis', onclick: () => runAct('demande', gr.list[0], act('Oui depuis JARVIS', {tone: 'main', go: () => ({title: 'Oui à ' + who, effect: 'Une ligne « Réponse » pour ' + who + ' dans le Canal, puis la sonnette.', bot: gr.bot, order: yesFromJarvis(gr.list), canalType: 'Réponse', say: 'Merci, je m\'en occupe.', mutate: () => gr.list.forEach((d) => drop('demandes', d.id))})}))}, 'Oui depuis JARVIS', costTag({cost: 'bot'})) : null,
         h('button', {type: 'button', class: 'btn' + (gr.list.every(isRoutineDem) ? '' : ' main'), onclick: copy}, link ? 'Copier et ouvrir ' + who : 'Copier la phrase', costTag({cost: 'chat'}))));
   }
 
@@ -6959,6 +7000,121 @@ void main(){
   /* rien n'est perdu : ce que l'ancien accueil montrait va dans sa rubrique */
   const VDM_OS = VIEWS.demandes;
   VIEWS.demandes = (el) => { VDM_OS(el); const cp = cotePanel(); if (cp) { const hp = el.querySelector('.hist-panel'); if (hp) hp.before(cp); else el.append(cp); } const src = h('div'); ACC_ORIG(src); ['Réponses reçues', 'Arrivés depuis'].forEach((t) => { const p2 = hpanel(src, t); if (p2) el.append(p2); }); };
+
+  /* ================= JARVIS OS (18/11/2026, retour du propriétaire : « cet onglet est très mal fait… des choses sont là alors qu'elles ne devraient pas…
+     illustrer par une image ou un schéma selon le type de demande, comme la carte du CRA ») =================
+     « Pour moi » refait : un résumé, « À décider », « À faire », « Projets au long cours » (replié), « En attente, plus tard, en rappel » (replié),
+     le courrier à trier (replié). Chaque carte : ce qu'on attend de toi en une phrase, une image selon le genre de la demande (le mail, la semaine,
+     oui ou non, les choix, les étapes, l'échéancier, ce que Claude a trouvé), un bouton principal ; un appui sur la carte ouvre la feuille.
+     L'historique du Canal part dans Suivi. */
+  const PM_KIND = {brouillon: ['Mail à envoyer', 'send'], oui: ['Ton oui', 'check'], ouinon: ['Oui ou non', 'check'], choix: ['À choisir', 'list'], question: ['Question', 'search'], afaire: ['À faire', 'hourglass']};
+  const cap1 = (t) => { t = String(t || '').trim(); return t ? t.charAt(0).toUpperCase() + t.slice(1) : t; };
+  /* le texte de la demande, sans la partie expirée déjà clôturée */
+  const pmExpM = (d) => { const m = String(d.ask || '').match(/([^.;|()]*?\b(?:terminée?s?|expirée?s?|finie?s?|close|échue|achevée?)\s+le\s+\d{1,2}\/\d{1,2}(?:\/\d{4})?)(\s*\([^)]*\))?\s*[.;]?\s*/i); return m && OFFRE.test(m[1]) ? m : null; };
+  function pmAsk(d) {
+    let t = String(d.ask || '');
+    const m = pmExpM(d); if (m) t = t.replace(m[0], '');
+    return t.replace(/\s*\|\s*/g, ' · ').trim();
+  }
+  /* les étapes : « a ; b, puis c » */
+  function pmSteps(d) {
+    const parts = pmAsk(d).split(/\s*;\s*|,\s*puis\s+|\.\s+(?=[A-ZÉÀ])/).map((x) => cap1(x.replace(/^puis\s+/i, '').replace(/[.;\s]+$/, ''))).filter((x) => x.length > 3);
+    return parts.length >= 2 ? parts.slice(0, 6) : [];
+  }
+  /* l'échéancier : la date limite, l'échéance du dossier, les échéances liées des 13 prochains mois */
+  function pmDates(d) {
+    const out = [], add = (n, label, cls) => { if (n == null || isNaN(n)) return; const o = out.find((x) => x.n === n); if (o) { if (o.label.indexOf(label) < 0) o.label += ' · ' + label; if (cls && !o.cls) o.cls = cls; return; } out.push({n, label, cls}); };
+    if (d.due != null) add(d.due, d.f && d.f.avant ? 'À faire avant' : 'Échéance', 'is-due');
+    const k = dosRowOf(d); if (k && lvFrIso(k['Échéance']) && N(lvFrIso(k['Échéance'])) !== d.due) add(N(lvFrIso(k['Échéance'])), 'Échéance du dossier', 'is-due');
+    (S.echeances || []).forEach((e) => { if (e.n >= -1 && e.n <= 400 && histHit(d, e.title + ' ' + e.note)) add(e.n, e.title.replace(/\s*\([^)]*\)\s*$/, ''), e.nature === 'offre' || e.nature === 'fin' ? 'is-end' : ''); });
+    out.sort((a, b) => a.n - b.n);
+    return out.slice(0, 6);
+  }
+  const relD = (n) => n === 0 ? "aujourd'hui" : n === 1 ? 'demain' : n < 0 ? 'il y a ' + (-n) + ' j' : n < 45 ? 'dans ' + n + ' j' : 'dans ' + Math.round(n / 30) + ' mois';
+  function pmTimeline(d, max) {
+    const ds = pmDates(d), t0 = ds.find((x) => x.n === 0), fut = ds.filter((x) => x.n !== 0);
+    if (!fut.length) return null;
+    const pts = [{n: 0, label: t0 ? t0.label : '', cls: 'is-now'}].concat(fut).sort((a, b) => a.n - b.n).slice(0, max || 6);
+    return h('ol', {class: 'pm-tl', 'aria-label': 'Échéancier'}, pts.map((x) => h('li', {class: x.cls || ''}, h('i', {}), h('b', {text: x.n === 0 ? "Aujourd'hui" : short(x.n)}), h('span', {text: x.n === 0 ? x.label : x.label + ' · ' + relD(x.n)}))));
+  }
+  /* ce que Claude a trouvé en revérifiant (sa ligne pour le bot dans le Canal) */
+  function pmFound(d) {
+    const l = (S.canal || []).find((x) => x.from === 'claude' && /^Revérification demandée/.test(x.msg || '') && String(x.msg).indexOf('« ' + d.title + ' »') >= 0);
+    if (!l) return null;
+    const txt = String(l.msg).replace(/^[^:]*faite par Claude\)\s*:\s*/, ''), url = (txt.match(/https?:\/\/\S+/) || [])[0];
+    return h('div', {class: 'pm-found'}, h('span', {class: 'ic', html: icon('search', 15)}), h('div', {}, h('b', {text: 'Claude a trouvé (' + l.date + ')'}), h('p', {text: txt.replace(/\s*Lien\s*:\s*https?:\/\/\S+/, '').slice(0, 260)}),
+      url ? h('a', {class: 'btn sm', href: url, target: '_blank', rel: 'noopener', onclick: (ev) => ev.stopPropagation()}, 'Ouvrir le document') : null));
+  }
+  /* l'image de la demande, selon son genre */
+  function pmViz(d, full) {
+    const f = d.f || {}, A = () => ACTIONS.demande(d), run = (a) => (ev) => { ev.stopPropagation(); if (!a) return; if (a.pick || a.confirm) openItem('demande', d, a); else finish(a.go(), {type: 'demande', item: d}); };
+    const dr = draftOf(d), out = [];
+    if (dr) out.push(h('div', {class: 'pm-mail'}, h('span', {class: 'ic', html: icon('send', 15)}), h('div', {}, h('b', {text: 'À ' + (dr.to.join(', ') || 'personne')}), h('span', {text: '« ' + (dr.subject || 'sans objet') + ' »'}), full ? null : h('small', {text: String(dr.body || '').replace(/\s+/g, ' ').slice(0, 110) + '…'}))));
+    if (!full && /\bcra\b|allegis|feuille de temps|timesheet/i.test(d.title + ' ' + d.ask)) out.push(craWeek(d));
+    const xm = pmExpM(d); if (xm && !expAcked(d)) out.push(h('p', {class: 'pm-expired'}, h('s', {text: xm[1].trim()}), h('span', {text: ' · expirée'})));
+    const found = pmFound(d); if (found) out.push(found);
+    if ((d.kind === 'ouinon' || d.kind === 'question' || isCraDem(d)) && (f.si_oui || f.si_non)) {
+      const acts = A(), yes = acts.find((a) => /^(Oui|Donner mon oui)/.test(a.label)), no = acts.find((a) => /^Non/.test(a.label));
+      out.push(h('div', {class: 'pm-yn'}, h('button', {type: 'button', class: 'pm-tile is-yes', onclick: run(yes)}, h('b', {text: yes ? yes.label : 'Si oui'}), h('span', {text: f.si_oui || '—'})),
+        h('button', {type: 'button', class: 'pm-tile is-no', onclick: run(no)}, h('b', {text: no ? no.label : 'Si non'}), h('span', {text: f.si_non || '—'}))));
+    }
+    if (d.kind === 'choix' && d.options.length) { const acts = A(); out.push(h('div', {class: 'pm-opts'}, d.options.map((o, i) => h('button', {type: 'button', class: 'pm-tile', onclick: run(acts.find((a) => a.label === o))}, h('b', {text: String.fromCharCode(65 + i)}), h('span', {text: o.replace(/^[A-C]\s+/, '')}))))); }
+    const steps = d.kind === 'afaire' || d.kind === 'question' ? pmSteps(d) : [];
+    if (steps.length) out.push(h('ol', {class: 'pm-steps'}, steps.map((x, i) => h('li', {}, h('i', {text: String(i + 1)}), h('span', {text: x})))));
+    const cra = /\bcra\b|allegis|feuille de temps|timesheet/i.test(d.title + ' ' + d.ask), tl = full || !cra ? pmTimeline(d, full ? 6 : 4) : null; if (tl) out.push(tl);
+    return out.length ? h('div', {class: 'pm-viz'}, out) : null;
+  }
+  function pmCard(d) {
+    const kd = PM_KIND[d.kind] || PM_KIND.afaire, ex = expOf(d), acts = ACTIONS.demande(d).filter((a) => !a.more && a.tone !== 'danger'), main = acts[0];
+    const ask = d.kind === 'oui' && !yesOk(d) ? lvName(d.bot) + ' attend ton oui dans son chat Grok' + (d.ask ? ' : ' + d.ask : '.') : pmAsk(d);
+    const card = h('article', {class: 'card pm-card' + (ex ? ' is-exp' : ''), style: botVars(d.bot), tabindex: '0', onclick: () => openItem('demande', d)},
+      h('div', {class: 'pm-head'}, h('span', {class: 'pm-ic', html: icon(kd[1], 16)}), h('span', {class: 'pm-kind', text: kd[0]}), h('span', {class: 'pm-who', text: lvName(d.bot) + ' · ' + (d.since === 0 ? "aujourd'hui" : d.since === -1 ? 'hier' : 'depuis ' + (-d.since) + ' j')}),
+        ex ? h('span', {class: 'pill st-exp', text: ex.whole ? 'Expirée' : 'En partie expirée'}) : d.due != null && d.due <= 3 ? h('span', {class: 'pill is-amber', text: d.due < 0 ? 'En retard' : d.due === 0 ? "Aujourd'hui" : 'Dans ' + d.due + ' j'}) : null),
+      h('h3', {class: 'pm-title', text: d.title}), h('p', {class: 'pm-ask', text: cap1(ask)}),
+      d.why ? h('p', {class: 'pm-why'}, h('b', {text: 'Pourquoi · '}), String(d.why).replace(/^Pourquoi\s*:\s*/i, '')) : null,
+      pmViz(d, false),
+      h('div', {class: 'pm-row'}, main && !card_hasTiles(d) ? h('button', {type: 'button', class: 'btn main', onclick: (ev) => { ev.stopPropagation(); if (main.pick || main.confirm) openItem('demande', d, main); else finish(main.go(), {type: 'demande', item: d}); }}, main.label, costTag(main)) : null,
+        h('button', {type: 'button', class: 'btn ghost', onclick: (ev) => { ev.stopPropagation(); openItem('demande', d); }}, 'Ouvrir ›')));
+    return card;
+  }
+  function card_hasTiles(d) { const f = d.f || {}; return ((d.kind === 'ouinon' || d.kind === 'question' || isCraDem(d)) && !!(f.si_oui || f.si_non)) || (d.kind === 'choix' && d.options.length > 0); }
+  const pmProj = (d) => d.kind === 'afaire' && pmSteps(d).length >= 2 && (d.since == null || d.since <= -7) && (d.due == null || d.due > 30);
+  function pmSection(id, title, aside, kids, closed) {
+    if (!kids.length) return null;
+    const head = [h('h2', {text: title}), h('span', {class: 'aside', text: aside})];
+    return closed ? h('details', {class: 'panel pm-sec', id}, h('summary', {}, head), h('div', {class: 'pm-list'}, kids)) : h('section', {class: 'panel pm-sec', id}, h('header', {class: 'panel-h'}, head), h('div', {class: 'pm-list'}, kids));
+  }
+  VIEWS.demandes = (el) => {
+    if (GP.on) el.append(pauseBanner());
+    const dem = S.demandes || [], yg = yesGroups().filter((g) => g.list.length >= 2), grouped = new Set(yg.flatMap((g) => g.list.map((d) => d.id)));
+    const dec = dem.filter((d) => d.kind !== 'afaire' && !grouped.has(d.id)), proj = dem.filter(pmProj), todo = dem.filter((d) => d.kind === 'afaire' && !pmProj(d));
+    const drafts = (S.drafts || []).filter((x) => !demandeOfDraft(x)), reps = S.dosReplies || [], wait = (S.coteVis || []).length;
+    const nDec = dec.length + drafts.length + reps.length + yg.length;
+    el.append(h('div', {class: 'pm-sum'}, [[nDec, 'à décider', 'pm-dec'], [todo.length, 'à faire', 'pm-todo'], [proj.length, proj.length > 1 ? 'projets' : 'projet', 'pm-proj'], [wait, 'en attente', 'pm-wait']].filter((x) => x[0]).map(([n, l, id]) =>
+      h('button', {type: 'button', class: 'pm-chip', onclick: () => { const t = document.getElementById(id); if (t) { if (t.tagName === 'DETAILS') t.open = true; t.scrollIntoView({behavior: 'smooth', block: 'start'}); } }}, h('b', {text: String(n)}), ' ' + l))));
+    if (!nDec && !todo.length && !proj.length) el.append(emptyState(wait ? 'Rien à décider maintenant : tout le reste attend (voir plus bas).' : "Rien ne t'attend."));
+    el.append(...[
+      pmSection('pm-dec', 'À décider', nDec + ' · un appui ouvre le détail', [].concat(yg.map(yesCard), drafts.map(draftCard), reps.map(dosReplyCard), dec.map(pmCard))),
+      pmSection('pm-todo', 'À faire', todo.length + ' · par toi', todo.map(pmCard)),
+      pmSection('pm-proj', 'Projets au long cours', proj.length + ' · plusieurs étapes, pas urgent', proj.map(pmCard), true)
+    ].filter(Boolean));
+    const cp = cotePanel(); if (cp) { cp.id = 'pm-wait'; el.append(cp); }
+    const src = h('div'); ACC_ORIG(src); const mail = hpanel(src, 'Arrivés depuis');
+    if (mail) { const n = mail.querySelectorAll('.card, article, li').length; el.append(h('details', {class: 'panel pm-sec'}, h('summary', {}, h('h2', {text: 'Courrier à trier'}), h('span', {class: 'aside', text: n ? n + ' mail' + (n > 1 ? 's' : '') : 'depuis le dernier tour d\'Iris'})), mail)); }
+  };
+  /* l'historique de tes demandes (Canal) va dans Suivi */
+  const VSU_PM = VIEWS.suivi;
+  VIEWS.suivi = (el) => { VSU_PM(el); if (LINK.on && LV.mcp && typeof histPanel === 'function') el.append(histPanel()); };
+  /* la feuille : l'image de la demande en haut (le CRA garde sa semaine) */
+  const SD_PM = SHEETCFG.demande;
+  SHEETCFG.demande = (d) => {
+    const cfg = SD_PM(d);
+    if (!d.live) return cfg;
+    const top = cfg.extraTop, a = pmAsk(d);
+    if (d.kind !== 'oui' && a) cfg.say = a.length > 150 ? a.slice(0, 147) + '…' : a;   /* sans la partie expirée */
+    cfg.extraTop = () => h('div', {class: 'stack'}, top ? top() : null, pmViz(d, true));
+    return cfg;
+  };
   const VEQ_OS = VIEWS.equipe;
   VIEWS.equipe = (el) => { VEQ_OS(el); if (AGENT) return; const src = h('div'); ACC_ORIG(src); /* le Journal est dans « En ce moment » */ const st = src.querySelector('.stats'); if (st) el.append(st); };
 

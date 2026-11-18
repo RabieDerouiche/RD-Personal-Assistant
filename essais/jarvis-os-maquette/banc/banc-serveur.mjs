@@ -170,7 +170,7 @@ try {
   { const today = new Date().toLocaleDateString('fr-FR', {timeZone: 'Europe/Paris'});
     FG.sheet["'À toi'!A3:D300"] = [['Depuis le', 'Bot', 'Sujet', "Ce qu'on attend de toi"], [today, 'Iris', 'Date du bail', "À faire : Retrouve la date de début du bail pour l'assureur | Conseil : retrouver cette date sur l'un de ces deux documents"]];
     await p.goto(BASE + '/?serveur#demandes'); await p.reload(); await p.waitForTimeout(4500);   /* même page, seul le # change : recharger pour relire Pilotage */
-    const found = await p.evaluate(() => { const c = [...document.querySelectorAll('article')].find((x) => /Date du bail/.test(x.textContent) && /Plus…/.test(x.textContent)); if (!c) return false; [...c.querySelectorAll('button')].find((x) => x.textContent.trim() === 'Plus…').click(); return true; }); await p.waitForTimeout(900);
+    const found = await p.evaluate(() => { const c = [...document.querySelectorAll('article')].find((x) => /Date du bail/.test(x.textContent) && /Plus…|Ouvrir ›/.test(x.textContent)); if (!c) return false; [...c.querySelectorAll('button')].find((x) => /^(Plus…|Ouvrir ›)$/.test(x.textContent.trim())).click(); return true; }); await p.waitForTimeout(900);
     if (!found) console.error('DIAG', JSON.stringify(await p.evaluate(() => ({h: location.href, title: (document.getElementById('view-title') || {}).textContent, arts: [...document.querySelectorAll('article')].map((x) => x.textContent.slice(0, 70)).slice(0, 14)}))), JSON.stringify(FG.calls.filter((c) => /toi/.test(c.path)).slice(-3).map((c) => [c.path, c.auth ? 'jeton' : 'sans', c.method])));
     const vis = await p.evaluate(() => [...document.querySelectorAll('#sheet .sheet-actions > div:not(.sa-more) .btn')].map((x) => x.firstChild.textContent.trim()));
     await p.screenshot({path: SH + 'demande-feuille-serveur.png'});
@@ -183,11 +183,11 @@ try {
     await p.screenshot({path: SH + 'demande-reverifie-serveur.png'}); }
   /* 0.20.0 (18/11/2026) : « Mettre de côté » gardé par le serveur (rappel du dimanche), puis « Remettre » */
   { await p.evaluate(() => document.querySelectorAll('#toasts .toast').forEach((t) => t.remove()));
-    await p.evaluate(() => { const c = [...document.querySelectorAll('article')].find((x) => /Date du bail/.test(x.textContent) && /Plus…/.test(x.textContent)); [...c.querySelectorAll('button')].find((x) => x.textContent.trim() === 'Plus…').click(); }); await p.waitForTimeout(900);
+    await p.evaluate(() => { const c = [...document.querySelectorAll('article')].find((x) => /Date du bail/.test(x.textContent) && /Plus…|Ouvrir ›/.test(x.textContent)); [...c.querySelectorAll('button')].find((x) => /^(Plus…|Ouvrir ›)$/.test(x.textContent.trim())).click(); }); await p.waitForTimeout(900);
     await p.evaluate(() => [...document.querySelectorAll('#sheet .sheet-actions > div:not(.sa-more) .btn')].find((x) => /^Plus tard/.test(x.textContent)).click()); await p.waitForTimeout(600);
     await p.evaluate(() => [...document.querySelectorAll('#sheet .sheet-pick .btn')].find((x) => /^Dans une semaine/.test(x.textContent)).click()); await p.waitForTimeout(1500);
     const l1 = await p.evaluate(() => window.JarvisServeur.cote.liste());
-    const shown = await p.evaluate(() => [...document.querySelectorAll('article')].some((x) => /Date du bail/.test(x.textContent) && /Plus…/.test(x.textContent)));
+    const shown = await p.evaluate(() => [...document.querySelectorAll('article')].some((x) => /Date du bail/.test(x.textContent) && /Plus…|Ouvrir ›/.test(x.textContent)));
     await p.evaluate(() => [...document.querySelectorAll('.cote-it')].find((x) => /Date du bail/.test(x.textContent)).querySelector('button').click()); await p.waitForTimeout(1200);
     const l2 = await p.evaluate(() => window.JarvisServeur.cote.liste());
     ok('« Plus tard » (dans une semaine) gardé par le serveur, gratuit, carte cachée, puis « Remettre »', (l1 || []).some((x) => x.id === 'a:Date du bail' && x.jusqu > Date.now() + 6 * 864e5) && !shown && Array.isArray(l2) && !l2.some((x) => x.id === 'a:Date du bail'), JSON.stringify([l1, shown, l2])); }
