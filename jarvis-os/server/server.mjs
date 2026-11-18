@@ -18,7 +18,7 @@ import {createSante} from './sante.mjs';
 import {createComparatifs} from './comparatif.mjs';
 import {createEcoute, wavOk, intention, quand, meteoPhrase, meteoUrl, heurePhrase, datePhrase, nrm, diction} from './voix.mjs';
 
-const VERSION = '0.23.1';
+const VERSION = '0.23.2';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PORT = +(process.env.PORT || 8787);
 const HOST = process.env.HOST || '127.0.0.1';
@@ -791,7 +791,7 @@ const WHISPER_DIR = process.env.JARVIS_WHISPER_DIR || path.join(os.homedir(), 'w
 const ECOUTE = createEcoute({dir: WHISPER_DIR, py: path.join(WHISPER_DIR, 'venv', 'bin', 'python'), helper: path.join(HERE, 'stt', 'whisper_helper.py'), model: process.env.JARVIS_WHISPER_MODEL || 'small', fakeHelper: process.env.JARVIS_STT_HELPER || '', log: (t) => { S.ecouteErr = {at: now(), t: String(t).slice(0, 300)}; }});
 let ECOUTE_INSTALL = {state: 'idle', at: 0, tail: ''};
 /* 0.23.0 : le comparatif des produits suivis (comparatif.mjs) */
-const COMP = createComparatifs({S, save, DATA, runClaude, model: MODELS.equilibre, settings: guardSettings('chat'), now, log: (t) => { S.compErr = {at: now(), t: String(t).slice(0, 300)}; }});
+const COMP = createComparatifs({S, save, DATA, runClaude, model: MODELS.equilibre, visionModel: MODELS.rapide, steamBase: process.env.JARVIS_STEAM_URL || undefined, settings: guardSettings('chat'), now, log: (t) => { S.compErr = {at: now(), t: String(t).slice(0, 300)}; }});
 function installEcoute() {
   if (ECOUTE_INSTALL.state === 'running') return ECOUTE_INSTALL;
   const log = path.join(DATA, 'ecoute-install.log');
