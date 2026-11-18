@@ -166,6 +166,21 @@ try {
     ok('papiers en direct : « loyer » trouvé dans le texte du bail (Drive, lecture seule)', FG.calls.some((c) => c.path === '/drive/files' && /fullText contains 'loyer'/.test(c.q.q || '')) && await q.evaluate(() => /Dans le texte des documents · 1/.test(document.querySelector('.pap-res').textContent) && /Bail 2024/.test((document.querySelector('.pap-res-txt') || {}).textContent || '') && !/null|undefined/.test(document.querySelector('.pap-res').textContent)),
       JSON.stringify(FG.calls.filter((c) => c.path === '/drive/files' && /fullText/.test(c.q.q || '')).map((c) => c.q.q)) + ' ' + await q.evaluate(() => document.querySelector('.pap-res').textContent.slice(0, 200)));
     await q.screenshot({path: SH + 'papiers-texte-serveur.png'}); }
+  /* 0.19.0 (18/11/2026) : « Revérifie dans mes papiers » depuis la feuille d'une demande : le serveur cherche dans Papiers, Claude juge, une ligne pour Iris dans le Canal */
+  { const today = new Date().toLocaleDateString('fr-FR', {timeZone: 'Europe/Paris'});
+    FG.sheet["'À toi'!A3:D300"] = [['Depuis le', 'Bot', 'Sujet', "Ce qu'on attend de toi"], [today, 'Iris', 'Date du bail', "À faire : Retrouve la date de début du bail pour l'assureur | Conseil : retrouver cette date sur l'un de ces deux documents"]];
+    await p.goto(BASE + '/?serveur#demandes'); await p.reload(); await p.waitForTimeout(4500);   /* même page, seul le # change : recharger pour relire Pilotage */
+    const found = await p.evaluate(() => { const c = [...document.querySelectorAll('article')].find((x) => /Date du bail/.test(x.textContent) && /Plus…/.test(x.textContent)); if (!c) return false; [...c.querySelectorAll('button')].find((x) => x.textContent.trim() === 'Plus…').click(); return true; }); await p.waitForTimeout(900);
+    if (!found) console.error('DIAG', JSON.stringify(await p.evaluate(() => ({h: location.href, title: (document.getElementById('view-title') || {}).textContent, arts: [...document.querySelectorAll('article')].map((x) => x.textContent.slice(0, 70)).slice(0, 14)}))), JSON.stringify(FG.calls.filter((c) => /toi/.test(c.path)).slice(-3).map((c) => [c.path, c.auth ? 'jeton' : 'sans', c.method])));
+    const vis = await p.evaluate(() => [...document.querySelectorAll('#sheet .sheet-actions > div:not(.sa-more) .btn')].map((x) => x.firstChild.textContent.trim()));
+    await p.screenshot({path: SH + 'demande-feuille-serveur.png'});
+    const a0 = (FG.appends || []).length;
+    await p.evaluate(() => [...document.querySelectorAll('#sheet .sheet-actions .btn')].find((x) => /^Revérifie dans mes papiers/.test(x.textContent)).click());
+    let ln = null; for (let i = 0; i < 40 && !ln; i++) { await p.waitForTimeout(250); ln = (FG.appends || []).slice(a0).find((x) => /Date du bail/.test(JSON.stringify(x.values))); }
+    const ts = await p.evaluate(() => [...document.querySelectorAll('#toasts .toast')].map((x) => x.textContent).join(' || '));
+    const ms = await p.evaluate(() => window.JarvisServeur.missions()), mv = (ms || []).find((x) => /^Revérifie dans tes papiers : « Date du bail »/.test(x.text));
+    ok('revérifier : « Revérifie dans mes papiers » en haut de la feuille, lancé sur le serveur, ligne pour Iris dans le Canal, mission suivie', vis.includes('Revérifie dans mes papiers') && /Claude revérifie tes papiers/.test(ts) && ln && ln.values[0][1] === 'Claude' && ln.values[0][2] === 'Iris' && /Bail 2024\.pdf/.test(ln.values[0][4]) && mv && /Iris prévenue dans le Canal/.test(mv.result || ''), JSON.stringify([vis, ts.slice(0, 120), ln && ln.values[0][4], mv && mv.status]));
+    await p.screenshot({path: SH + 'demande-reverifie-serveur.png'}); }
 } catch (e) { ok('exception', false, e.stack); }
 ok('aucune erreur de page', !errs.length, errs.join(' | '));
 console.log(out.join('\n')); const bad = out.filter((l) => l.startsWith('ÉCHEC')).length; console.log(bad ? bad + ' échec(s)' : 'Tout passe (' + out.length + ' vérifications).');

@@ -1306,6 +1306,18 @@
   .sa-main .btn .cost, .sa-grid .btn .cost { margin-left: auto; flex: 0 0 auto; }
   .sa-main .btn .chev, .sa-grid .btn .chev { margin-left: auto; flex: 0 0 auto; } .sa-main .btn .cost + .chev, .sa-grid .btn .cost + .chev { margin-left: 2px; }
   .sa-main .btn .sugg-tag, .sa-grid .btn .sugg-tag { flex: 0 0 auto; }
+  /* JARVIS OS (18/11/2026, retour du propriétaire) : une pastille dont le texte passe à la ligne gardait ses coins de pilule (999 px) et le texte sortait de la forme.
+     13 px = pilule exacte sur une ligne (26 px de haut), rectangle arrondi au-delà ; jamais plus large que sa carte. */
+  .mchip { border-radius: 13px; max-width: 100%; min-width: 0; box-sizing: border-box; overflow-wrap: anywhere; }
+  .sor-chip { align-items: flex-start; } .sor-chip .ic { margin-top: 2px; }
+  /* JARVIS OS (18/11/2026) : feuille d'une demande raccourcie, le reste replié sous « Autres réponses » */
+  .sa-more { margin-top: 10px; border: 1px solid var(--line); border-radius: 22px; padding: 0 6px; }
+  .sa-more > summary { list-style: none; cursor: pointer; min-height: 46px; display: flex; align-items: center; gap: 8px; padding: 0 12px; color: var(--muted); font-size: 15px; }
+  .sa-more > summary::-webkit-details-marker { display: none; }
+  .sa-more > summary::after { content: '›'; margin-left: auto; transition: transform .2s; font-size: 18px; }
+  .sa-more[open] > summary::after { transform: rotate(90deg); }
+  .sa-more > .sa-grid { padding: 0 0 8px; }
+  .sa-main .btn .verif-tag, .sa-grid .btn .verif-tag { flex: 0 0 auto; }
 </style>
 
 <div class="scroller" id="scroller">
@@ -2129,7 +2141,7 @@ void main(){
     if (!sm || !sm.act) return;
     const a = sm.act, list = (cfg.actions || []).slice();
     if (a.tone !== 'main') { list.forEach((x) => { if (x.tone === 'main') x.tone = 'main2'; }); if (a.tone !== 'danger') a.tone = 'main'; }
-    a.sugg = true;
+    a.sugg = true; a.more = false;
     cfg.actions = [a].concat(list.filter((x) => x !== a));
   }
   const refresh = () => { syncModes(); if (DIR && DIR.update) DIR.update(); if (APP.id) renderApp(); };
@@ -2195,6 +2207,9 @@ void main(){
   const pickAsk = (a) => a.confirm ? 'Tu es sûr ? « ' + a.label + ' ».' : ({snooze: 'Je te le représente quand ?', slot: 'Quel créneau je bloque dans ton agenda ?', bot: 'À qui je le confie ?', date: 'Quelle date ?', text: 'Dis-moi.', number: 'Quel montant ?', choice: 'Lequel ?', info: 'Voilà le détail.'})[a.pick.kind] || 'Dis-moi.';
   function renderActions(list, onPick) {
     const wrap = h('div', {class: 'sheet-actions'});
+    /* JARVIS OS (18/11/2026) : les actions marquées « more » sont repliées sous « Autres réponses » */
+    const folded = list.filter((a) => a.more);
+    list = list.filter((a) => !a.more);
     const mains = list.filter((a) => a.tone === 'main' || a.tone === 'main2');
     const others = list.filter((a) => !a.tone);
     const danger = list.filter((a) => a.tone === 'danger');
@@ -2202,6 +2217,7 @@ void main(){
     if (mains.length) wrap.append(h('div', {class: 'sa-main'}, mains.map((a) => b(a, a.tone))));
     if (others.length) wrap.append(h('div', {class: 'sa-grid'}, others.map((a) => b(a, ''))));
     if (danger.length) wrap.append(h('div', {class: 'sa-danger'}, danger.map((a) => b(a, 'ghost danger'))));
+    if (folded.length) wrap.append(h('details', {class: 'sa-more'}, h('summary', {text: 'Autres réponses (' + folded.length + ')'}), h('div', {class: 'sa-grid'}, folded.map((a) => b(a, a.tone === 'danger' ? 'ghost danger' : '')))));
     return wrap;
   }
   const snoozeChoices = () => [
@@ -2422,7 +2438,7 @@ void main(){
   function actionRow(type, item, n) {
     const list = ACTIONS[type](item);
     const row = h('div', {class: 'row-actions'});
-    list.filter((a) => a.tone !== 'danger').slice(0, n).forEach((a, i) => row.append(h('button', {type: 'button', class: 'btn ' + (i === 0 ? 'main' : ''), onclick: () => (a.pick || a.confirm) ? openItem(type, item, a) : finish(a.go(), {type, item})}, a.label + (a.pick && a.pick.kind !== 'info' ? ' ›' : ''), costTag(a))));
+    list.filter((a) => a.tone !== 'danger' && !a.more).slice(0, n).forEach((a, i) => row.append(h('button', {type: 'button', class: 'btn ' + (i === 0 ? 'main' : ''), onclick: () => (a.pick || a.confirm) ? openItem(type, item, a) : finish(a.go(), {type, item})}, a.label + (a.pick && a.pick.kind !== 'info' ? ' ›' : ''), costTag(a))));
     row.append(h('button', {type: 'button', class: 'btn ghost', onclick: () => openItem(type, item)}, 'Plus…'));
     return row;
   }
@@ -2717,6 +2733,8 @@ void main(){
   };
   const talkRow = (type, item, bot) => {
     const b = bot && BOT[bot] && bot !== 'toi' ? bot : 'hydra';
+    /* JARVIS OS (18/11/2026, choix QCM) : sur une demande, « Autre chose ? » et « Écrire à <bot> » doublaient « Discuter avec Claude » et « Non, plutôt… » */
+    if (type === 'demande') return h('div', {class: 'talk'}, h('button', {type: 'button', class: 'btn talk-claude', onclick: () => openChat('claude', b, type, item)}, C('claude', 26).el, h('span', {}, h('b', {text: 'Discuter avec Claude'}), h('small', {text: 'en direct, sur cette demande'}))));
     return h('div', {class: 'talk'}, freeRow(type, item, b),
       h('button', {type: 'button', class: 'btn talk-claude', onclick: () => openChat('claude', b, type, item)}, C('claude', 26).el, h('span', {}, h('b', {text: 'Discuter avec Claude'}), h('small', {text: 'en direct, sur cet élément'}))),
       b !== 'claude' ? h('button', {type: 'button', class: 'btn talk-bot', style: botVars(b), onclick: () => openChat('bot', b, type, item)}, C(b, 26).el, h('span', {}, h('b', {text: 'Écrire à ' + BOT[b].name}), h('small', {text: 'par le Canal, réponse à son passage'}))) : null);
@@ -4559,12 +4577,15 @@ void main(){
         h('p', {text: 'Glisse une carte vers la droite quand c\'est fait, vers la gauche si elle ne te plaît pas. Sinon, elle reste dans ta liste.'}),
         h('div', {class: 'mchips'}, h('span', {class: 'mchip' + (wk.length ? ' is-amber' : ''), text: wk.length + ' ce week-end'}), exp.length ? h('span', {class: 'mchip', text: exp.length + ' expirée' + (exp.length > 1 ? 's' : '')}) : null, h('span', {class: 'mchip', text: done.length + ' faite' + (done.length > 1 ? 's' : '')})))));
     const flt = SEL.sorFilter;
-    el.append(h('div', {class: 'seg', role: 'group', 'aria-label': 'Filtre'}, [['afaire', 'À faire (' + todo.length + ')'], ['faites', 'Faites (' + done.length + ')']].map(([k, l]) => h('button', {type: 'button', 'aria-pressed': String(flt === k), onclick: () => { SEL.sorFilter = k; renderView(true); }}, l))));
-    if (flt === 'faites') { el.append(done.length ? panel('Déjà faites', h('span', {class: 'aside', text: 'touche pour la remettre'}), h('div', {class: 'sor-list'}, done.map(sorCard))) : emptyState('Aucune sortie marquée faite pour l\'instant.')); return; }
-    if (!todo.length) el.append(emptyState('Rien dans ta liste. Demande des idées à Ulysse ci-dessous.'));
+    /* JARVIS OS (18/11/2026, retour du propriétaire) : « À faire » ne compte plus les sorties dont la période est passée ; elles ont leur propre filtre */
+    if (flt === 'expirees' && !exp.length) SEL.sorFilter = 'afaire';
+    const segs = [['afaire', 'À faire (' + open.length + ')'], exp.length ? ['expirees', 'Expirées (' + exp.length + ')'] : null, ['faites', 'Faites (' + done.length + ')']].filter(Boolean);
+    el.append(h('div', {class: 'seg', role: 'group', 'aria-label': 'Filtre'}, segs.map(([k, l]) => h('button', {type: 'button', 'aria-pressed': String(SEL.sorFilter === k), onclick: () => { SEL.sorFilter = k; renderView(true); }}, l))));
+    if (SEL.sorFilter === 'faites') { el.append(done.length ? panel('Déjà faites', h('span', {class: 'aside', text: 'touche pour la remettre'}), h('div', {class: 'sor-list'}, done.map(sorCard))) : emptyState('Aucune sortie marquée faite pour l\'instant.')); return; }
+    if (SEL.sorFilter === 'expirees') { el.append(panel('Expirées', h('span', {class: 'aside', text: 'période passée · glisse pour retirer'}), h('div', {class: 'sor-list'}, exp.map(sorCard)))); return; }
+    if (!open.length) el.append(emptyState(exp.length ? 'Plus rien à venir : ' + exp.length + (exp.length > 1 ? ' sorties sont passées' : ' sortie est passée') + ' (filtre « Expirées »). Demande des idées à Ulysse ci-dessous.' : 'Rien dans ta liste. Demande des idées à Ulysse ci-dessous.'));
     if (wk.length) el.append(panel('Ce week-end', h('span', {class: 'aside', text: short(w[0]) + ' et ' + short(w[1])}), h('div', {class: 'sor-list'}, wk.map(sorCard))));
     if (later.length) el.append(panel('Plus tard', h('span', {class: 'aside', text: 'par date'}), h('div', {class: 'sor-list'}, later.map(sorCard))));
-    if (exp.length) el.append(panel('Expirées', h('span', {class: 'aside', text: 'période passée'}), h('div', {class: 'sor-list'}, exp.map(sorCard))));
     el.append(panel("D'autres idées", h('span', {class: 'aside', text: 'Ulysse, par le Canal'}),
       h('p', {class: 'muted', text: 'Ses idées arrivent ici, jamais dans tes demandes. Il tient compte de tes sorties faites et supprimées.'}),
       h('div', {class: 'row-actions'},
@@ -5198,28 +5219,55 @@ void main(){
       actions: [link ? act('Ouvrir le chat de ' + who, {tone: 'main', go: () => { try { window.open(link, '_blank'); } catch (e) { /* lien non pris en charge */ } return null; }}) : null].filter(Boolean)});
     try { navigator.clipboard.writeText(phrase).then(() => done(true), () => done(false)); } catch (e) { done(false); }
   }
+  /* JARVIS OS (18/11/2026, demande du propriétaire, choix QCM « Claude vérifie, et s'il trouve un changement il sonne à Iris ») :
+     « Revérifie dans mes papiers / mes mails ». Ton serveur cherche (accès Google direct), Claude juge ; nouveau : une ligne pour le bot et sa sonnette ;
+     rien : une 2e vérification dans 2 jours. Notification dans les deux cas (serveur 0.19.0). */
+  const VERIF_PAP = /papier|document|attestation|certificat|justificatif|passeport|carte (grise|vitale|d'identit)|permis|contrat|\bbail\b|quittance|facture|\bavis\b|\bacte\b|livret|dipl[ôo]me|ordonnance|\bscan|\bpdf\b|drive|pi[èe]ce|titre de s[ée]jour|assurance|mutuelle|carnet/i;
+  const VERIF_MAIL = /\bmails?\b|courriel|r[ée]ponse|r[ée]pondu|re[çc]u|confirm|relanc|envoy|message|courrier|syndic|agence|notaire|bailleur|employeur|[ée]cole|cr[èe]che/i;
+  const verifTopic = (d) => { const t = [d.title, d.ask, d.why, d.f && d.f.conseil, d.f && d.f.deja].filter(Boolean).join(' '); return {papiers: VERIF_PAP.test(t), mails: VERIF_MAIL.test(t)}; };
+  function verifAct(d, ou) {
+    const JS = window.JarvisServeur, who = lvName(d.bot), ouTxt = ou === 'papiers' ? 'tes papiers' : 'tes mails';
+    const can = !!(SRV_OS && JS && JS.verifier && JS.linked && JS.linked());
+    if (SRV_OS && !can) return null;
+    return act(ou === 'papiers' ? 'Revérifie dans mes papiers' : 'Revérifie dans mes mails', {cost: 'claude', go: () => {
+      const f = d.f || {}, demande = {titre: d.title, bot: who, demande: d.ask, pourquoi: d.why || '', conseil: f.conseil || '', deja: f.deja || '', depuis: isoOf(day(d.since || 0))};
+      if (!can) { toast('Revérification (maquette)', 'Sur ton serveur, Claude cherche dans ' + ouTxt + ' pour « ' + d.title + ' ». Du nouveau : il écrit à ' + who + ' et la sonne. Rien : il revérifie dans 2 jours. Tu reçois le résultat en notification.', true); return null; }
+      JS.verifier(ou, demande).then((r) => toast(r && r.ok ? (r.deja ? 'Déjà en cours' : 'Claude revérifie ' + ouTxt) : 'Revérification refusée',
+        r && r.ok ? '« ' + d.title + ' » : tu reçois le résultat en notification. Du nouveau : ' + who + ' est prévenue et sonnée. Rien : 2e vérification dans 2 jours. Suivi : Missions de Claude.' : (r && r.error) || 'Serveur injoignable.', true));
+      return null;
+    }});
+  }
   const AD0 = ACTIONS.demande;
   ACTIONS.demande = (d) => {
     if (!d.live) return AD0(d);
     const who = BOT[d.bot] ? BOT[d.bot].name : 'Iris', q = '« ' + d.title + ' »';
     const rep = (label, txt, tone, more) => act(label, Object.assign({tone, go: () => ({title: 'Réponse à ' + who, effect: 'Une ligne « Réponse » pour ' + who + ' dans le Canal : « ' + txt + ' », puis la sonnette.', bot: d.bot, order: txt, canalType: 'Réponse', say: 'Merci, je m\'en occupe.', mutate: () => drop('demandes', d.id)})}, more || {}));
     const repText = (label, prefix, tone) => act(label, {tone, pick: {kind: 'text', label: label, placeholder: 'Écris, ou dicte avec le micro du clavier'}, go: (v) => ({title: 'Réponse à ' + who, effect: 'Une ligne « Réponse » pour ' + who + ' dans le Canal, puis la sonnette.', bot: d.bot, order: prefix + v.txt, canalType: 'Réponse', say: 'Merci, je m\'en occupe.', mutate: () => drop('demandes', d.id)})});
-    const why = ord('Explique-moi', d.bot, 'Explique-moi ' + q + ' : ce que tu me demandes en clair, ce qui se passe si je dis oui, si je dis non, et ton conseil. 5 lignes.', 'Je te prépare une explication.', '');
     const later = act('Plus tard', {pick: {kind: 'snooze'}, go: (v) => ({title: 'Reporté : ' + v.txt, effect: 'Une ligne pour ' + who + ' : te la représenter ' + v.txt + '.', bot: d.bot, order: 'Représente-moi ' + q + ' ' + v.txt + '.', canalType: 'Réponse', say: 'Je te la représente ' + v.txt + '.', mutate: () => drop('demandes', d.id)})});
     const link = (label) => d.link ? act(label, {go: () => { window.open(d.link, '_blank'); return null; }}) : null;
     const no = rep('Non, pas besoin', 'Non, pas besoin pour ' + q + ' : ferme la demande sans la reposer.', 'main2');
     const noWhy = repText('Non, parce que…', 'Non pour ' + q + ', parce que : ');
-    let list;
+    /* JARVIS OS (18/11/2026, choix QCM « Court, selon la demande ») : 3 ou 4 réponses en haut, le reste replié sous « Autres réponses » ;
+       « Explique-moi » retiré (« Un second avis de Claude » le fait) ; « Revérifie dans mes papiers / mes mails » en haut quand le sujet s'y prête, replié sinon */
+    const more = (a) => (a ? Object.assign(a, {more: true}) : a);
+    const tp = verifTopic(d), vp = verifAct(d, 'papiers'), vm = verifAct(d, 'mails');
+    const vTop = [tp.papiers ? vp : null, tp.mails ? vm : null], vRest = [tp.papiers ? null : vp, tp.mails ? null : vm];
+    const plutot = repText('Non, plutôt…', 'Non pour ' + q + ' tel quel. Refais-le en tenant compte de ceci, puis redemande-moi mon oui : ', 'main2');
+    let top, rest;
     switch (d.kind) {
-      case 'oui': list = isRoutineDem(d) ? [rep('Oui depuis JARVIS', yesFromJarvis([d]), 'main'), act('Oui dans son chat', {go: () => { setTimeout(() => lvGiveYes(d), 280); return null; }}), repText('Non, plutôt…', 'Non pour ' + q + ' tel quel. Refais-le en tenant compte de ceci, puis redemande-moi mon oui : ', 'main2'), rep("Non, n'applique pas", 'Non pour ' + q + ' : ne l\'applique pas, ferme la ligne.'), why]
-        : [act('Donner mon oui à ' + who, {tone: 'main', go: () => { setTimeout(() => lvGiveYes(d), 280); return null; }}), repText('Non, plutôt…', 'Non pour ' + q + ' tel quel. Refais-le en tenant compte de ceci, puis redemande-moi mon oui : ', 'main2'), rep("Non, n'applique pas", 'Non pour ' + q + ' : ne l\'applique pas, ferme la ligne.'), why]; break;
-      case 'ouinon': list = [rep('Oui, vas-y', 'Oui, vas-y pour ' + q + ' : ' + d.ask, 'main'), no, noWhy, later, why]; break;
-      case 'choix': list = d.options.map((o, i) => rep(o, 'Choix pour ' + q + ' : ' + o + '.', i === 0 ? 'main' : 'main2')).concat([repText('Autre chose…', 'Choix pour ' + q + ' : '), rep('Aucune, merci', 'Aucun choix pour ' + q + ' : ferme la demande.'), later, why]); break;
-      case 'question': list = [repText('Répondre à ' + who, 'Réponse à ' + q + ' : ', 'main'), ord('Cherche toi-même', d.bot, 'Cherche toi-même la réponse à ' + q + ' (Drive, Gmail, agenda, Pilotage) ; si tu ne trouves pas, dis-moi où tu as cherché.', 'Je cherche.', '', 'main2'), later, why, rep('Pas concerné', 'Pas concerné par ' + q + ' : ferme la demande.')]; break;
-      case 'brouillon': list = [link('Ouvrir le brouillon'), rep("Je l'ai envoyé", "C'est envoyé pour " + q + '.', 'main'), repText('Modifie-le…', 'Modifie le brouillon pour ' + q + ' : ', 'main2'), rep("Non, n'envoie rien", 'Non pour ' + q + " : je n'envoie rien, ferme la demande."), later, why]; break;
-      default: list = [link('Ouvrir le lien'), rep("C'est fait", "C'est fait pour " + q + '.', 'main'), repText('Non, plutôt…', 'Pas comme ça pour ' + q + '. À la place : '), ord('Prépare-moi tout', d.bot, 'Prépare tout pour ' + q + ' : lien, pièces, créneaux libres dans mon agenda, brouillon.', 'Je prépare tout.', '', 'main2'), later, why, no];
+      case 'oui': top = isRoutineDem(d) ? [rep('Oui depuis JARVIS', yesFromJarvis([d]), 'main'), act('Oui dans son chat', {go: () => { setTimeout(() => lvGiveYes(d), 280); return null; }}), plutot]
+        : [act('Donner mon oui à ' + who, {tone: 'main', go: () => { setTimeout(() => lvGiveYes(d), 280); return null; }}), plutot];
+        rest = [rep("Non, n'applique pas", 'Non pour ' + q + ' : ne l\'applique pas, ferme la ligne.')]; break;
+      case 'ouinon': top = [rep('Oui, vas-y', 'Oui, vas-y pour ' + q + ' : ' + d.ask, 'main'), no, later]; rest = [noWhy]; break;
+      case 'choix': top = d.options.map((o, i) => rep(o, 'Choix pour ' + q + ' : ' + o + '.', i === 0 ? 'main' : 'main2')).concat([later]); rest = [repText('Autre chose…', 'Choix pour ' + q + ' : '), rep('Aucune, merci', 'Aucun choix pour ' + q + ' : ferme la demande.')]; break;
+      case 'question': top = [repText('Répondre à ' + who, 'Réponse à ' + q + ' : ', 'main')].concat(vTop, [later]);
+        rest = [ord('Cherche toi-même', d.bot, 'Cherche toi-même la réponse à ' + q + ' (Drive, Gmail, agenda, Pilotage) ; si tu ne trouves pas, dis-moi où tu as cherché.', 'Je cherche.', ''), rep('Pas concerné', 'Pas concerné par ' + q + ' : ferme la demande.')]; break;
+      case 'brouillon': top = [link('Ouvrir le brouillon'), rep("Je l'ai envoyé", "C'est envoyé pour " + q + '.', 'main'), repText('Modifie-le…', 'Modifie le brouillon pour ' + q + ' : ', 'main2'), later]; rest = [rep("Non, n'envoie rien", 'Non pour ' + q + " : je n'envoie rien, ferme la demande.")]; break;
+      default: top = [link('Ouvrir le lien'), rep("C'est fait", "C'est fait pour " + q + '.', 'main')].concat(vTop, [later]);
+        rest = [ord('Prépare-moi tout', d.bot, 'Prépare tout pour ' + q + ' : lien, pièces, créneaux libres dans mon agenda, brouillon.', 'Je prépare tout.', ''), no, repText('Non, plutôt…', 'Pas comme ça pour ' + q + '. À la place : ')];
     }
-    return list.filter(Boolean).concat([act('Confier à un autre bot', {pick: {kind: 'bot', exclude: d.bot}, go: (v) => ({title: 'Confié à ' + BOT[v.id].name, effect: 'Une ligne pour ' + BOT[v.id].name + ' dans le Canal.', bot: v.id, order: 'Prends en charge ' + q + ' (demande d\'abord tenue par ' + who + ').', say: 'Je prends.'})})]);
+    const deleg = act('Confier à un autre bot', {pick: {kind: 'bot', exclude: d.bot}, go: (v) => ({title: 'Confié à ' + BOT[v.id].name, effect: 'Une ligne pour ' + BOT[v.id].name + ' dans le Canal.', bot: v.id, order: 'Prends en charge ' + q + ' (demande d\'abord tenue par ' + who + ').', say: 'Je prends.'})});
+    return top.filter(Boolean).concat(rest.concat(vRest, [deleg]).filter(Boolean).map(more));
   };
   /* la fiche d'une demande : ce qu'on te demande, si oui, si non, ce qui est prêt, le conseil, le temps */
   const SD0 = SHEETCFG.demande;

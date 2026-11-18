@@ -21,6 +21,13 @@ function answer(raw) {
     const mod = /Gmail/.test(input) ? 'mails' : /Google Agenda/.test(input) ? 'agenda' : ((input.match(/onglets? « ([^»]+) »/) || [])[1] || 'autre');
     return {text: 'Voici : ' + JSON.stringify({items: [{module: mod, from: 'Banque', subject: 'Facture de novembre', title: 'Réunion', date: '2026-11-17', message: 'Exemple ' + mod, bot: 'Iris', objet: 'Robot cuiseur', sortie: 'Zoo', projet: 'Tunisie', statut: 'À faire'}]}) + ' Fin.', tools: ['mcp__claude_ai_Google_Sheets__get_values']};
   }
+  /* revérification (0.19.0) : du nouveau seulement si la quittance de loyer ou le mail du syndic est dans ce que le serveur a trouvé */
+  if (/^Demande de \S+ au propriétaire \(onglet À toi/.test(input)) {
+    const sys = opt('--append-system-prompt') || '', papiers = /ses papiers \(dossier Papiers/.test(input);
+    const hit = papiers ? /"nom":"Quittance 2019\.pdf"/.test(input) : /Dégât des eaux/.test(input);
+    if (papiers && /"nom":"Bail 2024\.pdf"/.test(input)) return {text: JSON.stringify({nouveau: true, constat: 'La date de début du bail est sur Bail 2024.pdf.', source: 'Bail 2024.pdf', lien: 'https://drive.example/e1', pour_bot: 'La date de début du bail est en page 1 de Bail 2024.pdf (Papiers > Logement).', certitude: 'certain'})};
+    return {text: (/Réponds UNIQUEMENT par ce JSON/.test(sys) ? '' : 'SANS CONSIGNE ') + JSON.stringify(hit ? {nouveau: true, constat: papiers ? 'La quittance de mai est dans Papiers, Logement.' : "Le syndic a répondu : l'expert passe mardi.", source: papiers ? 'Quittance 2019.pdf' : 'Syndic Dupont : RE: Dégât des eaux', lien: papiers ? 'https://drive.example/d3' : 'https://mail.google.com/mail/#all/th1', pour_bot: papiers ? 'La quittance de mai est dans Papiers > Logement > Locations (Quittance 2019.pdf).' : "Le syndic a répondu le 16/11 : l'expert passe mardi.", certitude: 'certain'} : {nouveau: false, constat: 'Rien de nouveau sur ce sujet. Outils : ' + allow, source: '', lien: '', pour_bot: '', certitude: 'certain'})};
+  }
   if (/erreur/i.test(input)) return {error: 'Invalid API key · Please run /login'};
   if (/outils refusés/.test(input)) return {text: 'refusés : ' + (args.includes('--disallowedTools') ? args.slice(args.indexOf('--disallowedTools') + 1).filter((x) => !x.startsWith('--')).join(',') : '')};
   if (/^Tour de JARVIS/.test(input)) {   /* tour de Claude (0.15.0) : prévient pour le mail du syndic, une seule fois */
