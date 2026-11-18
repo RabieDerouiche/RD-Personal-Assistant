@@ -356,6 +356,15 @@ srv.listen(0, async () => {
       const bars = await p.evaluate(() => { const c = [...document.querySelectorAll('.cmp-crit')].find((x) => /^Prix du jour/.test(x.textContent)); return c ? [...c.querySelectorAll('.cmp-bar')].map((b) => ({v: b.querySelector('.cmp-v').textContent, w: b.querySelector('.cmp-track i').getBoundingClientRect().width, best: b.classList.contains('is-best')})) : []; });
       ok('Achats : la barre est la valeur (le prix le plus bas a la barre la plus courte, en vert)', bars.length === 2 && bars[0].best && !bars[1].best && bars[0].w < bars[1].w && +bars[0].v < +bars[1].v, JSON.stringify(bars));
       ok('Achats : sous chaque variante, pour qui, à quoi elle sert, forces et limites, les deux notes', cp && cp.ex === 2 && /Pour qui/.test(cp.exT) && /À quoi elle sert/.test(cp.exT) && /Qualité\/prix \d/.test(cp.exT) && /Qualité \d/.test(cp.exT), cp && cp.exT.replace(/\s+/g, ' ').slice(0, 140)); }
+    /* 19/11/2026 (capture : « 186 320 € TTC » pour une sortie à 18 €) : prix écrit en phrase, trajet en une ligne */
+    { p = await page('#sorties');
+      await p.evaluate(() => { const G = window.__G, d = new Date(Date.now() + 10 * 864e5), p2 = (n) => String(n).padStart(2, '0'), fr = p2(d.getDate()) + '/' + p2(d.getMonth() + 1) + '/' + d.getFullYear();
+        G['Sorties'].push(['Lumières de test', 'Ville test', fr, fr, '18 € TTC au guichet (tarif unique 6 € × 3 personnes) ou 19,50 € TTC en ligne (6 € + 0,50 € de frais × 3)', 'Voiture : 5,7 km, 9 min depuis la mairie (itinéraire OSRM). Transports : bus 1, 14 min tout compris dont 7 min de bus (Rome2Rio, https://exemple.fr).', 'à partir de 3 ans', '', 'Proposée', fr, 'Ulysse', ''],
+          ['Conte de test', 'Ville test', fr, fr, '0 € TTC (accès libre sur réservation)', '', '', '', 'Proposée', fr, 'Ulysse', '']);
+        location.hash = '#voir-recent'; });
+      await p.waitForTimeout(2500); await p.evaluate(() => { location.hash = '#sorties'; }); await p.waitForTimeout(1500);
+      const t = await p.evaluate(() => [...document.querySelectorAll('#view .mchips')].map((x) => x.innerText.replace(/\s+/g, ' ')).join(' | '));
+      ok('Sorties : un prix écrit en phrase donne son premier montant (« 18 € TTC au guichet », pas « 186 320 € »), 0 € = « Gratuit », trajet en une ligne', /18 € TTC au guichet/.test(t) && !/186/.test(t) && /Gratuit/.test(t) && /Voiture 9 min \(5,7 km\) · transports 14 min/.test(t) && !/rome2rio/i.test(t), t.slice(0, 200)); }
     /* aucune rubrique n'affiche de texte cassé */
     const broken = [];
     for (const t of ['accueil', 'demandes', 'agenda', 'suivi', 'achats', 'voyages', 'sorties', 'papiers', 'equipe', 'automatisations', 'reglages']) {
