@@ -31,7 +31,7 @@ function answer(raw) {
   /* 0.23.0 : comparatif des variantes d'un produit suivi (JSON) */
   if (/^Comparatif à préparer pour « /.test(input)) {
     const arr = JSON.parse(input.split('données) :\n')[1].split('\n')[0]);
-    return {text: JSON.stringify({resume: 'Deux robots proches : le second lave mieux.', difference_cle: 'La serpillière vibrante du Sonic.', criteres: [{nom: 'Aspiration', unite: 'Pa', plus_haut_mieux: true}, {nom: 'Bruit', unite: 'dB', plus_haut_mieux: false}],
+    return {text: JSON.stringify({resume: 'Deux robots proches : le second lave mieux.', difference_cle: 'La serpillière vibrante du Sonic.', criteres: [{nom: 'Aspiration', unite: 'Pa', plus_haut_mieux: true}, {nom: 'Prix du jour', unite: '€', plus_haut_mieux: false}, {nom: 'Bruit', unite: 'dB', plus_haut_mieux: false}],
       variantes: arr.map((p, i) => ({nom: p.nom, pour_qui: 'Pour un appartement ' + (i ? 'avec carrelage' : 'avec tapis'), utilite: 'Aspire et lave chaque jour', points_forts: ['Puissant', 'Station autonome'], limites: ['Bruyant'], valeurs: {Aspiration: 20000 + i * 2000, Bruit: 64 - i}, qualite: 7 + i, rapport_qualite_prix: 8 - i, verdict: 'Bon choix ' + (i + 1), image: ''})),
       conseil: 'Prends le premier au prix du jour.', certitude: 'likely', sources: ['https://exemple.fr/test']})};
   }

@@ -13,7 +13,7 @@ const CSS = `
 .jv-btn .orb-stage canvas, .jv-stage canvas { display: block; width: 100% !important; height: 100% !important; }
 .jv-btn::after { content: ""; position: absolute; inset: 2px; border-radius: 50%; box-shadow: 0 0 0 1px rgba(180, 192, 255, .25), 0 8px 30px rgba(99, 102, 241, .45); animation: jvpulse 2.6s ease-in-out infinite; pointer-events: none; }
 @keyframes jvpulse { 50% { box-shadow: 0 0 0 1px rgba(180, 192, 255, .35), 0 8px 44px rgba(124, 92, 255, .7); } }
-.jv { position: fixed; inset: 0; z-index: 9999; display: flex; flex-direction: column; background: radial-gradient(120% 60% at 20% 0, #0b2027 0, #050509 50%); color: #eef1fb; font: 400 15px/1.5 Inter, system-ui, -apple-system, sans-serif; padding: calc(10px + env(safe-area-inset-top, 0px)) 16px calc(10px + env(safe-area-inset-bottom, 0px)); }
+.jv { position: fixed; inset: 0; z-index: 9999; display: flex; flex-direction: column; background: radial-gradient(120% 60% at 20% 0, #0b2027 0, #050509 50%); color: #eef1fb; font: 400 15px/1.5 Inter, system-ui, -apple-system, sans-serif; padding: calc(10px + env(safe-area-inset-top, 0px) * 1.4) 16px calc(10px + env(safe-area-inset-bottom, 0px)); }
 .jv[hidden] { display: none; }
 .jv-top { display: flex; align-items: center; gap: 8px; color: #9aa3c2; font-size: 13px; }
 .jv-dot { width: 8px; height: 8px; border-radius: 50%; background: #5b8cff; box-shadow: 0 0 10px #5b8cff; }
