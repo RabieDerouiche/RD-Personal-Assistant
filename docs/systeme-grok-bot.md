@@ -20,7 +20,7 @@ Source de vérité commune. Onglets Faits, Dossiers, Échéances, Prix, Sources,
 - Onglet **Sorties** (13/11/2026, à sa demande : « les propositions de sorties restent des propositions ») : une ligne par idée d'Ulysse (Sortie, Où, Début, Fin, prix total TTC, Trajet, Âge, Lien, Statut, Proposée le, Bot, Remarque). Statuts : Proposée, Faite, Supprimée (ne lui plaît pas : Ulysse ne repropose rien de semblable), Retirée (période passée, pas un refus). Une idée n'est jamais une demande dans le Canal (Charte, section 7 ; fiche Ulysse, paragraphe « Onglet Sorties »). Les 5 idées du 12/11 y sont recopiées ; Ulysse change sa routine par la ligne 50 du Canal (oui d'avance).
 - Onglet **Déploiement** : compte rendu de la mise en place, une ligne par point de fiche. Argus remplit État, Preuve et Reste à faire ; toi, la colonne « Vérifié par Claude ».
 - Onglet **Textes des routines** : le texte enregistré de chaque routine, recopié par Argus. Vérifie un bot sur ce texte, jamais sur ce qu'un bot dit avoir fait.
-- Onglet **Faits**, lignes lues par la page : « Sonnette <bot> » (adresse de la sonnette de chaque bot), « Lien Grok <Bot> », « Grok en pause jusqu'au » (date de reprise notée depuis la page, puis « Reprise sonnée le … »), « Reset Grok » (facultative, ex. « mardi 12h »).
+- Onglet **Faits**, lignes lues par la page : « Sonnette <bot> » (adresse de la sonnette de chaque bot ; depuis le 18/11/2026, la page et le serveur y prennent l'adresse même si le bot l'a écrite dans une phrase, comme la ligne d'Ulysse), « Lien Grok <Bot> », « Grok en pause jusqu'au » (date de reprise notée depuis la page, puis « Reprise sonnée le … »), « Reset Grok » (facultative, ex. « mardi 12h »).
 
 ## Le Canal en détail
 

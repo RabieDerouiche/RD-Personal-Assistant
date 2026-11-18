@@ -21,8 +21,9 @@ self.addEventListener('notificationclick', (e) => {
   e.notification.close();
   const url = new URL((e.notification.data && e.notification.data.url) || '/', self.registration.scope).href;
   e.waitUntil(self.clients.matchAll({type: 'window', includeUncontrolled: true}).then((cs) => {
+    /* 18/11/2026 : l'app déjà ouverte reçoit l'adresse (« /#voir-<ligne du Canal> ») : elle relit Pilotage et ouvre la réponse */
     const c = cs.find((x) => 'focus' in x);
-    if (c) return (c.navigate ? c.navigate(url).catch(() => c) : Promise.resolve(c)).then((w) => (w || c).focus());
+    if (c) { try { c.postMessage({type: 'jarvis-notif', url}); } catch (x) { /* rien */ } return c.focus().catch(() => null); }
     return self.clients.openWindow(url);
   }));
 });

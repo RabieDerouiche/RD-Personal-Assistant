@@ -70,17 +70,18 @@ export function createNotifier({S, save, push, read, linked, pause, now = () => 
       if (!prev) return;   /* première lecture : on prend l'état tel quel, sans rien annoncer */
       const before = prev[key], what = String((iObj >= 0 && r[iObj]) || (iType >= 0 && r[iType]) || '').trim();
       if (toBot && before) {
-        if (now1.s === 'attend ton oui' && before.s !== 'attend ton oui') events.push({bot: String(r[iPour]).trim(), kind: 'oui', what, text: rep});
-        else if (rep && now1.r !== before.r) events.push({bot: String(r[iPour]).trim(), kind: 'reponse', what, text: rep});
+        if (now1.s === 'attend ton oui' && before.s !== 'attend ton oui') events.push({bot: String(r[iPour]).trim(), kind: 'oui', what, text: rep, row: k + 2});
+        else if (rep && now1.r !== before.r) events.push({bot: String(r[iPour]).trim(), kind: 'reponse', what, text: rep, row: k + 2});
       }
-      if (fromBot && !before && OPEN(st)) events.push({bot: String(r[iDe]).trim(), kind: 'demande', what, text: String(r[iMsg] || '').trim()});
+      if (fromBot && !before && OPEN(st)) events.push({bot: String(r[iDe]).trim(), kind: 'demande', what, text: String(r[iMsg] || '').trim(), row: k + 2});
     });
     return {events, seen, badge};
   }
+  /* 18/11/2026 : l'adresse mène à la ligne du Canal (« /#voir-<ligne> ») ; l'app relit Pilotage et ouvre la réponse */
   function canalMessage(events, badge) {
     const line = (e) => e.bot + (e.kind === 'demande' ? ' te demande' : e.kind === 'oui' ? ' attend ton oui' : ' a répondu') + (e.what ? ' (' + e.what + ')' : '') + ' : ' + e.text.replace(/\s+/g, ' ').slice(0, 140);
-    if (events.length === 1) { const e = events[0]; return {title: e.bot + (e.kind === 'demande' ? ' te demande' : e.kind === 'oui' ? ' attend ton oui' : ' a répondu'), body: (e.what ? e.what + ' : ' : '') + e.text.replace(/\s+/g, ' ').slice(0, 220), url: '/#demandes', badge, tag: 'canal'}; }
-    return {title: events.length + ' nouvelles de tes bots', body: events.slice(0, 3).map(line).join('\n') + (events.length > 3 ? '\n… et ' + (events.length - 3) + ' autres' : ''), url: '/#demandes', badge, tag: 'canal'};
+    if (events.length === 1) { const e = events[0]; return {title: e.bot + (e.kind === 'demande' ? ' te demande' : e.kind === 'oui' ? ' attend ton oui' : ' a répondu'), body: (e.what ? e.what + ' : ' : '') + e.text.replace(/\s+/g, ' ').slice(0, 220), url: '/#voir-' + e.row, badge, tag: 'canal'}; }
+    return {title: events.length + ' nouvelles de tes bots', body: events.slice(0, 3).map(line).join('\n') + (events.length > 3 ? '\n… et ' + (events.length - 3) + ' autres' : ''), url: '/#voir-recent', badge, tag: 'canal'};
   }
   async function checkCanal(force) {
     if (!force && now() - (S.notify.lastCanal || 0) < everyMs) return null;

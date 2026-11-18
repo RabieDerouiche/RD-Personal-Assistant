@@ -40,6 +40,11 @@ try {
   await p.goto(BASE + '/?serveur#agenda'); await p.waitForTimeout(4000);
   ok('agenda en direct : carte Aujourd\'hui, 7 prochains jours, grille', await p.evaluate(() => !!document.querySelector('.agt .agt-date') && document.querySelectorAll('.agw-d').length === 7 && !!document.querySelector('.mgrid .mg-d.is-today')));
   await p.screenshot({path: SH + 'os-live-agenda.png'});
+  /* 0.21.0 : la notification « Iris a répondu » ouvre « /#voir-<ligne> » : la page relit Pilotage par le serveur et ouvre ton ordre avec la réponse */
+  await p.goto(BASE + '/?serveur#voir-2'); await p.waitForTimeout(4500);
+  { const v = await p.evaluate(() => { const s = document.getElementById('sheet'); return [location.hash, s && !s.hidden ? s.innerText : '']; });
+    ok('notification : « /#voir-2 » ouvre la ligne 2 du Canal (ton ordre, la réponse d\'Iris), en direct par le serveur', v[0] === '#demandes' && /Ton ordre/i.test(v[1]) && /Noté\./.test(v[1]), v[0] + ' ' + v[1].replace(/\s+/g, ' ').slice(0, 100));
+    await p.screenshot({path: SH + 'os-voir-ligne.png'}); }
   await p.goto(BASE + '/?serveur#papiers'); await p.waitForTimeout(3000);
   ok('papiers en direct : arborescence demandée au Drive (lecture seule)', FG.calls.some((c) => c.path === '/drive/files') && FG.calls.filter((c) => c.path.startsWith('/drive')).every((c) => c.method === 'GET') && await p.evaluate(() => !!document.querySelector('.pap-n')));
   /* outils de Claude dans la discussion et « Confier à la tâche Claude », sur le serveur (16/11/2026) */
