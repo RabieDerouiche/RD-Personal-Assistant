@@ -98,8 +98,9 @@
     background: linear-gradient(180deg, rgba(251, 191, 36, .12), rgba(4, 12, 34, .82)) padding-box, linear-gradient(135deg, rgba(251, 191, 36, .75), rgba(251, 191, 36, .2) 50%, rgba(168, 85, 247, .45)) border-box; box-shadow: 0 0 18px rgba(251, 191, 36, .12); }
   html.theme-holo .hero.boss { background: radial-gradient(420px 220px at 50% 0%, rgba(56, 189, 248, .16), transparent 70%) padding-box, linear-gradient(180deg, rgba(12, 38, 92, .55), rgba(4, 12, 34, .82)) padding-box, linear-gradient(135deg, rgba(103, 232, 249, .65), rgba(99, 102, 241, .28) 45%, rgba(168, 85, 247, .55)) border-box; }
   /* 17/11/2026 (retour du propriétaire : « le bandeau en haut est assombri ») : même teinte que la bande de la barre d'état (rgb 4, 11, 31), un seul bandeau */
-  html.theme-holo .top { background: rgba(4, 11, 31, .94); border-bottom: 1px solid rgba(56, 189, 248, .3); box-shadow: 0 1px 0 rgba(56, 189, 248, .12), 0 10px 30px rgba(14, 165, 233, .08); }
-  html.theme-holo .brand b { font: 700 19px var(--logo); letter-spacing: .2em; background: linear-gradient(90deg, #a5f3fc, #e0f2fe 45%, #60a5fa); -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 0 8px rgba(56, 189, 248, .65)); }
+  /* 18/11/2026 (« le haut du bandeau est un peu flouté ») : fond opaque, plus de flou de ce qui défile dessous ni de halo de 30 px */
+  html.theme-holo .top { background: rgb(4, 11, 31); -webkit-backdrop-filter: none; backdrop-filter: none; border-bottom: 1px solid rgba(56, 189, 248, .3); box-shadow: 0 1px 0 rgba(56, 189, 248, .12); }
+  html.theme-holo .brand b { font: 700 19px var(--logo); letter-spacing: .2em; background: linear-gradient(90deg, #a5f3fc, #e0f2fe 45%, #60a5fa); -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 0 3px rgba(56, 189, 248, .55)); }
   html.theme-holo .view-title { font: 600 12px var(--tech); letter-spacing: .2em; color: #7dd3fc; }
   html.theme-holo .view-title::after { content: ""; display: block; height: 1px; margin-top: 8px; background: linear-gradient(90deg, rgba(56, 189, 248, .8), rgba(168, 85, 247, .35) 50%, transparent); box-shadow: 0 0 8px rgba(56, 189, 248, .5); }
   html.theme-holo .panel-h h2 { display: flex; align-items: center; gap: 9px; color: #e0f2fe; letter-spacing: .01em; }
@@ -550,6 +551,9 @@
   textarea.inp { resize: vertical; }
   select.inp option { background: #0c1222; }
   .inp:focus-visible { outline: 2px solid var(--accent); outline-offset: 0; }
+  /* 18/11/2026 (« dans Agenda et dans Suivi, un bloc dépasse ») : sur iPhone, un champ date ou heure garde sa largeur propre et sort de sa carte */
+  input.inp[type="date"], input.inp[type="time"], input.inp[type="datetime-local"] { -webkit-appearance: none; appearance: none; display: block; min-width: 0; max-width: 100%; text-align: left; }
+  input.inp::-webkit-date-and-time-value { text-align: left; min-height: 1.4em; }
   .pick-bot { flex-direction: column; align-items: flex-start; gap: 2px; min-height: 58px; }
   .pick-bot .dot { margin: 0; }
   .pick-bot small { font-size: 11px; color: var(--muted); }
@@ -1000,7 +1004,7 @@
   .done-ic { flex: 0 0 auto; width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; background: rgba(110, 231, 183, .2); color: #6ee7b7; }
   .done-foot { display: flex; justify-content: space-between; gap: 8px; margin-top: 10px; }
   .btn.ai-next { background: linear-gradient(90deg, rgba(245, 158, 11, .16), rgba(59, 7, 100, .35)); border-color: rgba(251, 191, 36, .45); color: var(--fg); }
-  .toast { pointer-events: auto; display: flex; gap: 10px; align-items: center; }
+  .toast { pointer-events: auto; display: flex; gap: 10px; align-items: center; touch-action: pan-x; }
   .toast-txt { flex: 1; min-width: 0; }
   .toast-undo { flex: 0 0 auto; }
   .toast-x { flex: 0 0 auto; width: 32px; height: 32px; margin: -6px -8px -6px 2px; border: 0; border-radius: 50%; background: transparent; color: var(--muted); font: 400 22px/1 var(--sans); cursor: pointer; }
@@ -1032,7 +1036,7 @@
   .fab-talk { position: fixed; right: max(14px, env(safe-area-inset-right, 0px)); bottom: calc(84px + env(safe-area-inset-bottom, 0px)); z-index: 41; width: 56px; height: 56px; border-radius: 50%; border: 1px solid rgba(180, 192, 255, .5); background: linear-gradient(135deg, #7dd3fc, #c4b5fd 55%, #fda4af); color: #0b1020; display: grid; place-items: center; box-shadow: 0 10px 28px rgba(99, 102, 241, .4); }
   body.noscroll .fab-talk { display: none; }
   .hist-panel .seg { align-self: flex-start; }
-  .alert-t { flex-wrap: wrap; } .alert-acts { display: flex; gap: 6px; } .alert-acts .btn { width: auto; flex: 0 0 auto; }
+  .alert-t { flex-wrap: wrap; } .alert-t .toast-txt { cursor: pointer; } .alert-acts { display: flex; gap: 6px; flex: 1 0 100%; justify-content: flex-end; } .alert-acts .btn { width: auto; flex: 0 0 auto; }
   .talk-quick { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; padding: 8px 16px 0; border-top: 1px solid var(--line); }
   .talk-quick .btn { width: auto; flex: 0 0 auto; }
   .sys { margin: 0; display: flex; flex-direction: column; gap: 2px; }
@@ -1325,6 +1329,11 @@
   .pm-sec > summary { list-style: none; cursor: pointer; display: flex; align-items: baseline; gap: 10px; padding: 4px 0 8px; }
   .pm-sec > summary::-webkit-details-marker { display: none; } .pm-sec > summary h2 { margin: 0; } .pm-sec > summary .aside { margin-left: auto; }
   .pm-list { display: grid; gap: 12px; }
+  .ord-tx { display: grid; gap: 3px; min-width: 0; } .ord-tx > span { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; } .ord-rep { color: var(--muted); font-size: 12.5px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+  .pm-rep { font: inherit; color: var(--fg); text-align: left; display: grid; gap: 4px; width: 100%; min-width: 0; padding: 11px 13px; border-radius: 14px; border: 1px solid var(--line); background: var(--glass-2); cursor: pointer; }
+  .pm-rep-h { display: flex; gap: 8px; align-items: baseline; min-width: 0; } .pm-rep-h small { color: var(--muted); font-size: 12px; }
+  .pm-rep-a { font-size: 14px; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+  .pm-rep-q { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .pm-card { cursor: pointer; display: grid; gap: 8px; padding: 14px; }
   .pm-card.is-exp { border-color: rgba(248, 113, 113, .35); }
   .pm-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12.5px; color: var(--muted); }
@@ -2408,7 +2417,7 @@ void main(){
       const who = BOT[k.bot].name, q = '« ' + k.title + ' »';
       return [
         ord('Où en est-on ?', k.bot, 'Où en est le dossier ' + q + ' ? Fait, bloqué, suite, en 3 lignes.', 'Je te fais le point.', 'Toujours sans réponse de ' + k.who + ' : une relance serait utile.', 'main'),
-        ord('Relancer ' + k.who, k.bot, 'Prépare un brouillon de relance à ' + k.who + ' pour ' + q + '.', 'Je rédige la relance.', 'Brouillon de relance prêt dans Gmail.', 'main2'),
+        ord('Relancer ' + String(k.who).replace(/^([^@\s]+)@([^.\s]+)\..*$/, (m, u, d) => /^(contact|info|support|service|noreply|no-reply|hello|bonjour)$/i.test(u) ? d : u).replace(/\s*\(.*\)\s*$/, ''), k.bot, 'Prépare un brouillon de relance à ' + k.who + ' pour ' + q + '.', 'Je rédige la relance.', 'Brouillon de relance prêt dans Gmail.', 'main2'),
         act('Ajouter une info', {pick: {kind: 'text', label: 'Ce qui est nouveau', placeholder: 'ex. le syndic a appelé ce matin'}, go: (v) => ({title: 'Info transmise', effect: 'Une ligne « Info » pour ' + who + ' : « ' + v.txt + ' » ; il met le dossier à jour.', bot: k.bot, order: 'Info sur ' + q + ' : ' + v.txt, say: 'Merci, je mets le dossier à jour.', reply: 'Dossier mis à jour.'})}),
         act('Rappelle-le-moi', {pick: {kind: 'snooze'}, go: (v) => ({title: 'Rappel noté', effect: 'Une échéance « Point sur ' + k.title + ' » ' + v.txt + ' dans Pilotage.', mutate: () => S.echeances.push({id: 'e' + (++SEQ), n: v.n, title: 'Point sur ' + k.title, nature: 'moi', domain: 'Dossiers', bot: k.bot}), bot: k.bot, say: 'Je te le rappelle.', work: false})}),
         act('Clore le dossier', {tone: 'danger', confirm: true, go: () => ({title: 'Dossier clos', effect: 'Le dossier passe à « Fait » dans Pilotage ; ' + who + ' arrête de le suivre.', mutate: () => drop('dossiers', k.id), bot: k.bot, say: 'Dossier rangé.', work: false})})
@@ -3504,7 +3513,7 @@ void main(){
       const ords = EQ.allOrd ? S.ordres : S.ordres.slice(0, 6);
       el.append(panel('Tes ordres', null, h('div', {class: 'stack'},
         btn('Nouvel ordre', () => openSheet({bot: 'hydra', title: 'Nouvel ordre', say: 'À qui tu donnes un ordre ?', actions: BOTS.concat([BOT.claude]).map((b) => write(b.id, b.name))}), 'main', 'send'),
-        ords.length ? ords.map((o) => h('button', {type: 'button', class: 'canal-row', style: botVars(o.bot), onclick: () => openItem('ordre', o)}, h('time', {text: rel(o.n)}), h('span', {text: BOT[o.bot].name + ' · ' + o.text}), h('span', {class: 'pill' + (/^à faire/i.test(o.status) ? ' is-demande' : ''), text: o.status}))) : emptyState('Aucun ordre envoyé.'),
+        ords.length ? ords.map((o) => h('button', {type: 'button', class: 'canal-row', style: botVars(o.bot), onclick: () => openItem('ordre', o)}, h('time', {text: rel(o.n)}), h('span', {class: 'ord-tx'}, h('span', {text: BOT[o.bot].name + ' · ' + o.text}), o.reply ? h('small', {class: 'ord-rep', text: '↳ ' + o.reply}) : null), h('span', {class: 'pill' + (/^à faire/i.test(o.status) ? ' is-demande' : ''), text: o.status}))) : emptyState('Aucun ordre envoyé.'),
         S.ordres.length > 6 ? h('button', {type: 'button', class: 'link', onclick: () => { EQ.allOrd = !EQ.allOrd; renderView(true); }}, EQ.allOrd ? 'Seulement les 6 derniers' : 'Tous tes ordres (' + S.ordres.length + ')') : null)));
       /* JARVIS OS (doublon 16) : « Déposer un document » est dans la rubrique Papiers */
     },
@@ -4803,10 +4812,12 @@ void main(){
     const faits = rows('faits');
     if (faits) {
       const bell = faits.find((r) => lvLow(r['Fait']) === 'sonnette jarvis');
-      LV.bell = bell && LV.DOMAIN.test(bell['Valeur'] || '') ? bell['Valeur'].trim() : '';
+      /* JARVIS OS (18/11/2026) : la ligne « Sonnette Ulysse » contient une phrase autour de l'adresse ; l'adresse est extraite (sinon Ulysse passait pour sans sonnette) */
+      const bellAddr = (v) => { const m = String(v || '').match(/[a-z0-9._+-]+@[a-z0-9.-]+/i); return m && LV.DOMAIN.test(m[0]) ? m[0] : ''; };
+      LV.bell = bell ? bellAddr(bell['Valeur']) : '';
       /* la sonnette de chaque bot (Charte, section 7, 13/11/2026) : ligne « Sonnette <nom> » de l'onglet Faits */
       LV.bells = {};
-      BOTS.forEach((b) => { if (b.id === 'hydra') return; const r = faits.find((x) => lvLow(x['Fait']) === 'sonnette ' + lvLow(b.name)); if (r && LV.DOMAIN.test(r['Valeur'] || '')) LV.bells[b.id] = r['Valeur'].trim(); });
+      BOTS.forEach((b) => { if (b.id === 'hydra') return; const r = faits.find((x) => lvLow(x['Fait']) === 'sonnette ' + lvLow(b.name)); const a = r ? bellAddr(r['Valeur']) : ''; if (a) LV.bells[b.id] = a; });
       S.anniv = [];
       faits.forEach((r, i) => {
         const v = r['Valeur'] || '', m = v.match(/(?:née?|anniversaire)\s+le\s+(\d{2})\/(\d{2})(?:\/(\d{4}))?/i);
@@ -4910,7 +4921,10 @@ void main(){
             state: /^choisi|^réserv/.test(lvLow(o['Statut'])) ? 'choisie' : /^écart/.test(lvLow(o['Statut'])) ? 'ecartee' : 'proposee', why: o['Raison ou remarque'] || '', pros: o['Raison ou remarque'] || ''})),
           src: 'Onglet Voyages de Pilotage'};
         v.checks.forEach((c) => { if (/^rabie\b/i.test(c.t)) c.who = 'toi'; });
-        const d1 = lvFrIso(dates); v.depart = d1 ? N(d1) : null;
+        /* JARVIS OS (18/11/2026, « J--2 » à l'accueil) : « Fixées par Rabie le 16/11/2026 : … aller le 27/02/2027 » ; la première date du texte était
+           celle où les dates ont été fixées. Le départ est la première date à venir ; à défaut, la dernière passée (voyage en cours ou fini) */
+        const ds = [...String(dates).matchAll(/(\d{1,2})\/(\d{1,2})\/(\d{4})/g)].map((m) => N(m[3] + '-' + pad2(+m[2]) + '-' + pad2(+m[1]))).filter((n) => !isNaN(n));
+        const fut = ds.filter((n) => n >= 0).sort((a, b) => a - b); v.depart = fut.length ? fut[0] : ds.length ? Math.max(...ds) : null;
         if (/proposition/i.test(dates)) v.plan = {dates: [['', dates.replace(/^.*?proposition[^:]*:\s*/i, '')]], conges: '', why: dates.split(/proposition/i)[0].replace(/[.\s]+$/, '')};
         return v;
       });
@@ -5035,7 +5049,7 @@ void main(){
     const bad = Object.keys(LV.st).map((k) => LV.st[k]).find((s) => s.err && LV_SOURCES[s.key] && LV_SOURCES[s.key].server === LV.SHEETS);
     n.classList.toggle('is-live', !!LV.mcp && !bad); n.classList.toggle('is-bad', !LV.mcp || !!bad);
     const waiting = typeof LV_WAIT !== 'undefined' && LV_WAIT.size ? ' · attend ' + Array.from(new Set(Array.from(LV_WAIT.values()).map((w) => lvName(w.bot)))).join(', ') : '';
-    n.textContent = (!LV.mcp ? (LV.gave ? 'Hors liaison : connecteurs non reçus' : 'Connexion à Pilotage…') : bad ? 'En direct · ' + lvExplain(bad.err, bad.err.server) : SNAP ? 'En direct · Pilotage ' + SNAP : 'Lecture de Pilotage…') + waiting;
+    n.textContent = (!LV.mcp ? (LV.gave ? 'Hors liaison : connecteurs non reçus' : 'Connexion à Pilotage…') : bad ? 'En direct · ' + lvExplain(bad.err, bad.err.server) : SNAP ? 'En direct · ' + SNAP.replace(/^lu à /, '') : 'Lecture de Pilotage…') + waiting;   /* 18/11/2026 : « En direct · 14h41 », qui tient dans l'en-tête de l'iPhone */
   }
   const lvSchedule = () => { clearTimeout(LV.timer); LV.timer = setTimeout(lvApply, 200); };
   LV.sig = {};
@@ -5355,7 +5369,7 @@ void main(){
     const v = S.coteVis || [];
     if (!v.length) return null;
     const when = (t) => fmt(new Date(t), {weekday: 'short', day: 'numeric', month: 'long'});
-    return h('details', {class: 'panel cote-panel'}, h('summary', {}, h('h2', {text: 'En attente, plus tard, en rappel'}), h('span', {class: 'aside', text: v.length + ' carte' + (v.length > 1 ? 's' : '')})),
+    return h('details', {class: 'panel cote-panel', open: ''}, h('summary', {}, h('h2', {text: 'En attente, plus tard, en rappel'}), h('span', {class: 'aside', text: v.length + ' carte' + (v.length > 1 ? 's' : '')})),
       h('div', {class: 'cote-l'}, v.map((x) => h('div', {class: 'cote-it', style: botVars(x.d.bot)}, h('div', {class: 'cote-tx'}, h('b', {text: x.d.title}),
         h('small', {text: x.p ? 'Répondu le ' + when(x.p.at) + ' · en attente du passage de ' + lvName(x.d.bot) : x.c ? (x.c.jusqu ? 'Plus tard · revient le ' + when(x.c.jusqu) : 'Plus tard, sans date · rappel chaque dimanche à 18 h') : 'En rappel · revient le ' + when(x.r.back) + ' · rappels : ' + x.r.e.rem})),
         h('button', {type: 'button', class: 'btn sm', onclick: () => coteRemettre(x)}, 'Remettre')))));
@@ -6884,18 +6898,46 @@ void main(){
     const c = ALR.ctx; if (!c || c.state !== 'running') return;
     try { [[880, 0], [1320, 0.16]].forEach(([f, t]) => { const o = c.createOscillator(), g = c.createGain(); o.type = 'sine'; o.frequency.value = f; g.gain.setValueAtTime(0.0001, c.currentTime + t); g.gain.exponentialRampToValueAtTime(0.18, c.currentTime + t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, c.currentTime + t + 0.28); o.connect(g).connect(c.destination); o.start(c.currentTime + t); o.stop(c.currentTime + t + 0.3); }); } catch (e) { /* rien */ }
   }
-  function alertShow(title, text, tab) {
+  /* JARVIS OS (18/11/2026, retour du propriétaire : « la notif ne part pas d'un glissé ni d'un appui », « Voir ne fait rien », « l'app ne montre pas ce
+     qu'Iris a répondu ») : le bandeau se ferme d'un glissé vers le haut ou de sa croix ; un appui ou « Voir » ouvre la réponse elle-même. */
+  function alertShow(title, text, open) {
     const box = $('toasts'); if (!box) return;
     /* la page annonce déjà certaines réponses (ordre envoyé d'ici) : on remplace ce bandeau simple par celui-ci, sans doublon */
     Array.from(box.children).forEach((x) => { if (!x.classList.contains('alert-t') && (x.querySelector('b') || {}).textContent === title) x.remove(); });
     if (Array.from(box.querySelectorAll('.alert-t b')).some((b) => b.textContent === title)) return;
     alertChime();
-    const t = h('div', {class: 'toast is-bot alert-t', role: 'status'}, h('div', {class: 'toast-txt'}, h('b', {text: title}), h('span', {text: text.length > 160 ? text.slice(0, 157) + '…' : text})),
-      h('div', {class: 'alert-acts'}, h('button', {type: 'button', class: 'btn sm', onclick: () => { voxSpeak({text: title + '. ' + text}); }}, 'Écouter'), tab ? h('button', {type: 'button', class: 'btn sm', onclick: () => { t.remove(); go(tab); }}, 'Voir') : null));
+    const bye = () => { if (t.classList.contains('out')) return; t.classList.add('out'); setTimeout(() => t.remove(), 320); };
+    const see = () => { bye(); if (open) open(); else go('demandes'); };
+    const t = h('div', {class: 'toast is-bot alert-t', role: 'status'}, h('div', {class: 'toast-txt', onclick: see}, h('b', {text: title}), h('span', {text: text.length > 160 ? text.slice(0, 157) + '…' : text})),
+      h('button', {type: 'button', class: 'toast-x', 'aria-label': 'Fermer', onclick: bye}, '×'),
+      h('div', {class: 'alert-acts'}, h('button', {type: 'button', class: 'btn sm', onclick: () => { voxSpeak({text: title + '. ' + text}); }}, 'Écouter'), h('button', {type: 'button', class: 'btn sm main', onclick: see}, 'Voir')));
+    let y0 = null;
+    t.addEventListener('touchstart', (e) => { y0 = e.touches[0].clientY; }, {passive: true});
+    t.addEventListener('touchmove', (e) => { if (y0 == null) return; const dy = e.touches[0].clientY - y0; if (dy < 0) t.style.transform = 'translateY(' + dy + 'px)'; if (dy < -28) { y0 = null; bye(); } }, {passive: true});
+    t.addEventListener('touchend', () => { if (y0 != null) t.style.transform = ''; y0 = null; }, {passive: true});
     box.append(t);
     while (box.children.length > 3) box.firstChild.remove();
-    setTimeout(() => { t.classList.add('out'); setTimeout(() => t.remove(), 320); }, 30000);
+    setTimeout(bye, 30000);
   }
+  /* ouvrir une ligne du Canal : ton ordre et sa réponse, la demande qu'elle porte, sinon la ligne elle-même */
+  function voirLigne(row) {
+    row = +row;
+    const o = (S.ordres || []).find((x) => x.id === 'o:' + row);
+    if (o) { openItem('ordre', o); return true; }
+    const l = (S.canal || []).find((x) => +x._row === row);
+    if (!l) return false;
+    const d = (S.demandes || []).find((x) => lvLow(x.title) === lvLow(l.subject) || (l.objet && lvLow(x.title) === lvLow(l.objet)));
+    if (d) { openItem('demande', d); return true; }
+    const b = BOT[l.to] && !['toi', 'claude'].includes(l.to) ? l.to : BOT[l.from] && !['toi', 'claude'].includes(l.from) ? l.from : 'hydra';
+    openSheet({bot: b, kicker: 'Canal · ' + l.date + (l.status ? ' · ' + l.status : ''), title: l.subject || l.objet || 'Ligne ' + row, say: l.reply || l.msg,
+      facts: [['De', l.from === 'rabie' ? 'Toi' : lvName(l.from)], ['Message', l.msg]].concat(l.reply ? [['Réponse', l.reply]] : []), actions: []});
+    return true;
+  }
+  const voirOrdre = (id) => () => { const o = (S.ordres || []).find((x) => x.id === id); if (o) openItem('ordre', o); else go('demandes'); };
+  const voirDemande = (id) => () => { const d = (S.demandes || []).find((x) => x.id === id); if (d) openItem('demande', d); else go('demandes'); };
+  /* la feuille d'un ordre montre la réponse du bot dès qu'il y en a une, quel que soit le statut */
+  const SOR_OS = SHEETCFG.ordre;
+  SHEETCFG.ordre = (o) => { const c = SOR_OS(o); if (o.reply) c.say = o.reply; c.kicker = 'Ton ordre · ' + (o.status || 'À faire'); c.facts = [['Envoyé', o.date || rel(o.n)], ['Statut', o.status || 'À faire']]; return c; };
   function alertsCheck() {
     if (!LV.mcp || !LV.t.canal) return;
     const now = {o: {}, d: new Set()};
@@ -6907,16 +6949,53 @@ void main(){
     (S.ordres || []).forEach((o) => {
       const was = b.o[o.id]; if (was == null || was === now.o[o.id]) return;
       const [, rep0] = was.split('|'), name = BOT[o.bot] ? BOT[o.bot].name : 'Un bot';
-      if (o.reply && o.reply !== rep0) got.push([name + ' a répondu', o.reply, 'demandes']);
-      else if (/^attend ton oui/i.test(o.status)) got.push([name + ' attend ton oui', o.text, 'demandes']);
-      else if (/^fait/i.test(o.status)) got.push([name + ' a fini', o.text, 'demandes']);
+      if (o.reply && o.reply !== rep0) got.push([name + ' a répondu', o.reply, voirOrdre(o.id)]);
+      else if (/^attend ton oui/i.test(o.status)) got.push([name + ' attend ton oui', o.text, voirOrdre(o.id)]);
+      else if (/^fait/i.test(o.status)) got.push([name + ' a fini', o.text, voirOrdre(o.id)]);
     });
-    (S.demandes || []).forEach((d) => { if (!b.d.has(d.id)) got.push(['Nouvelle demande de ' + (BOT[d.bot] ? BOT[d.bot].name : 'un bot'), d.title + (d.ask ? ' : ' + d.ask : ''), 'demandes']); });
-    got.slice(0, 3).forEach(([t, x, tab], i) => setTimeout(() => alertShow(t, x, tab), i * 400));
-    if (got.length > 3) setTimeout(() => toast('Jarvis', 'Et ' + (got.length - 3) + ' autres nouveautés dans Demandes.', true), 1300);
+    (S.demandes || []).forEach((d) => { if (!b.d.has(d.id)) got.push(['Nouvelle demande de ' + (BOT[d.bot] ? BOT[d.bot].name : 'un bot'), d.title + (d.ask ? ' : ' + d.ask : ''), voirDemande(d.id)]); });
+    got.slice(0, 3).forEach(([t, x, op], i) => setTimeout(() => alertShow(t, x, op), i * 400));
+    if (got.length > 3) setTimeout(() => toast('Jarvis', 'Et ' + (got.length - 3) + ' autres nouveautés dans Pour moi.', true), 1300);
   }
+  /* une notification de l'iPhone ouvre « /#voir-<ligne du Canal> » : on relit Pilotage tout de suite, puis on ouvre la réponse.
+     Revenir dans l'app après plus de 20 secondes relit aussi tout (gratuit : lecture de Pilotage, aucun passage de bot). */
+  const VOIR = {row: null, t: null};
+  function voirTry(last) {
+    if (VOIR.row == null || !LV.t.canal) return;
+    const row = VOIR.row;
+    if (row === 'recent' || row === 'cote') { VOIR.row = null; clearTimeout(VOIR.t); const id = row === 'cote' ? 'pm-wait' : 'pm-rep'; setTimeout(() => { const x = document.getElementById(id); if (x) { if (x.tagName === 'DETAILS') x.open = true; x.scrollIntoView({block: 'start'}); } }, 120); return; }
+    const o = (S.ordres || []).find((x) => x.id === 'o:' + row), l = (S.canal || []).find((x) => +x._row === +row);
+    const ready = o ? !!(o.reply || /^attend ton oui/i.test(o.status)) : !!l;
+    if (!ready && !last) return;
+    VOIR.row = null; clearTimeout(VOIR.t);
+    if (!voirLigne(row)) toast('Ligne introuvable', 'La ligne ' + row + ' du Canal a changé : regarde dans Pour moi.', true);
+  }
+  function voirUrl(hash) {
+    const m = String(hash || '').match(/^#voir-(\d+|recent|cote)\b/);
+    if (!m) return false;
+    try { history.replaceState(null, '', '#demandes'); } catch (e) { /* rien */ }
+    VOIR.row = m[1]; clearTimeout(VOIR.t); VOIR.t = setTimeout(() => voirTry(true), 4000);
+    if (TAB !== 'demandes') go('demandes');
+    if (LV.mcp) lvReread(Object.keys(LV_SOURCES));
+    voirTry(false);
+    return true;
+  }
+  window.addEventListener('hashchange', () => { voirUrl(location.hash); });
+  /* l'en-tête d'un iPhone : date courte (« mer. 18 nov. ») pour que « En direct · 14h41 » tienne en entier */
+  setTimeout(() => { const td = $('today'); if (td && window.innerWidth <= 440) td.textContent = fmt(TODAY, {weekday: 'short', day: 'numeric', month: 'short'}); }, 0);
+  setTimeout(() => voirUrl(location.hash), 0);
+  try { if (navigator.serviceWorker && typeof navigator.serviceWorker.addEventListener === 'function') navigator.serviceWorker.addEventListener('message', (ev) => {
+    const d = ev.data || {}; if (d.type !== 'jarvis-notif') return;
+    let u = null; try { u = new URL(d.url || '/', location.href); } catch (e) { u = null; }
+    if (u && voirUrl(u.hash)) return;
+    if (LV.mcp) lvReread(Object.keys(LV_SOURCES));
+    const id = u ? u.hash.slice(1) : ''; if (VIEWS[id] && id !== TAB) go(id);
+  }); } catch (e) { /* navigateur sans service worker : la relecture au retour dans l'app suffit */ }
+  let HID_AT = 0;
+  document.addEventListener('visibilitychange', () => { if (document.hidden) { HID_AT = Date.now(); return; } if (HID_AT && Date.now() - HID_AT > 20000 && LV.mcp) lvReread(Object.keys(LV_SOURCES)); HID_AT = 0; });
+  window.addEventListener('pageshow', (e) => { if (e.persisted && LV.mcp) lvReread(Object.keys(LV_SOURCES)); });
   const LVA0 = lvApply;
-  lvApply = function () { LVA0(); try { alertsCheck(); } catch (e) { /* rien */ } };
+  lvApply = function () { LVA0(); try { alertsCheck(); } catch (e) { /* rien */ } try { voirTry(false); } catch (e) { /* rien */ } };
 
   /* ---------- démarrage ---------- */
   (async () => {
@@ -6937,7 +7016,7 @@ void main(){
   function homeData() {
     const dem = S.demandes.slice().sort((a, b) => (a.due == null ? 999 : a.due) - (b.due == null ? 999 : b.due));
     const ag = [].concat((S.evenements || []).filter((e) => e.n >= 0 && e.n <= 7).map((e) => ({n: e.n, time: e.time, title: e.title, who: 'Agenda', open: () => openItem('evenement', e)})),
-      (S.echeances || []).filter((e) => e.n >= 0 && e.n <= 7).map((e) => ({n: e.n, time: null, title: e.title, who: BOT[e.bot] ? BOT[e.bot].name : '', open: () => openItem('echeance', e)})))
+      (S.echeances || []).filter((e) => e.n >= 0 && e.n <= 7).map((e) => ({n: e.n, time: null, title: e.title, who: BOT[e.bot] ? BOT[e.bot].name : '', mine: !['bot', 'suivi'].includes(e.nature), open: () => openItem('echeance', e)})))
       .sort((a, b) => a.n - b.n || String(a.time || '99').localeCompare(String(b.time || '99')))
       .filter((a, i, arr) => { const k = (x) => lvLow(x.title).replace(/\s*\(.*\)\s*$/, ''); return !arr.slice(0, i).some((b) => b.n === a.n && k(b) === k(a)); });
     const hot = (S.ach || []).filter((f) => ACH_HOT.includes(famState(f))).sort((a, b) => ST_RANK[famState(a)] - ST_RANK[famState(b)]);
@@ -6948,9 +7027,13 @@ void main(){
     const bots = (S.ordres || []).filter((o) => !/^(fait|annul)/i.test(o.status) && o.n >= -2);
     const openFam = (f) => { SEL.achats = f.id; go('achats'); };
     const now = [];
-    dem.slice(0, 2).forEach((d) => now.push({ic: 'chat', t: d.title, sub: (BOT[d.bot] ? BOT[d.bot].name : '') + (d.due != null ? ' · ' + dueTxt(d.due) : ''), urgent: d.due != null && d.due <= 2, open: () => openItem('demande', d)}));
+    /* JARVIS OS (18/11/2026, « le home n'est pas à jour, surtout À faire ») : les mêmes cartes que Pour moi, dans le même ordre (l'urgent, puis à décider, puis à faire), sans les projets au long cours */
+    const pmL = dem.filter((d) => !(typeof pmProj === 'function' && pmProj(d))), urg = (d) => d.due != null && d.due <= 2;
+    const ordered = pmL.filter(urg).concat(pmL.filter((d) => !urg(d) && d.kind !== 'afaire'), pmL.filter((d) => !urg(d) && d.kind === 'afaire'));
+    (S.drafts || []).filter((x) => typeof demandeOfDraft === 'function' && !demandeOfDraft(x)).slice(0, 1).forEach((x) => now.push({ic: 'send', t: x.subject || 'Brouillon', sub: 'Mail à envoyer', open: () => openItem('draft', x)}));
+    ordered.slice(0, 3 - now.length).forEach((d) => now.push({ic: 'chat', t: d.title, sub: (BOT[d.bot] ? BOT[d.bot].name : '') + (d.due != null ? ' · ' + dueTxt(d.due) : ''), urgent: urg(d), open: () => openItem('demande', d)}));
     const past = (a) => { const m = String(a.time || '').match(/(\d{1,2})h(\d{2})?/), d = new Date(); return !!m && (+m[1] * 60 + (+m[2] || 0)) < d.getHours() * 60 + d.getMinutes(); };
-    ag.filter((a) => a.n === 0 && !past(a)).slice(0, 1).forEach((a) => now.push({ic: 'cal', t: a.title, sub: "Aujourd'hui" + (a.time ? ' à ' + a.time : ''), open: a.open}));
+    ag.filter((a) => a.n === 0 && !past(a) && a.mine !== false).slice(0, 1).forEach((a) => now.push({ic: 'cal', t: a.title, sub: "Aujourd'hui" + (a.time ? ' à ' + a.time : ''), open: a.open}));
     if (hot[0] && lead && lead.last) now.push({ic: 'tag', t: hot[0].title + ' à ' + eur2(lead.last.price), sub: ST_TXT[famState(hot[0])] || 'À décider', open: () => openFam(hot[0])});
     return {dem, ag, hot, liveA, fam, lead, wk, trip, bots, now: now.slice(0, 4), openFam};
   }
@@ -6972,7 +7055,7 @@ void main(){
 
   /* L'accueil « Fil du jour » (choisi le 16/11/2026) : à faire, la journée en frise horaire, la semaine, bientôt */
   function homeFil(el, D, bar) {
-    el.append(h('header', {class: 'hm-hello'}, h('span', {class: 'hm-glb'}, globe({nodes: 60, size: 52, ring: false})), h('div', {}, h('b', {text: hello() + ', Rabie'}), h('small', {text: D.now.length + ' choses à faire · ' + D.ag.filter((a) => a.n === 0).length + " aujourd'hui"}))), bar);
+    el.append(h('header', {class: 'hm-hello'}, h('span', {class: 'hm-glb'}, globe({nodes: 60, size: 52, ring: false})), h('div', {}, h('b', {text: hello() + ', Rabie'}), h('small', {text: pourMoiN() + ' pour toi · ' + D.ag.filter((a) => a.n === 0).length + " aujourd'hui"}))), bar);
     el.append(hsec('À faire maintenant', more('Tout voir', 'demandes'), nowRows(D)));
     const today = D.ag.filter((a) => a.n === 0), H0 = 7, H1 = 23, nowH = new Date().getHours() + new Date().getMinutes() / 60, pos = (x) => Math.max(0, Math.min(100, (x - H0) / (H1 - H0) * 100));
     const axis = h('div', {class: 'tl-axis'}, h('span', {class: 'tl-now', style: 'left:' + pos(nowH) + '%'}, h('small', {text: hm(new Date())})));
@@ -6985,7 +7068,7 @@ void main(){
       allDay.length ? h('div', {class: 'tl-day'}, h('small', {text: 'Toute la journée'}), allDay.map((a) => h('button', {type: 'button', class: 'tl-chip', onclick: a.open}, a.title))) : null));
     const week = D.ag.filter((a) => a.n >= 1);
     el.append(hsec('Cette semaine', more('Agenda', 'agenda'), h('ul', {class: 'hm-rows'}, week.length ? week.slice(0, 5).map((a) => h('li', {}, h('button', {type: 'button', class: 'hm-row', onclick: a.open}, dayTile(a.n), h('span', {class: 'hm-tx'}, h('b', {text: a.title}), h('small', {text: a.who + (a.time ? ' · ' + a.time : '')})), h('span', {class: 'hm-go', html: icon('next', 16)})))) : [h('li', {class: 'muted', text: 'Semaine calme.'})])));
-    const soon = [D.trip ? h('button', {type: 'button', class: 'soon', onclick: () => go('voyages')}, h('span', {class: 'ic', html: icon('plane', 16)}), h('b', {text: D.trip.depart != null ? 'J-' + D.trip.depart : '—'}), h('small', {text: D.trip.title})) : null,
+    const soon = [D.trip ? h('button', {type: 'button', class: 'soon', onclick: () => go('voyages')}, h('span', {class: 'ic', html: icon('plane', 16)}), h('b', {text: D.trip.depart == null ? '—' : D.trip.depart > 0 ? 'J-' + D.trip.depart : D.trip.depart === 0 ? "Aujourd'hui" : 'En cours'}), h('small', {text: D.trip.title})) : null,
       D.wk[0] ? h('button', {type: 'button', class: 'soon', onclick: () => go('sorties')}, h('span', {class: 'ic', html: icon('map', 16)}), h('b', {text: D.wk[0].from != null && D.wk[0].from >= 0 ? (D.wk[0].from === 0 ? "Aujourd'hui" : 'J-' + D.wk[0].from) : 'En ce moment'}), h('small', {text: D.wk[0].title})) : null,
       D.fam ? h('button', {type: 'button', class: 'soon', onclick: () => D.openFam(D.fam)}, h('span', {class: 'ic', html: icon('tag', 16)}), h('b', {text: D.lead && D.lead.last ? eur(D.lead.last.price) : '—'}), h('small', {text: D.fam.title})) : null,
       h('button', {type: 'button', class: 'soon', onclick: () => go('suivi')}, h('span', {class: 'ic', html: icon('pulse', 16)}), h('b', {text: String(D.bots.length)}), h('small', {text: 'chez tes bots'}))].filter(Boolean);
@@ -7079,6 +7162,24 @@ void main(){
   }
   function card_hasTiles(d) { const f = d.f || {}; return ((d.kind === 'ouinon' || d.kind === 'question' || isCraDem(d)) && !!(f.si_oui || f.si_non)) || (d.kind === 'choix' && d.options.length > 0); }
   const pmProj = (d) => d.kind === 'afaire' && pmSteps(d).length >= 2 && (d.since == null || d.since <= -7) && (d.due == null || d.due > 30);
+  /* JARVIS OS (18/11/2026, « tu veux voir ce qu'Iris a répondu dans la notif mais l'app ne te le montre pas ») : les réponses de tes bots
+     des trois derniers jours, à tes ordres et aux lignes de Claude ; un appui ouvre la réponse entière. Le reste est dans Équipe. */
+  function recentReplies() {
+    const fromYou = (S.ordres || []).filter((o) => o.reply && o.n >= -2).map((o) => ({bot: o.bot, n: o.n, q: o.text, a: o.reply, st: o.status, open: () => openItem('ordre', o)}));
+    const fromClaude = (S.canal || []).filter((l) => l.from === 'claude' && l.reply && BOT[l.to] && N(lvFrIso(l.date) || '') >= -2).map((l) => ({bot: l.to, n: N(lvFrIso(l.date)), q: l.msg, a: l.reply, st: l.status, open: () => voirLigne(l._row)}));
+    return fromYou.concat(fromClaude).sort((a, b) => b.n - a.n);
+  }
+  const PMR = {all: false};
+  function pmReplies() {
+    const all = recentReplies();
+    if (!all.length) return null;
+    const L = PMR.all ? all : all.slice(0, 4);
+    const row = (x) => h('button', {type: 'button', class: 'pm-rep', onclick: x.open}, h('span', {class: 'pm-rep-h'}, h('b', {text: lvName(x.bot)}), h('small', {text: rel(x.n) + (x.st ? ' · ' + x.st : '')})),
+      h('span', {class: 'pm-rep-a', text: x.a}), h('small', {class: 'pm-rep-q', text: 'À : « ' + String(x.q || '').replace(/\s+/g, ' ').slice(0, 90) + (String(x.q || '').length > 90 ? '…' : '') + ' »'}));
+    const kids = L.map(row);
+    if (all.length > 4) kids.push(h('button', {type: 'button', class: 'link', onclick: () => { PMR.all = !PMR.all; renderView(true); }}, PMR.all ? 'Seulement les 4 dernières' : 'Les ' + all.length + ' réponses'));
+    return pmSection('pm-rep', 'Réponses de tes bots', all.length + ' · 3 derniers jours', kids);
+  }
   function pmSection(id, title, aside, kids, closed) {
     if (!kids.length) return null;
     const head = [h('h2', {text: title}), h('span', {class: 'aside', text: aside})];
@@ -7096,8 +7197,9 @@ void main(){
     el.append(...[
       pmSection('pm-dec', 'À décider', nDec + ' · un appui ouvre le détail', [].concat(yg.map(yesCard), drafts.map(draftCard), reps.map(dosReplyCard), dec.map(pmCard))),
       pmSection('pm-todo', 'À faire', todo.length + ' · par toi', todo.map(pmCard)),
-      pmSection('pm-proj', 'Projets au long cours', proj.length + ' · plusieurs étapes, pas urgent', proj.map(pmCard), true)
+      pmSection('pm-proj', 'Projets au long cours', proj.length + ' · plusieurs étapes, pas urgent', proj.map(pmCard))   /* 18/11/2026 : ouvert, comme « En attente » (rien de caché par défaut) */
     ].filter(Boolean));
+    const rp = pmReplies(); if (rp) el.append(rp);
     const cp = cotePanel(); if (cp) { cp.id = 'pm-wait'; el.append(cp); }
     const src = h('div'); ACC_ORIG(src); const mail = hpanel(src, 'Arrivés depuis');
     if (mail) { const n = mail.querySelectorAll('.card, article, li').length; el.append(h('details', {class: 'panel pm-sec'}, h('summary', {}, h('h2', {text: 'Courrier à trier'}), h('span', {class: 'aside', text: n ? n + ' mail' + (n > 1 ? 's' : '') : 'depuis le dernier tour d\'Iris'})), mail)); }
@@ -7115,8 +7217,33 @@ void main(){
     cfg.extraTop = () => h('div', {class: 'stack'}, top ? top() : null, pmViz(d, true));
     return cfg;
   };
+  /* JARVIS OS (18/11/2026, « des incohérences partout ») : un seul compte « pour toi », le même dans l'en-tête, la pastille, l'accueil et Pour moi
+     (les cartes, les brouillons sans carte, les réponses à tes dossiers ; pas ce qui est mis de côté) */
+  function pourMoiN() { return (S.demandes || []).length + (S.drafts || []).filter((x) => typeof demandeOfDraft === 'function' && !demandeOfDraft(x)).length + (S.dosReplies || []).length; }
+  const HEAD_OS = header;
+  header = function () {
+    HEAD_OS();
+    const n = pourMoiN(), st = document.querySelector('#status .st.is-demande'), badge = document.querySelector('.tab[data-tab="demandes"] .badge');
+    if (st) st.lastChild.textContent = n + ' pour toi';
+    if (badge) { badge.textContent = n || ''; badge.hidden = !n; }
+  };
+  /* Équipe : des chiffres sur l'équipe (pas ceux des autres pages, qui étaient faux ou en double) */
+  function teamStats() {
+    const wait = (S.ordres || []).filter((o) => !/^(fait|annul)/i.test(o.status)).length, reps = recentReplies().length;
+    let pass = null; try { if (LV.t.jour) pass = weekStats(weekStart(), nextReset()).passN; } catch (e) { pass = null; }
+    const toOrd = () => { const p = Array.from(document.querySelectorAll('#dir .panel')).find((x) => /^Tes ordres/.test((x.querySelector('h2') || {}).textContent || '')); if (p) p.scrollIntoView({behavior: 'smooth', block: 'start'}); };
+    const items = [[wait, wait > 1 ? 'ordres en cours' : 'ordre en cours', 'hourglass', toOrd, wait ? 'is-amber' : ''], [reps, reps > 1 ? 'réponses en 3 jours' : 'réponse en 3 jours', 'chat', () => voirUrl('#voir-recent'), '']]
+      .concat(pass != null ? [[pass, pass > 1 ? 'passages cette semaine' : 'passage cette semaine', 'pulse', () => go('suivi'), '']] : []);
+    return h('div', {class: 'stats'}, items.map(([v, l, ic, fn, cls]) => h('button', {type: 'button', class: 'stat ' + cls, onclick: fn}, h('span', {class: 'ic', html: icon(ic, 16)}), h('b', {text: String(v)}), h('span', {text: l}))));
+  }
   const VEQ_OS = VIEWS.equipe;
-  VIEWS.equipe = (el) => { VEQ_OS(el); if (AGENT) return; const src = h('div'); ACC_ORIG(src); /* le Journal est dans « En ce moment » */ const st = src.querySelector('.stats'); if (st) el.append(st); };
+  VIEWS.equipe = (el) => {
+    VEQ_OS(el); if (AGENT) return;
+    /* « Échanges récents dans le Canal » doublait « Tes ordres » : l'historique complet est dans Suivi */
+    Array.from(el.querySelectorAll('.panel')).forEach((p) => { if (/^Échanges récents dans le Canal/.test((p.querySelector('h2') || {}).textContent || '')) p.remove(); });
+    const tp = Array.from(el.querySelectorAll('.panel')).find((p) => /^Ton équipe/.test((p.querySelector('h2') || {}).textContent || ''));
+    const ts = teamStats(); if (tp) tp.after(ts); else el.append(ts);
+  };
 
   /* ---------- JARVIS OS : Réglages. Relier cet iPhone au serveur, créer et relier l'accès Google, tester les données ---------- */
   ICONS.gear = '<circle cx="12" cy="12" r="3"/><path d="M12 2.5v2.2M12 19.3v2.2M4.6 4.6l1.6 1.6M17.8 17.8l1.6 1.6M2.5 12h2.2M19.3 12h2.2M4.6 19.4l1.6-1.6M17.8 6.2l1.6-1.6"/>';

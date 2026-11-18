@@ -291,6 +291,40 @@ srv.listen(0, async () => {
       const open = await q.evaluate(() => !document.querySelector('.face-open') && [...document.querySelectorAll('.hm-h h2')].some((x) => x.textContent === 'Papiers privés') && document.querySelectorAll('.pt').length > 8);
       ok('Face ID : activé dans Papiers, papiers privés verrouillés au retour, ouverts après Face ID', on && locked && open, [on, locked, open].join(' '));
       await ctx.close(); }
+    /* 18/11/2026, passe globale : notifications (lien profond, bandeau qui se ferme, « Voir »), compteurs, Équipe, champs date */
+    { p = await page('#accueil');
+      const row = await p.evaluate(() => { let k = -1; window.__G['Canal'].forEach((x, i) => { if (i && x[1] === 'Rabie' && x[6]) k = i; }); return k + 1; });
+      const nums = await p.evaluate(() => [(document.querySelector('#status .st.is-demande') || {}).textContent, (document.querySelector('.tab[data-tab="demandes"] .badge') || {}).textContent, (document.querySelector('.hm-hello small') || {}).textContent, document.getElementById('view').innerText]);
+      const n0 = (nums[0].match(/^(\d+) pour toi$/) || [])[1];
+      ok('compteurs : un seul « pour toi », le même dans l\'en-tête, la pastille et l\'accueil', n0 != null && nums[1] === n0 && nums[2].indexOf(n0 + ' pour toi') === 0, nums.slice(0, 3).join(' / '));
+      ok('accueil : jamais « J-- » (voyage en cours ou passé)', !/J--/.test(nums[3]));
+      p = await page('#voir-' + row);
+      const sh = await p.evaluate(() => { const s = document.getElementById('sheet'); return [location.hash, s && !s.hidden ? s.innerText : '']; });
+      ok('notification : « /#voir-<ligne du Canal> » ouvre ton ordre et la réponse du bot, l\'adresse revient à Pour moi', sh[0] === '#demandes' && /Ton ordre/i.test(sh[1]), sh[0] + ' ' + sh[1].slice(0, 80));
+      await p.evaluate(() => document.getElementById('sheet-back').click()); await p.waitForTimeout(400);
+      const add = (txt) => p.evaluate((t) => { const c = window.__G['Canal']; c.push([c[c.length - 1][0], 'Rabie', 'Iris', 'Ordre', t, 'À faire', '', '']); location.hash = '#voir-recent'; return c.length; }, txt);
+      const answer = (r, txt) => p.evaluate(([rr, t]) => { const x = window.__G['Canal'][rr - 1]; x[5] = 'Fait'; x[6] = t; location.hash = '#voir-recent'; }, [r, txt]);
+      const r1 = await add('Cherche le bail'); await p.waitForTimeout(1500); await answer(r1, 'Bail trouvé dans Logement.'); await p.waitForTimeout(2200);
+      const a1 = await p.evaluate(() => [...document.querySelectorAll('.alert-t:not(.out)')].map((t) => t.innerText).join(' | '));
+      await p.evaluate(() => { const v = [...document.querySelectorAll('.alert-t .btn')].find((x) => x.textContent === 'Voir'); if (v) v.click(); }); await p.waitForTimeout(2200);   /* la bulle du bot s'écrit lettre à lettre */
+      const v1 = await p.evaluate(() => { const s = document.getElementById('sheet'); return [s && !s.hidden ? s.innerText : '', document.querySelectorAll('.alert-t:not(.out)').length]; });
+      ok('notification dans l\'app : « Iris a répondu », « Voir » ouvre sa réponse et ferme le bandeau', /Iris a répondu/.test(a1) && /Bail trouvé dans Logement/.test(v1[0]) && v1[1] === 0, a1.slice(0, 80) + ' :: ' + v1[1] + ' ' + v1[0].slice(0, 120));
+      await p.evaluate(() => document.getElementById('sheet-back').click()); await p.waitForTimeout(400);
+      const r2 = await add('Cherche la quittance'); await p.waitForTimeout(1500); await answer(r2, 'Quittance de mai trouvée.'); await p.waitForTimeout(2200);
+      const a2 = await p.evaluate(() => document.querySelectorAll('.alert-t:not(.out)').length);
+      await p.evaluate(() => { const x = document.querySelector('.alert-t:not(.out) .toast-x'); if (x) x.click(); }); await p.waitForTimeout(500);
+      const gone = await p.evaluate(() => [document.querySelectorAll('.alert-t:not(.out)').length, document.getElementById('sheet').hidden]);
+      ok('notification dans l\'app : la croix la ferme sans rien ouvrir', a2 === 1 && gone[0] === 0 && gone[1] === true, a2 + ' ' + gone.join(' '));
+      const rep = await p.evaluate(() => { const x = document.getElementById('pm-rep'); return x ? x.innerText : ''; });
+      ok('Pour moi : « Réponses de tes bots » (3 derniers jours), la plus récente en tête', /Réponses de tes bots/.test(rep) && rep.indexOf('Quittance de mai trouvée') >= 0 && rep.indexOf('Quittance de mai trouvée') < rep.indexOf('Bail trouvé'), rep.slice(0, 120));
+      const wait = await p.evaluate(() => { const x = document.getElementById('pm-wait'); return x ? (x.tagName !== 'DETAILS' || x.open) : null; });
+      ok('Pour moi : « En attente, plus tard, en rappel » ouvert par défaut', wait === true, String(wait));
+      p = await page('#equipe');
+      const eq = await p.evaluate(() => [[...document.querySelectorAll('#view .panel h2')].map((x) => x.textContent).join(' | '), (document.querySelector('#view .stats') || {}).innerText || '']);
+      ok('Équipe : plus de doublon « Échanges récents », des chiffres d\'équipe (ordres en cours, réponses)', !/Échanges récents/.test(eq[0]) && /Tes ordres/.test(eq[0]) && /en cours/.test(eq[1]) && /répons/.test(eq[1]) && !/prix suivis|papiers/.test(eq[1]), eq.join(' :: ').replace(/\s+/g, ' ').slice(0, 160));
+      p = await page('#agenda');
+      const di = await p.evaluate(() => { const x = document.querySelector('input.inp[type="date"]'); if (!x) return null; const c = getComputedStyle(x); return c.minWidth + ' ' + c.appearance; });
+      ok('Agenda : le champ date ne peut plus sortir de sa carte sur iPhone (largeur min. 0, sans apparence native)', di === '0px none', String(di)); }
     /* aucune rubrique n'affiche de texte cassé */
     const broken = [];
     for (const t of ['accueil', 'demandes', 'agenda', 'suivi', 'achats', 'voyages', 'sorties', 'papiers', 'equipe', 'automatisations', 'reglages']) {

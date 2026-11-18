@@ -16,7 +16,7 @@ import {createNotifier, paris, daysTo, parisMs, pauseDepuisFaits} from './notify
 import {createSauvegarde} from './sauvegarde.mjs';
 import {createSante} from './sante.mjs';
 
-const VERSION = '0.20.0';
+const VERSION = '0.21.0';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PORT = +(process.env.PORT || 8787);
 const HOST = process.env.HOST || '127.0.0.1';
@@ -359,9 +359,9 @@ async function relanceVerifier(r) {
   if (r.ligne && GG.status('').linked) {
     const rows = await sheetRead('Canal!A1:H1'), row = (await sheetRead('Canal!A' + r.ligne + ':H' + r.ligne))[0] || [], hd = (rows[0] || []).map(low), g = (k) => String(row[hd.indexOf(k)] ?? '').trim();
     const qui = g('pour') || 'le bot', st = low(g('statut')), rep = g('reponse'), sujet = g('objet') || g('message').slice(0, 80);
-    if (st === 'attend ton oui') return {title: qui + ' attend ton oui', body: sujet + (rep ? ' : ' + rep.slice(0, 200) : '') + retard, url: '/#demandes'};
-    if (rep || ['fait', 'annule', 'annulee'].includes(st)) return {title: qui + ' a répondu', body: sujet + ' : ' + (rep || g('statut')).slice(0, 220) + retard, url: '/#demandes'};
-    return {title: 'Toujours rien de ' + qui, body: r.quoi + ' (ligne ' + r.ligne + ' du Canal, ' + (g('statut') || 'sans statut') + ')' + retard, url: '/#demandes'};
+    if (st === 'attend ton oui') return {title: qui + ' attend ton oui', body: sujet + (rep ? ' : ' + rep.slice(0, 200) : '') + retard, url: '/#voir-' + r.ligne};
+    if (rep || ['fait', 'annule', 'annulee'].includes(st)) return {title: qui + ' a répondu', body: sujet + ' : ' + (rep || g('statut')).slice(0, 220) + retard, url: '/#voir-' + r.ligne};
+    return {title: 'Toujours rien de ' + qui, body: r.quoi + ' (ligne ' + r.ligne + ' du Canal, ' + (g('statut') || 'sans statut') + ')' + retard, url: '/#voir-' + r.ligne};
   }
   return {title: 'Rappel', body: r.quoi + retard, url: '/#suivi'};
 }
@@ -404,7 +404,7 @@ async function coteTick(force) {
   const t = paris(new Date()), dow = new Date(Date.UTC(t.y, t.m - 1, t.d)).getUTCDay();
   if ((force || (dow === 0 && t.hm >= '18:00' && S.coteHebdo !== t.ymd)) && S.cote.length) {
     if (!force) S.coteHebdo = t.ymd; save();
-    if (S.push && S.push.subs.length) { await PUSH.send({title: S.cote.length === 1 ? '1 carte mise de côté' : S.cote.length + ' cartes mises de côté', body: S.cote.slice().sort((a, b) => (a.jusqu || 9e15) - (b.jusqu || 9e15)).map(coteListe).join('\n').slice(0, 400), url: '/#demandes', tag: 'cote-hebdo'}, {urgency: 'high'}).catch(() => {}); out.rappel = true; }
+    if (S.push && S.push.subs.length) { await PUSH.send({title: S.cote.length === 1 ? '1 carte mise de côté' : S.cote.length + ' cartes mises de côté', body: S.cote.slice().sort((a, b) => (a.jusqu || 9e15) - (b.jusqu || 9e15)).map(coteListe).join('\n').slice(0, 400), url: '/#voir-cote', tag: 'cote-hebdo'}, {urgency: 'high'}).catch(() => {}); out.rappel = true; }
   }
   return out;
 }
@@ -480,7 +480,8 @@ async function sonnerBot(bot) {
   const pu = await grokPauseMs();
   if (pu && pu > now()) { S.sonnettesGardees = [...new Set([...(S.sonnettesGardees || []), bot])]; save(); return {ok: false, gardee: true, note: 'sonnette gardée jusqu’à la reprise de Grok (' + quandFr(pu) + ')'}; }
   const faits = await sheetRead('Faits!A1:E300'), hd = (faits[0] || []).map(low), iF = hd.indexOf('fait'), iV = hd.indexOf('valeur');
-  const get = (k) => { const r = faits.slice(1).find((x) => low(x[iF]) === k); const a = r ? String(r[iV] || '').trim() : ''; return BELL_RE.test(a) ? a : ''; };
+  /* l'adresse peut être dans une phrase (« mail de l'adresse de Rabie vers …@…, qui déclenche… ») : elle est extraite */
+  const get = (k) => { const r = faits.slice(1).find((x) => low(x[iF]) === k); const m = r ? String(r[iV] || '').match(/[a-z0-9._+-]+@[a-z0-9.-]+/i) : null; return m && BELL_RE.test(m[0]) ? m[0] : ''; };
   const addr = get('sonnette ' + low(bot)) || get('sonnette jarvis');
   if (!addr) return {ok: false, note: 'aucune sonnette dans Faits : ' + bot + ' lira la ligne à son prochain passage'};
   /* deux revérifications à la suite (papiers puis mails) : une seule sonnette, le bot traite toutes ses lignes à son passage */
