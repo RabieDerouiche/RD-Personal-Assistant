@@ -356,6 +356,46 @@ srv.listen(0, async () => {
       const bars = await p.evaluate(() => { const c = [...document.querySelectorAll('.cmp-crit')].find((x) => /^Prix du jour/.test(x.textContent)); return c ? [...c.querySelectorAll('.cmp-bar')].map((b) => ({v: b.querySelector('.cmp-v').textContent, w: b.querySelector('.cmp-track i').getBoundingClientRect().width, best: b.classList.contains('is-best')})) : []; });
       ok('Achats : la barre est la valeur (le prix le plus bas a la barre la plus courte, en vert)', bars.length === 2 && bars[0].best && !bars[1].best && bars[0].w < bars[1].w && +bars[0].v < +bars[1].v, JSON.stringify(bars));
       ok('Achats : sous chaque variante, pour qui, à quoi elle sert, forces et limites, les deux notes', cp && cp.ex === 2 && /Pour qui/.test(cp.exT) && /À quoi elle sert/.test(cp.exT) && /Qualité\/prix \d/.test(cp.exT) && /Qualité \d/.test(cp.exT), cp && cp.exT.replace(/\s+/g, ' ').slice(0, 140)); }
+    /* 0.24.0 : trois thèmes (le classique est retiré) ; le bouton marche depuis n'importe quelle rubrique (avant : seulement depuis l'accueil) */
+    { p = await page('?theme=actuel#achats');
+      ok('thèmes : un ancien choix « actuel » (thème classique retiré) retombe sur Hologramme', await p.evaluate(() => document.documentElement.getAttribute('data-th') === 'holo' && document.documentElement.classList.contains('theme-holo')));
+      await p.goto(base + '#achats'); await p.waitForTimeout(1500);
+      await p.click('.fav-handle'); await p.waitForTimeout(600);
+      const picks = await p.evaluate(() => [...document.querySelectorAll('.th-pick')].map((x) => x.textContent));
+      ok('thèmes : trois choix avec leur aperçu (Hologramme, Ambre, Néon)', picks.join(',') === 'Hologramme,Ambre,Néon' && await p.evaluate(() => document.querySelectorAll('.th-pick .th-sw').length === 3), picks.join(','));
+      await Promise.all([p.waitForNavigation({timeout: 8000}).catch(() => null), p.click('.th-pick:has-text("Ambre")')]); await p.waitForTimeout(1500);
+      const am = await p.evaluate(() => ({th: document.documentElement.getAttribute('data-th'), cls: document.documentElement.className, hash: location.hash, c1: getComputedStyle(document.documentElement).getPropertyValue('--c1').trim(), warn: getComputedStyle(document.documentElement).getPropertyValue('--warn').trim(), meta: document.querySelector('meta[name="theme-color"]').content}));
+      ok('thèmes : « Ambre » choisi depuis Achats s\'applique (rechargement, on reste dans Achats), palette ambrée, l\'urgent passe en cyan', am.th === 'ambre' && /theme-holo/.test(am.cls) && /theme-ambre/.test(am.cls) && am.hash === '#achats' && am.c1 === '251, 176, 36' && am.warn === '56, 189, 248' && am.meta === '#0a0602', JSON.stringify(am));
+      await p.click('.fav-handle'); await p.waitForTimeout(600);
+      await Promise.all([p.waitForNavigation({timeout: 8000}).catch(() => null), p.click('.th-pick:has-text("Néon")')]); await p.waitForTimeout(1500);
+      const ne = await p.evaluate(() => ({th: document.documentElement.getAttribute('data-th'), c1: getComputedStyle(document.documentElement).getPropertyValue('--c1').trim(), muted: getComputedStyle(document.documentElement).getPropertyValue('--muted').trim()}));
+      ok('thèmes : « Néon » (rose et cyan), ses couleurs l\'emportent sur les retouches d\'Hologramme', ne.th === 'neon' && ne.c1 === '236, 72, 153' && ne.muted === '#c9a3e6', JSON.stringify(ne));
+      await p.screenshot({path: path.join(SH, 'theme-neon.png')});
+      await p.evaluate(() => { try { localStorage.setItem('jarvis.theme', 'holo'); } catch (e) { /* rien */ } });
+    }
+    /* 0.24.0 : chercher un produit à partir d'une idée (ici, la recherche d'exemple et une recherche simulée) */
+    { p = await page('#achats');
+      const f = await p.evaluate(() => { const b = document.querySelector('.idee-box'); return b && {idee: !!b.querySelector('#ix-idee'), pour: !!b.querySelector('#ix-pour'), min: !!b.querySelector('#ix-min'), max: !!b.querySelector('#ix-max'), n: b.querySelectorAll('#ix-n option').length, after: !!(b.closest('.idee-wrap') && b.closest('.idee-wrap').previousElementSibling && b.closest('.idee-wrap').previousElementSibling.classList.contains('shop-hero'))}; });
+      ok('idées : « Trouver une idée » en haut d\'Achats : idée, pour qui, budget min et max, 1 à 20 propositions', f && f.idee && f.pour && f.min && f.max && f.n === 20 && f.after, JSON.stringify(f));
+      ok('idées : mes recherches (photo, pour qui, budget, nombre)', await p.evaluate(() => { const it = document.querySelector('.idee-it'); return !!it && /fille de 3 ans · 30 à 60 € · 6 propositions/.test(it.textContent) && !!it.querySelector('.idee-th.has-pic img'); }));
+      await p.click('.idee-it'); await p.waitForTimeout(800);
+      const pg = await p.evaluate(() => ({t: document.querySelector('.view-title').textContent, cards: document.querySelectorAll('.idee-card').length, first: (document.querySelector('.idee-rank') || {}).textContent, why: !!document.querySelector('.cmp-key'), warn: [...document.querySelectorAll('.idee-warn')].map((x) => x.textContent).join('|'), note: [...document.querySelectorAll('.idee-note')].map((x) => x.textContent).join('|'), bars: document.querySelectorAll('.idee-bar').length, links: document.querySelectorAll('.idee-card a.btn[target="_blank"]').length}));
+      ok('idées : la page des propositions (meilleur choix en tête, conseil, photo, prix TTC avec vendeur et date, pourquoi, forces et limites, deux notes, lien vers le vendeur)', /Maison de poupée/.test(pg.t) && pg.cards === 6 && pg.first === 'Meilleur choix' && pg.why && pg.bars === 12 && pg.links === 6, JSON.stringify(pg));
+      ok('idées : un prix différent sur la page du vendeur est signalé ; une page illisible aussi ; les hors budget sont comptés', /64,90/.test(pg.warn) && /non revérifié/.test(pg.note) && /hors de ton budget/.test(pg.note), pg.warn + ' / ' + pg.note);
+      await p.click('.idee-tri button:has-text("Prix")'); await p.waitForTimeout(300);
+      const px = await p.evaluate(() => [...document.querySelectorAll('.idee-prix b')].map((x) => parseFloat(x.textContent.replace(/\s/g, '').replace(',', '.'))));
+      ok('idées : tri par prix', px.length === 6 && px.every((v, i) => !i || v >= px[i - 1]), px.join(' '));
+      await p.click('.idee-card .btn:has-text("Suivre le prix")'); await p.waitForTimeout(700);
+      const sv = await p.evaluate(() => [...document.querySelectorAll('.pick-form input')].map((x) => x.value));
+      ok('idées : « Suivre le prix » ouvre la fiche pour Kairos préremplie (produit, lien, prix max = budget)', /Cottage en tissu Doudou/.test(sv[0]) && /^https:/.test(sv[1]) && sv[2] === '60', sv.join(' | '));
+      p = await page('#achats');
+      await p.fill('#ix-idee', 'Trottinette'); await p.fill('#ix-pour', 'garçon de 6 ans'); await p.fill('#ix-max', '50'); await p.selectOption('#ix-n', '3'); await p.click('.idee-go'); await p.waitForTimeout(500);
+      const w = await p.evaluate(() => ({t: document.querySelector('.view-title').textContent, wait: !!document.querySelector('.cmp-wait .cmp-spin')}));
+      await p.waitForTimeout(2800);
+      const d = await p.evaluate(() => [...document.querySelectorAll('.idee-prix b')].map((x) => parseFloat(x.textContent.replace(/\s/g, '').replace(',', '.'))));
+      ok('idées : une nouvelle recherche ouvre sa page (attente, puis propositions dans le budget, au nombre demandé)', /Trottinette/.test(w.t) && w.wait && d.length === 3 && d.every((v) => v <= 50), JSON.stringify(w) + ' ' + d.join(' '));
+      await p.screenshot({path: path.join(SH, 'idees.png')});
+    }
     /* 19/11/2026 (capture : « 186 320 € TTC » pour une sortie à 18 €) : prix écrit en phrase, trajet en une ligne */
     { p = await page('#sorties');
       await p.evaluate(() => { const G = window.__G, d = new Date(Date.now() + 10 * 864e5), p2 = (n) => String(n).padStart(2, '0'), fr = p2(d.getDate()) + '/' + p2(d.getMonth() + 1) + '/' + d.getFullYear();
