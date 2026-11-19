@@ -53,26 +53,26 @@ const CSS = `
 .jv-mic.say { background: linear-gradient(135deg, #a78bfa, #8b5cf6 50%, #d946ef); }
 @keyframes jvring { 50% { box-shadow: 0 0 0 16px rgba(91, 140, 255, 0), 0 10px 40px rgba(91, 140, 255, .55); } }
 /* thème hologramme (html.theme-holo) */
-.theme-holo .jv-btn { background: radial-gradient(circle, rgba(var(--k12, 2, 8, 24), .95) 55%, rgba(var(--k12, 2, 8, 24), 0) 72%); }
-.theme-holo .jv-btn::after { box-shadow: 0 0 0 1px rgba(var(--c1, 56, 189, 248), .5), 0 0 22px rgba(var(--c1, 56, 189, 248), .45); animation: jvholo 2.6s ease-in-out infinite; }
-@keyframes jvholo { 50% { box-shadow: 0 0 0 1px rgba(var(--c2, 103, 232, 249), .75), 0 0 36px rgba(var(--c1, 56, 189, 248), .7); } }
-.theme-holo .jv { background: radial-gradient(90% 46% at 50% 26%, rgb(var(--jv1, 11, 45, 99)) 0, rgb(var(--jv2, 4, 17, 43)) 45%, rgb(var(--jv3, 2, 4, 13)) 100%); font-family: 'Exo 2', system-ui, sans-serif; }
-.theme-holo .jv::before { content: ""; position: absolute; inset: 0; pointer-events: none; background-image: radial-gradient(1px 1px at 12% 18%, rgba(255,255,255,.55), transparent 60%), radial-gradient(1px 1px at 78% 12%, rgba(255,255,255,.4), transparent 60%), radial-gradient(1.5px 1.5px at 88% 46%, rgba(var(--c7, 125, 211, 252), .6), transparent 60%), radial-gradient(1px 1px at 22% 62%, rgba(255,255,255,.35), transparent 60%), radial-gradient(1px 1px at 60% 80%, rgba(255,255,255,.3), transparent 60%), radial-gradient(1.5px 1.5px at 40% 8%, rgba(var(--c3, 168, 85, 247), .6), transparent 60%); }
+.theme-holo .jv-btn { background: radial-gradient(circle, rgba(2, 8, 24, .95) 55%, rgba(2, 8, 24, 0) 72%); }
+.theme-holo .jv-btn::after { box-shadow: 0 0 0 1px rgba(56, 189, 248, .5), 0 0 22px rgba(56, 189, 248, .45); animation: jvholo 2.6s ease-in-out infinite; }
+@keyframes jvholo { 50% { box-shadow: 0 0 0 1px rgba(103, 232, 249, .75), 0 0 36px rgba(56, 189, 248, .7); } }
+.theme-holo .jv { background: radial-gradient(90% 46% at 50% 26%, #0b2d63 0, #04112b 45%, #02040d 100%); font-family: 'Exo 2', system-ui, sans-serif; }
+.theme-holo .jv::before { content: ""; position: absolute; inset: 0; pointer-events: none; background-image: radial-gradient(1px 1px at 12% 18%, rgba(255,255,255,.55), transparent 60%), radial-gradient(1px 1px at 78% 12%, rgba(255,255,255,.4), transparent 60%), radial-gradient(1.5px 1.5px at 88% 46%, rgba(125,211,252,.6), transparent 60%), radial-gradient(1px 1px at 22% 62%, rgba(255,255,255,.35), transparent 60%), radial-gradient(1px 1px at 60% 80%, rgba(255,255,255,.3), transparent 60%), radial-gradient(1.5px 1.5px at 40% 8%, rgba(168,85,247,.6), transparent 60%); }
 .theme-holo .jv > * { position: relative; }
-.theme-holo .jv-top { font: 600 11px Orbitron, Oxanium, sans-serif; letter-spacing: .18em; text-transform: uppercase; color: rgb(var(--c7, 125, 211, 252)); }
-.theme-holo .jv-dot { background: rgb(var(--c5, 34, 211, 238)); box-shadow: 0 0 12px rgb(var(--c5, 34, 211, 238)); }
-.theme-holo .jv-chip { font-family: 'Exo 2', sans-serif; letter-spacing: 0; text-transform: none; color: rgb(var(--c2, 103, 232, 249)); border-color: rgba(var(--c2, 103, 232, 249), .4); }
-.theme-holo .jv-me { color: rgb(var(--c9, 224, 242, 254)); }
-.theme-holo .jv-rep, .theme-holo .jv-a { color: rgb(var(--jvtx, 191, 219, 254)); }
-.theme-holo .jv-q { background: rgba(var(--c12, 14, 165, 233), .2); border: 1px solid rgba(var(--c1, 56, 189, 248), .35); }
-.theme-holo .jv-pill { font-family: Oxanium, 'Exo 2', sans-serif; letter-spacing: .06em; border-color: rgba(var(--c1, 56, 189, 248), .45); background: rgba(var(--k6, 8, 30, 70), .5); color: rgb(var(--c10, 186, 230, 253)); box-shadow: 0 0 14px rgba(var(--c1, 56, 189, 248), .18); }
-.theme-holo .jv-sugg button { border-color: rgba(var(--c1, 56, 189, 248), .4); background: rgba(var(--k6, 8, 30, 70), .45); color: rgb(var(--c9, 224, 242, 254)); }
-.theme-holo .jv-title { font: 700 13px Orbitron, Oxanium, sans-serif; letter-spacing: .22em; color: rgb(var(--c8, 165, 243, 252)); text-shadow: 0 0 8px rgba(var(--c1, 56, 189, 248), .6); }
-.theme-holo .jv-comp { background: rgba(var(--k6, 8, 30, 70), .55); border-color: rgba(var(--c1, 56, 189, 248), .45); box-shadow: 0 0 18px rgba(var(--c1, 56, 189, 248), .18); }
-.theme-holo .jv-comp button { background: linear-gradient(90deg, rgb(var(--c12, 14, 165, 233)), rgb(var(--c4, 99, 102, 241)) 60%, rgb(var(--c3, 168, 85, 247))); color: #fff; }
-.theme-holo .jv-side { border-color: rgba(var(--c1, 56, 189, 248), .45); background: rgba(var(--k6, 8, 30, 70), .5); color: rgb(var(--c10, 186, 230, 253)); box-shadow: 0 0 14px rgba(var(--c1, 56, 189, 248), .2); }
-.theme-holo .jv-mic { background: radial-gradient(circle at 50% 35%, rgb(var(--c1, 56, 189, 248)), rgb(var(--k4, 37, 99, 235)) 55%, rgb(var(--jvm3, 109, 40, 217))); box-shadow: 0 0 0 1px rgba(var(--c7, 125, 211, 252), .8), 0 0 0 7px rgba(var(--c1, 56, 189, 248), .14), 0 0 40px rgba(var(--c1, 56, 189, 248), .6); }
-.theme-holo .jv-mic.say { background: radial-gradient(circle at 50% 35%, rgb(var(--jvs1, 192, 132, 252)), rgb(var(--jvs2, 124, 58, 237)) 55%, rgb(var(--jvs3, 76, 29, 149))); }
+.theme-holo .jv-top { font: 600 11px Orbitron, Oxanium, sans-serif; letter-spacing: .18em; text-transform: uppercase; color: #7dd3fc; }
+.theme-holo .jv-dot { background: #22d3ee; box-shadow: 0 0 12px #22d3ee; }
+.theme-holo .jv-chip { font-family: 'Exo 2', sans-serif; letter-spacing: 0; text-transform: none; color: #67e8f9; border-color: rgba(103, 232, 249, .4); }
+.theme-holo .jv-me { color: #e0f2fe; }
+.theme-holo .jv-rep, .theme-holo .jv-a { color: #bfdbfe; }
+.theme-holo .jv-q { background: rgba(14, 165, 233, .2); border: 1px solid rgba(56, 189, 248, .35); }
+.theme-holo .jv-pill { font-family: Oxanium, 'Exo 2', sans-serif; letter-spacing: .06em; border-color: rgba(56, 189, 248, .45); background: rgba(8, 30, 70, .5); color: #bae6fd; box-shadow: 0 0 14px rgba(56, 189, 248, .18); }
+.theme-holo .jv-sugg button { border-color: rgba(56, 189, 248, .4); background: rgba(8, 30, 70, .45); color: #e0f2fe; }
+.theme-holo .jv-title { font: 700 13px Orbitron, Oxanium, sans-serif; letter-spacing: .22em; color: #a5f3fc; text-shadow: 0 0 8px rgba(56, 189, 248, .6); }
+.theme-holo .jv-comp { background: rgba(8, 30, 70, .55); border-color: rgba(56, 189, 248, .45); box-shadow: 0 0 18px rgba(56, 189, 248, .18); }
+.theme-holo .jv-comp button { background: linear-gradient(90deg, #0ea5e9, #6366f1 60%, #a855f7); color: #fff; }
+.theme-holo .jv-side { border-color: rgba(56, 189, 248, .45); background: rgba(8, 30, 70, .5); color: #bae6fd; box-shadow: 0 0 14px rgba(56, 189, 248, .2); }
+.theme-holo .jv-mic { background: radial-gradient(circle at 50% 35%, #38bdf8, #2563eb 55%, #6d28d9); box-shadow: 0 0 0 1px rgba(125, 211, 252, .8), 0 0 0 7px rgba(56, 189, 248, .14), 0 0 40px rgba(56, 189, 248, .6); }
+.theme-holo .jv-mic.say { background: radial-gradient(circle at 50% 35%, #c084fc, #7c3aed 55%, #4c1d95); }
 `;
 const SVG = (d: string, s = 24) => `<svg viewBox="0 0 24 24" width="${s}" height="${s}" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
 const I = {mic: '<rect x="9" y="3.5" width="6" height="11" rx="3"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3"/>', key: '<rect x="3" y="6.5" width="18" height="11" rx="2"/><path d="M7 10.5h.01M11 10.5h.01M15 10.5h.01M8 14h8"/>', x: '<path d="M6 6l12 12M18 6L6 18"/>', speaker: '<path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5z"/><path d="M15.5 9a4.2 4.2 0 0 1 0 6"/>', stop: '<rect x="7" y="7" width="10" height="10" rx="2"/>'};

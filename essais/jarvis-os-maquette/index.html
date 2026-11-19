@@ -1,13 +1,12 @@
 <!doctype html><html><head><meta charset="utf-8"><script>window.__SCEN = {};
 /* JARVIS OS : sur le serveur du propriétaire, ses vraies données (jarvis-serveur.js) ; sur GitHub ou en local, les exemples. ?maquette ou ?serveur pour forcer. */
 (function () { var q = location.search, srv = /[?&]serveur\b/.test(q) || (location.protocol === 'https:' && !/github\.io$/i.test(location.hostname) && !/[?&]maquette\b/.test(q)); window.__JARVIS_MODE = srv ? 'serveur' : 'maquette'; document.write('<script src="' + (srv ? 'jarvis-serveur.js' : 'donnees-fictives.js') + '"><\/script>'); })();</script><script>/* JARVIS OS : thème « hologramme » par défaut (choisi le 16/11/2026) ; ?theme=actuel ou « Thème » dans Toutes les rubriques pour l'ancien, gardé dans le téléphone */
-(function () { var q = (location.search.match(/[?&]theme=(\w+)/) || [])[1], t = null; try { if (q) localStorage.setItem('jarvis.theme', q); t = localStorage.getItem('jarvis.theme'); } catch (e) { t = q; }
-  /* 19/11/2026 (demande du propriétaire) : le thème classique est retiré ; trois thèmes du même style : Hologramme, Ambre, Néon */
-  var TH = {holo: ['#02040e', 'Orbitron:wght@600;700&family=Oxanium:wght@500;600;700&family=Exo+2:wght@400;500;600;700'], ambre: ['#0a0602', 'Orbitron:wght@600;700&family=Rajdhani:wght@500;600;700&family=Share+Tech+Mono'], neon: ['#07010f', 'Audiowide&family=Exo+2:wght@400;500;600;700&family=Oxanium:wght@500;600;700']};
-  if (!TH[t]) t = 'holo';
-  var d = document.documentElement; d.classList.add('theme-holo'); if (t !== 'holo') d.classList.add('theme-' + t); d.setAttribute('data-th', t);
-  var l = document.createElement('link'); l.rel = 'stylesheet'; l.href = 'https://fonts.googleapis.com/css2?family=' + TH[t][1] + '&display=swap'; document.head.appendChild(l);
-  window.__THEME_COLOR = TH[t][0]; })();</script><script src="jarvis-voix.js"></script><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><link rel="manifest" href="manifest.webmanifest"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black"><meta name="theme-color" content="#02040e"><script>try { document.querySelector('meta[name="theme-color"]').setAttribute('content', window.__THEME_COLOR || '#02040e'); } catch (e) { /* rien */ }</script><link rel="apple-touch-icon" href="icon-180.png"><link rel="icon" type="image/png" href="icon-192.png"><meta name="apple-mobile-web-app-title" content="JARVIS"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}
+(function () { try { localStorage.removeItem('jarvis.theme'); } catch (e) { /* rien */ }
+  /* 19/11/2026 (demandes du propriétaire) : le thème classique est retiré, puis les thèmes Ambre et Néon essayés le même jour : Hologramme seul.
+     Un ancien choix (« actuel », « ambre », « neon ») retombe sur Hologramme. */
+  var d = document.documentElement; d.classList.add('theme-holo'); d.setAttribute('data-th', 'holo');
+  var l = document.createElement('link'); l.rel = 'stylesheet'; l.href = 'https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700&family=Oxanium:wght@500;600;700&family=Exo+2:wght@400;500;600;700&display=swap'; document.head.appendChild(l);
+  })();</script><script src="jarvis-voix.js"></script><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><link rel="manifest" href="manifest.webmanifest"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black"><meta name="theme-color" content="#02040e"><link rel="apple-touch-icon" href="icon-180.png"><link rel="icon" type="image/png" href="icon-192.png"><meta name="apple-mobile-web-app-title" content="JARVIS"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}
   /* ---------- JARVIS OS : navigation et écrans ajoutés ---------- */
   .fab-talk { display: none !important; }
   /* barre à tes favoris (bas) et toutes les rubriques */
@@ -75,11 +74,8 @@
   .pap { display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; border-radius: 16px; }
 
   /* ---------- JARVIS OS : thème « hologramme » à l'essai (image du 16/11/2026) : nuit bleue, néons cyan et violet, globe de réseau ---------- */
-  .theme-row { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 13px; }
-  .theme-row span { margin-right: auto; }
-  .theme-row .chip.is-on { color: var(--fg); border-color: var(--accent); background: var(--glass-3); }
   html.theme-holo {
-    /* 19/11/2026 : la palette du thème en variables (trois valeurs rouge, vert, bleu), pour Hologramme, Ambre et Néon */
+    /* 19/11/2026 : la palette du thème en variables (trois valeurs rouge, vert, bleu) */
     --c1: 56, 189, 248; --c2: 103, 232, 249; --c3: 168, 85, 247; --c4: 99, 102, 241; --c5: 34, 211, 238; --c6: 150, 220, 255; --c7: 125, 211, 252; --c8: 165, 243, 252; --c9: 224, 242, 254; --c10: 186, 230, 253; --c11: 96, 165, 250; --c12: 14, 165, 233; --c13: 139, 92, 246;
     --k1: 4, 12, 34; --k2: 12, 38, 92; --k3: 10, 30, 72; --k4: 37, 99, 235; --k5: 4, 11, 31; --k6: 8, 30, 70; --k7: 14, 44, 104; --k8: 10, 36, 86; --k9: 6, 20, 58; --k10: 20, 60, 140; --k11: 3, 10, 30; --k12: 2, 6, 20; --warn: 251, 191, 36;
     --bg: #02040e; --bg-2: #040b1f; --sheet: rgba(var(--k1), .97);
@@ -88,79 +84,9 @@
     --fg: #e6f2ff; --muted: #8fb3db; --dim: #5d7ea8;
     --accent: rgb(var(--c1)); --accent-fg: #ffffff;
     --iris: linear-gradient(110deg, rgb(var(--c2)) 0%, rgb(var(--c1)) 30%, rgb(var(--c4)) 65%, rgb(var(--c3)) 100%);
-    --jv1: 76, 16, 120; --jv2: 30, 6, 56; --jv3: 7, 1, 15; --jvtx: 250, 220, 245; --jvm3: 126, 34, 206; --jvs1: 244, 114, 182; --jvs2: 219, 39, 119; --jvs3: 112, 26, 117;
     --display: 'Oxanium', 'Exo 2', system-ui, sans-serif; --sans: 'Exo 2', 'Inter', system-ui, sans-serif; --tech: 'Oxanium', 'Exo 2', system-ui, sans-serif; --logo: 'Orbitron', 'Oxanium', sans-serif;
   }
   html.theme-holo body { font-family: var(--sans); }
-  /* ---------- Ambre (19/11/2026) : écran tactique ambré, lignes de balayage, chiffres à chasse fixe ; l'urgent passe en cyan ---------- */
-  html.theme-holo.theme-ambre {
-    --c1: 251, 176, 36; --c2: 253, 224, 71; --c3: 249, 115, 22; --c4: 234, 88, 12; --c5: 250, 204, 21; --c6: 254, 215, 170; --c7: 253, 186, 116; --c8: 254, 240, 138; --c9: 255, 247, 237; --c10: 254, 215, 170; --c11: 251, 146, 60; --c12: 245, 158, 11; --c13: 234, 88, 12;
-    --k1: 18, 10, 3; --k2: 46, 26, 6; --k3: 36, 20, 4; --k4: 180, 83, 9; --k5: 14, 8, 2; --k6: 40, 22, 6; --k7: 56, 32, 8; --k8: 48, 28, 8; --k9: 28, 16, 4; --k10: 92, 50, 12; --k11: 16, 9, 2; --k12: 8, 5, 1; --warn: 56, 189, 248;
-    --bg: #0a0602; --bg-2: #120a03; --glass: rgba(120, 60, 10, .14); --glass-2: rgba(160, 80, 12, .16); --glass-3: rgba(200, 110, 20, .22);
-    --fg: #fff4e0; --muted: #d9b27a; --dim: #a07a45; --accent-fg: #1a0f02;
-    --iris: linear-gradient(110deg, #fde047 0%, #fbbf24 35%, #f97316 70%, #ea580c 100%);
-    --jv1: 92, 46, 8; --jv2: 36, 18, 4; --jv3: 10, 6, 2; --jvtx: 254, 230, 190; --jvm3: 180, 60, 10; --jvs1: 253, 186, 116; --jvs2: 234, 88, 12; --jvs3: 124, 45, 18;
-    --display: 'Rajdhani', 'Share Tech Mono', system-ui, sans-serif; --sans: 'Rajdhani', 'Exo 2', system-ui, sans-serif; --tech: 'Share Tech Mono', ui-monospace, monospace; --logo: 'Orbitron', 'Rajdhani', sans-serif;
-  }
-  html.theme-ambre body { font-weight: 500; letter-spacing: .01em; }
-  html.theme-ambre .kpi-n, html.theme-ambre .cmp-v, html.theme-ambre #clock, html.theme-ambre .hm-day b { font-family: var(--tech); }
-  /* ---------- Néon (19/11/2026) : nuit violette, néons rose et cyan, grille d'horizon ---------- */
-  html.theme-holo.theme-neon {
-    --c1: 236, 72, 153; --c2: 34, 211, 238; --c3: 168, 85, 247; --c4: 217, 70, 239; --c5: 45, 212, 191; --c6: 251, 207, 232; --c7: 244, 114, 182; --c8: 165, 243, 252; --c9: 253, 242, 248; --c10: 249, 168, 212; --c11: 192, 132, 252; --c12: 219, 39, 119; --c13: 147, 51, 234;
-    --k1: 14, 4, 30; --k2: 42, 10, 72; --k3: 30, 8, 56; --k4: 192, 38, 211; --k5: 12, 3, 26; --k6: 36, 8, 62; --k7: 54, 12, 90; --k8: 46, 10, 78; --k9: 24, 6, 44; --k10: 88, 20, 140; --k11: 12, 3, 24; --k12: 6, 1, 14; --warn: 250, 204, 21;
-    --bg: #07010f; --bg-2: #0c0320; --glass: rgba(120, 20, 160, .14); --glass-2: rgba(160, 30, 200, .16); --glass-3: rgba(236, 72, 153, .2);
-    --fg: #fdf2ff; --muted: #c9a3e6; --dim: #8f6bb0; --accent-fg: #ffffff;
-    --iris: linear-gradient(110deg, #22d3ee 0%, #a855f7 45%, #ec4899 80%, #f472b6 100%);
-    --display: 'Oxanium', 'Exo 2', system-ui, sans-serif; --sans: 'Exo 2', system-ui, sans-serif; --tech: 'Oxanium', 'Exo 2', system-ui, sans-serif; --logo: 'Audiowide', 'Oxanium', sans-serif;
-  }
-  html.theme-neon .brand b { text-shadow: 0 0 10px rgba(236, 72, 153, .55), 0 0 22px rgba(34, 211, 238, .35); }
-  /* ---------- Ambre : signature (cadres à coins de visée, nid d'abeille, chiffres lumineux) ---------- */
-  html.theme-holo.theme-ambre body::after { background:
-    repeating-linear-gradient(0deg, rgba(255, 176, 40, .04) 0 1px, transparent 1px 3px), url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%2256%22%20height%3D%2297%22%20viewBox%3D%220%200%2056%2097%22%3E%3Cpath%20d%3D%22M28%200l28%2016v32L28%2064%200%2048V16zM28%2064v33M0%2048l-28%2016M56%2048l28%2016%22%20fill%3D%22none%22%20stroke%3D%22%23fbb024%22%20stroke-opacity%3D%22.07%22%20stroke-width%3D%221%22/%3E%3C/svg%3E") center top / 56px 97px,
-    radial-gradient(900px 520px at 50% -8%, rgba(180, 83, 9, .40), transparent 62%), radial-gradient(640px 520px at -10% 70%, rgba(146, 64, 14, .22), transparent 62%),
-    radial-gradient(700px 560px at 110% 95%, rgba(234, 88, 12, .24), transparent 62%), var(--bg) !important; }
-  html.theme-holo.theme-ambre .glass, html.theme-holo.theme-ambre .card, html.theme-holo.theme-ambre .unit, html.theme-holo.theme-ambre .kpi, html.theme-holo.theme-ambre .key, html.theme-holo.theme-ambre .mate, html.theme-holo.theme-ambre .hero, html.theme-holo.theme-ambre .feed, html.theme-holo.theme-ambre .canal-row, html.theme-holo.theme-ambre .tl, html.theme-holo.theme-ambre .routines, html.theme-holo.theme-ambre .intent-row, html.theme-holo.theme-ambre .brief-card, html.theme-holo.theme-ambre .auto, html.theme-holo.theme-ambre .pap, html.theme-holo.theme-ambre .menu-tile, html.theme-holo.theme-ambre .kpi-t {
-    background:
-      linear-gradient(rgb(var(--c1)), rgb(var(--c1))) top left / 14px 2px no-repeat border-box,
-      linear-gradient(rgb(var(--c1)), rgb(var(--c1))) top left / 2px 14px no-repeat border-box,
-      linear-gradient(rgb(var(--c1)), rgb(var(--c1))) top right / 14px 2px no-repeat border-box,
-      linear-gradient(rgb(var(--c1)), rgb(var(--c1))) top right / 2px 14px no-repeat border-box,
-      linear-gradient(rgb(var(--c1)), rgb(var(--c1))) bottom left / 14px 2px no-repeat border-box,
-      linear-gradient(rgb(var(--c1)), rgb(var(--c1))) bottom left / 2px 14px no-repeat border-box,
-      linear-gradient(rgb(var(--c1)), rgb(var(--c1))) bottom right / 14px 2px no-repeat border-box,
-      linear-gradient(rgb(var(--c1)), rgb(var(--c1))) bottom right / 2px 14px no-repeat border-box,
-      linear-gradient(180deg, rgba(var(--k2), .6), rgba(var(--k1), .9)) padding-box,
-      linear-gradient(rgba(var(--c1), .26), rgba(var(--c1), .26)) border-box !important;
-    border: 1px solid transparent; border-radius: 5px !important; box-shadow: 0 0 20px rgba(180, 83, 9, .12) !important; }
-  html.theme-holo.theme-ambre .kpi-t.is-amber { background: linear-gradient(rgb(var(--warn)), rgb(var(--warn))) top left / 14px 2px no-repeat border-box, linear-gradient(rgb(var(--warn)), rgb(var(--warn))) top left / 2px 14px no-repeat border-box, linear-gradient(rgb(var(--warn)), rgb(var(--warn))) bottom right / 14px 2px no-repeat border-box, linear-gradient(rgb(var(--warn)), rgb(var(--warn))) bottom right / 2px 14px no-repeat border-box, linear-gradient(180deg, rgba(var(--warn), .1), rgba(var(--k1), .9)) padding-box, linear-gradient(rgba(var(--warn), .4), rgba(var(--warn), .4)) border-box !important; }
-  html.theme-holo.theme-ambre .kpi-n, html.theme-holo.theme-ambre .kpi b { font-family: var(--tech) !important; text-shadow: 0 0 12px rgba(var(--c1), .7); }
-  html.theme-holo.theme-ambre .view-title { font-family: var(--tech); letter-spacing: .26em; text-shadow: 0 0 10px rgba(var(--c1), .55); }
-  html.theme-holo.theme-ambre .view-title::before { content: "▸ "; color: rgb(var(--c1)); }
-  html.theme-holo.theme-ambre .top { background: rgb(var(--k5)); border-bottom: 1px solid rgba(var(--c1), .35); box-shadow: 0 1px 0 rgba(var(--c1), .15), 0 6px 18px rgba(0, 0, 0, .35); }
-  html.theme-holo.theme-ambre .brand b { letter-spacing: .26em; }
-  /* ---------- Néon : signature (horizon en grille, néons rose et cyan, titres en dégradé) ---------- */
-  html.theme-holo.theme-neon body::after { background:
-    linear-gradient(180deg, var(--bg) 0, rgba(7, 1, 15, 0) 22%) left bottom / 100% 34% no-repeat,
-    url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%20400%20200%22%20preserveAspectRatio%3D%22none%22%3E%3Cpath%20d%3D%22M200%200L-1200%20200%20M200%200L-1100%20200%20M200%200L-1000%20200%20M200%200L-900%20200%20M200%200L-800%20200%20M200%200L-700%20200%20M200%200L-600%20200%20M200%200L-500%20200%20M200%200L-400%20200%20M200%200L-300%20200%20M200%200L-200%20200%20M200%200L-100%20200%20M200%200L0%20200%20M200%200L100%20200%20M200%200L200%20200%20M200%200L300%20200%20M200%200L400%20200%20M200%200L500%20200%20M200%200L600%20200%20M200%200L700%20200%20M200%200L800%20200%20M200%200L900%20200%20M200%200L1000%20200%20M200%200L1100%20200%20M200%200L1200%20200%20M200%200L1300%20200%20M200%200L1400%20200%20M200%200L1500%20200%20M200%200L1600%20200%20M0%200.0H400%20M0%2056.0H400%20M0%2096.3H400%20M0%20125.4H400%20M0%20146.3H400%20M0%20161.3H400%20M0%20172.1H400%20M0%20179.9H400%20M0%20185.6H400%20M0%20189.6H400%20M0%20192.5H400%20M0%20194.6H400%20M0%20196.1H400%20M0%20197.2H400%20M0%20198.0H400%22%20fill%3D%22none%22%20stroke%3D%22%23ec4899%22%20stroke-opacity%3D%22.38%22%20stroke-width%3D%22.8%22%20vector-effect%3D%22non-scaling-stroke%22/%3E%3C/svg%3E") left bottom / 100% 34% no-repeat,
-    radial-gradient(70% 22% at 50% 66%, rgba(236, 72, 153, .30), transparent 70%),
-    radial-gradient(900px 520px at 50% -10%, rgba(126, 34, 206, .44), transparent 62%), radial-gradient(640px 520px at -10% 50%, rgba(34, 211, 238, .14), transparent 62%),
-    radial-gradient(700px 560px at 110% 40%, rgba(219, 39, 119, .22), transparent 62%), var(--bg) !important; }
-  html.theme-holo.theme-neon .glass, html.theme-holo.theme-neon .card, html.theme-holo.theme-neon .unit, html.theme-holo.theme-neon .kpi, html.theme-holo.theme-neon .key, html.theme-holo.theme-neon .mate, html.theme-holo.theme-neon .hero, html.theme-holo.theme-neon .feed, html.theme-holo.theme-neon .canal-row, html.theme-holo.theme-neon .tl, html.theme-holo.theme-neon .routines, html.theme-holo.theme-neon .intent-row, html.theme-holo.theme-neon .brief-card, html.theme-holo.theme-neon .auto, html.theme-holo.theme-neon .pap, html.theme-holo.theme-neon .menu-tile, html.theme-holo.theme-neon .kpi-t {
-    background: linear-gradient(180deg, rgba(var(--k2), .58), rgba(var(--k1), .86)) padding-box, linear-gradient(135deg, rgba(34, 211, 238, .75), rgba(168, 85, 247, .35) 45%, rgba(236, 72, 153, .8)) border-box !important;
-    border: 1px solid transparent; box-shadow: 0 0 16px rgba(236, 72, 153, .16), 0 0 30px rgba(34, 211, 238, .06), inset 0 1px 0 rgba(251, 207, 232, .08) !important; }
-  html.theme-holo.theme-neon .view-title { background: linear-gradient(90deg, #22d3ee, #e879f9 50%, #f472b6); -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 0 6px rgba(236, 72, 153, .55)); }
-  html.theme-holo.theme-neon .view-title::after { background: linear-gradient(90deg, #22d3ee, #ec4899 55%, transparent); box-shadow: 0 0 10px rgba(236, 72, 153, .7); }
-  html.theme-holo.theme-neon .panel-h h2::before { background: linear-gradient(#22d3ee, #ec4899); box-shadow: 0 0 10px rgba(236, 72, 153, .9); }
-  html.theme-holo.theme-neon .kpi-n, html.theme-holo.theme-neon .kpi b { text-shadow: 0 0 10px rgba(236, 72, 153, .8), 0 0 22px rgba(34, 211, 238, .35); }
-  html.theme-holo.theme-neon .top { background: rgb(var(--k5)); border-bottom: 1px solid rgba(236, 72, 153, .45); box-shadow: 0 1px 0 rgba(34, 211, 238, .25), 0 0 18px rgba(236, 72, 153, .25); }
-  /* la page vocale suit les polices du thème */
-  html.theme-ambre .jv, html.theme-ambre .jv-chip { font-family: var(--sans) !important; } html.theme-ambre .jv-top, html.theme-ambre .jv-title, html.theme-ambre .jv-pill { font-family: var(--tech) !important; }
-  html.theme-neon .jv-title, html.theme-neon .jv-top { font-family: var(--logo) !important; } html.theme-neon .jv-title { text-shadow: 0 0 8px rgba(236, 72, 153, .7), 0 0 20px rgba(34, 211, 238, .4); }
-  /* ---------- le choix du thème (Toutes les rubriques) : un aperçu de chaque palette ---------- */
-  .theme-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; } .theme-row > span { width: 100%; }
-  .th-pick { font: inherit; color: var(--fg); display: grid; gap: 6px; justify-items: center; padding: 8px 10px; border-radius: 14px; border: 1px solid var(--line); background: var(--glass); cursor: pointer; flex: 1 1 0; min-width: 0; }
-  .th-pick.is-on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent), 0 0 16px rgba(var(--c1), .35); }
-  .th-sw { width: 100%; height: 26px; border-radius: 8px; } .th-pick small { font-size: 12.5px; }
 
   html.theme-holo body::after { background:
     radial-gradient(1px 1px at 8% 14%, rgba(255,255,255,.5), transparent 60%), radial-gradient(1px 1px at 34% 6%, rgba(255,255,255,.35), transparent 60%),
@@ -4047,10 +3973,6 @@ void main(){
         h('div', {class: 'all-grid'}, ALL.map((a) => editFav
           ? h('button', {type: 'button', class: 'tab fav-pick' + (FAV.includes(a[0]) ? ' is-fav' : ''), onclick: () => { if (FAV.includes(a[0])) FAV = FAV.filter((f) => f !== a[0]); else if (FAV.length < 4) FAV.push(a[0]); if (FAV.length === 4) { try { localStorage.setItem('jarvis.fav', JSON.stringify(FAV)); } catch (e) { /* rien */ } drawBar(); } drawSheet(); }}, h('span', {class: 'ic', html: icon(a[2], 20)}), h('span', {class: 'lbl', text: a[1]}), h('span', {class: 'star', text: FAV.includes(a[0]) ? '★' : '☆'}))
           : navBtn(a))),
-        /* 19/11/2026 : trois thèmes ; le bouton recharge vraiment la page (avant, il ne marchait que depuis l'accueil : remplacer l'adresse par elle-même ne recharge rien quand elle a un #) */
-        h('div', {class: 'theme-row'}, h('span', {text: 'Thème'}), [['holo', 'Hologramme', 'linear-gradient(110deg, #67e8f9, #38bdf8 35%, #6366f1 70%, #a855f7)'], ['ambre', 'Ambre', 'linear-gradient(110deg, #fde047, #fbbf24 35%, #f97316 70%, #ea580c)'], ['neon', 'Néon', 'linear-gradient(110deg, #22d3ee, #a855f7 45%, #ec4899 80%, #f472b6)']].map(([k, l, g]) =>
-          h('button', {type: 'button', class: 'th-pick' + (document.documentElement.getAttribute('data-th') === k ? ' is-on' : ''), 'aria-pressed': String(document.documentElement.getAttribute('data-th') === k), onclick: () => { try { localStorage.setItem('jarvis.theme', k); } catch (e) { /* rien */ } try { if (/[?&]theme=/.test(location.search)) history.replaceState(null, '', location.pathname + location.search.replace(/([?&])theme=\w+&?/, '$1').replace(/[?&]$/, '') + location.hash); } catch (e) { /* rien */ } location.reload(); }},
-            h('span', {class: 'th-sw', style: 'background:' + g}), h('small', {text: l})))),
         h('button', {type: 'button', class: 'all-close', onclick: closeAll}, 'Fermer')));
     }
     sheet.addEventListener('click', (e) => { if (e.target === sheet) closeAll(); });

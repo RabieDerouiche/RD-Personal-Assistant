@@ -356,22 +356,13 @@ srv.listen(0, async () => {
       const bars = await p.evaluate(() => { const c = [...document.querySelectorAll('.cmp-crit')].find((x) => /^Prix du jour/.test(x.textContent)); return c ? [...c.querySelectorAll('.cmp-bar')].map((b) => ({v: b.querySelector('.cmp-v').textContent, w: b.querySelector('.cmp-track i').getBoundingClientRect().width, best: b.classList.contains('is-best')})) : []; });
       ok('Achats : la barre est la valeur (le prix le plus bas a la barre la plus courte, en vert)', bars.length === 2 && bars[0].best && !bars[1].best && bars[0].w < bars[1].w && +bars[0].v < +bars[1].v, JSON.stringify(bars));
       ok('Achats : sous chaque variante, pour qui, à quoi elle sert, forces et limites, les deux notes', cp && cp.ex === 2 && /Pour qui/.test(cp.exT) && /À quoi elle sert/.test(cp.exT) && /Qualité\/prix \d/.test(cp.exT) && /Qualité \d/.test(cp.exT), cp && cp.exT.replace(/\s+/g, ' ').slice(0, 140)); }
-    /* 0.24.0 : trois thèmes (le classique est retiré) ; le bouton marche depuis n'importe quelle rubrique (avant : seulement depuis l'accueil) */
-    { p = await page('?theme=actuel#achats');
-      ok('thèmes : un ancien choix « actuel » (thème classique retiré) retombe sur Hologramme', await p.evaluate(() => document.documentElement.getAttribute('data-th') === 'holo' && document.documentElement.classList.contains('theme-holo')));
-      await p.goto(base + '#achats'); await p.waitForTimeout(1500);
+    /* 0.24.0 (19/11/2026) : Hologramme seul (classique retiré, Ambre et Néon essayés puis retirés à sa demande) */
+    { p = await page('#achats');
+      await p.evaluate(() => { try { localStorage.setItem('jarvis.theme', 'neon'); } catch (e) { /* rien */ } }); await p.reload(); await p.waitForTimeout(2000);
+      const th = await p.evaluate(() => ({cls: document.documentElement.className, th: document.documentElement.getAttribute('data-th'), c1: getComputedStyle(document.documentElement).getPropertyValue('--c1').trim(), jv: getComputedStyle(document.documentElement).getPropertyValue('--jv1').trim()}));
+      ok('thème : Hologramme seul, un ancien choix (classique, Ambre, Néon) retombe sur Hologramme', th.cls === 'theme-holo' && th.th === 'holo' && th.c1 === '56, 189, 248' && th.jv === '', JSON.stringify(th));
       await p.click('.fav-handle'); await p.waitForTimeout(600);
-      const picks = await p.evaluate(() => [...document.querySelectorAll('.th-pick')].map((x) => x.textContent));
-      ok('thèmes : trois choix avec leur aperçu (Hologramme, Ambre, Néon)', picks.join(',') === 'Hologramme,Ambre,Néon' && await p.evaluate(() => document.querySelectorAll('.th-pick .th-sw').length === 3), picks.join(','));
-      await Promise.all([p.waitForNavigation({timeout: 8000}).catch(() => null), p.click('.th-pick:has-text("Ambre")')]); await p.waitForTimeout(1500);
-      const am = await p.evaluate(() => ({th: document.documentElement.getAttribute('data-th'), cls: document.documentElement.className, hash: location.hash, c1: getComputedStyle(document.documentElement).getPropertyValue('--c1').trim(), warn: getComputedStyle(document.documentElement).getPropertyValue('--warn').trim(), meta: document.querySelector('meta[name="theme-color"]').content}));
-      ok('thèmes : « Ambre » choisi depuis Achats s\'applique (rechargement, on reste dans Achats), palette ambrée, l\'urgent passe en cyan', am.th === 'ambre' && /theme-holo/.test(am.cls) && /theme-ambre/.test(am.cls) && am.hash === '#achats' && am.c1 === '251, 176, 36' && am.warn === '56, 189, 248' && am.meta === '#0a0602', JSON.stringify(am));
-      await p.click('.fav-handle'); await p.waitForTimeout(600);
-      await Promise.all([p.waitForNavigation({timeout: 8000}).catch(() => null), p.click('.th-pick:has-text("Néon")')]); await p.waitForTimeout(1500);
-      const ne = await p.evaluate(() => ({th: document.documentElement.getAttribute('data-th'), c1: getComputedStyle(document.documentElement).getPropertyValue('--c1').trim(), muted: getComputedStyle(document.documentElement).getPropertyValue('--muted').trim()}));
-      ok('thèmes : « Néon » (rose et cyan), ses couleurs l\'emportent sur les retouches d\'Hologramme', ne.th === 'neon' && ne.c1 === '236, 72, 153' && ne.muted === '#c9a3e6', JSON.stringify(ne));
-      await p.screenshot({path: path.join(SH, 'theme-neon.png')});
-      await p.evaluate(() => { try { localStorage.setItem('jarvis.theme', 'holo'); } catch (e) { /* rien */ } });
+      ok('thème : plus de ligne « Thème » dans Toutes les rubriques (un seul thème)', await p.evaluate(() => !document.querySelector('.theme-row, .th-pick') && !!document.querySelector('.all-panel')));
     }
     /* 0.24.0 : chercher un produit à partir d'une idée (ici, la recherche d'exemple et une recherche simulée) */
     { p = await page('#achats');

@@ -3,8 +3,7 @@
 import type {Orb, OrbState} from './orb';
 
 type RGB = [number, number, number];
-type Pal = Record<OrbState, {a: RGB; b: RGB; spd: number; amp: number}>;
-const HOLO: Pal = {
+const COL: Record<OrbState, {a: RGB; b: RGB; spd: number; amp: number}> = {
   idle: {a: [56, 189, 248], b: [99, 102, 241], spd: 1, amp: 0},
   listening: {a: [34, 211, 238], b: [56, 189, 248], spd: 1.5, amp: 0.5},
   thinking: {a: [168, 85, 247], b: [99, 102, 241], spd: 3, amp: 0.25},
@@ -12,29 +11,10 @@ const HOLO: Pal = {
   speaking: {a: [96, 165, 250], b: [168, 85, 247], spd: 1.8, amp: 1},
   error: {a: [251, 113, 133], b: [245, 158, 11], spd: 0.6, amp: 0}
 };
-/* 0.24.0 (19/11/2026) : un globe aux couleurs de chaque thème (Ambre, Néon) ; le blanc du cœur suit aussi */
-const PALS: Record<string, {pal: Pal; hot: string}> = {
-  holo: {pal: HOLO, hot: '240,250,255'},
-  ambre: {hot: '255,246,228', pal: {
-    idle: {a: [251, 176, 36], b: [234, 88, 12], spd: 1, amp: 0},
-    listening: {a: [253, 224, 71], b: [251, 176, 36], spd: 1.5, amp: 0.5},
-    thinking: {a: [249, 115, 22], b: [220, 38, 38], spd: 3, amp: 0.25},
-    executing: {a: [163, 230, 53], b: [251, 176, 36], spd: 2, amp: 0.3},
-    speaking: {a: [253, 186, 116], b: [249, 115, 22], spd: 1.8, amp: 1},
-    error: {a: [239, 68, 68], b: [56, 189, 248], spd: 0.6, amp: 0}}},
-  neon: {hot: '255,240,250', pal: {
-    idle: {a: [236, 72, 153], b: [34, 211, 238], spd: 1, amp: 0},
-    listening: {a: [34, 211, 238], b: [236, 72, 153], spd: 1.5, amp: 0.5},
-    thinking: {a: [168, 85, 247], b: [217, 70, 239], spd: 3, amp: 0.25},
-    executing: {a: [45, 212, 191], b: [34, 211, 238], spd: 2, amp: 0.3},
-    speaking: {a: [244, 114, 182], b: [34, 211, 238], spd: 1.8, amp: 1},
-    error: {a: [250, 204, 21], b: [239, 68, 68], spd: 0.6, amp: 0}}}
-};
-const theme = () => PALS[(typeof document !== 'undefined' && document.documentElement.getAttribute('data-th')) || 'holo'] || PALS.holo;
 export interface HoloOpts { pedestal?: boolean; nodes?: number; ring?: boolean }
 
 export function createHolo(o: HoloOpts = {}): Orb {
-  const N = o.nodes ?? 130, ped = !!o.pedestal, ring = o.ring !== false, TH = theme(), COL = TH.pal, HOT = TH.hot;
+  const N = o.nodes ?? 130, ped = !!o.pedestal, ring = o.ring !== false;
   const el = document.createElement('div'); el.className = 'orb-stage holo-stage';
   const cv = document.createElement('canvas'); el.append(cv);
   const g = cv.getContext('2d');
@@ -123,19 +103,19 @@ export function createHolo(o: HoloOpts = {}): Orb {
     for (const s of S) {
       const fr = s[2] > 0, r0 = (fr ? 1.6 : 1) * dpr * (0.8 + s[2] * 0.3);
       g.fillStyle = rgba(A, fr ? 0.18 : 0.06); g.beginPath(); g.arc(s[0], s[1], r0 * 3.2, 0, Math.PI * 2); g.fill();
-      g.fillStyle = fr ? `rgba(${HOT},.95)` : rgba(A, 0.45); g.beginPath(); g.arc(s[0], s[1], r0, 0, Math.PI * 2); g.fill();
+      g.fillStyle = fr ? 'rgba(220,245,255,.95)' : rgba(A, 0.45); g.beginPath(); g.arc(s[0], s[1], r0, 0, Math.PI * 2); g.fill();
     }
     /* cœur */
     const cr = R * (0.3 + live * 0.12 + 0.03 * Math.sin(t * 2));
     gr = g.createRadialGradient(cx, cy, 0, cx, cy, cr);
-    gr.addColorStop(0, `rgba(${HOT},.95)`); gr.addColorStop(0.25, rgba(A, 0.65)); gr.addColorStop(1, rgba(B, 0));
+    gr.addColorStop(0, 'rgba(240,250,255,.95)'); gr.addColorStop(0.25, rgba(A, 0.65)); gr.addColorStop(1, rgba(B, 0));
     g.fillStyle = gr; g.beginPath(); g.arc(cx, cy, cr, 0, Math.PI * 2); g.fill();
     /* orbite (moitié avant) et l'étincelle qui y circule */
     if (ring) {
       orbit(0, Math.PI, 0.55);
       const u = t * 0.9, ex = Math.cos(u) * orx, ey = Math.sin(u) * ory, rx = cx + ex * Math.cos(tilt) - ey * Math.sin(tilt), ry = cy + ex * Math.sin(tilt) + ey * Math.cos(tilt);
       if (Math.sin(u) > 0 || Math.hypot(rx - cx, ry - cy) > R) {
-        gr = g.createRadialGradient(rx, ry, 0, rx, ry, 7 * dpr); gr.addColorStop(0, `rgba(${HOT},1)`); gr.addColorStop(1, rgba(A, 0));
+        gr = g.createRadialGradient(rx, ry, 0, rx, ry, 7 * dpr); gr.addColorStop(0, 'rgba(240,250,255,1)'); gr.addColorStop(1, rgba(A, 0));
         g.fillStyle = gr; g.beginPath(); g.arc(rx, ry, 7 * dpr, 0, Math.PI * 2); g.fill();
       }
     }
