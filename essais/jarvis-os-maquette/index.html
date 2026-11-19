@@ -9,6 +9,88 @@
   })();</script><script src="jarvis-voix.js"></script><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><link rel="manifest" href="manifest.webmanifest"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black"><meta name="theme-color" content="#02040e"><link rel="apple-touch-icon" href="icon-180.png"><link rel="icon" type="image/png" href="icon-192.png"><meta name="apple-mobile-web-app-title" content="JARVIS"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}
   /* ---------- JARVIS OS : navigation et écrans ajoutés ---------- */
   .fab-talk { display: none !important; }
+  /* 0.25.0 : en-tête sur une ligne */
+  .top-in { grid-template-columns: auto minmax(0, 1fr) auto !important; gap: 4px 10px !important; }
+  .top-in > .brand { grid-column: 1; grid-row: 1; }
+  .top-in > .status { grid-column: 2; grid-row: 1; margin: 0 !important; min-width: 0; }
+  .top-in > .top-meta { grid-column: 3; grid-row: 1; gap: 6px; }
+  .top-meta #today, .top-meta #clock { display: none !important; }
+  .top-meta .demo { margin: 0; cursor: pointer; }
+  .top-meta .demo.is-short { display: inline-flex; align-items: center; gap: 5px; font: 600 11.5px var(--display); letter-spacing: .04em; text-transform: none; color: var(--muted); opacity: 1; white-space: nowrap; }
+  .top-meta .demo.is-short::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--amber); box-shadow: 0 0 8px var(--amber); }
+  .top-meta .demo.is-short.is-live::before { background: #4ade80; box-shadow: 0 0 8px #4ade80; }
+  .top-meta .demo.is-short.is-bad::before { background: #f87171; box-shadow: 0 0 8px #f87171; }
+  .top-meta .demo:not(.is-short) { position: absolute; left: max(16px, env(safe-area-inset-left, 0px)); right: max(16px, env(safe-area-inset-right, 0px)); top: 100%; padding: 4px 0 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .top-in { position: relative; }
+  .top-in:has(.demo:not(.is-short)) { margin-bottom: 22px; }
+  #status .st[role="button"] { cursor: pointer; }
+  .top-in:has(#status .st.is-pause) .demo.is-short { font-size: 0; gap: 0; padding: 8px 4px; }
+  #status .st { font-size: 12px; }
+  #status .st.is-pause b { font-weight: 600; color: var(--accent); }
+  .top-tools { gap: 6px !important; }
+  /* 0.25.0 : la recherche partout */
+  .gsearch { position: fixed; inset: 0; z-index: 80; display: flex; flex-direction: column; background: radial-gradient(90% 40% at 50% 0, #0b2d63 0, #04112b 45%, #02040d 100%); color: var(--fg); padding: calc(10px + env(safe-area-inset-top, 0px)) max(14px, env(safe-area-inset-right, 0px)) 0 max(14px, env(safe-area-inset-left, 0px)); }
+  .gsearch[hidden] { display: none; }
+  .gs-top { position: relative; display: flex; align-items: center; gap: 8px; padding-bottom: 10px; border-bottom: 1px solid var(--line); }
+  .gs-lens { position: absolute; left: 13px; top: 13px; color: var(--muted); display: inline-flex; pointer-events: none; }
+  .gs-in { flex: 1; min-width: 0; min-height: 46px; padding: 10px 14px 10px 40px; border-radius: 14px; border: 1px solid rgba(56, 189, 248, .5); background: rgba(8, 30, 70, .55); color: var(--fg); font: 400 16px var(--sans); outline: none; box-shadow: 0 0 18px rgba(56, 189, 248, .16); }
+  .gs-x { width: auto; flex: 0 0 auto; }
+  .gs-res { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 10px 0 calc(24px + env(safe-area-inset-bottom, 0px)); display: grid; gap: 12px; align-content: start; }
+  .gs-hint { margin: 6px 2px 0; font-size: 14px; } .gs-count { margin: 0 2px; font-size: 12.5px; color: var(--muted); }
+  .gs-quick { display: flex; flex-wrap: wrap; gap: 8px; }
+  .gs-grp { display: grid; gap: 6px; }
+  .gs-grp h3 { margin: 0 2px; display: flex; align-items: baseline; gap: 8px; font: 600 11.5px var(--display); letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+  .gs-grp h3 small { font: 500 11px var(--sans); letter-spacing: 0; color: var(--dim); }
+  .gs-row { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; padding: 10px 12px; min-height: 52px; border-radius: 14px; border: 1px solid var(--line); background: linear-gradient(180deg, rgba(var(--k3), .5), rgba(var(--k1), .78)); color: var(--fg); font: inherit; }
+  .gs-ic { flex: 0 0 32px; height: 32px; border-radius: 10px; display: grid; place-items: center; color: #7dd3fc; border: 1px solid rgba(56, 189, 248, .3); background: rgba(8, 30, 70, .5); }
+  .gs-t { flex: 1; min-width: 0; display: grid; gap: 1px; }
+  .gs-t b { font: 600 14.5px var(--sans); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .gs-t small { font-size: 12.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .gs-row mark { background: rgba(56, 189, 248, .28); color: #fff; border-radius: 3px; padding: 0 1px; }
+  .gs-go { flex: 0 0 auto; color: var(--muted); }
+  .gs-more { justify-self: start; margin-left: 2px; }
+  .gs-pap { border-style: dashed; }
+  /* 0.25.0 : « Pour moi », une par une */
+  .fc-start { display: flex; align-items: center; gap: 12px; width: 100%; justify-content: flex-start; text-align: left; padding: 12px 16px !important; margin: 4px 0 10px; border-radius: 18px !important; }
+  .fc-start-t { flex: 1; min-width: 0; display: grid; gap: 1px; } .fc-start-t b { font: 600 16px var(--display); } .fc-start-t small { font-size: 13px; font-weight: 500; color: #fff; }
+  .fc-head { display: grid; gap: 8px; }
+  .fc-top { display: flex; align-items: center; gap: 10px; }
+  .fc-close { width: auto; flex: 0 0 auto; gap: 6px; }
+  .fc-count { flex: 1; text-align: center; font: 600 15px var(--display); color: var(--fg); }
+  .fc-done { flex: 0 0 auto; min-width: 64px; text-align: right; font-size: 12.5px; color: #4ade80; }
+  .fc-prog { height: 4px; border-radius: 2px; background: rgba(255, 255, 255, .1); overflow: hidden; }
+  .fc-prog i { display: block; height: 100%; background: linear-gradient(90deg, #22d3ee, #818cf8); border-radius: 2px; transition: width .35s ease; }
+  .fc-sec { margin: 4px 0 0; font: 600 11.5px var(--display); letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+  .fc-card .pm-title { font-size: 19px; } .fc-card .pm-ask { font-size: 15.5px; }
+  .fc-acts { display: grid; gap: 8px; margin-top: 4px; }
+  .fc-acts .btn { width: 100%; min-height: 48px; justify-content: space-between; text-align: left; }
+  .fc-acts .btn.ghost { justify-content: center; min-height: 40px; color: var(--muted); }
+  .fc-nav { display: grid; grid-template-columns: 1fr 1.4fr; gap: 10px; position: sticky; bottom: calc(88px + max(6px, env(safe-area-inset-bottom, 0px))); z-index: 5; padding: 8px; margin: 0; border-radius: 18px; background: rgba(3, 8, 22, .88); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); border: 1px solid var(--line); }
+  .fc-nav .btn { min-height: 48px; justify-content: center; }
+  .fc-nav .btn[disabled] { opacity: .35; }
+  .fc-hint { text-align: center; font-size: 12.5px; margin: 8px 0 0; }
+  .fc-end { display: grid; justify-items: center; gap: 8px; text-align: center; padding: 28px 18px; }
+  .fc-end h3 { margin: 0; font: 600 20px var(--display); } .fc-end p { margin: 0; }
+  .fc-end-ic { width: 56px; height: 56px; border-radius: 50%; display: grid; place-items: center; color: #4ade80; border: 1px solid rgba(74, 222, 128, .5); box-shadow: 0 0 24px rgba(74, 222, 128, .25); }
+  .fc-end .fc-acts { width: 100%; margin-top: 8px; } .fc-end .fc-acts .btn { justify-content: center; }
+  /* 0.25.0 : la dictée d'une question dans la discussion avec Claude */
+  .dict-btn { flex: 0 0 auto; border: 1px solid rgba(56, 189, 248, .55) !important; background: rgba(8, 30, 70, .55) !important; color: #bae6fd !important; }
+  .dict-btn.is-on { background: radial-gradient(circle at 50% 35%, #38bdf8, #2563eb 60%, #6d28d9) !important; color: #fff !important; box-shadow: 0 0 0 4px rgba(56, 189, 248, .18), 0 0 22px rgba(56, 189, 248, .55); animation: dictring 1.4s ease-in-out infinite; }
+  @keyframes dictring { 50% { box-shadow: 0 0 0 9px rgba(56, 189, 248, 0), 0 0 22px rgba(56, 189, 248, .55); } }
+  .dict-strip { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 6px 8px 6px 14px; margin-bottom: 8px; border-radius: 14px; border: 1px solid rgba(56, 189, 248, .5); background: rgba(8, 30, 70, .55); box-shadow: 0 0 18px rgba(56, 189, 248, .16); }
+  .dict-dot { flex: 0 0 auto; width: 10px; height: 10px; border-radius: 50%; background: #22d3ee; box-shadow: 0 0 10px #22d3ee; animation: dictblink 1s ease-in-out infinite; }
+  .dict-strip[data-s="hearing"] .dict-dot { background: #4ade80; box-shadow: 0 0 12px #4ade80; animation: none; }
+  .dict-strip[data-s="transcribing"] .dict-dot { background: #a855f7; box-shadow: 0 0 10px #a855f7; animation-duration: .6s; }
+  @keyframes dictblink { 50% { opacity: .35; } }
+  .dict-txt { flex: 1; min-width: 0; font: 500 14px var(--sans); color: #e0f2fe; }
+  .dict-bar { flex: 0 0 46px; height: 4px; border-radius: 2px; background: rgba(255, 255, 255, .12); overflow: hidden; }
+  .dict-bar i { display: block; width: 100%; height: 100%; background: linear-gradient(90deg, #22d3ee, #818cf8); transform: scaleX(.04); transform-origin: left; transition: transform .08s linear; }
+  .dict-strip[data-s="transcribing"] .dict-bar { visibility: hidden; }
+  .dict-fin { flex: 0 0 auto; width: auto; min-height: 34px; }
+  .dict-no { flex: 0 0 auto; color: var(--muted); font-size: 13px; min-height: 34px; }
+  .dict-note { margin: 0 0 8px; font-size: 13px; color: var(--muted); }
+  .dict-note.is-ok { color: #7dd3fc; }
+  .lire-toggle.is-on { border-color: rgba(56, 189, 248, .8) !important; color: #e0f2fe !important; box-shadow: 0 0 12px rgba(56, 189, 248, .25); }
   /* barre à tes favoris (bas) et toutes les rubriques */
   .fav-bar { position: fixed !important; left: 0 !important; right: 0 !important; bottom: 0 !important; top: auto !important; transform: none !important; width: auto !important; z-index: 50; display: block !important; padding: 0 8px max(6px, env(safe-area-inset-bottom, 0px)) !important; background: rgba(5, 8, 16, .98) !important; -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); border: 0 !important; border-top: 1px solid var(--line) !important; border-radius: 0 !important; box-shadow: none !important; }
   .fav-handle { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; border: 0; background: none; color: var(--dim); font: 500 10.5px var(--sans); padding: 5px 0 2px; }
@@ -2199,6 +2281,8 @@ void main(){
     };
     let nexts = [];
     try { nexts = ctx && ctx.type ? NEXT(e, ctx, o) : []; } catch (err) { nexts = []; }
+    /* JARVIS OS 0.25.0, « une par une » : la demande suivante arrive seule ; pas de feuille « Et ensuite ? », le bandeau garde « Annuler » */
+    if (typeof FOCUS === 'object' && FOCUS && FOCUS.on && TAB === 'demandes') nexts = [];
     if (e.bot && e.work !== false && !LINK.on) busyFor(e.bot, 9000); else refresh();
     if (nexts.length && $('sheet').hidden) {
       /* action lancée depuis une carte : la feuille s'ouvre sur la suite */
@@ -2943,7 +3027,15 @@ void main(){
       papiers: S.papiers.map((q) => ({document: q.name, personne: q.who, valable_jusqu_au: q.untilTxt, sert_pour: q.use})),
       presence: Object.keys(S.presence).sort().filter((iso) => { const n = dayDiff(iso); return n >= -7 && n <= 31; }).map((iso) => isoFr(iso) + ' : ' + CODE[S.presence[iso]]),
       anniversaires: S.anniv.map((a) => a.who + ' : ' + pad2(a.d) + '/' + pad2(a.m)),
-      equipe: BOTS.map((b) => ({bot: b.name, role: b.title, dernier_passage: S.last[b.id], prochain_passage: S.next[b.id], passages: ROUTINES[b.id]}))
+      equipe: BOTS.map((b) => ({bot: b.name, role: b.title, dernier_passage: S.last[b.id], prochain_passage: S.next[b.id], passages: ROUTINES[b.id]})),
+      /* JARVIS OS 0.25.0 (un seul Claude) : ce que la voix savait dire seule et que Claude n'avait pas — l'heure, la météo, l'agenda,
+         les tâches, les sorties et les voyages — pour qu'une question dictée (« j'ai quoi demain ? », « une sortie ce week-end ? ») ait sa réponse */
+      maintenant: (() => { try { return new Intl.DateTimeFormat('fr-FR', {timeZone: 'Europe/Paris', weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit'}).format(new Date()) + ', heure de Paris'; } catch (e) { return String(new Date()); } })(),
+      meteo: (() => { try { return typeof metLine === 'function' ? metLine() || 'inconnue (position non donnée)' : undefined; } catch (e) { return undefined; } })(),
+      agenda_7_jours: (() => { try { return typeof homeData === 'function' ? homeData().ag.slice(0, 40).map((a) => ({jour: a.n === 0 ? "aujourd'hui" : a.n === 1 ? 'demain' : 'dans ' + a.n + ' jours', heure: a.time || 'journée', quoi: a.title, source: a.who})) : undefined; } catch (e) { return undefined; } })(),
+      mes_taches: (S.taches || []).slice(0, 40).map((t) => ({tache: t.title, pour_le: t.n != null ? short(t.n) : 'sans date'})),
+      sorties_proposees: (S.sorties || []).filter((x) => x.status === 'proposee' && (x.to == null || x.to >= 0)).slice(0, 20).map((x) => ({sortie: x.title, ou: x.where, quand: x.from != null ? short(x.from) + (x.to != null && x.to !== x.from ? ' au ' + short(x.to) : '') : 'sans date', prix: x.priceTxt || undefined, trajet: x.trajet || undefined, age: x.age || undefined})),
+      voyages: (S.voyages || []).slice(0, 10).map((v) => ({projet: v.title, qui: v.who, dates: v.when, budget_max: v.budget || undefined}))
     };
   }
   function rulesFor() {
@@ -3045,6 +3137,7 @@ void main(){
   function closeChat() {
     if (typeof convPause === 'function' && EAR.session) convPause();
     if (typeof voxStop === 'function') voxStop();
+    if (typeof dictCancel === 'function') dictCancel();
     if (CHAT.ctl) CHAT.ctl.abort();
     CHAT.open = false; $('chat').hidden = true;
     if (!APP.id && $('sheet').hidden) document.body.classList.remove('noscroll');
@@ -3081,7 +3174,8 @@ void main(){
     const head = h('header', {class: 'chat-head'},
       h('button', {type: 'button', class: 'btn ghost icon-btn', 'aria-label': 'Fermer la discussion', onclick: closeChat, html: icon('back', 20)}),
       avatar, h('div', {class: 'chat-id'}, h('b', {text: who === 'claude' ? 'Claude' : BOT[who].name + ' · ' + BOT[who].title}), h('span', {text: 'À propos de « ' + titleOf(CHAT.type, CHAT.item) + ' »'})),
-      CHAT.mode === 'claude' && typeof talkStage === 'function' ? h('button', {type: 'button', class: 'btn sm talk-toggle' + (CHAT.talk ? ' is-on' : ''), 'aria-pressed': String(!!CHAT.talk), onclick: () => talkSet(!CHAT.talk)}, h('span', {class: 'ic', html: icon(CHAT.talk ? 'chat' : 'sound', 15)}), CHAT.talk ? 'Fil' : 'Conversation') : null);
+      /* JARVIS OS 0.25.0 : plus de « Conversation » en continu ; à la place, « Lecture » (les réponses de Claude lues à voix haute, au choix) */
+      CHAT.mode === 'claude' && typeof lireToggle === 'function' ? lireToggle() : null);
     const log = h('div', {class: 'chat-log', 'aria-live': 'polite'}, T.msgs.map(msgEl));
     let note = null;
     if (CHAT.mode === 'claude') {
@@ -3096,7 +3190,8 @@ void main(){
     const send = CHAT.busy && CHAT.mode === 'claude'
       ? h('button', {type: 'button', class: 'btn icon-btn', 'aria-label': 'Arrêter', onclick: () => CHAT.ctl && CHAT.ctl.abort(), html: icon('x', 18)})
       : h('button', {type: 'button', class: 'btn main icon-btn', 'aria-label': 'Envoyer', onclick: sendChat, html: icon('send', 18)});
-    const form = h('div', {class: 'chat-form'}, sugg, h('div', {class: 'chat-row'}, ta, send), tier, CHAT.mode === 'claude' && typeof voxPanel === 'function' ? voxPanel() : null);
+    const dOn = typeof DICT === 'object' && DICT.on;
+    const form = h('div', {class: 'chat-form'}, dOn ? null : sugg, typeof dictStrip === 'function' ? dictStrip() : null, h('div', {class: 'chat-row'}, ta, typeof dictBtn === 'function' ? dictBtn() : null, send), tier, CHAT.mode === 'claude' && typeof voxPanel === 'function' && typeof lireVoixIphone === 'function' && lireVoixIphone() ? voxPanel() : null);
     const conv = !!CHAT.talk && CHAT.mode === 'claude' && typeof talkStage === 'function';
     ov.classList.toggle('is-talk', conv);
     ov.classList.toggle('no-kb', conv && !EAR.kb && !!earKind());
@@ -3112,6 +3207,7 @@ void main(){
     const T = THREADS[CHAT.key];
     ta.value = '';
     if (CHAT.talk && CHAT.mode === 'claude' && typeof voxPrime === 'function' && !EAR.session) voxPrime();
+    if (typeof dictSent === 'function') dictSent();
     T.msgs.push({who: 'toi', text});
     if (CHAT.mode === 'claude' && typeof localCmd === 'function' && localCmd(text, T)) return;
     if (CHAT.mode === 'bot') {
@@ -3156,6 +3252,7 @@ void main(){
       const res = await SAMPLE([{role: 'user', content: rulesFor()}].concat(T.turns), opts);
       { const sp = splitNext(res.text); out.text = sp.body; out.next = sp.next; } out.wait = false;
       if (CHAT.talk && out.text && !(typeof voxFeed === 'function' && voxFeed(out, true))) setTimeout(() => { if (CHAT.open && CHAT.talk && VOX.on !== out) voxSpeak(out); }, 80);
+      if (!CHAT.talk && out.text && typeof lireAuto === 'function') lireAuto(out);
       T.turns.push({role: 'assistant', content: res.text});
       if (res.truncated) T.msgs.push({who: 'claude', text: 'Réponse coupée : demande-moi la suite.'});
     } catch (e) {
@@ -5875,7 +5972,8 @@ void main(){
     return panel('Coût de la semaine', h('span', {class: 'aside', text: 'depuis ' + dayFr(ws) + ' ' + hmFr(ws)}),
       h('div', {class: 'card cost-card'},
         h('p', {class: 'cost-reset'}, h('b', {text: 'Réserve Grok remise à zéro ' + dayFr(nr) + ' à ' + hmFr(nr)}), h('span', {text: ' · dans ' + (dd ? dd + ' j ' : '') + hh + ' h'})),
-        GP.on ? h('p', {class: 'smart is-plain', text: 'Grok est en pause' + (GP.until ? ' : les passages reprennent ' + dayFr(GP.until) + ' à ' + hmFr(GP.until) + '.' : ' : aucun passage depuis la remise à zéro.')}) : null,
+        /* 0.25.0 : la pause est dite par l'en-tête, une fois ; ici seulement s'il n'y a pas de date de reprise à lire au-dessus */
+        GP.on && !GP.until ? h('p', {class: 'smart is-plain', text: 'Grok est en pause : aucun passage depuis la remise à zéro.'}) : null,
         h('div', {class: 'cost-t-wrap'}, h('table', {class: 'cost-t'},
           h('thead', {}, h('tr', {}, h('th', {text: 'Poste'}), h('th', {text: 'Semaine'}), h('th', {text: 'Avant'}))),
           h('tbody', {}, rows.map(([k, a, b]) => h('tr', {}, h('td', {text: k}), h('td', {text: String(a)}), h('td', {text: String(b)})))))),
@@ -6517,6 +6615,7 @@ void main(){
     clearInterval(VOX.timer);
     const was = VOX.on; VOX.on = null;
     try { if (VOX.tts) VOX.tts.stop(); } catch (e) { /* rien */ }
+    try { if (window.JarvisVoice && window.JarvisVoice.hush) window.JarvisVoice.hush(); } catch (e) { /* rien */ }
     try { if (window.speechSynthesis) window.speechSynthesis.cancel(); } catch (e) { /* rien */ }
     if (was && CHAT.open) renderChat();
   }
@@ -6778,6 +6877,79 @@ void main(){
       note ? h('p', {class: 'muted talk-hint', text: note}) : null,
       !kind && earSR() ? h('div', {class: 'row-actions center'}, h('button', {type: 'button', class: 'btn sm ghost', onclick: earRetry}, 'Réessayer le micro')) : null);
   }
+  /* ---------- JARVIS OS 0.25.0 : un seul Claude (choix du propriétaire, QCM du 19/11/2026) ----------
+     La conversation continue est retirée : son cerveau à part ne voyait aucune de ses données, et la chaîne écoute → Claude → voix
+     ne peut pas approcher une conversation vocale native sur un petit serveur sans frais d'API. À la place :
+     - l'orbe ouvre CETTE discussion avec Claude (celle qui a l'état de Pilotage et ses boutons : ordre, tâche, échéance) ;
+     - le micro écoute UNE question (Whisper du serveur, sinon l'iPhone), l'écrit dans le champ, et se referme : il relit, corrige, envoie ;
+     - « Lecture » : les réponses lues à voix haute (Pierre sur son serveur, sinon la voix de l'iPhone), au choix, coupée par défaut. */
+  function JVX() { return window.JarvisVoice || null; }
+  var DICT = {on: false, state: '', note: '', ready: false, base: ''};
+  var LIRE = {on: false}; try { LIRE.on = localStorage.getItem('jarvis.lire') === 'oui'; } catch (e) { LIRE.on = false; }
+  function dictKindNow() { const v = JVX(); try { return v && v.dictKind ? v.dictKind() : null; } catch (e) { return null; } }
+  function lireVoixIphone() { const v = JVX(); return LIRE.on && !(v && v.sayKind && v.sayKind() === 'serveur'); }
+  var DICT_TXT = {listening: "Je t'écoute…", hearing: "Je t'entends…", transcribing: "J'écris ta phrase…"};
+  function dictPaint() {
+    const n = document.querySelector('#chat .dict-strip');
+    if (!n || !DICT.on) { if (CHAT.open) renderChat(); return; }
+    n.dataset.s = DICT.state; const t = n.querySelector('.dict-txt'); if (t) t.textContent = DICT_TXT[DICT.state] || "Je t'écoute…";
+    const f = n.querySelector('.dict-fin'); if (f) f.hidden = DICT.state === 'transcribing';
+  }
+  function dictStart() {
+    const v = JVX();
+    if (DICT.on) { if (v) v.dictStop(true); return true; }   /* deuxième appui : « j'ai fini » */
+    if (!v || !v.dictate || !dictKindNow()) { DICT.note = "Pas de micro pour cette page ici : touche le champ, puis le micro du clavier de l'iPhone."; DICT.ready = false; if (CHAT.open) renderChat(); const ta = $('chat-in'); if (ta) try { ta.focus({preventScroll: true}); } catch (e) { /* rien */ } return false; }
+    if (typeof voxStop === 'function') voxStop();
+    const ta0 = $('chat-in'); DICT.base = ta0 ? ta0.value.trim() : '';
+    DICT.on = true; DICT.state = 'listening'; DICT.note = ''; DICT.ready = false; DICT.why = '';
+    if (CHAT.open) renderChat();
+    const join = (t) => (DICT.base ? DICT.base + ' ' : '') + t;
+    v.dictate({
+      onState: (st, why) => { DICT.state = st; if (why) DICT.why = why; if (DICT.on) dictPaint(); },
+      onPartial: (t) => { const ta = $('chat-in'); if (ta && DICT.on) ta.value = join(t); },
+      onLevel: (x) => { const b = $('dict-lvl'); if (b) b.style.transform = 'scaleX(' + Math.max(0.04, Math.min(1, x)).toFixed(2) + ')'; }
+    }).then((text) => {
+      const was = DICT.on; DICT.on = false; if (!was) return;   /* annulée entre-temps */
+      const ta = $('chat-in');
+      if (text && ta) { ta.value = join(text.charAt(0).toUpperCase() + text.slice(1)); DICT.ready = true; DICT.note = 'Relis, corrige si besoin, puis envoie.'; }
+      else { DICT.ready = false; DICT.note = DICT.state === 'error' ? 'Micro : ' + (DICT.why || 'indisponible') + ". Touche le champ, puis le micro du clavier de l'iPhone." : "Je n'ai rien entendu. Touche le micro pour réessayer."; }
+      if (CHAT.open) renderChat();
+    });
+    return true;
+  }
+  function dictCancel() { const v = JVX(); const was = DICT.on; DICT.on = false; DICT.note = ''; DICT.ready = false; if (was && v && v.dictStop) v.dictStop(false); }
+  function dictSent() { DICT.note = ''; DICT.ready = false; if (LIRE.on) { const v = JVX(); try { if (v && v.prime) v.prime(); } catch (e) { /* rien */ } if (typeof voxPrime === 'function' && lireVoixIphone()) voxPrime(); } }
+  function dictBtn() {
+    if (!dictKindNow()) return null;
+    return h('button', {type: 'button', class: 'btn icon-btn dict-btn' + (DICT.on ? ' is-on' : ''), id: 'dict-btn', 'aria-label': DICT.on ? "J'ai fini de parler" : 'Dicter ma question', 'aria-pressed': String(!!DICT.on), onclick: () => dictStart(), html: icon('mic', 19)});
+  }
+  function dictStrip() {
+    if (DICT.on) return h('div', {class: 'dict-strip', 'data-s': DICT.state, role: 'status'},
+      h('i', {class: 'dict-dot', 'aria-hidden': 'true'}), h('span', {class: 'dict-txt', text: DICT_TXT[DICT.state] || "Je t'écoute…"}),
+      h('span', {class: 'dict-bar', 'aria-hidden': 'true'}, h('i', {id: 'dict-lvl'})),
+      (() => { const b = h('button', {type: 'button', class: 'btn sm dict-fin', onclick: () => { const v = JVX(); if (v) v.dictStop(true); }}, "J'ai fini"); b.hidden = DICT.state === 'transcribing'; return b; })(),
+      h('button', {type: 'button', class: 'link dict-no', onclick: () => { dictCancel(); renderChat(); }}, 'Annuler'));
+    if (DICT.note) return h('p', {class: 'dict-note' + (DICT.ready ? ' is-ok' : ''), role: 'status', text: DICT.note});
+    return null;
+  }
+  function lireToggle() {
+    return h('button', {type: 'button', class: 'btn sm talk-toggle lire-toggle' + (LIRE.on ? ' is-on' : ''), 'aria-pressed': String(!!LIRE.on), 'aria-label': LIRE.on ? 'Lecture à voix haute : active' : 'Lecture à voix haute : coupée',
+      onclick: () => { LIRE.on = !LIRE.on; try { localStorage.setItem('jarvis.lire', LIRE.on ? 'oui' : 'non'); } catch (e) { /* rien */ }
+        if (LIRE.on) { const v = JVX(); try { if (v && v.prime) v.prime(); } catch (e) { /* rien */ } toast('Lecture', 'Les réponses de Claude seront lues à voix haute.', true); } else if (typeof voxStop === 'function') voxStop();
+        renderChat(); }},
+      h('span', {class: 'ic', html: icon('sound', 15)}), LIRE.on ? 'Lecture : oui' : 'Lecture : non');
+  }
+  function lireAuto(m) { if (!LIRE.on || !m || !m.text) return; setTimeout(() => { if (CHAT.open && LIRE.on && VOX.on !== m && !DICT.on) voxSpeak(m); }, 80); }
+  /* l'orbe : la discussion générale avec Claude, et l'écoute de la question tout de suite (l'appui sur l'orbe est le geste qu'attend l'iPhone) */
+  function askOpen() {
+    const v = JVX(); try { if (v && v.refresh) v.refresh(); } catch (e) { /* rien */ }
+    if (CHAT.open && CHAT.mode === 'claude') { dictStart(); return; }
+    CHAT.talk = false;
+    openChat('claude', 'hydra', 'equipe', 'equipe');
+    if (!dictStart() && !DICT.note) { const ta = $('chat-in'); if (ta) try { ta.focus({preventScroll: true}); } catch (e) { /* rien */ } }
+  }
+  window.JarvisAsk = askOpen;
+
   /* le bouton unique : visible sur tous les écrans, il ouvre la conversation et écoute tout de suite */
   (() => {
     const fab = h('button', {type: 'button', class: 'fab-talk', id: 'fab-talk', 'aria-label': 'Parler à Claude', onclick: () => convOpen()}, h('span', {class: 'ic', html: icon('mic', 24)}));
@@ -6843,7 +7015,12 @@ void main(){
     const done = (why) => { if (VOX.on !== m) return; clearInterval(VOX.timer); VOX.on = null; if (why) toast('Voix', why, true); if (CHAT.open) renderChat(); if (typeof VOX.after === 'function') VOX.after(m); };
     VOX.on = m;
     VOX.timer = setInterval(() => { if (CHAT.open && CHAT.av) CHAT.av.talk(0.9); }, 700);
-    if (VOX.tts && !(EAR.session && earKind() === 'claude')) {
+    /* JARVIS OS 0.25.0 : sur son serveur, c'est Pierre (la voix du serveur) qui lit, phrase par phrase */
+    const JVs = window.JarvisVoice;
+    if (JVs && JVs.say && JVs.sayKind && JVs.sayKind() === 'serveur') {
+      if (!VOX.toldP) { VOX.toldP = true; toast('Voix', 'Lu par Pierre, la voix de ton serveur.', true); }
+      JVs.say(text.slice(0, 2500)).then(() => done(''), () => done(''));
+    } else if (VOX.tts && !(EAR.session && earKind() === 'claude')) {
       if (!VOX.toldC) { VOX.toldC = true; toast('Voix', 'Lu par la voix de Claude.', true); }
       Promise.resolve().then(() => VOX.tts.speak(text.slice(0, 2000), {language: 'fr'})).then(() => done(''), (e) => {
         if (VOX.on !== m) return;
@@ -7269,7 +7446,8 @@ void main(){
     (S.sorties || []).filter((x) => x.from != null && x.from >= 1 && x.from <= 14 && ['proposee', 'choisie', 'reservee'].includes(x.status)).forEach((x) => it.push({n: x.from, t: x.title, sub: 'Sortie ' + (x.status === 'proposee' ? 'proposée par ' + lvName(x.bot) : 'prévue') + (x.where ? ' · ' + x.where : ''), open: () => go('sorties')}));
     (S.voyages || []).filter((v) => !v.demo && v.depart != null && v.depart >= 1 && v.depart <= 14).forEach((v) => it.push({n: v.depart, t: 'Départ : ' + v.title, sub: 'Voyage', open: () => go('voyages')}));
     it.sort((a, b) => a.n - b.n || String(a.time || '99').localeCompare(String(b.time || '99')));
-    return it.filter((a, i) => !it.slice(0, i).some((b) => b.n === a.n && lvLow(b.t) === lvLow(a.t)));
+    /* 0.25.0 : le même rendez-vous écrit dans l'agenda et dans Échéances (« Rendez-vous notaire » et « Rendez-vous notaire (14h30) ») : une seule ligne */
+    return it.filter((a, i) => !it.slice(0, i).some((b) => b.n === a.n && dupKey(b.t) === dupKey(a.t)));
   }
   /* à surveiller : chaque ligne dit ce que c'est et pourquoi elle est là */
   function homeWatch() {
@@ -7445,6 +7623,199 @@ void main(){
     const src = h('div'); ACC_ORIG(src); const mail = hpanel(src, 'Arrivés depuis');
     if (mail) { const n = mail.querySelectorAll('.card, article, li').length; el.append(h('details', {class: 'panel pm-sec', id: 'pm-mail'}, h('summary', {}, h('h2', {text: 'Courrier à trier'}), h('span', {class: 'aside', text: n ? n + ' mail' + (n > 1 ? 's' : '') : 'depuis le dernier tour d\'Iris'})), mail)); }
   };
+  /* ================= JARVIS OS 0.25.0 (revue UX du 19/11/2026, choix QCM « Pour moi, une par une ») =================
+     « Pour moi » fait 6 écrans de cartes : pour vider la liste, il fallait faire défiler, ouvrir, répondre, revenir. Le mode « une par une »
+     montre UNE demande à la fois, avec toutes ses réponses en gros ; dès qu'il répond, la suivante prend sa place. « Passer » la laisse
+     pour plus tard (rien n'est écrit), « Précédente » revient. La liste est celle de la page (à décider, puis à faire), relue en direct :
+     les réponses passent par les mêmes boutons que les cartes (mêmes écritures, même annulation de 5 secondes). */
+  var FOCUS = {on: false, key: '', i: 0, done: 0, skipped: {}, total: 0};
+  function focusQueue() {
+    const dem = S.demandes || [], yg = yesGroups().filter((g) => g.list.length >= 2), grouped = new Set(yg.flatMap((g) => g.list.map((d) => d.id)));
+    const dec = dem.filter((d) => d.kind !== 'afaire' && !grouped.has(d.id)), todo = dem.filter((d) => d.kind === 'afaire' && !pmProj(d));
+    const drafts = (S.drafts || []).filter((x) => !demandeOfDraft(x)), reps = S.dosReplies || [];
+    return [].concat(yg.map((g) => ({key: 'y:' + g.bot, sec: 'À décider', el: () => yesCard(g)})), drafts.map((x) => ({key: 'b:' + x.id, sec: 'À décider', el: () => draftCard(x)})),
+      reps.map((x, i) => ({key: 'r:' + (x.id || x.title || i), sec: 'À décider', el: () => dosReplyCard(x)})), dec.map((d) => ({key: 'd:' + d.id, sec: 'À décider', d, el: () => focusCard(d)})), todo.map((d) => ({key: 'd:' + d.id, sec: 'À faire', d, el: () => focusCard(d)})));
+  }
+  /* la carte d'une demande, avec toutes ses réponses courantes (celles de la feuille, sans « Autres réponses ») */
+  function focusCard(d) {
+    const card = pmCard(d), row = card.querySelector('.pm-row'), tiles = card_hasTiles(d);
+    const acts = ACTIONS.demande(d).filter((a) => !a.more), tileLabels = new Set(Array.from(card.querySelectorAll('.pm-tile b')).map((b) => b.textContent));
+    const run = (a) => (ev) => { ev.stopPropagation(); if (a.pick || a.confirm) openItem('demande', d, a); else finish(a.go(), {type: 'demande', item: d}); };
+    const btns = acts.filter((a) => !(tiles && (tileLabels.has(a.label) || d.options.indexOf(a.label) >= 0))).map((a, i) => h('button', {type: 'button', class: 'btn ' + (i === 0 && !tiles ? 'main' : a.tone === 'danger' ? 'ghost danger' : ''), onclick: run(a)}, a.label, costTag(a)));
+    const box = h('div', {class: 'fc-acts'}, btns, h('button', {type: 'button', class: 'btn ghost', onclick: (ev) => { ev.stopPropagation(); openItem('demande', d); }}, 'Tout le détail et les autres réponses ›'));
+    if (row) row.replaceWith(box); else card.append(box);
+    card.classList.add('fc-card'); card.onclick = null; card.removeAttribute('tabindex'); card.style.cursor = 'default';
+    return card;
+  }
+  function focusStart() { FOCUS.on = true; FOCUS.i = 0; FOCUS.key = ''; FOCUS.done = 0; FOCUS.skipped = {}; FOCUS.total = focusQueue().length; renderView(); }
+  function focusStop() { FOCUS.on = false; renderView(); }
+  function focusMove(n) { const q = focusQueue(); if (n > 0 && q[FOCUS.i]) FOCUS.skipped[q[FOCUS.i].key] = true; FOCUS.i = Math.max(0, FOCUS.i + n); FOCUS.key = q[FOCUS.i] ? q[FOCUS.i].key : ''; renderView(); }
+  function focusView(el) {
+    const q = focusQueue();
+    /* la demande affichée a disparu de la liste : il vient d'y répondre ; la suivante est à la même place */
+    if (FOCUS.key && !q.some((x) => x.key === FOCUS.key)) { FOCUS.done++; delete FOCUS.skipped[FOCUS.key]; FOCUS.key = ''; }
+    else if (FOCUS.key) FOCUS.i = q.findIndex((x) => x.key === FOCUS.key);
+    const left = q.length, cur = q[FOCUS.i] || null, total = Math.max(FOCUS.total, FOCUS.done + left);
+    el.classList.add('fc-view');
+    el.append(h('div', {class: 'fc-head'}, h('div', {class: 'fc-top'},
+      h('button', {type: 'button', class: 'btn sm ghost fc-close', onclick: focusStop}, h('span', {class: 'ic', html: icon('back', 15)}), 'Toute la liste'),
+      h('span', {class: 'fc-count', text: cur ? (FOCUS.i + 1) + ' sur ' + left : left ? 'Fin de la liste' : 'Terminé'}),
+      h('span', {class: 'fc-done', text: FOCUS.done ? FOCUS.done + ' traitée' + (FOCUS.done > 1 ? 's' : '') : ''})),
+      h('div', {class: 'fc-prog', role: 'progressbar', 'aria-valuemin': '0', 'aria-valuemax': String(total), 'aria-valuenow': String(FOCUS.done), 'aria-label': 'Demandes traitées'}, h('i', {style: 'width:' + (total ? Math.round(100 * FOCUS.done / total) : 100) + '%'})),
+      cur ? h('p', {class: 'fc-sec', text: cur.sec}) : null));
+    if (!cur) {
+      const nSkip = Object.keys(FOCUS.skipped).filter((k) => q.some((x) => x.key === k)).length;
+      el.append(h('div', {class: 'card fc-end'}, h('span', {class: 'fc-end-ic', html: icon('check', 26)}),
+        h('h3', {text: left ? 'Tu as fait le tour' : "Plus rien ne t'attend"}),
+        h('p', {class: 'muted', text: (FOCUS.done ? FOCUS.done + ' demande' + (FOCUS.done > 1 ? 's traitées' : ' traitée') + '. ' : '') + (left ? left + ' encore dans la liste' + (nSkip ? ' (' + nSkip + ' passée' + (nSkip > 1 ? 's' : '') + ')' : '') + '.' : 'Tout est traité.')}),
+        h('div', {class: 'fc-acts'}, left ? h('button', {type: 'button', class: 'btn main', onclick: () => { FOCUS.i = 0; FOCUS.key = ''; FOCUS.skipped = {}; renderView(); }}, 'Reprendre au début') : null, h('button', {type: 'button', class: 'btn' + (left ? ' ghost' : ' main'), onclick: focusStop}, 'Revenir à « Pour moi »'))));
+      return;
+    }
+    FOCUS.key = cur.key;
+    el.append(cur.el(),
+      h('div', {class: 'fc-nav'},
+        h('button', {type: 'button', class: 'btn ghost', disabled: FOCUS.i === 0 ? '' : null, onclick: () => focusMove(-1)}, '‹ Précédente'),
+        h('button', {type: 'button', class: 'btn', onclick: () => focusMove(1)}, FOCUS.i + 1 < left ? 'Passer ›' : 'Passer · fin ›')),
+      h('p', {class: 'muted fc-hint', text: '« Passer » ne répond à rien : la demande reste dans la liste.'}));
+  }
+  const VD_FOCUS = VIEWS.demandes;
+  VIEWS.demandes = (el) => {
+    if (FOCUS.on) { focusView(el); return; }
+    VD_FOCUS(el);
+    const n = focusQueue().length, sum = el.querySelector('.pm-sum');
+    if (n >= 2 && sum) sum.after(h('button', {type: 'button', class: 'btn main fc-start', id: 'fc-start', onclick: focusStart}, h('span', {class: 'ic', html: icon('check', 17)}), h('span', {class: 'fc-start-t'}, h('b', {text: 'Traiter une par une'}), h('small', {text: 'Une demande à la fois, la suivante arrive seule'})), h('span', {'aria-hidden': 'true', text: '›'})));
+  };
+  /* une notification qui renvoie à un panneau de « Pour moi » (réponses récentes, cartes de côté, courrier) : la liste entière revient */
+  const VU_FOCUS = voirUrl;
+  voirUrl = function (hash) { if (FOCUS.on && /^#voir-/.test(String(hash || ''))) { FOCUS.on = false; if (TAB === 'demandes') renderView(); } return VU_FOCUS(hash); };
+  /* quitter la rubrique ferme le mode « une par une » (au retour, on retrouve toute la liste) */
+  const GO_FOCUS = go;
+  go = function (id, keepAgent) { if (id !== 'demandes') FOCUS.on = false; return GO_FOCUS(id, keepAgent); };
+
+  /* ================= JARVIS OS 0.25.0 (revue UX du 19/11/2026, choix QCM « Recherche partout ») =================
+     Rien ne permettait de retrouver un dossier, une échéance, un achat ou un échange sans savoir dans quelle rubrique il est. La loupe de
+     l'en-tête cherche dans tout ce que la page a déjà en mémoire (aucun appel, aucun coût) : demandes, agenda et échéances, dossiers, achats,
+     sorties, voyages, papiers, tâches, échanges avec les bots, rubriques. Un appui ouvre l'élément là où il vit. */
+  ICONS.search = ICONS.search || '<circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/>';
+  var GS = {open: false, q: '', more: {}};
+  const gsNorm = (t) => String(t == null ? '' : t).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  const gsWhen = (n) => (n == null || isNaN(n) ? '' : n === 0 ? "aujourd'hui" : n === 1 ? 'demain' : n === -1 ? 'hier' : n < 0 ? 'il y a ' + (-n) + ' j' : short(n));
+  function gsIndex() {
+    const out = [], add = (grp, ic, title, sub, more, open) => { if (title) out.push({grp, ic, title: String(title), sub: String(sub || ''), hay: gsNorm(title + ' ' + (sub || '') + ' ' + (more || '')), ht: gsNorm(title), open}); };
+    const inTab = (tab, fn) => () => { if (TAB !== tab) go(tab); if (fn) setTimeout(fn, 60); };
+    const sheet = (tab, type, item) => inTab(tab, () => { try { if (SHEETCFG[type]) openItem(type, item); } catch (e) { /* la rubrique est ouverte : c'est déjà ça */ } });
+    (S.demandes || []).forEach((d) => add('Pour moi', 'chat', d.title, lvName(d.bot) + ' · ' + String(d.ask || '').slice(0, 90), (d.why || '') + ' ' + (d.ctx || ''), sheet('demandes', 'demande', d)));
+    (S.drafts || []).forEach((x) => add('Pour moi', 'send', 'Brouillon : ' + (x.subject || 'sans objet'), 'À ' + ((x.to || []).join(', ') || 'personne'), x.body, inTab('demandes')));
+    (S.echeances || []).filter((e) => e.n >= -30).forEach((e) => add('Agenda et échéances', 'cal', e.title, gsWhen(e.n) + (BOT[e.bot] ? ' · ' + lvName(e.bot) : ''), e.note, sheet('agenda', 'echeance', e)));
+    (S.evenements || []).filter((e) => e.n >= -7).forEach((e) => add('Agenda et échéances', 'cal', e.title, gsWhen(e.n) + (e.time ? ' · ' + e.time : '') + ' · agenda', '', sheet('agenda', 'evenement', e)));
+    (S.anniv || []).forEach((a) => add('Agenda et échéances', 'cal', 'Anniversaire de ' + a.who, pad2(a.d) + '/' + pad2(a.m), '', sheet('agenda', 'anniv', a)));
+    (S.dossiers || []).forEach((k) => add('Dossiers', 'doc', k.title, (k.who ? 'En attente de ' + k.who + ' · ' : '') + (k.step || ''), (k.pour || '') + ' ' + (k.ctx || ''), sheet('suivi', 'dossier', k)));
+    (S.ach || []).forEach((f) => { const ps = (S.prix || []).filter((x) => (f.ids || []).indexOf(x.id) >= 0); add('Achats', 'tag', f.title, f.need || 'Produit suivi', ps.map((x) => x.name + ' ' + (x.vendors || '')).join(' '), () => { go('achats'); SEL.achats = f.id; renderView(false); }); });
+    if (!(S.ach || []).length) (S.prix || []).forEach((x) => add('Achats', 'tag', x.name, 'Prix suivi', x.vendors, sheet('achats', 'prix', x)));
+    (S.sorties || []).filter((x) => x.status !== 'supprimee' && x.status !== 'retiree').forEach((x) => add('Sorties', 'map', x.title, (x.where || '') + (x.from != null ? ' · ' + gsWhen(x.from) : '') + (x.status === 'faite' ? ' · faite' : ''), x.note, sheet('sorties', 'sortie', x)));
+    (S.voyages || []).forEach((v) => add('Voyages', 'plane', v.title, (v.who || '') + (v.when ? ' · ' + v.when : ''), v.dest, () => { go('voyages'); SEL.voyages = v.id; renderView(false); }));
+    (S.papiers || []).forEach((q) => add('Papiers', 'doc', q.name, (q.who || '') + (q.untilTxt ? ' · valable jusqu’au ' + q.untilTxt : ''), q.use, () => { PAPS.q = q.name; PAPS.open = null; go('papiers'); }));
+    try { if (PT.data && PT.data.all) PT.data.all.forEach((f) => add('Papiers', 'doc', f.name, 'Drive · ' + ((f.path || []).join(' › ') || 'Papiers'), '', () => { PAPS.q = f.name; PAPS.open = null; go('papiers'); })); } catch (e) { /* arbre du Drive pas encore lu */ }
+    (S.taches || []).forEach((t) => add('Mes tâches', 'check', t.title, t.n != null ? 'pour ' + gsWhen(t.n) : 'sans date', '', inTab('suivi', () => { const p = Array.from(document.querySelectorAll('#dir .panel')).find((x) => /^Mes tâches/.test((x.querySelector('h2') || {}).textContent || '')); if (p) p.scrollIntoView({block: 'start'}); })));
+    (S.ordres || []).slice(0, 60).forEach((o) => add('Échanges avec les bots', 'send', 'Ton ordre à ' + lvName(o.bot), String(o.text || '').slice(0, 100), o.reply, () => { try { openItem('ordre', o); } catch (e) { go('equipe'); } }));
+    (S.canal || []).filter((l) => l.reply && BOT[l.from === 'rabie' || l.from === 'claude' ? l.to : l.from]).slice(0, 80).forEach((l) => { const b = l.from === 'rabie' || l.from === 'claude' ? l.to : l.from; add('Échanges avec les bots', 'chat', 'Réponse de ' + lvName(b) + (l.date ? ' · ' + l.date : ''), String(l.reply).replace(/\s+/g, ' ').slice(0, 100), (l.msg || '') + ' ' + (l.subject || ''), () => { if (typeof voirLigne === 'function' && l._row) voirLigne(l._row); else go('equipe'); }); });
+    [['accueil', 'Accueil'], ['demandes', 'Pour moi'], ['agenda', 'Agenda'], ['suivi', 'Suivi'], ['achats', 'Achats'], ['voyages', 'Voyages'], ['sorties', 'Sorties'], ['papiers', 'Papiers'], ['equipe', 'Équipe'], ['automatisations', 'Automatisations'], ['reglages', 'Réglages']]
+      .forEach(([id, label]) => { if (VIEWS[id]) add('Rubriques', 'folder', label, TITLES[id] || '', '', () => go(id)); });
+    return out;
+  }
+  function gsFind(q) {
+    const toks = gsNorm(q).split(/\s+/).filter((x) => x.length >= 2);
+    if (!toks.length) return [];
+    return gsIndex().filter((x) => toks.every((t) => x.hay.indexOf(t) >= 0)).map((x) => Object.assign(x, {score: toks.reduce((a, t) => a + (x.ht.indexOf(t) === 0 ? 4 : x.ht.indexOf(t) > 0 ? 2 : 0), 0)}));
+  }
+  function gsMark(text, q) {
+    const toks = gsNorm(q).split(/\s+/).filter((x) => x.length >= 2), n = gsNorm(text), out = []; let i = 0;
+    if (n.length !== String(text).length) return [String(text)];   /* accents décomposés autrement : pas de surlignage, plutôt qu'un décalage */
+    while (i < text.length) { let hit = null; toks.forEach((t) => { const k = n.indexOf(t, i); if (k >= 0 && (!hit || k < hit[0])) hit = [k, t.length]; }); if (!hit) { out.push(text.slice(i)); break; } if (hit[0] > i) out.push(text.slice(i, hit[0])); out.push(h('mark', {text: text.slice(hit[0], hit[0] + hit[1])})); i = hit[0] + hit[1]; }
+    return out;
+  }
+  function gsDraw() {
+    const box = $('gs-res'); if (!box) return;
+    const q = GS.q.trim();
+    if (gsNorm(q).length < 2) {
+      box.replaceChildren(h('p', {class: 'muted gs-hint', text: 'Tape un mot : un nom, un dossier, un produit, un papier… La recherche se fait dans ce que JARVIS a déjà lu, sans rien coûter.'}),
+        h('div', {class: 'gs-quick'}, ['notaire', 'passeport', 'CRA', 'assurance', 'week-end'].map((x) => h('button', {type: 'button', class: 'chip', onclick: () => { GS.q = x; const i = $('gs-in'); if (i) i.value = x; gsDraw(); }}, x))));
+      return;
+    }
+    const res = gsFind(q), groups = [];
+    res.forEach((x) => { let g = groups.find((y) => y.name === x.grp); if (!g) groups.push(g = {name: x.grp, list: []}); g.list.push(x); });
+    groups.forEach((g) => { g.list.sort((a, b) => b.score - a.score); if (g.name === 'Agenda et échéances') g.list = g.list.filter((a, i) => !g.list.slice(0, i).some((b) => dupKey(b.title) === dupKey(a.title) && b.sub.split(' · ')[0] === a.sub.split(' · ')[0])); });
+    const kids = [h('p', {class: 'gs-count', role: 'status', text: res.length ? res.length + ' résultat' + (res.length > 1 ? 's' : '') : 'Rien pour « ' + q + ' » dans ce que JARVIS a lu.'})];
+    groups.forEach((g) => {
+      const all = GS.more[g.name], L = all ? g.list : g.list.slice(0, 5);
+      kids.push(h('section', {class: 'gs-grp'}, h('h3', {}, g.name, h('small', {text: String(g.list.length)})),
+        L.map((x) => h('button', {type: 'button', class: 'gs-row', onclick: () => { gsClose(); try { x.open(); } catch (e) { /* rien */ } }}, h('span', {class: 'gs-ic', html: icon(ICONS[x.ic] ? x.ic : 'doc', 17)}), h('span', {class: 'gs-t'}, h('b', {}, gsMark(x.title, q)), x.sub ? h('small', {}, gsMark(x.sub, q)) : null), h('span', {class: 'gs-go', 'aria-hidden': 'true', text: '›'}))),
+        g.list.length > 5 ? h('button', {type: 'button', class: 'link gs-more', onclick: () => { GS.more[g.name] = !all; gsDraw(); }}, all ? 'Moins' : 'Les ' + g.list.length + ' résultats') : null));
+    });
+    kids.push(h('button', {type: 'button', class: 'gs-row gs-pap', onclick: () => { gsClose(); PAPS.q = q; PAPS.open = null; go('papiers'); }}, h('span', {class: 'gs-ic', html: icon('doc', 17)}), h('span', {class: 'gs-t'}, h('b', {text: 'Chercher « ' + q + ' » dans mes papiers'}), h('small', {text: 'Noms des fichiers du Drive et texte des documents'})), h('span', {class: 'gs-go', 'aria-hidden': 'true', text: '›'})),
+      typeof askOpen === 'function' && SAMPLE ? h('button', {type: 'button', class: 'gs-row gs-pap', onclick: () => { gsClose(); openChat('claude', 'hydra', 'equipe', 'equipe'); const ta = $('chat-in'); if (ta) { ta.value = q; ta.focus(); } }}, h('span', {class: 'gs-ic', html: icon('chat', 17)}), h('span', {class: 'gs-t'}, h('b', {text: 'Demander à Claude : « ' + q + ' »'}), h('small', {text: 'Il a tes données sous les yeux'})), h('span', {class: 'gs-go', 'aria-hidden': 'true', text: '›'})) : null);
+    box.replaceChildren(...kids.filter(Boolean));
+  }
+  function gsOpen() {
+    let ov = $('gsearch');
+    if (!ov) {
+      const inp = h('input', {class: 'gs-in', id: 'gs-in', type: 'search', placeholder: 'Chercher partout', autocomplete: 'off', autocapitalize: 'off', enterkeyhint: 'search', 'aria-label': 'Chercher partout dans JARVIS', oninput: (e) => { GS.q = e.target.value; GS.more = {}; gsDraw(); }});
+      ov = h('div', {class: 'gsearch', id: 'gsearch', role: 'dialog', 'aria-label': 'Recherche'},
+        h('div', {class: 'gs-top'}, h('span', {class: 'gs-lens', html: icon('search', 18)}), inp, h('button', {type: 'button', class: 'btn sm ghost gs-x', onclick: gsClose}, 'Fermer')),
+        h('div', {class: 'gs-res', id: 'gs-res'}));
+      document.body.append(ov);
+    }
+    GS.open = true; ov.hidden = false; document.body.classList.add('noscroll');
+    const i = $('gs-in'); i.value = GS.q; gsDraw(); try { i.focus(); i.select(); } catch (e) { /* rien */ }
+  }
+  function gsClose() { const ov = $('gsearch'); GS.open = false; if (ov) ov.hidden = true; if (!CHAT.open && $('sheet').hidden && !APP.id) document.body.classList.remove('noscroll'); }
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && GS.open) gsClose(); });
+  (() => { const tools = document.getElementById('top-tools'); if (tools) tools.prepend(h('button', {type: 'button', class: 'btn icon-btn gs-btn', id: 'gs-btn', 'aria-label': 'Chercher partout', title: 'Chercher partout', onclick: gsOpen, html: icon('search', 18)})); })();
+
+  /* ================= JARVIS OS 0.25.0 (choix QCM « En-tête et répétitions ») =================
+     1. L'en-tête tient sur une ligne : JARVIS, l'état utile (pause de Grok, pour toi, au travail, en retard), l'heure de la dernière lecture,
+        la loupe et la mise à jour. L'heure n'est plus écrite deux fois (l'horloge doublait « En direct · 14h41 » et la barre de l'iPhone) ;
+        « 0 au travail » et « en veille » ne disaient rien.
+     2. La pause de Grok est dite une fois par écran : la pastille de l'en-tête, qui ouvre le détail (file d'attente, date de reprise,
+        « Grok est reparti »). La pastille de l'accueil, le grand cadre de « Pour moi » et la note du coût de la semaine la répétaient.
+     3. Un rendez-vous écrit à la fois dans l'agenda et dans Échéances n'apparaît qu'une fois (accueil et agenda). */
+  /* le même rendez-vous, écrit deux fois : même jour, même titre une fois retirés l'heure et ce qui est entre parenthèses */
+  function dupKey(t) { return lvLow(String(t || '')).replace(/\s*\([^)]*\)\s*/g, ' ').replace(/\s*[·:,-]?\s*\b\d{1,2}\s*h\s*\d{0,2}\b\s*$/, '').replace(/\s+/g, ' ').trim(); }
+  const DI_1L = dayItems;
+  dayItems = function (iso) {
+    const its = DI_1L(iso), evs = its.filter((x) => x.k === 'ev').map((x) => dupKey(x.title || x.label));
+    if (!evs.length) return its;
+    return its.filter((x) => { if (!/^(e-|b-)/.test(x.k)) return true; const i = evs.indexOf(dupKey(String(x.label).replace(/ · fait ✓$/, ''))); if (i < 0) return true; const ev = its.filter((y) => y.k === 'ev')[i]; if (ev && x.bot && !ev.bot) ev.bot = x.bot; return false; });
+  };
+  function pauseDetail() { openSheet({bot: 'cyclops', kicker: 'Grok Bot', title: 'La pause de Grok', say: 'Tes ordres sont écrits tout de suite ; la sonnette part à la reprise.', extra: () => pauseBanner(), actions: []}); }
+  const HEAD_1L = header;
+  header = function () {
+    HEAD_1L();
+    const box = $('status'); if (!box) return;
+    box.querySelectorAll('.st.is-veille').forEach((n) => n.remove());
+    box.querySelectorAll('.st.is-travail').forEach((n) => { if (/^0\b/.test(n.textContent.trim())) n.remove(); });
+    const p = box.querySelector('.st.is-pause');
+    if (p && !p.dataset.tap) { p.dataset.tap = '1'; p.setAttribute('role', 'button'); p.setAttribute('tabindex', '0'); p.setAttribute('aria-label', p.textContent + ' : voir le détail'); p.addEventListener('click', pauseDetail); p.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pauseDetail(); } }); }
+    const d = box.querySelector('.st.is-demande'); if (d && !d.dataset.tap) { d.dataset.tap = '1'; d.setAttribute('role', 'button'); d.setAttribute('tabindex', '0'); d.addEventListener('click', () => go('demandes')); }
+    demoShort();
+  };
+  /* « En direct · 14h41 » devient « 14h41 » avec un point vert (rouge si la liaison a un souci : là, le texte entier reste, sur sa ligne) */
+  function demoShort() {
+    const n = $('demo'); if (!n) return;
+    const meta = document.querySelector('.top-meta'), tools = $('top-tools'); if (meta && tools && n.parentNode !== meta) meta.insertBefore(n, tools);
+    const t = n.textContent || '', m = t.match(/^En direct · (\d{1,2}h\d{2})$/i), mq = /^Maquette/.test(t);
+    n.classList.toggle('is-short', !!m || mq || /^\d{1,2}h\d{2}$/.test(t) || t === 'Maquette');
+    if (m) { n.textContent = m[1]; n.setAttribute('aria-label', 'En direct, lu à ' + m[1] + ' : état des systèmes'); } else if (mq) { n.textContent = 'Maquette'; }
+  }
+  if (typeof lvStatus === 'function') { const LVS_1L = lvStatus; lvStatus = function () { LVS_1L(); demoShort(); }; }
+  setTimeout(demoShort, 0);
+  /* accueil : plus de pastille de pause (elle est dans l'en-tête) */
+  const HT_1L = homeTop;
+  homeTop = function (src) { return HT_1L(src).filter((x) => !(x && x.classList && x.classList.contains('pause-pill'))); };
+  /* « Pour moi » : plus de grand cadre de pause en tête de liste (l'en-tête l'ouvre) */
+  const VD_1L = VIEWS.demandes;
+  VIEWS.demandes = (el) => { VD_1L(el); if (!FOCUS.on) { const b = el.querySelector(':scope > .pause-b'); if (b) b.remove(); } };
+
   /* l'historique de tes demandes (Canal) va dans Suivi */
   const VSU_PM = VIEWS.suivi;
   VIEWS.suivi = (el) => { VSU_PM(el); if (LINK.on && LV.mcp && typeof histPanel === 'function') el.append(histPanel()); };
@@ -7962,11 +8333,11 @@ void main(){
         h('p', {class: 'muted', text: st ? 'Serveur ' + st.version + (st.commit ? ' (' + String(st.commit).slice(0, 7) + ')' : '') + ' · Claude ' + (st.claude && st.claude.loggedIn ? 'connecté' : 'non connecté') + ' · voix du serveur ' + (st.tts ? 'prête' : 'absente') + ' · écoute Whisper ' + (st.ecoute ? 'prête' : st.ecouteInstall === 'running' ? 'en cours d’installation' : 'absente') : 'État du serveur indisponible.'}),
         h('button', {type: 'button', class: 'btn main', onclick: async () => { upd.textContent = 'Mise à jour…'; const r = await JS.update(); upd.textContent = (r && r.message) || 'Réponse illisible.'; upd.classList.toggle('is-bad', !(r && r.ok)); if (r && r.changed) setTimeout(() => location.reload(), 6000); }}, 'Mettre à jour le serveur'), upd,
         h('small', {class: 'pick-label', text: 'Voix de JARVIS'}), seg('voiceEngine', [['serveur', 'Pierre (ton serveur)'], ['iphone', "Voix de l'iPhone"]], 'serveur'),
-        /* 0.22.0 (choix QCM du 18/11/2026) : écoute Whisper du serveur, micro continu, ta voix coupe JARVIS ; réponses instantanées puis Claude Haiku */
-        h('small', {class: 'pick-label', text: 'Écoute de JARVIS'}), seg('ecoute', [['whisper', 'Whisper (ton serveur)'], ['iphone', "Écoute de l'iPhone"]], 'whisper'),
-        h('p', {class: 'muted', text: "Whisper : le micro reste ouvert pendant la conversation, ta voix ou un appui coupe JARVIS. À la voix, Claude Haiku répond ; dis « réfléchis » pour Sonnet. L'heure, la date, la météo, ton agenda, Pour moi et « où en est Iris » sont répondus tout de suite, sans Claude."}),
+        /* 0.25.0 (choix QCM du 19/11/2026, « un seul Claude ») : plus de conversation continue ; l'orbe ouvre la discussion avec Claude et le micro
+           écoute une question (Whisper du serveur, sinon l'iPhone), écrite dans le champ avant l'envoi */
+        h('small', {class: 'pick-label', text: 'Dictée (le micro de la discussion avec Claude)'}), seg('ecoute', [['whisper', 'Whisper (ton serveur)'], ['iphone', "Écoute de l'iPhone"]], 'whisper'),
+        h('p', {class: 'muted', text: "L'orbe ouvre la discussion avec Claude, qui a tes données sous les yeux, et écoute une question : elle s'écrit dans le champ, tu la relis, tu envoies. « Lecture : oui », en haut de la discussion, fait lire les réponses par la voix choisie ci-dessus. La conversation en continu a été retirée (19/11/2026)."}),
         st && !st.ecoute ? h('button', {type: 'button', class: 'btn sm', onclick: async (ev) => { const b = ev.currentTarget; b.disabled = true; const r = await JS.ecouteInstall(); upd.textContent = r ? "Installation de l'écoute Whisper lancée (5 à 10 minutes, modèle de 500 Mo). Reviens ici ensuite." : 'Installation impossible : serveur injoignable.'; const poll = async () => { const e = await JS.ecouteEtat(); if (!e || e.state === 'running') { setTimeout(poll, 8000); return; } upd.textContent = e.state === 'done' ? "Écoute Whisper installée : rouvre la conversation." : "L'installation a échoué : " + String(e.tail || '').slice(-200); upd.classList.toggle('is-bad', e.state !== 'done'); }; setTimeout(poll, 8000); }}, "Installer l'écoute Whisper") : null,
-        h('small', {class: 'pick-label', text: "Écoute de l'iPhone (secours)"}), seg('listenMode', [['continu', 'Conversation continue'], ['phrase', 'Une phrase']], 'phrase'),
         st && !st.tts ? h('button', {type: 'button', class: 'btn sm', onclick: async () => { const r = await JS.voiceInstall(); upd.textContent = r ? 'Installation de la voix : ' + r.state + '. Reviens dans quelques minutes.' : 'Installation impossible.'; }}, 'Installer la voix Pierre') : null,
         h('a', {class: 'link', href: '/ancienne/', text: 'Ancienne app (réglages avancés, diagnostic)'})));
       swap(parts);
@@ -7980,5 +8351,5 @@ void main(){
 
 <script>/* comparaison des dispositions : ?nav=grille ou ?nav=dock */ (function () { var v = (location.search.match(/nav=(grille|dock)/) || [])[1]; if (!v) return; document.documentElement.classList.add('nav-' + v); if (v === 'dock') { var n = document.getElementById('tabs'); var d = document.createElement('nav'); d.className = 'dock-nav'; d.setAttribute('aria-label', 'Rubriques'); setTimeout(function () { Array.prototype.slice.call(n.children).forEach(function (b) { d.appendChild(b); }); document.body.appendChild(d); }, 0); } })();</script>
 <script>/* JARVIS OS : app installable (écran d'accueil), hors données d'exemple */ try { if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js'); } catch (e) { /* rien */ }</script>
-<script>/* JARVIS OS : l'orbe au centre de la barre ouvre la page vocale */ try { var slot = document.querySelector('.talk-slot'); if (slot && !slot.querySelector('.jv-btn')) window.JarvisVoice.mountButton(slot); } catch (e) { /* rien */ }</script>
+<script>/* JARVIS OS : l'orbe au centre de la barre ouvre la discussion avec Claude et écoute ta question (0.25.0 : un seul Claude) */ try { var slot = document.querySelector('.talk-slot'); if (slot && !slot.querySelector('.jv-btn')) window.JarvisVoice.mountButton(slot); } catch (e) { /* rien */ }</script>
 </body></html>

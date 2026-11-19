@@ -59,4 +59,5 @@ Règle (16/11/2026) : **aucune régression**. Chaque fonction de la page (copie 
 - [ ] Automatisations en suivi de livraison (dates, étapes, prochain passage)
 - [ ] Achats : ajout et retrait faciles, courbe des prix par objet
 - [ ] Papiers : recherche, regroupement, catégories (voiture, lui, épouse, fille, appartement et immobilier, entourage de la fille)
-- [ ] Voix : page de conversation et champ de saisie repensés
+- [x] Voix (0.25.0, choix QCM du 19/11/2026) : la conversation continue est retirée ; l'orbe ouvre la discussion avec Claude, le micro dicte une question dans le champ, « Lecture » lit les réponses (banc maquette et bout en bout)
+- [x] Recherche partout (loupe de l'en-tête) et « Pour moi » une par une (0.25.0)

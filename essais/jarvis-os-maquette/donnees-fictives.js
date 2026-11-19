@@ -324,7 +324,8 @@
     opts = opts || {};
     const last = Array.isArray(input) ? input[input.length - 1].content : String(input);
     const first = Array.isArray(input) ? input[0].content : String(input);
-    samples.push({first: first.slice(0, 200), last: last.slice(0, 300), tools: (opts.tools || []).map((t) => t.name), tier: opts.modelTier});
+    samples.push({first: first.slice(0, 200), last: last.slice(0, 300), tools: (opts.tools || []).map((t) => t.name), tier: opts.modelTier,
+      ctx: ['maintenant', 'meteo', 'agenda_7_jours', 'mes_taches', 'sorties_proposees', 'voyages'].filter((k) => first.indexOf('"' + k + '"') >= 0)});   /* 0.25.0 : ce que Claude reçoit en plus (heure, météo, agenda, tâches, sorties, voyages) */
     await delay(null, 40);
     let text;
     if (/en_clair/.test(first)) text = '{"en_clair": "On te demande un oui.", "si_oui": "Ça part.", "si_non": "Rien.", "conseil": "oui", "pourquoi_conseil": "simple", "temps": "1 min", "certitude": "Likely"}';

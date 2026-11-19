@@ -7,7 +7,8 @@ const HERE = path.dirname(fileURLToPath(import.meta.url)), SRV = path.join(HERE,
 const {startFakeGoogle} = await import(SRV + '/tests/fake-google.mjs'); const FG = await startFakeGoogle();
 FG.sheet['Canal!A1:H3000'] = [['Date', 'De', 'Pour', 'Type', 'Message', 'Statut', 'Réponse', 'Objet'], ['15/11/2026', 'Rabie', 'Iris', 'Info', 'Le syndic a appelé.', 'Fait', 'Noté.', '']];
 const DATA = fs.mkdtempSync(path.join(os.tmpdir(), 'jarvis-e2e-')), PORT = 19000 + Math.floor(Math.random() * 900), BASE = 'http://127.0.0.1:' + PORT;
-const env = {...process.env, JARVIS_PUSH_ALLOW_HTTP: '1', JARVIS_NOTIFY_TICK_MS: '3600000', JARVIS_SANTE_TICK_MS: '3600000', JARVIS_GOOGLE_FAKE: FG.url, PORT: String(PORT), JARVIS_DATA: DATA, CLAUDE_BIN: SRV + '/tests/fake-claude.mjs', JARVIS_TTS_HELPER: SRV + '/tests/fake-tts.mjs', JARVIS_STT_HELPER: SRV + '/tests/fake-stt.mjs'};
+const env = {...process.env, JARVIS_PUSH_ALLOW_HTTP: '1', JARVIS_NOTIFY_TICK_MS: '3600000', JARVIS_SANTE_TICK_MS: '3600000', JARVIS_GOOGLE_FAKE: FG.url, PORT: String(PORT), JARVIS_DATA: DATA, CLAUDE_BIN: SRV + '/tests/fake-claude.mjs', JARVIS_TTS_HELPER: SRV + '/tests/fake-tts.mjs', JARVIS_STT_HELPER: SRV + '/tests/fake-stt.mjs', JARVIS_VOICE_MODEL: path.join(DATA, 'fausse-voix.onnx')};
+fs.mkdirSync(DATA, {recursive: true}); fs.writeFileSync(path.join(DATA, 'fausse-voix.onnx'), 'faux');   /* 0.25.0 : la voix Pierre « installée » (fausse), pour la lecture des réponses */
 const code = execFileSync(process.execPath, [SRV + '/server.mjs', 'pair'], {env}).toString().match(/: ([A-Z0-9]{4}-[A-Z0-9]{4})/)[1];
 const srv = spawn(process.execPath, [SRV + '/server.mjs'], {env, stdio: ['ignore', 'pipe', 'pipe']}); await new Promise((r) => srv.stdout.once('data', r));
 const out = [], errs = []; const ok = (n, c, i) => out.push((c ? 'OK    ' : 'ÉCHEC ') + n + (i ? ' :: ' + i : ''));
@@ -196,32 +197,36 @@ try {
     await p.evaluate(() => [...[...document.querySelectorAll('.cote-it')].find((x) => /Date du bail/.test(x.textContent)).querySelectorAll('button')].find((b) => b.textContent === 'Remettre').click()); await p.waitForTimeout(1200);   /* le premier bouton ouvre la carte (0.23.0) */
     const l2 = await p.evaluate(() => window.JarvisServeur.cote.liste());
     ok('« Plus tard » (dans une semaine) gardé par le serveur, gratuit, carte cachée, puis « Remettre »', (l1 || []).some((x) => x.id === 'a:Date du bail' && x.jusqu > Date.now() + 6 * 864e5) && !shown && Array.isArray(l2) && !l2.some((x) => x.id === 'a:Date du bail'), JSON.stringify([l1, shown, l2])); }
-  /* 0.22.0 : la voix refaite. Faux micro (un son que le banc allume), écoute Whisper du serveur (fausse), réponses instantanées,
-     ta voix qui coupe JARVIS pendant qu'il répond, le bouton qui ne ferme jamais la conversation */
+  /* 0.25.0 : un seul Claude. L'orbe ouvre la discussion avec Claude (celle qui a ses données) et écoute UNE question : faux micro
+     (un son que le banc allume), écoute Whisper du serveur (fausse). La phrase arrive dans le champ, le micro se referme, rien ne part
+     sans « Envoyer » ; « J'ai fini » envoie la phrase à l'écriture sans attendre le silence ; « Lecture » fait lire la réponse par Pierre. */
   { const v = await ctx.newPage(); v.on('pageerror', (e) => errs.push('voix : ' + e.message));
+    const hits = {tts: 0, stt: 0, voix: 0, sample: 0}; v.on('request', (r) => { const u = r.url(); if (/\/api\/tts$/.test(u)) hits.tts++; if (/\/api\/stt$/.test(u)) hits.stt++; if (/\/api\/voix(\/|$)/.test(u)) hits.voix++; if (/\/api\/sample$/.test(u)) hits.sample++; });
     await v.addInitScript(() => {
       const AC = window.AudioContext || window.webkitAudioContext; const ac = new AC(), osc = ac.createOscillator(), g = ac.createGain(), dest = ac.createMediaStreamDestination();
       g.gain.value = 0; osc.frequency.value = 220; osc.connect(g); g.connect(dest); osc.start();
       window.__talk = (ms) => { ac.resume(); const t0 = ac.currentTime + 0.02; g.gain.setValueAtTime(0.6, t0); g.gain.setValueAtTime(0, t0 + ms / 1000); };
-      window.__gum = 0; navigator.mediaDevices.getUserMedia = async (c) => { window.__gum++; window.__gumC = c; await ac.resume(); return dest.stream; };
+      window.__gum = 0; window.__stops = 0; navigator.mediaDevices.getUserMedia = async (c) => { window.__gum++; window.__gumC = c; await ac.resume(); const s = dest.stream.clone(); s.getTracks().forEach((t) => { const st = t.stop.bind(t); t.stop = () => { window.__stops++; st(); }; }); return s; };
     });
     await v.goto(BASE + '/?serveur#accueil'); await v.waitForTimeout(3000);
-    const st = () => v.evaluate(() => ({s: (document.querySelector('.jv-state') || {}).textContent, q: [...document.querySelectorAll('.jv-q')].map((x) => x.textContent), a: [...document.querySelectorAll('.jv-a')].map((x) => x.textContent), chip: (document.querySelector('.jv-chip') || {}).textContent, open: !document.querySelector('.jv').hidden}));
+    const st = () => v.evaluate(() => ({chat: !document.getElementById('chat').hidden, strip: (document.querySelector('#chat .dict-txt') || {}).textContent || '', val: (document.getElementById('chat-in') || {}).value, note: (document.querySelector('#chat .dict-note') || {}).textContent || '', on: (document.getElementById('dict-btn') || {className: ''}).className.includes('is-on'), moi: [...document.querySelectorAll('#chat .msg.me')].map((x) => x.textContent), eux: [...document.querySelectorAll('#chat .msg.them p')].map((x) => x.textContent), kind: window.JarvisVoice.dictKind(), say: window.JarvisVoice.sayKind(), dict: window.JarvisVoice.dictating(), gum: window.__gum, stops: window.__stops, page: !!document.querySelector('.jv')}));
     await v.tap('.talk-slot .jv-btn'); await v.waitForTimeout(1500);
-    let s0 = await st(), c0 = await v.evaluate(() => window.__gumC && window.__gumC.audio);
-    ok('voix : micro ouvert pour toute la conversation, avec l\'annulation d\'écho, écoute Whisper du serveur', s0.open && /^Je t'écoute/.test(s0.s) && /Whisper/.test(s0.chip) && c0 && c0.echoCancellation === true, JSON.stringify([s0.s, s0.chip, c0]));
-    await v.evaluate(() => window.__talk(900)); await v.waitForTimeout(3500); s0 = await st();
-    ok('voix : ta phrase est écrite par Whisper et l\'heure répond tout de suite, sans Claude', s0.q[0] === 'quelle heure est-il' && /^Il est \d{1,2} h/.test(s0.a[0] || ''), JSON.stringify([s0.q, s0.a]));
-    await v.evaluate(() => window.__talk(1800)); await v.waitForTimeout(3600); const s1 = await st();
-    await v.evaluate(() => window.__talk(900)); await v.waitForTimeout(4000); const s2 = await st();
-    ok('voix : parler pendant qu\'il répond le coupe (réponse longue arrêtée) et ta nouvelle question est traitée', s1.q[1] === 'raconte lentement ta journée' && s2.q[2] === 'quelle heure est-il' && /^Il est/.test(s2.a[2] || '') && (s2.a[1] || '').length < 6000 && /^Je t'écoute/.test(s2.s), JSON.stringify([s1.s, s2.q, (s2.a[1] || '').length, s2.s]));
-    await v.evaluate(() => window.__talk(1800)); await v.waitForTimeout(3300); const s3 = await st();
-    await v.tap('.jv-mic'); await v.waitForTimeout(700); const s4 = await st();
-    ok('voix : un appui sur le micro pendant qu\'il réfléchit ou parle le coupe et t\'écoute, sans fermer la conversation', /^(Je réfléchis|Je réponds)/.test(s3.s) && /^Je t'écoute/.test(s4.s) && s4.open, JSON.stringify([s3.s, s4.s, s4.open]));
-    await v.tap('.jv-mic'); await v.waitForTimeout(400); const s5 = await st(); await v.tap('.jv-mic'); await v.waitForTimeout(400); const s6 = await st();
-    ok('voix : à l\'écoute, le micro se coupe et se rouvre d\'un appui', /^Micro coupé/.test(s5.s) && /^Je t'écoute/.test(s6.s) && s6.open, JSON.stringify([s5.s, s6.s]));
-    await v.screenshot({path: SH + 'voix-whisper.png'});
-    await v.tap('.jv-x'); await v.waitForTimeout(500); await v.close(); }
+    let s0 = await st(); const c0 = await v.evaluate(() => window.__gumC && window.__gumC.audio), n0 = s0.moi.length;   /* la discussion générale garde ses messages d'avant */
+    ok('un seul Claude : l\'orbe ouvre la discussion avec Claude et écoute par Whisper du serveur (plus de page vocale, plus de cerveau à part)', s0.chat && !s0.page && s0.kind === 'whisper' && /écoute/.test(s0.strip) && s0.on && s0.gum === 1 && c0 && c0.echoCancellation === true && hits.voix === 0, JSON.stringify([s0, c0, hits]));
+    await v.evaluate(() => window.__talk(900)); await v.waitForTimeout(3600); s0 = await st();
+    ok('dictée : Whisper écrit la phrase dans le champ, le micro se referme, rien ne part sans « Envoyer »', s0.val === 'Quelle heure est-il' && /Relis/.test(s0.note) && !s0.on && !s0.dict && s0.stops >= 1 && s0.moi.length === n0 && hits.stt === 1 && hits.sample === 0, JSON.stringify([s0, hits]));
+    await v.screenshot({path: SH + 'dictee-whisper.png'});
+    await v.tap('#chat .lire-toggle'); await v.waitForTimeout(300);
+    await v.tap('#chat .chat-row .btn.main'); await v.waitForTimeout(5000); const s1 = await st();
+    ok('dictée : « Envoyer » pose la question à Claude (celui de la page, avec ses données) ; « Lecture : oui » la fait lire par Pierre', s1.say === 'serveur' && s1.moi.length === n0 + 1 && /Quelle heure est-il/.test(s1.moi[n0]) && s1.eux.length >= 2 && hits.sample === 1 && hits.voix === 0 && hits.tts >= 1, JSON.stringify([s1.say, s1.moi, s1.eux.map((x) => x.slice(0, 60)), hits]));
+    /* « J'ai fini » : une longue phrase, coupée d'un appui : elle part à l'écriture tout de suite, sans attendre le silence */
+    await v.tap('#dict-btn'); await v.waitForTimeout(900); await v.evaluate(() => window.__talk(6000)); await v.waitForTimeout(2200);
+    const mid = await st(); await v.tap('#chat .dict-fin'); await v.waitForTimeout(1500); const s2 = await st();
+    ok('dictée : « J\'ai fini » envoie la phrase à l\'écriture sans attendre que tu te taises', /entends/.test(mid.strip) && s2.val === 'Raconte lentement ta journée' && !s2.on && hits.stt === 2, JSON.stringify([mid.strip, s2.val, s2.on, hits]));
+    /* annuler : le micro se referme, le champ garde ce qui y était */
+    await v.tap('#dict-btn'); await v.waitForTimeout(900); const s3 = await st(); await v.tap('#chat .dict-no'); await v.waitForTimeout(600); const s4 = await st();
+    ok('dictée : « Annuler » referme le micro et garde le champ', s3.on && !s4.on && !s4.dict && s4.val === 'Raconte lentement ta journée' && s4.stops >= 3, JSON.stringify([s3.on, s4]));
+    await v.close(); }
   /* 0.24.0 : chercher un produit à partir d'une idée, par le serveur (faux Claude) */
   { await p.goto(BASE + '/?serveur#achats'); await p.waitForTimeout(3500);
     await p.evaluate(() => document.querySelectorAll('#toasts .toast').forEach((t) => t.remove()));
