@@ -24,7 +24,7 @@ L'assistant personnel du propriétaire sur iPhone : une app web (installable sur
 - **Administration du serveur** (depuis le 16/11/2026) : session « Serveur JARVIS » de l'app Claude (onglet Code ; Remote Control, service `jarvis-rc`, root, accord demandé à chaque commande). Une session de développement tourne dans le cloud sur le dépôt, jamais dans l'environnement « Serveur JARVIS » : elle ne touche pas au serveur, elle fusionne dans `main`, puis le propriétaire met le serveur à jour.
 - **Relier un téléphone** : `sudo -iu jarvis node /opt/rd/jarvis-os/server/server.mjs pair` affiche un code (30 min, usage unique), à saisir dans Réglages.
 - Claude Code sur le serveur est connecté à l'abonnement du propriétaire (`sudo -iu jarvis claude auth login` si besoin). Aucune clé d'API : les variables payantes sont retirées à chaque appel.
-- Adresses servies : `/courses/` Panier, la liste de courses du foyer (app à part, `docs/panier.md`), `/` app (voir État), `/os/` nouvelle app (essai), `/api/*` (voir `jarvis-os/server/README.md`), `/confidentialite.html` (déclarée à Google, à ne pas déplacer).
+- `/courses…` n'est plus à JARVIS : Caddy l'envoie au service `panier` (port 8790), l'app Panier, qui a son propre dépôt (`Panier`) et sa propre mise à jour. Si `install/setup.sh` de JARVIS est relancé, il réécrit le Caddyfile : relancer ensuite `install/setup.sh` de Panier. Adresses servies par JARVIS : `/` app (voir État), `/os/` nouvelle app (essai), `/api/*` (voir `jarvis-os/server/README.md`), `/confidentialite.html` (déclarée à Google, à ne pas déplacer).
 
 ## L'accès Google direct (créé par le propriétaire le 16/11/2026)
 
