@@ -305,7 +305,7 @@ function ouvreFiche(id) {
 }
 const ficheId = () => { const f = piles.find((x) => x.cle === 'fiche'); return f && f.id; };
 const ligneDe = (id) => M.etat.lignes.find((x) => x.id === id);
-function retire(id) { const l = ligneDe(id); if (!l) return; const copie = {...l, id: uid('l')}; fais({t: 'ligne.supprime', id}); toast(esc(l.nom) + ' retiré', {annule: () => fais({t: 'ligne.ajoute', ligne: copie})}); }
+function retire(id) { const l = ligneDe(id); if (!l) return; const copie = {...l, id: uid('l')}; fais({t: 'ligne.supprime', id}); toast('Retiré : ' + esc(l.nom), {annule: () => fais({t: 'ligne.ajoute', ligne: copie})}); }
 function quantite(id, sens) { const l = ligneDe(id); if (!l) return; const q = pas(l.q, l.u, sens); if (q < mini(l.u)) { if (ficheId() === id) ferme(); return retire(id); } fais({t: 'ligne.modifie', id, champs: {q}}); }
 
 /* choisir une autre photo : candidates des sources libres, appareil photo, photothèque */
@@ -370,14 +370,14 @@ const ACT = {
   rayons: () => { R.rayon = null; rResultats(); },
   tuile: (el) => { const t = el.closest('.tuile'), a = art(t.dataset.a), l = dansListe(a.id); if (l) return ouvreFiche(l.id);
     const A = analyse(R.q), tape = !!A.texte, l2 = ajoute(a, {q: A.q, u: A.u, m: t.dataset.m || undefined});
-    if (tape) { toast(esc(a.nom) + ' ajouté · ' + esc(qteTxt(l2.q, l2.u))); const q = $('#q'); q.value = ''; R.q = ''; rResultats(); q.focus(); } },
+    if (tape) { toast('Ajouté : ' + esc(a.nom) + ' · ' + esc(qteTxt(l2.q, l2.u))); const q = $('#q'); q.value = ''; R.q = ''; rResultats(); q.focus(); } },
   tuilePlus: (el) => { const l = dansListe(el.closest('.tuile').dataset.a); if (l) quantite(l.id, 1); },
   tuileMoins: (el) => { const l = dansListe(el.closest('.tuile').dataset.a); if (l) quantite(l.id, -1); },
   creer: () => { const A = analyse(R.q), nom = A.texte.slice(0, 60).replace(/^./, (c) => c.toUpperCase()), id = 'x-' + slug(nom); if (!slug(nom)) return;
     const u = A.u || 'pièce', a = {id, nom, u: fam(u) === 'compte' ? 'pièce' : (u === 'g' ? 'kg' : u === 'cl' ? 'L' : u), q: 1};
     const ops = []; if (!art(id)) ops.push({t: 'article.cree', article: a});
     const l = {id: uid('l'), l: liste().id, a: id, nom, m: '', q: A.q || 1, u, note: '', mag: ''}; neufs.add(l.id); fais(...ops, {t: 'ligne.ajoute', ligne: l});
-    toast(esc(nom) + ' ajouté' + (M.local ? '' : ' · photo en cours')); const q = $('#q'); q.value = ''; R.q = ''; rResultats(); q.focus(); },
+    toast('Ajouté : ' + esc(nom) + (M.local ? '' : ' · photo en cours')); const q = $('#q'); q.value = ''; R.q = ''; rResultats(); q.focus(); },
   qPlus: () => quantite(ficheId(), 1), qMoins: () => quantite(ficheId(), -1),
   unite: (el) => { const l = ligneDe(ficheId()), a = art(l.a); fais({t: 'ligne.modifie', id: l.id, champs: {u: el.dataset.u, q: convertis(l.q, l.u, el.dataset.u, a)}}); },
   marque: (el) => fais({t: 'ligne.modifie', id: ficheId(), champs: {m: el.dataset.m}}),
