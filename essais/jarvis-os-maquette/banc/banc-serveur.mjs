@@ -222,6 +222,18 @@ try {
     ok('voix : à l\'écoute, le micro se coupe et se rouvre d\'un appui', /^Micro coupé/.test(s5.s) && /^Je t'écoute/.test(s6.s) && s6.open, JSON.stringify([s5.s, s6.s]));
     await v.screenshot({path: SH + 'voix-whisper.png'});
     await v.tap('.jv-x'); await v.waitForTimeout(500); await v.close(); }
+  /* 0.24.0 : chercher un produit à partir d'une idée, par le serveur (faux Claude) */
+  { await p.goto(BASE + '/?serveur#achats'); await p.waitForTimeout(3500);
+    await p.evaluate(() => document.querySelectorAll('#toasts .toast').forEach((t) => t.remove()));
+    await p.fill('#ix-idee', 'maison de poupée'); await p.fill('#ix-pour', 'fille de 3 ans'); await p.fill('#ix-max', '60'); await p.selectOption('#ix-n', '4');
+    await p.tap('.idee-go'); await p.waitForTimeout(1500);
+    const w = await p.evaluate(() => document.querySelector('.view-title').textContent);
+    await p.waitForTimeout(9500);
+    const r = await p.evaluate(() => ({cards: document.querySelectorAll('.idee-card').length, prix: [...document.querySelectorAll('.idee-prix b')].map((x) => parseFloat(x.textContent.replace(/\s/g, '').replace(',', '.'))), conseil: !!document.querySelector('.cmp-key'), age: (document.querySelector('.idee-age') || {}).textContent || ''}));
+    ok('idées (serveur) : lancée depuis Achats, sa page attend puis montre les propositions dans le budget, au nombre demandé', /maison de poupée/i.test(w) && r.cards === 4 && r.prix.every((v) => v <= 60) && r.conseil && r.age === 'dès 3 ans', w + ' ' + JSON.stringify(r));
+    const l = await p.evaluate(() => window.JarvisServeur.idees());
+    ok('idées (serveur) : gardée sur le serveur, retrouvée dans « Mes recherches d\'idées »', l && l.recherches.some((x) => x.idee === 'maison de poupée' && x.statut === 'pret' && x.max === 60 && x.n === 4));
+    await p.screenshot({path: SH + 'idees-serveur.png'}); }
 } catch (e) { ok('exception', false, e.stack); }
 ok('aucune erreur de page', !errs.length, errs.join(' | '));
 console.log(out.join('\n')); const bad = out.filter((l) => l.startsWith('ÉCHEC')).length; console.log(bad ? bad + ' échec(s)' : 'Tout passe (' + out.length + ' vérifications).');

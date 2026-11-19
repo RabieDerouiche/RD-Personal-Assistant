@@ -18,7 +18,7 @@ import {createSante} from './sante.mjs';
 import {createComparatifs} from './comparatif.mjs';
 import {createEcoute, wavOk, intention, quand, meteoPhrase, meteoUrl, heurePhrase, datePhrase, nrm, diction} from './voix.mjs';
 
-const VERSION = '0.23.2';
+const VERSION = '0.24.0';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PORT = +(process.env.PORT || 8787);
 const HOST = process.env.HOST || '127.0.0.1';
@@ -791,7 +791,9 @@ const WHISPER_DIR = process.env.JARVIS_WHISPER_DIR || path.join(os.homedir(), 'w
 const ECOUTE = createEcoute({dir: WHISPER_DIR, py: path.join(WHISPER_DIR, 'venv', 'bin', 'python'), helper: path.join(HERE, 'stt', 'whisper_helper.py'), model: process.env.JARVIS_WHISPER_MODEL || 'small', fakeHelper: process.env.JARVIS_STT_HELPER || '', log: (t) => { S.ecouteErr = {at: now(), t: String(t).slice(0, 300)}; }});
 let ECOUTE_INSTALL = {state: 'idle', at: 0, tail: ''};
 /* 0.23.0 : le comparatif des produits suivis (comparatif.mjs) */
-const COMP = createComparatifs({S, save, DATA, runClaude, model: MODELS.equilibre, visionModel: MODELS.rapide, steamBase: process.env.JARVIS_STEAM_URL || undefined, settings: guardSettings('chat'), now, log: (t) => { S.compErr = {at: now(), t: String(t).slice(0, 300)}; }});
+/* 0.24.0 : une recherche d'idées prend 2 à 6 minutes : une notification quand elle est prête (ou impossible), qui ouvre ses propositions */
+const ideeFinie = (x) => { if (S.push && S.push.subs.length) PUSH.send(x.statut === 'pret' ? {title: 'Idées prêtes', body: x.data.propositions.length + ' propositions pour « ' + x.idee + ' »' + (x.pour ? ' (' + x.pour + ')' : ''), url: '/#voir-idee-' + x.id, tag: 'idee-' + x.id} : {title: 'Recherche d’idées impossible', body: '« ' + x.idee + ' » : ' + (x.erreur || 'erreur'), url: '/#voir-idee-' + x.id, tag: 'idee-' + x.id}, {urgency: 'normal'}).catch(() => {}); };
+const COMP = createComparatifs({S, save, DATA, runClaude, onIdee: ideeFinie, model: MODELS.equilibre, visionModel: MODELS.rapide, steamBase: process.env.JARVIS_STEAM_URL || undefined, settings: guardSettings('chat'), now, log: (t) => { S.compErr = {at: now(), t: String(t).slice(0, 300)}; }});
 function installEcoute() {
   if (ECOUTE_INSTALL.state === 'running') return ECOUTE_INSTALL;
   const log = path.join(DATA, 'ecoute-install.log');
@@ -1112,6 +1114,10 @@ const server = http.createServer(async (req, res) => {
       }
       if (p === '/api/comparatifs') return json(res, 200, {comparatifs: COMP.liste()});
       if (p === '/api/comparatif' && req.method === 'POST') { const r = COMP.demander(await readBody(req)); return json(res, r.ok ? 200 : 400, r); }
+      /* 0.24.0 : chercher un produit à partir d'une idée (âge, budget minimum et maximum, 1 à 20 propositions) */
+      if (p === '/api/idees' && req.method === 'GET') return json(res, 200, {recherches: COMP.idees()});
+      if (p === '/api/idees' && req.method === 'POST') { const r = COMP.chercher(await readBody(req)); return json(res, r.ok ? 200 : 400, r); }
+      if (p === '/api/idees/efface' && req.method === 'POST') { const b = await readBody(req); return json(res, COMP.effaceIdee(String(b.id || '')) ? 200 : 404, {ok: true}); }
       { const mi = /^\/api\/image\/([\w.]+)$/.exec(p); if (mi) { const f = COMP.image(mi[1]); if (!f) return json(res, 404, {error: 'Image inconnue.'}); res.writeHead(200, {'content-type': /png$/.test(f) ? 'image/png' : /webp$/.test(f) ? 'image/webp' : 'image/jpeg', 'cache-control': 'private, max-age=2592000'}); fs.createReadStream(f).pipe(res); return; } }
       if (p === '/api/voix/prechauffe' && req.method === 'POST') return json(res, 200, await prechauffe());
       if (p === '/api/stt' && req.method === 'POST') {

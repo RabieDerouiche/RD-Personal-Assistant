@@ -33,6 +33,15 @@ function answer(raw) {
     const arr = JSON.parse(input.slice(input.indexOf('['), input.lastIndexOf(']') + 1));
     return {text: JSON.stringify({choix: arr.map((x) => ({variante: x.variante, fichier: x.fichiers.find((f) => { try { return fs.readFileSync(f).includes('BON'); } catch { return false; } }) || null}))})};
   }
+  /* 0.24.0 : idée de produit : n propositions dans le budget, plus une hors budget (le serveur l'écarte) et un doublon */
+  if (/^Idée de produit à trouver : « /.test(input)) {
+    const n = +(input.match(/Nombre de propositions attendues : (\d+)/) || [])[1] || 3, max = +(input.match(/au plus ([\d.]+) €/) || [])[1] || 100, vb = process.env.JARVIS_STEAM_URL || '';
+    if (/introuvable/.test(input)) return {text: JSON.stringify({comprehension: 'Rien', conseils: '', propositions: [{nom: 'Trop cher', prix: max * 3}], certitude: 'likely', sources: []})};
+    const P = Array.from({length: n}, (_, i) => ({nom: 'Maison de poupée ' + (i + 1), marque: i % 2 ? 'Djeco' : 'Hape', prix: Math.round((max - 1 - i) * 100) / 100, prix_detail: 'livraison offerte', vendeur: 'Vendeur ' + (i + 1),
+      lien: i === 0 ? vb + '/idee-a' : i === 1 ? vb + '/produit-b' : vb + '/rien', date_prix: '2026-11-19', age: 'dès 3 ans', pourquoi: 'En bois, sans petites pièces, adaptée à 3 ans.', points_forts: ['Solide', 'Meubles inclus'], limites: ['Montage 20 min'], qualite: 8 - i * 0.2, rapport_qualite_prix: 7.5,
+      images: i === 0 ? [vb + '/promo-a.png'] : []}));
+    return {text: JSON.stringify({comprehension: 'Une maison de poupée pour une fille de 3 ans, dans ton budget.', conseils: 'Pour 3 ans : bois massif, grandes pièces, pas d’aimants.', propositions: [P[0], {nom: 'Château géant', prix: max * 2}, P[0], ...P.slice(1)], certitude: 'likely', sources: ['https://exemple.fr/guide']})};
+  }
   /* 0.23.0 : comparatif des variantes d'un produit suivi (JSON) */
   if (/^Comparatif à préparer pour « /.test(input)) {
     const arr = JSON.parse(input.split('données) :\n')[1].split('\n')[0]);

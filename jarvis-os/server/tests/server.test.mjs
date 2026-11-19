@@ -21,6 +21,7 @@ const VEND = http.createServer((q, rr) => { const VBx = 'http://127.0.0.1:' + VE
   if (IMGS[u]) { rr.writeHead(200, {'content-type': 'image/png'}); rr.end(IMGS[u]); return; }
   const html = (b) => { rr.writeHead(200, {'content-type': 'text/html'}); rr.end('<html><head>' + b + '</head></html>'); };
   if (u === '/produit-a') return html('<meta property="og:image" content="/promo-a.png"><script type="application/ld+json">{"@type":"Product","image":["' + VBx + '/bon-a.png","' + VBx + '/petit.png"]}</script>');
+  if (u === '/idee-a') return html('<script type="application/ld+json">{"@type":"Product","image":"' + VBx + '/bon-a.png","offers":{"@type":"Offer","price":"52.90","priceCurrency":"EUR"}}</script>');
   if (u === '/produit-b') return html('<script type="application/ld+json">{"@type":"Product","image":["http:\\/\\/127.0.0.1:' + VEND.address().port + '\\/bon-b.png"]}</script>');
   if (u === '/api/storesearch/') { rr.writeHead(200, {'content-type': 'application/json'}); rr.end(JSON.stringify({items: [{id: 42, name: 'Phantom Blade Zero'}]})); return; }
   if (u === '/api/appdetails') { rr.writeHead(200, {'content-type': 'application/json'}); rr.end(JSON.stringify({42: {data: {header_image: VBx + '/bon-steam.png'}}})); return; }
@@ -310,6 +311,21 @@ try {
       ok('comparatif : gardé (pas de nouvel appel à Claude tant que les variantes ne changent pas)', r.body.comparatif.statut === 'pret' && (await G('/api/comparatifs')).body.comparatifs.length === n0);
       r = await G('/api/comparatif', {famille: 'Roborock Saros', produits: body.produits.concat([{nom: 'Roborock Saros 20X', prix: 799, ref: 1289, lien: ''}])}); ok('comparatif : une variante de plus = un nouveau comparatif', r.body.comparatif.statut === 'en_cours');
       r = await G('/api/comparatif', {famille: '', produits: []}); ok('comparatif : demande vide refusée', r.status === 400);
+      /* 0.24.0 : chercher un produit à partir d'une idée */
+      r = await G('/api/idees', {idee: 'maison de poupée', pour: 'fille de 3 ans', min: 70, max: 60, n: 4});
+      ok('idées : la recherche part en arrière-plan (budget min et max remis dans l’ordre)', r.status === 200 && r.body.recherche.statut === 'en_cours' && r.body.recherche.min === 60 && r.body.recherche.max === 70 && r.body.recherche.n === 4, JSON.stringify(r.body).slice(0, 160));
+      const iid = r.body.recherche.id;
+      let id1 = null; for (let i = 0; i < 80 && !(id1 && id1.statut === 'pret'); i++) { await new Promise((z) => setTimeout(z, 150)); id1 = ((await G('/api/idees')).body.recherches || []).find((x) => x.id === iid); }
+      const pr = (id1 && id1.data && id1.data.propositions) || [];
+      ok('idées : n propositions dans le budget, sans doublon ni produit hors budget, avec pourquoi, âge, qualité et rapport qualité/prix', id1 && id1.statut === 'pret' && pr.length === 4 && !pr.some((x) => x.nom === 'Château géant') && new Set(pr.map((x) => x.nom)).size === 4 && pr.every((x) => x.prix >= 60 && x.prix <= 70) && pr[0].age === 'dès 3 ans' && pr[0].qualite === 8 && pr[0].rqp === 7.5 && /3 ans/.test(pr[0].pourquoi) && id1.data.hors_budget === 1, JSON.stringify(id1).slice(0, 300));
+      ok('idées : le prix affiché par la page du vendeur est relevé (vérification du prix donné par Claude)', pr[0].page && pr[0].page.ok === true && pr[0].page.prix === 52.9 && pr[1].page.ok === true && pr[1].page.prix === null && pr[2].page.ok === true, JSON.stringify(pr.map((x) => x.page)));
+      ok('idées : photos choisies en les regardant (la vraie photo, pas la bannière promo proposée), jamais empruntée à un autre produit', pr[0].photo && /BON-A/.test(await im(pr[0].photo)) && pr[1].photo && /BON-B/.test(await im(pr[1].photo)) && !pr[2].photo, JSON.stringify(pr.map((x) => x.photo)));
+      r = await G('/api/idees', {idee: 'maison de poupée', pour: 'fille de 3 ans', min: 60, max: 70, n: 4}); ok('idées : la même recherche est gardée (pas de nouvel appel à Claude)', r.body.recherche.id === iid && r.body.recherche.statut === 'pret');
+      r = await G('/api/idees', {idee: 'x'}); ok('idées : idée vide refusée', r.status === 400 && /idée/.test(r.body.error));
+      r = await G('/api/idees', {idee: 'jouet introuvable', max: 20, n: 50}); const iid2 = r.body.recherche.id;
+      let id2 = null; for (let i = 0; i < 60 && !(id2 && id2.statut === 'echec'); i++) { await new Promise((z) => setTimeout(z, 150)); id2 = ((await G('/api/idees')).body.recherches || []).find((x) => x.id === iid2); }
+      ok('idées : 20 propositions au plus ; rien dans le budget = échec expliqué', r.body.recherche.n === 20 && id2 && id2.statut === 'echec' && /budget/.test(id2.erreur), JSON.stringify(id2).slice(0, 160));
+      r = await G('/api/idees/efface', {id: iid2}); ok('idées : une recherche s’efface', r.status === 200 && !((await G('/api/idees')).body.recherches || []).some((x) => x.id === iid2));
       }
     /* sauvegarde de Pilotage (0.14.0) : copie maintenant, comparée à une copie plus ancienne */
     { const H = ['Date', 'De', 'Pour', 'Type', 'Message', 'Statut', 'Réponse', 'Objet'];

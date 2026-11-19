@@ -107,6 +107,10 @@
     comparatifs: () => req('/api/comparatifs').then((r) => (r.status === 200 ? r.j : null)).catch(() => null),
     comparatif: (b) => req('/api/comparatif', b).then((r) => r.j).catch(() => null),
     image: (id) => fetch(BASE + '/api/image/' + encodeURIComponent(id), {headers: {authorization: 'Bearer ' + token()}}).then((r) => (r.ok ? r.blob() : null)).then((b) => (b ? URL.createObjectURL(b) : null)).catch(() => null),
+    /* 0.24.0 : chercher un produit à partir d'une idée (Claude sur le serveur, avec le web) */
+    idees: () => req('/api/idees').then((r) => (r.status === 200 ? r.j : null)).catch(() => null),
+    idee: (b) => req('/api/idees', b).then((r) => r.j).catch(() => null),
+    ideeEfface: (id) => req('/api/idees/efface', {id}).then((r) => r.status === 200).catch(() => false),
     ecouteEtat: () => req('/api/ecoute/install').then((r) => (r.status === 200 ? r.j : null)).catch(() => null),
     /* Raccourcis de l'iPhone (0.13.0) : clé à part pour « Dis Siri, Jarvis » et le bouton Action */
     raccourci: {
