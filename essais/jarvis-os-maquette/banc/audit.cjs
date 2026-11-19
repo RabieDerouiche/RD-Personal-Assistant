@@ -28,7 +28,7 @@ const CHECK = () => {
   const vis = (e) => { if (!e.getClientRects().length) return false; const s = getComputedStyle(e); return s.visibility !== 'hidden' && s.display !== 'none'; };
   const name = (e) => e.tagName.toLowerCase() + (e.id ? '#' + e.id : '') + (typeof e.className === 'string' && e.className.trim() ? '.' + e.className.trim().split(/\s+/).slice(0, 3).join('.') : '');
   const txt = (e) => (e.innerText || e.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 70);
-  const layers = [...document.querySelectorAll('#scroller, #sheet:not([hidden]), #chat:not([hidden]), #app:not([hidden]), .all-sheet:not([hidden]), .jv-overlay, .jv-root, #toasts')].filter(vis);
+  const layers = [...document.querySelectorAll('#scroller, #sheet:not([hidden]), #chat:not([hidden]), #app:not([hidden]), .all-sheet:not([hidden]), #gsearch:not([hidden]), #toasts')].filter(vis);
   /* texte cassé */
   const all = document.body.innerText;
   const re = /\[object \w+\]|\bundefined\b|\bNaN\b|\bnull\b|Invalid Date|\$\{|function \(|=>/g; let m;
@@ -109,8 +109,11 @@ const SCREENS = [
   {id: 'equipe-bot', url: '#equipe', go: async (p) => { await p.evaluate(() => document.querySelector('.team .mate').click()); await p.waitForTimeout(900); }},
   {id: 'automatisations', url: '#automatisations'},
   {id: 'reglages', url: '#reglages'},
-  {id: 'vocale', url: '', go: async (p) => { await p.tap('.talk-slot .jv-btn'); await p.waitForTimeout(1200); }, scope: 'body', voice: true},
-  {id: 'vocale-echange', url: '', go: async (p) => { await p.tap('.talk-slot .jv-btn'); await p.waitForTimeout(1000); await p.evaluate(() => { const c = document.querySelector('.jv-comp'); if (c) c.hidden = false; }); await p.fill('.jv-comp input', 'Quoi de neuf aujourd\'hui ?'); await p.tap('.jv-comp button'); await p.waitForTimeout(2500); }, scope: 'body', voice: true}
+  /* 0.25.0 : l'orbe ouvre la discussion avec Claude (plus de page vocale) ; puis « Pour moi » une par une et la recherche partout */
+  {id: 'claude', url: '', go: async (p) => { await p.tap('.talk-slot .jv-btn'); await p.waitForTimeout(1200); }, scope: 'body', voice: true},
+  {id: 'claude-echange', url: '', go: async (p) => { await p.tap('.talk-slot .jv-btn'); await p.waitForTimeout(1000); await p.fill('#chat-in', 'Quoi de neuf aujourd\'hui ?'); await p.tap('#chat .chat-row .btn.main'); await p.waitForTimeout(2500); }, scope: 'body', voice: true},
+  {id: 'une-par-une', url: '#demandes', go: async (p) => { await p.tap('#fc-start'); await p.waitForTimeout(700); }},
+  {id: 'recherche', url: '#accueil', go: async (p) => { await p.tap('#gs-btn'); await p.waitForTimeout(300); await p.fill('#gs-in', 'robot'); await p.waitForTimeout(500); }, scope: 'body'}
 ];
 
 const web = async (ctx) => {

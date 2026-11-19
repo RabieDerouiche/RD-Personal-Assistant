@@ -13,6 +13,8 @@ srv.listen(0, async () => {
      et la sonnette automatique de reprise masquait des boutons. Le banc pose une pause explicite (onglet Faits), la même quel que soit le jour. */
   const PAUSE_INIT = () => { let v; const d = new Date(Date.now() + 2 * 864e5), p2 = (n) => String(n).padStart(2, '0'); const until = p2(d.getDate()) + '/' + p2(d.getMonth() + 1) + '/' + d.getFullYear() + ' 12h47';
     Object.defineProperty(window, '__SCEN', {configurable: true, get: () => v, set: (x) => { v = Object.assign({pauseUntil: until}, x || {}); }}); };
+  /* une page avec un scénario de la maquette en plus (micro, voix) */
+  const pageWith = async (scen, url) => { const ctx = await b.newContext({...devices['iPhone 15 Pro Max']}); await ctx.addInitScript(PAUSE_INIT); await ctx.addInitScript((sc) => { const d = Object.getOwnPropertyDescriptor(window, '__SCEN'); Object.defineProperty(window, '__SCEN', {configurable: true, get: d.get, set: (x) => d.set.call(window, Object.assign({}, sc, x || {}))}); }, scen); const p = await ctx.newPage(); p.on('pageerror', (e) => errs.push(url + ' : ' + e.message)); await p.goto(base + url); await p.waitForTimeout(3500); return p; };
   const page = async (url) => { const ctx = await b.newContext({...devices['iPhone 15 Pro Max']}); await ctx.addInitScript(PAUSE_INIT); const p = await ctx.newPage(); p.on('pageerror', (e) => errs.push(url + ' : ' + e.message)); await p.goto(base + url); await p.waitForTimeout(3500); return p; };
   try {
     /* service worker (0.12.0) : notification reçue, pastille, appui qui ouvre la bonne rubrique ; exécuté hors navigateur avec un faux « self » */
@@ -32,7 +34,15 @@ srv.listen(0, async () => {
     ok('accueil en tableau de bord : « Demander » en haut, 3 chiffres (pour toi, mails, bons prix), à faire, aujourd\'hui, 14 prochains jours, à surveiller (plus de « Bientôt »)', await p.evaluate(() => ['En un coup d’œil', 'À faire maintenant', "Aujourd'hui", 'Les 14 prochains jours', 'À surveiller'].every((t) => [...document.querySelectorAll('.hm-h h2')].some((x) => x.textContent === t)) && ![...document.querySelectorAll('.hm-h h2')].some((x) => x.textContent === 'Bientôt') && document.querySelectorAll('.kpi-t').length === 3 && !!document.querySelector('#view .intent') && document.querySelector('#view .intent').getBoundingClientRect().top < document.querySelector('.kpi-grid').getBoundingClientRect().top));
     ok('accueil : le résumé du jour donne la météo, et chaque chiffre ouvre sa rubrique', await p.evaluate(() => /(\d+° · \S+ · \d+ à \d+°|Demain : [^,]+, \d+ à \d+°)/.test((document.querySelector('.hm-hello small') || {}).textContent || '')));
     { await p.evaluate(() => [...document.querySelectorAll('.kpi-t')].find((x) => /bons? prix/.test(x.textContent)).click()); await p.waitForTimeout(500); const tab = await p.evaluate(() => location.hash); await p.goto(base + '#accueil'); await p.waitForTimeout(1500); ok('accueil : la tuile « bon prix » ouvre Achats', tab === '#achats', tab); }
-    ok('pastille « Grok en pause »', await p.evaluate(() => !!document.querySelector('.pause-pill')));
+    /* 0.25.0 : en-tête sur une ligne, la pause dite une fois (la pastille de l'en-tête, qui ouvre le détail) */
+    ok('en-tête sur une ligne : JARVIS, l\'état, la loupe et la mise à jour à la même hauteur ; plus d\'horloge ni de « 0 au travail », « en veille »', await p.evaluate(() => { const y = (e) => { const r = e.getBoundingClientRect(); return r.top + r.height / 2; }, a = y(document.querySelector('.brand b')), b = y(document.getElementById('status')), c = y(document.getElementById('gs-btn')), d = y(document.querySelector('.refresh-btn'));
+      const hid = (id) => getComputedStyle(document.getElementById(id)).display === 'none'; return Math.max(a, b, c, d) - Math.min(a, b, c, d) < 12 && hid('clock') && hid('today') && !document.querySelector('#status .st.is-veille') && ![...document.querySelectorAll('#status .st.is-travail')].some((x) => /^0\b/.test(x.textContent.trim())) && document.querySelector('.top').getBoundingClientRect().height < 62; }),
+      JSON.stringify(await p.evaluate(() => [document.querySelector('.top').getBoundingClientRect().height, [...document.querySelectorAll('#status .st')].map((x) => x.textContent)])));
+    ok('pause de Grok dite une fois : pastille de l\'en-tête seulement (plus de pastille sur l\'accueil)', await p.evaluate(() => !!document.querySelector('#status .st.is-pause') && !document.querySelector('.pause-pill') && !document.querySelector('#dir .pause-b')));
+    await p.tap('#status .st.is-pause'); await p.waitForTimeout(500);
+    ok('pause de Grok : la pastille de l\'en-tête ouvre le détail (file d\'attente, date de reprise, « Grok est reparti »)', await p.evaluate(() => { const s = document.getElementById('sheet'); return !s.hidden && /La pause de Grok/.test(s.textContent) && /Grok est reparti/.test(s.textContent) && /file d'attente/.test(s.textContent); }));
+    await p.evaluate(() => [...document.querySelectorAll('#sheet button')].find((x) => /^Fermer$/.test(x.textContent.trim())).click()); await p.waitForTimeout(400);
+    ok('accueil : un rendez-vous écrit dans l\'agenda et dans Échéances n\'apparaît qu\'une fois dans « Les 14 prochains jours »', await p.evaluate(() => { const h2 = [...document.querySelectorAll('.hm-h h2')].find((x) => /14 prochains/.test(x.textContent)); return [...h2.closest('section').querySelectorAll('.hm-row')].filter((r) => /notaire/i.test(r.textContent)).length === 1; }));
     await p.screenshot({path: path.join(SH, 'accueil.png')});
     /* barre du bas et toutes les rubriques */
     const bar = await p.evaluate(() => [...document.querySelectorAll('.fav-row .tab')].map((t) => t.dataset.tab));
@@ -43,12 +53,75 @@ srv.listen(0, async () => {
     await p.screenshot({path: path.join(SH, 'tout.png')});
     await p.tap('.all-grid .tab[data-tab="papiers"]'); await p.waitForTimeout(600);
     ok('rubrique ouverte depuis « Tout »', await p.evaluate(() => document.querySelector('.all-sheet').hidden && /papiers/i.test(document.getElementById('view-title').textContent)));
-    /* page vocale */
+    /* 0.25.0, un seul Claude : l'orbe ouvre la discussion avec Claude (celle qui a ses données) ; plus de page vocale ni de « Conversation » en continu */
     await p.tap('.talk-slot .jv-btn'); await p.waitForTimeout(1000);
-    await p.evaluate(() => { const c = document.querySelector('.jv-comp'); if (c) c.hidden = false; });
-    await p.fill('.jv-comp input', 'Bonjour'); await p.tap('.jv-comp button'); await p.waitForTimeout(1200);
-    ok('page vocale : l\'échange reste à l\'écran', await p.evaluate(() => document.querySelectorAll('.jv-turn').length === 1 && /Bonjour/.test(document.querySelector('.jv-q').textContent)));
-    await p.tap('.jv-x');
+    ok('orbe : ouvre la discussion avec Claude, sans page vocale ni mode « Conversation »', await p.evaluate(() => !document.getElementById('chat').hidden && !document.querySelector('.jv') && !!document.querySelector('#chat .lire-toggle') && ![...document.querySelectorAll('#chat .chat-head button')].some((x) => /Conversation|Fil/.test(x.textContent)) && /Claude/.test(document.querySelector('#chat .chat-id b').textContent)));
+    ok('orbe sans micro (maquette) : pas de bouton micro, le clavier de l\'iPhone est proposé', await p.evaluate(() => !document.getElementById('dict-btn') && /micro du clavier/.test((document.querySelector('#chat .dict-note') || {}).textContent || '')));
+    await p.fill('#chat-in', 'Bonjour'); await p.tap('#chat .chat-row .btn.main'); await p.waitForTimeout(1500);
+    ok('orbe : la question écrite part à Claude avec l\'heure, la météo, l\'agenda, les tâches, les sorties et les voyages', await p.evaluate(() => { const s = window.__samples[window.__samples.length - 1]; return [...document.querySelectorAll('#chat .msg.me')].some((m) => /Bonjour/.test(m.textContent)) && document.querySelectorAll('#chat .msg.them').length >= 2 && s && s.ctx.length === 6; }), JSON.stringify(await p.evaluate(() => (window.__samples[window.__samples.length - 1] || {}).ctx)));
+    await p.tap('#chat .chat-head .icon-btn'); await p.waitForTimeout(300);
+    /* la dictée d'une question (fausse reconnaissance de l'iPhone) : l'orbe écoute, la phrase arrive dans le champ, rien ne part sans « Envoyer » */
+    { const q = await pageWith({ear: 'ok', tts: 'ok'}, '');
+      await q.tap('.talk-slot .jv-btn'); await q.waitForTimeout(500);
+      const ecoute = await q.evaluate(() => ({strip: !!document.querySelector('#chat .dict-strip'), txt: (document.querySelector('#chat .dict-txt') || {}).textContent, on: (document.getElementById('dict-btn') || {className: ''}).className.includes('is-on'), sugg: !!document.querySelector('#chat .chat-form .sugg')}));
+      ok('dictée : l\'orbe ouvre Claude et écoute tout de suite (bandeau « Je t\'écoute », micro allumé)', ecoute.strip && /écoute/.test(ecoute.txt) && ecoute.on && !ecoute.sugg, JSON.stringify(ecoute));
+      await q.evaluate(() => window.__say.push("qu'est-ce que j'ai demain")); await q.waitForTimeout(1300);
+      const pret = await q.evaluate(() => ({v: document.getElementById('chat-in').value, note: (document.querySelector('#chat .dict-note') || {}).textContent, strip: !!document.querySelector('#chat .dict-strip'), moi: document.querySelectorAll('#chat .msg.me').length}));
+      ok('dictée : la phrase arrive dans le champ, à relire ; rien ne part tout seul', pret.v === "Qu'est-ce que j'ai demain" && /Relis/.test(pret.note || '') && !pret.strip && pret.moi === 0, JSON.stringify(pret));
+      await q.screenshot({path: path.join(SH, 'dictee.png')});
+      await q.tap('#chat .lire-toggle'); await q.waitForTimeout(200);
+      await q.tap('#chat .chat-row .btn.main'); await q.waitForTimeout(1800);
+      const lu = await q.evaluate(() => ({moi: [...document.querySelectorAll('#chat .msg.me')].map((m) => m.textContent), voix: window.__voice.slice(), lire: localStorage.getItem('jarvis.lire'), press: document.querySelector('#chat .lire-toggle').getAttribute('aria-pressed')}));
+      ok('lecture : « Lecture : oui » retenu, la réponse est lue à voix haute sans autre appui', lu.moi.length === 1 && lu.lire === 'oui' && lu.press === 'true' && lu.voix.some((x) => /^claude:fr:Voici ma réponse/.test(x)), JSON.stringify(lu));
+      /* « j'ai fini » d'un appui, puis annuler */
+      await q.tap('#dict-btn'); await q.waitForTimeout(400);
+      await q.tap('#chat .dict-no'); await q.waitForTimeout(800); await q.evaluate(() => window.__say.push('phrase dite après « Annuler » : elle ne doit pas arriver')); await q.waitForTimeout(700);
+      ok('dictée : « Annuler » referme le micro sans rien écrire', await q.evaluate(() => !document.querySelector('#chat .dict-strip') && !document.getElementById('dict-btn').className.includes('is-on') && window.__ear.includes('abort') && document.getElementById('chat-in').value === ''), JSON.stringify(await q.evaluate(() => [document.getElementById('chat-in').value, window.__ear])));
+      await q.context().close(); }
+    /* 0.25.0 : la recherche partout (loupe de l'en-tête), dans ce que la page a déjà lu */
+    { const q = await page('#accueil');
+      await q.tap('#gs-btn'); await q.waitForTimeout(300); await q.fill('#gs-in', 'notaire'); await q.waitForTimeout(300);
+      const r1 = await q.evaluate(() => ({rows: [...document.querySelectorAll('#gsearch .gs-grp .gs-row')].map((r) => r.textContent), grp: [...document.querySelectorAll('#gsearch .gs-grp h3')].map((x) => x.firstChild.textContent), mark: !!document.querySelector('#gsearch .gs-row mark'), pap: !!document.querySelector('#gsearch .gs-pap')}));
+      ok('recherche : « notaire » trouve le rendez-vous une seule fois, surligné, avec le lien vers les papiers', r1.rows.length === 1 && /notaire/i.test(r1.rows[0]) && r1.grp[0] === 'Agenda et échéances' && r1.mark && r1.pap, JSON.stringify(r1));
+      await q.fill('#gs-in', 'robot'); await q.waitForTimeout(300);
+      const r2 = await q.evaluate(() => [...document.querySelectorAll('#gsearch .gs-grp h3')].map((x) => x.firstChild.textContent));
+      ok('recherche : « robot » ressort dans plusieurs rubriques (Pour moi, Achats, échanges avec les bots…)', ['Pour moi', 'Achats', 'Échanges avec les bots'].every((g) => r2.includes(g)), r2.join(' | '));
+      await q.screenshot({path: path.join(SH, 'recherche.png')});
+      await q.evaluate(() => [...document.querySelectorAll('#gsearch .gs-grp')].find((g) => /^Achats/.test(g.querySelector('h3').textContent)).querySelector('.gs-row').click()); await q.waitForTimeout(700);
+      ok('recherche : un appui ouvre l\'élément là où il vit (la fiche de l\'achat)', await q.evaluate(() => document.getElementById('gsearch').hidden && location.hash === '#achats' && /Robot Alpha/.test(document.getElementById('dir').textContent) && /Tous les achats/.test(document.getElementById('dir').textContent)), await q.evaluate(() => location.hash));
+      await q.tap('#gs-btn'); await q.waitForTimeout(300); await q.fill('#gs-in', 'passeport'); await q.waitForTimeout(300);
+      await q.evaluate(() => document.querySelector('#gsearch .gs-pap').click()); await q.waitForTimeout(900);
+      ok('recherche : « dans mes papiers » ouvre Papiers avec le mot déjà cherché', await q.evaluate(() => location.hash === '#papiers' && (document.querySelector('.pap-search') || {}).value === 'passeport'));
+      await q.tap('#gs-btn'); await q.waitForTimeout(300); await q.fill('#gs-in', 'zzzqqq'); await q.waitForTimeout(300);
+      ok('recherche : rien trouvé est dit clairement, « Fermer » referme', await q.evaluate(() => /Rien pour « zzzqqq »/.test(document.getElementById('gs-res').textContent)) && await (async () => { await q.tap('#gsearch .gs-x'); await q.waitForTimeout(200); return q.evaluate(() => document.getElementById('gsearch').hidden); })());
+      await q.context().close(); }
+    /* 0.25.0 : « Pour moi », une par une */
+    { const q = await page('#demandes');
+      const top = await q.evaluate(() => { const b = document.getElementById('fc-start'), r = b && b.getBoundingClientRect(); return {btn: !!b, y: r ? r.bottom : 9999, banner: !!document.querySelector('#dir .view-in > .pause-b'), vh: innerHeight}; });
+      ok('Pour moi : « Traiter une par une » visible dès l\'ouverture, sans le grand cadre de pause au-dessus', top.btn && top.y < top.vh * 0.5 && !top.banner, JSON.stringify(top));
+      await q.tap('#fc-start'); await q.waitForTimeout(500);
+      const st = () => q.evaluate(() => ({count: (document.querySelector('.fc-count') || {}).textContent, done: (document.querySelector('.fc-done') || {}).textContent, cards: document.querySelectorAll('.fc-view .card, .fc-view article').length, t: (document.querySelector('.fc-view .pm-title') || {}).textContent, prog: (document.querySelector('.fc-prog i') || {style: {}}).style.width, badge: (document.querySelector('.tab[data-tab="demandes"] .badge') || {}).textContent}));
+      const a0 = await st(), n0 = +a0.count.split(' sur ')[1];
+      ok('une par une : une seule demande à l\'écran, « 1 sur N », la barre du bas reste', /^1 sur \d+$/.test(a0.count) && n0 >= 10 && await q.evaluate(() => document.querySelectorAll('.fc-view .fc-card, .fc-view > .card, .fc-view > article').length === 1 && !!document.querySelector('.fav-bar') && !document.getElementById('fc-start')), JSON.stringify(a0));
+      for (let i = 0; i < 3; i++) { await q.tap('.fc-nav .btn:last-child'); await q.waitForTimeout(300); }
+      const a1 = await st();
+      ok('une par une : « Passer » avance sans rien écrire (4 sur N, rien de traité)', a1.count === '4 sur ' + n0 && !a1.done && a1.badge === a0.badge, JSON.stringify(a1));
+      await q.evaluate(() => [...document.querySelectorAll('.fc-view .pm-tile')].find((x) => /^Oui/.test(x.textContent)).click()); await q.waitForTimeout(900);
+      const a2 = await st();
+      ok('une par une : après une réponse, la suivante prend la place (4 sur N-1, « 1 traitée »), sans feuille « Et ensuite ? », avec « Annuler »', a2.count === '4 sur ' + (n0 - 1) && /^1 traitée$/.test(a2.done) && a2.t !== a1.t && await q.evaluate(() => document.getElementById('sheet').hidden && [...document.querySelectorAll('.toast button')].some((b) => /Annuler/.test(b.textContent))), JSON.stringify([a1.t, a2]));
+      await q.screenshot({path: path.join(SH, 'une-par-une.png')});
+      await q.tap('.fc-nav .btn:first-child'); await q.waitForTimeout(300);
+      ok('une par une : « Précédente » revient en arrière', (await st()).count === '3 sur ' + (n0 - 1));
+      for (let i = 0; i < n0 + 2; i++) { const more = await q.evaluate(() => { const b = document.querySelector('.fc-nav .btn:last-child'); if (b) b.click(); return !!b; }); if (!more) break; await q.waitForTimeout(100); }
+      ok('une par une : au bout de la liste, le bilan (traitées, restantes) et le retour à la liste', await q.evaluate(() => /Tu as fait le tour/.test(document.querySelector('.fc-end').textContent) && /1 demande traitée/.test(document.querySelector('.fc-end').textContent)));
+      await q.evaluate(() => [...document.querySelectorAll('.fc-end button')].find((b) => /Revenir/.test(b.textContent)).click()); await q.waitForTimeout(400);
+      ok('une par une : retour à toute la liste', await q.evaluate(() => !document.querySelector('.fc-view') && !!document.getElementById('fc-start') && !!document.getElementById('pm-dec')));
+      await q.tap('#fc-start'); await q.waitForTimeout(300); await q.tap('.fav-row .tab[data-tab="agenda"]'); await q.waitForTimeout(500); await q.tap('.fav-row .tab[data-tab="demandes"]'); await q.waitForTimeout(500);
+      ok('une par une : changer de rubrique referme le mode (au retour, toute la liste)', await q.evaluate(() => !document.querySelector('.fc-view') && !!document.getElementById('fc-start')));
+      await q.context().close(); }
+    { const q = await page('#agenda');
+      ok('agenda : le rendez-vous écrit aussi dans Échéances n\'est listé qu\'une fois dans le mois, avec le bot qui le suit', await q.evaluate(() => { const rows = [...document.querySelectorAll('#dir .mlist .dl-row')].filter((r) => /notaire/i.test(r.textContent)); return rows.length === 1 && /14h30/.test(rows[0].textContent) && /Iris/.test(rows[0].textContent); }));
+      await q.context().close(); }
     /* agenda plus vivant (16/11/2026) */
     p = await page('#agenda');
     ok('agenda : carte « Aujourd\'hui » (date, présence, événements du jour)', await p.evaluate(() => { const c = document.querySelector('.agt'); return !!c && c.querySelector('.agt-date b').textContent === String(new Date().getDate()) && /Télétravail/.test(c.querySelector('.agt-pr').textContent) && c.querySelectorAll('.agt-row').length >= 2; }));
@@ -220,7 +293,7 @@ srv.listen(0, async () => {
     ok('check-up : frise, aucun repère horaire sous l\'heure actuelle', await p.evaluate(() => { const n = document.querySelector('.tl-now small').getBoundingClientRect(); return [...document.querySelectorAll('.tl-tick small')].every((t) => { const r = t.getBoundingClientRect(); return r.right < n.left || r.left > n.right; }); }));
     ok('check-up : texte secondaire lisible (gris assez clair)', await p.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--dim').trim().toLowerCase() === '#8aa9d1'));
     await p.tap('.talk-slot .jv-btn'); await p.waitForTimeout(900);
-    ok('check-up : page vocale dans les polices de la charte (plus d\'Inter)', await p.evaluate(() => [...document.querySelectorAll('.jv, .jv *')].filter((e) => [...e.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim())).every((e) => /^("?Exo 2|"?Oxanium|Orbitron)/.test(getComputedStyle(e).fontFamily))));
+    ok('check-up : la discussion ouverte par l\'orbe dans les polices de la charte (plus d\'Inter)', await p.evaluate(() => { const els = [...document.querySelectorAll('#chat, #chat *')].filter((e) => [...e.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim())); return els.length > 5 && els.every((e) => /^("?Exo 2|"?Oxanium|Orbitron)/.test(getComputedStyle(e).fontFamily)); }));
     p = await page('#demandes');
     /* 17/11/2026 : routine conforme à la fiche → « Oui depuis JARVIS » (ligne Réponse + sonnette) ; le reste garde la phrase à coller */
     ok('oui : « Oui depuis JARVIS » pour une demande de routine (carte seule), phrase à coller pour les oui groupés d\'Argus', await p.evaluate(() => { const u = [...document.querySelectorAll('.pm-card')].find((c) => /Ulysse/.test(c.textContent) && /Ton oui/i.test(c.textContent)), a = [...document.querySelectorAll('.card.item')].find((c) => c.querySelector('.yes-l') && /Argus/.test(c.textContent)); const b = u && [...u.querySelectorAll('.pm-row .btn')].find((x) => /^Oui depuis JARVIS/.test(x.textContent)); return !!b && /1 passage|à la reprise/.test(b.textContent) && !!a && !a.querySelector('.yes-jarvis') && /Copier/.test(a.textContent) && ![...document.querySelectorAll('.card.item')].some((c) => c.querySelector('.yes-l') && /Ulysse/.test(c.textContent)); }));
@@ -282,9 +355,9 @@ srv.listen(0, async () => {
       await drag(p, 215, 40, 0, 260, 350);
       ok('glisser : la discussion se ferme d\'un glissé vers le bas', opened && await p.evaluate(() => document.getElementById('chat').hidden));
       await p.tap('.talk-slot .jv-btn'); await p.waitForTimeout(900);
-      const vOpen = await p.evaluate(() => { const j = document.querySelector('.jv'); return !!j && !j.hidden && getComputedStyle(j).display !== 'none'; });
-      await drag(p, 215, 60, 0, 300, 350);
-      ok('glisser : la page vocale se ferme d\'un glissé vers le bas', vOpen && await p.evaluate(() => { const j = document.querySelector('.jv'); return !j || j.hidden || getComputedStyle(j).display === 'none'; })); }
+      const vOpen = await p.evaluate(() => !document.getElementById('chat').hidden);
+      await drag(p, 215, 40, 0, 260, 350);
+      ok('glisser : la discussion ouverte par l\'orbe se ferme d\'un glissé vers le bas', vOpen && await p.evaluate(() => document.getElementById('chat').hidden)); }
     /* Face ID pour les papiers privés (0.14.0) : authentificateur virtuel du navigateur, sur « localhost » (Face ID refuse une adresse IP) */
     { const ctx = await b.newContext({...devices['iPhone 15 Pro Max']}); const q = await ctx.newPage(); q.on('pageerror', (e) => errs.push('faceid : ' + e.message));
       const cdp = await ctx.newCDPSession(q); await cdp.send('WebAuthn.enable'); await cdp.send('WebAuthn.addVirtualAuthenticator', {options: {protocol: 'ctap2', transport: 'internal', hasResidentKey: true, hasUserVerification: true, isUserVerified: true, automaticPresenceSimulation: true}});

@@ -7,6 +7,7 @@ from faster_whisper import WhisperModel
 
 model_name, root = sys.argv[1], (sys.argv[2] if len(sys.argv) > 2 else None)
 threads = int(os.environ.get("JARVIS_WHISPER_THREADS", "2"))
+beam = max(1, int(os.environ.get("JARVIS_WHISPER_BEAM", "5")))
 model = WhisperModel(model_name, device="cpu", compute_type="int8", cpu_threads=threads, download_root=root)
 
 
@@ -31,7 +32,8 @@ for line in sys.stdin:
     req = None
     try:
         req = json.loads(line)
-        segs, info = model.transcribe(load(req["wav"]), language="fr", beam_size=1, best_of=1, temperature=0.0,
+        # 0.25.0 : la phrase dictée est relue avant l'envoi, la justesse passe avant la vitesse : recherche en faisceau (5) au lieu du premier choix
+        segs, info = model.transcribe(load(req["wav"]), language="fr", beam_size=beam, best_of=1, temperature=0.0,
                                       condition_on_previous_text=False, initial_prompt=req.get("prompt") or None,
                                       without_timestamps=True, vad_filter=False)
         keep = []

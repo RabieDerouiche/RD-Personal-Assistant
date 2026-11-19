@@ -41,6 +41,8 @@ export class Ecoute {
   busy: 'idle' | 'speaking' | 'thinking' = 'idle';
   paused = false;
   endMs = 700;   /* silence qui termine une phrase (0.22.1 : 0,7 s au lieu de 0,8) */
+  maxMs = 20000;   /* durée maximale d'une phrase */
+  private sr = 16000;
   private closing = false;   /* fermé pendant que l'iPhone ouvrait le micro : le micro ne doit pas rester ouvert */
   constructor(private o: EarOpts) {}
   get on() { return !!this.stream; }
@@ -75,6 +77,8 @@ export class Ecoute {
     try { const s = W.navigator.audioSession; if (s) s.type = 'auto'; } catch { /* rien */ }
     this.o.onState('off');
   }
+  /* 0.25.0 (dictée d'une question) : micro fermé et contexte audio rendu ; l'iPhone n'en accorde que quelques-uns à une page */
+  close() { this.stop(); try { if (this.ctx) this.ctx.close().catch(() => {}); } catch { /* rien */ } this.ctx = null; }
   pause(p: boolean) { this.paused = p; this.reset(); this.o.onState(p ? 'paused' : 'listening'); }
   cancelSend() { if (this.sending) { this.sending.abort(); this.sending = null; } }
   private tick() {
@@ -85,6 +89,7 @@ export class Ecoute {
 
   private frame(x: Float32Array, sr: number) {
     if (this.paused || !this.stream) return;
+    this.sr = sr;
     let s = 0; for (let i = 0; i < x.length; i++) s += x[i] * x[i];
     const db = 20 * Math.log10(Math.sqrt(s / x.length) + 1e-9), ms = (x.length / sr) * 1000, copy = new Float32Array(x);
     if (this.o.onLevel) this.o.onLevel(Math.max(0, Math.min(1, (db + 60) / 45)));
@@ -108,8 +113,10 @@ export class Ecoute {
     }
     this.chunks.push(copy); this.totalMs += ms;
     if (db > off) { this.silence = 0; this.speechMs += ms; } else this.silence += ms;
-    if (this.silence >= this.endMs || this.totalMs > 20000) this.finish(sr);
+    if (this.silence >= this.endMs || this.totalMs > this.maxMs) this.finish(sr);
   }
+  /* 0.25.0 (dictée d'une question) : « j'ai fini » d'un appui : la phrase en cours part tout de suite ; faux s'il n'a encore rien dit */
+  flush(): boolean { if (!this.inSpeech || !this.stream) return false; this.finish(this.sr); return true; }
   private finish(sr: number) {
     const chunks = this.chunks, wasBarge = this.barge, speech = this.speechMs;
     this.reset();
