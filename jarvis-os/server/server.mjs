@@ -1007,9 +1007,14 @@ function cors(req, res) {
 const json = (res, status, body) => { res.writeHead(status, {'content-type': 'application/json', 'cache-control': 'no-store'}); res.end(JSON.stringify(body)); };
 const readBody = (req) => new Promise((resolve) => { let b = ''; req.on('data', (d) => { b += d; if (b.length > 64000) req.destroy(); }); req.on('end', () => { try { resolve(b ? JSON.parse(b) : {}); } catch { resolve({}); } }); });
 
+/* Panier (19/11/2026) : la liste de courses du foyer, une app à part servie sous /courses/ (courses/server/courses.mjs).
+   Elle a ses propres appareils, ses propres données (DATA/courses) et n'appelle ni Claude ni un bot ; si elle ne se charge pas, JARVIS tourne sans elle. */
+let COURSES = null;
+import('../../courses/server/courses.mjs').then((m) => { COURSES = m.createCourses({data: path.join(DATA, 'courses')}); console.log('Panier ' + m.VERSION + ' servi sous /courses/'); }).catch((e) => console.log('Panier indisponible : ' + e.message));
 const server = http.createServer(async (req, res) => {
-  cors(req, res);
   const url = new URL(req.url, 'http://x'), p = url.pathname;
+  if (p === '/courses' || p.startsWith('/courses/')) { if (COURSES) return COURSES.handle(req, res, url); res.writeHead(503, {'content-type': 'text/plain; charset=utf-8'}); res.end('Panier redémarre.'); return; }
+  cors(req, res);
   if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
   try {
     if (p === '/api/health') return json(res, 200, {ok: true, version: VERSION, paired: S.tokens.length > 0});
