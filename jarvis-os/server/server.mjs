@@ -18,7 +18,7 @@ import {createSante} from './sante.mjs';
 import {createComparatifs} from './comparatif.mjs';
 import {createEcoute, wavOk, intention, quand, meteoPhrase, meteoUrl, heurePhrase, datePhrase, nrm, diction} from './voix.mjs';
 
-const VERSION = '0.24.0';
+const VERSION = '0.24.1';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PORT = +(process.env.PORT || 8787);
 const HOST = process.env.HOST || '127.0.0.1';
@@ -1007,9 +1007,14 @@ function cors(req, res) {
 const json = (res, status, body) => { res.writeHead(status, {'content-type': 'application/json', 'cache-control': 'no-store'}); res.end(JSON.stringify(body)); };
 const readBody = (req) => new Promise((resolve) => { let b = ''; req.on('data', (d) => { b += d; if (b.length > 64000) req.destroy(); }); req.on('end', () => { try { resolve(b ? JSON.parse(b) : {}); } catch { resolve({}); } }); });
 
+/* Panier (19/11/2026) : la liste de courses du foyer, une app à part servie sous /courses/ (courses/server/courses.mjs).
+   Elle a ses propres appareils, ses propres données (DATA/courses) et n'appelle ni Claude ni un bot ; si elle ne se charge pas, JARVIS tourne sans elle. */
+let COURSES = null;
+const chargeCourses = () => import('../../courses/server/courses.mjs').then((m) => { COURSES = m.createCourses({data: path.join(DATA, 'courses')}); console.log('Panier ' + m.VERSION + ' servi sous /courses/'); }).catch((e) => console.log('Panier indisponible : ' + e.message));
 const server = http.createServer(async (req, res) => {
-  cors(req, res);
   const url = new URL(req.url, 'http://x'), p = url.pathname;
+  if (p === '/courses' || p.startsWith('/courses/')) { if (COURSES) return COURSES.handle(req, res, url); res.writeHead(503, {'content-type': 'text/plain; charset=utf-8'}); res.end('Panier redémarre.'); return; }
+  cors(req, res);
   if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
   try {
     if (p === '/api/health') return json(res, 200, {ok: true, version: VERSION, paired: S.tokens.length > 0});
@@ -1202,6 +1207,7 @@ setTimeout(() => { mcpList().then(() => console.log('Connecteurs Google : ' + (r
   if (stuck.length) save(); }
 server.listen(PORT, HOST, () => {
   console.log('JARVIS OS serveur ' + VERSION + ' sur http://' + HOST + ':' + PORT);
+  chargeCourses();   /* après JARVIS : sa première ligne de journal reste « serveur prêt » */
   ECOUTE.warm();   /* 0.22.0 : Whisper chargé une fois, pas à la première phrase */
   if (!S.tokens.length && !fs.existsSync(PAIR)) console.log('Aucun appareil relié. Code d\'appairage : ' + newPairing() + ' (30 minutes)');
 });
