@@ -19,7 +19,7 @@ import {createComparatifs} from './comparatif.mjs';
 import {BOT_IDS, BOT_NOMS, BOT_LISTE} from './bots.mjs';
 import {createEcoute, wavOk, intention, quand, meteoPhrase, meteoUrl, heurePhrase, datePhrase, nrm, diction} from './voix.mjs';
 
-const VERSION = '0.28.0';
+const VERSION = '0.29.0';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PORT = +(process.env.PORT || 8787);
 const HOST = process.env.HOST || '127.0.0.1';
@@ -792,9 +792,12 @@ const WHISPER_DIR = process.env.JARVIS_WHISPER_DIR || path.join(os.homedir(), 'w
 const ECOUTE = createEcoute({dir: WHISPER_DIR, py: path.join(WHISPER_DIR, 'venv', 'bin', 'python'), helper: path.join(HERE, 'stt', 'whisper_helper.py'), model: process.env.JARVIS_WHISPER_MODEL || 'small', fakeHelper: process.env.JARVIS_STT_HELPER || '', log: (t) => { S.ecouteErr = {at: now(), t: String(t).slice(0, 300)}; }});
 let ECOUTE_INSTALL = {state: 'idle', at: 0, tail: ''};
 /* 0.23.0 : le comparatif des produits suivis (comparatif.mjs) */
-/* 0.24.0 : une recherche d'idées prend 2 à 6 minutes : une notification quand elle est prête (ou impossible), qui ouvre ses propositions */
-const ideeFinie = (x) => { if (S.push && S.push.subs.length) PUSH.send(x.statut === 'pret' ? {title: 'Idées prêtes', body: x.data.propositions.length + ' propositions pour « ' + x.idee + ' »' + (x.pour ? ' (' + x.pour + ')' : ''), url: '/#voir-idee-' + x.id, tag: 'idee-' + x.id} : {title: 'Recherche d’idées impossible', body: '« ' + x.idee + ' » : ' + (x.erreur || 'erreur'), url: '/#voir-idee-' + x.id, tag: 'idee-' + x.id}, {urgency: 'normal'}).catch(() => {}); };
-const COMP = createComparatifs({S, save, DATA, runClaude, onIdee: ideeFinie, model: MODELS.equilibre, visionModel: MODELS.rapide, steamBase: process.env.JARVIS_STEAM_URL || undefined, settings: guardSettings('chat'), now, log: (t) => { S.compErr = {at: now(), t: String(t).slice(0, 300)}; }});
+/* 0.24.0 : une recherche d'idées prend 5 à 15 minutes (0.29.0 : deux passes d'Opus) : une notification quand elle est prête (ou impossible), qui ouvre ses propositions */
+/* 0.29.0 : le message dit aussi ce qui est « presque » (hors budget de peu, ou un critère absent) quand rien ne coche tout */
+const ideeResume = (d) => { const n = d.propositions.length, m = (d.presque || []).length; return n ? n + (n > 1 ? ' propositions' : ' proposition') + (m ? ' et ' + m + ' presque' : '') : m ? 'Rien qui coche tout, mais ' + m + ' presque' : 'Rien trouvé, mais des pistes pour relancer'; };
+const ideeFinie = (x) => { if (S.push && S.push.subs.length) PUSH.send(x.statut === 'pret' ? {title: 'Idées prêtes', body: ideeResume(x.data) + ' pour « ' + x.idee + ' »' + (x.pour ? ' (' + x.pour + ')' : ''), url: '/#voir-idee-' + x.id, tag: 'idee-' + x.id} : {title: 'Recherche d’idées impossible', body: '« ' + x.idee + ' » : ' + (x.erreur || 'erreur'), url: '/#voir-idee-' + x.id, tag: 'idee-' + x.id}, {urgency: 'normal'}).catch(() => {}); };
+const COMP = createComparatifs({S, save, DATA, runClaude, onIdee: ideeFinie, model: MODELS.equilibre, ideesModel: process.env.JARVIS_IDEES_MODELE || MODELS.profond, visionModel: MODELS.rapide,   /* 0.29.0 : Opus pour les idées (bien meilleur à chercher), JARVIS_IDEES_MODELE pour changer */
+  steamBase: process.env.JARVIS_STEAM_URL || undefined, settings: guardSettings('chat'), now, log: (t) => { S.compErr = {at: now(), t: String(t).slice(0, 300)}; }});
 function installEcoute() {
   if (ECOUTE_INSTALL.state === 'running') return ECOUTE_INSTALL;
   const log = path.join(DATA, 'ecoute-install.log');

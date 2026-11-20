@@ -331,6 +331,13 @@ try {
       r = await G('/api/idees', {idee: 'jouet introuvable', max: 20, n: 50}); const iid2 = r.body.recherche.id;
       let id2 = null; for (let i = 0; i < 60 && !(id2 && id2.statut === 'echec'); i++) { await new Promise((z) => setTimeout(z, 150)); id2 = ((await G('/api/idees')).body.recherches || []).find((x) => x.id === iid2); }
       ok('idées : 20 propositions au plus ; rien dans le budget = échec expliqué', r.body.recherche.n === 20 && id2 && id2.statut === 'echec' && /budget/.test(id2.erreur), JSON.stringify(id2).slice(0, 160));
+      /* 0.29.0 : peu de choix sur le marché : rien n'est jeté. Le hors-budget de peu et le « sans le critère » vont dans « presque », avec l'écart ;
+         les pistes sont gardées ; il en manque, donc une seconde passe dans la même conversation, sans doublon (même produit écrit autrement) */
+      r = await G('/api/idees', {idee: 'maison lumineuse', pour: 'Rille de 3 and', min: 30, max: 80, n: 5}); const iid3 = r.body.recherche.id;
+      let id3 = null; for (let i = 0; i < 80 && !(id3 && ['pret', 'echec'].includes(id3.statut)); i++) { await new Promise((z) => setTimeout(z, 150)); id3 = ((await G('/api/idees')).body.recherches || []).find((x) => x.id === iid3); }
+      const d3 = (id3 && id3.data) || {}, n3 = (d3.propositions || []).map((x) => x.nom), p3 = (d3.presque || []).map((x) => x.nom + ' (' + x.ecart + ')');
+      ok('idées : le JSON est lu même suivi d’une phrase avec des accolades ; 2 dans le budget + 1 de la seconde passe, sans le doublon « la Maison Étoile »', id3 && id3.statut === 'pret' && n3.join('|') === 'Maison Étoile (réf. 1234)|Villa Lune|Cabane Comète' && d3.passes === 2, JSON.stringify([id3 && id3.statut, n3, d3.passes]));
+      ok('idées : rien n’est jeté : 8 € au-dessus et « sans LED » vont dans « presque », avec leur écart ; la piste est gardée ; prix vu dans la recherche signalé', p3.join('|') === 'Palais Soleil (8 € au-dessus)|Maison sans lumière Nuage (sans LED)' && (d3.pistes || []).length === 1 && d3.pistes[0].max === 88 && d3.propositions[0].prix_vu === 'recherche', JSON.stringify([p3, d3.pistes]));
       r = await G('/api/idees/efface', {id: iid2}); ok('idées : une recherche s’efface', r.status === 200 && !((await G('/api/idees')).body.recherches || []).some((x) => x.id === iid2));
       }
     /* sauvegarde de Pilotage (0.14.0) : copie maintenant, comparée à une copie plus ancienne */

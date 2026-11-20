@@ -511,11 +511,14 @@ srv.listen(0, async () => {
       ok('idées : « Trouver une idée » en haut d\'Achats : idée, pour qui, budget min et max, 1 à 20 propositions', f && f.idee && f.pour && f.min && f.max && f.n === 20 && f.after, JSON.stringify(f));
       ok('idées : mes recherches (photo, pour qui, budget, nombre)', await p.evaluate(() => { const it = document.querySelector('.idee-it'); return !!it && /fille de 3 ans · 30 à 60 € · 6 propositions/.test(it.textContent) && !!it.querySelector('.idee-th.has-pic img'); }));
       await p.click('.idee-it'); await p.waitForTimeout(800);
-      const pg = await p.evaluate(() => ({t: document.querySelector('.view-title').textContent, cards: document.querySelectorAll('.idee-card').length, first: (document.querySelector('.idee-rank') || {}).textContent, why: !!document.querySelector('.cmp-key'), warn: [...document.querySelectorAll('.idee-warn')].map((x) => x.textContent).join('|'), note: [...document.querySelectorAll('.idee-note')].map((x) => x.textContent).join('|'), bars: document.querySelectorAll('.idee-bar').length, links: document.querySelectorAll('.idee-card a.btn[target="_blank"]').length}));
+      const pg = await p.evaluate(() => ({t: document.querySelector('.view-title').textContent, cards: document.querySelectorAll('.idee-card:not(.is-presque)').length, first: (document.querySelector('.idee-rank') || {}).textContent, why: !!document.querySelector('.cmp-key'), warn: [...document.querySelectorAll('.idee-warn')].map((x) => x.textContent).join('|'), note: [...document.querySelectorAll('.idee-note')].map((x) => x.textContent).join('|'), bars: document.querySelectorAll('.idee-card:not(.is-presque) .idee-bar').length, links: document.querySelectorAll('.idee-card:not(.is-presque) a.btn[target="_blank"]').length,
+        presque: [...document.querySelectorAll('.idee-card.is-presque')].map((c) => c.querySelector('.idee-ecart').textContent + ' · ' + c.querySelector('.idee-nom').textContent), pistes: [...document.querySelectorAll('.idee-piste')].map((b) => b.textContent)}));
       ok('idées : la page des propositions (meilleur choix en tête, conseil, photo, prix TTC avec vendeur et date, pourquoi, forces et limites, deux notes, lien vers le vendeur)', /Maison de poupée/.test(pg.t) && pg.cards === 6 && pg.first === 'Meilleur choix' && pg.why && pg.bars === 12 && pg.links === 6, JSON.stringify(pg));
-      ok('idées : un prix différent sur la page du vendeur est signalé ; une page illisible aussi ; les hors budget sont comptés', /64,90/.test(pg.warn) && /non revérifié/.test(pg.note) && /hors de ton budget/.test(pg.note), pg.warn + ' / ' + pg.note);
+      ok('idées : un prix différent sur la page du vendeur est signalé ; une page illisible aussi', /64,90/.test(pg.warn) && /non revérifié/.test(pg.note), pg.warn + ' / ' + pg.note);
+      /* 0.29.0 (son retour : « archi nulle, ça ne trouve que dalle ») : ce qui manque de peu n'est plus jeté, et les pistes de Claude se relancent d'un appui */
+      ok('idées : « Presque » montre ce qui manque de peu, avec l\'écart ; « Pour en trouver plus » donne les pistes de Claude', pg.presque.length === 1 && /^10 € au-dessus · Maison lumineuse Étoile/.test(pg.presque[0]) && pg.pistes.length === 2 && /Monte le maximum à 70 €/.test(pg.pistes[0]) && /Relancer : Maison de poupée · 30 à 70 €/.test(pg.pistes[0]), JSON.stringify([pg.presque, pg.pistes]));
       await p.click('.idee-tri button:has-text("Prix")'); await p.waitForTimeout(300);
-      const px = await p.evaluate(() => [...document.querySelectorAll('.idee-prix b')].map((x) => parseFloat(x.textContent.replace(/\s/g, '').replace(',', '.'))));
+      const px = await p.evaluate(() => [...document.querySelectorAll('.idee-card:not(.is-presque) .idee-prix b')].map((x) => parseFloat(x.textContent.replace(/\s/g, '').replace(',', '.'))));
       ok('idées : tri par prix', px.length === 6 && px.every((v, i) => !i || v >= px[i - 1]), px.join(' '));
       await p.click('.idee-card .btn:has-text("Suivre le prix")'); await p.waitForTimeout(700);
       const sv = await p.evaluate(() => [...document.querySelectorAll('.pick-form input')].map((x) => x.value));
@@ -524,9 +527,20 @@ srv.listen(0, async () => {
       await p.fill('#ix-idee', 'Trottinette'); await p.fill('#ix-pour', 'garçon de 6 ans'); await p.fill('#ix-max', '50'); await p.selectOption('#ix-n', '3'); await p.click('.idee-go'); await p.waitForTimeout(500);
       const w = await p.evaluate(() => ({t: document.querySelector('.view-title').textContent, wait: !!document.querySelector('.cmp-wait .cmp-spin')}));
       await p.waitForTimeout(2800);
-      const d = await p.evaluate(() => [...document.querySelectorAll('.idee-prix b')].map((x) => parseFloat(x.textContent.replace(/\s/g, '').replace(',', '.'))));
+      const d = await p.evaluate(() => [...document.querySelectorAll('.idee-card:not(.is-presque) .idee-prix b')].map((x) => parseFloat(x.textContent.replace(/\s/g, '').replace(',', '.'))));
       ok('idées : une nouvelle recherche ouvre sa page (attente, puis propositions dans le budget, au nombre demandé)', /Trottinette/.test(w.t) && w.wait && d.length === 3 && d.every((v) => v <= 50), JSON.stringify(w) + ' ' + d.join(' '));
       await p.screenshot({path: path.join(SH, 'idees.png')});
+      /* 0.29.0 : rien dans le budget, mais du « presque » : la recherche n'est plus « vide » ; la piste se relance et trouve */
+      p = await page('#achats');
+      await p.fill('#ix-idee', 'Maison de poupée'); await p.fill('#ix-max', '30'); await p.selectOption('#ix-n', '4'); await p.click('.idee-go'); await p.waitForTimeout(3300);
+      const v0 = await p.evaluate(() => ({vide: (document.querySelector('.idee-vide') || {}).textContent || '', titres: [...document.querySelectorAll('.panel-h h2')].map((x) => x.textContent), presque: [...document.querySelectorAll('.idee-card.is-presque .idee-ecart')].map((x) => x.textContent), pistes: [...document.querySelectorAll('.idee-piste b')].map((x) => x.textContent)}));
+      ok('idées : rien dans le budget n\'est plus un échec muet : « Rien qui coche tout », puis le plus proche (5 € au-dessus) et une piste', /n’a rien trouvé qui respecte/.test(v0.vide) && v0.titres.includes('Presque') && v0.presque.length === 1 && /^5 € au-dessus$/.test(v0.presque[0]) && /Monte le maximum à 35 €/.test(v0.pistes[0] || ''), JSON.stringify(v0));
+      await p.screenshot({path: path.join(SH, 'idees-presque.png')});
+      await p.click('.idee-piste'); await p.waitForTimeout(3300);
+      const v1 = await p.evaluate(() => ({t: document.querySelector('.view-title').textContent, sub: (document.querySelector('.idee-hero small') || {}).textContent || '', prix: [...document.querySelectorAll('.idee-card:not(.is-presque) .idee-prix b')].map((x) => x.textContent)}));
+      ok('idées : une piste se relance d\'un appui (même idée, maximum monté à 35 €) et trouve', /Maison de poupée/.test(v1.t) && /jusqu’à 35 €/.test(v1.sub) && v1.prix.length === 1 && /34,90/.test(v1.prix[0]), JSON.stringify(v1));
+      await p.click('.back-link'); await p.waitForTimeout(500);
+      ok('idées : dans « Mes recherches », la recherche sans rien dans le budget dit « Rien dans ton budget · 1 presque »', await p.evaluate(() => [...document.querySelectorAll('.idee-it .idee-st')].some((x) => /^Rien dans ton budget · 1 presque/.test(x.textContent))), await p.evaluate(() => [...document.querySelectorAll('.idee-it .idee-st')].map((x) => x.textContent).join(' | ')));
     }
     /* 19/11/2026 (capture : « 186 320 € TTC » pour une sortie à 18 €) : prix écrit en phrase, trajet en une ligne */
     { p = await page('#sorties');

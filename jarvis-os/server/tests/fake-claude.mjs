@@ -33,10 +33,22 @@ function answer(raw) {
     const arr = JSON.parse(input.slice(input.indexOf('['), input.lastIndexOf(']') + 1));
     return {text: JSON.stringify({choix: arr.map((x) => ({variante: x.variante, fichier: x.fichiers.find((f) => { try { return fs.readFileSync(f).includes('BON'); } catch { return false; } }) || null}))})};
   }
+  /* 0.29.0 : seconde passe de la recherche d'idées (même conversation) : une nouvelle, et un doublon écrit autrement (« la », sans la référence) */
+  if (/^Il en manque \d+ dans le budget/.test(input)) {
+    const it = (nom, prix) => ({nom, marque: 'Kidoria', prix, prix_detail: '', prix_vu: 'page', vendeur: 'Autre Enseigne', lien: '', date_prix: '2026-11-20', age: 'dès 3 ans', pourquoi: 'Trouvée en cherchant encore.', points_forts: ['Bois'], limites: [], qualite: 7, rapport_qualite_prix: 7, images: []});
+    return {text: JSON.stringify({propositions: [it('Cabane Comète', 40), it('Kidoria la Maison Étoile', 45)], presque: [], pistes: [], certitude: 'likely', sources: []}) + (resume ? '' : ' SANS REPRISE')};
+  }
   /* 0.24.0 : idée de produit : n propositions dans le budget, plus une hors budget (le serveur l'écarte) et un doublon */
   if (/^Idée de produit à trouver : « /.test(input)) {
     const n = +(input.match(/Nombre de propositions attendues : (\d+)/) || [])[1] || 3, max = +(input.match(/au plus ([\d.]+) €/) || [])[1] || 100, vb = process.env.JARVIS_STEAM_URL || '';
     if (/introuvable/.test(input)) return {text: JSON.stringify({comprehension: 'Rien', conseils: '', propositions: [{nom: 'Trop cher', prix: max * 3}], certitude: 'likely', sources: []})};
+    /* 0.29.0 : le marché en offre peu : 2 dans le budget, 1 à 10 % au-dessus (le serveur la met dans « presque »), 1 sans le critère, des pistes ;
+       une phrase avec des accolades après le JSON (lue quand même) ; la seconde passe (--resume) en apporte une de plus et un doublon */
+    if (/lumineuse/.test(input)) {
+      const it = (nom, prix, extra) => Object.assign({nom, marque: 'Kidoria', prix, prix_detail: 'livraison offerte', prix_vu: 'recherche', vendeur: 'Grande Enseigne', lien: vb + '/rien', date_prix: '2026-11-20', age: 'dès 3 ans', pourquoi: 'Éclairage dans chaque pièce.', points_forts: ['Lumières'], limites: ['Piles'], qualite: 8, rapport_qualite_prix: 7, images: []}, extra || {});
+      return {text: JSON.stringify({comprehension: 'Une maison lumineuse pour 3 ans.', conseils: 'Les lumières à piles suffisent.', propositions: [it('Maison Étoile (réf. 1234)', max - 10), it('Villa Lune', max - 20), it('Palais Soleil', Math.round(max * 1.1))],
+        presque: [it('Maison sans lumière Nuage', max - 5, {ecart: 'sans LED'})], pistes: [{texte: 'Monte le maximum à ' + Math.round(max * 1.1) + ' €', max: Math.round(max * 1.1)}], certitude: 'likely', sources: ['https://exemple.fr/guide']}) + '\nVoilà {fin de la réponse}.'};
+    }
     const P = Array.from({length: n}, (_, i) => ({nom: 'Maison de poupée ' + (i + 1), marque: i % 2 ? 'Djeco' : 'Hape', prix: Math.round((max - 1 - i) * 100) / 100, prix_detail: 'livraison offerte', vendeur: 'Vendeur ' + (i + 1),
       lien: i === 0 ? vb + '/idee-a' : i === 1 ? vb + '/produit-b' : vb + '/rien', date_prix: '2026-11-19', age: 'dès 3 ans', pourquoi: 'En bois, sans petites pièces, adaptée à 3 ans.', points_forts: ['Solide', 'Meubles inclus'], limites: ['Montage 20 min'], qualite: 8 - i * 0.2, rapport_qualite_prix: 7.5,
       images: i === 0 ? [vb + '/promo-a.png'] : []}));

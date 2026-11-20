@@ -438,6 +438,9 @@
         PROP('Maison sonore Petit Nid', 'Hopla', 44.0, 'Jouets du Coin', 'dès 2 ans', 'Des sons (sonnette, chasse d’eau) qui plaisent beaucoup à cet âge.', ['Sons amusants', 'Plastique épais'], ['Piles fournies, mais à changer'], 7, 7.6, house('#99f6e4', '#0f766e')),
         PROP('Cottage en tissu Doudou', 'Filou', 34.9, 'Boutique en ligne', 'dès 18 mois', 'Tout doux, sans aucune pièce dure : idéal si elle joue encore beaucoup par terre.', ['Lavable', 'Très léger'], ['Moins de jeu d’imitation'], 6.8, 7.4, '', {ok: false, prix: null}),
         PROP('Ferme-maison 2 en 1', 'Atelier Pin', 49.0, 'Grande Enseigne', 'dès 3 ans', 'Maison d’un côté, ferme de l’autre : deux jeux en un.', ['Deux jeux', 'Bois certifié'], ['Animaux vendus à part'], 7.8, 7.7, house('#bbf7d0', '#15803d'))],
+      /* 0.29.0 : ce qui manque de peu, et les pistes de Claude pour relancer */
+      presque: [Object.assign(PROP('Maison lumineuse Étoile', 'Kidoria', 69.9, 'Grande Enseigne', 'dès 3 ans', 'Éclairage LED dans chaque pièce, très demandé à cet âge.', ['Lumières LED', 'Bois solide'], ['Piles non fournies'], 8.3, 7.4, house('#fbcfe8', '#be185d')), {ecart: '10 € au-dessus'})],
+      pistes: [{texte: 'Monte le maximum à 70 € : la maison lumineuse Étoile entre', idee: '', min: null, max: 70}, {texte: 'Cherche plutôt une maison en tissu, plus légère', idee: 'maison de poupée en tissu', min: null, max: null}],
       hors_budget: 1, certitude: 'likely', sources: ['https://example.org/guide-jouets-3-ans', 'https://example.org/tests-maisons']}}];
   /* 0.23.0 : la météo de l'accueil (en vrai : Open-Meteo, à la position de l'iPhone) */
   window.__METEO = {current: {temperature_2m: 9.4, apparent_temperature: 6.2, weather_code: 3}, daily: {time: [fr(D(0)), fr(D(1))], weather_code: [3, 61], temperature_2m_min: [4, 2], temperature_2m_max: [11, 7], precipitation_probability_max: [10, 70]}};
