@@ -1,14 +1,19 @@
 /* JARVIS OS : garde l'app pour l'ouvrir vite depuis l'écran d'accueil. Réseau d'abord, cache en secours ; jamais les données (/api/).
-   Depuis 0.12.0 : notifications envoyées par le serveur (format « déclaratif » de Safari, lu aussi ici) et pastille sur l'icône. */
-const CACHE = 'jarvis-os-app-v2';
+   Depuis 0.12.0 : notifications envoyées par le serveur (format « déclaratif » de Safari, lu aussi ici) et pastille sur l'icône.
+   0.27.0 (comme Panier, après son incident du 19/11/2026) : une nouvelle version de ce service ne prend JAMAIS la place de l'ancienne pendant
+   qu'une page charge (plus de skipWaiting à l'installation) : elle attend que l'app passe à l'arrière-plan (message « active ») ou soit fermée.
+   L'ancien service suffit entre-temps : le code vient d'abord du réseau. Une erreur 5xx (le serveur redémarre) retombe sur la copie gardée. */
+const CACHE = 'jarvis-os-app-v3';
 const CORE = ['./', './index.html', './jarvis-voix.js', './jarvis-serveur.js', './manifest.webmanifest', './icon-180.png', './icon-192.png', './icon-512.png'];
-self.addEventListener('install', (e) => { e.waitUntil(caches.open(CACHE).then((c) => Promise.all(CORE.map((u) => c.add(u).catch(() => null)))).then(() => self.skipWaiting())); });
+self.addEventListener('install', (e) => { e.waitUntil(caches.open(CACHE).then((c) => Promise.all(CORE.map((u) => c.add(u).catch(() => null))))); });
+self.addEventListener('message', (e) => { if (e.data && e.data.type === 'active') self.skipWaiting(); });   /* l'app est à l'arrière-plan : la relève peut se faire */
 self.addEventListener('activate', (e) => { e.waitUntil(caches.keys().then((ks) => Promise.all(ks.filter((k) => k !== CACHE).map((k) => caches.delete(k)))).then(() => self.clients.claim())); });
 self.addEventListener('fetch', (e) => {
   const u = new URL(e.request.url);
   if (e.request.method !== 'GET' || u.origin !== location.origin || u.pathname.startsWith('/api/') || u.pathname.startsWith('/ancienne/') || u.pathname.startsWith('/courses')) return;   /* /courses : l'app Panier, qui a son propre service */
-  e.respondWith(fetch(e.request).then((r) => { if (r.ok) { const copy = r.clone(); caches.open(CACHE).then((c) => c.put(e.request, copy)).catch(() => {}); } return r; })
-    .catch(() => caches.match(e.request).then((m) => m || caches.match('./index.html'))));
+  const garde = () => caches.match(e.request).then((m) => m || (e.request.mode === 'navigate' ? caches.match('./index.html') : null));
+  e.respondWith(fetch(e.request).then((r) => { if (r.ok) { const copy = r.clone(); caches.open(CACHE).then((c) => c.put(e.request, copy)).catch(() => {}); return r; } return r.status >= 500 ? garde().then((m) => m || r) : r; })
+    .catch(() => garde().then((m) => m || caches.match('./index.html'))));
 });
 self.addEventListener('push', (e) => {
   let d = {}; try { d = e.data ? e.data.json() : {}; } catch (x) { d = {notification: {title: 'JARVIS', body: e.data ? e.data.text() : ''}}; }

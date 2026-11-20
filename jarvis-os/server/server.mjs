@@ -4,7 +4,7 @@
    avant chaque appel. Il garde la mémoire et les missions, et ne fait rien sans l'accord du propriétaire.
    Usage : `node server.mjs` (service), `node server.mjs pair` (nouveau code d'appairage, valable 30 minutes). */
 import http from 'node:http';
-import {spawn, execFile} from 'node:child_process';
+import {spawn, execFile, execFileSync} from 'node:child_process';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -19,7 +19,7 @@ import {createComparatifs} from './comparatif.mjs';
 import {BOT_IDS, BOT_NOMS, BOT_LISTE} from './bots.mjs';
 import {createEcoute, wavOk, intention, quand, meteoPhrase, meteoUrl, heurePhrase, datePhrase, nrm, diction} from './voix.mjs';
 
-const VERSION = '0.26.0';
+const VERSION = '0.27.0';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PORT = +(process.env.PORT || 8787);
 const HOST = process.env.HOST || '127.0.0.1';
@@ -897,17 +897,41 @@ function claudeStatus() {
 }
 
 /* ---------- mise à jour depuis le dépôt public (git pull), puis redémarrage par systemd ---------- */
-const git = (args) => new Promise((resolve) => execFile('git', ['-C', REPO, ...args], {timeout: 60000}, (err, out, errOut) => resolve({ok: !err, out: String(out || '').trim(), err: String(errOut || (err && err.message) || '').trim()})));
-let commit = '';
-git(['rev-parse', '--short', 'HEAD']).then((r) => { if (r.ok) commit = r.out; });
+const git = (args) => new Promise((resolve) => execFile('git', ['-C', REPO, ...args], {timeout: 60000, env: {...process.env, GIT_TERMINAL_PROMPT: '0'}}, (err, out, errOut) => resolve({ok: !err, out: String(out || '').trim(), err: String(errOut || (err && err.message) || '').trim()})));
+/* 0.27.0 : l'empreinte du code est lue avant de répondre à la première requête : l'app s'en sert pour savoir que le nouveau serveur est là */
+let commit = ''; try { commit = execFileSync('git', ['-C', REPO, 'rev-parse', '--short', 'HEAD'], {timeout: 5000, stdio: ['ignore', 'pipe', 'ignore']}).toString().trim(); } catch { /* pas un dépôt git : sans importance */ }
+/* 0.27.0 (20/11/2026, « on a mis en place une mise à jour automatique sur Panier, fais pareil sur JARVIS ») : y a-t-il une version plus récente
+   dans le dépôt ? Demandé par l'app à son lancement ; le serveur n'interroge le dépôt qu'une fois toutes les dix minutes. Seuls comptent les
+   fichiers de l'app et du serveur : une fusion qui ne touche que la documentation ou les instructions ne propose rien. JARVIS_MAJ=0 coupe tout. */
+const MAJ = process.env.JARVIS_MAJ !== '0', MAJ_DELAI = +(process.env.JARVIS_MAJ_DELAI_MS || 600000), MAJ_CHEMINS = ['jarvis-os/server', 'jarvis-os/web', 'essais/jarvis-os-maquette'];
+let distant = {le: 0, dispo: false, version: '', nouveautes: 0}, majVerif = null, majEnCours = false;
+function majVerifie(force) {
+  if (!MAJ) return Promise.resolve({dispo: false, actuelle: VERSION, commit});
+  if (!force && now() - distant.le < MAJ_DELAI) return Promise.resolve({...distant, actuelle: VERSION, commit});
+  if (!majVerif) majVerif = (async () => {
+    const f = await git(['fetch', '--quiet']); let n = 0, version = '';
+    if (f.ok && (+(await git(['rev-list', '--count', 'HEAD..@{u}'])).out || 0) > 0) {
+      const d = await git(['diff', '--name-only', 'HEAD', '@{u}', '--', ...MAJ_CHEMINS]); n = d.ok ? d.out.split('\n').filter(Boolean).length : 0;
+      if (n > 0) { const v = /const VERSION = '([0-9][0-9.]*)'/.exec((await git(['show', '@{u}:jarvis-os/server/server.mjs'])).out || ''); version = v ? v[1] : ''; }
+    }
+    if (!f.ok) console.error('[jarvis] vérification de mise à jour ratée : ' + f.err.slice(0, 200));
+    distant = {le: now(), dispo: n > 0, version, nouveautes: n, erreur: !f.ok}; majVerif = null; return {...distant, actuelle: VERSION, commit};
+  })();
+  return majVerif;
+}
 async function update() {
-  const before = (await git(['rev-parse', 'HEAD'])).out;
-  const r = await git(['pull', '--ff-only']);
-  if (!r.ok) return {ok: false, message: 'Mise à jour impossible : ' + r.err.slice(0, 200)};
-  const after = (await git(['rev-parse', 'HEAD'])).out;
-  if (before === after) return {ok: true, changed: false, message: 'Déjà à jour (version ' + VERSION + ').'};
-  setTimeout(() => process.exit(0), 400);   /* systemd relance le service avec le nouveau code */
-  return {ok: true, changed: true, message: 'Mis à jour. Le serveur redémarre : quelques secondes.'};
+  if (majEnCours) return {ok: false, message: 'Mise à jour déjà en cours.'};
+  majEnCours = true;
+  try {
+    const before = (await git(['rev-parse', 'HEAD'])).out;
+    const r = await git(['pull', '--ff-only']); distant.le = 0;
+    if (!r.ok) return {ok: false, message: 'Mise à jour impossible : ' + r.err.slice(0, 200)};
+    const after = (await git(['rev-parse', 'HEAD'])).out;
+    if (before === after) return {ok: true, changed: false, message: 'Déjà à jour (version ' + VERSION + ').'};
+    try { save(); } catch { /* l'état est déjà écrit à chaque changement */ }
+    setTimeout(() => process.exit(0), 500);   /* systemd relance le service avec le nouveau code : un seul redémarrage par version, pour tous les appareils */
+    return {ok: true, changed: true, message: 'Mis à jour. Le serveur redémarre : quelques secondes.'};
+  } finally { majEnCours = false; }
 }
 
 /* ---------- les modules de la page Jarvis, lus en arrière-plan et gardés en mémoire ----------
@@ -1013,7 +1037,7 @@ const server = http.createServer(async (req, res) => {
   cors(req, res);
   if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
   try {
-    if (p === '/api/health') return json(res, 200, {ok: true, version: VERSION, paired: S.tokens.length > 0});
+    if (p === '/api/health') return json(res, 200, {ok: true, version: VERSION, commit, paired: S.tokens.length > 0});
     if (p === '/api/pair' && req.method === 'POST') { const b = await readBody(req); const r = pair(b.code, b.device); return json(res, r.status, r.body); }
     /* retour de Google après « Connecter Google » : protégé par l'état à usage unique, pas par le jeton de l'appareil */
     /* Raccourcis de l'iPhone : leur propre clé (POST /api/raccourci/cle depuis Réglages), qui n'ouvre que cette adresse ; réponse en texte, à lire à voix haute */
@@ -1060,6 +1084,7 @@ const server = http.createServer(async (req, res) => {
       }
       if (p === '/api/status') { const cs = await claudeStatus(); if (cs.loggedIn && (!MCP.at || now() - MCP.at > 600000)) await mcpList(); return json(res, 200, {version: VERSION, commit, claude: cs, connectors: connSummary(), google: (({configured, linked, account}) => ({configured, linked, account}))(GG.status('')), grokPauseUntil: await grokPauseMs().then((v) => (v ? new Date(v).toISOString() : '')).catch(() => S.config.grokPauseUntil), usage: S.usage, tache: {running: TACHE.running, last: TACHE.last}, push: {count: S.push.subs.length, last: S.push.last || null, prefs: S.push.prefs}, session: !!S.session, timing: S.lastTiming || null, tts: ttsReady(), voiceInstall: VOICE_INSTALL.state, ecoute: ECOUTE.ready(), ecouteInstall: ECOUTE_INSTALL.state}); }
       if (p === '/api/update' && req.method === 'POST') return json(res, 200, await update());
+      if (p === '/api/maj') return json(res, 200, await majVerifie(url.searchParams.get('force') === '1'));   /* 0.27.0 : une version plus récente ? */
       /* notifications : clé publique, abonnement de cet appareil, essai, préférences, vérification immédiate */
       if (p === '/api/push') return json(res, 200, PUSH.status());
       if (p === '/api/sauvegarde') return json(res, 200, {...SAV.status(), changements: SAV.diff()});

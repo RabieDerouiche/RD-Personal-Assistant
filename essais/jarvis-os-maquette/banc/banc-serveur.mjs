@@ -7,7 +7,7 @@ const HERE = path.dirname(fileURLToPath(import.meta.url)), SRV = path.join(HERE,
 const {startFakeGoogle} = await import(SRV + '/tests/fake-google.mjs'); const FG = await startFakeGoogle();
 FG.sheet['Canal!A1:H3000'] = [['Date', 'De', 'Pour', 'Type', 'Message', 'Statut', 'Réponse', 'Objet'], ['15/11/2026', 'Rabie', 'Iris', 'Info', 'Le syndic a appelé.', 'Fait', 'Noté.', '']];
 const DATA = fs.mkdtempSync(path.join(os.tmpdir(), 'jarvis-e2e-')), PORT = 19000 + Math.floor(Math.random() * 900), BASE = 'http://127.0.0.1:' + PORT;
-const env = {...process.env, JARVIS_PUSH_ALLOW_HTTP: '1', JARVIS_NOTIFY_TICK_MS: '3600000', JARVIS_SANTE_TICK_MS: '3600000', JARVIS_GOOGLE_FAKE: FG.url, PORT: String(PORT), JARVIS_DATA: DATA, CLAUDE_BIN: SRV + '/tests/fake-claude.mjs', JARVIS_TTS_HELPER: SRV + '/tests/fake-tts.mjs', JARVIS_STT_HELPER: SRV + '/tests/fake-stt.mjs', JARVIS_VOICE_MODEL: path.join(DATA, 'fausse-voix.onnx')};
+const env = {...process.env, JARVIS_PUSH_ALLOW_HTTP: '1', JARVIS_NOTIFY_TICK_MS: '3600000', JARVIS_SANTE_TICK_MS: '3600000', JARVIS_GOOGLE_FAKE: FG.url, PORT: String(PORT), JARVIS_DATA: DATA, CLAUDE_BIN: SRV + '/tests/fake-claude.mjs', JARVIS_TTS_HELPER: SRV + '/tests/fake-tts.mjs', JARVIS_STT_HELPER: SRV + '/tests/fake-stt.mjs', JARVIS_VOICE_MODEL: path.join(DATA, 'fausse-voix.onnx'), JARVIS_MAJ: '0'};   /* 0.27.0 : pas de question de mise à jour pendant le banc (elle a son essai à part, sur un dépôt de test) */
 fs.mkdirSync(DATA, {recursive: true}); fs.writeFileSync(path.join(DATA, 'fausse-voix.onnx'), 'faux');   /* 0.25.0 : la voix Pierre « installée » (fausse), pour la lecture des réponses */
 const code = execFileSync(process.execPath, [SRV + '/server.mjs', 'pair'], {env}).toString().match(/: ([A-Z0-9]{4}-[A-Z0-9]{4})/)[1];
 const srv = spawn(process.execPath, [SRV + '/server.mjs'], {env, stdio: ['ignore', 'pipe', 'pipe']}); await new Promise((r) => srv.stdout.once('data', r));
@@ -239,6 +239,46 @@ try {
     const l = await p.evaluate(() => window.JarvisServeur.idees());
     ok('idées (serveur) : gardée sur le serveur, retrouvée dans « Mes recherches d\'idées »', l && l.recherches.some((x) => x.idee === 'maison de poupée' && x.statut === 'pret' && x.max === 60 && x.n === 4));
     await p.screenshot({path: SH + 'idees-serveur.png'}); }
+  /* 0.27.0 : mise à jour proposée au lancement (comme Panier). Second serveur sur un dépôt git de test en retard d'une version, relancé après
+     son arrêt comme par systemd ; deux « appareils » : celui qui accepte, et un autre resté sur l'ancienne version. */
+  { const R = fs.mkdtempSync(path.join(os.tmpdir(), 'jarvis-maj-e2e-')), ORI = path.join(R, 'origine.git'), SRC = path.join(R, 'source'), CLO = path.join(R, 'serveur'), D2 = path.join(R, 'data');
+    const GENV = {...process.env, GIT_AUTHOR_NAME: 'banc', GIT_AUTHOR_EMAIL: 'banc@exemple.invalid', GIT_COMMITTER_NAME: 'banc', GIT_COMMITTER_EMAIL: 'banc@exemple.invalid', GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_SYSTEM: '/dev/null'};
+    const g = (cwd, ...a) => execFileSync('git', a, {cwd, stdio: ['ignore', 'pipe', 'pipe'], env: GENV}).toString().trim();
+    const ecris = (f, t) => { fs.mkdirSync(path.dirname(path.join(SRC, f)), {recursive: true}); fs.writeFileSync(path.join(SRC, f), t); };
+    const pousse = (m) => { g(SRC, 'add', '-A'); g(SRC, 'commit', '-q', '-m', m); g(SRC, 'push', '-q', 'origin', 'main'); };
+    fs.mkdirSync(SRC, {recursive: true}); g(R, 'init', '-q', '--bare', '-b', 'main', ORI); g(SRC, 'init', '-q', '-b', 'main'); g(SRC, 'remote', 'add', 'origin', ORI);
+    ecris('jarvis-os/server/server.mjs', "const VERSION = '1.0.0';\n"); pousse('départ'); g(R, 'clone', '-q', ORI, CLO);
+    ecris('jarvis-os/server/server.mjs', "const VERSION = '9.9.9';\n"); pousse('nouvelle version');
+    const P2 = PORT + 1001, B2 = 'http://127.0.0.1:' + P2, env2 = {...env, ...GENV, PORT: String(P2), JARVIS_DATA: D2, JARVIS_REPO: CLO, JARVIS_MAJ: '1', JARVIS_OS_DIR: path.join(HERE, '..')};   /* le dépôt de test ne sert qu'à git : l'app servie reste celle du banc */
+    const code2 = execFileSync(process.execPath, [SRV + '/server.mjs', 'pair'], {env: env2}).toString().match(/: ([A-Z0-9]{4}-[A-Z0-9]{4})/)[1];
+    let s2, fini = false, relances = 0;
+    const lance2 = () => new Promise((z) => { s2 = spawn(process.execPath, [SRV + '/server.mjs'], {env: env2, stdio: ['ignore', 'pipe', 'pipe']}); s2.stdout.once('data', z); s2.once('exit', () => { if (!fini) { relances++; setTimeout(lance2, 1500); } }); });   /* « systemd » : relancé 1,5 s après son arrêt */
+    await lance2();
+    try {
+    const tok2 = (await (await fetch(B2 + '/api/pair', {method: 'POST', headers: {'content-type': 'application/json'}, body: JSON.stringify({code: code2, device: 'iPhone maj'})})).json()).token;
+    const ouvre = async () => { const c = await b.newContext({...devices['iPhone 15 Pro Max']}); await c.addInitScript((t) => { try { localStorage.setItem('jarvis.settings', JSON.stringify({serverToken: t})); } catch (e) { /* rien */ } }, tok2); const q = await c.newPage(); q.on('pageerror', (e) => errs.push('maj : ' + e.message)); await q.goto(B2 + '/?serveur#accueil'); return q; };
+    const vue = (q) => q.evaluate(() => { const m = document.getElementById('maj'); return {ouvert: !!m && !m.hidden, etape: m && m.querySelector('.maj-card') ? m.querySelector('.maj-card').dataset.etape : '', txt: m ? m.textContent : ''}; });
+    const autre = await ouvre(); await autre.waitForTimeout(3200); await autre.tap('#maj-non'); await autre.waitForTimeout(300); await autre.evaluate(() => { window.__marque = 'ancienne page'; });
+    const q = await ouvre(); await q.waitForTimeout(3200); let v = await vue(q);
+    ok('mise à jour : à l\'ouverture, l\'app annonce la nouvelle version (« Plus tard » ou « Mettre à jour »)', v.ouvert && v.etape === 'question' && /Nouvelle version disponible/.test(v.txt) && /JARVIS 9\.9\.9 est prêt/.test(v.txt) && /Plus tard/.test(v.txt) && /Mettre à jour/.test(v.txt), JSON.stringify(v));
+    await q.screenshot({path: SH + 'maj-question.png'});
+    await q.tap('#maj-non'); await q.waitForTimeout(300); await q.tap('.fav-row .tab[data-tab="agenda"]'); await q.waitForTimeout(2500); v = await vue(q);
+    ok('mise à jour : « Plus tard » vaut pour l\'ouverture en cours (une seule vérification, au lancement)', !v.ouvert && relances === 0, JSON.stringify(v));
+    await q.reload(); await q.waitForTimeout(3200); v = await vue(q); const avant = await (await fetch(B2 + '/api/health')).json();
+    await q.evaluate(() => { window.__marque = 'avant la mise à jour'; }); await q.tap('#maj-oui'); await q.waitForTimeout(600); const cours = await vue(q);
+    let recharge = false; for (let i = 0; i < 40 && !recharge; i++) { await q.waitForTimeout(500); recharge = await q.evaluate(() => !window.__marque && !!window.JarvisMaj).catch(() => false); }
+    await q.waitForTimeout(2500); const apres = await (await fetch(B2 + '/api/health')).json(), fin = await q.evaluate(() => ({maj: !!(document.getElementById('maj') && !document.getElementById('maj').hidden), toast: [...document.querySelectorAll('#toasts *')].map((x) => x.textContent).join(' ')}));
+    ok('mise à jour : la question revient à l\'ouverture suivante ; sur oui, le serveur redémarre une fois, l\'app attend le nouveau code puis se recharge seule, sans reposer la question', v.ouvert && cours.etape === 'cours' && recharge && relances === 1 && apres.commit && apres.commit !== avant.commit && !fin.maj && /JARVIS est à jour/.test(fin.toast), JSON.stringify([v.etape, cours, recharge, relances, avant.commit, apres.commit, fin]));
+    await q.screenshot({path: SH + 'maj-faite.png'});
+    /* l'autre appareil, resté sur l'ancienne version : au retour dans l'app, il se recharge seul, une fois, sans rien redémarrer */
+    await autre.evaluate(() => document.dispatchEvent(new Event('visibilitychange'))); let r2 = false; for (let i = 0; i < 16 && !r2; i++) { await autre.waitForTimeout(500); r2 = await autre.evaluate(() => !window.__marque && !!window.JarvisMaj).catch(() => false); }
+    await autre.waitForTimeout(2500); const a2 = await vue(autre);
+    ok('mise à jour : l\'autre appareil, resté sur l\'ancienne version, se recharge seul à son retour dans l\'app, sans redémarrer le serveur', r2 && relances === 1 && !a2.ouvert, JSON.stringify([r2, relances, a2]));
+    /* Réglages : le bouton force la vérification */
+    await q.goto(B2 + '/?serveur#reglages'); await q.waitForTimeout(2500); await q.tap('#set-maj'); await q.waitForTimeout(1500);
+    ok('mise à jour : Réglages, « Mettre à jour le serveur » force la vérification et dit que JARVIS est à jour', await q.evaluate(() => /JARVIS est à jour \(version /.test((document.querySelector('#set-maj + .set-msg') || {}).textContent || '')), await q.evaluate(() => [...document.querySelectorAll('.set-msg')].map((x) => x.textContent).join(' | ')));
+    await q.context().close(); await autre.context().close();
+    } finally { fini = true; try { s2.kill(); } catch (e) { /* rien */ } fs.rmSync(R, {recursive: true, force: true}); } }
 } catch (e) { ok('exception', false, e.stack); }
 ok('aucune erreur de page', !errs.length, errs.join(' | '));
 console.log(out.join('\n')); const bad = out.filter((l) => l.startsWith('ÉCHEC')).length; console.log(bad ? bad + ' échec(s)' : 'Tout passe (' + out.length + ' vérifications).');

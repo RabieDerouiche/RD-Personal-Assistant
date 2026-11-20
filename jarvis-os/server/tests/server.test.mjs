@@ -498,6 +498,33 @@ try {
   const st0 = fs.statSync(path.join(DATA, 'state.json')); ok('fichier d\'état lisible par le seul service', (st0.mode & 0o077) === 0, (st0.mode & 0o777).toString(8));
   const raw = fs.readFileSync(path.join(DATA, 'state.json'), 'utf8'); ok('jeton jamais stocké en clair', !raw.includes(tok));
   r = await fetch(BASE + '/../server.mjs'); ok('fichiers du serveur non servis', r.status !== 200 || !(await r.text()).includes('PAID_ENV'));
+  /* 0.27.0 : mise à jour proposée au lancement (comme Panier). Un vrai dépôt git de test (origine, copie du serveur) et un second serveur,
+     relancé après son arrêt comme le fait systemd. Seuls les fichiers de l'app et du serveur comptent ; la documentation seule ne propose rien. */
+  { const R = fs.mkdtempSync(path.join(os.tmpdir(), 'jarvis-maj-')), ORI = path.join(R, 'origine.git'), SRC = path.join(R, 'source'), CLO = path.join(R, 'serveur'), D2 = path.join(R, 'data');
+    const GENV = {...process.env, GIT_AUTHOR_NAME: 'banc', GIT_AUTHOR_EMAIL: 'banc@exemple.invalid', GIT_COMMITTER_NAME: 'banc', GIT_COMMITTER_EMAIL: 'banc@exemple.invalid', GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_SYSTEM: '/dev/null'};
+    const g = (cwd, ...a) => execFileSync('git', a, {cwd, stdio: ['ignore', 'pipe', 'pipe'], env: GENV}).toString().trim();
+    const ecris = (f, t) => { fs.mkdirSync(path.dirname(path.join(SRC, f)), {recursive: true}); fs.writeFileSync(path.join(SRC, f), t); };
+    const pousse = (m) => { g(SRC, 'add', '-A'); g(SRC, 'commit', '-q', '-m', m); g(SRC, 'push', '-q', 'origin', 'main'); };
+    fs.mkdirSync(SRC, {recursive: true}); g(R, 'init', '-q', '--bare', '-b', 'main', ORI); g(SRC, 'init', '-q', '-b', 'main'); g(SRC, 'remote', 'add', 'origin', ORI);
+    ecris('jarvis-os/server/server.mjs', "const VERSION = '1.0.0';\n"); ecris('docs/note.md', 'un\n'); pousse('départ'); g(R, 'clone', '-q', ORI, CLO);
+    const P2 = PORT + 1001, B2 = 'http://127.0.0.1:' + P2, env2 = {...env, ...GENV, PORT: String(P2), JARVIS_DATA: D2, JARVIS_REPO: CLO};
+    const code2 = execFileSync(process.execPath, [path.join(HERE, '..', 'server.mjs'), 'pair'], {env: env2}).toString().match(/: ([A-Z0-9]{4}-[A-Z0-9]{4})/)[1];
+    let s2, sorti; const lance2 = async () => { s2 = spawn(process.execPath, [path.join(HERE, '..', 'server.mjs')], {env: env2, stdio: ['ignore', 'pipe', 'pipe']}); sorti = new Promise((z) => s2.once('exit', (c) => z(c))); await new Promise((z) => s2.stdout.once('data', z)); };
+    await lance2();
+    const c2 = async (u, o = {}) => { const x = await fetch(B2 + u, {...o, headers: {'content-type': 'application/json', ...(o.headers || {})}}); return {status: x.status, body: await x.json().catch(() => null)}; };
+    const A2 = {authorization: 'Bearer ' + (await c2('/api/pair', {method: 'POST', body: JSON.stringify({code: code2, device: 'iPhone maj'})})).body.token};
+    const h0 = (await c2('/api/health')).body; let m = await c2('/api/maj', {headers: A2});
+    ok('mise à jour : l\'empreinte du code est donnée dès le démarrage ; rien de plus récent, rien de proposé', h0.commit === g(CLO, 'rev-parse', '--short', 'HEAD') && m.status === 200 && m.body.dispo === false && m.body.actuelle === h0.version && (await c2('/api/maj')).status === 401, JSON.stringify([h0, m.body]));
+    ecris('docs/note.md', 'deux\n'); pousse('documentation seule'); m = await c2('/api/maj?force=1', {headers: A2});
+    ok('mise à jour : une fusion qui ne touche que la documentation ne propose rien', m.body.dispo === false && !m.body.erreur, JSON.stringify(m.body));
+    ecris('jarvis-os/server/server.mjs', "const VERSION = '9.9.9';\n"); ecris('essais/jarvis-os-maquette/index.html', 'neuf\n'); pousse('nouvelle version');
+    const m1 = await c2('/api/maj', {headers: A2}), m2 = await c2('/api/maj?force=1', {headers: A2});
+    ok('mise à jour : le dépôt n\'est interrogé qu\'une fois toutes les dix minutes (sauf demande forcée) ; la nouvelle version est annoncée avec son numéro', m1.body.dispo === false && m2.body.dispo === true && m2.body.version === '9.9.9' && m2.body.nouveautes === 2, JSON.stringify([m1.body, m2.body]));
+    const u1 = await c2('/api/update', {method: 'POST', headers: A2}), fin = await Promise.race([sorti, new Promise((z) => setTimeout(() => z('pas arrêté'), 5000))]);
+    ok('mise à jour : le serveur tire le code puis s\'arrête proprement pour être relancé (un seul redémarrage)', u1.body.ok && u1.body.changed === true && fin === 0, JSON.stringify([u1.body, fin]));
+    await lance2(); const h1 = (await c2('/api/health')).body, m3 = await c2('/api/maj?force=1', {headers: A2}), u2 = await c2('/api/update', {method: 'POST', headers: A2});
+    ok('mise à jour : relancé, le serveur répond avec la nouvelle empreinte, garde l\'appareil relié et ne propose plus rien ; un second appareil ne redémarre rien', h1.commit && h1.commit !== h0.commit && h1.commit === g(SRC, 'rev-parse', '--short', 'HEAD') && h1.paired === true && m3.status === 200 && m3.body.dispo === false && u2.body.ok && u2.body.changed === false, JSON.stringify([h0.commit, h1, m3.body, u2.body]));
+    s2.kill(); fs.rmSync(R, {recursive: true, force: true}); }
 } catch (e) { ok('exception', false, e.stack); }
 srv.kill(); FG.close(); fs.rmSync(DATA, {recursive: true, force: true});
 console.log(results.join('\n')); console.log(fails ? fails + ' échec(s)' : 'Tout passe (' + results.length + ' vérifications).');
