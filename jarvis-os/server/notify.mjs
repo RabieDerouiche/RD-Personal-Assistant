@@ -3,8 +3,9 @@
    2. les rappels du matin (onglet Échéances : aujourd'hui, demain, dans 7 jours ; onglet Papiers : fin de validité à 90, 30, 7 jours et le jour même) ;
    3. Grok est reparti après une pause : combien de lignes attendent les bots (la sonnette reste un geste de l'app, avec ses 5 s pour annuler).
    Rien n'est lu s'il n'y a aucun appareil abonné ou si Google n'est pas relié. Lecture seule de Pilotage : le serveur n'écrit rien ici. */
+import {BOT_IDS} from './bots.mjs';
 const low = (s) => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
-const BOTS = ['iris', 'chronos', 'kairos', 'ulysse', 'athena', 'argus'];
+const BOTS = BOT_IDS;
 const OPEN = (st) => !['fait', 'annule', 'annulee'].includes(low(st));
 
 /* date et heure de Paris, quel que soit le fuseau du serveur */

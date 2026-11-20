@@ -78,6 +78,33 @@ srv.listen(0, async () => {
       await q.tap('#chat .dict-no'); await q.waitForTimeout(800); await q.evaluate(() => window.__say.push('phrase dite après « Annuler » : elle ne doit pas arriver')); await q.waitForTimeout(700);
       ok('dictée : « Annuler » referme le micro sans rien écrire', await q.evaluate(() => !document.querySelector('#chat .dict-strip') && !document.getElementById('dict-btn').className.includes('is-on') && window.__ear.includes('abort') && document.getElementById('chat-in').value === ''), JSON.stringify(await q.evaluate(() => [document.getElementById('chat-in').value, window.__ear])));
       await q.context().close(); }
+    /* 0.26.0 : Plutus (bot ajouté le 20/11/2026) et les bots à venir */
+    { const q = await page('#equipe');
+      const t0 = await q.evaluate(() => [...document.querySelectorAll('.team .mate')].map((m) => ({n: m.querySelector('b').textContent, t: m.querySelector('.mate-t').textContent, p: m.querySelector('.pill').textContent, neuf: m.classList.contains('is-new')})));
+      const pl = t0.find((x) => x.n === 'Plutus');
+      ok('Plutus : dans l\'équipe ; sans ligne dans Pilotage, sa carte le dit (« Pas encore dans Pilotage »), pas celles des autres', !!pl && pl.t === 'Générateur de revenus' && /Pas encore dans Pilotage/.test(pl.p) && pl.neuf && t0.filter((x) => x.neuf).length === 1, JSON.stringify(t0));
+      await q.evaluate(() => [...document.querySelectorAll('.team .mate')].find((m) => m.querySelector('b').textContent === 'Plutus').click()); await q.waitForTimeout(900);
+      const pg = await q.evaluate(() => { const n = document.getElementById('bot-new'); return {hero: document.querySelector('.hero-id').textContent, ex: /ex-Plutus/.test(document.querySelector('.hero-id').textContent), txt: n ? n.textContent : '', btn: n ? [...n.querySelectorAll('button')].map((b) => b.textContent) : []}; });
+      ok('Plutus : sa page explique pourquoi rien ne remonte et donne la phrase à coller dans son chat (État, Routines, Sonnette, « Via chat », Journal, aucune donnée bancaire)', /dieu de la richesse/.test(pg.hero) && !pg.ex && ['onglet État', 'onglet Routines', 'Sonnette Plutus', '« Via chat »', 'onglet Journal', 'Aucune donnée bancaire'].every((k) => pg.txt.includes(k)) && pg.btn.some((b) => /Copier la phrase/.test(b)), JSON.stringify(pg).slice(0, 300));
+      await q.screenshot({path: path.join(SH, 'plutus-a-brancher.png')});
+      await q.context().close(); }
+    { const q = await pageWith({newBots: true}, '#equipe');
+      const t1 = await q.evaluate(() => [...document.querySelectorAll('.team .mate')].map((m) => ({n: m.querySelector('b').textContent, t: m.querySelector('.mate-t').textContent, p: m.querySelector('.pill').textContent, neuf: m.classList.contains('is-new')})));
+      const pl = t1.find((x) => x.n === 'Plutus'), mi = t1.find((x) => x.n === 'Midas'), ir = t1.find((x) => x.n === 'Iris');
+      ok('nouveaux bots : Plutus inscrit dans Pilotage n\'a plus l\'avis et sa question lui est attribuée (pas à Iris)', !!pl && !pl.neuf && /Te demande/.test(pl.p) && /Te demande · 8/.test(ir.p), JSON.stringify(t1));
+      ok('nouveaux bots : un bot inconnu de la page mais présent dans État et Routines (« Midas ») rejoint l\'équipe seul ; un nom vu seulement dans le Canal (« Pegasus ») non', t1.length === 8 && !!mi && mi.t === 'Nouveau bot' && !mi.neuf && !t1.some((x) => x.n === 'Pegasus'), t1.map((x) => x.n).join(', '));
+      await q.evaluate(() => [...document.querySelectorAll('.team .mate')].find((m) => m.querySelector('b').textContent === 'Plutus').click()); await q.waitForTimeout(900);
+      const pg = await q.evaluate(() => ({neuf: !!document.getElementById('bot-new'), txt: document.getElementById('dir').textContent.replace(/\s+/g, ' ')}));
+      ok('Plutus inscrit : sa page montre son dernier passage, ses routines et son fil du Canal', !pg.neuf && /Dernier passage\d{2}\/\d{2} · 08h05/.test(pg.txt) && /Point du matin · Lun-ven 8h/.test(pg.txt) && /Sonnette Plutus/.test(pg.txt) && /Piste freelance/.test(pg.txt), pg.txt.slice(0, 300));
+      await q.screenshot({path: path.join(SH, 'plutus-inscrit.png')});
+      await q.goto(base + '#demandes'); await q.waitForTimeout(1500);
+      const pm = await q.evaluate(() => [...document.querySelectorAll('.pm-card')].filter((c) => /freelance/i.test(c.textContent)).map((c) => c.querySelector('.pm-who').textContent));
+      ok('Plutus : sa question arrive dans « Pour moi » sous son nom', pm.length === 1 && /^Plutus/.test(pm[0]), JSON.stringify(pm));
+      await q.tap('#gs-btn'); await q.waitForTimeout(300); await q.fill('#gs-in', 'revenus'); await q.waitForTimeout(300);
+      ok('Plutus : la recherche trouve ce qu\'il a répondu', await q.evaluate(() => [...document.querySelectorAll('#gsearch .gs-row')].some((r) => /Plutus/.test(r.textContent))));
+      await q.tap('#gsearch .gs-x'); await q.tap('.talk-slot .jv-btn'); await q.waitForTimeout(800); await q.fill('#chat-in', 'Où en est Plutus ?'); await q.tap('#chat .chat-row .btn.main'); await q.waitForTimeout(1500);
+      ok('Plutus : Claude reçoit la vraie liste de l\'équipe (Plutus et Midas compris)', await q.evaluate(() => { const s = window.__samples[window.__samples.length - 1]; return /Argus, Plutus, Midas\)/.test(s.first); }), await q.evaluate(() => (window.__samples[window.__samples.length - 1] || {}).first));
+      await q.context().close(); }
     /* 0.25.0 : la recherche partout (loupe de l'en-tête), dans ce que la page a déjà lu */
     { const q = await page('#accueil');
       await q.tap('#gs-btn'); await q.waitForTimeout(300); await q.fill('#gs-in', 'notaire'); await q.waitForTimeout(300);
@@ -230,7 +257,7 @@ srv.listen(0, async () => {
     ok('équipe : « En ce moment », fil en direct (maintenant, bientôt, plus tôt = Journal)', await p.evaluate(() => { const f = document.querySelector('.lf'); const hs = f ? [...f.querySelectorAll('.lf-h')].map((x) => x.textContent) : []; return !!f && hs.join(',') === 'Maintenant,Bientôt,Plus tôt' && /En direct/.test(f.textContent) && f.querySelectorAll('.lf-r.is-past').length >= 3 && f.querySelectorAll('.lf-r.is-wait').length >= 1 && ![...document.querySelectorAll('.panel-h h2')].some((x) => /^Journal/.test(x.textContent)); }));
     ok('équipe : passages des 24 heures avec « dans … »', await p.evaluate(() => { const r = [...document.querySelectorAll('.lf-r.is-soon')]; return r.length >= 1 && r.every((x) => /dans |maintenant/.test(x.textContent)); }));
     /* équipe harmonisée (16/11/2026) */
-    ok('équipe : une seule grille de 6 cartes identiques, plus de liste des bots en double', await p.evaluate(() => { const m = [...document.querySelectorAll('.team .mate')]; return m.length === 6 && m.every((x) => x.querySelector('.mate-log span') && /^Prochain · /.test(x.querySelector('.mate-next small').textContent)) && !document.querySelector('.units'); }));
+    ok('équipe : une seule grille de 7 cartes identiques (Plutus compris), plus de liste des bots en double', await p.evaluate(() => { const m = [...document.querySelectorAll('.team .mate')]; return m.length === 7 && m.every((x) => x.querySelector('.mate-log span') && /^Prochain · /.test(x.querySelector('.mate-next small').textContent)) && !document.querySelector('.units'); }));
     ok('équipe : texte en Exo 2, plus de police machine à écrire', await p.evaluate(() => /Exo 2/.test(getComputedStyle(document.querySelector('.mate-log')).fontFamily) && /Oxanium/.test(getComputedStyle(document.querySelector('.mate b')).fontFamily)));
     ok('équipe : l\'ambre ne remplit plus les cartes', await p.evaluate(() => { const d = document.querySelector('.mate[data-mode="demande"]'); return !!d && !/251, 191, 36, 0\.12/.test(getComputedStyle(d).backgroundImage); }));
     ok('équipe : « Te demande » une seule fois par carte', await p.evaluate(() => [...document.querySelectorAll('.mate[data-mode="demande"]')].every((x) => !/^Te demande/.test(x.querySelector('.mate-log span').textContent))));

@@ -7,12 +7,13 @@ import {spawn} from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import {BOT_NOMS} from './bots.mjs';
 
 export const nrm = (t) => String(t ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[’`]/g, "'");
 
 /* ---------- 1. l'écoute ---------- */
 /* mots que Whisper doit reconnaître (noms des bots, mots de JARVIS) : donnés en amorce, ils corrigent l'orthographe et l'écoute */
-export const VOCAB = 'JARVIS, Claude, Iris, Chronos, Kairos, Ulysse, Athéna, Argus, Grok, Pilotage, Canal, CRA, agenda, météo, rendez-vous, échéance, il fait frais.';
+export const VOCAB = 'JARVIS, Claude, Iris, Chronos, Kairos, Ulysse, Athéna, Argus, Plutus, Grok, Pilotage, Canal, CRA, agenda, météo, rendez-vous, échéance, il fait frais.';
 /* phrases que Whisper invente sur un silence ou un bruit (connues en français) : jamais envoyées */
 const HALLU = /amara\.org|sous-titr|merci d'avoir regard|abonnez-vous|n'oubliez pas de vous abonner|merci de votre attention|^\W*(merci|bonjour|au revoir)?\W*$/i;
 export const halluc = (t) => HALLU.test(String(t || '').trim());
@@ -64,7 +65,7 @@ export function createEcoute({dir, py, helper, model, fakeHelper, log = () => {}
 export function wavOk(b) { return Buffer.isBuffer(b) && b.length > 44 && b.length < 3e6 && b.toString('ascii', 0, 4) === 'RIFF' && b.toString('ascii', 8, 12) === 'WAVE'; }
 
 /* ---------- 2. les réponses instantanées ---------- */
-const BOTS = {iris: 'Iris', chronos: 'Chronos', kairos: 'Kairos', ulysse: 'Ulysse', athena: 'Athéna', argus: 'Argus'};
+const BOTS = BOT_NOMS;
 const JOURS = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
 /* le jour visé par la phrase : 0 aujourd'hui, 1 demain… ; soir ; week-end (samedi et dimanche) */
 export function quand(t, dow) {

@@ -176,6 +176,19 @@
     [stamp(at(-1, 0, 15)), 'Kairos', 'ETAT', 'Relevé', 'Jeu Gamma relevé.'],
     [stamp(SCEN.active ? lastSign : at(-1, 0, 20)), 'Argus', 'ETAT', 'Skill', 'À jour.']
   ];
+  /* 0.26.0 : scénario « newBots » — Plutus s'est inscrit dans Pilotage, et un bot que la page ne connaît pas (« Midas ») y a aussi ses lignes ;
+     un nom qui n'est que dans le Canal (« Pegasus », bot supprimé) ne doit pas devenir un bot */
+  if (SCEN.newBots) {
+    G['État'].push(['Plutus', stamp(at(0, 8, 5)), 'Trois pistes de revenus étudiées', nextP(1, 8, 0, 'Point du matin')], ['Midas', stamp(at(-1, 21, 10)), 'Veille des appels d’offres', nextP(2, 21, 0, 'Veille')]);
+    G['Routines'].push(['Plutus', 'Point du matin', 'Horaire', 'Lun-ven 8h', 'x', 'x', 'En place'], ['Plutus', 'Sonnette Plutus', 'Mail', "À l'arrivée", 'x', 'x', 'En place'], ['Midas', 'Veille', 'Horaire', 'Mar 21h', 'x', 'x', 'En place']);
+    G['Canal'].push([fr(D(0)), 'Rabie', 'Plutus', 'Via chat', 'Cherche trois idées de revenus complémentaires compatibles avec mon emploi.', 'Fait', 'Trois pistes notées : le détail est dans mon chat.', ''],
+      [fr(D(0)), 'Plutus', 'Rabie', 'Piste freelance', 'Oui/Non : Je prépare une offre de mission courte en .NET ? | Pourquoi : la piste la plus rapide à tester | Si oui : brouillon prêt demain | Si non : je passe à la suivante', 'À faire', '', ''],
+      [fr(D(-1)), 'Rabie', 'Midas', 'Via chat', 'Surveille les appels d’offres de ma région.', 'En cours', 'Veille lancée.', ''],
+      [fr(D(-9)), 'Claude', 'Pegasus', 'Premier export', 'Vieille ligne d’un bot supprimé.', 'Annulé', '', '']);
+    G['Journal'].push([stamp(at(0, 8, 5)), 'Plutus', 'ETAT', 'Pistes de revenus', 'Trois pistes étudiées, une question posée dans le Canal.'], [stamp(at(-1, 21, 10)), 'Midas', 'ETAT', 'Veille', 'Deux appels d’offres repérés.']);
+    G['Faits'].push(['Assistants', 'Sonnette Plutus', 'bots+plutus@mail.grokbot.com', '', '']);
+    G['À toi'].push([fr(D(0)), 'Plutus', 'Piste freelance', 'Oui/Non : Je prépare une offre de mission courte en .NET ? | Pourquoi : la piste la plus rapide à tester | Si oui : brouillon prêt demain | Si non : je passe à la suivante']);
+  }
   const wk = (() => { const d = new Date().getDay(); return d === 0 ? [-1, 0] : d === 6 ? [0, 1] : [6 - d, 7 - d]; })();
   G['Sorties'] = [
     ['Sortie', 'Où', 'Début', 'Fin', 'Prix total TTC (2 adultes et Léa)', 'Trajet', 'Âge conseillé', 'Lien', 'Statut', 'Proposée le', 'Bot', 'Remarque'],
