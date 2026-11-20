@@ -66,6 +66,13 @@
   .gs-go { flex: 0 0 auto; color: var(--muted); }
   .gs-more { justify-self: start; margin-left: 2px; }
   .gs-pap { border-style: dashed; }
+  /* 0.29.0 : recherche d'idées, « presque » et pistes */
+  .idee-card.is-presque { border-color: rgba(var(--warn), .35) !important; }
+  .idee-ecart { justify-self: start; display: inline-block; margin-bottom: 6px; padding: 3px 10px; border-radius: 999px; font: 600 12px var(--sans); color: #fde68a; background: rgba(var(--warn), .14); border: 1px solid rgba(var(--warn), .4); }
+  .idee-vide { margin: 0; font-size: 14.5px; line-height: 1.5; }
+  .idee-pistes { display: grid; gap: 8px; }
+  .idee-piste { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; padding: 12px 14px; border-radius: 16px; border: 1px solid rgba(56, 189, 248, .45); background: rgba(8, 30, 70, .5); color: var(--fg); font: inherit; }
+  .idee-piste .ic { flex: 0 0 auto; color: #7dd3fc; } .idee-pt { flex: 1; min-width: 0; display: grid; gap: 2px; } .idee-pt b { font: 600 14.5px var(--sans); line-height: 1.35; } .idee-pt small { font-size: 12.5px; color: var(--muted); }
   /* 0.28.0 : un événement sur plusieurs jours */
   .ev-fin-note { margin: -4px 0 0; font-size: 12.5px; min-height: 0; } .ev-fin-note:empty { display: none; } .ev-fin-note.is-bad { color: #fca5a5; }
   .ev-form .inp:disabled { opacity: .45; }
@@ -8198,7 +8205,7 @@ void main(){
 
   /* ================= JARVIS OS 0.24.0 (19/11/2026, demande du propriétaire : « chercher un produit à partir de l'idée seulement, ex. maison de poupée ;
      l'âge si c'est utile (fille de 3 ans), le budget max et min si je veux, et le nombre de propositions, 20 au plus ») =================
-     Claude cherche sur le serveur, avec le web (2 à 6 minutes, gratuit : ton abonnement) ; le serveur relit la page de chaque produit
+     Claude cherche sur le serveur, avec le web (5 à 15 minutes depuis 0.29.0, gratuit : ton abonnement) ; le serveur relit la page de chaque produit
      (prix affiché aujourd'hui) et Claude choisit les photos en les regardant. Une notification dit quand c'est prêt ; 15 recherches gardées. */
   const IDEES = {list: null, loading: false, poll: 0, sig: '', tri: 'best', form: {idee: '', pour: '', min: '', max: '', n: '6'}, busy: false};
   const ideeAPI = () => (SRV_OS && window.JarvisServeur && window.JarvisServeur.idees ? window.JarvisServeur : null);
@@ -8209,7 +8216,11 @@ void main(){
   const budTxt = (x) => (x.min != null && x.max != null ? x.min + ' à ' + x.max + ' €' : x.max != null ? 'jusqu’à ' + x.max + ' €' : x.min != null ? 'dès ' + x.min + ' €' : 'sans budget');
   const ideeSub = (x) => [x.pour, budTxt(x), x.n + ' proposition' + (x.n > 1 ? 's' : '')].filter(Boolean).join(' · ');
   const ideeNb = (x) => ((x.data && x.data.propositions) || []).length;
-  const ideeEtat = (x) => (x.statut === 'en_cours' ? 'Claude cherche… (lancée ' + depuis(x.at) + ')' : x.statut === 'photos' ? ideeNb(x) + ' trouvées · photos en cours' : x.statut === 'echec' ? 'Pas abouti : ' + (x.erreur || 'erreur') : ideeNb(x) + ' proposition' + (ideeNb(x) > 1 ? 's' : '') + ' · ' + depuis(x.at));
+  /* 0.29.0 : ce qui est « presque » (hors budget de peu, ou un critère absent) compte aussi : une recherche n'est plus « vide » quand Claude a trouvé des produits proches */
+  const ideePresque = (x) => ((x.data && x.data.presque) || []).length;
+  const ideeEtat = (x) => { const n = ideeNb(x), m = ideePresque(x), q = m ? ' · ' + m + ' presque' : '';
+    return x.statut === 'en_cours' ? 'Claude cherche… (lancée ' + depuis(x.at) + ')' : x.statut === 'photos' ? (n || 'aucune') + ' dans le budget' + q + ' · photos en cours' : x.statut === 'echec' ? 'Pas abouti : ' + (x.erreur || 'erreur')
+      : (n ? n + ' proposition' + (n > 1 ? 's' : '') : 'Rien dans ton budget') + q + ' · ' + depuis(x.at); };
   function ideesRepaint() {
     if (TAB !== 'achats') return;
     if (ideeOpen()) { refresh(); return; }
@@ -8232,8 +8243,12 @@ void main(){
     const base = (window.__IDEES || []).find((y) => y.data), x = Object.assign({id: 'm' + (++SEQ), at: Date.now(), statut: 'en_cours', erreur: '', data: null}, q);
     IDEES.list = [x].concat(IDEES.list || []);
     setTimeout(() => {
-      const ps = base ? base.data.propositions.filter((p) => (q.min == null || p.prix >= q.min) && (q.max == null || p.prix <= q.max)).slice(0, q.n) : [];
-      if (ps.length) { x.data = Object.assign({}, base.data, {propositions: ps}); x.statut = 'pret'; } else { x.statut = 'echec'; x.erreur = 'aucune proposition dans ton budget'; }
+      const all = base ? base.data.propositions.concat(base.data.presque || []) : [], dansBudget = (p) => (q.min == null || p.prix >= q.min) && (q.max == null || p.prix <= q.max);
+      const ps = all.filter((p) => !p.ecart && dansBudget(p)).slice(0, q.n);
+      /* 0.29.0 : ce qui dépasse de peu (25 % au plus) va dans « presque », avec son écart, et une piste propose de monter le maximum */
+      const pr = all.filter((p) => !ps.includes(p) && p.prix != null && q.max != null && p.prix > q.max && p.prix <= q.max * 1.25).map((p) => Object.assign({}, p, {ecart: Math.round(p.prix - q.max) + ' € au-dessus'})).slice(0, 6);
+      const pistes = pr.length ? [{texte: 'Monte le maximum à ' + Math.ceil(Math.max(...pr.map((p) => p.prix))) + ' € : ' + pr.length + ' de plus', max: Math.ceil(Math.max(...pr.map((p) => p.prix)))}] : [];
+      if (ps.length || pr.length) { x.data = Object.assign({}, base.data, {propositions: ps, presque: pr, pistes}); x.statut = 'pret'; } else { x.statut = 'echec'; x.erreur = 'rien dans ton budget'; }
       x.at = Date.now(); ideesRepaint();
     }, 2500);
     return x;
@@ -8261,6 +8276,14 @@ void main(){
     const JS = ideeAPI(), q = {idee: x.idee, pour: x.pour, min: x.min, max: x.max, n: x.n};
     if (!JS) { IDEES.list = (IDEES.list || []).filter((y) => y.id !== x.id); const y = ideeFake(q); openIdee(y.id); return; }
     JS.idee(Object.assign({refaire: true}, q)).then((r) => { if (!r || !r.ok) { toast('Recherche impossible', (r && r.error) || 'Le serveur ne répond pas.', false); return; } IDEES.list = [r.recherche].concat((IDEES.list || []).filter((y) => y.id !== r.recherche.id && y.id !== x.id)); clearTimeout(IDEES.poll); IDEES.poll = setTimeout(ideesLoad, 8000); openIdee(r.recherche.id); });
+  }
+  /* 0.29.0 : une piste de Claude (« monte le maximum à 90 € », « cherche plutôt … ») se relance d'un appui, avec le reste de la demande */
+  function ideePiste(x, q) {
+    const nq = {idee: q.idee || x.idee, pour: x.pour, min: q.min != null ? q.min : x.min, max: q.max != null ? q.max : x.max, n: x.n};
+    if (nq.min != null && nq.max != null && nq.min > nq.max) { const t = nq.min; nq.min = nq.max; nq.max = t; }
+    const JS = ideeAPI();
+    if (!JS) { ideesLoad(); const y = ideeFake(nq); openIdee(y.id); return; }
+    JS.idee(nq).then((r) => { if (!r || !r.ok) { toast('Recherche impossible', (r && r.error) || 'Le serveur ne répond pas.', false); return; } IDEES.list = [r.recherche].concat((IDEES.list || []).filter((y) => y.id !== r.recherche.id)); clearTimeout(IDEES.poll); if (ideeBusy(r.recherche)) IDEES.poll = setTimeout(ideesLoad, 8000); openIdee(r.recherche.id); });
   }
   function ideeForget(x) {
     const JS = ideeAPI(), done = () => { IDEES.list = (IDEES.list || []).filter((y) => y.id !== x.id); NAV.up = true; SEL.achats = null; renderView(false); toast('Recherche effacée', '« ' + x.idee + ' »', false); };
@@ -8300,17 +8323,18 @@ void main(){
     const pg = p.page || null, diff = pg && pg.prix && p.prix && Math.abs(pg.prix - p.prix) / p.prix > 0.03;
     const bar = (l, v) => (v == null ? null : h('div', {class: 'idee-bar'}, h('span', {class: 'idee-bl', text: l}), h('span', {class: 'cmp-track'}, h('i', {style: 'width:' + Math.round(v * 10) + '%'})), h('b', {text: nb(v) + '/10'})));
     const suivi = (p.marque && p.nom.toLowerCase().indexOf(p.marque.toLowerCase()) < 0 ? p.marque + ' ' : '') + p.nom;
-    return h('article', {class: 'card idee-card'},
+    return h('article', {class: 'card idee-card' + (p.ecart ? ' is-presque' : '')},
+      p.ecart ? h('span', {class: 'idee-ecart', text: p.ecart}) : null,
       h('div', {class: 'idee-top'},
         h('figure', {class: 'cmp-pic idee-pic' + (p.photo ? '' : ' is-none')}, (p.photo && compImg(p.photo, p.nom)) || h('span', {class: 'cmp-noimg', html: icon('tag', 28)})),
         h('div', {class: 'idee-main'},
-          h('span', {class: 'idee-rank', text: p.rang === 1 && IDEES.tri === 'best' ? 'Meilleur choix' : '#' + p.rang}),
+          p.ecart ? null : h('span', {class: 'idee-rank', text: p.rang === 1 && IDEES.tri === 'best' ? 'Meilleur choix' : '#' + p.rang}),
           h('b', {class: 'idee-nom', text: p.nom}), p.marque ? h('small', {class: 'idee-mq', text: p.marque}) : null,
           h('div', {class: 'idee-prix'}, h('b', {text: p.prix != null ? eur2(p.prix) : 'prix à vérifier'}), h('small', {text: [p.vendeur ? 'chez ' + p.vendeur : '', dFr(p.date_prix) ? 'le ' + dFr(p.date_prix) : ''].filter(Boolean).join(' · ')})),
           p.prix_detail ? h('small', {class: 'idee-pd', text: p.prix_detail}) : null,
           p.age ? h('span', {class: 'mchip idee-age', text: p.age}) : null)),
       diff ? h('p', {class: 'idee-warn', text: 'La page du vendeur affiche ' + eur2(pg.prix) + ' aujourd’hui (peut-être sans la livraison) : vérifie avant d’acheter.'}) : null,
-      pg && !pg.ok && p.lien ? h('p', {class: 'idee-note', text: 'Prix non revérifié : le site du vendeur ne s’est pas laissé lire.'}) : null,
+      pg && !pg.ok && p.lien ? h('p', {class: 'idee-note', text: p.prix_vu === 'recherche' ? 'Prix vu dans les résultats de recherche : le site du vendeur ne se laisse pas lire, vérifie sur sa page.' : 'Prix non revérifié : le site du vendeur ne s’est pas laissé lire.'}) : null,
       p.pourquoi ? h('p', {class: 'idee-why', text: p.pourquoi}) : null,
       (p.points_forts || []).length || (p.limites || []).length ? h('ul', {class: 'var-pm'}, (p.points_forts || []).map((t) => h('li', {class: 'is-plus', text: t})), (p.limites || []).map((t) => h('li', {class: 'is-minus', text: t}))) : null,
       h('div', {class: 'idee-bars'}, bar('Qualité', p.qualite), bar('Qualité/prix', p.rqp)),
@@ -8329,17 +8353,24 @@ void main(){
       d && d.conseils ? h('div', {class: 'cmp-key'}, h('span', {class: 'ic', html: icon('bolt', 15)}), h('div', {}, h('b', {text: 'Pour bien choisir'}), h('p', {text: d.conseils}))) : null));
     if (!d) {
       el.append(panel(x.statut === 'echec' ? 'Pas abouti' : 'Claude cherche', null, h('div', {class: 'cmp-wait'},
-        h('p', {class: 'muted', text: x.statut === 'echec' ? 'La recherche n’a pas abouti : ' + (x.erreur || 'erreur') + '. Change le budget ou l’idée, ou relance-la.' : 'Claude cherche ' + x.n + (x.n > 1 ? ' idées' : ' idée') + ' sur le web : 2 à 6 minutes, gratuit (ton abonnement). Tu peux quitter la page : la recherche continue, et une notification te prévient.'}),
+        h('p', {class: 'muted', text: x.statut === 'echec' ? 'La recherche n’a pas abouti : ' + (x.erreur || 'erreur') + '. Change le budget ou l’idée, ou relance-la.' : 'Claude cherche ' + x.n + (x.n > 1 ? ' idées' : ' idée') + ' sur le web, chez plusieurs vendeurs et plusieurs marques : 5 à 15 minutes, gratuit (ton abonnement). Tu peux quitter la page : la recherche continue, et une notification te prévient.'}),
         x.statut === 'echec' ? h('button', {type: 'button', class: 'btn sm', onclick: () => ideeRedo(x)}, 'Relancer') : h('span', {class: 'cmp-spin', 'aria-hidden': 'true'}))));
       if (x.statut === 'echec') el.append(h('div', {class: 'row-actions idee-foot'}, h('button', {type: 'button', class: 'btn ghost', onclick: () => ideeForget(x)}, 'Effacer cette recherche')));
       return;
     }
     const P = d.propositions.map((p, i) => Object.assign({rang: i + 1}, p)), by = (k) => (a, b) => (b[k] == null ? -1 : a[k] == null ? 1 : b[k] - a[k]);
     const S2 = IDEES.tri === 'prix' ? P.slice().sort((a, b) => (a.prix == null ? 1e9 : a.prix) - (b.prix == null ? 1e9 : b.prix)) : IDEES.tri === 'qualite' ? P.slice().sort(by('qualite')) : IDEES.tri === 'rqp' ? P.slice().sort(by('rqp')) : P;
-    el.append(panel(P.length + (P.length > 1 ? ' propositions' : ' proposition'), h('span', {class: 'aside', text: x.statut === 'photos' ? 'photos en cours…' : budTxt(x)}),
-      h('div', {class: 'seg idee-tri', role: 'group', 'aria-label': 'Trier'}, [['best', 'Meilleur choix'], ['prix', 'Prix'], ['qualite', 'Qualité'], ['rqp', 'Qualité/prix']].map(([k, l]) => h('button', {type: 'button', 'aria-pressed': String(IDEES.tri === k), onclick: () => { IDEES.tri = k; renderView(true); }}, l))),
+    const PR = d.presque || [], PI = d.pistes || [];
+    if (P.length) el.append(panel(P.length + (P.length > 1 ? ' propositions' : ' proposition'), h('span', {class: 'aside', text: x.statut === 'photos' ? 'photos en cours…' : budTxt(x)}),
+      P.length > 1 ? h('div', {class: 'seg idee-tri', role: 'group', 'aria-label': 'Trier'}, [['best', 'Meilleur choix'], ['prix', 'Prix'], ['qualite', 'Qualité'], ['rqp', 'Qualité/prix']].map(([k, l]) => h('button', {type: 'button', 'aria-pressed': String(IDEES.tri === k), onclick: () => { IDEES.tri = k; renderView(true); }}, l))) : null,
       S2.map((p) => ideeCard(p, x)),
-      d.hors_budget ? h('p', {class: 'idee-note', text: d.hors_budget + (d.hors_budget > 1 ? ' propositions écartées' : ' proposition écartée') + ' : hors de ton budget.'}) : null));
+      P.length < x.n ? h('p', {class: 'idee-note', text: 'Tu en voulais ' + x.n + ' : Claude n’en a pas trouvé plus qui cochent tout' + (PR.length ? ', les plus proches sont juste en dessous' : '') + '.'}) : null));
+    else el.append(panel('Rien qui coche tout', h('span', {class: 'aside', text: budTxt(x)}), h('p', {class: 'idee-vide', text: 'Claude n’a rien trouvé qui respecte à la fois ton budget et ton idée' + (PR.length ? ' : voici ce qui s’en approche' : '') + (PI.length ? ', et comment en trouver plus.' : '.')})));
+    /* 0.29.0 : ce qui manque de peu (hors budget de peu, ou un critère absent) : montré, jamais jeté */
+    if (PR.length) el.append(panel('Presque', h('span', {class: 'aside', text: 'un peu hors budget, ou un critère absent'}), PR.map((p, i) => ideeCard(Object.assign({rang: P.length + i + 1}, p), x))));
+    /* et les pistes de Claude pour en trouver plus, relancées d'un appui */
+    if (PI.length) el.append(panel('Pour en trouver plus', null, h('div', {class: 'idee-pistes'}, PI.map((q) => h('button', {type: 'button', class: 'idee-piste', onclick: () => ideePiste(x, q)},
+      h('span', {class: 'ic', html: icon('search', 16)}), h('span', {class: 'idee-pt'}, h('b', {text: q.texte}), h('small', {text: 'Relancer : ' + (q.idee || x.idee) + ' · ' + budTxt({min: q.min != null ? q.min : x.min, max: q.max != null ? q.max : x.max})})), h('span', {'aria-hidden': 'true', text: '›'}))))));
     el.append(h('section', {class: 'panel idee-src'}, h('p', {class: 'muted'}, 'Prix relevés par Claude sur les pages des vendeurs' + (d.certitude ? ' (certitude : ' + (CERT[d.certitude] || d.certitude) + ')' : '') + '. Vérifie le total au moment de payer : tu paies toi-même.'),
       (d.sources || []).length ? h('p', {class: 'idee-links'}, 'Sources : ', d.sources.map((u, i) => [i ? ' · ' : '', h('a', {href: u, target: '_blank', rel: 'noopener noreferrer', text: (u.match(/^https?:\/\/(?:www\.)?([^/]+)/) || [])[1] || 'lien'})])) : null,
       h('div', {class: 'row-actions'}, h('button', {type: 'button', class: 'btn', onclick: () => ideeRedo(x)}, 'Refaire avec les prix du jour'), h('button', {type: 'button', class: 'btn ghost', onclick: () => ideeForget(x)}, 'Effacer'))));
