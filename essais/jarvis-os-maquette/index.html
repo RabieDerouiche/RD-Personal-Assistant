@@ -66,6 +66,10 @@
   .gs-go { flex: 0 0 auto; color: var(--muted); }
   .gs-more { justify-self: start; margin-left: 2px; }
   .gs-pap { border-style: dashed; }
+  /* 0.28.0 : un événement sur plusieurs jours */
+  .ev-fin-note { margin: -4px 0 0; font-size: 12.5px; min-height: 0; } .ev-fin-note:empty { display: none; } .ev-fin-note.is-bad { color: #fca5a5; }
+  .ev-form .inp:disabled { opacity: .45; }
+  .ech-date.is-multi small { display: block; font-size: 10.5px; color: var(--accent); margin-top: 2px; }
   /* 0.27.0 : la mise à jour proposée au lancement */
   .maj { position: fixed; inset: 0; z-index: 95; display: flex; align-items: flex-end; justify-content: center; background: rgba(1, 4, 14, .62); -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); padding: 0 12px calc(14px + env(safe-area-inset-bottom, 0px)); }
   .maj[hidden] { display: none; }
@@ -2938,20 +2942,36 @@ void main(){
       facts: [['Date', fmt(x.date, {weekday: 'long', day: 'numeric', month: 'long'})], ['Âge', x.age != null ? x.age + ' ans' : ''], ['Agenda', 'Événement annuel dans ton agenda principal, rappels 7 jours avant et le jour même à 9h'], ['Iris', 'Rappel 3 jours avant, idées de cadeaux 3 semaines avant']],
       actions: ACTIONS.anniv(a)};
   };
+  /* JARVIS OS 0.28.0 (20/11/2026, « sur l'agenda je veux pouvoir ajouter un événement qui s'étend sur plusieurs jours ») : n est le premier
+     jour, n2 le dernier, compris. Un événement de plusieurs jours est en journées entières, et il apparaît sur chacun de ses jours. */
+  const evEnd = (v) => (v && v.n2 != null && v.n2 > v.n ? v.n2 : v.n);
+  const evMulti = (v) => evEnd(v) > v.n;
+  const evDays = (v) => evEnd(v) - v.n + 1;
+  const evWhen = (v) => (evMulti(v) ? 'du ' + short(v.n) + ' au ' + short(evEnd(v)) + ' (' + evDays(v) + ' jours)' : longDay(v.n) + (v.time ? ' à ' + v.time : ''));
   ACTIONS.evenement = (v) => [
-    ord('Préparer avec Iris', 'hydra', 'Prépare « ' + v.title + ' » (' + longDay(v.n) + (v.time ? ' à ' + v.time : '') + ') : trajet, papiers à emporter, ce que je dois savoir.', 'Je prépare tout.', 'Fiche prête dans mon chat : trajet, papiers et horaires.', 'main'),
-    act('Déplacer', {pick: {kind: 'date', label: 'Nouvelle date', init: v.n + 1}, go: (x) => ({title: 'Événement déplacé', effect: '« ' + v.title + ' » passe ' + x.txt + ' dans ton agenda principal ; les rappels suivent, la ligne Échéances aussi.', bot: 'hydra', say: 'Déplacé.', work: false, mutate: () => { v.n = x.n; }})}),
+    ord('Préparer avec Iris', 'hydra', 'Prépare « ' + v.title + ' » (' + evWhen(v) + ') : trajet, papiers à emporter, ce que je dois savoir.', 'Je prépare tout.', 'Fiche prête dans mon chat : trajet, papiers et horaires.', 'main'),
+    act('Déplacer', {pick: {kind: 'date', label: evMulti(v) ? 'Nouveau premier jour (la durée est gardée)' : 'Nouvelle date', init: v.n + 1}, go: (x) => ({title: 'Événement déplacé', effect: '« ' + v.title + ' » passe ' + x.txt + (evMulti(v) ? ', pour ' + evDays(v) + ' jours,' : '') + ' dans ton agenda principal ; les rappels suivent, la ligne Échéances aussi.', bot: 'hydra', say: 'Déplacé.', work: false, mutate: () => { const d = x.n - v.n; v.n = x.n; if (v.n2 != null) v.n2 += d; }})}),
     act('Retirer de mon agenda', {tone: 'danger', confirm: true, go: () => ({title: 'Événement retiré', effect: '« ' + v.title + ' » retiré de ton agenda principal, et sa ligne Échéances marquée Annulé.', bot: 'hydra', say: 'Retiré.', work: false, mutate: () => { drop('evenements', v.id); }})})
   ];
   SHEETCFG.evenement = (v) => ({bot: 'hydra', kicker: 'Événement important · agenda principal', title: v.title,
-    say: v.n === 0 ? "C'est aujourd'hui" + (v.time ? ' à ' + v.time : '') + '.' : v.n < 0 ? "C'était hier." : 'Dans ' + v.n + (v.n > 1 ? ' jours.' : ' jour.') + (v._id ? ' Ses rappels sont ceux de ton agenda.' : " Je te le rappelle comme tu me l'as demandé."),
-    facts: [['Quand', longDay(v.n) + (v.time ? ' à ' + v.time : ', toute la journée')], ['Où', v.place], ['Rappels', v.rem.join(' · ')], ['Iris', v.hydra ? 'Le cite dans sa veille du matin' : 'Non']],
+    say: evMulti(v) && v.n <= 0 && evEnd(v) >= 0 ? (evEnd(v) === 0 ? "C'est le dernier jour." : 'En cours : jour ' + (1 - v.n) + ' sur ' + evDays(v) + ", jusqu'à " + short(evEnd(v)) + '.') : v.n === 0 ? "C'est aujourd'hui" + (v.time ? ' à ' + v.time : '') + '.' : v.n < 0 ? (evMulti(v) ? "C'est terminé." : "C'était hier.") : 'Dans ' + v.n + (v.n > 1 ? ' jours.' : ' jour.') + (v._id ? ' Ses rappels sont ceux de ton agenda.' : " Je te le rappelle comme tu me l'as demandé."),
+    facts: [['Quand', evMulti(v) ? 'Du ' + longDay(v.n) + ' au ' + longDay(evEnd(v)) + ' · ' + evDays(v) + ' jours, journées entières' : longDay(v.n) + (v.time ? ' à ' + v.time : ', toute la journée')], ['Où', v.place], ['Rappels', v.rem.join(' · ')], ['Iris', v.hydra ? 'Le cite dans sa veille du matin' : 'Non']],
     actions: ACTIONS.evenement(v)});
   function importantForm(defIso) {
-    const ids = ['ev-t', 'ev-d', 'ev-h', 'ev-l'].map((p) => p + (++SEQ));
+    const ids = ['ev-t', 'ev-d', 'ev-h', 'ev-l', 'ev-f'].map((p) => p + (++SEQ));
     const t = h('input', {class: 'inp', id: ids[0], type: 'text', maxlength: '140', placeholder: 'ex. Rendez-vous chez le médecin'});
     const d = h('input', {class: 'inp', id: ids[1], type: 'date', value: typeof defIso === 'string' ? defIso : isoOf(day(7))});
     const hh = h('input', {class: 'inp', id: ids[2], type: 'time', step: '300'});
+    /* 0.28.0 : « Jusqu'au », facultatif : l'événement couvre alors chaque jour, en journées entières (l'heure ne sert plus) */
+    const fin = h('input', {class: 'inp ev-fin', id: ids[4], type: 'date', min: d.value}), finNote = h('p', {class: 'muted ev-fin-note', role: 'status'});
+    const span = () => (fin.value && d.value ? dayDiff(fin.value) - dayDiff(d.value) : 0);
+    const finSync = () => {
+      fin.min = d.value || ''; const k = span(), multi = !!fin.value && k > 0;
+      hh.disabled = multi; if (multi) hh.value = '';
+      finNote.textContent = !fin.value ? '' : k < 0 ? 'La fin est avant le début : corrige la date.' : k === 0 ? 'Même jour que le début : un seul jour.' : (k + 1) + ' jours, en journées entières.';
+      finNote.classList.toggle('is-bad', !!fin.value && k < 0);
+      drawChips();
+    };
     const l = h('input', {class: 'inp', id: ids[3], type: 'text', maxlength: '140', placeholder: 'Facultatif'});
     const yearly = h('input', {type: 'checkbox'}), hyd = h('input', {type: 'checkbox', checked: true});
     const chips = h('div', {class: 'chips', role: 'group', 'aria-label': 'Rappels'});
@@ -2962,22 +2982,25 @@ void main(){
       chips.replaceChildren(...list.map((x) => h('button', {type: 'button', class: 'chip', 'aria-pressed': String(on.has(x)), onclick: () => { on.has(x) ? on.delete(x) : on.add(x); drawChips(); }}, x)));
     };
     hh.addEventListener('input', drawChips);
+    d.addEventListener('input', finSync); fin.addEventListener('input', finSync);
     drawChips();
     return h('form', {class: 'pick-form ev-form', onsubmit: (ev) => {
       ev.preventDefault();
       const title = t.value.trim();
       if (!title || !d.value) { t.focus(); return; }
-      const n = dayDiff(d.value), time = hh.value ? hh.value.replace(':', 'h') : null, rem = [...on];
+      if (fin.value && span() < 0) { finSync(); fin.focus(); return; }
+      const n = dayDiff(d.value), n2 = fin.value && span() > 0 ? dayDiff(fin.value) : null, time = n2 == null && hh.value ? hh.value.replace(':', 'h') : null, rem = [...on];
       finish({title: 'Événement important ajouté', bot: 'hydra', work: false,
-        effect: '« ' + title + ' » dans ton agenda principal, ' + longDay(n) + (time ? ' à ' + time : ', toute la journée') + (yearly.checked ? ', chaque année' : '') + ', en rouge, avec ' + (rem.length ? 'les rappels : ' + rem.join(', ').toLowerCase() : 'aucun rappel') + (hyd.checked ? ". Une ligne dans l'onglet Échéances : Iris le cite dans sa veille du matin." : '.'),
+        effect: '« ' + title + ' » dans ton agenda principal, ' + (n2 != null ? 'du ' + longDay(n) + ' au ' + longDay(n2) + ' (' + (n2 - n + 1) + ' jours, journées entières)' : longDay(n) + (time ? ' à ' + time : ', toute la journée')) + (yearly.checked ? ', chaque année' : '') + ', en rouge, avec ' + (rem.length ? 'les rappels : ' + rem.join(', ').toLowerCase() : 'aucun rappel') + (hyd.checked ? ". Une ligne dans l'onglet Échéances : Iris le cite dans sa veille du matin." : '.'),
         say: 'Noté. Je te le rappellerai.',
         mutate: () => {
-          S.evenements.push({id: 'v' + (++SEQ), title, n, time, rem, yearly: yearly.checked, hydra: hyd.checked, place: l.value.trim()});
-          if (hyd.checked) S.echeances.push({id: 'e' + (++SEQ), n, iso: d.value, title: title + (time ? ' (' + time + ')' : ''), nature: 'date', domain: 'Famille', bot: 'hydra', note: 'Événement important ajouté depuis la page' + (l.value.trim() ? ', à ' + l.value.trim() : '') + '.', rem: rem.join(', ')});
+          S.evenements.push({id: 'v' + (++SEQ), title, n, n2, time, rem, yearly: yearly.checked, hydra: hyd.checked, place: l.value.trim()});
+          if (hyd.checked) S.echeances.push({id: 'e' + (++SEQ), n, iso: d.value, title: title + (time ? ' (' + time + ')' : ''), nature: 'date', domain: 'Famille', bot: 'hydra', note: 'Événement important ajouté depuis la page' + (n2 != null ? ', du ' + short(n) + ' au ' + short(n2) + ' (' + (n2 - n + 1) + ' jours)' : '') + (l.value.trim() ? ', à ' + l.value.trim() : '') + '.', rem: rem.join(', ')});
         }});
     }},
     h('label', {for: ids[0], class: 'pick-label', text: 'Quoi'}), t,
-    h('div', {class: 'two'}, h('div', {class: 'field'}, h('label', {for: ids[1], class: 'pick-label', text: 'Date'}), d), h('div', {class: 'field'}, h('label', {for: ids[2], class: 'pick-label', text: 'Heure (vide : journée)'}), hh)),
+    h('div', {class: 'two'}, h('div', {class: 'field'}, h('label', {for: ids[1], class: 'pick-label', text: 'Date (premier jour)'}), d), h('div', {class: 'field'}, h('label', {for: ids[2], class: 'pick-label', text: 'Heure (vide : journée)'}), hh)),
+    h('label', {for: ids[4], class: 'pick-label', text: "Jusqu'au (facultatif : plusieurs jours)"}), fin, finNote,
     h('label', {for: ids[3], class: 'pick-label', text: 'Lieu'}), l,
     h('span', {class: 'pick-label', text: 'Rappels sur ton téléphone'}), chips,
     h('div', {class: 'checks'}, h('label', {class: 'check'}, yearly, ' Chaque année'), h('label', {class: 'check'}, hyd, ' Iris me le rappelle aussi')),
@@ -3421,7 +3444,7 @@ void main(){
   }
   function nextKey() {
     const items = S.anniv.map((a) => { const x = nextAnniv(a); return {n: x.n, label: 'Anniversaire de ' + a.who + (x.age != null ? ' · ' + x.age + ' ans' : ''), open: () => openItem('anniv', a)}; })
-      .concat(S.evenements.filter((v) => v.n >= 0).map((v) => ({n: v.n, label: v.title + (v.time ? ' · ' + v.time : ''), open: () => openItem('evenement', v)})));
+      .concat(S.evenements.filter((v) => evEnd(v) >= 0).map((v) => ({n: Math.max(0, v.n), label: v.title + (evMulti(v) ? " · jusqu'à " + short(evEnd(v)) : v.time ? ' · ' + v.time : ''), open: () => openItem('evenement', v)})));
     return items.sort((a, b) => a.n - b.n)[0];
   }
   const thread = (b, limit) => {
@@ -3547,7 +3570,7 @@ void main(){
     const hol = holiday(iso); if (hol) out.push({k: 'fe', label: 'Jour férié : ' + hol});
     const code = S.presence[iso]; if (code) out.push({k: 'pr', code, label: 'Présence : ' + CODE[code]});
     S.anniv.forEach((a) => { if (a.m === mm && a.d === dd) { const age = a.year ? +iso.slice(0, 4) - a.year : null; out.push({k: 'an', label: 'Anniversaire de ' + a.who + (age != null && age > 0 ? ' (' + age + ' ans)' : ''), open: () => openItem('anniv', a)}); } });
-    S.evenements.forEach((v) => { if (isoOf(day(v.n)) === iso) out.push({k: 'ev', label: v.title + (v.time ? ' · ' + v.time : ''), title: v.title, time: v.time, open: () => openItem('evenement', v)}); });
+    { const dn = dayDiff(iso); S.evenements.forEach((v) => { if (dn >= v.n && dn <= evEnd(v)) out.push({k: 'ev', label: v.title + (evMulti(v) ? ' · jour ' + (dn - v.n + 1) + '/' + evDays(v) : v.time ? ' · ' + v.time : ''), title: v.title, time: evMulti(v) ? null : v.time, open: () => openItem('evenement', v)}); }); }
     S.echeances.forEach((e) => { if (isoOfItem(e) === iso) out.push({k: e.nature === 'bot' || e.nature === 'suivi' ? 'b-' + e.bot : 'e-' + e.nature, label: e.doneBy ? e.title + ' · fait ✓' : e.title, bot: e.bot, open: () => openItem('echeance', e)}); });   /* JARVIS OS (18/11/2026) : fait par le bot d'après le Journal ou le Canal */
     return out;
   }
@@ -3716,7 +3739,7 @@ void main(){
       }))));
       const evs = S.evenements.slice().sort((a, b) => a.n - b.n);
       el.append(panel('Mes événements importants', h('span', {class: 'aside', text: 'Agenda principal · rappels'}), evs.length ? evs.map((v) => h('article', {class: 'card item ech n-moi', style: botVars('hydra')},
-        h('div', {class: 'ech-date'}, h('b', {text: short(v.n)}), h('span', {text: v.time || 'journée'})),
+        h('div', {class: 'ech-date' + (evMulti(v) ? ' is-multi' : '')}, h('b', {text: short(v.n)}), h('span', {text: evMulti(v) ? 'au ' + short(evEnd(v)) : v.time || 'journée'}), evMulti(v) ? h('small', {text: evDays(v) + ' jours'}) : null),
         h('div', {class: 'ech-main'}, h('span', {class: 'nature', text: 'Important' + (v.rem.length ? ' · ' + v.rem.length + ' rappel' + (v.rem.length > 1 ? 's' : '') : '') + (v.yearly ? ' · chaque année' : '')}), h('h3', {class: 'item-title', text: v.title}), actionRow('evenement', v, 1)))) : emptyState("Aucun pour l'instant. « Nouvel événement important » le met dans ton agenda principal, en rouge, avec ses rappels, et Iris te le rappelle le matin.")));
       el.append(panel('Ajouter une échéance', null, newEcheanceForm()));
     },
@@ -5216,8 +5239,11 @@ void main(){
     if (LV.t.imp) {
       S.evenements = LV.t.imp.filter((ev) => ev && String(ev.colorId) === '11' && lvLow(ev.status) !== 'cancelled').map((ev) => {
         const sd = ev.start && (ev.start.dateTime || ev.start.date) || '', iso = sd.slice(0, 10), tm = ev.start && ev.start.dateTime ? sd.slice(11, 16).replace(':', 'h') : null;
-        return {id: 'ev:' + ev.id, _id: ev.id, _s: sd, _e: (ev.end && (ev.end.dateTime || ev.end.date)) || '', title: ev.summary || 'Sans titre', n: N(iso), time: tm, rem: [], yearly: !!(ev.recurringEventId || ev.recurrence), hydra: false, place: ev.location || ''};
-      }).filter((v) => v.n >= -1);
+        const ed = (ev.end && (ev.end.dateTime || ev.end.date)) || '';
+        /* 0.28.0 : dernier jour compris. Journées entières : la fin de Google est le lendemain du dernier jour ; avec une heure : le jour de fin, ou la veille s'il finit à minuit */
+        let n2 = null; if (ed.length >= 10) { const last = N(ed.slice(0, 10)) - (ed.length === 10 || /T00:00/.test(ed) ? 1 : 0); if (last > N(iso)) n2 = last; }
+        return {id: 'ev:' + ev.id, _id: ev.id, _s: sd, _e: ed, title: ev.summary || 'Sans titre', n: N(iso), n2, time: n2 != null ? null : tm, rem: [], yearly: !!(ev.recurringEventId || ev.recurrence), hydra: false, place: ev.location || ''};
+      }).filter((v) => evEnd(v) >= -1);
     }
     if (LV.t.mail) {
       const since = lvMailSince(), items = [];
@@ -5376,10 +5402,10 @@ void main(){
     return Promise.resolve();
   }});
   const LV_REM = {'7 jours avant, 9h': 9540, '3 jours avant, 9h': 3780, 'La veille, 19h': 300, 'Le jour même, 8h': -480, 'La veille, même heure': 1440, '3 h avant': 180, '1 h avant': 60, '15 min avant': 15};
-  const opEvent = (x) => ({label: '« ' + x.title + ' » dans ton agenda, en rouge', src: 'imp', server: LV.CAL, run: async () => {
+  const opEvent = (x) => ({label: '« ' + x.title + ' » dans ton agenda, en rouge' + (evMulti(x) ? ', du ' + short(x.n) + ' au ' + short(evEnd(x)) : ''), src: 'imp', server: LV.CAL, run: async () => {
     const iso = isoOf(day(x.n)), input = {summary: x.title, colorId: '11', useDefaultReminders: false, description: 'Événement important, ajouté depuis Jarvis le ' + lvToday() + '.'};
     if (x.time) { const p = iso.split('-').map(Number), t = x.time.split('h').map(Number); const s = new Date(p[0], p[1] - 1, p[2], t[0], t[1] || 0), e = new Date(s.getTime() + 3600000); const li = (d) => isoOf(d) + 'T' + pad2(d.getHours()) + ':' + pad2(d.getMinutes()) + ':00'; input.startTime = li(s); input.endTime = li(e); }
-    else { input.allDay = true; input.startTime = iso + 'T00:00:00'; input.endTime = lvAddDays(iso, 1) + 'T00:00:00'; }
+    else { input.allDay = true; input.startTime = iso + 'T00:00:00'; input.endTime = lvAddDays(iso, evDays(x)) + 'T00:00:00'; }   /* 0.28.0 : plusieurs jours = fin au lendemain du dernier jour */
     if (x.place) input.location = x.place;
     if (x.yearly) input.recurrenceData = ['RRULE:FREQ=YEARLY'];
     input.overrideReminders = (x.rem || []).map((r) => LV_REM[r]).filter((m) => m != null).map((minutes) => ({method: 'popup', minutes}));
@@ -7384,7 +7410,7 @@ void main(){
   const dayTile = (n) => { const d = new Date(TODAY); d.setDate(d.getDate() + n); return h('span', {class: 'hm-day'}, h('small', {text: ['dim', 'lun', 'mar', 'mer', 'jeu', 'ven', 'sam'][d.getDay()]}), h('b', {text: String(d.getDate())})); };
   function homeData() {
     const dem = S.demandes.slice().sort((a, b) => (a.due == null ? 999 : a.due) - (b.due == null ? 999 : b.due));
-    const ag = [].concat((S.evenements || []).filter((e) => e.n >= 0 && e.n <= 7).map((e) => ({n: e.n, time: e.time, title: e.title, who: 'Agenda', open: () => openItem('evenement', e)})),
+    const ag = [].concat((S.evenements || []).filter((e) => evEnd(e) >= 0 && e.n <= 7).map((e) => ({n: Math.max(0, e.n), time: evMulti(e) ? null : e.time, title: e.title + (evMulti(e) ? " (jusqu'à " + short(evEnd(e)) + ')' : ''), who: 'Agenda', open: () => openItem('evenement', e)})),
       (S.echeances || []).filter((e) => e.n >= 0 && e.n <= 7).map((e) => ({n: e.n, time: null, title: e.title, who: BOT[e.bot] ? BOT[e.bot].name : '', mine: !['bot', 'suivi'].includes(e.nature), done: !!e.doneBy, open: () => openItem('echeance', e)})))
       .sort((a, b) => a.n - b.n || String(a.time || '99').localeCompare(String(b.time || '99')))
       .filter((a, i, arr) => { const k = (x) => lvLow(x.title).replace(/\s*\(.*\)\s*$/, ''); return !arr.slice(0, i).some((b) => b.n === a.n && k(b) === k(a)); });
@@ -7485,7 +7511,7 @@ void main(){
   /* les 14 prochains jours (après aujourd'hui) : agenda, échéances, sorties, départs, avec qui s'en occupe */
   function homeNext() {
     const it = [];
-    (S.evenements || []).filter((v) => v.n >= 1 && v.n <= 14).forEach((v) => it.push({n: v.n, time: v.time, t: v.title, sub: 'Agenda' + (v.time ? ' · ' + v.time : ''), open: () => openItem('evenement', v)}));
+    (S.evenements || []).filter((v) => v.n >= 1 && v.n <= 14).forEach((v) => it.push({n: v.n, time: v.time, t: v.title, sub: 'Agenda' + (evMulti(v) ? " · jusqu'à " + short(evEnd(v)) + ' · ' + evDays(v) + ' jours' : v.time ? ' · ' + v.time : ''), open: () => openItem('evenement', v)}));
     (S.echeances || []).filter((e) => e.n >= 1 && e.n <= 14 && e.nature !== 'offre').forEach((e) => { const who = lvName(e.bot);   /* les offres sont dans « À surveiller » */ it.push({n: e.n, t: e.title, sub: e.doneBy ? 'Fait par ' + who : e.nature === 'moi' ? 'À faire par toi' : e.nature === 'bot' ? who + ' s’en occupe' : e.nature === 'suivi' ? who + ' suit' : e.nature === 'offre' ? 'Fin d’offre · ' + who + ' suit' : e.nature === 'fin' ? 'Fin de validité' : 'À retenir', mine: e.nature === 'moi', done: !!e.doneBy, open: () => openItem('echeance', e)}); });
     (S.sorties || []).filter((x) => x.from != null && x.from >= 1 && x.from <= 14 && ['proposee', 'choisie', 'reservee'].includes(x.status)).forEach((x) => it.push({n: x.from, t: x.title, sub: 'Sortie ' + (x.status === 'proposee' ? 'proposée par ' + lvName(x.bot) : 'prévue') + (x.where ? ' · ' + x.where : ''), open: () => go('sorties')}));
     (S.voyages || []).filter((v) => !v.demo && v.depart != null && v.depart >= 1 && v.depart <= 14).forEach((v) => it.push({n: v.depart, t: 'Départ : ' + v.title, sub: 'Voyage', open: () => go('voyages')}));
@@ -7751,7 +7777,7 @@ void main(){
     (S.demandes || []).forEach((d) => add('Pour moi', 'chat', d.title, lvName(d.bot) + ' · ' + String(d.ask || '').slice(0, 90), (d.why || '') + ' ' + (d.ctx || ''), sheet('demandes', 'demande', d)));
     (S.drafts || []).forEach((x) => add('Pour moi', 'send', 'Brouillon : ' + (x.subject || 'sans objet'), 'À ' + ((x.to || []).join(', ') || 'personne'), x.body, inTab('demandes')));
     (S.echeances || []).filter((e) => e.n >= -30).forEach((e) => add('Agenda et échéances', 'cal', e.title, gsWhen(e.n) + (BOT[e.bot] ? ' · ' + lvName(e.bot) : ''), e.note, sheet('agenda', 'echeance', e)));
-    (S.evenements || []).filter((e) => e.n >= -7).forEach((e) => add('Agenda et échéances', 'cal', e.title, gsWhen(e.n) + (e.time ? ' · ' + e.time : '') + ' · agenda', '', sheet('agenda', 'evenement', e)));
+    (S.evenements || []).filter((e) => evEnd(e) >= -7).forEach((e) => add('Agenda et échéances', 'cal', e.title, gsWhen(e.n) + (evMulti(e) ? ' au ' + short(evEnd(e)) : e.time ? ' · ' + e.time : '') + ' · agenda', '', sheet('agenda', 'evenement', e)));
     (S.anniv || []).forEach((a) => add('Agenda et échéances', 'cal', 'Anniversaire de ' + a.who, pad2(a.d) + '/' + pad2(a.m), '', sheet('agenda', 'anniv', a)));
     (S.dossiers || []).forEach((k) => add('Dossiers', 'doc', k.title, (k.who ? 'En attente de ' + k.who + ' · ' : '') + (k.step || ''), (k.pour || '') + ' ' + (k.ctx || ''), sheet('suivi', 'dossier', k)));
     (S.ach || []).forEach((f) => { const ps = (S.prix || []).filter((x) => (f.ids || []).indexOf(x.id) >= 0); add('Achats', 'tag', f.title, f.need || 'Produit suivi', ps.map((x) => x.name + ' ' + (x.vendors || '')).join(' '), () => { go('achats'); SEL.achats = f.id; renderView(false); }); });

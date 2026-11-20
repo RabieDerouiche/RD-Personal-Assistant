@@ -19,7 +19,7 @@ import {createComparatifs} from './comparatif.mjs';
 import {BOT_IDS, BOT_NOMS, BOT_LISTE} from './bots.mjs';
 import {createEcoute, wavOk, intention, quand, meteoPhrase, meteoUrl, heurePhrase, datePhrase, nrm, diction} from './voix.mjs';
 
-const VERSION = '0.27.0';
+const VERSION = '0.28.0';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PORT = +(process.env.PORT || 8787);
 const HOST = process.env.HOST || '127.0.0.1';

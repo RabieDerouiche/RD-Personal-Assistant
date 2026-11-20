@@ -89,6 +89,35 @@ srv.listen(0, async () => {
       await q.tap('#chat .dict-no'); await q.waitForTimeout(800); await q.evaluate(() => window.__say.push('phrase dite après « Annuler » : elle ne doit pas arriver')); await q.waitForTimeout(700);
       ok('dictée : « Annuler » referme le micro sans rien écrire', await q.evaluate(() => !document.querySelector('#chat .dict-strip') && !document.getElementById('dict-btn').className.includes('is-on') && window.__ear.includes('abort') && document.getElementById('chat-in').value === ''), JSON.stringify(await q.evaluate(() => [document.getElementById('chat-in').value, window.__ear])));
       await q.context().close(); }
+    /* 0.28.0 : un événement sur plusieurs jours (formulaire « Jusqu'au », affichage sur chaque jour, lecture de l'agenda Google) */
+    { const q = await page('#agenda'); const isoN = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+      await q.evaluate(() => [...document.querySelectorAll('button')].find((x) => /Nouvel événement important/.test(x.textContent)).click()); await q.waitForTimeout(600);
+      await q.fill('.ev-form input[type=text]', 'Visite des grands-parents'); await q.fill('.ev-form input[type=date]:not(.ev-fin)', isoN(2)); await q.fill('.ev-form input[type=time]', '10:00');
+      await q.fill('.ev-form .ev-fin', isoN(1)); await q.waitForTimeout(150); const avantDebut = await q.evaluate(() => ({note: document.querySelector('.ev-fin-note').textContent, bad: document.querySelector('.ev-fin-note').classList.contains('is-bad')}));
+      await q.evaluate(() => document.querySelector('.ev-form button[type=submit]').click()); await q.waitForTimeout(300); const refuse = await q.evaluate(() => !!document.querySelector('.ev-form'));
+      await q.fill('.ev-form .ev-fin', isoN(4)); await q.waitForTimeout(150);
+      const f = await q.evaluate(() => ({note: document.querySelector('.ev-fin-note').textContent, heure: document.querySelector('.ev-form input[type=time]').disabled, hv: document.querySelector('.ev-form input[type=time]').value}));
+      ok('plusieurs jours : « Jusqu\'au » dans le formulaire ; une fin avant le début est refusée ; avec une fin, 3 jours en journées entières (l\'heure ne sert plus)', /avant le début/.test(avantDebut.note) && avantDebut.bad && refuse && /^3 jours, en journées entières/.test(f.note) && f.heure && f.hv === '', JSON.stringify([avantDebut, refuse, f]));
+      await q.screenshot({path: path.join(SH, 'plusieurs-jours-formulaire.png')});
+      await q.evaluate(() => document.querySelector('.ev-form button[type=submit]').click()); await q.waitForTimeout(1000);
+      const vue = () => q.evaluate(() => ({liste: [...document.querySelectorAll('.ech-date.is-multi')].map((x) => x.textContent), mois: [...document.querySelectorAll('.mlist .dl-row')].map((x) => x.textContent).filter((t) => /grands-parents/.test(t)), toast: (document.getElementById('toasts') || {}).textContent || ''}));
+      const a1 = await vue();
+      ok('plusieurs jours : l\'événement est listé avec sa période et apparaît sur chacun de ses trois jours dans le mois', a1.liste.length === 1 && /au .+3 jours/.test(a1.liste[0]) && a1.mois.length === 3 && /jour 1\/3/.test(a1.mois[0]) && /jour 3\/3/.test(a1.mois[2]) && / du .+ au /.test(a1.toast), JSON.stringify(a1));
+      await q.waitForTimeout(7000);   /* les 5 secondes d'annulation passées : l'événement part dans l'agenda (faux), puis est relu */
+      const ev = await q.evaluate(() => (window.__calls || []).filter((c) => c.tool === 'create_event').map((c) => c.input).pop()), a2 = await vue();
+      ok('plusieurs jours : écrit dans l\'agenda en journées entières, fin au lendemain du dernier jour (règle de Google), et relu sur ses trois jours', !!ev && ev.allDay === true && ev.startTime.slice(0, 10) === isoN(2) && ev.endTime.slice(0, 10) === isoN(5) && a2.mois.length === 3 && a2.liste.length === 1, JSON.stringify([ev, a2]));
+      await q.evaluate(() => [...document.querySelectorAll('.mlist .dl-row')].filter((x) => /grands-parents/.test(x.textContent))[1].click()); await q.waitForTimeout(700);
+      ok('plusieurs jours : la feuille donne la période entière (du … au …, 3 jours)', await q.evaluate(() => /Du .+ au .+ · 3 jours, journées entières/.test(document.getElementById('sheet').textContent)));
+      await q.screenshot({path: path.join(SH, 'plusieurs-jours.png')});
+      await q.context().close(); }
+    { const q = await pageWith({multi: true}, '#agenda');
+      const m = await q.evaluate(() => { const rows = [...document.querySelectorAll('.mlist .dl-row')].map((x) => x.textContent); const k = (t) => rows.filter((r) => r.indexOf(t) >= 0); return {cousins: k('Vacances chez les cousins'), salon: k('Salon professionnel'), soir: k('Soirée théâtre'), stage: k('Stage déjà commencé'), multi: [...document.querySelectorAll('.ech-date.is-multi')].length}; });
+      const fin = new Date(); fin.setDate(fin.getDate() + 13); const memeMois = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return d.getMonth() === new Date().getMonth(); };
+      ok('plusieurs jours : un événement de l\'agenda Google sur 3 journées entières est lu sur 3 jours (pas 4), un événement à heures sur deux jours aussi ; une soirée qui finit à minuit reste sur un jour', (!memeMois(3) || m.cousins.length === 3) && (!memeMois(11) || m.salon.length === 2) && (!memeMois(12) || (m.soir.length === 1 && /20h00/.test(m.soir[0]))) && m.multi >= 3, JSON.stringify(m));
+      await q.goto(base + '#accueil'); await q.waitForTimeout(1200);
+      const h1 = await q.evaluate(() => ({jour: (document.querySelector('.tl-day') || {}).textContent || '', suite: [...document.querySelectorAll('.hm-row')].map((r) => r.textContent).filter((t) => /cousins/.test(t))}));
+      ok('plusieurs jours : l\'accueil montre aujourd\'hui un événement déjà commencé (« jusqu\'à … ») et annonce la période de celui qui arrive', /Stage déjà commencé \(jusqu'à /.test(h1.jour) && h1.suite.length === 1 && /jusqu'à .+3 jours/.test(h1.suite[0]), JSON.stringify(h1));
+      await q.context().close(); }
     /* 0.26.0 : Plutus (bot ajouté le 20/11/2026) et les bots à venir */
     { const q = await page('#equipe');
       const t0 = await q.evaluate(() => [...document.querySelectorAll('.team .mate')].map((m) => ({n: m.querySelector('b').textContent, t: m.querySelector('.mate-t').textContent, p: m.querySelector('.pill').textContent, neuf: m.classList.contains('is-new')})));
@@ -266,7 +295,8 @@ srv.listen(0, async () => {
       ok('« Remettre » : la carte revient dans Pour moi', await p.evaluate(() => [...document.querySelectorAll('article')].some((x) => /Passeport/.test(x.textContent) && /Plus…|Ouvrir ›/.test(x.textContent)) && ![...document.querySelectorAll('.cote-it')].some((x) => /^Passeport/.test(x.textContent)))); }
     p = await page('#equipe');
     ok('équipe : « En ce moment », fil en direct (maintenant, bientôt, plus tôt = Journal)', await p.evaluate(() => { const f = document.querySelector('.lf'); const hs = f ? [...f.querySelectorAll('.lf-h')].map((x) => x.textContent) : []; return !!f && hs.join(',') === 'Maintenant,Bientôt,Plus tôt' && /En direct/.test(f.textContent) && f.querySelectorAll('.lf-r.is-past').length >= 3 && f.querySelectorAll('.lf-r.is-wait').length >= 1 && ![...document.querySelectorAll('.panel-h h2')].some((x) => /^Journal/.test(x.textContent)); }));
-    ok('équipe : passages des 24 heures avec « dans … »', await p.evaluate(() => { const r = [...document.querySelectorAll('.lf-r.is-soon')]; return r.length >= 1 && r.every((x) => /dans |maintenant/.test(x.textContent)); }));
+    /* 20/11/2026 : indépendant du jour. Du vendredi après-midi au samedi, aucune routine d'exemple ne tombe dans les 24 heures : le bloc « Bientôt » le dit (« Aucun passage prévu dans les 24 heures »), ce qui est juste */
+    ok('équipe : passages des 24 heures avec « dans … » (ou « Aucun passage prévu » quand rien ne tombe d\'ici demain)', await p.evaluate(() => { const r = [...document.querySelectorAll('.lf-r.is-soon')], vide = [...document.querySelectorAll('.lf-calm')].some((x) => /Aucun passage prévu dans les 24 heures/.test(x.textContent)); return r.length ? r.every((x) => /dans |maintenant/.test(x.textContent)) : vide; }));
     /* équipe harmonisée (16/11/2026) */
     ok('équipe : une seule grille de 7 cartes identiques (Plutus compris), plus de liste des bots en double', await p.evaluate(() => { const m = [...document.querySelectorAll('.team .mate')]; return m.length === 7 && m.every((x) => x.querySelector('.mate-log span') && /^Prochain · /.test(x.querySelector('.mate-next small').textContent)) && !document.querySelector('.units'); }));
     ok('équipe : texte en Exo 2, plus de police machine à écrire', await p.evaluate(() => /Exo 2/.test(getComputedStyle(document.querySelector('.mate-log')).fontFamily) && /Oxanium/.test(getComputedStyle(document.querySelector('.mate b')).fontFamily)));

@@ -215,6 +215,12 @@
     {id: 'imp3', summary: 'Visite médicale', status: 'confirmed', colorId: '11', start: {date: isoD(D(9))}, end: {date: isoD(D(10))}},
     {id: 'n1', summary: 'Réunion banale', status: 'confirmed', start: {date: isoD(D(1))}, end: {date: isoD(D(2))}}
   ];
+  /* 0.28.0 : scénario « multi » — des événements de plusieurs jours déjà dans l'agenda Google : journées entières (la fin de Google est le lendemain
+     du dernier jour), avec des heures sur deux jours, et un événement d'un soir qui finit à minuit (un seul jour) */
+  if (SCEN.multi) CAL.primary.push({id: 'impM1', summary: 'Vacances chez les cousins', status: 'confirmed', colorId: '11', start: {date: isoD(D(1))}, end: {date: isoD(D(4))}},
+    {id: 'impM2', summary: 'Salon professionnel', status: 'confirmed', colorId: '11', start: {dateTime: isoD(D(10)) + 'T09:00:00+01:00'}, end: {dateTime: isoD(D(11)) + 'T17:00:00+01:00'}},
+    {id: 'impM3', summary: 'Soirée théâtre', status: 'confirmed', colorId: '11', start: {dateTime: isoD(D(12)) + 'T20:00:00+01:00'}, end: {dateTime: isoD(D(13)) + 'T00:00:00+01:00'}},
+    {id: 'impM4', summary: 'Stage déjà commencé', status: 'confirmed', colorId: '11', start: {date: isoD(D(-2))}, end: {date: isoD(D(2))}});
 
   /* Gmail */
   const msg = (id, th, from, name, subject, when, labels, snippet) => ({id, threadId: th, sender: from, addressDisplayNames: [{displayName: name, emailAddress: from}], subject, snippet: snippet || 'Extrait du mail', date: when.toISOString(), internalDate: String(when.getTime()), labelIds: labels || ['INBOX'], viewUrl: 'https://mail.google.com/mail/#all/' + th});

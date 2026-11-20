@@ -239,6 +239,15 @@ try {
     const l = await p.evaluate(() => window.JarvisServeur.idees());
     ok('idées (serveur) : gardée sur le serveur, retrouvée dans « Mes recherches d\'idées »', l && l.recherches.some((x) => x.idee === 'maison de poupée' && x.statut === 'pret' && x.max === 60 && x.n === 4));
     await p.screenshot({path: SH + 'idees-serveur.png'}); }
+  /* 0.28.0 : un événement sur plusieurs jours, créé depuis l'agenda, arrive chez Google en journées entières (fin au lendemain du dernier jour) */
+  { const isoN = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+    await p.goto(BASE + '/?serveur#agenda'); await p.waitForTimeout(3000);
+    await p.evaluate(() => [...document.querySelectorAll('button')].find((x) => /Nouvel événement important/.test(x.textContent)).click()); await p.waitForTimeout(600);
+    await p.fill('.ev-form input[type=text]', 'Séjour de test'); await p.fill('.ev-form input[type=date]:not(.ev-fin)', isoN(3)); await p.fill('.ev-form .ev-fin', isoN(6)); await p.waitForTimeout(150);
+    await p.evaluate(() => { const c = [...document.querySelectorAll('.ev-form .check input')]; if (c[1] && c[1].checked) c[1].click(); document.querySelector('.ev-form button[type=submit]').click(); }); await p.waitForTimeout(8000);
+    const ev = (FG.events.primary || []).find((e) => e.summary === 'Séjour de test'), rows = await p.evaluate(() => [...document.querySelectorAll('.mlist .dl-row')].map((x) => x.textContent).filter((t) => /Séjour de test/.test(t)));
+    const dansLeMois = [3, 4, 5, 6].filter((n) => { const d = new Date(); d.setDate(d.getDate() + n); return d.getMonth() === new Date().getMonth(); }).length;
+    ok('plusieurs jours (serveur) : l\'événement part chez Google en journées entières, du premier jour au lendemain du dernier, en rouge, puis est relu sur chacun de ses jours', !!ev && ev.start.date === isoN(3) && ev.end.date === isoN(7) && String(ev.colorId) === '11' && !ev.start.dateTime && rows.length === dansLeMois, JSON.stringify([ev, rows, dansLeMois])); }
   /* 0.27.0 : mise à jour proposée au lancement (comme Panier). Second serveur sur un dépôt git de test en retard d'une version, relancé après
      son arrêt comme par systemd ; deux « appareils » : celui qui accepte, et un autre resté sur l'ancienne version. */
   { const R = fs.mkdtempSync(path.join(os.tmpdir(), 'jarvis-maj-e2e-')), ORI = path.join(R, 'origine.git'), SRC = path.join(R, 'source'), CLO = path.join(R, 'serveur'), D2 = path.join(R, 'data');
