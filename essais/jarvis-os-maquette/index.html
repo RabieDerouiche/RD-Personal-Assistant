@@ -6,7 +6,23 @@
      Un ancien choix (« actuel », « ambre », « neon ») retombe sur Hologramme. */
   var d = document.documentElement; d.classList.add('theme-holo'); d.setAttribute('data-th', 'holo');
   var l = document.createElement('link'); l.rel = 'stylesheet'; l.href = 'https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700&family=Oxanium:wght@500;600;700&family=Exo+2:wght@400;500;600;700&display=swap'; document.head.appendChild(l);
-  })();</script><script src="jarvis-voix.js"></script><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><link rel="manifest" href="manifest.webmanifest"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black"><meta name="theme-color" content="#02040e"><link rel="apple-touch-icon" href="icon-180.png"><link rel="icon" type="image/png" href="icon-192.png"><meta name="apple-mobile-web-app-title" content="JARVIS"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}
+  })();</script><script>/* JARVIS OS 0.27.0, filet de sécurité (comme Panier) : si le programme ne s'est pas chargé (coupure pendant une mise à jour, serveur qui
+   redémarre), l'app se recharge seule, deux fois au plus, puis propose « Réessayer ». Elle ne reste jamais figée sans rien dire. */
+(function () {
+  var cle = 'jarvis.relance';
+  window.addEventListener('load', function () { setTimeout(function () {
+    var ok = !!window.JarvisAsk && !!window.JarvisVoice && (window.__JARVIS_MODE !== 'serveur' || !!window.JarvisServeur);
+    if (ok) { try { sessionStorage.removeItem(cle); } catch (e) { /* rien */ } return; }
+    var n = 9; try { n = +sessionStorage.getItem(cle) || 0; sessionStorage.setItem(cle, n + 1); } catch (e) { /* mémoire fermée */ }
+    if (n < 2) { setTimeout(function () { location.reload(); }, 900 + n * 1500); return; }
+    try { sessionStorage.removeItem(cle); } catch (e) { /* rien */ }
+    var d = document.createElement('div'); d.id = 'jarvis-relance';
+    d.style.cssText = 'position:fixed;left:12px;right:12px;top:calc(12px + env(safe-area-inset-top,0px));z-index:99;display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:16px;background:#0a2350;border:1px solid rgba(248,113,113,.6);color:#e0f2fe;font:500 14px system-ui,sans-serif';
+    d.innerHTML = '<span style="flex:1">JARVIS n\'a pas pu se charger en entier.</span><button type="button" style="font:inherit;font-weight:700;color:#fff;background:#2563eb;border:0;border-radius:999px;padding:9px 16px">Réessayer</button>';
+    d.querySelector('button').onclick = function () { location.reload(); };
+    document.body.appendChild(d);
+  }, 400); });
+})();</script><script src="jarvis-voix.js"></script><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><link rel="manifest" href="manifest.webmanifest"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black"><meta name="theme-color" content="#02040e"><link rel="apple-touch-icon" href="icon-180.png"><link rel="icon" type="image/png" href="icon-192.png"><meta name="apple-mobile-web-app-title" content="JARVIS"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}
   /* ---------- JARVIS OS : navigation et écrans ajoutés ---------- */
   .fab-talk { display: none !important; }
   /* 0.25.0 : en-tête sur une ligne */
@@ -50,6 +66,16 @@
   .gs-go { flex: 0 0 auto; color: var(--muted); }
   .gs-more { justify-self: start; margin-left: 2px; }
   .gs-pap { border-style: dashed; }
+  /* 0.27.0 : la mise à jour proposée au lancement */
+  .maj { position: fixed; inset: 0; z-index: 95; display: flex; align-items: flex-end; justify-content: center; background: rgba(1, 4, 14, .62); -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); padding: 0 12px calc(14px + env(safe-area-inset-bottom, 0px)); }
+  .maj[hidden] { display: none; }
+  .maj-card { width: 100%; max-width: 460px; display: grid; justify-items: center; gap: 10px; text-align: center; padding: 22px 18px 18px; border-radius: 24px; border: 1px solid rgba(56, 189, 248, .5); background: linear-gradient(180deg, #0a2350, #04112b 70%); box-shadow: 0 0 40px rgba(56, 189, 248, .25); color: var(--fg); }
+  .maj-card h3 { margin: 0; font: 600 19px var(--display); } .maj-card p { margin: 0; font-size: 14.5px; line-height: 1.5; color: #bfdbfe; }
+  .maj-rond { width: 56px; height: 56px; border-radius: 50%; display: grid; place-items: center; color: #7dd3fc; border: 1px solid rgba(56, 189, 248, .6); box-shadow: 0 0 24px rgba(56, 189, 248, .3); }
+  .maj-rond.is-tourne svg { animation: majtourne 1.1s linear infinite; } .maj-rond.is-bad { color: #fca5a5; border-color: rgba(248, 113, 113, .6); box-shadow: 0 0 24px rgba(248, 113, 113, .25); }
+  @keyframes majtourne { to { transform: rotate(360deg); } }
+  .maj-acts { display: grid; grid-template-columns: 1fr 1.4fr; gap: 10px; width: 100%; margin-top: 8px; }
+  .maj-acts .btn { min-height: 48px; justify-content: center; } .maj-acts .btn:only-child { grid-column: 1 / -1; }
   /* 0.26.0 : un bot pas encore inscrit dans Pilotage */
   .bot-new { border-color: rgba(var(--warn), .45) !important; }
   .bot-new-t { margin: 0 0 10px; font-size: 14px; line-height: 1.5; }
@@ -7905,6 +7931,83 @@ void main(){
     return card;
   };
 
+  /* ================= JARVIS OS 0.27.0 (20/11/2026, « on a mis en place une mise à jour automatique sur Panier, fais pareil sur JARVIS ») =================
+     Le même mécanisme que Panier. Au lancement, et seulement au lancement, l'app demande au serveur s'il existe une version plus récente
+     (GET /api/maj : le serveur n'interroge le dépôt qu'une fois toutes les dix minutes) et la propose : « Plus tard » ou « Mettre à jour ».
+     Sur oui : le serveur tire le code, systemd le relance, l'app attend deux réponses de suite du nouveau serveur (empreinte changée), puis se
+     recharge seule. « Plus tard » vaut pour l'ouverture en cours. Un autre appareil resté sur l'ancienne version se recharge seul à son prochain
+     retour dans l'app. Réglages, « Mettre à jour le serveur », force la vérification. Le service de cache ne prend la relève qu'à l'arrière-plan. */
+  var MAJ = {st: null, plusTard: false, commit0: '', version0: ''};
+  function majJS() { const J = window.__JARVIS_MODE === 'serveur' ? window.JarvisServeur : null; return J && J.maj && J.sante0 && J.linked && J.linked() ? J : null; }
+  const majAttente = (ms) => new Promise((z) => setTimeout(z, ms));
+  /* rien d'ouvert ni en cours à l'écran : la question (ou un rechargement) ne coupe jamais un geste */
+  function majLibre() { return $('sheet').hidden && !CHAT.open && !APP.id && !(typeof GS === 'object' && GS && GS.open) && !(typeof FOCUS === 'object' && FOCUS && FOCUS.on) && !(typeof DICT === 'object' && DICT && DICT.on) && !document.querySelector('.all-sheet:not([hidden])'); }
+  function majPaint() {
+    let ov = $('maj');
+    const st = MAJ.st;
+    if (!st) { if (ov) ov.hidden = true; return; }
+    if (!ov) { ov = h('div', {class: 'maj', id: 'maj', role: 'dialog', 'aria-label': 'Mise à jour de JARVIS'}); document.body.append(ov); }
+    const ferme = () => { MAJ.st = null; majPaint(); };
+    const corps = st.etape === 'question'
+      ? [h('div', {class: 'maj-rond', html: icon('refresh', 26)}), h('h3', {text: 'Nouvelle version disponible'}),
+        h('p', {text: (st.version ? 'JARVIS ' + st.version + ' est prêt.' : 'Une version plus récente de JARVIS est prête.') + ' La mise à jour prend une dizaine de secondes, tes données ne bougent pas.'}),
+        h('div', {class: 'maj-acts'}, h('button', {type: 'button', class: 'btn ghost', id: 'maj-non', onclick: () => { MAJ.plusTard = true; ferme(); }}, 'Plus tard'), h('button', {type: 'button', class: 'btn main', id: 'maj-oui', onclick: majLance}, 'Mettre à jour'))]
+      : st.etape === 'cours'
+        ? [h('div', {class: 'maj-rond is-tourne', html: icon('refresh', 26)}), h('h3', {text: 'Mise à jour en cours…'}), h('p', {role: 'status', text: st.message || 'Le serveur installe la nouvelle version.'})]
+        : [h('div', {class: 'maj-rond is-bad', html: icon('x', 26)}), h('h3', {text: "La mise à jour n'a pas abouti"}), h('p', {role: 'status', text: st.message}), h('div', {class: 'maj-acts'}, h('button', {type: 'button', class: 'btn main', id: 'maj-ferme', onclick: ferme}, 'Fermer'))];
+    ov.replaceChildren(h('div', {class: 'maj-card', 'data-etape': st.etape}, corps)); ov.hidden = false;
+  }
+  /* demandee : depuis Réglages (la vérification est forcée et la réponse toujours dite) ; sinon au lancement, en silence s'il n'y a rien */
+  async function majCheck(demandee) {
+    const J = majJS();
+    if (!J) return demandee ? 'Cet iPhone n’est pas relié au serveur.' : '';
+    if (MAJ.st) return '';
+    const r = await J.maj(!!demandee);
+    if (!r) return demandee ? 'Serveur injoignable, ou serveur trop ancien pour cette vérification.' : '';
+    if (r.erreur) return demandee ? "Le serveur n'a pas pu lire le dépôt : réessaie dans un instant." : '';
+    if (!r.dispo) return demandee ? 'JARVIS est à jour (version ' + (r.actuelle || '?') + ').' : '';
+    if (!demandee && (MAJ.plusTard || !majLibre())) return '';
+    const v = r.version && r.version !== r.actuelle ? r.version : '';   /* même numéro (correctif sans changement de version) : on ne l'affiche pas */
+    MAJ.st = {etape: 'question', version: v, message: ''}; majPaint();
+    return demandee ? (v ? 'Version ' + v + ' disponible.' : 'Une version plus récente est disponible.') : '';
+  }
+  async function majLance() {
+    const J = majJS(), st = MAJ.st; if (!J || !st || st.etape === 'cours') return;
+    st.etape = 'cours'; st.message = ''; majPaint();
+    const echec = (m) => { st.etape = 'echec'; st.message = m; majPaint(); };
+    const avant = await J.sante0(), rep = await J.update();
+    if (!rep || !rep.ok) return echec((rep && rep.message) || 'Le serveur ne répond pas. Réessaie dans un instant.');
+    if (rep.changed) {   /* le serveur redémarre : on attend qu'il réponde avec le nouveau code, 45 secondes au plus */
+      st.message = 'Le serveur redémarre…'; majPaint();
+      const t0 = Date.now(), neuf = (x) => x && x.ok && (!avant || (x.commit && x.commit !== avant.commit) || x.version !== avant.version); let bons = 0, pret = false;
+      while (Date.now() - t0 < 45000) { await majAttente(700); bons = neuf(await J.sante0()) ? bons + 1 : 0; if (bons >= 2) { pret = true; break; } }   /* deux réponses de suite du nouveau serveur */
+      if (!pret) return echec('Le serveur met plus de temps que prévu à redémarrer. Rouvre JARVIS dans une minute.');
+    }
+    st.message = 'Chargement de la nouvelle version…'; majPaint();
+    try { localStorage.setItem('jarvis.maj.faite', '1'); } catch (e) { /* rien */ }
+    location.reload();   /* un simple rechargement : le code vient d'abord du réseau ; le service de cache n'est jamais remplacé pendant que la page charge */
+  }
+  /* l'app ouverte est plus ancienne que le serveur (un autre appareil a fait la mise à jour) : on recharge, une seule fois, quand rien n'est en cours */
+  async function majRechargeSiAncienne() {
+    const J = majJS(); if (!J || !MAJ.commit0 || MAJ.st) return;
+    const x = await J.sante0(); if (!x || !x.ok || !x.commit || x.commit === MAJ.commit0) return;
+    let deja = ''; try { deja = sessionStorage.getItem('jarvis.recharge') || ''; } catch (e) { deja = ''; }
+    if (deja === x.commit || !majLibre()) return;
+    try { sessionStorage.setItem('jarvis.recharge', x.commit); localStorage.setItem('jarvis.maj.faite', '1'); } catch (e) { /* rien */ }
+    location.reload();
+  }
+  /* l'app passe à l'arrière-plan : un nouveau service de cache en attente peut prendre la relève sans rien couper */
+  function majReleveService() { try { if (navigator.serviceWorker && navigator.serviceWorker.getRegistration) navigator.serviceWorker.getRegistration().then((reg) => { if (reg && reg.waiting) reg.waiting.postMessage({type: 'active'}); }).catch(() => {}); } catch (e) { /* rien */ } }
+  document.addEventListener('visibilitychange', () => { if (document.hidden) majReleveService(); else majRechargeSiAncienne(); });
+  window.JarvisMaj = {check: majCheck};
+  (async () => {
+    const J = majJS(); if (!J) return;
+    const x = await J.sante0(); if (x && x.ok) { MAJ.commit0 = x.commit || ''; MAJ.version0 = x.version || ''; }
+    let faite = ''; try { faite = localStorage.getItem('jarvis.maj.faite') || ''; if (faite) localStorage.removeItem('jarvis.maj.faite'); } catch (e) { faite = ''; }
+    if (faite === '1') toast('JARVIS est à jour', 'Version ' + (MAJ.version0 || '?') + '.', true);
+    setTimeout(() => { majCheck(false).catch(() => {}); }, 1500);   /* une seule vérification, au lancement */
+  })();
+
   /* l'historique de tes demandes (Canal) va dans Suivi */
   const VSU_PM = VIEWS.suivi;
   VIEWS.suivi = (el) => { VSU_PM(el); if (LINK.on && LV.mcp && typeof histPanel === 'function') el.append(histPanel()); };
@@ -8420,7 +8523,9 @@ void main(){
       const seg = (k, opts, def) => h('div', {class: 'seg set-seg', role: 'group'}, opts.map(([v, l]) => h('button', {type: 'button', 'aria-pressed': String((JS.setting(k) || def) === v), onclick: () => { JS.set(k, v); location.reload(); }}, l)));
       parts.push(h('section', {class: 'card set-card'}, h('b', {text: 'JARVIS'}),
         h('p', {class: 'muted', text: st ? 'Serveur ' + st.version + (st.commit ? ' (' + String(st.commit).slice(0, 7) + ')' : '') + ' · Claude ' + (st.claude && st.claude.loggedIn ? 'connecté' : 'non connecté') + ' · voix du serveur ' + (st.tts ? 'prête' : 'absente') + ' · écoute Whisper ' + (st.ecoute ? 'prête' : st.ecouteInstall === 'running' ? 'en cours d’installation' : 'absente') : 'État du serveur indisponible.'}),
-        h('button', {type: 'button', class: 'btn main', onclick: async () => { upd.textContent = 'Mise à jour…'; const r = await JS.update(); upd.textContent = (r && r.message) || 'Réponse illisible.'; upd.classList.toggle('is-bad', !(r && r.ok)); if (r && r.changed) setTimeout(() => location.reload(), 6000); }}, 'Mettre à jour le serveur'), upd,
+        /* 0.27.0 : la mise à jour est proposée toute seule à l'ouverture de l'app ; ce bouton force la vérification et suit le même chemin */
+        h('button', {type: 'button', class: 'btn main', id: 'set-maj', onclick: async () => { upd.textContent = 'Vérification…'; upd.classList.remove('is-bad'); let m = ''; try { m = await window.JarvisMaj.check(true); } catch (e) { m = 'Vérification impossible.'; } upd.textContent = m; upd.classList.toggle('is-bad', /injoignable|impossible|pas pu|pas relié/.test(m)); }}, 'Mettre à jour le serveur'), upd,
+        h('p', {class: 'muted', text: 'Une nouvelle version est proposée toute seule à l’ouverture de JARVIS ; ce bouton force la vérification.'}),
         h('small', {class: 'pick-label', text: 'Voix de JARVIS'}), seg('voiceEngine', [['serveur', 'Pierre (ton serveur)'], ['iphone', "Voix de l'iPhone"]], 'serveur'),
         /* 0.25.0 (choix QCM du 19/11/2026, « un seul Claude ») : plus de conversation continue ; l'orbe ouvre la discussion avec Claude et le micro
            écoute une question (Whisper du serveur, sinon l'iPhone), écrite dans le champ avant l'envoi */

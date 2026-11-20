@@ -27,6 +27,17 @@ srv.listen(0, async () => {
       await Promise.all(waits);
       H.notificationclick({notification: {close: () => {}, data: shown[0] && shown[0][1].data}, waitUntil: (p) => waits.push(p)}); await Promise.all(waits);
       ok('service worker : notification affichée, pastille à 2, un appui ouvre « Pour moi »', shown.length === 1 && shown[0][0] === 'Iris a répondu' && shown[0][1].body === 'Prix relevés' && badges[0] === 2 && opened[0] === 'https://jarvis.essai/#demandes', JSON.stringify({shown, badges, opened})); }
+      /* 0.27.0 (comme Panier) : jamais de relève pendant un chargement (pas de skipWaiting à l'installation), seulement quand l'app est à
+         l'arrière-plan (message « active ») ; une erreur 5xx du serveur qui redémarre retombe sur la copie gardée */
+      { let skips = 0; const vm = require('vm'), H2 = {}, gardes = {'https://jarvis.essai/index.html': {ok: true, status: 200, copie: true}};
+        const self2 = {addEventListener: (t, f) => { H2[t] = f; }, registration: {scope: 'https://jarvis.essai/'}, clients: {claim: () => Promise.resolve()}, skipWaiting: () => { skips++; return Promise.resolve(); }};
+        const cachesF = {open: () => Promise.resolve({add: () => Promise.resolve(), put: () => Promise.resolve()}), keys: () => Promise.resolve([]), match: (r) => Promise.resolve(gardes[typeof r === 'string' ? 'https://jarvis.essai/index.html' : r.url] || null)};
+        let rep = {ok: false, status: 502}; vm.runInNewContext(fs.readFileSync(path.join(ROOT, 'sw.js'), 'utf8'), {self: self2, caches: cachesF, fetch: () => Promise.resolve(rep), URL, Promise, location: {origin: 'https://jarvis.essai'}});
+        const w2 = []; H2.install({waitUntil: (p) => w2.push(p)}); await Promise.all(w2); const apresInstall = skips;
+        H2.message({data: {type: 'autre'}}); const apresAutre = skips; H2.message({data: {type: 'active'}});
+        let rendu = null; H2.fetch({request: {method: 'GET', url: 'https://jarvis.essai/index.html', mode: 'navigate', clone: () => ({})}, respondWith: (p) => { rendu = p; }}); const r502 = await rendu;
+        rep = {ok: false, status: 404}; H2.fetch({request: {method: 'GET', url: 'https://jarvis.essai/index.html', mode: 'navigate'}, respondWith: (p) => { rendu = p; }}); const r404 = await rendu;
+        ok('service worker : pas de relève pendant un chargement (seulement sur « active », à l\'arrière-plan) ; un serveur qui redémarre (502) rend la copie gardée, pas une page d\'erreur', apresInstall === 0 && apresAutre === 0 && skips === 1 && r502 && r502.copie === true && r404.status === 404, JSON.stringify({apresInstall, apresAutre, skips, r502, r404})); }
     /* accueil et thème */
     let p = await page('');
     ok('mode maquette sur un serveur local', await p.evaluate(() => window.__JARVIS_MODE === 'maquette'));
