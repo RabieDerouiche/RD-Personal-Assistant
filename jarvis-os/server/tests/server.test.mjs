@@ -607,6 +607,15 @@ try {
         ok('mémoire : le Claude de la discussion reçoit ses souvenirs et son Profil, jamais les finances', /^Je retiens : vols directs ; Profil : lu ; finances : absentes\./.test(fm.fin || ''), fm.fin);
         const ef = await MP('/api/memoire/efface', {id: a1.body.item.id});
         ok('mémoire : « Oublier » retire le souvenir', ef.status === 200 && ef.body.items.length === 1 && !ef.body.items.some((x) => /vols directs/.test(x.texte)), JSON.stringify(ef.body.items));
+        /* 0.42.0 : la mémoire qui se range seule — les échanges de la discussion sont notés ; Claude propose, il valide une à une */
+        await MP('/api/memoire', {texte: 'Aime les randonnées le dimanche'});
+        await flux({input: [{role: 'user', content: 'Cherche un train de nuit pour Rome'}], tier: 'quick'});
+        const jr = JSON.parse(fs.readFileSync(path.join(DATA, 'discussions.json'), 'utf8'));
+        const rg = await MP('/api/memoire/ranger', {});
+        const pr = rg.body.propositions || [], samedi = pr.find((x) => /samedi/.test(x.texte)), nuit = pr.find((x) => /trains de nuit/.test(x.texte));
+        ok('mémoire qui se range : les échanges sont notés sur le serveur ; Claude propose (rien de bancaire), rien n\'est retenu sans lui', jr.some((x) => /train de nuit pour Rome/.test(x.q)) && rg.status === 200 && pr.length === 2 && !!samedi && samedi.remplace === 'Aime les randonnées le dimanche' && !!nuit && !pr.some((x) => /IBAN/.test(x.texte)) && !rg.body.items.some((x) => /trains de nuit/.test(x.texte)), JSON.stringify([jr.length, pr]));
+        const o1 = await MP('/api/memoire/proposition', {id: samedi.id, oui: true}), o2 = await MP('/api/memoire/proposition', {id: nuit.id, oui: false});
+        ok('mémoire qui se range : « Retenir » remplace le souvenir dépassé ; « Non » l\'écarte', o1.status === 200 && o1.body.items.some((x) => x.texte === 'Aime les randonnées le samedi' && x.source === 'rangement') && !o1.body.items.some((x) => /dimanche/.test(x.texte)) && o2.body.propositions.length === 0 && !o2.body.items.some((x) => /trains de nuit/.test(x.texte)), JSON.stringify([o1.body.items, o2.body.propositions]));
         await G('/api/google/unlink', {}); }
       /* 0.38.0 : les skills des missions — relues, posées dans le dossier de travail de chaque mission, outil Skill permis */
       { const sk = await call('/api/skills', {headers: A});

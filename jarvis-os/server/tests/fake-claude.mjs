@@ -93,6 +93,8 @@ function answer(raw) {
   /* discussion de la page sur le serveur : propositions en fin de réponse (⟦outil …⟧), seulement si la consigne décrit les outils */
   const lastQ = input.split('Lui : ').pop(), sys = (opt('--append-system-prompt') || '') + '\n' + (opt('--system-prompt') || '') + '\n' + FIRST;
   /* 0.37.0 : la mémoire durable — ce qu'il reçoit dans sa consigne, et la proposition de retenir (si l'outil est décrit) */
+  /* 0.42.0 : le rangement de la mémoire : deux propositions utiles (dont une qui remplace), et une bancaire que le serveur doit écarter */
+  if (/Propose ce qu'il faut retenir/.test(input)) return {text: JSON.stringify({propositions: [{texte: 'Préfère les trains de nuit pour les longs trajets', remplace: ''}, {texte: 'Aime les randonnées le samedi', remplace: /Aime les randonnées le dimanche/.test(raw) ? 'Aime les randonnées le dimanche' : ''}, {texte: 'Mon IBAN est FR76 3000 6000 0112 3456 7890 189', remplace: ''}]})};
   /* 0.41.0 : Claude propose une routine (si l'outil est décrit) */
   if (/programme chaque lundi/i.test(lastQ)) return {text: /outil programmer_routine|- programmer_routine :/.test(sys) ? 'Je te propose cette routine.\n⟦outil programmer_routine {"phrase":"chaque lundi à 8 h, résume la semaine qui vient"}⟧' : 'Pas d’outil de routine.'};
   if (/que retiens-tu/i.test(lastQ)) return {text: 'Je retiens : ' + (/- Préfère les vols directs/.test(sys) ? 'vols directs' : 'rien') + ' ; Profil : ' + (/Végétarien le lundi/.test(sys) ? 'lu' : 'non lu') + ' ; finances : ' + (/plafond de dépenses/.test(sys) ? 'présentes' : 'absentes') + '.'};
