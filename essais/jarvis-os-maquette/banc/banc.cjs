@@ -65,6 +65,31 @@ srv.listen(0, async () => {
     await p.screenshot({path: path.join(SH, 'tout.png')});
     await p.tap('.all-grid .tab[data-tab="papiers"]'); await p.waitForTimeout(600);
     ok('rubrique ouverte depuis « Tout »', await p.evaluate(() => document.querySelector('.all-sheet').hidden && /papiers/i.test(document.getElementById('view-title').textContent)));
+    /* 0.49.1 (« l'ouverture du menu bugge des fois ») : vrais gestes tactiles, une page neuve par geste */
+    { const fresh = async () => { const q = await page(''); return {q, cdp: await q.context().newCDPSession(q)}; };
+      const st = (q) => q.evaluate(() => { const s = document.querySelector('.all-sheet'); return s.hidden ? 'fermé' : s.classList.contains('is-open') ? 'ouvert' : 'transition'; });
+      const tt = (cdp, type, x, y) => cdp.send('Input.dispatchTouchEvent', {type, touchPoints: /End|Cancel/.test(type) ? [] : [{x, y}]});
+      const drag = async (q, cdp, x0, y0, x1, y1) => { await tt(cdp, 'touchStart', x0, y0); for (let i = 1; i <= 6; i++) { await tt(cdp, 'touchMove', x0 + (x1 - x0) * i / 6, y0 + (y1 - y0) * i / 6); await q.waitForTimeout(16); } await tt(cdp, 'touchEnd'); await q.waitForTimeout(600); };
+      const hd = (q) => q.evaluate(() => { const r = document.querySelector('.fav-handle').getBoundingClientRect(); return {x: r.left + r.width / 2, y: r.top + r.height / 2, top: r.top}; });
+      const tab = (q) => q.evaluate(() => { const r = document.querySelector('.fav-row .tab').getBoundingClientRect(); return {x: r.left + r.width / 2, y: r.top + r.height / 2}; });
+      const orb = (q) => q.evaluate(() => { const r = document.querySelector('.talk-slot').getBoundingClientRect(); return {x: r.left + r.width / 2, y: r.top + r.height / 2}; });
+      let {q, cdp} = await fresh(); let H = await hd(q); await q.touchscreen.tap(H.x, H.y); await q.waitForTimeout(150); await q.touchscreen.tap(H.x, H.y); await q.waitForTimeout(600);
+      ok('« Tout » : un second appui impatient ne referme pas le menu (« Fermer » monte à la place de « Tout »)', await st(q) === 'ouvert');
+      await q.context().close(); ({q, cdp} = await fresh()); H = await hd(q); await q.touchscreen.tap(H.x, H.top - 8); await q.waitForTimeout(600);
+      ok('« Tout » : un appui un peu au-dessus de la poignée ouvre le menu, pas la carte derrière', await st(q) === 'ouvert' && await q.evaluate(() => document.getElementById('sheet').hidden));
+      await q.context().close(); ({q, cdp} = await fresh()); let O = await orb(q); await drag(q, cdp, O.x, O.y + 10, O.x, O.y - 45);
+      const deOrbe = await st(q); await q.context().close(); ({q, cdp} = await fresh()); let A = await tab(q); await drag(q, cdp, A.x, A.y, A.x + 120, A.y - 45);
+      const biais = await st(q); await q.context().close(); ({q, cdp} = await fresh()); A = await tab(q); await drag(q, cdp, A.x, A.y, A.x, A.y - 50);
+      ok('glissé vers le haut sur la barre : ouvre depuis un favori, jamais depuis l\'orbe ni en biais', deOrbe === 'fermé' && biais === 'fermé' && await st(q) === 'ouvert', deOrbe + ' / ' + biais);
+      const t = await q.evaluate(() => document.querySelector('.all-panel').getBoundingClientRect().top + 30);
+      await tt(cdp, 'touchStart', 215, t); await tt(cdp, 'touchMove', 215, t + 40); await tt(cdp, 'touchCancel'); await q.waitForTimeout(500);
+      ok('menu : un glissé interrompu par iOS (touchcancel) remet le panneau en place', await st(q) === 'ouvert' && await q.evaluate(() => { const e = document.querySelector('.all-panel'); return !e.style.transform && !e.style.transition; }));
+      await Promise.all([tt(cdp, 'touchStart', 215, t), tt(cdp, 'touchMove', 215, t + 25), tt(cdp, 'touchMove', 215, t + 50), tt(cdp, 'touchMove', 215, t + 70), tt(cdp, 'touchEnd')]); await q.waitForTimeout(600);
+      ok('menu : un lancer vif vers le bas le ferme (même s\'il fait moins de 90 px)', await st(q) === 'fermé');
+      H = await hd(q); await q.touchscreen.tap(H.x, H.y); await q.waitForTimeout(500);
+      await q.evaluate(() => document.querySelector('.all-h .link').click()); await q.evaluate(() => document.querySelector('.fav-pick.is-fav').click()); await q.evaluate(() => document.querySelector('.all-h .link').click()); await q.waitForTimeout(200);
+      ok('favoris laissés à 3 puis « Terminé » : les 4 d\'avant sont gardés, avec un avis', await q.evaluate(() => { const s = document.querySelector('.all-sheet'); s.querySelector('.all-h .link').click(); return document.querySelectorAll('.fav-pick.is-fav').length === 4 && document.querySelectorAll('.fav-row .tab').length === 4 && /Favoris inchangés/.test(document.getElementById('toasts').textContent); }));
+      await q.context().close(); }
     /* 0.25.0, un seul Claude : l'orbe ouvre la discussion avec Claude (celle qui a ses données) ; plus de page vocale ni de « Conversation » en continu */
     await p.tap('.talk-slot .jv-btn'); await p.waitForTimeout(1000);
     ok('orbe : ouvre la discussion avec Claude, sans page vocale ni mode « Conversation »', await p.evaluate(() => !document.getElementById('chat').hidden && !document.querySelector('.jv') && !!document.querySelector('#chat .lire-toggle') && ![...document.querySelectorAll('#chat .chat-head button')].some((x) => /Conversation|Fil/.test(x.textContent)) && /Claude/.test(document.querySelector('#chat .chat-id b').textContent)));
