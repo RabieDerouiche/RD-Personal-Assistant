@@ -627,6 +627,12 @@ try {
         const ms = await call('/api/mission', {method: 'POST', headers: A, body: JSON.stringify({texte: 'liste tes skills'})});
         let mr = null; for (let i = 0; i < 60 && !(mr && ['terminee', 'echouee'].includes(mr.status)); i++) { await new Promise((z) => setTimeout(z, 250)); mr = ((await call('/api/missions', {headers: A})).body.missions || []).find((x) => x.id === ms.body.id); }
         ok('skills : posées dans le dossier de travail de la mission, outil Skill permis', !!mr && /^Skills : comparatif-achat, courrier, demarche, recherche-web, voyage ; outil Skill : oui\./.test(mr.result || ''), JSON.stringify(mr && {s: mr.status, r: mr.result})); }
+      /* 0.45.0 : JARVIS se connaît : le Claude de la discussion reçoit l'état du moment (voix, compteur Google, écoute…) avec la question, et le guide de ses réglages */
+      { const q1 = await flux({input: [{role: 'user', content: 'La voix Google est-elle activée ?'}], tier: 'quick'});
+        await call('/api/voix/google', {method: 'POST', headers: A, body: JSON.stringify({voixServeur: 'google'})});
+        const q2 = await flux({input: [{role: 'user', content: 'La voix Google est-elle activée ?'}], tier: 'quick'});
+        await call('/api/voix/google', {method: 'POST', headers: A, body: JSON.stringify({voixServeur: 'pierre'})});
+        ok('JARVIS se connaît : son Claude sait si la voix Google est choisie, son compteur et son plafond, l\'écoute ; il a le guide de ses réglages', /^Non ; plafond 220 ; guide : oui ; écoute : Whisper/.test(q1.fin || '') && /^Oui ; plafond 220 ; guide : oui/.test(q2.fin || ''), JSON.stringify([q1.fin, q2.fin])); }
       /* 0.39.0 : le serveur MCP — découverte OAuth, inscription, accord donné dans l'app (4 chiffres), PKCE, jetons, outils, propositions à approuver */
       { const PK = (v) => crypto.createHash('sha256').update(v).digest('base64url');
         const raw = (u, o = {}) => fetch(BASE + u, {redirect: 'manual', ...o});

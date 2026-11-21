@@ -27,7 +27,7 @@ import {createActivite, outilNom} from './activite.mjs';
 import {createRadar} from './radar.mjs';
 const ACT = createActivite();   /* 0.33.0 : ce que fait Claude à l'instant */
 
-const VERSION = '0.44.0';
+const VERSION = '0.45.0';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PORT = +(process.env.PORT || 8787);
 const HOST = process.env.HOST || '127.0.0.1';
@@ -365,7 +365,7 @@ function prechauffe() {
   });
 }
 /* 0.30.0 : Claude pour la page, instantané (flux.mjs) : discussion gardée ouverte, réponse mot par mot, file à part, secours */
-const FLUX = createFlux({bin: CLAUDE, env: childEnv, settings: () => guardSettings('chat'), cwd: path.join(DATA, 'sample'), conso: consoAdd, friendly, dateLigne, activite: ACT,
+const FLUX = createFlux({bin: CLAUDE, env: childEnv, settings: () => guardSettings('chat'), cwd: path.join(DATA, 'sample'), conso: consoAdd, friendly, dateLigne: () => dateLigne() + etatJarvisLigne(), activite: ACT,
   models: {quick: MODELS.rapide, default: MODELS.equilibre, deep: MODELS.profond, smart: MODELS.profond}});
 const PAGE_SYS = "Tu réponds au propriétaire dans sa page Jarvis (JARVIS OS), en français, en le tutoyant. Réponds exactement au format demandé.";
 function chatFin(r, t0, warm, model, send) {
@@ -917,7 +917,7 @@ const MCP_OUTILS = [
     run: async () => {
       const ctx = GG.status('').linked ? await racContext() : "Google n'est pas relié à JARVIS : agenda et Pilotage indisponibles.";
       const ms = S.missions.filter((x) => ['a_approuver', 'attente', 'envoyee', 'approuvee'].includes(x.status)).slice(-8);
-      return ctx + (ms.length ? '\nMissions et propositions : ' + ms.map((x) => (x.agent === 'claude' ? '' : 'ordre à ' + (BOT_NOMS[x.agent] || x.agent) + ' : ') + '« ' + clip(x.text, 90) + ' » (' + (MCP_STATUT[x.status] || x.status) + ')').join(' ; ') + '.' : '');
+      return ctx + '\n' + etatJarvisLigne().trim() + (ms.length ? '\nMissions et propositions : ' + ms.map((x) => (x.agent === 'claude' ? '' : 'ordre à ' + (BOT_NOMS[x.agent] || x.agent) + ' : ') + '« ' + clip(x.text, 90) + ' » (' + (MCP_STATUT[x.status] || x.status) + ')').join(' ; ') + '.' : '');
     }},
   {name: 'jarvis_agenda', title: 'Agenda', description: "Son agenda principal (Google Agenda), de 1 à 14 jours à partir d'une date, à l'heure de Paris.",
     inputSchema: {type: 'object', properties: {debut: {type: 'string', description: "AAAA-MM-JJ (aujourd'hui par défaut)"}, jours: {type: 'integer', minimum: 1, maximum: 14, description: 'Nombre de jours (1 par défaut)'}}}, annotations: MCP_LECTURE,
@@ -950,6 +950,33 @@ const MCP_OUTILS = [
       mcpProposer(id, t, client); return 'Proposé à ' + BOT_NOMS[id] + ' : il attend son accord dans JARVIS (Suivi).';
     }}
 ];
+/* ---------- 0.45.0 : JARVIS se connaît (capture du 21/11/2026 : à « la voix Google est-elle activée ? », son Claude répondait
+   « je ne peux pas vérifier » et proposait la tâche du serveur). Un guide fixe de ses fonctions et de leurs réglages va dans la consigne
+   (stable : la discussion garde son Claude), et l'état du moment part avec chaque question dans une ligne [JARVIS …]. ---------- */
+const GUIDE_JARVIS = `\n\n[JARVIS OS ${VERSION} : ce que tu es et ce que tu sais faire. Tu es le Claude de JARVIS OS, l'app du propriétaire sur son serveur. « Réglages » s'ouvre par « Tout » (la petite barre au-dessus de l'orbe), puis Réglages.
+- Conversation continue : l'orbe. Écoute Parakeet et fin de phrase Smart Turn : Réglages, carte « JARVIS » (« Passer à Parakeet », « Installer la fin de phrase (Smart Turn) »).
+- Voix du serveur : Pierre (Piper, gratuit) ou Google Chirp 3 HD : Réglages, carte « Voix du serveur : Pierre ou Google » (il y colle sa clé d'API Google, puis choisit « Google » et une voix). Gratuite jusqu'à 1 million de caractères par mois ; JARVIS compte, prévient à 80 % et à 95 %, et repasse seul sur Pierre à son plafond (sous le million) jusqu'au mois suivant : jamais rien de payant. Ce garde-fou existe déjà.
+- Mémoire : « retiens que… » (outil retenir) ; Réglages, « Ce que JARVIS retient » ; Claude la range chaque dimanche à 18 h (propositions à valider).
+- Routines et brief du matin : « Tout », Automatisations, « Routines de Claude » (une routine en une phrase ; outil programmer_routine).
+- Automatisations de l'iPhone : Réglages, « Siri et bouton Action », « Automatisations » (actions brief, agenda, demain, pourmoi, meteo).
+- Assistants reliés (app Claude, Grok Bot) : Réglages, « Assistants reliés (MCP) » ; leurs propositions dans « Tout », Suivi, « Missions de Claude » (« À approuver »).
+- Argent (Radar) : « Tout », rubrique « Argent » : ses dépenses fixes, sa paie, le reste à payer, ce que ses mails annoncent. Ses chiffres ne te sont jamais donnés (rien de bancaire dans tes consignes) : pour une question d'argent, renvoie-le à cette rubrique, sans rien inventer.
+- Notifications : Réglages, « Notifications ». Mise à jour : proposée à l'ouverture, ou Réglages, carte « JARVIS », « Mettre à jour le serveur ».
+L'état du moment (voix, compteurs, écoute, mémoire, routines, assistants) arrive avec chaque question dans la ligne [JARVIS …] : réponds à partir d'elle, sans dire que tu ne peux pas vérifier. Pour un réglage : son état, puis les étapes exactes. Un changement du code de JARVIS se demande dans sa session de développement (Claude Code) : ne le confie jamais à la tâche Claude du serveur.]`;
+const nbFr = (n) => Number(n || 0).toLocaleString('fr-FR');
+function etatJarvisLigne() {
+  try {
+    const vg = VG.etat(), g = (S.config || {}).voixServeur === 'google', nomG = String((S.config || {}).voixGoogleNom || VOIX_DEFAUT).split('-').pop();
+    const voix = g && vg.pret ? 'voix du serveur Google (' + nomG + ')' + (vg.pause ? ', en pause : plafond atteint, Pierre parle jusqu’au 1er' : '') : 'voix du serveur Pierre' + (vg.pret ? ' (clé Google posée, Google pas choisi)' : ' (voix Google non activée : aucune clé)');
+    const compteur = vg.pret ? ', ' + nbFr(vg.caracteres) + ' caractères Google ce mois sur un plafond de ' + nbFr(vg.plafond) + ' (gratuit jusqu’à 1 million)' : '';
+    const em = ECOUTE.moteur(), ecoute = ECOUTE.ready() ? 'écoute ' + (em.moteur === 'parakeet' ? 'Parakeet' : 'Whisper') + ', fin de phrase ' + (TOUR.ready() ? 'Smart Turn' : 'à 0,7 s de silence (Smart Turn pas installé)') : 'écoute du serveur pas installée';
+    const rs = ROUT.liste(), b = rs.find((x) => x.genre === 'brief'), nr = rs.filter((x) => x.genre === 'mission' && x.actif).length;
+    const relies = JMCP.etat().relies.map((x) => x.nom);
+    return '[JARVIS ' + VERSION + ' : ' + voix + compteur + ' ; ' + ecoute + ' ; mémoire ' + MEM.liste().length + ' souvenir(s), Profil ' + (PROFIL.texte ? 'lu' : 'pas lu')
+      + ' ; brief du matin ' + (b && b.actif ? b.quand : 'coupé') + ' ; ' + nr + ' routine(s) active(s) ; assistants reliés : ' + (relies.join(', ') || 'aucun')
+      + ' ; notifications : ' + ((S.push && S.push.subs.length) || 0) + ' appareil(s)]\n';
+  } catch { return ''; }
+}
 const mcpBase = (req) => (process.env.JARVIS_PUBLIC_URL || publicBase(req)).replace(/\/+$/, '');
 const JMCP = createMcp({S, save, now, version: VERSION, base: mcpBase, outils: MCP_OUTILS, journal: mcpJournal,
   prevenir: ({titre, texte}) => { if (S.push && S.push.subs.length) PUSH.send({title: titre, body: texte, url: '/#reglages', tag: 'mcp-acces'}, {urgency: 'high'}).catch(() => {}); }});
@@ -1201,7 +1228,7 @@ let TTS = null;
 const ttsReady = () => fs.existsSync(VOICE.model) && (fs.existsSync(PIPER_PY) || !!process.env.JARVIS_TTS_HELPER);
 /* 0.40.0 : la voix Google Chirp 3 HD (voix-google.mjs), choisie dans Réglages, plafonnée sous la part gratuite ; Pierre en secours */
 const VG = createVoixGoogle({fichier: path.join(DATA, 'voix-google.json'), compteurFichier: path.join(DATA, 'voix-google-compteur.json'), base: process.env.JARVIS_VOIX_GOOGLE_URL || 'https://texttospeech.googleapis.com',
-  plafond: Math.min(+process.env.JARVIS_VOIX_GOOGLE_PLAFOND || 900000, 1000000), now,
+  plafond: Math.min(+process.env.JARVIS_VOIX_GOOGLE_PLAFOND || 990000, 1000000), now,   /* 0.45.0 : 990 000, juste sous le million gratuit (sa demande : « qu'il ne bascule pas avant d'atteindre le seuil facturable ») */
   alerte: ({titre, texte}) => { if (S.push && S.push.subs.length) PUSH.send({title: titre, body: texte, url: '/#reglages', tag: 'voix-google'}, {urgency: 'normal'}).catch(() => {}); },
   log: (t) => { S.voixGoogleErr = {at: now(), t: String(t).slice(0, 300)}; }});
 const googleChoisie = () => (S.config || {}).voixServeur === 'google' && VG.pret();
@@ -1286,7 +1313,7 @@ const server = http.createServer(async (req, res) => {
       { const mm = q.match(/^(?:lance (?:une )?|nouvelle )?mission\s*[:,]?\s*(.{4,})$/i); if (mm) { newMission(mm[1]); return say(200, 'Mission lancée : ' + mm[1].slice(0, 120) + '. Je te préviens quand c’est prêt.'); } }
       const ctx = GG.status('').linked ? await racContext() : "Google n'est pas relié à JARVIS : tu n'as pas ses données.";
       const box = path.join(DATA, 'raccourci'); fs.mkdirSync(box, {recursive: true});
-      const r = await serialSiri(() => runClaude({kind: 'siri', prompt: ctx + '\n\n[Question]\n' + (lien ? 'Lien partagé : ' + lien + '\n' : '') + (q || 'Que puis-je faire de ce lien ?'), system: RAC_SYSTEM + memoireBloc(), model: MODELS.rapide, cwd: box, timeoutMs: 60000, effort: 'low', settings: guardSettings('chat'),
+      const r = await serialSiri(() => runClaude({kind: 'siri', prompt: ctx + '\n' + etatJarvisLigne() + '\n[Question]\n' + (lien ? 'Lien partagé : ' + lien + '\n' : '') + (q || 'Que puis-je faire de ce lien ?'), system: RAC_SYSTEM + memoireBloc() + GUIDE_JARVIS, model: MODELS.rapide, cwd: box, timeoutMs: 60000, effort: 'low', settings: guardSettings('chat'),
         tools: {allow: [], deny: ['Bash', 'Read', 'Edit', 'Write', 'Glob', 'Grep', 'NotebookEdit', 'WebFetch', 'WebSearch', 'Task']}}));
       S.usage.raccourcis = (S.usage.raccourcis || 0) + 1; if (S.raccourci) { S.raccourci.uses = (S.raccourci.uses || 0) + 1; S.raccourci.last = now(); } save();
       return say(r.ok ? 200 : 502, r.ok ? relancesDuTexte(r.text, 'siri').text : r.error);   /* « rappelle-moi… » : la relance est notée, la ligne technique n'est pas lue */
@@ -1305,7 +1332,7 @@ const server = http.createServer(async (req, res) => {
          ouverte (les questions suivantes n'envoient que la question) ; sans stream, la réponse entière en JSON, comme avant */
       if (p === '/api/sample' && req.method === 'POST') {
         const b = await readBody(req, 600000);
-        const o = {tier: b.tier, system: String(b.system || PAGE_SYS).slice(0, 16000) + memoireBloc(), input: Array.isArray(b.input) ? b.input : [{role: 'user', content: String(b.input || '')}], conv: !!b.conv};
+        const o = {tier: b.tier, system: String(b.system || PAGE_SYS).slice(0, 16000) + memoireBloc() + GUIDE_JARVIS, input: Array.isArray(b.input) ? b.input : [{role: 'user', content: String(b.input || '')}], conv: !!b.conv};
         S.usage.samples = (S.usage.samples || 0) + 1; save();
         if (!b.stream) { const r = await FLUX.demander(o); if (r.ok) JOURNAL.noter(questionDe(o.input), r.text); return json(res, r.ok ? 200 : 502, r.ok ? {text: r.text} : {error: r.error}); }
         res.writeHead(200, {'content-type': 'text/event-stream', 'cache-control': 'no-store', 'x-accel-buffering': 'no'});
@@ -1367,7 +1394,7 @@ const server = http.createServer(async (req, res) => {
       if (p === '/api/sample/prepare' && req.method === 'POST') {
         const b = await readBody(req, 600000);
         if (GG.status('').linked && !PROFIL.at) await profilLire().catch(() => {});   /* 0.37.0 : le Profil lu avant la première discussion */
-        return json(res, 200, FLUX.preparer({tier: b.tier, system: String(b.system || PAGE_SYS).slice(0, 16000) + memoireBloc(), input: Array.isArray(b.input) ? b.input : [{role: 'user', content: String(b.input || '')}]}));
+        return json(res, 200, FLUX.preparer({tier: b.tier, system: String(b.system || PAGE_SYS).slice(0, 16000) + memoireBloc() + GUIDE_JARVIS, input: Array.isArray(b.input) ? b.input : [{role: 'user', content: String(b.input || '')}]}));
       }
       /* les outils de la page Jarvis, traduits en appels directs aux API Google */
       if (p === '/api/tool' && req.method === 'POST') {

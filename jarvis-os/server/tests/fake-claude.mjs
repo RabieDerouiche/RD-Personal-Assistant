@@ -93,6 +93,8 @@ function answer(raw) {
   /* discussion de la page sur le serveur : propositions en fin de réponse (⟦outil …⟧), seulement si la consigne décrit les outils */
   const lastQ = input.split('Lui : ').pop(), sys = (opt('--append-system-prompt') || '') + '\n' + (opt('--system-prompt') || '') + '\n' + FIRST;
   /* 0.37.0 : la mémoire durable — ce qu'il reçoit dans sa consigne, et la proposition de retenir (si l'outil est décrit) */
+  /* 0.45.0 : JARVIS se connaît : l'état du moment avec la question, le guide dans la consigne */
+  if (/la voix Google est-elle activée/i.test(lastQ)) { const l = (/\[JARVIS \d[^\]]*\]/.exec(raw) || [''])[0];   /* la ligne d'état (« [JARVIS 0.45.0 : … »), pas le guide (« [JARVIS OS … ») */ return {text: (/voix du serveur Google/.test(l) ? 'Oui' : 'Non') + ' ; plafond ' + ((/sur un plafond de ([\d\s\u202f\u00a0]+) /.exec(l) || [])[1] || '?').replace(/[\s\u202f\u00a0]/g, '') + ' ; guide : ' + (/Voix du serveur : Pierre ou Google/.test(sys) && /ne le confie jamais à la tâche Claude du serveur/.test(sys) ? 'oui' : 'non') + ' ; écoute : ' + ((/écoute (\w+)/.exec(l) || [])[1] || '?')}; }
   /* 0.42.0 : le rangement de la mémoire : deux propositions utiles (dont une qui remplace), et une bancaire que le serveur doit écarter */
   if (/Propose ce qu'il faut retenir/.test(input)) return {text: JSON.stringify({propositions: [{texte: 'Préfère les trains de nuit pour les longs trajets', remplace: ''}, {texte: 'Aime les randonnées le samedi', remplace: /Aime les randonnées le dimanche/.test(raw) ? 'Aime les randonnées le dimanche' : ''}, {texte: 'Mon IBAN est FR76 3000 6000 0112 3456 7890 189', remplace: ''}]})};
   /* 0.41.0 : Claude propose une routine (si l'outil est décrit) */
