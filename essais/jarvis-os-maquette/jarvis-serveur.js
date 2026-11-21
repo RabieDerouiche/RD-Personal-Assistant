@@ -187,6 +187,19 @@
     missions: () => req('/api/missions').then((r) => (r.status === 200 ? r.j.missions : null)).catch(() => null),
     /* 0.33.0 : ce que fait Claude à l'instant (missions, Siri, tour, discussion), avec l'outil utilisé et le plan d'une mission */
     activite: () => req('/api/activite').then((r) => (r.status === 200 ? r.j : null)).catch(() => null),
+    /* 0.41.0 : les routines planifiées et le brief du matin */
+    routines: {
+      liste: () => req('/api/routines').then((r) => (r.status === 200 ? r.j : null)).catch(() => null),
+      lire: (phrase) => req('/api/routines/lire', {phrase}).then((r) => (r.status === 200 ? r.j : null)).catch(() => null),
+      ajouter: (o) => req('/api/routines', o).then((r) => r.j).catch(() => ({ok: false, error: 'Serveur injoignable.'})),
+      modifier: (id, o) => req('/api/routines/' + encodeURIComponent(id), o).then((r) => (r.status === 200 ? r.j : null)).catch(() => null),
+      supprimer: (id) => req('/api/routines/' + encodeURIComponent(id), null, 'DELETE').then((r) => (r.status === 200 ? r.j : null)).catch(() => null),
+      maintenant: (id) => req('/api/routines/' + encodeURIComponent(id) + '/maintenant', {}).then((r) => (r.status === 200 ? r.j : null)).catch(() => null)
+    },
+    brief: {
+      lire: () => req('/api/brief').then((r) => (r.status === 200 ? r.j.brief : null)).catch(() => null),
+      maintenant: () => req('/api/brief/maintenant', {}).then((r) => (r.status === 200 ? r.j.brief : null)).catch(() => null)
+    },
     /* 0.40.0 : la voix Google Chirp 3 HD (plafonnée sous la part gratuite) */
     voixGoogle: {
       etat: () => req('/api/voix/google').then((r) => (r.status === 200 ? r.j : null)).catch(() => null),

@@ -90,6 +90,14 @@ try {
     ok('mémoire : Claude propose de retenir (carte « À retenir ») ; rien n\'est retenu sans le bouton', carte && !avant.items.some((x) => /train/.test(x.texte)), JSON.stringify(avant.items));
     await p.evaluate(() => [...document.querySelectorAll('#chat .msg.proposal .btn.main')].pop().click()); await p.waitForTimeout(1500); const apres = await M();
     ok('mémoire : « Retenir » le garde sur le serveur (venu de la discussion)', apres.items.some((x) => x.texte === 'Préfère le train pour aller à Lyon' && x.source === 'discussion'), JSON.stringify(apres.items)); }
+  /* 0.41.0 : Claude propose une routine dans la discussion ; programmée sur son bouton */
+  await p.fill('#chat-in', 'Programme chaque lundi un résumé de ma semaine'); await p.press('#chat-in', 'Enter').catch(() => {}); await p.waitForTimeout(2500);
+  if (!(await p.evaluate(() => /Routine proposée/.test(document.getElementById('chat').textContent)))) { await p.evaluate(() => { const f = document.querySelector('#chat form'); if (f) f.requestSubmit(); }); await p.waitForTimeout(2500); }
+  { const tk = await p.evaluate(() => JSON.parse(localStorage.getItem('jarvis.settings')).serverToken), RL = () => fetch(BASE + '/api/routines', {headers: {authorization: 'Bearer ' + tk}}).then((x) => x.json());
+    const carte = await p.evaluate(() => /Routine proposée · chaque lundi à 8 h/.test(document.getElementById('chat').textContent) && /Résume la semaine qui vient/.test(document.getElementById('chat').textContent)), avant = await RL();
+    await p.evaluate(() => [...document.querySelectorAll('#chat .msg.proposal .btn.main')].pop().click()); await p.waitForTimeout(1500); const apres = await RL();
+    ok('routines : Claude propose une routine (carte « Routine proposée ») ; programmée seulement sur « Programmer »', carte && !avant.routines.length && apres.routines.some((x) => x.texte === 'Résume la semaine qui vient' && x.source === 'claude' && x.quand === 'chaque lundi à 8 h'), JSON.stringify(apres.routines));
+    for (const x of apres.routines) await fetch(BASE + '/api/routines/' + x.id, {method: 'DELETE', headers: {authorization: 'Bearer ' + tk}}); }
   { const q = await ctx.newPage(); q.on('pageerror', (e) => errs.push('mémoire : ' + e.message));
     await q.goto(BASE + '/?serveur#reglages'); await q.waitForTimeout(3500);
     const c1 = await q.evaluate(() => { const c = document.getElementById('mem-card'); return c ? {txt: c.textContent, n: c.querySelectorAll('.mem-it').length} : null; });
@@ -141,6 +149,27 @@ try {
     ok('voix Google : « Google » choisi, JARVIS parle avec la voix Google (clé envoyée à Google seulement)', /GOOGLE:fr-FR-Chirp3-HD-Charon:Bonjour de Google\./.test(tv) && sv.voixServeur === 'google' && GV.calls.some((c) => c.key === 'AIzaSyTEST-0123456789abcdefghijklmnop'), JSON.stringify([tv.slice(44), sv.voixServeur]));
     await q.evaluate(() => document.getElementById('voixg-card').scrollIntoView()); await q.screenshot({path: SH + 'voix-google.png'});
     await q.evaluate(() => [...document.querySelectorAll('#voixg-card .set-seg button')].find((b) => b.textContent === 'Pierre').click()); await q.waitForTimeout(800);
+    /* 0.41.0 : les routines dans Automatisations (une phrase lue, programmée, mise en pause, supprimée) et le brief du matin (activé, fait maintenant, sur l'accueil) */
+    await q.goto(BASE + '/?serveur#automatisations'); await q.waitForTimeout(3000);
+    await q.fill('#routines .mem-in', 'chaque vendredi à 18 h, prépare les sorties du week-end'); await q.waitForTimeout(1500);
+    const ap = await q.evaluate(() => (document.querySelector('#routines .rout-apercu') || {}).textContent || '');
+    await q.evaluate(() => document.querySelector('#routines .rout-apercu .btn.main').click()); await q.waitForTimeout(1200);
+    const l1 = await q.evaluate(() => [...document.querySelectorAll('#routines .rout-it')].map((x) => x.textContent));
+    ok('routines : Automatisations lit la phrase (« Chaque vendredi à 18 h · « Prépare les sorties du week-end » »), puis la programme', /Chaque vendredi à 18 h · « Prépare les sorties du week-end »/.test(ap) && l1.length === 1 && /Chaque vendredi à 18 h/.test(l1[0]) && /prochaine :/.test(l1[0]), JSON.stringify([ap, l1]));
+    await q.evaluate(() => [...document.querySelectorAll('#routines .rout-it .btn')].find((b) => b.textContent === 'Pause').click()); await q.waitForTimeout(800);
+    const l2 = await q.evaluate(() => [...document.querySelectorAll('#routines .rout-it')].map((x) => x.textContent));
+    await q.evaluate(() => [...document.querySelectorAll('#routines .rout-it .btn')].find((b) => b.textContent === 'Supprimer').click()); await q.waitForTimeout(800);
+    const l3 = await q.evaluate(() => document.querySelectorAll('#routines .rout-it').length);
+    ok('routines : « Pause » puis « Supprimer »', /en pause/.test(l2[0] || '') && l3 === 0, JSON.stringify([l2, l3]));
+    await q.evaluate(() => [...document.querySelectorAll('#routines .rout-brief .btn')].find((b) => b.textContent === 'Activer').click()); await q.waitForTimeout(1000);
+    await q.evaluate(() => [...document.querySelectorAll('#routines .rout-brief .btn')].find((b) => b.textContent === 'Brief maintenant').click()); await q.waitForTimeout(1500);
+    const br = await q.evaluate(() => ({b: (document.querySelector('#routines .rout-brief') || {}).textContent || '', out: (document.querySelector('#routines .set-msg') || {}).textContent || ''}));
+    await q.screenshot({path: SH + 'routines.png'});
+    ok('brief du matin : activé (tous les jours à 7 h 30 par défaut) et fait sans IA à la demande', /Brief du matin · tous les jours à 7 h 30/.test(br.b) && /^Bonjour\. Nous sommes /.test(br.out), JSON.stringify(br).slice(0, 300));
+    await q.goto(BASE + '/?serveur#accueil'); await q.waitForTimeout(2500);
+    const bc = await q.evaluate(() => { const c = document.getElementById('brief-card'); return c && !c.hidden ? c.textContent : ''; });
+    ok('brief du matin : le brief du jour est sur l\'accueil, avec « Lire »', /Brief du matin/.test(bc) && /Bonjour\. Nous sommes/.test(bc) && /Lire/.test(bc), bc.slice(0, 160));
+    { const tk2 = await q.evaluate(() => JSON.parse(localStorage.getItem('jarvis.settings')).serverToken); for (const x of (await fetch(BASE + '/api/routines', {headers: {authorization: 'Bearer ' + tk2}}).then((y) => y.json())).routines) await fetch(BASE + '/api/routines/' + x.id, {method: 'DELETE', headers: {authorization: 'Bearer ' + tk2}}); }
     await q.close(); }
   { const q = await ctx.newPage();
     await q.goto(BASE + '/?serveur#reglages'); await q.waitForTimeout(3500);
