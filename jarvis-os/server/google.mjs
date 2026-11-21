@@ -42,12 +42,27 @@ function addrs(v) {
 }
 const b64d = (s) => Buffer.from(String(s || '').replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8');
 const b64u = (s) => Buffer.from(s, 'utf8').toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-function textOf(part) {
+/* 0.51.0 : le texte d'un mail. La partie texte d'abord ; mais quand elle ne fait que renvoyer au HTML (« votre messagerie ne prend pas en
+   charge le format HTML »), le HTML, sans ses styles, avec ses entités (« &euro; ») et une case de tableau par « | » (un échéancier reste lisible) */
+const ENT = {nbsp: ' ', amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", euro: '€', rsquo: '’', lsquo: '‘', laquo: '«', raquo: '»', hellip: '…', ndash: '–', mdash: '—', deg: '°',
+  eacute: 'é', egrave: 'è', ecirc: 'ê', euml: 'ë', agrave: 'à', acirc: 'â', ccedil: 'ç', ocirc: 'ô', ucirc: 'û', ugrave: 'ù', icirc: 'î', iuml: 'ï', Eacute: 'É', Egrave: 'È', Agrave: 'À'};
+const point = (n) => { try { return String.fromCodePoint(n); } catch { return ' '; } };
+export const sansBalises = (html) => String(html || '').replace(/<(style|script|head)\b[\s\S]*?<\/\1>/gi, ' ').replace(/<!--[\s\S]*?-->/g, ' ')
+  .replace(/<br\s*\/?>/gi, '\n').replace(/<\/(p|div|tr|li|h[1-6]|table)>/gi, '\n').replace(/<\/t[dh]>/gi, ' | ').replace(/<[^>]+>/g, '')
+  .replace(/&#x([0-9a-f]+);/gi, (_, x) => point(parseInt(x, 16))).replace(/&#(\d+);/g, (_, d) => point(+d)).replace(/&([a-z]+);/gi, (m, n) => ENT[n] || ENT[n.toLowerCase()] || m)
+  .replace(/[ \t\u00a0]+/g, ' ').replace(/ *\n[ \n]*/g, '\n').trim();
+function partOf(part, type) {
   if (!part) return '';
-  if (part.mimeType === 'text/plain' && part.body && part.body.data) return b64d(part.body.data);
-  for (const p of part.parts || []) { const t = textOf(p); if (t) return t; }
-  if (part.mimeType === 'text/html' && part.body && part.body.data) return b64d(part.body.data).replace(/<br\s*\/?>/gi, '\n').replace(/<\/p>/gi, '\n').replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&#39;/g, "'").replace(/&quot;/g, '"');
+  if (part.mimeType === type && part.body && part.body.data) return b64d(part.body.data);
+  for (const p of part.parts || []) { const t = partOf(p, type); if (t) return t; }
   return '';
+}
+export function textOf(part) {
+  const t = partOf(part, 'text/plain');
+  const bouchon = t.trim().length < 400 && /ne (prend|supporte) pas (en charge )?(le format |les messages |les e-?mails |l.affichage )?html|n.affiche pas (le format|les messages) html|(does not|doesn.t|cannot|can.t) (support|display) html|(view|voir|afficher|consulter|lire) (this|ce|le|cet) (e-?mail|message|courriel|mail) (in|dans) (your|votre|un) (web )?(browser|navigateur)/i.test(t);
+  if (t && !bouchon) return t;
+  const h = partOf(part, 'text/html');
+  return h ? sansBalises(h) : t;
 }
 function mailMsg(m, withBody) {
   const from = addrs(hdr(m, 'From'))[0] || {displayName: '', emailAddress: ''};

@@ -675,6 +675,20 @@ srv.listen(0, async () => {
       ok('Reste à payer : raccourcis « sans mail » (crédit déjà là : pas proposé ; « + Mutuelle » ouvre la feuille au nom écrit, et disparaît une fois ajoutée)', !rac0.some((x) => /Crédit immobilier/.test(x)) && rac0.some((x) => /Mutuelle/.test(x)) && nomPre === 'Mutuelle'
         && !rac1.chips.some((x) => /Mutuelle/.test(x)) && rac1.rules.some((x) => /^Mutuelle le 3 de chaque mois · ajouté par toi 24,00 €$/.test(x)), JSON.stringify([rac0, nomPre, rac1.chips]));
       await q.screenshot({path: path.join(SH, 'radar-reste.png')}); await ctx.close(); }
+    /* 0.51.0 : la facture du mois annoncée remplace l'habituel ; une dépense qui commence plus tard (impôts mensualisés) ne compte pas avant
+       (lundi 23/11/2026, paie du 28 avancée au 27 ; dépenses d'exemple posées dans le téléphone) */
+    { const ctx = await b.newContext({...devices['iPhone 15 Pro Max']}); await ctx.addInitScript(PAUSE_INIT);
+      await ctx.addInitScript(() => { try { localStorage.setItem('jarvis.radar.reste', JSON.stringify({jusqua: 'paie', fx: [
+        {id: 'td', service: 'Impôts (exemple)', cat: 'Impôts', montant: 90, jour: 25, rythme: 'mensuel', source: 'mail', debut: '2027-01-15'},
+        {id: 'tp', service: 'Téléphone (exemple)', cat: 'Télécoms', montant: 16, jour: 25, rythme: 'mensuel', source: 'mail', estime: true, variable: true, prochain: {date: '2026-11-26', montant: 87.5}}]})); } catch (e) { /* rien */ } });
+      const q = await ctx.newPage(); q.on('pageerror', (e) => errs.push('radar 0.51 : ' + e.message));
+      await q.clock.setFixedTime(new Date('2026-11-23T10:00:00')); await q.goto(base + '#argent'); await q.waitForTimeout(3000);
+      const r = await q.evaluate(() => ({big: document.querySelector('.rad-big').textContent, rows: [...document.querySelectorAll('.rad-fixes > .panel:first-child .rad-fx')].map((x) => x.innerText.replace(/\s+/g, ' ').trim()),
+        rules: [...document.querySelectorAll('.rad-rule')].map((x) => x.innerText.replace(/\s+/g, ' ').trim()), large: document.documentElement.scrollWidth <= innerWidth + 1}));
+      ok('Radar 0.51 : la facture du mois annoncée (87,50 € le 26/11) remplace l\'habituel (16 €, estimé) ; une dépense qui commence en janvier ne compte pas en novembre et le dit (« à partir du 15/01/2027 »)',
+        r.big === '117,05 €' && r.rows.some((x) => /Téléphone \(exemple\)/.test(x) && /87,50 €/.test(x) && !/≈/.test(x)) && !r.rows.some((x) => /Impôts/.test(x)) && r.rules.some((x) => /Impôts \(exemple\)/.test(x) && /à partir du 15\/01\/2027/.test(x))
+        && r.rules.some((x) => /Téléphone \(exemple\)/.test(x) && /facture du mois : 87,50 €/.test(x)) && r.large, JSON.stringify(r));
+      await q.screenshot({path: path.join(SH, 'radar-051.png')}); await ctx.close(); }
     /* aucune rubrique n'affiche de texte cassé */
     const broken = [];
     for (const t of ['accueil', 'demandes', 'agenda', 'suivi', 'achats', 'voyages', 'sorties', 'papiers', 'argent', 'equipe', 'automatisations', 'reglages']) {
