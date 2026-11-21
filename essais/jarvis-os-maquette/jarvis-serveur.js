@@ -159,7 +159,9 @@
       etat: () => req('/api/raccourci/etat').then((r) => (r.status === 200 ? r.j : null)).catch(() => null),
       cle: () => req('/api/raccourci/cle', {}).then((r) => r.j).catch(() => null),
       retirer: () => req('/api/raccourci/retirer', {}).then((r) => r.j).catch(() => null),
-      essai: (texte) => fetch(BASE + '/api/raccourci', {method: 'POST', headers: {'content-type': 'application/json', authorization: 'Bearer ' + token()}, body: JSON.stringify({texte})}).then((r) => r.text()).catch(() => 'Serveur injoignable.')
+      essai: (texte) => fetch(BASE + '/api/raccourci', {method: 'POST', headers: {'content-type': 'application/json', authorization: 'Bearer ' + token()}, body: JSON.stringify({texte})}).then((r) => r.text()).catch(() => 'Serveur injoignable.'),
+      /* 0.43.0 : une action sans IA, comme l'appellera une automatisation de l'iPhone */
+      action: (action) => fetch(BASE + '/api/raccourci', {method: 'POST', headers: {'content-type': 'application/json', authorization: 'Bearer ' + token()}, body: JSON.stringify({action})}).then((r) => r.text()).catch(() => 'Serveur injoignable.')
     },
     /* sauvegarde de Pilotage (0.14.0) : état, ce qui a changé, copie immédiate */
     sauvegarde: {

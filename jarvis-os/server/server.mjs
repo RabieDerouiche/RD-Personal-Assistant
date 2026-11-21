@@ -26,7 +26,7 @@ import {createFlux, SECOURS} from './flux.mjs';
 import {createActivite, outilNom} from './activite.mjs';
 const ACT = createActivite();   /* 0.33.0 : ce que fait Claude à l'instant */
 
-const VERSION = '0.42.0';
+const VERSION = '0.43.0';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PORT = +(process.env.PORT || 8787);
 const HOST = process.env.HOST || '127.0.0.1';
@@ -1259,6 +1259,20 @@ const server = http.createServer(async (req, res) => {
       const say = (st, t) => { res.writeHead(st, {'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store'}); res.end(t); };
       if (!racOk(req) && !authed(req)) return say(401, 'Clé du Raccourci refusée : recrée-la dans JARVIS, Réglages, Siri et bouton Action.');
       const b = await readBody(req), q = String(b.texte || b.text || '').trim().slice(0, 2000), lien = String(b.lien || b.url || '').trim().slice(0, 600);
+      /* 0.43.0 (choix du 21/11/2026, « Automatisations iPhone ») : des réponses sans IA, en moins d'une seconde, pour les automatisations de
+         l'iPhone (au réveil, en montant en voiture, en arrivant au bureau) : {"action": "brief" | "agenda" | "demain" | "pourmoi" | "meteo"},
+         avec la position si le Raccourci la donne ; le Raccourci lit la réponse à voix haute */
+      const act = String(b.action || '').trim().toLowerCase();
+      if (act) {
+        const la = Number(b.lat), lo = Number(b.lon);
+        if (b.lat != null && b.lon != null && isFinite(la) && isFinite(lo) && Math.abs(la) <= 90 && Math.abs(lo) <= 180) S.pos = {lat: Math.round(la * 100) / 100, lon: Math.round(lo * 100) / 100, at: now()};
+        const ACTIONS = {brief: () => briefTexte(), agenda: () => instantReply({kind: 'agenda'}, "mon agenda aujourd'hui"), demain: () => instantReply({kind: 'agenda'}, 'mon agenda demain'),
+          pourmoi: () => instantReply({kind: 'pourmoi'}, "ce qui m'attend"), meteo: () => instantReply({kind: 'meteo', court: true}, "météo aujourd'hui")};
+        if (!ACTIONS[act]) return say(400, 'Action inconnue. Les actions : brief, agenda, demain, pourmoi, meteo.');
+        let t = null; try { t = await ACTIONS[act](); } catch { t = null; }
+        S.usage.raccourcis = (S.usage.raccourcis || 0) + 1; S.usage.automatisations = (S.usage.automatisations || 0) + 1; save();
+        return say(200, t || (act === 'meteo' ? "Je n'ai pas ta position pour la météo : ouvre JARVIS une fois, ou ajoute ta position au Raccourci." : "Google n'est pas relié à JARVIS : je n'ai pas tes données."));
+      }
       if (!q && !lien) return say(400, "Je n'ai rien entendu.");
       { const mm = q.match(/^(?:lance (?:une )?|nouvelle )?mission\s*[:,]?\s*(.{4,})$/i); if (mm) { newMission(mm[1]); return say(200, 'Mission lancée : ' + mm[1].slice(0, 120) + '. Je te préviens quand c’est prêt.'); } }
       const ctx = GG.status('').linked ? await racContext() : "Google n'est pas relié à JARVIS : tu n'as pas ses données.";
