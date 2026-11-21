@@ -630,10 +630,16 @@ srv.listen(0, async () => {
       await q.evaluate(() => [...document.querySelectorAll('.rad-prop')].find((x) => /Stockage en ligne/.test(x.textContent)).querySelector('.row-actions button').click()); await q.waitForTimeout(600);
       await q.evaluate(() => [...[...document.querySelectorAll('.rad-prop')].find((x) => /Club de sport/.test(x.textContent)).querySelectorAll('.row-actions button')].find((b) => /Pas une/.test(b.textContent)).click()); await q.waitForTimeout(600);
       const pr1 = await q.evaluate(() => { document.querySelector('.rad-deja').open = true; return {props: document.querySelectorAll('.rad-prop').length, rules: document.querySelectorAll('.rad-rule').length, deja: [...document.querySelectorAll('.rad-deja .rad-fx')].map((x) => x.innerText.replace(/\s+/g, ' ').trim())}; });
+      /* 0.49.0 : une dépense dont le montant n'est que dans la pièce jointe : « montant à compléter », « Ajouter » ouvre la feuille */
+      await q.evaluate(() => [...document.querySelectorAll('.rad-prop')].find((x) => /Garde d’enfant/.test(x.textContent)).querySelector('.row-actions button').click()); await q.waitForTimeout(700);
+      const vide = await q.evaluate(() => document.querySelector('.rad-form input[inputmode="decimal"]').value);
+      await q.fill('.rad-form input[inputmode="decimal"]', '310'); await q.evaluate(() => document.querySelector('.rad-form button[type="submit"]').click()); await q.waitForTimeout(700);
       await q.reload(); await q.waitForTimeout(2500);
-      const pr2 = await q.evaluate(() => ({props: document.querySelectorAll('.rad-prop').length, rules: document.querySelectorAll('.rad-rule').length}));
-      ok('Reste à payer : 2 dépenses trouvées dans les mails à valider ; « Ajouter » la range dans ses dépenses fixes (déjà prélevée le lundi 16), « Pas une dépense fixe » l\'écarte, et c\'est gardé après un rechargement',
-        pr0.length === 2 && pr0.some((x) => /Stockage en ligne/.test(x) && /le 14 de chaque mois · vue 12 fois, depuis 11\/2025/.test(x)) && pr1.props === 0 && pr1.rules === 18 && pr1.deja.some((x) => /^lun\. 16\/11 Stockage en ligne Abonnements · décalé du sam\. 14\/11 1,99 €$/.test(x)) && pr2.props === 0 && pr2.rules === 18, JSON.stringify([pr0, pr1, pr2]));
+      const pr2 = await q.evaluate(() => ({props: document.querySelectorAll('.rad-prop').length, rules: [...document.querySelectorAll('.rad-rule')].map((x) => x.innerText.replace(/\s+/g, ' '))}));
+      ok('Reste à payer : 3 dépenses trouvées dans les mails à valider ; « Ajouter » la range (déjà prélevée le lundi 16), « Pas une dépense fixe » l\'écarte, et c\'est gardé après un rechargement',
+        pr0.length === 3 && pr0.some((x) => /Stockage en ligne/.test(x) && /le 14 de chaque mois · vue 12 fois, depuis 11\/2025/.test(x)) && pr1.props === 1 && pr1.rules === 18 && pr1.deja.some((x) => /^lun\. 16\/11 Stockage en ligne Abonnements · décalé du sam\. 14\/11 1,99 €$/.test(x)), JSON.stringify([pr0, pr1]));
+      ok('Reste à payer : une dépense « montant à compléter » (vers le 5 de chaque mois) s\'ajoute en saisissant son montant (310 €)', pr0.some((x) => /Garde d’enfant/.test(x) && /vers le 5 de chaque mois/.test(x) && /montant à compléter/.test(x)) && vide === '' && pr2.props === 0 && pr2.rules.length === 19
+        && pr2.rules.some((x) => /Garde d’enfant \(exemple\) .*310,00 €/.test(x)), JSON.stringify([vide, pr2]));
       await q.screenshot({path: path.join(SH, 'radar-reste.png')}); await ctx.close(); }
     /* aucune rubrique n'affiche de texte cassé */
     const broken = [];

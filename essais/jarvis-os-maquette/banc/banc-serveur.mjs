@@ -52,8 +52,8 @@ try {
     await p.evaluate(() => { const c = document.querySelector('.all-close'); if (c) c.click(); }); await p.waitForTimeout(400); }
   await p.screenshot({path: SH + 'os-live.png'});
   { await p.goto(BASE + '/?serveur#argent'); await p.waitForTimeout(9000);
-    const a1 = await p.evaluate(() => ({props: [...document.querySelectorAll('.rad-prop')].map((x) => x.innerText.replace(/\s+/g, ' ')), defaut: !!document.querySelector('.rad-paie-defaut'), big: (document.querySelector('.rad-big') || {}).textContent || ''}));
-    ok('Radar (serveur) : la première ouverture lit les mails ; la facture mensuelle inventée devient une dépense à valider (48,20 € le 12) ; la paie pas encore réglée est signalée', a1.props.length === 1 && /Énergie Exemple/.test(a1.props[0]) && /le 12 de chaque mois/.test(a1.props[0]) && /48,20 €/.test(a1.props[0]) && a1.defaut, JSON.stringify(a1));
+    const a1 = await p.evaluate(() => ({props: [...document.querySelectorAll('.rad-prop')].map((x) => x.innerText.replace(/\s+/g, ' ')), defaut: !!document.querySelector('.rad-paie-defaut'), big: (document.querySelector('.rad-big') || {}).textContent || '', vide: /Rien de validé pour l’instant/.test((document.querySelector('.rad-hero p') || {}).textContent || '')}));
+    ok('Radar (serveur) : la première ouverture lit les mails ; la facture mensuelle inventée devient une dépense à valider (48,20 € le 12) ; la paie pas encore réglée est signalée, et le total à 0 € expliqué (rien de validé)', a1.props.length === 1 && /Énergie Exemple/.test(a1.props[0]) && /le 12 de chaque mois/.test(a1.props[0]) && /48,20 €/.test(a1.props[0]) && a1.defaut && a1.vide, JSON.stringify(a1));
     await p.evaluate(() => { const b = document.querySelector('.rad-prop .row-actions button'); if (b) b.click(); }); await p.waitForTimeout(1500);
     const a2 = await p.evaluate(() => ({props: document.querySelectorAll('.rad-prop').length, rules: [...document.querySelectorAll('.rad-rule')].map((x) => x.innerText.replace(/\s+/g, ' '))}));
     await p.reload(); await p.waitForTimeout(4000);
