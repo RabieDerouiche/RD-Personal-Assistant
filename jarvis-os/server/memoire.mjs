@@ -32,7 +32,7 @@ export function createMemoire({file, max = 200, maxLen = 300, now = Date.now}) {
     if (interdit(t)) return {ok: false, error: 'Rien de bancaire, aucun mot de passe ni code : JARVIS ne retient pas cela.'};
     const m = load(), k = t.toLowerCase(), deja = m.items.find((x) => x.texte.toLowerCase() === k);
     if (deja) return {ok: true, item: deja, deja: true};
-    const item = {id: crypto.randomUUID().slice(0, 8), texte: t, at: now(), source: source === 'discussion' ? 'discussion' : 'reglages'};
+    const item = {id: crypto.randomUUID().slice(0, 8), texte: t, at: now(), source: ['discussion', 'rangement'].includes(source) ? source : 'reglages'};
     m.items.push(item); if (m.items.length > max) m.items.splice(0, m.items.length - max);
     save();
     return {ok: true, item};
@@ -42,6 +42,23 @@ export function createMemoire({file, max = 200, maxLen = 300, now = Date.now}) {
   /* une ligne par souvenir, du plus ancien au plus récent */
   const bloc = () => { const it = load().items; return it.length ? it.map((x) => '- ' + x.texte).join('\n') : ''; };
   return {ajouter, effacer, liste, bloc};
+}
+
+/* 0.42.0 (choix du 21/11/2026, « Mémoire qui se range seule ») : le journal des discussions avec Claude, gardé sur le serveur
+   (DATA/discussions.json, 400 échanges et 30 jours au plus) ; chaque semaine, Claude le relit et propose des choses à retenir */
+export function createJournal({file, max = 400, jours = 30, now = Date.now}) {
+  let J = null;
+  const load = () => { if (J) return J; try { J = JSON.parse(fs.readFileSync(file, 'utf8')); if (!Array.isArray(J)) J = []; } catch { J = []; } return J; };
+  const save = () => { const tmp = file + '.tmp'; fs.writeFileSync(tmp, JSON.stringify(J), {mode: 0o600}); fs.renameSync(tmp, file); };
+  function noter(q, r) {
+    const question = String(q || '').replace(/\s+/g, ' ').trim().slice(0, 600), reponse = String(r || '').replace(/\s+/g, ' ').trim().slice(0, 800);
+    if (question.length < 2) return;
+    const j = load(), lim = now() - jours * 864e5;
+    j.push({at: now(), q: question, r: reponse});
+    J = j.filter((x) => x.at >= lim).slice(-max); save();
+  }
+  const depuis = (t) => load().filter((x) => x.at > (t || 0));
+  return {noter, depuis, taille: () => load().length};
 }
 
 /* le Profil, en HTML exporté par Drive → texte, sans les parties dont le titre parle d'argent (finances, budget, banque, crédit, épargne) */
