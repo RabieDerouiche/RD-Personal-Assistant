@@ -4,7 +4,9 @@
    - la dictée d'UNE question (Whisper du serveur s'il est installé, sinon la reconnaissance de l'iPhone) : le micro s'ouvre,
      écoute une phrase, se referme ; le texte revient à la page, qui le met dans le champ de la discussion avec Claude ;
    - la lecture d'une réponse à voix haute (Pierre, la voix du serveur, phrase par phrase ; sinon la voix de l'iPhone).
-   La page (essais/jarvis-os-maquette/index.html) décide de ce qu'ouvre l'orbe : la discussion avec Claude, qui a ses données. */
+   La page (essais/jarvis-os-maquette/index.html) décide de ce qu'ouvre l'orbe : la discussion avec Claude, qui a ses données.
+   0.31.0 (choix du 21/11/2026) : les mains libres reviennent, mais sur ce même Claude (plus de cerveau à part) : micro ouvert pendant
+   la conversation (converse), réponse lue au fil de l'eau (sayFlux), coupure à la voix (hold). */
 import {createOrb} from './orb';
 import {createHolo, type HoloOpts} from './holo';
 import {Ecoute, canEar} from './ecoute';
@@ -106,7 +108,7 @@ export function prime() {
 export const speaking = () => talking;
 /* la voix qui lira : Pierre (serveur) ou celle de l'iPhone */
 export const sayKind = (): 'serveur' | 'iphone' | null => (srv.serverVoice() ? 'serveur' : synth && W.SpeechSynthesisUtterance ? 'iphone' : null);
-export function hush() { gen++; talking = false; try { if (audio) { audio.dataset.token = 'stop'; audio.pause(); } } catch { /* rien */ } try { if (synth) synth.cancel(); } catch { /* rien */ } }
+export function hush() { gen++; talking = false; held = false; try { if (audio) { audio.dataset.token = 'stop'; audio.pause(); } } catch { /* rien */ } try { if (synth) synth.cancel(); } catch { /* rien */ } }
 /* en phrases : la première est dite pendant que les suivantes se préparent */
 export const phrases = (text: string): string[] => {
   const out: string[] = []; let acc = '';
@@ -159,6 +161,97 @@ export async function say(text: string): Promise<void> {
   } finally { if (g === gen) { talking = false; audioMode('auto'); } }
 }
 
+/* ---------- 0.31.0 : lecture au fil de la réponse (choix du 21/11/2026, Claude instantané) ----------
+   La réponse de Claude arrive mot par mot : chaque phrase complète part à la voix pendant que la suite s'écrit (Pierre prépare
+   les deux suivantes). La page donne le texte brut (qui ne fait que s'allonger) et sa règle de nettoyage pour la voix. */
+export interface Flux { push: (text: string) => void; end: () => void; done: Promise<void>; started: () => boolean }
+let held = false;
+/* sa voix couvre JARVIS (conversation) : la lecture se met en pause ; un bruit : elle reprend */
+export function hold(on: boolean) {
+  held = on;
+  try { if (audio && talking && /^p/.test(audio.dataset.token || '')) { if (on) audio.pause(); else audio.play().catch(() => {}); } } catch { /* rien */ }
+  try { if (synth && talking && !srv.serverVoice()) { if (on) synth.pause(); else synth.resume(); } } catch { /* rien */ }
+}
+/* coupe le texte en morceaux à dire : une fin de phrase (ou un retour à la ligne) suivie d'un blanc ; le premier morceau part tôt
+   (dès 12 caractères, ou à la première virgule après 25), les suivants font 40 caractères au moins (moins d'appels à la voix) */
+export function decoupe(raw: string, off: number, first: boolean, final: boolean): {parts: string[], off: number} {
+  const parts: string[] = []; let start = off, i = off;
+  for (; i < raw.length; i++) {
+    const c = raw[i], nx = raw[i + 1], len = i + 1 - start;
+    const fin = /[.!?…:;]/.test(c) && nx !== undefined && /\s/.test(nx), ligne = c === '\n', virgule = c === ',' && nx !== undefined && /\s/.test(nx);
+    const need = first && !parts.length ? 12 : 40;
+    if ((fin || ligne) && len >= need || (first && !parts.length && virgule && len >= 25)) { parts.push(raw.slice(start, i + 1)); start = i + 1; }
+  }
+  if (final && start < raw.length) { parts.push(raw.slice(start)); start = raw.length; }
+  return {parts, off: start};
+}
+export function sayFlux(o: {clean?: (t: string) => string, onStart?: () => void} = {}): Flux {
+  hush(); held = false;
+  const g = ++gen, keepMic = !!conv, queue: string[] = [];
+  let raw = '', off = 0, fin = false, began = false, wake: (() => void) | null = null;
+  const clean = (t: string) => { try { return (o.clean ? o.clean(t) : t).replace(/\s+/g, ' ').trim(); } catch { return t.trim(); } };
+  const cut = (final: boolean) => {
+    const r = decoupe(raw, off, !queue.length, final); off = r.off;
+    for (const p of r.parts) { const t = clean(p); if (t && /[\p{L}\p{N}]/u.test(t)) queue.push(t); }
+    if (wake) { const w = wake; wake = null; w(); }
+  };
+  const run = async () => {
+    const urls: Array<Promise<string | null> | undefined> = [];
+    const prep = (k: number) => { if (srv.serverVoice() && queue[k] && !urls[k]) urls[k] = srv.ttsUrl(queue[k]).catch(() => null); };
+    for (let i = 0; ; ) {
+      if (g !== gen) return;
+      if (i >= queue.length) { if (fin) return; await new Promise<void>((z) => { wake = z; }); continue; }
+      while (held && g === gen) await new Promise((z) => window.setTimeout(z, 120));
+      if (g !== gen) return;
+      if (!began) { began = true; talking = true; if (!keepMic) audioMode('playback'); try { if (o.onStart) o.onStart(); } catch { /* rien */ } }
+      if (srv.serverVoice()) {
+        if (!audio) { try { audio = new Audio(); } catch { audio = null; } }
+        prep(i); prep(i + 1); prep(i + 2);
+        const url = await urls[i];
+        if (g !== gen) { if (url) try { URL.revokeObjectURL(url); } catch { /* rien */ } return; }
+        if (!url || !(await play(url, g))) { if (g !== gen) return; await local(queue[i], g); }
+      } else await local(queue[i], g);
+      i++;
+    }
+  };
+  const done = run().finally(() => { if (g === gen) { talking = false; if (!keepMic) audioMode('auto'); } });
+  return {
+    push(t: string) { if (g !== gen || fin) return; raw = String(t || ''); if (off > raw.length) off = raw.length; cut(false); },
+    end() { if (g !== gen || fin) return; cut(true); fin = true; if (wake) { const w = wake; wake = null; w(); } },
+    done, started: () => began
+  };
+}
+
+/* ---------- 0.31.0 : la conversation mains libres (choix du propriétaire, QCM du 21/11/2026 : « Mains libres ») ----------
+   Le micro reste ouvert pendant toute la conversation, avec l'annulation d'écho de l'iPhone ; chaque phrase va à Whisper puis à la page,
+   qui la pose au MÊME Claude que la discussion (ses données, ses boutons : un seul cerveau, comme depuis 0.25.0). Pendant que Claude
+   réfléchit ou parle, ta voix (plus forte et plus longue que son écho) met sa lecture en pause : si c'était un bruit, il reprend ;
+   si c'est une phrase, la page la traite (il se tait, ou il change de question). */
+export type ConvState = 'listening' | 'hearing' | 'transcribing' | 'off' | 'error' | 'paused';
+export interface ConvOpts { onState?: (s: ConvState, why?: string) => void; onUtterance: (t: string) => void; onBarge?: () => void; onBargeCancel?: () => void; onLevel?: (x: number) => void }
+let conv: Ecoute | null = null;
+export const conversing = () => !!conv;
+/* à appeler pendant un appui (l'iPhone n'ouvre le micro qu'après un geste) */
+export function converse(o: ConvOpts): Promise<boolean> {
+  dictStop(false); prime();
+  if (conv) return Promise.resolve(true);
+  if (!(srv.serverEar() && canEar())) { try { if (o.onState) o.onState('error', "l'écoute n'est pas installée sur le serveur (Réglages)"); } catch { /* rien */ } return Promise.resolve(false); }
+  const ear: Ecoute = new Ecoute({
+    stt: (w, sig) => srv.stt(w, sig),
+    onState: (s, why) => { if (conv !== ear) return; try { if (o.onState) o.onState(s, why); } catch { /* rien */ } },
+    onBargeStart: () => { if (conv !== ear) return; hold(true); try { if (o.onBarge) o.onBarge(); } catch { /* rien */ } },
+    onBargeCancel: () => { if (conv !== ear) return; hold(false); try { if (o.onBargeCancel) o.onBargeCancel(); } catch { /* rien */ } },
+    onUtterance: (t) => { if (conv !== ear) return; const x = String(t || '').trim(); if (x) o.onUtterance(x); },
+    onLevel: (x) => { if (conv === ear && o.onLevel) try { o.onLevel(x); } catch { /* rien */ } }
+  });
+  ear.endMs = 700; ear.maxMs = 20000;
+  conv = ear;
+  return ear.start().then((ok) => { if (!ok && conv === ear) conv = null; return ok; });
+}
+/* ce que fait JARVIS : il réfléchit ou il parle (seuil plus haut contre son écho), ou il t'écoute */
+export function convBusy(b: 'idle' | 'thinking' | 'speaking') { if (conv) conv.busy = b; if (b !== 'speaking') held = false; }
+export function convStop() { const e = conv; conv = null; held = false; if (e) { try { e.close(); } catch { /* rien */ } } }
+
 /* ---------- l'orbe et le globe ---------- */
 /* le grand bouton orbe du bas : la page dit ce qu'il ouvre (la discussion avec Claude) */
 export function mountButton(host: HTMLElement = document.body, onTap?: () => void) {
@@ -174,4 +267,4 @@ export function mountButton(host: HTMLElement = document.body, onTap?: () => voi
 export function holo(o: HoloOpts = {}) { return createHolo(o); }
 /* l'état du serveur (écoute et voix installées) : relu à l'ouverture de la discussion */
 export const refresh = () => (srv.linked() ? srv.status().then(() => true, () => false) : Promise.resolve(false));
-W.JarvisVoice = {mountButton, holo, dictate, dictStop, dictating, dictKind, say, hush, speaking, sayKind, prime, refresh};
+W.JarvisVoice = {mountButton, holo, dictate, dictStop, dictating, dictKind, say, hush, speaking, sayKind, prime, refresh, sayFlux, hold, converse, convBusy, convStop, conversing};

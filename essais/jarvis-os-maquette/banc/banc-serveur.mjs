@@ -28,6 +28,9 @@ try {
   ok('retour de Google : page « relié »', /Google est relié/.test(await p.textContent('body')), (await p.textContent('body')).slice(0, 80));
   await p.goto(BASE + '/?serveur#reglages'); await p.waitForTimeout(2500);
   ok('Réglages : compte Google affiché', await p.evaluate(() => /proprietaire@example\.org/.test(document.querySelector('.set-wrap').textContent)));
+  /* 0.32.0 : l'écoute du serveur est Whisper (faux moteur du banc) : Réglages le dit et propose de passer à Parakeet */
+  { const e = await p.evaluate(() => ({txt: document.querySelector('.set-wrap').textContent, btn: (document.getElementById('set-ecoute') || {}).textContent || ''}));
+    ok('Réglages : écoute du serveur nommée (Whisper) et « Passer à Parakeet » proposé', /écoute Whisper prête/.test(e.txt) && /Passer à Parakeet/.test(e.btn) && /mains libres/.test(e.txt), e.btn); }
   await p.tap('button:has-text("Tester mes données")'); await p.waitForTimeout(1500);
   const t = await p.evaluate(() => document.querySelector('.set-card .set-msg').textContent); ok('test des données : Pilotage lu par le serveur', /Pilotage lu : 1 ligne dans/.test(t), t);
   await p.screenshot({path: SH + 'set-2.png'});
@@ -249,6 +252,41 @@ try {
     /* annuler : le micro se referme, le champ garde ce qui y était */
     await v.tap('#dict-btn'); await v.waitForTimeout(900); const s3 = await st(); await v.tap('#chat .dict-no'); await v.waitForTimeout(600); const s4 = await st();
     ok('dictée : « Annuler » referme le micro et garde le champ', s3.on && !s4.on && !s4.dict && s4.val === 'Raconte lentement ta journée' && s4.stops >= 3, JSON.stringify([s3.on, s4]));
+    await v.close(); }
+  /* 0.31.0 : mains libres — l'orbe garde le micro ouvert ; chaque phrase part seule à Claude (le même, avec ses données) ; la réponse est lue
+     dès sa première phrase, puis il réécoute ; ta voix le coupe pendant qu'il parle ; « c'est tout » termine ; « Mains libres : non » rend la dictée */
+  { const v = await ctx.newPage(); v.on('pageerror', (e) => errs.push('mains libres : ' + e.message));
+    const hits = {tts: 0, stt: 0, sample: 0}, entendu = []; v.on('request', (r) => { const u = r.url(); if (/\/api\/tts$/.test(u)) hits.tts++; if (/\/api\/stt$/.test(u)) hits.stt++; if (/\/api\/sample$/.test(u)) hits.sample++; });
+    v.on('response', (r) => { if (/\/api\/stt$/.test(r.url())) r.text().then((t) => entendu.push(t.slice(0, 80))).catch(() => {}); });
+    await v.addInitScript(() => {
+      try { localStorage.removeItem('jarvis.mains'); } catch (e) { /* rien */ }
+      const AC = window.AudioContext || window.webkitAudioContext; const ac = new AC(), osc = ac.createOscillator(), g = ac.createGain(), dest = ac.createMediaStreamDestination();
+      g.gain.value = 0; osc.frequency.value = 220; osc.connect(g); g.connect(dest); osc.start();
+      window.__talk = (ms) => { ac.resume(); const t0 = ac.currentTime + 0.02; g.gain.setValueAtTime(0.6, t0); g.gain.setValueAtTime(0, t0 + ms / 1000); };
+      window.__gum = 0; window.__stops = 0; navigator.mediaDevices.getUserMedia = async (c) => { window.__gum++; await ac.resume(); const s = dest.stream.clone(); s.getTracks().forEach((t) => { const st = t.stop.bind(t); t.stop = () => { window.__stops++; st(); }; }); return s; };
+    });
+    await v.goto(BASE + '/?serveur#accueil'); await v.waitForTimeout(3000);
+    const st = () => v.evaluate(() => ({chat: !document.getElementById('chat').hidden, strip: (document.querySelector('#chat .mains-strip .dict-txt') || {}).textContent || '', etat: (document.querySelector('#chat .mains-strip') || {dataset: {}}).dataset.s || '', toggle: (document.querySelector('#chat .mains-toggle') || {}).textContent || '', dictBtn: !!document.getElementById('dict-btn'), val: (document.getElementById('chat-in') || {}).value, moi: [...document.querySelectorAll('#chat .msg.me')].map((x) => x.textContent), eux: [...document.querySelectorAll('#chat .msg.them p')].map((x) => x.textContent), conv: window.JarvisVoice.conversing(), gum: window.__gum, stops: window.__stops}));
+    await v.tap('.talk-slot .jv-btn'); await v.waitForTimeout(1500);
+    let s0 = await st(); const n0 = s0.moi.length;
+    ok('mains libres : l\'orbe ouvre la discussion avec Claude, micro ouvert pour toute la conversation (écoute Whisper du serveur)', s0.chat && s0.conv && /écoute/.test(s0.strip) && /Mains libres : oui/.test(s0.toggle) && !s0.dictBtn && s0.gum === 1, JSON.stringify(s0));
+    await v.evaluate(() => window.__talk(900)); await v.waitForTimeout(4500); let s1 = await st();
+    ok('mains libres : la phrase part seule à Claude (sans « Envoyer »), sa réponse est lue par Pierre, puis il réécoute, micro toujours ouvert', s1.moi.length === n0 + 1 && /quelle heure est-il/i.test(s1.moi[n0]) && hits.sample === 1 && hits.tts >= 1 && s1.conv && s1.stops === 0 && s1.etat === 'listening' && s1.val === '', JSON.stringify([s1.moi.slice(-1), s1.etat, s1.stops, hits]));
+    await v.screenshot({path: SH + 'mains-libres.png'});
+    /* une longue réponse (lente) est coupée par sa voix : sa nouvelle phrase part à la place */
+    await v.evaluate(() => window.__talk(1800)); await v.waitForTimeout(3200);
+    const mid = await st();
+    await v.evaluate(() => window.__talk(900)); await v.waitForTimeout(4500); const s2 = await st();
+    ok('mains libres : pendant que Claude répond (et parle), ta voix le coupe et ta nouvelle phrase part à la place', /lentement/i.test(mid.moi[mid.moi.length - 1]) && ['thinking', 'speaking', 'hearing', 'transcribing'].includes(mid.etat) && s2.moi.length === n0 + 3 && /quelle heure est-il/i.test(s2.moi[s2.moi.length - 1]) && hits.sample === 3 && s2.conv, JSON.stringify([mid.etat, mid.moi.slice(-1), s2.moi.slice(-2), hits]));
+    /* « c'est tout » : fin de la conversation, micro fermé ; l'orbe la reprend */
+    await v.evaluate(() => window.__talk(3800)); await v.waitForTimeout(5200); const s3 = await st();
+    ok('mains libres : « c\'est tout » termine la conversation et ferme le micro (rien n\'est envoyé à Claude)', !s3.conv && !s3.strip && s3.stops >= 1 && hits.sample === 3 && s3.moi.length === s2.moi.length, JSON.stringify([s3.conv, s3.stops, hits, s3.moi.length, s3.etat, entendu]));
+    /* dans la discussion, le bouton les reprend ; « Mains libres : non » les coupe (retenu sur l'iPhone) ; l'orbe revient alors à la dictée d'une question */
+    await v.tap('#chat .mains-toggle'); await v.waitForTimeout(800); const s4 = await st();
+    await v.tap('#chat .mains-toggle'); await v.waitForTimeout(500); const s5 = await st(); const pref = await v.evaluate(() => localStorage.getItem('jarvis.mains'));
+    await v.tap('#chat .chat-head .btn.ghost'); await v.waitForTimeout(600); await v.tap('.talk-slot .jv-btn'); await v.waitForTimeout(1200);
+    const s6 = await st(), dicte = await v.evaluate(() => window.JarvisVoice.dictating()); await v.evaluate(() => { const n = document.querySelector('#chat .dict-no'); if (n) n.click(); });
+    ok('mains libres : le bouton les reprend ; « Mains libres : non » les coupe (retenu sur l\'iPhone) et l\'orbe revient à la dictée d\'une question', s4.conv && /Mains libres : oui/.test(s4.toggle) && !s5.conv && /Mains libres : non/.test(s5.toggle) && s5.dictBtn && pref === 'non' && !s6.conv && dicte, JSON.stringify([s4.conv, s5.conv, s5.toggle, pref, s6.conv, dicte]));
     await v.close(); }
   /* 0.24.0 : chercher un produit à partir d'une idée, par le serveur (faux Claude) */
   { await p.goto(BASE + '/?serveur#achats'); await p.waitForTimeout(3500);
