@@ -28,7 +28,7 @@ import {createRadar} from './radar.mjs';
 import {pique, PERSO_ORAL} from './humour.mjs';   /* 21/11/2026 : sa personnalité à l'oral (« sarcastique assumé ») */
 const ACT = createActivite();   /* 0.33.0 : ce que fait Claude à l'instant */
 
-const VERSION = '0.49.0';
+const VERSION = '0.50.0';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PORT = +(process.env.PORT || 8787);
 const HOST = process.env.HOST || '127.0.0.1';
