@@ -595,34 +595,44 @@ srv.listen(0, async () => {
         prog: document.querySelector('.rad-prog-l').textContent, w: document.querySelector('.rad-prog i').style.width, rows: [...document.querySelectorAll('.rad-fixes > .panel:first-child .rad-fx')].map((x) => x.innerText.replace(/\s+/g, ' ').trim()),
         deja: (document.querySelector('.rad-deja summary') || {}).textContent || '', rules: document.querySelectorAll('.rad-rule').length, seg: (document.querySelector('.rad-seg button') || {}).textContent, large: document.documentElement.scrollWidth <= innerWidth + 1}));
       const ra = await rs();
-      ok('Reste à payer : d\'ici la paie du 28 avancée au vendredi 27/11, 110,48 € en 3 prélèvements (celui du dimanche 22 part le lundi 23) ; 1 435,07 € déjà prélevés depuis la paie du 28/10', ra.k === 'Reste à payer d’ici ta paie du ven. 27/11' && ra.big === '110,48 €'
-        && /^3 prélèvements fixes · prochain : Livraison de repas, abonnement, aujourd’hui, 5,99 €$/.test(ra.p) && /depuis ta paie du mer\. 28\/10 : 1\s435,07 €$/.test(ra.prog) && ra.w === '93%' && ra.rows.length === 3
-        && /^lun\. 23\/11 Livraison de repas, abonnement Abonnements · décalé du dim\. 22\/11 5,99 €$/.test(ra.rows[0]) && /^jeu\. 26\/11 Console de jeux/.test(ra.rows[2]) && /^Déjà prélevé \(12\) : 1\s435,07 €$/.test(ra.deja) && ra.rules === 16 && ra.large, JSON.stringify(ra));
+      ok('Reste à payer : d\'ici la paie du 28 avancée au vendredi 27/11, 140,03 € en 4 prélèvements (celui du dimanche 22 part le lundi 23 ; l\'échéance d\'un paiement en 4 fois comptée) ; 1 435,07 € déjà prélevés depuis la paie du 28/10', ra.k === 'Reste à payer d’ici ta paie du ven. 27/11' && ra.big === '140,03 €'
+        && /^4 prélèvements · prochain : Livraison de repas, abonnement, aujourd’hui, 5,99 €$/.test(ra.p) && /depuis ta paie du mer\. 28\/10 : 1\s435,07 €$/.test(ra.prog) && ra.w === '91%' && ra.rows.length === 4
+        && /^lun\. 23\/11 Livraison de repas, abonnement Abonnements · décalé du dim\. 22\/11 5,99 €$/.test(ra.rows[0]) && /^mer\. 25\/11 Paiement en 4 fois : Boutique Ponctuel · annoncé par mail 29,55 €$/.test(ra.rows[1]) && /^jeu\. 26\/11 Console de jeux/.test(ra.rows[3])
+        && /^Déjà prélevé \(12\) : 1\s435,07 €$/.test(ra.deja) && ra.rules === 16 && ra.large, JSON.stringify(ra));
       await q.evaluate(() => [...document.querySelectorAll('.rad-notif button')].find((x) => /exemple/.test(x.textContent)).click()); await q.waitForTimeout(500);
       const ex = await q.evaluate(() => [...document.querySelectorAll('.toast')].map((x) => x.textContent).join(' | '));
-      ok('Reste à payer : l\'exemple de notification part la veille (mar. 24/11 à 19 h), pour le prochain prélèvement d\'au moins 20 €, avec le reste d\'ici la paie', /mar\. 24\/11 à 19 h : « Demain : Complémentaire santé, 24,50 €\. Reste à payer d’ici ta paie du ven\. 27\/11 : 104,49 €\. »/.test(ex), ex);
+      ok('Reste à payer : l\'exemple de notification part la veille (mar. 24/11 à 19 h), avec tous les prélèvements d\'au moins 20 € du lendemain et le reste d\'ici la paie', /mar\. 24\/11 à 19 h : « Demain : 2 prélèvements \(Paiement en 4 fois : Boutique, 29,55 € ; Complémentaire santé, 24,50 €\)\. Reste à payer d’ici ta paie du ven\. 27\/11 : 134,04 €\. »/.test(ex), ex);
       await q.evaluate(() => [...document.querySelectorAll('.rad-to button')][1].click()); await q.waitForTimeout(400);
       const rb = await rs();
-      ok('Reste à payer : « Jusqu\'à la fin du mois » donne 132,08 € (le prélèvement du dimanche 29 part le lundi 30) et 1 413,47 € déjà prélevés depuis le 1er novembre', rb.k === 'Reste à payer d’ici la fin du mois (lun. 30/11)' && rb.big === '132,08 €' && rb.rows.length === 4
-        && /^lun\. 30\/11 Assistant IA .*décalé du dim\. 29\/11/.test(rb.rows[3]) && /depuis le 1er novembre : 1\s413,47 €$/.test(rb.prog), JSON.stringify(rb));
+      ok('Reste à payer : « Jusqu\'à la fin du mois » donne 161,63 € (le prélèvement du dimanche 29 part le lundi 30) et 1 413,47 € déjà prélevés depuis le 1er novembre', rb.k === 'Reste à payer d’ici la fin du mois (lun. 30/11)' && rb.big === '161,63 €' && rb.rows.length === 5
+        && /^lun\. 30\/11 Assistant IA .*décalé du dim\. 29\/11/.test(rb.rows[4]) && /depuis le 1er novembre : 1\s413,47 €$/.test(rb.prog), JSON.stringify(rb));
       const ajoute = async (nom, mt, j) => { await q.evaluate(() => [...document.querySelectorAll('.rad-act button')][0].click()); await q.waitForTimeout(700);
         await q.fill('.rad-form input[type="text"]', nom); await q.fill('.rad-form input[inputmode="decimal"]', mt); await q.fill('.rad-form input[type="number"]', j);
         await q.evaluate(() => document.querySelector('.rad-form button[type="submit"]').click()); await q.waitForTimeout(700); };
       await ajoute('Salle de sport', '29,90', '26');
       const rc = await rs(); await q.reload(); await q.waitForTimeout(2500); const rd = await rs();
-      ok('Reste à payer : une dépense fixe ajoutée (29,90 € le 26) compte tout de suite (161,98 €) ; l\'ajout et « fin du mois » tiennent après un rechargement', rc.big === '161,98 €' && rc.rules === 17 && rd.big === '161,98 €' && /fin du mois/.test(rd.k) && rd.seg === 'Fixes (17)', JSON.stringify([rc, rd]));
+      ok('Reste à payer : une dépense fixe ajoutée (29,90 € le 26) compte tout de suite (191,53 €) ; l\'ajout et « fin du mois » tiennent après un rechargement', rc.big === '191,53 €' && rc.rules === 17 && rd.big === '191,53 €' && /fin du mois/.test(rd.k) && rd.seg === 'Fixes (17)', JSON.stringify([rc, rd]));
       await q.evaluate(() => [...document.querySelectorAll('.rad-to button')][0].click()); await q.waitForTimeout(300);
       await q.evaluate(() => [...document.querySelectorAll('.rad-act button')][1].click()); await q.waitForTimeout(700);
       await q.selectOption('.rad-form select', 'dernier'); await q.evaluate(() => document.querySelector('.rad-form button[type="submit"]').click()); await q.waitForTimeout(700);
       const re = await rs();
-      ok('Reste à payer : paie au dernier jour du mois (lundi 30/11) : le reste court jusqu\'au 30 (161,98 €)', re.k === 'Reste à payer d’ici ta paie du lun. 30/11' && re.big === '161,98 €', JSON.stringify(re));
+      ok('Reste à payer : paie au dernier jour du mois (lundi 30/11) : le reste court jusqu\'au 30 (191,53 €)', re.k === 'Reste à payer d’ici ta paie du lun. 30/11' && re.big === '191,53 €', JSON.stringify(re));
       await q.evaluate(() => [...document.querySelectorAll('.rad-rule')].find((x) => /Salle de sport/.test(x.textContent)).click()); await q.waitForTimeout(700);
       await q.evaluate(() => [...document.querySelectorAll('.rad-form button')].find((x) => /Retirer/.test(x.textContent)).click()); await q.waitForTimeout(700);
       const rf = await rs();
-      ok('Reste à payer : « Retirer cette dépense » l\'enlève du calcul (132,08 € d\'ici la paie du 30/11)', rf.big === '132,08 €' && rf.rules === 16, JSON.stringify(rf));
+      ok('Reste à payer : « Retirer cette dépense » l\'enlève du calcul (161,63 € d\'ici la paie du 30/11)', rf.big === '161,63 €' && rf.rules === 16, JSON.stringify(rf));
       await ajoute('Cotisation', '40', '11');
       const fer = await q.evaluate(() => { document.querySelector('.rad-deja').open = true; return [...document.querySelectorAll('.rad-deja .rad-fx')].map((x) => x.innerText.replace(/\s+/g, ' ').trim()); });
       ok('Reste à payer : un prélèvement prévu le 11 novembre (férié) part le jeudi 12', fer.some((x) => /^jeu\. 12\/11 Cotisation Autres · décalé du mer\. 11\/11 40,00 €$/.test(x)), JSON.stringify(fer));
+      /* les dépenses trouvées dans ses mails : « Ajouter » (Stockage en ligne, le 14 : un samedi, donc le lundi 16, déjà passé) et « Pas une dépense fixe » */
+      const pr0 = await q.evaluate(() => [...document.querySelectorAll('.rad-prop')].map((x) => x.innerText.replace(/\s+/g, ' ')));
+      await q.evaluate(() => [...document.querySelectorAll('.rad-prop')].find((x) => /Stockage en ligne/.test(x.textContent)).querySelector('.row-actions button').click()); await q.waitForTimeout(600);
+      await q.evaluate(() => [...[...document.querySelectorAll('.rad-prop')].find((x) => /Club de sport/.test(x.textContent)).querySelectorAll('.row-actions button')].find((b) => /Pas une/.test(b.textContent)).click()); await q.waitForTimeout(600);
+      const pr1 = await q.evaluate(() => { document.querySelector('.rad-deja').open = true; return {props: document.querySelectorAll('.rad-prop').length, rules: document.querySelectorAll('.rad-rule').length, deja: [...document.querySelectorAll('.rad-deja .rad-fx')].map((x) => x.innerText.replace(/\s+/g, ' ').trim())}; });
+      await q.reload(); await q.waitForTimeout(2500);
+      const pr2 = await q.evaluate(() => ({props: document.querySelectorAll('.rad-prop').length, rules: document.querySelectorAll('.rad-rule').length}));
+      ok('Reste à payer : 2 dépenses trouvées dans les mails à valider ; « Ajouter » la range dans ses dépenses fixes (déjà prélevée le lundi 16), « Pas une dépense fixe » l\'écarte, et c\'est gardé après un rechargement',
+        pr0.length === 2 && pr0.some((x) => /Stockage en ligne/.test(x) && /le 14 de chaque mois · vue 12 fois, depuis 11\/2025/.test(x)) && pr1.props === 0 && pr1.rules === 18 && pr1.deja.some((x) => /^lun\. 16\/11 Stockage en ligne Abonnements · décalé du sam\. 14\/11 1,99 €$/.test(x)) && pr2.props === 0 && pr2.rules === 18, JSON.stringify([pr0, pr1, pr2]));
       await q.screenshot({path: path.join(SH, 'radar-reste.png')}); await ctx.close(); }
     /* aucune rubrique n'affiche de texte cassé */
     const broken = [];

@@ -4318,7 +4318,7 @@ void main(){
         h('div', {class: 'row-actions'},
           kept ? btn('Ne plus garder', () => { RAD.garde.delete(x.k); radSave(); renderView(true); }, 'sm') : btn('Je garde', () => { RAD.garde.add(x.k); radSave(); toast('Gardé', x.service + ' : plus de rappel avant le ' + radDate(x.date) + '.'); renderView(true); }, 'sm', 'check'),
           btn('Comparer avec Claude', () => radAsk('Compare pour moi « ' + x.service + ' » (' + (x.montant != null ? radEur(x.montant) : 'montant inconnu') + (x.rythme ? ', ' + x.rythme : '') + ') avec ce qui existe aujourd’hui en France, en total TTC, et dis-moi s’il vaut mieux garder, changer ou résilier avant le ' + radDate(x.date) + '.'), 'sm', 'chat'),
-          btn('Résilier', () => toast(SRV_OS ? 'Résiliation' : 'Maquette', 'Sur ton serveur, ce bouton ouvrira la page de résiliation du service ou préparera un brouillon de lettre dans Gmail. Rien ne part sans toi.'), 'sm'))));
+          btn('Résilier', () => (SRV_OS ? window.open('https://www.google.com/search?q=' + encodeURIComponent('résilier ' + x.service + ' espace client'), '_blank', 'noopener') : toast('Maquette', 'Sur ton serveur, ce bouton ouvre la recherche de la page de résiliation du service. Rien ne part sans toi.')), 'sm'))));
   }
   function radAlert(x) {
     const t = RAD_A[x.type] || ['Alerte', 'pulse'];
@@ -4327,9 +4327,11 @@ void main(){
       h('p', {class: 'rad-amt'}, h('b', {text: radEur(x.montant)}), x.avant ? h('span', {class: 'rad-up', text: 'avant : ' + radEur(x.avant)}) : null),
       x.texte ? h('p', {class: 'item-why', text: x.texte}) : null,
       h('div', {class: 'row-actions'}, btn('Vu', () => { RAD.vu.add(x.k); radSave(); renderView(true); }, 'sm', 'check'),
+        x.url ? btn('Ouvrir le mail', () => window.open(x.url, '_blank', 'noopener'), 'sm', 'inbox') : null,
         btn('Demander à Claude', () => radAsk('Le Radar signale : ' + (x.titre || t[0]) + ' pour « ' + x.service + ' » (' + radEur(x.montant) + '). ' + (x.texte || '') + ' Que dois-je faire ?'), 'sm', 'chat')));
   }
   function radAbos(ab) {
+    if (!ab.length) return emptyState('Aucun abonnement parmi tes dépenses fixes : ceux que tu valides dans « Fixes » arrivent ici.');
     const yr = (x) => (x.prix || 0) * (RAD_K[x.rythme] || 12), tot = ab.reduce((s, x) => s + yr(x), 0), cats = [...new Set(ab.map((x) => x.cat || 'Autres'))];
     return h('div', {class: 'stack'},
       h('p', {class: 'lead rad-tot', text: ab.length + ' abonnements : ' + radEur(tot) + ' par an, soit ' + radEur(tot / 12) + ' par mois.'}),
@@ -4345,7 +4347,7 @@ void main(){
       m.postes.map((p) => h('div', {class: 'rad-bar'}, h('div', {class: 'rad-bar-h'}, h('b', {text: p.label}), h('span', {text: radEur(p.montant)})),
         h('div', {class: 'rad-bar-t'}, h('i', {style: 'width:' + Math.max(2, Math.round((p.montant || 0) / max * 100)) + '%'})),
         h('small', {class: 'muted', text: p.note || (p.n ? p.n + (p.n > 1 ? ' paiements' : ' paiement') : '')}))),
-      h('p', {class: 'muted', text: 'Seuls les paiements annoncés par un mail sont comptés : pas les achats par carte en magasin.'}));
+      h('p', {class: 'muted', text: m.fixes ? 'Tes dépenses fixes du mois, par catégorie : celles que tu as validées dans « Fixes ».' : 'Seuls les paiements annoncés par un mail sont comptés : pas les achats par carte en magasin.'}));
   }
   function radNavigo(nv) {
     const mo = nv.conseil === 'mois';
@@ -4369,7 +4371,7 @@ void main(){
   function radPut(k, v) {
     if (RAD.data) RAD.data[RAD_KEY[k]] = v;
     const JS = radAPI();
-    if (JS && JS.radarSet) { JS.radarSet(RAD_KEY[k], v).catch(() => toast('Radar', 'Pas enregistré sur ton serveur : réessaie.')); return; }
+    if (JS && JS.radarSet) { JS.radarSet(RAD_KEY[k], v).then((r) => { if (r) { RAD.data = r; if (TAB === 'argent') renderView(true); } }).catch((e) => toast('Radar', 'Pas enregistré sur ton serveur : ' + ((e && e.message) || 'réessaie') + '.')); return; }
     RAD_FX[k] = v; radFxSave();
   }
   const radD = (y, m, j) => new Date(y, m, j, 12, 0, 0, 0);
@@ -4416,7 +4418,8 @@ void main(){
     const t = t0 || radAuj(), mois = (mode0 || RAD_FX.jusqua) === 'mois', rev = radGet(d, 'rev', {jour: 28, avance: true}), fx = radGet(d, 'fx', []), P = radPaies(rev, t);
     const fin = mois ? radD(t.getFullYear(), t.getMonth(), radDim(t.getFullYear(), t.getMonth())) : P.next;
     const deb = mois || !P.prev ? radD(t.getFullYear(), t.getMonth(), 1) : radD(P.prev.getFullYear(), P.prev.getMonth(), P.prev.getDate() + 1);
-    const occ = (a, b) => (a > b ? [] : fx.flatMap((x) => radOcc(x, a, b)).sort((p, q) => p.date - q.date || radC(q.x.montant) - radC(p.x.montant)));
+    const pc = ((d && d.ponctuels) || []).map((x) => { const [y, m, j] = String(x.date).split('-').map(Number), le = radD(y, m - 1, j); return {x: {service: x.service, montant: x.montant, cat: 'Ponctuel', ponctuel: true}, raw: le, date: le}; });
+    const occ = (a, b) => (a > b ? [] : fx.flatMap((x) => radOcc(x, a, b)).concat(pc.filter((o) => o.date >= a && o.date <= b)).sort((p, q) => p.date - q.date || radC(q.x.montant) - radC(p.x.montant)));
     const reste = occ(t, fin), deja = occ(deb, radD(t.getFullYear(), t.getMonth(), t.getDate() - 1));
     return {t, mois, rev, fx, P, fin, deb, reste, deja, tReste: radSom(reste), tDeja: radSom(deja)};
   }
@@ -4431,29 +4434,40 @@ void main(){
       h('div', {class: 'rad-hero-tx'},
         h('small', {class: 'rad-k', text: R.mois ? 'Reste à payer d’ici la fin du mois (' + radJour(R.fin) + ')' : 'Reste à payer d’ici ta paie du ' + radJour(R.fin)}),
         h('b', {class: 'rad-big', text: radEur(R.tReste)}),
-        h('p', {text: nx ? R.reste.length + (R.reste.length > 1 ? ' prélèvements fixes' : ' prélèvement fixe') + ' · prochain : ' + nx.x.service + ', ' + radQuand(nx.date, R.t) + ', ' + (nx.x.estime ? 'environ ' : '') + radEur(nx.x.montant) : 'Plus aucun prélèvement fixe d’ici là.'}),
+        h('p', {text: nx ? R.reste.length + (R.reste.length > 1 ? ' prélèvements' : ' prélèvement') + ' · prochain : ' + nx.x.service + ', ' + radQuand(nx.date, R.t) + ', ' + (nx.x.estime ? 'environ ' : '') + radEur(nx.x.montant) : 'Plus aucun prélèvement fixe d’ici là.'}),
         h('div', {class: 'rad-prog', role: 'img', 'aria-label': pc + ' % des dépenses fixes de la période déjà prélevées'}, h('i', {style: 'width:' + pc + '%'})),
         h('small', {class: 'rad-prog-l', text: 'Déjà prélevé ' + (R.mois || !R.P.prev ? 'depuis le 1er ' + RAD_MOIS[R.t.getMonth()] : 'depuis ta paie du ' + radJour(R.P.prev)) + ' : ' + radEur(R.tDeja)}),
+        R.rev.defaut ? h('button', {type: 'button', class: 'mchip is-amber rad-paie-defaut', onclick: radPaieSheet}, 'Paie supposée le 28 : règle-la') : null,
         h('div', {class: 'seg rad-to', role: 'group', 'aria-label': 'Jusqu’à quand'}, [['paie', 'Jusqu’à ma paie'], ['mois', 'Jusqu’à la fin du mois']].map(([k, l]) =>
           h('button', {type: 'button', 'aria-pressed': String((R.mois ? 'mois' : 'paie') === k), onclick: () => { RAD_FX.jusqua = k; radFxSave(); renderView(true); }}, l))),
         h('div', {class: 'mchips'}, h('span', {class: 'mchip' + (al.length ? ' is-amber' : ''), text: al.length + (al.length > 1 ? ' alertes' : ' alerte')}),
           h('span', {class: 'mchip', text: soon.length + (soon.length > 1 ? ' échéances' : ' échéance') + ' sous 7 jours'}), h('span', {class: 'mchip', text: 'lu ' + radLu(d.maj)}))));
   }
   function radFixes(R, d) {
-    const row = (o, done) => h('button', {type: 'button', class: 'hm-row rad-fx' + (done ? ' is-done' : ''), onclick: () => radEdit(o.x)},
+    const row = (o, done) => h('button', {type: 'button', class: 'hm-row rad-fx' + (done ? ' is-done' : '') + (o.x.ponctuel ? ' is-ponctuel' : ''),
+      onclick: () => (o.x.ponctuel ? toast('Prélèvement ponctuel', 'Annoncé par un mail (paiement en plusieurs fois) : il compte jusqu’à son jour, puis disparaît.') : radEdit(o.x))},
       h('span', {class: 'rad-fx-d', text: radJour(o.date)}),
-      h('span', {class: 'hm-tx'}, h('b', {text: o.x.service}), h('small', {text: (o.x.cat || 'Autres') + (radYmd(o.raw) !== radYmd(o.date) ? ' · décalé du ' + radJour(o.raw) : '') + (o.x.estime ? ' · montant estimé' : '')})),
+      h('span', {class: 'hm-tx'}, h('b', {text: o.x.service}), h('small', {text: (o.x.ponctuel ? 'Ponctuel · annoncé par mail' : (o.x.cat || 'Autres')) + (radYmd(o.raw) !== radYmd(o.date) ? ' · décalé du ' + radJour(o.raw) : '') + (o.x.estime ? ' · montant estimé' : '')})),
       h('span', {class: 'rad-yr', text: (o.x.estime ? '≈ ' : '') + radEur(o.x.montant)}));
     const list = R.fx.slice().sort((a, b) => (parseInt(a.jour, 10) || 0) - (parseInt(b.jour, 10) || 0) || String(a.service).localeCompare(String(b.service), 'fr'));
+    const props = (d.propositions || []).filter((x) => !(RAD_FX.pvus || []).includes(x.id)), sc = d.scan;
     return h('div', {class: 'stack rad-fixes'},
+      sc && sc.enCours ? h('p', {class: 'card rad-scan', role: 'status', text: 'Je lis tes ' + (sc.total || 13) + ' derniers mois de mails (' + (sc.mois || 0) + '/' + (sc.total || 13) + ') : les dépenses récurrentes trouvées arrivent ici, à valider une par une.'}) : null,
+      SRV_OS && d.google === false ? h('p', {class: 'card rad-scan', text: 'Google n’est pas relié à JARVIS : le Radar ne lit pas tes mails. Relie-le dans Réglages ; tes dépenses fixes saisies à la main comptent déjà.'}) : null,
+      sc && !sc.enCours && sc.erreur ? h('p', {class: 'muted', text: sc.erreur}) : null,
       panel(R.mois ? 'D’ici la fin du mois' : 'D’ici ta paie du ' + radJour(R.fin), h('span', {class: 'aside', text: radEur(R.tReste)}),
         R.reste.length ? R.reste.map((o) => row(o, false)) : h('p', {class: 'muted', text: 'Rien d’ici là.'})),
+      props.length ? panel('À valider (' + props.length + ')', h('span', {class: 'aside', text: 'trouvées dans tes mails'}), props.map((x) => h('article', {class: 'card item rad-prop'},
+        h('div', {class: 'rad-al-h'}, h('span', {class: 'hm-ic', html: icon('inbox', 17)}), h('div', {class: 'hm-tx'}, h('b', {text: x.service}), h('small', {text: radRegle(x) + (x.preuves ? ' · vue ' + x.preuves + ' fois' : '') + (x.depuis ? ', depuis ' + x.depuis : '')}))),
+        h('p', {class: 'rad-amt'}, h('b', {text: (x.estime ? 'environ ' : '') + radEur(x.montant)}), h('span', {class: 'muted', text: x.cat || ''})),
+        h('div', {class: 'row-actions'}, btn('Ajouter', () => radPropDo(x, true, null), 'sm main', 'check'), btn('Modifier', () => radEdit(x, x), 'sm'), btn('Pas une dépense fixe', () => radPropDo(x, false, null), 'sm ghost'))))) : null,
       R.deja.length ? h('details', {class: 'card rad-deja'}, h('summary', {text: 'Déjà prélevé (' + R.deja.length + ') : ' + radEur(R.tDeja)}), h('div', {class: 'stack'}, R.deja.map((o) => row(o, true)))) : null,
       panel('Mes dépenses fixes (' + list.length + ')', h('span', {class: 'aside', text: radEur(list.reduce((s, x) => s + radParMois(x), 0)) + ' par mois'}),
         list.map((x) => h('button', {type: 'button', class: 'hm-row rad-fx rad-rule', onclick: () => radEdit(x)},
           h('span', {class: 'hm-tx'}, h('b', {text: x.service}), h('small', {text: radRegle(x) + (x.source === 'mail' ? ' · lu dans tes mails' : ' · ajouté par toi') + (x.estime ? ' · estimé' : '')})),
           h('span', {class: 'rad-yr', text: (x.estime ? '≈ ' : '') + radEur(x.montant)})))),
-      h('div', {class: 'rad-act'}, btn('Ajouter une dépense fixe', () => radEdit(null), 'main', 'plus'), btn('Ma paie : ' + radRegleP(R.rev), radPaieSheet, '', 'cal')),
+      h('div', {class: 'rad-act'}, btn('Ajouter une dépense fixe', () => radEdit(null), 'main', 'plus'), btn('Ma paie : ' + radRegleP(R.rev), radPaieSheet, '', 'cal'),
+        SRV_OS && d.google !== false ? btn('Relire mes mails', () => { const JS = radAPI(); if (JS && JS.radarLire) JS.radarLire().then((r) => { if (r) { RAD.data = r; renderView(true); } toast('Radar', 'Je relis tes mails : les nouvelles dépenses arrivent dans « À valider ».'); }); }, 'ghost', 'refresh') : null),
       radNotifs(d, radGet(d, 'notif', {veille: true, seuil: 20, echec: true})));
   }
   function radNotifs(d, n) {
@@ -4468,15 +4482,23 @@ void main(){
       n.veille ? btn('Voir un exemple', () => radExemple(d, n), 'sm', 'clock') : null));
   }
   function radExemple(d, n) {
-    const t = radAuj(), o = radGet(d, 'fx', []).flatMap((x) => radOcc(x, radD(t.getFullYear(), t.getMonth(), t.getDate() + 1), radD(t.getFullYear(), t.getMonth(), t.getDate() + 75)))
-      .filter((p) => radC(p.x.montant) >= (+n.seuil || 0) * 100).sort((p, q) => p.date - q.date)[0];
-    if (!o) { toast('Notification', 'Aucun prélèvement fixe à annoncer dans les 75 jours.'); return; }
-    const R2 = radReste(d, o.date, 'paie');
-    toast('Exemple de notification', radJour(radD(o.date.getFullYear(), o.date.getMonth(), o.date.getDate() - 1)) + ' à 19 h : « Demain : ' + o.x.service + ', ' + (o.x.estime ? 'environ ' : '') + radEur(o.x.montant)
+    const t = radAuj(), dem = radD(t.getFullYear(), t.getMonth(), t.getDate() + 1), l = radReste(d, dem, 'mois').reste.concat(radReste(d, radD(dem.getFullYear(), dem.getMonth() + 1, 1), 'mois').reste)
+      .filter((p) => radC(p.x.montant) >= (+n.seuil || 0) * 100);
+    if (!l.length) { toast('Notification', 'Aucun prélèvement à annoncer d’ici la fin du mois prochain.'); return; }
+    const jour = l[0].date, du = l.filter((p) => radYmd(p.date) === radYmd(jour)), R2 = radReste(d, jour, 'paie'), m = (p) => p.x.service + ', ' + (p.x.estime ? 'environ ' : '') + radEur(p.x.montant);
+    toast('Exemple de notification', radJour(radD(jour.getFullYear(), jour.getMonth(), jour.getDate() - 1)) + ' à 19 h : « Demain : ' + (du.length === 1 ? m(du[0]) : du.length + ' prélèvements (' + du.map(m).join(' ; ') + ')')
       + '. Reste à payer d’ici ta paie du ' + radJour(R2.fin) + ' : ' + radEur(R2.tReste) + '. »');
   }
-  function radEdit(x) {
-    const fx = radGet(RAD.data, 'fx', []).slice(), nv = !x, ids = ['rf-n', 'rf-m', 'rf-r', 'rf-j', 'rf-o'].map((p) => p + (++SEQ));
+  /* une dépense trouvée dans ses mails : « Ajouter » (telle quelle ou corrigée) ou « Pas une dépense fixe » */
+  function radPropDo(p, oui, modif) {
+    const JS = radAPI();
+    if (JS && JS.radarProposition) { JS.radarProposition(p.id, oui, modif).then((r) => { if (r) { RAD.data = r; renderView(true); toast(oui ? 'Ajoutée' : 'Écartée', p.service + (oui ? ' compte maintenant dans le reste à payer.' : ' ne sera plus proposée.')); } else toast('Radar', 'Pas enregistré sur ton serveur : réessaie.'); }); return; }
+    RAD_FX.pvus = (RAD_FX.pvus || []).concat(p.id);
+    if (oui) radPut('fx', radGet(RAD.data, 'fx', []).concat([Object.assign({}, p, modif || {}, {id: 'f' + p.id, source: 'mail'})])); else radFxSave();
+    toast(oui ? 'Ajoutée' : 'Écartée', p.service + (oui ? ' compte maintenant dans le reste à payer.' : ' ne sera plus proposée.')); renderView(true);
+  }
+  function radEdit(x, prop) {
+    const fx = radGet(RAD.data, 'fx', []).slice(), nv = !x || !!prop, ids = ['rf-n', 'rf-m', 'rf-r', 'rf-j', 'rf-o'].map((p) => p + (++SEQ));
     const nom = h('input', {class: 'inp', id: ids[0], type: 'text', maxlength: '80', value: x ? x.service : '', placeholder: 'ex. Assurance habitation'});
     const mt = h('input', {class: 'inp', id: ids[1], type: 'text', inputmode: 'decimal', maxlength: '12', value: x ? String(x.montant).replace('.', ',') : '', placeholder: 'ex. 16,90'});
     const ry = h('select', {class: 'inp', id: ids[2]}, [['mensuel', 'Chaque mois'], ['trimestriel', 'Tous les 3 mois'], ['annuel', 'Chaque année']].map(([v, l]) => h('option', {value: v, selected: ((x && x.rythme) || 'mensuel') === v}, l)));
@@ -4493,13 +4515,14 @@ void main(){
       const it = {id: x ? x.id : 'fx' + Date.now().toString(36) + (++SEQ), service: n, cat: (x && x.cat) || 'Autres', montant: radC(m) / 100, jour: j, rythme: ry.value, source: (x && x.source) || 'toi'};
       if (ry.value !== 'mensuel') it.mois = +mo.value;
       if (est.checked) it.estime = true;
+      if (prop) { closeSheet(); radPropDo(prop, true, {service: it.service, montant: it.montant, jour: it.jour, rythme: it.rythme, mois: it.mois, estime: !!it.estime}); return; }
       const i = x ? fx.findIndex((y) => y.id === x.id) : -1;
       if (i >= 0) fx[i] = it; else fx.push(it);
       radPut('fx', fx); closeSheet(); toast(nv ? 'Ajoutée' : 'Enregistrée', n + ' : ' + radEur(it.montant) + ', ' + radRegle(it) + '.'); renderView(true);
     };
     const del = () => { radPut('fx', fx.filter((y) => y.id !== x.id)); closeSheet(); toast('Retirée', x.service + ' ne compte plus dans le reste à payer.'); renderView(true); };
-    openSheet({kicker: 'Radar · dépense fixe', title: nv ? 'Nouvelle dépense fixe' : x.service, actions: [],
-      say: nv ? 'Un prélèvement qui revient : il compte dans ton reste à payer dès que tu l’ajoutes.' : 'Corrige ce qui a changé : le reste à payer suit tout de suite.',
+    openSheet({kicker: prop ? 'Radar · trouvée dans tes mails' : 'Radar · dépense fixe', title: prop ? x.service : nv ? 'Nouvelle dépense fixe' : x.service, actions: [],
+      say: prop ? 'Corrige ce qu’il faut, puis ajoute-la : elle comptera dans ton reste à payer.' : nv ? 'Un prélèvement qui revient : il compte dans ton reste à payer dès que tu l’ajoutes.' : 'Corrige ce qui a changé : le reste à payer suit tout de suite.',
       extra: () => h('form', {class: 'pick-form rad-form', onsubmit: save},
         h('label', {for: ids[0], class: 'pick-label', text: 'Quoi'}), nom,
         h('div', {class: 'two'}, h('div', {class: 'field'}, h('label', {for: ids[1], class: 'pick-label', text: 'Montant (€)'}), mt), h('div', {class: 'field'}, h('label', {for: ids[3], class: 'pick-label', text: 'Jour du prélèvement'}), jr)),
@@ -4534,7 +4557,7 @@ void main(){
     + '.rad-bar-t{height:8px;border-radius:99px;background:rgba(var(--c1),.12);overflow:hidden}.rad-bar-t i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,rgb(var(--c1)),rgb(var(--c3)))}'
     + '.rad-nav{display:flex;gap:12px;align-items:center;padding:12px 14px;margin:0;border:1px solid var(--line);background:var(--glass)}.rad-nav.is-mois{border-color:rgba(var(--c5),.55)}.rad-foot{margin-top:14px;font-size:12.5px}'
     + '.rad-hero-tx{min-width:0;flex:1}.rad-hero .rad-k{display:block;color:var(--muted);font-size:13px}.rad-hero .rad-big{display:block;font:600 32px/1.15 var(--display);margin:4px 0 2px;color:var(--fg)}.rad-prog{height:8px;border-radius:99px;background:rgba(var(--c1),.12);overflow:hidden;margin:4px 0}.rad-prog i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,rgb(var(--c1)),rgb(var(--c3)))}.rad-prog-l{display:block;color:var(--muted);font-size:12.5px;margin:0 0 8px}.rad-to{display:flex;max-width:100%;margin:0 0 8px;box-sizing:border-box}.rad-to button{flex:1 1 0;padding:0 8px;min-width:0}'
-    + '.rad-fx{box-sizing:border-box;cursor:pointer;font:inherit}.rad-fx .hm-tx{min-width:0;flex:1}.rad-fx-d{flex:0 0 70px;font:600 13px var(--sans);color:var(--muted)}.rad-fx.is-done{opacity:.62}.rad-deja{padding:10px 12px}.rad-deja summary{cursor:pointer;font-weight:600;padding:4px 0}.rad-deja .stack{margin-top:8px}.rad-act{display:flex;gap:8px;flex-wrap:wrap}.rad-seuil{max-width:260px}.rad-notif .muted{margin:0}'}));
+    + '.rad-fx{box-sizing:border-box;cursor:pointer;font:inherit}.rad-fx .hm-tx{min-width:0;flex:1}.rad-fx-d{flex:0 0 70px;font:600 13px var(--sans);color:var(--muted)}.rad-fx.is-done{opacity:.62}.rad-deja{padding:10px 12px}.rad-deja summary{cursor:pointer;font-weight:600;padding:4px 0}.rad-deja .stack{margin-top:8px}.rad-act{display:flex;gap:8px;flex-wrap:wrap}.rad-seuil{max-width:260px}.rad-notif .muted{margin:0}.rad-scan{padding:12px 14px;margin:0;font-size:13.5px;border:1px solid var(--line);background:var(--glass)}.rad-prop .rad-amt .muted{font-size:12.5px}.rad-fx.is-ponctuel .rad-fx-d{color:#fde68a}.rad-paie-defaut{margin:0 0 8px;cursor:pointer}'}));
   TITLES.argent = 'Argent';
   TABS.push({id: 'argent', label: 'Argent', ic: 'euro'});
   VIEWS.argent = (el) => {
@@ -4544,6 +4567,7 @@ void main(){
     const av = (d.avenir || []).map((x) => Object.assign({n: radDay(x.date), k: 'av:' + x.service + ':' + x.date}, x)).filter((x) => x.n >= -1 && x.n <= 60).sort((a, b) => a.n - b.n);
     const al = (d.alertes || []).map((x) => Object.assign({k: 'al:' + x.type + ':' + x.service + ':' + x.date}, x)).filter((x) => !RAD.vu.has(x.k));
     const ab = d.abonnements || [], m = d.mois || {total: 0, postes: []}, soon = av.filter((x) => x.n <= 7 && !RAD.garde.has(x.k)), R = radReste(d);
+    if (SRV_OS && d.scan && d.scan.enCours && !RAD.poll) RAD.poll = setTimeout(() => { RAD.poll = null; if (TAB === 'argent') radLoad(); }, 4000);
     el.append(radHero(R, d, al, soon));
     if (d.navigo) el.append(radNavigo(d.navigo));
     const segs = [['fixes', 'Fixes (' + R.fx.length + ')'], ['avenir', 'À venir (' + av.length + ')'], ['alertes', 'Alertes (' + al.length + ')'], ['abos', 'Abonnements (' + ab.length + ')'], ['mois', 'Le mois']];

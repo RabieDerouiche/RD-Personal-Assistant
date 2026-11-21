@@ -46,11 +46,20 @@ try {
   const uniq = [...new Set(used)];
   ok('page en direct : Pilotage, agenda et Gmail lus par l’accès Google', uniq.some((u) => /sheets values Canal/.test(u)) && uniq.some((u) => /calendar events/.test(u)) && uniq.some((u) => /gmail threads/.test(u)), uniq.length + ' sources : ' + uniq.slice(0, 8).join(' | '));
   ok('aucune donnée d’exemple chargée', await p.evaluate(() => !document.querySelector('script[src="donnees-fictives.js"]')));
-  /* Radar (maquette du 21/11/2026) : tant que le serveur ne sait pas répondre, la rubrique Argent n'apparaît pas dans l'app en service */
+  /* Radar (21/11/2026) : le serveur répond, la rubrique Argent apparaît ; sa première ouverture lit les mails (faux Google : 3 factures inventées) */
   { await p.tap('.fav-handle').catch(() => p.click('.fav-handle')); await p.waitForTimeout(600);
-    ok('Radar : sans réponse du serveur, pas de rubrique Argent dans « Toutes les rubriques » (l\'app en service ne change pas)', await p.evaluate(() => !!document.querySelector('.all-grid') && !document.querySelector('.all-grid .tab[data-tab="argent"]')));
+    ok('Radar : le serveur répond, la rubrique Argent est dans « Toutes les rubriques »', await p.evaluate(() => !!document.querySelector('.all-grid .tab[data-tab="argent"]')));
     await p.evaluate(() => { const c = document.querySelector('.all-close'); if (c) c.click(); }); await p.waitForTimeout(400); }
   await p.screenshot({path: SH + 'os-live.png'});
+  { await p.goto(BASE + '/?serveur#argent'); await p.waitForTimeout(9000);
+    const a1 = await p.evaluate(() => ({props: [...document.querySelectorAll('.rad-prop')].map((x) => x.innerText.replace(/\s+/g, ' ')), defaut: !!document.querySelector('.rad-paie-defaut'), big: (document.querySelector('.rad-big') || {}).textContent || ''}));
+    ok('Radar (serveur) : la première ouverture lit les mails ; la facture mensuelle inventée devient une dépense à valider (48,20 € le 12) ; la paie pas encore réglée est signalée', a1.props.length === 1 && /Énergie Exemple/.test(a1.props[0]) && /le 12 de chaque mois/.test(a1.props[0]) && /48,20 €/.test(a1.props[0]) && a1.defaut, JSON.stringify(a1));
+    await p.evaluate(() => { const b = document.querySelector('.rad-prop .row-actions button'); if (b) b.click(); }); await p.waitForTimeout(1500);
+    const a2 = await p.evaluate(() => ({props: document.querySelectorAll('.rad-prop').length, rules: [...document.querySelectorAll('.rad-rule')].map((x) => x.innerText.replace(/\s+/g, ' '))}));
+    await p.reload(); await p.waitForTimeout(4000);
+    const a3 = await p.evaluate(() => document.querySelectorAll('.rad-rule').length);
+    ok('Radar (serveur) : « Ajouter » la garde sur le serveur (« lu dans tes mails »), toujours là après un rechargement', a2.props === 0 && a2.rules.length === 1 && /Énergie Exemple/.test(a2.rules[0]) && /lu dans tes mails/.test(a2.rules[0]) && a3 === 1, JSON.stringify([a2, a3]));
+    await p.screenshot({path: SH + 'radar-serveur.png'}); }
   await p.goto(BASE + '/?serveur#agenda'); await p.waitForTimeout(4000);
   ok('agenda en direct : carte Aujourd\'hui, 7 prochains jours, grille', await p.evaluate(() => !!document.querySelector('.agt .agt-date') && document.querySelectorAll('.agw-d').length === 7 && !!document.querySelector('.mgrid .mg-d.is-today')));
   await p.screenshot({path: SH + 'os-live-agenda.png'});

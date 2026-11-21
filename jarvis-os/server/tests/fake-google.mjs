@@ -22,6 +22,11 @@ export function startFakeGoogle() {
   const msgMeta = (id, th) => ({id, threadId: th, labelIds: ['INBOX', 'CATEGORY_PERSONAL'], snippet: 'L&#39;expert passera mardi', internalDate: '1763290000000',
     payload: {headers: [{name: 'From', value: '"Syndic Dupont" <gestion@syndic.example>'}, {name: 'To', value: 'moi@example.org'}, {name: 'Subject', value: 'RE: Dégât des eaux'}, {name: 'Date', value: 'Sun, 16 Nov 2026 10:00:00 +0100'}]}});
   const full = (m, text) => ({...m, payload: {...m.payload, mimeType: 'multipart/alternative', parts: [{mimeType: 'text/plain', body: {data: b64u(text)}}, {mimeType: 'text/html', body: {data: b64u('<p>html</p>')}}]}});
+  /* Radar (21/11/2026) : trois factures mensuelles inventées (les deux mois d'avant et celui-ci), pour la lecture de départ des mails */
+  F.radar = {};
+  { const n = new Date(); for (const k of [2, 1, 0]) { const d = new Date(Date.UTC(n.getUTCFullYear(), n.getUTCMonth() - k, 1, 8)), mm = String(d.getUTCMonth() + 1).padStart(2, '0'), id = 'rd' + k;
+      F.radar['t' + id] = {id: 't' + id, threadId: 't' + id, labelIds: ['INBOX', 'CATEGORY_UPDATES'], snippet: 'Votre facture', internalDate: String(d.getTime()), text: 'Bonjour,\nVotre facture est disponible.\nMontant TTC : 48,20 €\nIl sera prélevé le 12/' + mm + '/' + d.getUTCFullYear() + '.',
+        payload: {headers: [{name: 'From', value: '"Énergie Exemple" <facturation@energie-exemple.fr>'}, {name: 'To', value: 'moi@example.org'}, {name: 'Subject', value: 'Votre facture du mois'}, {name: 'Date', value: d.toUTCString()}]}}; } }
   const send = (res, st, body) => { res.writeHead(st, {'content-type': 'application/json'}); res.end(st === 204 ? '' : JSON.stringify(body)); };
   const server = http.createServer((req, res) => {
     let raw = ''; req.on('data', (d) => { raw += d; }); req.on('end', () => {
@@ -52,7 +57,9 @@ export function startFakeGoogle() {
         if (req.method === 'PATCH') { Object.assign(ev, body); return send(res, 200, ev); }
         if (req.method === 'DELETE') { list.splice(list.indexOf(ev), 1); return send(res, 204); }
       }
+      if (p === '/gmail/users/me/threads' && /\(facture OR /.test(q.q || '')) return send(res, 200, {threads: Object.keys(F.radar).map((id) => ({id})), resultSizeEstimate: Object.keys(F.radar).length});   /* la requête du Radar */
       if (p === '/gmail/users/me/threads') return send(res, 200, /in:sent/.test(q.q || '') ? {resultSizeEstimate: 0} : {threads: [{id: 'th1'}], resultSizeEstimate: 1});
+      if ((m = p.match(/^\/gmail\/users\/me\/threads\/([^/]+)$/)) && F.radar[m[1]]) { const r = F.radar[m[1]], {text, ...meta} = r, msg = {...meta, id: 'm' + m[1]}; return send(res, 200, {id: m[1], messages: [q.format === 'full' ? full(msg, text) : msg]}); }
       if ((m = p.match(/^\/gmail\/users\/me\/threads\/([^/]+)$/))) return send(res, 200, {id: m[1], messages: [q.format === 'full' ? full(msgMeta('m1', m[1]), "Bonjour,\nL'expert passera mardi à 10h. Merci de confirmer.") : msgMeta('m1', m[1])]});
       if ((m = p.match(/^\/gmail\/users\/me\/threads\/([^/]+)\/modify$/))) return send(res, 200, {id: m[1]});
       if (p === '/gmail/users/me/drafts' && req.method === 'GET') return send(res, 200, {drafts: [{id: 'r-1', message: {id: 'm9', threadId: 'th9'}}]});
