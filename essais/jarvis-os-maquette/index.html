@@ -1449,6 +1449,8 @@
   .pap-dates.panel { border-top: 0; padding-top: 0; }
   /* 0.37.0 : la mémoire durable */
   .mem-list { list-style: none; margin: 8px 0; padding: 0; display: grid; gap: 6px; } .mem-it { display: flex; gap: 8px; align-items: center; justify-content: space-between; padding: 6px 8px; border-radius: 10px; background: rgba(56, 189, 248, .08); } .mem-it span { min-width: 0; overflow-wrap: anywhere; }
+  .rout-brief { margin: 8px 0 12px; padding: 10px; border-radius: 12px; background: rgba(56, 189, 248, .08); } .rout-heure { width: auto; } .rout-jours { flex: 1; min-width: 0; }
+  .rout-it { flex-wrap: wrap; } .rout-it.is-off { opacity: .6; } .rout-act { display: flex; gap: 4px; flex-wrap: wrap; } .rout-apercu { margin: 6px 0; } .brief-tx { white-space: pre-wrap; line-height: 1.45; }
   .voixg-etapes { margin: 8px 0; padding-left: 20px; display: grid; gap: 4px; font-size: 14px; } .voixg-sel { flex: 1; min-width: 0; }
   .mcp-d { padding: 10px; margin: 8px 0; border-radius: 12px; border: 1px solid rgba(168, 85, 247, .5); background: rgba(168, 85, 247, .12); } .mcp-code { font: 700 18px/1 ui-monospace, monospace; letter-spacing: .2em; }
   .mis-accord { margin: 8px 0; } .mis-par { font-size: 13px; margin: 4px 0; }
@@ -3351,7 +3353,7 @@ void main(){
         inputSchema: {type: 'object', properties: {demande: {type: 'string', description: 'La demande complète, telle que la tâche la lira'}}, required: ['demande']},
         execute: (input) => { const m = String(input.demande || '').trim(); if (!m) throw new Error('Demande vide');
           T.msgs.splice(T.msgs.indexOf(out), 0, {kind: 'act', label: SRV_OS ? 'Confier à la tâche Claude (sur ton serveur)' : 'Confier à la tâche Claude (session complète)', text: m, ok: 'Lancer la tâche', state: 'open', fin: () => ({title: 'Ordre à Claude', effect: 'Une ligne pour Claude dans le Canal, puis la tâche « Ordres Jarvis » lancée.', bot: 'claude', order: m, viaTask: true, say: 'Je lance la tâche.', reply: ''})});
-          renderChat(); return 'Proposée à Rabie ; en attente de son bouton.'; }}].concat(extraChatTools(T, out), relanceChatTool(T, out), carteChatTool(T, out), memoireChatTool(T, out));
+          renderChat(); return 'Proposée à Rabie ; en attente de son bouton.'; }}].concat(extraChatTools(T, out), relanceChatTool(T, out), carteChatTool(T, out), memoireChatTool(T, out), routineChatTool(T, out));
   }
   /* les données de la discussion (règles et état de Pilotage) restent les mêmes pendant 10 minutes : le serveur n'envoie à Claude que
      la nouvelle question, et l'heure de Paris part avec chacune ; au-delà, elles sont relues (nouveau Claude, données à jour) */
@@ -4032,7 +4034,49 @@ void main(){
   const whenTxt = (d) => { const n = new Date(), diff = Math.round((new Date(d.getFullYear(), d.getMonth(), d.getDate()) - new Date(n.getFullYear(), n.getMonth(), n.getDate())) / 864e5); return (diff === 0 ? "aujourd'hui" : diff === 1 ? 'demain' : fmt(d, {weekday: 'long', day: 'numeric', month: 'short'})) + ' à ' + hm(d); };
   const shortWhen = (d) => { const n = Math.round((new Date(d.getFullYear(), d.getMonth(), d.getDate()) - new Date(TODAY.getFullYear(), TODAY.getMonth(), TODAY.getDate())) / 864e5), t = pad2(d.getHours()) + 'h' + pad2(d.getMinutes());
     return (n === 0 ? "aujourd'hui " : n === 1 ? 'demain ' : n < 7 ? ['dim', 'lun', 'mar', 'mer', 'jeu', 'ven', 'sam'][d.getDay()] + ' ' : pad2(d.getDate()) + '/' + pad2(d.getMonth() + 1) + ' ') + t; };
+  /* 0.41.0 (choix du 21/11/2026, « Routines planifiées » et « Brief du matin sans IA ») : les routines de Claude sur ton serveur,
+     écrites en une phrase, et le brief du matin (météo, agenda, ce qui t'attend… sans IA), en tête des automatisations */
+  function routinesPanel() {
+    const JS = window.JarvisServeur; if (!SRV_OS || !JS || !JS.routines || !JS.linked()) return null;
+    const list = h('ul', {class: 'mem-list rout-list'}), out = h('p', {class: 'set-msg'}), apercu = h('div', {class: 'rout-apercu'}), bref = h('div', {class: 'rout-brief'});
+    const inp = h('input', {type: 'text', class: 'mem-in', maxlength: '600', placeholder: 'Ex. : chaque vendredi à 18 h, prépare les sorties du week-end', 'aria-label': 'Nouvelle routine en une phrase'});
+    let rs = [];
+    const btn = (t, f, cls) => h('button', {type: 'button', class: 'btn sm ' + (cls || 'ghost'), onclick: f}, t);
+    const dessine = (d) => {
+      if (d) rs = d.routines || rs;
+      const b = rs.find((x) => x.genre === 'brief');
+      const heure = h('input', {type: 'time', class: 'inp rout-heure', value: b ? b.heure : '07:30', 'aria-label': 'Heure du brief'});
+      const jours = (v) => ({tous: [0, 1, 2, 3, 4, 5, 6], semaine: [1, 2, 3, 4, 5], weekend: [0, 6]})[v];
+      const sel = h('select', {class: 'inp rout-jours', 'aria-label': 'Jours du brief'}, [['tous', 'Tous les jours'], ['semaine', 'En semaine'], ['weekend', 'Le week-end']].map(([v, l]) => h('option', Object.assign({value: v, text: l}, b && String(b.jours) === String(jours(v)) ? {selected: ''} : {}))));
+      bref.replaceChildren(h('p', {}, h('b', {text: 'Brief du matin'}), document.createTextNode(b && b.actif ? ' · ' + b.quand + (b.prochaine ? ' (prochain : ' + b.prochaine + ')' : '') : ' · coupé')),
+        h('p', {class: 'muted', text: 'Sans IA : météo, agenda, ce qui t’attend, échéances, missions finies. Une notification à l’heure dite ; le texte est aussi sur l’accueil.'}),
+        h('div', {class: 'row-actions mem-add'}, heure, sel, btn(b && b.actif ? 'Régler' : 'Activer', async () => { const r = await JS.routines.ajouter({genre: 'brief', heure: heure.value, jours: jours(sel.value)}); if (r && r.ok) { dessine(r); out.textContent = 'Brief du matin : ' + (r.routines.find((x) => x.genre === 'brief') || {}).quand + '.'; } else out.textContent = (r && r.error) || 'Refusé.'; }, 'main')),
+        h('div', {class: 'row-actions'}, b && b.actif ? btn('Couper le brief', async () => dessine(await JS.routines.modifier(b.id, {actif: false}))) : null,
+          btn('Brief maintenant', async () => { const t = await JS.brief.maintenant(); if (t) { out.textContent = t.texte; const v = JVX(); if (v && v.say) try { v.say(t.texte); } catch (e) { /* rien */ } } })));
+      const ms = rs.filter((x) => x.genre === 'mission');
+      list.replaceChildren(...(ms.length ? ms.map((r) => h('li', {class: 'mem-it rout-it' + (r.actif ? '' : ' is-off')}, h('span', {}, h('b', {text: r.quand.charAt(0).toUpperCase() + r.quand.slice(1)}), h('small', {class: 'muted', text: ' · ' + r.texte + (r.actif ? (r.prochaine ? ' · prochaine : ' + r.prochaine : '') : ' · en pause') + (r.source === 'claude' ? ' · proposée par Claude' : '')})),
+        h('span', {class: 'rout-act'}, btn(r.actif ? 'Pause' : 'Reprendre', async () => dessine(await JS.routines.modifier(r.id, {actif: !r.actif}))), btn('Maintenant', async () => { await JS.routines.maintenant(r.id); out.textContent = 'Lancée : tu seras prévenu quand c’est prêt (Suivi).'; }), btn('Supprimer', async () => dessine(await JS.routines.supprimer(r.id))))))
+        : [h('li', {class: 'muted', text: 'Aucune routine. Écris-en une ci-dessus, ou demande-la à Claude dans la discussion.'})]));
+    };
+    const lire = async () => { const t = inp.value.trim(); if (t.length < 6) { apercu.replaceChildren(); return; } const l = await JS.routines.lire(t); if (!l) return;
+      apercu.replaceChildren(l.lu.erreur ? h('p', {class: 'muted', text: l.lu.erreur}) : h('p', {}, h('b', {text: l.quand.charAt(0).toUpperCase() + l.quand.slice(1)}), document.createTextNode(' · « ' + l.lu.texte + ' »' + (l.lu.heureDevinee ? ' (heure non dite : 8 h)' : ''))),
+        l.lu.erreur ? null : btn('Programmer', async () => { const r = await JS.routines.ajouter({phrase: t}); if (r && r.ok) { inp.value = ''; apercu.replaceChildren(); dessine(r); out.textContent = 'Routine programmée : ' + r.routine.texte + '.'; } else out.textContent = (r && r.error) || 'Refusée.'; }, 'main')); };
+    let tl = 0; inp.oninput = () => { clearTimeout(tl); tl = setTimeout(lire, 400); };
+    JS.routines.liste().then((d) => { if (d) dessine(d); });
+    return h('section', {class: 'panel rout-panel', id: 'routines'}, h('header', {class: 'panel-h'}, h('h2', {text: 'Routines de Claude'}), h('span', {class: 'aside', text: 'sur ton serveur'})),
+      h('p', {class: 'muted', text: 'Une mission qui revient, écrite en une phrase : Claude la fait à l’heure dite et te prévient quand c’est prêt.'}), bref, inp, apercu, list, out);
+  }
+  /* le brief du jour sur l'accueil (s'il a été fait aujourd'hui), avec « Lire » */
+  function briefCard() {
+    const JS = window.JarvisServeur; if (!SRV_OS || !JS || !JS.brief || !JS.linked()) return null;
+    const card = h('section', {class: 'hm-sec brief-card', id: 'brief-card', hidden: ''});
+    JS.brief.lire().then((b) => { if (!b || !b.texte || new Date(b.at).toDateString() !== new Date().toDateString()) return; card.hidden = false;
+      card.replaceChildren(h('header', {class: 'hm-h'}, h('h2', {text: 'Brief du matin'}), h('span', {class: 'aside', text: fmt(new Date(b.at), {hour: '2-digit', minute: '2-digit'})})), h('p', {class: 'brief-tx', text: b.texte}),
+        h('div', {class: 'row-actions'}, h('button', {type: 'button', class: 'btn sm', onclick: () => { const v = JVX(); if (v && v.say) try { v.say(b.texte); } catch (e) { /* rien */ } }}, 'Lire'))); });
+    return card;
+  }
   VIEWS.automatisations = (el) => {
+    { const rp = routinesPanel(); if (rp) el.append(rp); }   /* 0.41.0 */
     const rows = (S.rout || []).filter((r) => r['Routine']), last = {};
     (S.activite || []).forEach((a) => { if (a.bot && a.s && (!last[a.bot] || a.s > last[a.bot])) last[a.bot] = a.s; });
     /* JARVIS OS (check-up du 16/11) : sinon, le dernier passage noté dans l'onglet État, comme sur la page du bot */
@@ -6714,6 +6758,16 @@ void main(){
   }
   SUGG.dosreply = ['Que dois-je répondre ?', "Qu'est-ce que ça change pour moi ?", 'Faut-il relancer ?', 'Propose la mise à jour'];
   /* JARVIS OS 0.18.0 : Claude peut proposer une relance (« je revérifie demain à 9 h si Iris a répondu ») ; programmée sur son bouton, gratuite */
+  /* 0.41.0 (choix du 21/11/2026, « Routines planifiées ») : Claude propose une routine ; rien n'est programmé sans son appui */
+  function routineChatTool(T, out) {
+    const JS = window.JarvisServeur; if (!SRV_OS || !JS || !JS.routines) return [];
+    return [{name: 'programmer_routine', description: "Propose à Rabie de programmer une routine : une mission que Claude refera seul à intervalles réguliers (ex. « chaque vendredi à 18 h, prépare les sorties du week-end », « le 1er du mois à 9 h, vérifie mes abonnements »). Une phrase : quand, puis quoi. Rien n'est programmé tant qu'il n'a pas touché « Programmer ».",
+      inputSchema: {type: 'object', properties: {phrase: {type: 'string', description: 'La routine en une phrase : le moment (jour et heure), puis la tâche'}}, required: ['phrase']},
+      execute: async (input) => { const ph = String(input.phrase || '').trim(); const lu = await JS.routines.lire(ph); if (!lu || lu.lu.erreur) throw new Error((lu && lu.lu.erreur) || 'Phrase illisible');
+        T.msgs.splice(T.msgs.indexOf(out), 0, {kind: 'act', label: 'Routine proposée · ' + lu.quand, text: lu.lu.texte, ok: 'Programmer', state: 'open',
+          fin: () => { JS.routines.ajouter({phrase: ph, source: 'claude'}).then((r) => toast(r && r.ok ? 'Routine programmée' : 'Routine refusée', r && r.ok ? lu.quand + ' : ' + lu.lu.texte : (r && r.error) || '')); return null; }});
+        renderChat(); return 'Proposée à Rabie ; en attente de son bouton.'; }}];
+  }
   /* 0.37.0 (choix du 21/11/2026, « Mémoire durable ») : Claude propose de retenir un fait sur lui ; rien n'est retenu sans son appui */
   function memoireChatTool(T, out) {
     const JS = window.JarvisServeur; if (!SRV_OS || !JS || !JS.memoire) return [];
@@ -7866,6 +7920,7 @@ void main(){
       h('div', {}, h('b', {text: hello() + ', Rabie'}), h('small', {text: cap1(fmt(TODAY, {weekday: 'long', day: 'numeric', month: 'long'})) + (pr ? ' · ' + CODE[pr] : '') + (ml ? ' · ' + ml : '')}),
         !ml && !window.__METEO ? h('button', {type: 'button', class: 'link hm-met', onclick: () => metLoad(true)}, 'Afficher la météo') : null)));
     el.append(bar);   /* 19/11/2026 : « Demander » repasse en haut (en bas, il ne servait à rien) */
+    if (typeof briefCard === 'function') { const bc = briefCard(); if (bc) el.append(bc); }   /* 0.41.0 : le brief du jour */
     if (typeof actCard === 'function') el.append(actCard());   /* 0.33.0 : ce que font Claude et tes bots, en direct */
     el.append(hsec('En un coup d’œil', null, homeKpis(D)));
     if (D.now.length) el.append(hsec('À faire maintenant', more('Tout voir', 'demandes'), nowRows(D)));

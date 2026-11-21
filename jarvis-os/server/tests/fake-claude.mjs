@@ -93,6 +93,8 @@ function answer(raw) {
   /* discussion de la page sur le serveur : propositions en fin de réponse (⟦outil …⟧), seulement si la consigne décrit les outils */
   const lastQ = input.split('Lui : ').pop(), sys = (opt('--append-system-prompt') || '') + '\n' + (opt('--system-prompt') || '') + '\n' + FIRST;
   /* 0.37.0 : la mémoire durable — ce qu'il reçoit dans sa consigne, et la proposition de retenir (si l'outil est décrit) */
+  /* 0.41.0 : Claude propose une routine (si l'outil est décrit) */
+  if (/programme chaque lundi/i.test(lastQ)) return {text: /outil programmer_routine|- programmer_routine :/.test(sys) ? 'Je te propose cette routine.\n⟦outil programmer_routine {"phrase":"chaque lundi à 8 h, résume la semaine qui vient"}⟧' : 'Pas d’outil de routine.'};
   if (/que retiens-tu/i.test(lastQ)) return {text: 'Je retiens : ' + (/- Préfère les vols directs/.test(sys) ? 'vols directs' : 'rien') + ' ; Profil : ' + (/Végétarien le lundi/.test(sys) ? 'lu' : 'non lu') + ' ; finances : ' + (/plafond de dépenses/.test(sys) ? 'présentes' : 'absentes') + '.'};
   if (/retiens que/i.test(lastQ)) return {text: /outil retenir|- retenir :/.test(sys) ? 'Je te propose de le retenir.\n⟦outil retenir {"fait":"Préfère le train pour aller à Lyon"}⟧' : 'Pas d’outil pour retenir.'};
   if (/relance demain pour Iris/.test(lastQ)) return {text: /programmer_relance/.test(sys) ? 'Je te propose une relance : elle attend ton bouton.\n⟦outil programmer_relance {"quand":"' + demain + 'T09:00","quoi":"Voir si Iris a répondu au syndic","ligne":2}⟧' : 'Pas d’outil de relance.'};
