@@ -77,6 +77,49 @@ export function createEcoute({dir, py, helper, parakeetHelper, model, fakeHelper
   return {ready, warm, transcribe, stop, moteur};
 }
 
+/* 0.36.0 : la fin de phrase reconnue à la voix (Smart Turn v3.2, stt/tour_helper.py), installée par install/ecoute.sh (marque tour/ok).
+   Un petit programme Python garde le modèle (8,7 Mo) en mémoire ; verdict(wav) → {ok, p} (probabilité que la phrase soit finie).
+   JARVIS_TOUR_HELPER : faux modèle du banc. */
+export function createTour({dir, py, helper, fakeHelper, log = () => {}}) {
+  const model = path.join(dir, 'tour', 'smart-turn-v3.2-cpu.onnx');
+  const ready = () => !!fakeHelper || (fs.existsSync(py) && fs.existsSync(path.join(dir, 'tour', 'ok')) && fs.existsSync(model));
+  let H = null;
+  function proc() {
+    if (H && !H.dead) return H;
+    const child = fakeHelper ? spawn(process.execPath, [fakeHelper], {stdio: ['pipe', 'pipe', 'pipe']}) : spawn(py, [helper, model], {stdio: ['pipe', 'pipe', 'pipe'], env: {...process.env, JARVIS_TOUR_THREADS: process.env.JARVIS_TOUR_THREADS || '1'}});
+    const h = {child, buf: '', waits: new Map(), dead: false, err: ''};
+    child.on('close', () => { h.dead = true; for (const w of h.waits.values()) w({ok: false, error: 'fin de phrase arrêtée'}); h.waits.clear(); });
+    child.on('error', () => { h.dead = true; });
+    child.stderr.on('data', (d) => { h.err = (h.err + d).slice(-800); });
+    child.stdout.on('data', (d) => {
+      h.buf += d; let i;
+      while ((i = h.buf.indexOf('\n')) >= 0) {
+        const line = h.buf.slice(0, i); h.buf = h.buf.slice(i + 1);
+        let m; try { m = JSON.parse(line); } catch { continue; }
+        if (m.ready) continue;
+        const w = h.waits.get(m.id); if (w) { h.waits.delete(m.id); w(m); }
+      }
+    });
+    return (H = h);
+  }
+  const warm = () => { if (ready()) { try { proc(); } catch { /* rien */ } } };
+  async function verdict(wav, tmpDir) {
+    if (!ready()) return {ok: false, error: 'fin_de_phrase_absente'};
+    const h = proc(), id = crypto.randomUUID(), f = path.join(tmpDir, 'tour-' + id + '.wav');
+    fs.mkdirSync(tmpDir, {recursive: true}); fs.writeFileSync(f, wav);
+    const r = await new Promise((resolve) => {
+      const timer = setTimeout(() => { h.waits.delete(id); resolve({ok: false, error: 'trop long'}); }, 3000);   /* au-delà, la phrase part comme avant */
+      h.waits.set(id, (m) => { clearTimeout(timer); resolve(m); });
+      try { h.child.stdin.write(JSON.stringify({id, wav: f}) + '\n'); } catch { clearTimeout(timer); h.waits.delete(id); resolve({ok: false, error: 'fin de phrase injoignable'}); }
+    });
+    fs.rm(f, {force: true}, () => {});
+    if (!r.ok || typeof r.p !== 'number') { log('fin de phrase : ' + (r.error || 'échec') + (h.err ? ' — ' + h.err.slice(-200) : '')); return {ok: false, error: r.error || 'échec'}; }
+    return {ok: true, p: Math.max(0, Math.min(1, r.p)), ms: r.ms};
+  }
+  const stop = () => { if (H) { try { H.child.kill(); } catch { /* rien */ } H = null; } };
+  return {ready, warm, verdict, stop};
+}
+
 /* un WAV mono 16 bits envoyé par l'iPhone : contrôle minimal (en-tête, taille) */
 export function wavOk(b) { return Buffer.isBuffer(b) && b.length > 44 && b.length < 3e6 && b.toString('ascii', 0, 4) === 'RIFF' && b.toString('ascii', 8, 12) === 'WAVE'; }
 

@@ -45,12 +45,12 @@ export async function pair(url: string, code: string): Promise<string | null> {
 export function unpair() { store.settings.serverToken = ''; store.save(); }
 
 export interface Conn { checked: boolean; gmail: boolean; calendar: boolean; sheets: boolean; drive: boolean; read: number }
-export interface Status { ok: boolean; claude?: {installed: boolean; loggedIn: boolean; method: string}; version?: string; commit?: string; connectors?: Conn; grokPauseUntil?: string; tts?: boolean; ecoute?: boolean; version2?: string; timing?: {total: number; first: number | null; tools: number; warm: boolean; model: string} | null; error?: string }
+export interface Status { ok: boolean; claude?: {installed: boolean; loggedIn: boolean; method: string}; version?: string; commit?: string; connectors?: Conn; grokPauseUntil?: string; tts?: boolean; ecoute?: boolean; finDeTour?: boolean; version2?: string; timing?: {total: number; first: number | null; tools: number; warm: boolean; model: string} | null; error?: string }
 /* 0.35.0 : l'écoute et la voix du serveur, gardées sur l'iPhone d'une ouverture à l'autre. Avant, elles restaient inconnues jusqu'à
    la réponse de /api/status (plusieurs secondes au lancement) : un appui rapide sur l'orbe donnait la dictée de l'iPhone au lieu
    de la conversation mains libres (capture du propriétaire, 21/11/2026, « Quelle est la méthode aujourd'hui ? »). */
 const DISPO = 'jarvis.dispo';
-const dispo = (): {ecoute?: boolean; tts?: boolean} => { try { return JSON.parse(localStorage.getItem(DISPO) || '{}') || {}; } catch { return {}; } };
+const dispo = (): {ecoute?: boolean; tts?: boolean; finDeTour?: boolean} => { try { return JSON.parse(localStorage.getItem(DISPO) || '{}') || {}; } catch { return {}; } };
 let last: Status = {ok: false, ...dispo()};
 export const lastStatus = () => last;
 export async function status(): Promise<Status> {
@@ -58,8 +58,8 @@ export async function status(): Promise<Status> {
   try {
     const r = await call('/api/status');
     if (r.status === 401) return (last = {ok: false, error: 'appareil plus reconnu : relie-le de nouveau'});
-    const b = await r.json(); last = {ok: true, claude: b.claude, version: b.version, commit: b.commit, connectors: b.connectors, grokPauseUntil: b.grokPauseUntil, tts: !!b.tts, ecoute: !!b.ecoute, timing: b.timing};
-    try { localStorage.setItem(DISPO, JSON.stringify({ecoute: last.ecoute, tts: last.tts})); } catch { /* rien */ }
+    const b = await r.json(); last = {ok: true, claude: b.claude, version: b.version, commit: b.commit, connectors: b.connectors, grokPauseUntil: b.grokPauseUntil, tts: !!b.tts, ecoute: !!b.ecoute, finDeTour: b.finDeTour === true, timing: b.timing};
+    try { localStorage.setItem(DISPO, JSON.stringify({ecoute: last.ecoute, tts: last.tts, finDeTour: last.finDeTour})); } catch { /* rien */ }
     return last;
   } catch { return (last = {ok: false, error: 'serveur injoignable', ...dispo()}); }
 }
@@ -132,6 +132,15 @@ export async function stt(wav: Blob, signal: AbortSignal): Promise<string> {
 /* 0.22.1 : Claude lancé d'avance à l'ouverture de la page vocale */
 export async function prechauffe() { try { await call('/api/voix/prechauffe', {method: 'POST'}, 20000); } catch { /* serveur plus ancien : rien */ } }
 export const serverEar = () => linked() && store.settings.ecoute !== 'iphone' && last.ecoute === true;
+/* 0.36.0 : la fin de phrase reconnue à la voix (Smart Turn, sur le serveur). Dès 0,25 s de pause, le serveur dit si la phrase est
+   finie (probabilité p) ; si oui (p ≥ 0,8), il l'écrit dans la même réponse : un aller-retour de moins */
+export const serverTour = () => serverEar() && last.finDeTour === true;
+export async function sttTour(wav: Blob, signal: AbortSignal): Promise<{fin: boolean; p?: number; text?: string}> {
+  const r = await fetch(base() + '/api/stt', {method: 'POST', headers: {'content-type': 'audio/wav', 'x-tour': '0.8', authorization: 'Bearer ' + store.settings.serverToken}, body: wav, signal});
+  if (!r.ok) throw new Error('écoute ' + r.status);
+  const b = (await r.json()) || {};
+  return {fin: b.fin === true, p: typeof b.p === 'number' ? b.p : undefined, text: typeof b.text === 'string' ? b.text : undefined};
+}
 export async function installEcoute(): Promise<string> {
   try { await call('/api/ecoute/install', {method: 'POST'}); } catch { return 'error'; }
   for (let i = 0; i < 180; i++) {   /* jusqu'à 15 minutes (modèle de 500 Mo) */
