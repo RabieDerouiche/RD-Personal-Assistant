@@ -187,6 +187,15 @@
     missions: () => req('/api/missions').then((r) => (r.status === 200 ? r.j.missions : null)).catch(() => null),
     /* 0.33.0 : ce que fait Claude à l'instant (missions, Siri, tour, discussion), avec l'outil utilisé et le plan d'une mission */
     activite: () => req('/api/activite').then((r) => (r.status === 200 ? r.j : null)).catch(() => null),
+    /* 0.40.0 : la voix Google Chirp 3 HD (plafonnée sous la part gratuite) */
+    voixGoogle: {
+      etat: () => req('/api/voix/google').then((r) => (r.status === 200 ? r.j : null)).catch(() => null),
+      voix: () => req('/api/voix/google/voix').then((r) => (r.status === 200 ? r.j : null)).catch(() => null),
+      choisir: (o) => req('/api/voix/google', o).then((r) => (r.status === 200 ? r.j : null)).catch(() => null),
+      cle: (cle) => req('/api/voix/google/cle', {cle}).then((r) => r.j).catch(() => ({error: 'Serveur injoignable.'})),
+      retirer: () => req('/api/voix/google/cle', {retirer: true}).then((r) => r.j).catch(() => null),
+      essai: async (nom) => { try { const r = await fetch(BASE + '/api/voix/google/essai', {method: 'POST', headers: {'content-type': 'application/json', authorization: 'Bearer ' + token()}, body: JSON.stringify({nom})}); return r.ok ? URL.createObjectURL(await r.blob()) : null; } catch (e) { return null; } }
+    },
     /* 0.39.0 : le serveur MCP (assistants reliés : app Claude, Grok Bot) et l'accord sur une proposition venue d'eux */
     mcp: {
       etat: () => req('/api/mcp').then((r) => (r.status === 200 ? r.j : null)).catch(() => null),

@@ -1449,6 +1449,7 @@
   .pap-dates.panel { border-top: 0; padding-top: 0; }
   /* 0.37.0 : la mémoire durable */
   .mem-list { list-style: none; margin: 8px 0; padding: 0; display: grid; gap: 6px; } .mem-it { display: flex; gap: 8px; align-items: center; justify-content: space-between; padding: 6px 8px; border-radius: 10px; background: rgba(56, 189, 248, .08); } .mem-it span { min-width: 0; overflow-wrap: anywhere; }
+  .voixg-etapes { margin: 8px 0; padding-left: 20px; display: grid; gap: 4px; font-size: 14px; } .voixg-sel { flex: 1; min-width: 0; }
   .mcp-d { padding: 10px; margin: 8px 0; border-radius: 12px; border: 1px solid rgba(168, 85, 247, .5); background: rgba(168, 85, 247, .12); } .mcp-code { font: 700 18px/1 ui-monospace, monospace; letter-spacing: .2em; }
   .mis-accord { margin: 8px 0; } .mis-par { font-size: 13px; margin: 4px 0; }
   .skill-it span { display: block; } .skill-it small { display: inline; }
@@ -8899,6 +8900,36 @@ void main(){
     paint();
     return card;
   }
+  /* 0.40.0 (choix du 21/11/2026 : l'essayer « tant que je suis notifié avant de passer sur du payant ») : la voix Google Chirp 3 HD,
+     plus naturelle que Pierre ; gratuite jusqu'à 1 million de caractères par mois ; JARVIS s'arrête de lui-même à 900 000 et reprend Pierre */
+  async function voixCard(JS) {
+    const card = h('section', {class: 'card set-card voixg-card', id: 'voixg-card'}, h('b', {text: 'Voix du serveur : Pierre ou Google'}));
+    let st = await JS.voixGoogle.etat();
+    if (!st) { card.append(h('p', {class: 'muted', text: 'Ton serveur ne la connaît pas encore : touche « Mettre à jour le serveur » plus bas.'})); return card; }
+    const out = h('p', {class: 'set-msg'}), corps = h('div', {});
+    const nb = (n) => Number(n || 0).toLocaleString('fr-FR');
+    const paint = async () => {
+      const kids = [];
+      kids.push(h('p', {class: 'muted', text: st.pret ? (st.choisie ? 'Google parle (' + String(st.nom || '').split('-').pop() + ')' : 'Pierre parle') + ' · ' + nb(st.caracteres) + ' caractères Google ce mois sur ' + nb(st.plafond) + ' (gratuit jusqu’à 1 million)' + (st.pause ? ' · plafond atteint : Pierre jusqu’au 1er' : '') : 'Pierre parle (gratuit, sur ton serveur). La voix Google, plus naturelle, demande une clé Google une fois.'}));
+      if (st.pret) {
+        kids.push(h('div', {class: 'seg set-seg', role: 'group'}, [['pierre', 'Pierre'], ['google', 'Google']].map(([v, l]) => h('button', {type: 'button', 'aria-pressed': String((st.choisie ? 'google' : 'pierre') === v), onclick: async () => { const r = await JS.voixGoogle.choisir({voixServeur: v}); if (r) { st = Object.assign({}, st, r); paint(); } }}, l))));
+        const vx = await JS.voixGoogle.voix(), sel = h('select', {class: 'inp voixg-sel', 'aria-label': 'Voix Google'}, ((vx && vx.voix) || []).map((v) => h('option', Object.assign({value: v.nom, text: v.court + (v.genre ? ' (' + v.genre + ')' : '')}, v.nom === st.nom ? {selected: ''} : {}))));
+        sel.onchange = async () => { const r = await JS.voixGoogle.choisir({nom: sel.value}); if (r) { st = Object.assign({}, st, r); out.textContent = 'Voix choisie : ' + sel.value.split('-').pop() + '.'; } };
+        const ecoute = h('button', {type: 'button', class: 'btn sm', onclick: async () => { ecoute.disabled = true; const u = await JS.voixGoogle.essai(sel.value); ecoute.disabled = false; if (!u) { out.textContent = 'Google n’a pas répondu (ou plafond atteint).'; return; } try { const a = new Audio(u); a.play().catch(() => {}); } catch (e) { /* rien */ } }}, 'Écouter');
+        kids.push(h('div', {class: 'row-actions mem-add'}, sel, ecoute), (vx && vx.erreur) ? h('p', {class: 'muted', text: 'Liste des voix indisponible : ' + vx.erreur}) : null,
+          h('button', {type: 'button', class: 'btn ghost sm', onclick: async () => { const r = await JS.voixGoogle.retirer(); if (r) { st = Object.assign({}, st, r); paint(); out.textContent = 'Clé retirée : Pierre parle.'; } }}, 'Retirer la clé Google'));
+      } else {
+        const inp = h('input', {type: 'password', class: 'mem-in', autocomplete: 'off', placeholder: 'Clé d’API Google (AIza…)', 'aria-label': 'Clé d’API Google Text-to-Speech'});
+        kids.push(h('ol', {class: 'muted voixg-etapes'}, ['Sur console.cloud.google.com, ouvre le projet de JARVIS (celui de son accès Google).', 'Active l’API « Cloud Text-to-Speech ».', 'Facturation : relie un compte de facturation (ta carte). Rien ne sera facturé : JARVIS s’arrête à 900 000 caractères par mois, sous la part gratuite d’un million.', 'Identifiants : « Créer une clé API », puis restreins-la à « Cloud Text-to-Speech API ».', 'Colle la clé ici : elle reste sur ton serveur, ni Claude ni l’app ne la relisent.'].map((t) => h('li', {text: t}))),
+          h('p', {class: 'muted', text: 'Noms des menus Google devinés.'}),
+          h('div', {class: 'row-actions mem-add'}, inp, h('button', {type: 'button', class: 'btn', onclick: async () => { const r = await JS.voixGoogle.cle(inp.value); inp.value = ''; if (r && r.pret) { st = Object.assign({}, st, r); out.textContent = 'Clé enregistrée. Choisis « Google » et écoute une voix.'; paint(); } else out.textContent = (r && r.error) || 'Clé refusée.'; }}, 'Enregistrer')));
+      }
+      corps.replaceChildren(...kids.filter(Boolean));
+    };
+    card.append(corps, out);
+    await paint();
+    return card;
+  }
   /* 0.39.0 (choix du 21/11/2026, « Serveur MCP ») : l'app Claude et Grok Bot reliés à JARVIS — l'adresse à donner, les demandes d'accès
      à accorder (les mêmes 4 chiffres que sur la page de l'assistant), les assistants reliés (« Retirer »), un jeton fixe, les derniers accès */
   async function mcpCard(JS) {
@@ -9033,6 +9064,7 @@ void main(){
       if (JS.tour) parts.push(await tourCard(JS)); /* JARVIS OS 0.15.0 : tour de Claude */
       if (JS.sauvegarde) parts.push(await savCard(JS)); /* JARVIS OS 0.14.0 : sauvegarde de Pilotage */
       if (JS.mcp) { const mc = await mcpCard(JS); if (mc.dataset.urgent) parts.unshift(mc); else parts.push(mc); } /* JARVIS OS 0.39.0 : assistants reliés (en tête si une demande attend) */
+      if (JS.voixGoogle) parts.push(await voixCard(JS)); /* JARVIS OS 0.40.0 : la voix Google, plafonnée */
       if (JS.memoire) parts.push(await memoireCard(JS)); /* JARVIS OS 0.37.0 : la mémoire durable */
       if (JS.skills) parts.push(await skillsCard(JS)); /* JARVIS OS 0.38.0 : les skills des missions */
       /* 3. JARVIS : version, mise à jour du serveur, voix et modèle (repris de l'ancienne app) */

@@ -20,11 +20,12 @@ import {BOT_IDS, BOT_NOMS, BOT_LISTE} from './bots.mjs';
 import {createEcoute, createTour, wavOk, intention, quand, meteoPhrase, meteoUrl, heurePhrase, datePhrase, nrm, diction} from './voix.mjs';
 import {createMemoire, profilTexte} from './memoire.mjs';
 import {createMcp} from './mcp.mjs';
+import {createVoixGoogle, VOIX_DEFAUT, nomOk} from './voix-google.mjs';
 import {createFlux, SECOURS} from './flux.mjs';
 import {createActivite, outilNom} from './activite.mjs';
 const ACT = createActivite();   /* 0.33.0 : ce que fait Claude à l'instant */
 
-const VERSION = '0.39.0';
+const VERSION = '0.40.0';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PORT = +(process.env.PORT || 8787);
 const HOST = process.env.HOST || '127.0.0.1';
@@ -1127,6 +1128,13 @@ const SAY = [[/\bJARVIS\b|\bJarvis\b/g, 'Djarviss'], [/\bKairos\b/g, 'Kaïross']
 const pronounce = (t) => SAY.reduce((a, [re, r]) => a.replace(re, r), diction(t)).replace(/[*_#`>|]/g, ' ');
 let TTS = null;
 const ttsReady = () => fs.existsSync(VOICE.model) && (fs.existsSync(PIPER_PY) || !!process.env.JARVIS_TTS_HELPER);
+/* 0.40.0 : la voix Google Chirp 3 HD (voix-google.mjs), choisie dans Réglages, plafonnée sous la part gratuite ; Pierre en secours */
+const VG = createVoixGoogle({fichier: path.join(DATA, 'voix-google.json'), compteurFichier: path.join(DATA, 'voix-google-compteur.json'), base: process.env.JARVIS_VOIX_GOOGLE_URL || 'https://texttospeech.googleapis.com',
+  plafond: Math.min(+process.env.JARVIS_VOIX_GOOGLE_PLAFOND || 900000, 1000000), now,
+  alerte: ({titre, texte}) => { if (S.push && S.push.subs.length) PUSH.send({title: titre, body: texte, url: '/#reglages', tag: 'voix-google'}, {urgency: 'normal'}).catch(() => {}); },
+  log: (t) => { S.voixGoogleErr = {at: now(), t: String(t).slice(0, 300)}; }});
+const googleChoisie = () => (S.config || {}).voixServeur === 'google' && VG.pret();
+const voixPrete = () => ttsReady() || googleChoisie();
 function ttsHelper() {
   if (TTS && !TTS.dead) return TTS;
   const helperCmd = process.env.JARVIS_TTS_HELPER ? [process.execPath, [TTS_HELPER, VOICE.model, VOICE.speaker]] : [PIPER_PY, [TTS_HELPER, VOICE.model, VOICE.speaker]];
@@ -1152,9 +1160,14 @@ function installVoice() {
   return VOICE_INSTALL;
 }
 async function tts(text) {
+  const dir = path.join(DATA, 'tts'); fs.mkdirSync(dir, {recursive: true});
+  if (googleChoisie()) {   /* 0.40.0 : la voix Google d'abord (gardée en cache comme Pierre) ; au plafond ou en erreur, Pierre */
+    const g = diction(String(text || '').trim()).replace(/[*_#`>|]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 600), nom = S.config.voixGoogleNom || VOIX_DEFAUT;
+    if (g) { const og = path.join(dir, sha('google' + nom + g).slice(0, 24) + '.wav'); if (fs.existsSync(og)) return og; const f = await VG.dire(g, nom, og); if (f) return f; }
+    if (!ttsReady()) return null;
+  }
   const clean = pronounce(String(text || '').trim()).slice(0, 600);
   if (!clean) return null;
-  const dir = path.join(DATA, 'tts'); fs.mkdirSync(dir, {recursive: true});
   const out = path.join(dir, sha(VOICE.model + VOICE.speaker + clean).slice(0, 24) + '.wav');
   if (fs.existsSync(out)) return out;
   const t = ttsHelper(), id = ++t.n;
@@ -1257,7 +1270,7 @@ const server = http.createServer(async (req, res) => {
         }
         catch (e) { return json(res, e.code === 'server_not_connected' ? 409 : e.code === 'not_in_manifest' ? 404 : 502, {error: {code: e.code || 'tool_error', message: e.message, status: e.status || 0}}); }
       }
-      if (p === '/api/status') { const cs = await claudeStatus(); if (cs.loggedIn && (!MCP.at || now() - MCP.at > 600000)) mcpListFond();   /* 0.35.0 : relue en fond (elle prenait plusieurs secondes et retardait l'orbe) */ return json(res, 200, {version: VERSION, commit, claude: cs, connectors: connSummary(), google: (({configured, linked, account}) => ({configured, linked, account}))(GG.status('')), grokPauseUntil: await grokPauseMs().then((v) => (v ? new Date(v).toISOString() : '')).catch(() => S.config.grokPauseUntil), usage: S.usage, tache: {running: TACHE.running, last: TACHE.last}, push: {count: S.push.subs.length, last: S.push.last || null, prefs: S.push.prefs}, session: !!S.session, timing: S.lastTiming || null, page: FLUX.etat(), tts: ttsReady(), voiceInstall: VOICE_INSTALL.state, ecoute: ECOUTE.ready(), ecouteMoteur: ECOUTE.moteur(), ecouteInstall: ECOUTE_INSTALL.state, finDeTour: ECOUTE.ready() && TOUR.ready()}); }
+      if (p === '/api/status') { const cs = await claudeStatus(); if (cs.loggedIn && (!MCP.at || now() - MCP.at > 600000)) mcpListFond();   /* 0.35.0 : relue en fond (elle prenait plusieurs secondes et retardait l'orbe) */ return json(res, 200, {version: VERSION, commit, claude: cs, connectors: connSummary(), google: (({configured, linked, account}) => ({configured, linked, account}))(GG.status('')), grokPauseUntil: await grokPauseMs().then((v) => (v ? new Date(v).toISOString() : '')).catch(() => S.config.grokPauseUntil), usage: S.usage, tache: {running: TACHE.running, last: TACHE.last}, push: {count: S.push.subs.length, last: S.push.last || null, prefs: S.push.prefs}, session: !!S.session, timing: S.lastTiming || null, page: FLUX.etat(), tts: voixPrete(), voixServeur: googleChoisie() ? 'google' : 'pierre', voiceInstall: VOICE_INSTALL.state, ecoute: ECOUTE.ready(), ecouteMoteur: ECOUTE.moteur(), ecouteInstall: ECOUTE_INSTALL.state, finDeTour: ECOUTE.ready() && TOUR.ready()}); }
       if (p === '/api/update' && req.method === 'POST') return json(res, 200, await update());
       if (p === '/api/maj') return json(res, 200, await majVerifie(url.searchParams.get('force') === '1'));   /* 0.27.0 : une version plus récente ? */
       /* notifications : clé publique, abonnement de cet appareil, essai, préférences, vérification immédiate */
@@ -1339,8 +1352,32 @@ const server = http.createServer(async (req, res) => {
       if (p === '/api/ecoute/install') return json(res, 200, {...ECOUTE_INSTALL, ready: ECOUTE.ready()});
       if (p === '/api/voice/install' && req.method === 'POST') return json(res, 200, installVoice());
       if (p === '/api/voice/install') return json(res, 200, VOICE_INSTALL);
+      /* 0.40.0 : la voix Google — état (compteur du mois, plafond), voix françaises disponibles, choix, essai d'une voix */
+      if (p === '/api/voix/google' && req.method === 'GET') return json(res, 200, {...VG.etat(), choisie: (S.config || {}).voixServeur === 'google', nom: (S.config || {}).voixGoogleNom || VOIX_DEFAUT, erreur: S.voixGoogleErr || null});
+      if (p === '/api/voix/google/voix' && req.method === 'GET') { try { return json(res, 200, {voix: await VG.voix()}); } catch (e) { return json(res, 200, {voix: [], erreur: String(e && e.message || e).slice(0, 200)}); } }
+      if (p === '/api/voix/google' && req.method === 'POST') {
+        const b = await readBody(req); S.config = S.config || {};
+        if (['google', 'pierre'].includes(b.voixServeur)) S.config.voixServeur = b.voixServeur;
+        if (nomOk(b.nom)) S.config.voixGoogleNom = b.nom;
+        save(); return json(res, 200, {...VG.etat(), choisie: S.config.voixServeur === 'google', nom: S.config.voixGoogleNom || VOIX_DEFAUT});
+      }
+      /* la clé d'API Google (Text-to-Speech) collée par lui dans Réglages : écrite sur le serveur (fichier protégé), jamais renvoyée ni relue */
+      if (p === '/api/voix/google/cle' && req.method === 'POST') {
+        const b = await readBody(req), cle = String(b.cle || '').trim();
+        if (b.retirer === true) { fs.rmSync(path.join(DATA, 'voix-google.json'), {force: true}); S.config = S.config || {}; S.config.voixServeur = 'pierre'; save(); return json(res, 200, {...VG.etat(), choisie: false}); }
+        if (!/^[A-Za-z0-9_-]{30,80}$/.test(cle)) return json(res, 400, {error: 'Ce n’est pas une clé d’API Google (39 caractères, commence en général par AIza).'});
+        fs.writeFileSync(path.join(DATA, 'voix-google.json'), JSON.stringify({cle}), {mode: 0o600});
+        return json(res, 200, {...VG.etat(), choisie: (S.config || {}).voixServeur === 'google'});
+      }
+      if (p === '/api/voix/google/essai' && req.method === 'POST') {
+        const b = await readBody(req), nom = nomOk(b.nom) ? b.nom : (S.config || {}).voixGoogleNom || VOIX_DEFAUT, dir = path.join(DATA, 'tts'); fs.mkdirSync(dir, {recursive: true});
+        const phrase = 'Bonjour, je suis la voix de JARVIS. Voici comment je sonne.', out = path.join(dir, sha('google' + nom + phrase).slice(0, 24) + '.wav');
+        const f = fs.existsSync(out) ? out : await VG.dire(phrase, nom, out);
+        if (!f) return json(res, 502, {error: VG.pret() ? 'Google n’a pas répondu (ou plafond atteint).' : 'Aucun accès Google posé sur le serveur.'});
+        res.writeHead(200, {'content-type': 'audio/wav', 'cache-control': 'private, max-age=86400'}); fs.createReadStream(f).pipe(res); return;
+      }
       if (p === '/api/tts' && req.method === 'POST') {
-        if (!ttsReady()) return json(res, 503, {error: 'Voix du serveur pas installée.'});
+        if (!voixPrete()) return json(res, 503, {error: 'Voix du serveur pas installée.'});
         const b = await readBody(req); const f = await tts(b.text);
         if (!f) return json(res, 500, {error: 'Synthèse impossible.'});
         res.writeHead(200, {'content-type': 'audio/wav', 'cache-control': 'private, max-age=86400'}); fs.createReadStream(f).pipe(res); return;
