@@ -475,6 +475,27 @@
       {service: 'VPN', cat: 'Services en ligne', prix: 89.00, rythme: 'annuel', depuis: '08/2021', hausse: '2 ans prépayés'},
       {service: 'Livraison de repas, abonnement', cat: 'Livraison', prix: 5.99, rythme: 'mensuel', depuis: '05/2023'},
       {service: 'Achats en ligne, livraison rapide', cat: 'Livraison', prix: 59.90, rythme: 'annuel', depuis: '2018'}],
+    /* Reste à payer (21/11/2026) : ses dépenses fixes, chacune avec son jour de prélèvement, et le jour de sa paie (le 28, avancée si
+       week-end ou férié). Les abonnements reprennent les dates de « À venir ». Tout est inventé. */
+    fixes: [
+      {id: 'f1', service: 'Crédit immobilier', cat: 'Logement', montant: 1150.00, jour: 5, rythme: 'mensuel', source: 'toi'},
+      {id: 'f2', service: 'Assurance emprunteur', cat: 'Logement', montant: 38.40, jour: 5, rythme: 'mensuel', source: 'toi'},
+      {id: 'f3', service: 'Assurance habitation', cat: 'Logement', montant: 16.90, jour: 10, rythme: 'mensuel', source: 'mail'},
+      {id: 'f4', service: 'Électricité', cat: 'Logement', montant: 48.20, jour: 12, rythme: 'mensuel', source: 'mail'},
+      {id: 'f5', service: 'Box internet', cat: 'Télécoms', montant: 29.99, jour: 8, rythme: 'mensuel', source: 'mail'},
+      {id: 'f6', service: 'Forfait mobile', cat: 'Télécoms', montant: 9.99, jour: 3, rythme: 'mensuel', source: 'mail'},
+      {id: 'f7', service: 'Navigo Liberté+', cat: 'Transport', montant: 36.72, jour: 10, rythme: 'mensuel', estime: true, source: 'mail'},
+      {id: 'f8', service: 'Assurance auto', cat: 'Transport', montant: 52.30, jour: 15, rythme: 'mensuel', source: 'mail'},
+      {id: 'f9', service: 'Complémentaire santé', cat: 'Santé', montant: 24.50, jour: 25, rythme: 'mensuel', source: 'toi'},
+      {id: 'f10', service: 'Plateforme vidéo', cat: 'Abonnements', montant: 9.99, jour: 15, rythme: 'mensuel', source: 'mail'},
+      {id: 'f11', service: 'Musique en famille', cat: 'Abonnements', montant: 17.99, jour: 20, rythme: 'mensuel', source: 'mail'},
+      {id: 'f12', service: 'Livraison de repas, abonnement', cat: 'Abonnements', montant: 5.99, jour: 22, rythme: 'mensuel', source: 'mail'},
+      {id: 'f13', service: 'Assistant IA', cat: 'Abonnements', montant: 21.60, jour: D(6).getDate(), rythme: 'mensuel', source: 'mail'},
+      {id: 'f14', service: 'Stockage photos', cat: 'Abonnements', montant: 2.99, jour: D(12).getDate(), rythme: 'mensuel', source: 'mail'},
+      {id: 'f15', service: 'Console de jeux, abonnement en ligne', cat: 'Abonnements', montant: 79.99, jour: D(3).getDate(), mois: D(3).getMonth() + 1, rythme: 'annuel', source: 'mail'},
+      {id: 'f16', service: 'Plateforme d’animation', cat: 'Abonnements', montant: 69.99, jour: D(41).getDate(), mois: D(41).getMonth() + 1, rythme: 'annuel', source: 'mail'}],
+    revenus: {jour: 28, avance: true},
+    notif: {veille: true, seuil: 20, echec: true},
     navigo: {mois: rMoisL(1), conseil: 'liberte', joursSite: 9, liberte: 36.72, moisNet: 45.40, texte: '9 jours sur site prévus, avec une semaine de congés : reste en Liberté+ (environ 36,72 €). Le Navigo Mois coûterait 45,40 € après le remboursement de 50 %.'}};
   /* 0.23.0 : la météo de l'accueil (en vrai : Open-Meteo, à la position de l'iPhone) */
   window.__METEO = {current: {temperature_2m: 9.4, apparent_temperature: 6.2, weather_code: 3}, daily: {time: [fr(D(0)), fr(D(1))], weather_code: [3, 61], temperature_2m_min: [4, 2], temperature_2m_max: [11, 7], precipitation_probability_max: [10, 70]}};
