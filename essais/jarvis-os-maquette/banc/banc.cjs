@@ -553,18 +553,20 @@ srv.listen(0, async () => {
       ok('Sorties : un prix écrit en phrase donne son premier montant (« 18 € TTC au guichet », pas « 186 320 € »), 0 € = « Gratuit », trajet en une ligne', /18 € TTC au guichet/.test(t) && !/186/.test(t) && /Gratuit/.test(t) && /Voiture 9 min \(5,7 km\) · transports 14 min/.test(t) && !/rome2rio/i.test(t), t.slice(0, 200)); }
     /* Radar (maquette du 21/11/2026, rubrique Argent) : prélèvements à venir, alertes, abonnements, total du mois, conseil Navigo ; données d'exemple */
     { p = await page('#argent');
-      const r0 = await p.evaluate(() => ({t: document.getElementById('view-title').textContent, hero: (document.querySelector('.rad-hero b') || {}).textContent || '', p: (document.querySelector('.rad-hero p') || {}).textContent || '',
-        segs: [...document.querySelectorAll('.rad-seg button')].map((x) => x.textContent), due: document.querySelectorAll('.rad-due').length, nav: (document.querySelector('.rad-nav b') || {}).textContent || '',
-        large: document.documentElement.scrollWidth <= innerWidth + 1}));
-      ok('Radar : la rubrique Argent s\'ouvre avec le total du mois, 4 filtres, 6 prélèvements à venir et le conseil Navigo, sans déborder', r0.t === 'Argent' && /Ce mois-ci : 641,37 €/.test(r0.hero) && /\+7 %/.test(r0.p) && /2 prélèvements dans les 7 jours/.test(r0.p)
-        && r0.segs.length === 4 && /^À venir \(6\)$/.test(r0.segs[0]) && r0.due === 6 && /^Navigo de .+ : reste en Liberté\+$/.test(r0.nav) && r0.large, JSON.stringify(r0));
+      const r0 = await p.evaluate(() => ({t: document.getElementById('view-title').textContent, k: (document.querySelector('.rad-hero .rad-k') || {}).textContent || '', big: (document.querySelector('.rad-hero .rad-big') || {}).textContent || '',
+        chips: (document.querySelector('.rad-hero .mchips') || {}).textContent || '', segs: [...document.querySelectorAll('.rad-seg button')].map((x) => x.textContent), fixes: document.querySelectorAll('.rad-fixes').length,
+        nav: (document.querySelector('.rad-nav b') || {}).textContent || '', large: document.documentElement.scrollWidth <= innerWidth + 1}));
+      ok('Radar : la rubrique Argent s\'ouvre sur le reste à payer d\'ici la paie, 5 filtres (Fixes d\'abord), le conseil Navigo, sans déborder', r0.t === 'Argent' && /^Reste à payer d’ici ta paie du \S+ \d\d\/\d\d$/.test(r0.k) && /^\d[\d\s]*,\d\d €$/.test(r0.big)
+        && /2 échéances sous 7 jours/.test(r0.chips) && r0.segs.length === 5 && /^Fixes \(16\)$/.test(r0.segs[0]) && /^À venir \(6\)$/.test(r0.segs[1]) && r0.fixes === 1 && /^Navigo de .+ : reste en Liberté\+$/.test(r0.nav) && r0.large, JSON.stringify(r0));
+      const avenir = () => p.evaluate(() => [...document.querySelectorAll('.rad-seg button')].find((x) => /^À venir/.test(x.textContent)).click()).then(() => p.waitForTimeout(400));
+      await avenir();
       ok('Radar : à venir dans l\'ordre des dates ; le plus proche signalé, avec la hausse par rapport à l\'an dernier', await p.evaluate(() => { const c = [...document.querySelectorAll('.rad-due')], j = c.map((x) => +((x.querySelector('.ech-date span').textContent.match(/\d+/) || [0])[0]));
-        return c[0].classList.contains('is-soon') && /dans 3 j/.test(c[0].textContent) && /\+33 % \(avant : 59,99 €\)/.test(c[0].textContent) && j.every((v, i) => !i || v >= j[i - 1]) && /montant à venir/.test(c[5].textContent); }));
+        return c.length === 6 && c[0].classList.contains('is-soon') && /dans 3 j/.test(c[0].textContent) && /\+33 % \(avant : 59,99 €\)/.test(c[0].textContent) && j.every((v, i) => !i || v >= j[i - 1]) && /montant à venir/.test(c[5].textContent); }));
       await p.evaluate(() => [...document.querySelectorAll('.rad-due')][0].querySelector('.row-actions button').click()); await p.waitForTimeout(500);
       const r1 = await p.evaluate(() => ({kept: document.querySelector('.rad-due').classList.contains('is-kept') && /gardé/.test(document.querySelector('.rad-due .nature').textContent), toast: [...document.querySelectorAll('.toast')].some((x) => /Gardé/.test(x.textContent))}));
-      await p.reload(); await p.waitForTimeout(1800);
-      const r2 = await p.evaluate(() => ({kept: document.querySelector('.rad-due').classList.contains('is-kept'), p: document.querySelector('.rad-hero p').textContent}));
-      ok('Radar : « Je garde » marque le prélèvement, prévient, et tient après un rechargement (plus qu\'un prélèvement à surveiller dans les 7 jours)', r1.kept && r1.toast && r2.kept && /1 prélèvement dans les 7 jours/.test(r2.p), JSON.stringify([r1, r2]));
+      await p.reload(); await p.waitForTimeout(1800); await avenir();
+      const r2 = await p.evaluate(() => ({kept: document.querySelector('.rad-due').classList.contains('is-kept'), p: document.querySelector('.rad-hero .mchips').textContent}));
+      ok('Radar : « Je garde » marque le prélèvement, prévient, et tient après un rechargement (plus qu\'une échéance à surveiller dans les 7 jours)', r1.kept && r1.toast && r2.kept && /1 échéance sous 7 jours/.test(r2.p), JSON.stringify([r1, r2]));
       await p.evaluate(() => [...document.querySelectorAll('.rad-seg button')].find((x) => /^Alertes/.test(x.textContent)).click()); await p.waitForTimeout(400);
       ok('Radar : 4 alertes, une icône par type (paiement échoué, essai, hausse, montant inhabituel) ; plus d\'alerte sur la facture mobile (seul le prix de l\'abonnement compte)', await p.evaluate(() => { const a = [...document.querySelectorAll('.rad-alert')];
         return a.length === 4 && ['echec', 'essai', 'hausse', 'inhabituel'].every((k) => a.some((x) => x.classList.contains('is-' + k))) && !a.some((x) => /facture mobile/i.test(x.textContent)) && a.every((x) => x.querySelector('.hm-ic svg')) && /avant : 48,20 €/.test(a[3].textContent); }));
@@ -576,7 +578,7 @@ srv.listen(0, async () => {
           && [...document.querySelectorAll('.rad-abo')].every((x) => x.getBoundingClientRect().right <= v.right + 1) && /119,88 € par an/.test(document.querySelector('.rad-abo').textContent); }));
       await p.evaluate(() => [...document.querySelectorAll('.rad-seg button')].find((x) => x.textContent === 'Le mois').click()); await p.waitForTimeout(400);
       ok('Radar : le mois, un poste par barre, la plus longue pour le plus gros poste, comparé au mois précédent', await p.evaluate(() => { const b = [...document.querySelectorAll('.rad-bar')], w = b.map((x) => parseFloat(x.querySelector('.rad-bar-t i').style.width));
-        return b.length === 5 && w[0] === 100 && w.every((v, i) => !i || v <= w[i - 1]) && /contre 598,20 €/.test(document.getElementById('view').textContent) && /10 commandes, 21,16 € en moyenne/.test(b[1].textContent); }));
+        return b.length === 5 && w[0] === 100 && w.every((v, i) => !i || v <= w[i - 1]) && /641,37 €, contre 598,20 € .+ \(\+7 %\)/.test(document.getElementById('view').textContent) && /10 commandes, 21,16 € en moyenne/.test(b[1].textContent); }));
       await p.screenshot({path: path.join(SH, 'radar-mois.png')});
       await p.evaluate(() => [...document.querySelectorAll('.rad-seg button')].find((x) => /^À venir/.test(x.textContent)).click()); await p.waitForTimeout(400);
       await p.evaluate(() => [...document.querySelectorAll('.rad-due')][1].querySelectorAll('.row-actions button')[1].click()); await p.waitForTimeout(800);
@@ -585,6 +587,43 @@ srv.listen(0, async () => {
       await p.tap('.fav-handle'); await p.waitForTimeout(600);
       ok('Radar : la rubrique Argent est dans « Toutes les rubriques » (maquette)', await p.evaluate(() => !!document.querySelector('.all-grid .tab[data-tab="argent"]')));
       p = await page('#argent'); await p.screenshot({path: path.join(SH, 'radar.png')}); }
+    /* Reste à payer (21/11/2026 ; ses choix : dans JARVIS, ses dépenses seulement, notification la veille + la page Radar). Date fixée au lundi
+       23/11/2026 : paie le 28 (un samedi : avancée au vendredi 27) ; prélèvements du week-end et des jours fériés décalés au jour ouvré suivant. */
+    { const ctx = await b.newContext({...devices['iPhone 15 Pro Max']}); await ctx.addInitScript(PAUSE_INIT); const q = await ctx.newPage(); q.on('pageerror', (e) => errs.push('reste à payer : ' + e.message));
+      await q.clock.setFixedTime(new Date('2026-11-23T10:00:00')); await q.goto(base + '#argent'); await q.waitForTimeout(3000);
+      const rs = () => q.evaluate(() => ({k: document.querySelector('.rad-k').textContent, big: document.querySelector('.rad-big').textContent, p: document.querySelector('.rad-hero p').textContent,
+        prog: document.querySelector('.rad-prog-l').textContent, w: document.querySelector('.rad-prog i').style.width, rows: [...document.querySelectorAll('.rad-fixes > .panel:first-child .rad-fx')].map((x) => x.innerText.replace(/\s+/g, ' ').trim()),
+        deja: (document.querySelector('.rad-deja summary') || {}).textContent || '', rules: document.querySelectorAll('.rad-rule').length, seg: (document.querySelector('.rad-seg button') || {}).textContent, large: document.documentElement.scrollWidth <= innerWidth + 1}));
+      const ra = await rs();
+      ok('Reste à payer : d\'ici la paie du 28 avancée au vendredi 27/11, 110,48 € en 3 prélèvements (celui du dimanche 22 part le lundi 23) ; 1 435,07 € déjà prélevés depuis la paie du 28/10', ra.k === 'Reste à payer d’ici ta paie du ven. 27/11' && ra.big === '110,48 €'
+        && /^3 prélèvements fixes · prochain : Livraison de repas, abonnement, aujourd’hui, 5,99 €$/.test(ra.p) && /depuis ta paie du mer\. 28\/10 : 1\s435,07 €$/.test(ra.prog) && ra.w === '93%' && ra.rows.length === 3
+        && /^lun\. 23\/11 Livraison de repas, abonnement Abonnements · décalé du dim\. 22\/11 5,99 €$/.test(ra.rows[0]) && /^jeu\. 26\/11 Console de jeux/.test(ra.rows[2]) && /^Déjà prélevé \(12\) : 1\s435,07 €$/.test(ra.deja) && ra.rules === 16 && ra.large, JSON.stringify(ra));
+      await q.evaluate(() => [...document.querySelectorAll('.rad-notif button')].find((x) => /exemple/.test(x.textContent)).click()); await q.waitForTimeout(500);
+      const ex = await q.evaluate(() => [...document.querySelectorAll('.toast')].map((x) => x.textContent).join(' | '));
+      ok('Reste à payer : l\'exemple de notification part la veille (mar. 24/11 à 19 h), pour le prochain prélèvement d\'au moins 20 €, avec le reste d\'ici la paie', /mar\. 24\/11 à 19 h : « Demain : Complémentaire santé, 24,50 €\. Reste à payer d’ici ta paie du ven\. 27\/11 : 104,49 €\. »/.test(ex), ex);
+      await q.evaluate(() => [...document.querySelectorAll('.rad-to button')][1].click()); await q.waitForTimeout(400);
+      const rb = await rs();
+      ok('Reste à payer : « Jusqu\'à la fin du mois » donne 132,08 € (le prélèvement du dimanche 29 part le lundi 30) et 1 413,47 € déjà prélevés depuis le 1er novembre', rb.k === 'Reste à payer d’ici la fin du mois (lun. 30/11)' && rb.big === '132,08 €' && rb.rows.length === 4
+        && /^lun\. 30\/11 Assistant IA .*décalé du dim\. 29\/11/.test(rb.rows[3]) && /depuis le 1er novembre : 1\s413,47 €$/.test(rb.prog), JSON.stringify(rb));
+      const ajoute = async (nom, mt, j) => { await q.evaluate(() => [...document.querySelectorAll('.rad-act button')][0].click()); await q.waitForTimeout(700);
+        await q.fill('.rad-form input[type="text"]', nom); await q.fill('.rad-form input[inputmode="decimal"]', mt); await q.fill('.rad-form input[type="number"]', j);
+        await q.evaluate(() => document.querySelector('.rad-form button[type="submit"]').click()); await q.waitForTimeout(700); };
+      await ajoute('Salle de sport', '29,90', '26');
+      const rc = await rs(); await q.reload(); await q.waitForTimeout(2500); const rd = await rs();
+      ok('Reste à payer : une dépense fixe ajoutée (29,90 € le 26) compte tout de suite (161,98 €) ; l\'ajout et « fin du mois » tiennent après un rechargement', rc.big === '161,98 €' && rc.rules === 17 && rd.big === '161,98 €' && /fin du mois/.test(rd.k) && rd.seg === 'Fixes (17)', JSON.stringify([rc, rd]));
+      await q.evaluate(() => [...document.querySelectorAll('.rad-to button')][0].click()); await q.waitForTimeout(300);
+      await q.evaluate(() => [...document.querySelectorAll('.rad-act button')][1].click()); await q.waitForTimeout(700);
+      await q.selectOption('.rad-form select', 'dernier'); await q.evaluate(() => document.querySelector('.rad-form button[type="submit"]').click()); await q.waitForTimeout(700);
+      const re = await rs();
+      ok('Reste à payer : paie au dernier jour du mois (lundi 30/11) : le reste court jusqu\'au 30 (161,98 €)', re.k === 'Reste à payer d’ici ta paie du lun. 30/11' && re.big === '161,98 €', JSON.stringify(re));
+      await q.evaluate(() => [...document.querySelectorAll('.rad-rule')].find((x) => /Salle de sport/.test(x.textContent)).click()); await q.waitForTimeout(700);
+      await q.evaluate(() => [...document.querySelectorAll('.rad-form button')].find((x) => /Retirer/.test(x.textContent)).click()); await q.waitForTimeout(700);
+      const rf = await rs();
+      ok('Reste à payer : « Retirer cette dépense » l\'enlève du calcul (132,08 € d\'ici la paie du 30/11)', rf.big === '132,08 €' && rf.rules === 16, JSON.stringify(rf));
+      await ajoute('Cotisation', '40', '11');
+      const fer = await q.evaluate(() => { document.querySelector('.rad-deja').open = true; return [...document.querySelectorAll('.rad-deja .rad-fx')].map((x) => x.innerText.replace(/\s+/g, ' ').trim()); });
+      ok('Reste à payer : un prélèvement prévu le 11 novembre (férié) part le jeudi 12', fer.some((x) => /^jeu\. 12\/11 Cotisation Autres · décalé du mer\. 11\/11 40,00 €$/.test(x)), JSON.stringify(fer));
+      await q.screenshot({path: path.join(SH, 'radar-reste.png')}); await ctx.close(); }
     /* aucune rubrique n'affiche de texte cassé */
     const broken = [];
     for (const t of ['accueil', 'demandes', 'agenda', 'suivi', 'achats', 'voyages', 'sorties', 'papiers', 'argent', 'equipe', 'automatisations', 'reglages']) {
