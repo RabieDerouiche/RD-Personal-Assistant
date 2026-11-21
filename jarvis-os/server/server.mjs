@@ -18,8 +18,9 @@ import {createSante} from './sante.mjs';
 import {createComparatifs} from './comparatif.mjs';
 import {BOT_IDS, BOT_NOMS, BOT_LISTE} from './bots.mjs';
 import {createEcoute, wavOk, intention, quand, meteoPhrase, meteoUrl, heurePhrase, datePhrase, nrm, diction} from './voix.mjs';
+import {createFlux} from './flux.mjs';
 
-const VERSION = '0.29.0';
+const VERSION = '0.30.0';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PORT = +(process.env.PORT || 8787);
 const HOST = process.env.HOST || '127.0.0.1';
@@ -319,6 +320,10 @@ function prechauffe() {
     return {ok: true};
   });
 }
+/* 0.30.0 : Claude pour la page, instantané (flux.mjs) : discussion gardée ouverte, réponse mot par mot, file à part, secours */
+const FLUX = createFlux({bin: CLAUDE, env: childEnv, settings: () => guardSettings('chat'), cwd: path.join(DATA, 'sample'), conso: consoAdd, friendly, dateLigne,
+  models: {quick: MODELS.rapide, default: MODELS.equilibre, deep: MODELS.profond, smart: MODELS.profond}});
+const PAGE_SYS = "Tu réponds au propriétaire dans sa page Jarvis (JARVIS OS), en français, en le tutoyant. Réponds exactement au format demandé.";
 function chatFin(r, t0, warm, model, send) {
   S.usage.chats++;
   S.lastTiming = {at: now(), total: now() - t0, first: r.first ? r.first - t0 : null, tools: (r.used || []).length, warm, model};
@@ -1033,7 +1038,7 @@ function cors(req, res) {
   if (o && ORIGINS.includes(o)) { res.setHeader('Access-Control-Allow-Origin', o); res.setHeader('Vary', 'Origin'); res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type'); res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS'); res.setHeader('Access-Control-Max-Age', '600'); }
 }
 const json = (res, status, body) => { res.writeHead(status, {'content-type': 'application/json', 'cache-control': 'no-store'}); res.end(JSON.stringify(body)); };
-const readBody = (req) => new Promise((resolve) => { let b = ''; req.on('data', (d) => { b += d; if (b.length > 64000) req.destroy(); }); req.on('end', () => { try { resolve(b ? JSON.parse(b) : {}); } catch { resolve({}); } }); });
+const readBody = (req, max = 64000) => new Promise((resolve) => { let b = ''; req.on('data', (d) => { b += d; if (b.length > max) req.destroy(); }); req.on('end', () => { try { resolve(b ? JSON.parse(b) : {}); } catch { resolve({}); } }); });
 
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x'), p = url.pathname;
@@ -1065,16 +1070,26 @@ const server = http.createServer(async (req, res) => {
       if (p === '/api/google/link' && req.method === 'POST') { const r = GG.link(googleRedirect(req)); return json(res, r.ok ? 200 : 400, r); }
       if (p === '/api/google/unlink' && req.method === 'POST') { S.googleVu = false; save(); return json(res, 200, await GG.unlink()); }   /* déconnecté par lui : le veilleur ne le signale pas */
       /* Claude pour la page (discussion, aide à la décision) : un appel ponctuel, sans aucun outil, hors de la conversation vocale */
+      /* 0.30.0 : Claude instantané (flux.mjs). stream = réponse mot par mot (SSE : delta, done, error) ; conv = la discussion, gardée
+         ouverte (les questions suivantes n'envoient que la question) ; sans stream, la réponse entière en JSON, comme avant */
       if (p === '/api/sample' && req.method === 'POST') {
-        const b = await readBody(req), msgs = Array.isArray(b.input) ? b.input : [{role: 'user', content: String(b.input || '')}];
-        const txt = (c) => typeof c === 'string' ? c : Array.isArray(c) ? c.map((x) => (x && x.text) || '').join('\n') : JSON.stringify(c);
-        const prompt = msgs.length === 1 ? txt(msgs[0].content) : msgs.map((m) => (m.role === 'assistant' ? 'Toi (réponse précédente) : ' : 'Lui : ') + txt(m.content)).join('\n\n');
-        const model = {quick: MODELS.rapide, default: MODELS.equilibre, deep: MODELS.profond, smart: MODELS.profond}[b.tier] || MODELS.equilibre;
-        const box = path.join(DATA, 'sample'); fs.mkdirSync(box, {recursive: true});
-        const r = await serial(() => runClaude({kind: 'page', prompt: prompt.slice(0, 60000), system: String(b.system || "Tu réponds au propriétaire dans sa page Jarvis (JARVIS OS), en français, en le tutoyant. Réponds exactement au format demandé.").slice(0, 16000), model, cwd: box, timeoutMs: 120000, effort: 'low', settings: guardSettings('chat'),
-          tools: {allow: [], deny: ['Bash', 'Read', 'Edit', 'Write', 'Glob', 'Grep', 'NotebookEdit', 'WebFetch', 'WebSearch', 'Task']}}));
+        const b = await readBody(req, 600000);
+        const o = {tier: b.tier, system: String(b.system || PAGE_SYS).slice(0, 16000), input: Array.isArray(b.input) ? b.input : [{role: 'user', content: String(b.input || '')}], conv: !!b.conv};
         S.usage.samples = (S.usage.samples || 0) + 1; save();
-        return json(res, r.ok ? 200 : 502, r.ok ? {text: r.text} : {error: r.error});
+        if (!b.stream) { const r = await FLUX.demander(o); return json(res, r.ok ? 200 : 502, r.ok ? {text: r.text} : {error: r.error}); }
+        res.writeHead(200, {'content-type': 'text/event-stream', 'cache-control': 'no-store', 'x-accel-buffering': 'no'});
+        let arret = null, fini = false;
+        res.on('close', () => { if (!fini && arret) arret(); });   /* la page a coupé (« Arrêter », discussion fermée) : Claude s'arrête aussi */
+        const send = (ev, d) => { if (!res.writableEnded) res.write('event: ' + ev + '\ndata: ' + JSON.stringify(d) + '\n\n'); };
+        send('ouvert', {version: VERSION});
+        const r = await FLUX.demander({...o, onDelta: (d) => send('delta', {d}), coupe: (fn) => { arret = fn; }});
+        fini = true;
+        if (r.ok) send('done', {text: r.text, premier: r.premier, total: r.total, secours: r.secours}); else send('error', {message: r.error});
+        S.lastPageTiming = FLUX.etat().dernier; if (!res.writableEnded) res.end(); return;
+      }
+      if (p === '/api/sample/prepare' && req.method === 'POST') {
+        const b = await readBody(req, 600000);
+        return json(res, 200, FLUX.preparer({tier: b.tier, system: String(b.system || PAGE_SYS).slice(0, 16000), input: Array.isArray(b.input) ? b.input : [{role: 'user', content: String(b.input || '')}]}));
       }
       /* les outils de la page Jarvis, traduits en appels directs aux API Google */
       if (p === '/api/tool' && req.method === 'POST') {
@@ -1085,7 +1100,7 @@ const server = http.createServer(async (req, res) => {
         }
         catch (e) { return json(res, e.code === 'server_not_connected' ? 409 : e.code === 'not_in_manifest' ? 404 : 502, {error: {code: e.code || 'tool_error', message: e.message, status: e.status || 0}}); }
       }
-      if (p === '/api/status') { const cs = await claudeStatus(); if (cs.loggedIn && (!MCP.at || now() - MCP.at > 600000)) await mcpList(); return json(res, 200, {version: VERSION, commit, claude: cs, connectors: connSummary(), google: (({configured, linked, account}) => ({configured, linked, account}))(GG.status('')), grokPauseUntil: await grokPauseMs().then((v) => (v ? new Date(v).toISOString() : '')).catch(() => S.config.grokPauseUntil), usage: S.usage, tache: {running: TACHE.running, last: TACHE.last}, push: {count: S.push.subs.length, last: S.push.last || null, prefs: S.push.prefs}, session: !!S.session, timing: S.lastTiming || null, tts: ttsReady(), voiceInstall: VOICE_INSTALL.state, ecoute: ECOUTE.ready(), ecouteInstall: ECOUTE_INSTALL.state}); }
+      if (p === '/api/status') { const cs = await claudeStatus(); if (cs.loggedIn && (!MCP.at || now() - MCP.at > 600000)) await mcpList(); return json(res, 200, {version: VERSION, commit, claude: cs, connectors: connSummary(), google: (({configured, linked, account}) => ({configured, linked, account}))(GG.status('')), grokPauseUntil: await grokPauseMs().then((v) => (v ? new Date(v).toISOString() : '')).catch(() => S.config.grokPauseUntil), usage: S.usage, tache: {running: TACHE.running, last: TACHE.last}, push: {count: S.push.subs.length, last: S.push.last || null, prefs: S.push.prefs}, session: !!S.session, timing: S.lastTiming || null, page: FLUX.etat(), tts: ttsReady(), voiceInstall: VOICE_INSTALL.state, ecoute: ECOUTE.ready(), ecouteInstall: ECOUTE_INSTALL.state}); }
       if (p === '/api/update' && req.method === 'POST') return json(res, 200, await update());
       if (p === '/api/maj') return json(res, 200, await majVerifie(url.searchParams.get('force') === '1'));   /* 0.27.0 : une version plus récente ? */
       /* notifications : clé publique, abonnement de cet appareil, essai, préférences, vérification immédiate */

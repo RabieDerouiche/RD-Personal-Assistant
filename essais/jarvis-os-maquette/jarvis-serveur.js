@@ -59,13 +59,50 @@
     + tools.map((t) => { const sc = t.inputSchema || t.input_schema || {}, req = sc.required || [], pr = sc.properties || {};
       return '- ' + t.name + ' : ' + String(t.description || '') + (Object.keys(pr).length ? ' Champs : ' + Object.keys(pr).map((k) => k + (req.includes(k) ? '' : ' (facultatif)') + (pr[k].description ? ' = ' + pr[k].description : '')).join(' ; ') + '.' : ''); }).join('\n');
   const sansOutils = (t) => t.replace(OUTIL, '').replace(/```\s*```/g, '').replace(/\n{3,}/g, '\n\n').trim();
+  /* pendant le flux : les propositions complètes sont retirées, et une proposition encore en cours d'écriture (« ⟦… ») ne s'affiche pas */
+  const enCours = (t) => { const s = t.replace(OUTIL, ''), i = s.indexOf('⟦'); return (i >= 0 ? s.slice(0, i) : s).replace(/```\s*$/, '').replace(/\n{3,}/g, '\n\n').trim(); };
+  const sysDe = (opts, tools) => (opts.system || BASE_SYS) + (tools.length ? '\n\n' + toolsSys(tools) : '');
+  const outilsDe = (opts) => (Array.isArray(opts.tools) ? opts.tools.filter((t) => t && t.name && typeof t.execute === 'function') : []);
+  /* 0.30.0 (Claude instantané) : la réponse arrive mot par mot (SSE) ; conversation = la discussion, dont le serveur garde le Claude ouvert ;
+     « Arrêter » (opts.signal) coupe la réponse et Claude avec elle */
+  async function flux(input, opts, tools) {
+    let r;
+    try { r = await fetch(BASE + '/api/sample', {method: 'POST', headers: {'content-type': 'application/json', authorization: 'Bearer ' + token()}, signal: opts.signal,
+      body: JSON.stringify({input, tier: opts.modelTier || 'default', system: sysDe(opts, tools), stream: true, conv: !!opts.conversation})}); }
+    catch (e) { if (opts.signal && opts.signal.aborted) throw {code: 'cancelled', message: 'Arrêté.'}; throw {code: 'tool_error', message: 'Serveur JARVIS injoignable.'}; }
+    if (r.status !== 200 || !r.body || !r.body.getReader) {
+      let j = {}; try { j = await r.json(); } catch (e) { j = {}; }
+      if (r.status === 200 && j.text != null) return String(j.text);
+      throw {code: r.status === 401 ? 'server_not_connected' : 'tool_error', message: (j && j.error) || 'Claude indisponible sur le serveur.'};
+    }
+    const rd = r.body.getReader(), dec = new TextDecoder(); let buf = '', brut = '', fin = null, err = null;
+    try {
+      for (;;) {
+        const {value, done} = await rd.read(); if (done) break;
+        buf += dec.decode(value, {stream: true}); let i;
+        while ((i = buf.indexOf('\n\n')) >= 0) {
+          const bloc = buf.slice(0, i).trim(); buf = buf.slice(i + 2);
+          const m = /^event: (\w+)\ndata: (.*)$/s.exec(bloc); if (!m) continue;
+          let d = {}; try { d = JSON.parse(m[2]); } catch (e) { continue; }
+          if (m[1] === 'delta') { brut += d.d || ''; if (opts.onText) try { opts.onText({text: enCours(brut), delta: d.d || ''}); } catch (e) { /* rien */ } }
+          else if (m[1] === 'done') fin = String(d.text != null ? d.text : brut);
+          else if (m[1] === 'error') err = String(d.message || 'Claude indisponible sur le serveur.');
+        }
+      }
+    } catch (e) {
+      const deja = enCours(brut);
+      if (opts.signal && opts.signal.aborted) throw {code: 'cancelled', message: 'Arrêté.', text: deja || undefined};
+      throw {code: 'tool_error', message: 'Réponse interrompue.', text: deja || undefined};
+    }
+    if (err) throw {code: 'tool_error', message: err, text: enCours(brut) || undefined};
+    if (fin == null) throw {code: 'tool_error', message: 'Réponse interrompue.', text: enCours(brut) || undefined};
+    return fin;
+  }
   const sample = async (input, opts) => {
     opts = opts || {};
     if (!token()) throw {code: 'server_not_connected', message: 'Cet iPhone n’est pas relié au serveur JARVIS (Réglages).'};
-    const tools = Array.isArray(opts.tools) ? opts.tools.filter((t) => t && t.name && typeof t.execute === 'function') : [];
-    const r = await req('/api/sample', {input, tier: opts.modelTier || 'default', system: (opts.system || BASE_SYS) + (tools.length ? '\n\n' + toolsSys(tools) : '')});
-    if (r.status !== 200) throw {code: r.status === 401 ? 'server_not_connected' : 'tool_error', message: (r.j && r.j.error) || 'Claude indisponible sur le serveur.'};
-    let text = String(r.j.text || '');
+    const tools = outilsDe(opts);
+    let text = await flux(input, opts, tools);
     if (tools.length) {
       const calls = [...text.matchAll(OUTIL)]; text = sansOutils(text);
       for (const m of calls) {
@@ -79,6 +116,8 @@
   };
   sample.limits = async () => ({tools: true, images: false});
   sample.json = async () => ({});
+  /* 0.30.0 : la discussion s'ouvre : le serveur lance Claude et lui donne déjà les données (mêmes consigne et outils que la question) */
+  sample.prepare = (input, opts) => { opts = opts || {}; if (!token()) return Promise.resolve(null); return req('/api/sample/prepare', {input, tier: opts.modelTier || 'default', system: sysDe(opts, outilsDe(opts))}).then((r) => r.j).catch(() => null); };
   window.claude = {use: async (name) => (name === 'mcp' ? mcp : name === 'sample' ? sample : null)};
 
   /* pour l'écran Réglages de la page : appairage et accès Google */

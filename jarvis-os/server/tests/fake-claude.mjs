@@ -13,9 +13,9 @@ let guard = 'aucune';
 if (opt('--settings')) { try { guard = JSON.parse(fs.readFileSync(opt('--settings'), 'utf8')).hooks.PreToolUse[0].hooks[0].command.split(' ').pop(); } catch { guard = 'illisible'; } }
 const conn = process.env.FAKE_NO_CONN ? [] : ['mcp__claude_ai_Gmail__search_threads', 'mcp__claude_ai_Gmail__send_message', 'mcp__claude_ai_Google_Calendar__list_events', 'mcp__claude_ai_Google_Sheets__get_values', 'mcp__claude_ai_Google_Sheets__append_values'];
 const init = () => out({type: 'system', subtype: 'init', session_id: sid, model, tools: ['Bash', 'Read', 'WebSearch', 'WebFetch'], mcp_servers: conn.length ? [{name: 'claude.ai Gmail', status: 'pending'}] : []});
-let turn = 0;
+let turn = 0, FIRST = null;
 function answer(raw) {
-  turn++;
+  turn++; if (FIRST === null) FIRST = raw;
   const ctx = raw.includes('[Question]\n'), input = raw.split('[Question]\n').pop();
   if (/Renvoie UNIQUEMENT ce JSON/.test(input)) {
     const mod = /Gmail/.test(input) ? 'mails' : /Google Agenda/.test(input) ? 'agenda' : ((input.match(/onglets? « ([^»]+) »/) || [])[1] || 'autre');
@@ -61,7 +61,8 @@ function answer(raw) {
       variantes: arr.map((p, i) => ({nom: p.nom, pour_qui: 'Pour un appartement ' + (i ? 'avec carrelage' : 'avec tapis'), utilite: 'Aspire et lave chaque jour', points_forts: ['Puissant', 'Station autonome'], limites: ['Bruyant'], valeurs: {Aspiration: 20000 + i * 2000, Bruit: 64 - i}, qualite: 7 + i, rapport_qualite_prix: 8 - i, verdict: 'Bon choix ' + (i + 1), image: ''})),
       conseil: 'Prends le premier au prix du jour.', certitude: 'likely', sources: ['https://exemple.fr/test']})};
   }
-  if (/lentement/i.test(input)) return {text: 'Réponse lente. ' + 'bla '.repeat(1500)};   /* 0.22.0 : pour couper JARVIS pendant qu'il répond */
+  if (/fin lente/i.test(input)) return {text: 'Réponse vite dite.', tail: 2500};
+  if (/lentement/i.test(input.split('Lui : ').pop())) return {text: 'Réponse lente. ' + 'bla '.repeat(1500)};   /* 0.22.0 : pour couper JARVIS pendant qu'il répond */
   if (/erreur/i.test(input)) return {error: 'Invalid API key · Please run /login'};
   if (/outils refusés/.test(input)) return {text: 'refusés : ' + (args.includes('--disallowedTools') ? args.slice(args.indexOf('--disallowedTools') + 1).filter((x) => !x.startsWith('--')).join(',') : '')};
   if (/^Tour de JARVIS/.test(input)) {   /* tour de Claude (0.15.0) : prévient pour le mail du syndic, une seule fois */
@@ -85,26 +86,28 @@ function answer(raw) {
   if (/^Mission :/.test(input)) return {text: 'Compte rendu : mission faite (' + input.slice(10, 60) + ').'};
   if (/rapport/i.test(input)) return {text: 'Claude va préparer ce rapport, la mission attend ton accord.\nMISSIONS: [{"agent":"claude","text":"préparer un rapport sur la veille .NET"}]'};
   /* discussion de la page sur le serveur : propositions en fin de réponse (⟦outil …⟧), seulement si la consigne décrit les outils */
-  const lastQ = input.split('Lui : ').pop(), sys = opt('--append-system-prompt') || '';
+  const lastQ = input.split('Lui : ').pop(), sys = (opt('--append-system-prompt') || '') + '\n' + (opt('--system-prompt') || '') + '\n' + FIRST;
   if (/relance demain pour Iris/.test(lastQ)) return {text: /programmer_relance/.test(sys) ? 'Je te propose une relance : elle attend ton bouton.\n⟦outil programmer_relance {"quand":"' + demain + 'T09:00","quoi":"Voir si Iris a répondu au syndic","ligne":2}⟧' : 'Pas d’outil de relance.'};
   if (/ordre de test pour Kairos/.test(lastQ)) return {text: /outil preparer_ordre/.test(sys) ? 'Je te propose cet ordre pour Kairos : il attend ton bouton.\n⟦outil preparer_ordre {"bot":"Kairos","message":"Relève le prix du robot cuiseur."}⟧' : 'Pas d’outils décrits.'};
   if (/confie à la tâche/.test(lastQ)) return {text: 'Je te propose de lancer la tâche Claude.\n```\n⟦outil confier_tache_claude {"demande":"Vérifie les routines d’Iris."}⟧\n```'};
   if (/kairos/i.test(input)) return {text: 'Je prépare ça pour Kairos, la mission attend ton accord.\nMISSIONS: [{"agent":"kairos","text":"vérifier le prix du robot cuiseur"}]'};
   if (/clé/i.test(input)) return {text: 'clé payante : ' + (process.env.ANTHROPIC_API_KEY ? 'présente' : 'absente') + ', base : ' + (process.env.ANTHROPIC_BASE_URL ? 'présente' : 'absente') + ', recherche d\'outils : ' + (process.env.ENABLE_TOOL_SEARCH || 'défaut') + '.'};
-  return {text: 'Tu as dit : ' + input.trim() + '. Session : ' + (resume || turn > 1 ? 'reprise' : 'nouvelle') + ', modèle : ' + model + ', outils : ' + allow + ', garde : ' + guard + ', processus : ' + process.pid + ', tour : ' + turn + ', contexte : ' + (ctx ? 'oui' : 'non') + '.'};
+  return {text: 'Tu as dit : ' + input.trim() + '. Session : ' + (resume || turn > 1 ? 'reprise' : 'nouvelle') + ', modèle : ' + model + ', outils : ' + allow + ', garde : ' + guard + ', processus : ' + process.pid + ', tour : ' + turn + ', contexte : ' + (ctx ? 'oui' : 'non') + ', secours : ' + (opt('--fallback-model') || 'aucun') + ', intégrés : ' + (args.includes('--tools') ? '[' + opt('--tools') + ']' : 'défaut') + ', consigne : ' + (opt('--system-prompt') ? 'remplacée' : 'ajoutée') + '.'};
 }
 async function emit(a) {
   if (a.error) { process.stderr.write(a.error + '\n'); out({type: 'result', is_error: true, result: a.error, session_id: sid}); return false; }
   if (a.tools) out({type: 'assistant', session_id: sid, message: {content: a.tools.map((name) => ({type: 'tool_use', name, input: {}}))}});
   for (let i = 0; i < a.text.length; i += 7) { out({type: 'stream_event', session_id: sid, event: {type: 'content_block_delta', index: 0, delta: {type: 'text_delta', text: a.text.slice(i, i + 7)}}}); await new Promise((r) => setTimeout(r, +(process.env.FAKE_DELAY || 5))); }
   out({type: 'assistant', session_id: sid, message: {content: [{type: 'text', text: a.text}]}});
+  out({type: 'stream_event', session_id: sid, event: {type: 'message_delta', delta: {stop_reason: 'end_turn'}}}); out({type: 'stream_event', session_id: sid, event: {type: 'message_stop'}});
+  if (a.tail) await new Promise((r) => setTimeout(r, a.tail));   /* 0.30.0 : le vrai Claude Code met 0,3 à 3 s à finir son tour après le dernier mot */
   out({type: 'result', subtype: 'success', is_error: false, result: a.text, session_id: sid, usage: {input_tokens: 120, output_tokens: Math.ceil(a.text.length / 4), cache_read_input_tokens: 900, cache_creation_input_tokens: 60}});
   return true;
 }
 if (opt('--input-format') === 'stream-json') {
   /* conversation ouverte : une demande par ligne, une réponse (« result ») par demande */
   init(); let buf = '', chain = Promise.resolve();
-  process.stdin.on('data', (d) => { buf += d; let i; while ((i = buf.indexOf('\n')) >= 0) { const line = buf.slice(0, i); buf = buf.slice(i + 1); let m; try { m = JSON.parse(line); } catch { continue; } const text = (m.message?.content || []).map((c) => c.text || '').join(''); chain = chain.then(() => emit(answer(text))); } });
+  process.stdin.on('data', (d) => { buf += d; let i; while ((i = buf.indexOf('\n')) >= 0) { const line = buf.slice(0, i); buf = buf.slice(i + 1); let m; try { m = JSON.parse(line); } catch { continue; } const text = (m.message?.content || []).map((c) => c.text || '').join('\n'); chain = chain.then(() => emit(answer(text))); } });
   process.stdin.on('end', () => chain.then(() => process.exit(0)));
 } else {
   let input = '';
