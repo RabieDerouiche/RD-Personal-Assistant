@@ -76,4 +76,35 @@ PY
   fi
   rm -f "$T"
 fi
+
+# 0.36.0 : la fin de phrase reconnue à la voix (Smart Turn v3.2 de Pipecat, BSD-2, 8,7 Mo, un cœur, environ 55 ms par phrase).
+# Version figée (révision et empreinte du fichier) ; un essai réel avant de l'utiliser (sinon : 0,7 s de silence, comme avant).
+if [ "${JARVIS_FIN_DE_PHRASE:-oui}" != "non" ]; then
+  R="$D/tour"; mkdir -p "$R"; rm -f "$R/ok"
+  uv pip install --python "$V/bin/python" "huggingface_hub>=0.24" numpy "onnxruntime==1.32.0"
+  "$V/bin/python" - "$R" <<'PY'
+import hashlib, os, shutil, sys
+from huggingface_hub import hf_hub_download
+d = sys.argv[1]
+f = hf_hub_download("pipecat-ai/smart-turn-v3", "smart-turn-v3.2-cpu.onnx", revision="f766f81d3cfdf7737ac64aad813d91bbfd56bf93")
+h = hashlib.sha256(open(f, "rb").read()).hexdigest()
+if h != "2bb026316b14a660486a75b1733cd3fbab8c2fd0314dc9af7be49f8cca967e4f":
+    sys.exit("Smart Turn : fichier inattendu (" + h + ")")
+shutil.copyfile(f, os.path.join(d, "smart-turn-v3.2-cpu.onnx"))
+print("Smart Turn prêt")
+PY
+  T="$R/essai.wav"
+  "$V/bin/python" - "$T" <<'PY'
+import sys, wave
+with wave.open(sys.argv[1], "wb") as w:
+    w.setnchannels(1); w.setsampwidth(2); w.setframerate(16000); w.writeframes(b"\0\0" * 16000)
+PY
+  OUT=$(printf '{"id":"essai","wav":"%s"}\n' "$T" | "$V/bin/python" "$(dirname "$0")/../stt/tour_helper.py" "$R/smart-turn-v3.2-cpu.onnx" 2>&1 || true)
+  if printf '%s' "$OUT" | grep -q '"ok": true'; then
+    touch "$R/ok"; echo "Fin de phrase installée (Smart Turn v3.2) : une pause de 0,25 s suffit quand ta phrase est finie."
+  else
+    echo "Smart Turn ne répond pas : la phrase finit après 0,7 s de silence, comme avant."
+  fi
+  rm -f "$T"
+fi
 echo "Écoute installée."

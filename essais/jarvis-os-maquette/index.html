@@ -3262,7 +3262,7 @@ void main(){
           h('div', {class: 'row-actions'}, h('button', {type: 'button', class: 'btn main sm', onclick: () => { m.state = 'done'; finish(m.fin()); renderChat(); }}, m.ok), h('button', {type: 'button', class: 'btn ghost sm', onclick: () => { m.state = 'dropped'; renderChat(); }}, 'Non')));
     }
     const who = m.who, isMe = who === 'toi';
-    const head = isMe ? null : h('div', {class: 'msg-h'}, h('b', {text: who === 'claude' ? 'Claude' : BOT[who] ? BOT[who].name : who}), m.modele ? h('em', {class: 'msg-mod', text: ({haiku: 'Haiku', sonnet: 'Sonnet', opus: 'Opus'}[m.modele] || m.modele) + (m.secours ? ' · secours' : '')}) : null, m.date ? h('time', {text: m.date}) : null, m.sim ? h('em', {text: 'simulé'}) : null);
+    const head = isMe ? null : h('div', {class: 'msg-h'}, h('b', {text: who === 'claude' ? 'Claude' : BOT[who] ? BOT[who].name : who}), m.modele ? h('em', {class: 'msg-mod', text: ({haiku: 'Haiku', sonnet: 'Sonnet', opus: 'Opus', instant: 'Instantané'}[m.modele] || m.modele) + (m.secours ? ' · secours' : '')}) : null, m.date ? h('time', {text: m.date}) : null, m.sim ? h('em', {text: 'simulé'}) : null);
     const nx = !isMe && m.next && m.next.length ? h('div', {class: 'msg-next'}, m.next.map((x) => h('button', {type: 'button', class: 'btn sm', onclick: () => { const ta = $('chat-in'); if (ta) { ta.value = x; sendChat(); } }}, x))) : null;
     const vox = who === 'claude' && !m.wait && m.text && typeof voxSpeak === 'function' ? h('button', {type: 'button', class: 'btn sm vox-btn' + (VOX.on === m ? ' is-on' : ''), 'aria-pressed': String(VOX.on === m), onclick: () => voxSpeak(m)}, h('span', {class: 'ic', html: icon('sound', 15)}), VOX.on === m ? 'Arrêter' : 'Écouter') : null;
     const pe = h('p', {}, ...mdNodes(m.text, !isMe && who === 'claude')), el = h('div', {class: 'msg ' + (isMe ? 'me' : 'them') + (m.wait ? ' is-wait' : ''), style: BOT[who] ? botVars(who) : null}, head, pe, vox, nx);
@@ -3383,6 +3383,21 @@ void main(){
       const wait = setInterval(() => { if (o.status === 'Fait') { clearInterval(wait); THREADS[key].msgs.push({who: b, text: o.reply, sim: true}); if (CHAT.open && CHAT.key === key) renderChat(); } }, 500);
       renderChat();
       return;
+    }
+    /* 0.36.0 (« Voix plus vive ») : en mains libres, l'heure, la météo, l'agenda… sont répondus par le serveur sans IA (moins d'une
+       seconde) ; Claude garde l'échange dans sa discussion (il le reçoit avec la question suivante) */
+    if (MAINS.on && window.JarvisServeur && window.JarvisServeur.rapide && window.JarvisServeur.linked && window.JarvisServeur.linked()) {
+      CHAT.busy = true; mainsBusy('thinking');
+      const rq = await Promise.race([window.JarvisServeur.rapide(text, typeof metPos === 'function' ? metPos() : null), new Promise((z) => setTimeout(() => z(null), 2500))]);
+      CHAT.busy = false;
+      if (rq && rq.reply && MAINS.on) {
+        const im = {who: 'claude', text: rq.reply, modele: 'instant', local: true};
+        T.msgs.push(im); T.turns.push({role: 'user', content: text}, {role: 'assistant', content: rq.reply}); renderChat();
+        const JVi = JVX();
+        if (JVi && JVi.sayFlux) { const fl = JVi.sayFlux({clean: voxClean, onStart: () => mainsBusy('speaking')}); VOX.on = im; fl.push(im.text); fl.end(); fl.done.then(() => { if (VOX.on === im) VOX.on = null; if (CHAT.open) renderChat(); mainsApres(); }); }
+        else mainsApres();
+        return;
+      }
     }
     if (!SAMPLE) { T.msgs.push({who: 'claude', text: "Je ne suis pas joignable dans cette vue. Ouvre la page dans l'app Claude ou sur claude.ai pour me parler en direct."}); renderChat(); return; }
     const out = {who: 'claude', text: 'Je réfléchis…', wait: true};
@@ -8824,7 +8839,7 @@ void main(){
       const st = await JS.status(), upd = h('p', {class: 'set-msg'});
       const seg = (k, opts, def) => h('div', {class: 'seg set-seg', role: 'group'}, opts.map(([v, l]) => h('button', {type: 'button', 'aria-pressed': String((JS.setting(k) || def) === v), onclick: () => { JS.set(k, v); location.reload(); }}, l)));
       parts.push(h('section', {class: 'card set-card'}, h('b', {text: 'JARVIS'}),
-        h('p', {class: 'muted', text: st ? 'Serveur ' + st.version + (st.commit ? ' (' + String(st.commit).slice(0, 7) + ')' : '') + ' · Claude ' + (st.claude && st.claude.loggedIn ? 'connecté' : 'non connecté') + ' · voix du serveur ' + (st.tts ? 'prête' : 'absente') + ' · écoute ' + (st.ecouteMoteur && st.ecouteMoteur.moteur === 'parakeet' ? 'Parakeet (' + (st.ecouteMoteur.variante || 'int8') + ')' : 'Whisper') + ' ' + (st.ecoute ? 'prête' : st.ecouteInstall === 'running' ? 'en cours d’installation' : 'absente') : 'État du serveur indisponible.'}),
+        h('p', {class: 'muted', text: st ? 'Serveur ' + st.version + (st.commit ? ' (' + String(st.commit).slice(0, 7) + ')' : '') + ' · Claude ' + (st.claude && st.claude.loggedIn ? 'connecté' : 'non connecté') + ' · voix du serveur ' + (st.tts ? 'prête' : 'absente') + ' · écoute ' + (st.ecouteMoteur && st.ecouteMoteur.moteur === 'parakeet' ? 'Parakeet (' + (st.ecouteMoteur.variante || 'int8') + ')' : 'Whisper') + ' ' + (st.ecoute ? 'prête' : st.ecouteInstall === 'running' ? 'en cours d’installation' : 'absente') + (st.ecoute ? ' · fin de phrase ' + (st.finDeTour ? 'Smart Turn' : '0,7 s de silence') : '') : 'État du serveur indisponible.'}),
         /* 0.27.0 : la mise à jour est proposée toute seule à l'ouverture de l'app ; ce bouton force la vérification et suit le même chemin */
         h('button', {type: 'button', class: 'btn main', id: 'set-maj', onclick: async () => { upd.textContent = 'Vérification…'; upd.classList.remove('is-bad'); let m = ''; try { m = await window.JarvisMaj.check(true); } catch (e) { m = 'Vérification impossible.'; } upd.textContent = m; upd.classList.toggle('is-bad', /injoignable|impossible|pas pu|pas relié/.test(m)); }}, 'Mettre à jour le serveur'), upd,
         h('p', {class: 'muted', text: 'Une nouvelle version est proposée toute seule à l’ouverture de JARVIS ; ce bouton force la vérification.'}),
@@ -8836,7 +8851,8 @@ void main(){
         h('p', {class: 'muted', text: "L'orbe ouvre la discussion avec Claude, qui a tes données sous les yeux. Avec l'écoute de ton serveur, l'orbe lance la conversation continue : tu parles, il répond à voix haute dès sa première phrase, puis il t'écoute de nouveau ; ta voix le coupe ; « c'est tout » ou « Terminer » finit. Le micro à côté du champ dicte une seule question à relire. Le haut-parleur, en haut de la discussion, fait lire les réponses écrites."}),
         /* 0.32.0 : Parakeet (NVIDIA) écoute à la place de Whisper une fois installé : 2 à 2,5 fois moins de mots faux, une phrase écrite
            en 0,2 à 0,3 s au lieu de 1,6 s (mesure du 21/11/2026) ; « Passer à Parakeet » quand Whisper est déjà là */
-        st && (!st.ecoute || (st.ecouteMoteur && st.ecouteMoteur.moteur === 'whisper')) ? h('button', {type: 'button', class: 'btn sm', id: 'set-ecoute', onclick: async (ev) => { const b = ev.currentTarget; b.disabled = true; const r = await JS.ecouteInstall(); upd.textContent = r ? "Installation de l'écoute lancée (5 à 15 minutes : environ 1 Go à télécharger). Reviens ici ensuite." : 'Installation impossible : serveur injoignable.'; const poll = async () => { const e = await JS.ecouteEtat(); if (!e || e.state === 'running') { setTimeout(poll, 8000); return; } upd.textContent = e.state === 'done' ? (/Parakeet installé/.test(String(e.tail || '')) ? 'Parakeet installé : c\'est lui qui t\'écoute maintenant.' : 'Écoute installée (Whisper).') : "L'installation a échoué : " + String(e.tail || '').slice(-200); upd.classList.toggle('is-bad', e.state !== 'done'); }; setTimeout(poll, 8000); }}, st.ecoute ? 'Passer à Parakeet (plus juste, plus rapide)' : "Installer l'écoute") : null,
+        /* 0.36.0 : la fin de phrase reconnue à la voix (Smart Turn) s'installe avec l'écoute : « Installer la fin de phrase » si elle manque */
+        st && (!st.ecoute || (st.ecouteMoteur && st.ecouteMoteur.moteur === 'whisper') || (st.finDeTour === false)) ? h('button', {type: 'button', class: 'btn sm', id: 'set-ecoute', onclick: async (ev) => { const b = ev.currentTarget; b.disabled = true; const r = await JS.ecouteInstall(); upd.textContent = r ? "Installation de l'écoute lancée (5 à 15 minutes : environ 1 Go à télécharger). Reviens ici ensuite." : 'Installation impossible : serveur injoignable.'; const poll = async () => { const e = await JS.ecouteEtat(); if (!e || e.state === 'running') { setTimeout(poll, 8000); return; } upd.textContent = e.state === 'done' ? (/Parakeet installé/.test(String(e.tail || '')) ? 'Parakeet installé : c\'est lui qui t\'écoute maintenant.' : 'Écoute installée (Whisper).') + (/Fin de phrase installée/.test(String(e.tail || '')) ? ' Fin de phrase reconnue à la voix (Smart Turn).' : '') : "L'installation a échoué : " + String(e.tail || '').slice(-200); upd.classList.toggle('is-bad', e.state !== 'done'); }; setTimeout(poll, 8000); }}, !st.ecoute ? "Installer l'écoute" : st.ecouteMoteur && st.ecouteMoteur.moteur === 'whisper' ? 'Passer à Parakeet (plus juste, plus rapide)' : 'Installer la fin de phrase (Smart Turn)') : null,
         st && !st.tts ? h('button', {type: 'button', class: 'btn sm', onclick: async () => { const r = await JS.voiceInstall(); upd.textContent = r ? 'Installation de la voix : ' + r.state + '. Reviens dans quelques minutes.' : 'Installation impossible.'; }}, 'Installer la voix Pierre') : null,
         h('a', {class: 'link', href: '/ancienne/', text: 'Ancienne app (réglages avancés, diagnostic)'})));
       swap(parts);
