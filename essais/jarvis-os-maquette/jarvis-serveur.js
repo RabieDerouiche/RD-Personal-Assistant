@@ -72,10 +72,10 @@
     catch (e) { if (opts.signal && opts.signal.aborted) throw {code: 'cancelled', message: 'Arrêté.'}; throw {code: 'tool_error', message: 'Serveur JARVIS injoignable.'}; }
     if (r.status !== 200 || !r.body || !r.body.getReader) {
       let j = {}; try { j = await r.json(); } catch (e) { j = {}; }
-      if (r.status === 200 && j.text != null) return String(j.text);
+      if (r.status === 200 && j.text != null) return {text: String(j.text)};
       throw {code: r.status === 401 ? 'server_not_connected' : 'tool_error', message: (j && j.error) || 'Claude indisponible sur le serveur.'};
     }
-    const rd = r.body.getReader(), dec = new TextDecoder(); let buf = '', brut = '', fin = null, err = null;
+    const rd = r.body.getReader(), dec = new TextDecoder(); let buf = '', brut = '', fin = null, err = null, modele = '', secours = false;
     try {
       for (;;) {
         const {value, done} = await rd.read(); if (done) break;
@@ -85,7 +85,7 @@
           const m = /^event: (\w+)\ndata: (.*)$/s.exec(bloc); if (!m) continue;
           let d = {}; try { d = JSON.parse(m[2]); } catch (e) { continue; }
           if (m[1] === 'delta') { brut += d.d || ''; if (opts.onText) try { opts.onText({text: enCours(brut), delta: d.d || ''}); } catch (e) { /* rien */ } }
-          else if (m[1] === 'done') fin = String(d.text != null ? d.text : brut);
+          else if (m[1] === 'done') { fin = String(d.text != null ? d.text : brut); modele = String(d.modele || ''); secours = !!d.secours; }   /* 0.33.0 : le modèle qui a répondu */
           else if (m[1] === 'error') err = String(d.message || 'Claude indisponible sur le serveur.');
         }
       }
@@ -96,13 +96,13 @@
     }
     if (err) throw {code: 'tool_error', message: err, text: enCours(brut) || undefined};
     if (fin == null) throw {code: 'tool_error', message: 'Réponse interrompue.', text: enCours(brut) || undefined};
-    return fin;
+    return {text: fin, modele, secours};
   }
   const sample = async (input, opts) => {
     opts = opts || {};
     if (!token()) throw {code: 'server_not_connected', message: 'Cet iPhone n’est pas relié au serveur JARVIS (Réglages).'};
     const tools = outilsDe(opts);
-    let text = await flux(input, opts, tools);
+    const rep = await flux(input, opts, tools); let text = rep.text;
     if (tools.length) {
       const calls = [...text.matchAll(OUTIL)]; text = sansOutils(text);
       for (const m of calls) {
@@ -112,7 +112,7 @@
       }
     }
     if (opts.onText) try { opts.onText({text, delta: text}); } catch (e) { /* rien */ }
-    return {text, truncated: false};
+    return {text, truncated: false, modele: rep.modele || '', secours: !!rep.secours};
   };
   sample.limits = async () => ({tools: true, images: false});
   sample.json = async () => ({});
@@ -170,7 +170,7 @@
     sante: () => req('/api/sante').then((r) => (r.status === 200 ? r.j : null)).catch(() => null),
     santeMaintenant: () => req('/api/sante/maintenant', {}).then((r) => (r.status === 200 ? r.j : null)).catch(() => null),
     /* missions de Claude (0.15.0) : lancer une mission longue, suivre les dernières ; notification à la fin */
-    mission: (texte, parent) => req('/api/mission', parent ? {texte, parent} : {texte}).then((r) => r.j).catch(() => ({ok: false, error: 'Serveur injoignable.'})),
+    mission: (texte, parent) => req('/api/mission', parent ? {texte, parent} : {texte}).then((r) => { try { if (r.j && r.j.ok && window.JarvisActivite) setTimeout(window.JarvisActivite, 300); } catch (e) { /* rien */ } return r.j; }).catch(() => ({ok: false, error: 'Serveur injoignable.'})),   /* 0.33.0 : visible tout de suite dans l'activité */
     /* cartes mises de côté (0.20.0) : liste, ajout (avec ou sans date de retour), retrait */
     cote: {
       liste: () => req('/api/cote').then((r) => (r.status === 200 ? r.j.cartes : null)).catch(() => null),
@@ -185,6 +185,8 @@
     relanceAnnuler: (id) => req('/api/relance/annuler', {id}).then((r) => r.j).catch(() => null),
     conso: () => req('/api/conso').then((r) => (r.status === 200 ? r.j : null)).catch(() => null),
     missions: () => req('/api/missions').then((r) => (r.status === 200 ? r.j.missions : null)).catch(() => null),
+    /* 0.33.0 : ce que fait Claude à l'instant (missions, Siri, tour, discussion), avec l'outil utilisé et le plan d'une mission */
+    activite: () => req('/api/activite').then((r) => (r.status === 200 ? r.j : null)).catch(() => null),
     /* tour de Claude (0.15.0) : réglage, dernier tour, tour immédiat */
     tour: {
       etat: () => req('/api/tour').then((r) => (r.status === 200 ? r.j : null)).catch(() => null),

@@ -71,6 +71,7 @@ function answer(raw) {
   }
   const demain = new Date(Date.now() + 864e5).toISOString().slice(0, 10);
   if (/rappelle-moi/i.test(input)) return {text: 'C\'est noté pour demain à 9 h.\nRELANCE: {"quand":"' + demain + 'T09:00","quoi":"Appeler le notaire"}'};
+  if (/^Mission : planifie/.test(input)) return {toolUses: [{name: 'TodoWrite', input: {todos: [{content: 'Chercher les offres', status: 'in_progress'}, {content: 'Comparer les prix', status: 'pending'}, {content: 'Écrire le compte rendu', status: 'pending'}]}}, {name: 'WebSearch', input: {query: 'assurance habitation T3 comparatif'}}], pause: 2500, text: 'Compte rendu planifié : trois offres comparées.'};
   if (/^Mission : Reprends cette mission/.test(input)) return {text: 'Version 2 : ' + (input.match(/Sa consigne : ([^\n]+)/) || [])[1]};
   if (/^Mission : vérifie la réponse du syndic/.test(input)) return {text: 'Compte rendu : demande faite.\nRELANCE: {"quand":"' + demain + 'T10:30","quoi":"Voir si le syndic a répondu"}'};
   if (/^Mission : lente/.test(input)) return {text: /Reprise après un redémarrage/.test(input) ? 'Compte rendu repris.' : 'Compte rendu lent. ' + 'x'.repeat(2400)};
@@ -97,6 +98,8 @@ function answer(raw) {
 async function emit(a) {
   if (a.error) { process.stderr.write(a.error + '\n'); out({type: 'result', is_error: true, result: a.error, session_id: sid}); return false; }
   if (a.tools) out({type: 'assistant', session_id: sid, message: {content: a.tools.map((name) => ({type: 'tool_use', name, input: {}}))}});
+  if (a.toolUses) for (const t of a.toolUses) { out({type: 'assistant', session_id: sid, message: {content: [{type: 'tool_use', name: t.name, input: t.input}]}}); await new Promise((r) => setTimeout(r, 200)); }
+  if (a.pause) await new Promise((r) => setTimeout(r, a.pause));
   for (let i = 0; i < a.text.length; i += 7) { out({type: 'stream_event', session_id: sid, event: {type: 'content_block_delta', index: 0, delta: {type: 'text_delta', text: a.text.slice(i, i + 7)}}}); await new Promise((r) => setTimeout(r, +(process.env.FAKE_DELAY || 5))); }
   out({type: 'assistant', session_id: sid, message: {content: [{type: 'text', text: a.text}]}});
   out({type: 'stream_event', session_id: sid, event: {type: 'message_delta', delta: {stop_reason: 'end_turn'}}}); out({type: 'stream_event', session_id: sid, event: {type: 'message_stop'}});

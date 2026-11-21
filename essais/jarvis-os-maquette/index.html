@@ -129,6 +129,16 @@
   .dict-bar { flex: 0 0 46px; height: 4px; border-radius: 2px; background: rgba(255, 255, 255, .12); overflow: hidden; }
   .dict-bar i { display: block; width: 100%; height: 100%; background: linear-gradient(90deg, #22d3ee, #818cf8); transform: scaleX(.04); transform-origin: left; transition: transform .08s linear; }
   .dict-strip[data-s="transcribing"] .dict-bar { visibility: hidden; }
+  /* 0.33.0 : activité en direct, étapes des missions, modèle de la réponse */
+  .jv-btn[data-act]::before { content: attr(data-act); position: absolute; top: 2px; right: 2px; z-index: 2; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 10px; background: #a855f7; color: #fff; font: 700 12px/20px 'Oxanium', system-ui, sans-serif; text-align: center; box-shadow: 0 0 10px rgba(168, 85, 247, .8); }
+  .act-card .act-row { display: flex; gap: 10px; align-items: flex-start; padding: 8px 4px; }
+  .act-ic { flex: none; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; background: rgba(56, 189, 248, .16); color: #7dd3fc; }
+  .act-ic.is-claude { background: rgba(168, 85, 247, .2); color: #c4b5fd; box-shadow: 0 0 12px rgba(168, 85, 247, .35); }
+  .act-tx { min-width: 0; display: grid; gap: 2px; } .act-tx small { color: var(--muted); overflow-wrap: anywhere; }
+  .mis-etapes { margin: 6px 0 2px; padding-left: 20px; display: grid; gap: 2px; font-size: 13px; color: var(--muted); }
+  .mis-etapes li.is-fait { text-decoration: line-through; opacity: .7; } .mis-etapes li.is-cours { color: var(--text, #e6f1ff); font-weight: 600; }
+  .mis-outil { font-size: 13px; margin: 4px 0; }
+  .msg-h .msg-mod { font-style: normal; font-size: 11px; padding: 1px 7px; border-radius: 8px; border: 1px solid rgba(56, 189, 248, .35); color: var(--muted); }
   /* 0.31.0 : mains libres */
   .mains-strip[data-s="thinking"] .dict-dot { background: #a855f7; box-shadow: 0 0 10px #a855f7; animation-duration: .9s; }
   .mains-strip[data-s="speaking"] .dict-dot { background: #38bdf8; box-shadow: 0 0 12px #38bdf8; animation-duration: .5s; }
@@ -3084,7 +3094,7 @@ void main(){
   wrapCfg('bot', (cfg, b) => { cfg.facts = [['Rôle', BOT[b].title], ['Mission', BOT[b].mission], ['Dernier passage', S.last[b]], ['Prochain passage', b === 'claude' ? S.next[b] : nextOf(b)]]; cfg.actions = [act('Ouvrir sa page', {tone: 'main', go: () => { setTimeout(() => openAgent(b), 280); return null; }})].concat(cfg.actions || []); });
 
   /* ---------- la discussion : avec Claude en direct, ou avec un bot par le Canal ---------- */
-  const CHAT = {open: false, mode: 'claude', bot: 'hydra', type: '', item: null, key: '', msgs: [], turns: [], busy: false, ctl: null, tier: 'quick', prev: null};
+  const CHAT = {open: false, mode: 'claude', bot: 'hydra', type: '', item: null, key: '', msgs: [], turns: [], busy: false, ctl: null, tier: SRV_OS ? 'auto' : 'quick', prev: null};   /* 0.33.0 : « Auto » sur son serveur */
   const THREADS = {};
   const titleOf = (type, item) => {
     if (!item && item !== 0) return 'Jarvis';
@@ -3239,7 +3249,7 @@ void main(){
           h('div', {class: 'row-actions'}, h('button', {type: 'button', class: 'btn main sm', onclick: () => { m.state = 'done'; finish(m.fin()); renderChat(); }}, m.ok), h('button', {type: 'button', class: 'btn ghost sm', onclick: () => { m.state = 'dropped'; renderChat(); }}, 'Non')));
     }
     const who = m.who, isMe = who === 'toi';
-    const head = isMe ? null : h('div', {class: 'msg-h'}, h('b', {text: who === 'claude' ? 'Claude' : BOT[who] ? BOT[who].name : who}), m.date ? h('time', {text: m.date}) : null, m.sim ? h('em', {text: 'simulé'}) : null);
+    const head = isMe ? null : h('div', {class: 'msg-h'}, h('b', {text: who === 'claude' ? 'Claude' : BOT[who] ? BOT[who].name : who}), m.modele ? h('em', {class: 'msg-mod', text: ({haiku: 'Haiku', sonnet: 'Sonnet', opus: 'Opus'}[m.modele] || m.modele) + (m.secours ? ' · secours' : '')}) : null, m.date ? h('time', {text: m.date}) : null, m.sim ? h('em', {text: 'simulé'}) : null);
     const nx = !isMe && m.next && m.next.length ? h('div', {class: 'msg-next'}, m.next.map((x) => h('button', {type: 'button', class: 'btn sm', onclick: () => { const ta = $('chat-in'); if (ta) { ta.value = x; sendChat(); } }}, x))) : null;
     const vox = who === 'claude' && !m.wait && m.text && typeof voxSpeak === 'function' ? h('button', {type: 'button', class: 'btn sm vox-btn' + (VOX.on === m ? ' is-on' : ''), 'aria-pressed': String(VOX.on === m), onclick: () => voxSpeak(m)}, h('span', {class: 'ic', html: icon('sound', 15)}), VOX.on === m ? 'Arrêter' : 'Écouter') : null;
     const pe = h('p', {text: m.text}), el = h('div', {class: 'msg ' + (isMe ? 'me' : 'them') + (m.wait ? ' is-wait' : ''), style: BOT[who] ? botVars(who) : null}, head, pe, vox, nx);
@@ -3270,7 +3280,7 @@ void main(){
     ta.value = draft;
     ta.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); sendChat(); } });
     const sugg = h('div', {class: 'sugg'}, suggFor(CHAT.type, CHAT.item).map((s) => h('button', {type: 'button', class: 'btn sm', onclick: () => { ta.value = s; sendChat(); }}, s)));
-    const tier = CHAT.mode === 'claude' ? h('div', {class: 'tier', role: 'group', 'aria-label': 'Profondeur de la réponse'}, [['quick', 'Rapide'], ['default', 'Approfondi']].map(([k, l]) => h('button', {type: 'button', 'aria-pressed': String(CHAT.tier === k), onclick: () => { const avant = CHAT.tier; CHAT.tier = k; renderChat(); if (avant !== k) chatPrepare(); }}, l))) : null;
+    const tier = CHAT.mode === 'claude' ? h('div', {class: 'tier', role: 'group', 'aria-label': 'Profondeur de la réponse'}, (SRV_OS ? [['auto', 'Auto'], ['quick', 'Rapide'], ['default', 'Approfondi']] : [['quick', 'Rapide'], ['default', 'Approfondi']]).map(([k, l]) => h('button', {type: 'button', 'aria-pressed': String(CHAT.tier === k), onclick: () => { const avant = CHAT.tier; CHAT.tier = k; renderChat(); if (avant !== k) chatPrepare(); }}, l))) : null;
     const send = CHAT.busy && CHAT.mode === 'claude'
       ? h('button', {type: 'button', class: 'btn icon-btn', 'aria-label': 'Arrêter', onclick: () => CHAT.ctl && CHAT.ctl.abort(), html: icon('x', 18)})
       : h('button', {type: 'button', class: 'btn main icon-btn', 'aria-label': 'Envoyer', onclick: sendChat, html: icon('send', 18)});
@@ -3373,7 +3383,7 @@ void main(){
       if (canTools) opts.tools = tools; else opts.cache = false;
       opts.conversation = true;   /* 0.30.0 : le serveur garde le Claude de cette discussion ouvert */
       const res = await SAMPLE([{role: 'user', content: chatCtx(T)}].concat(T.turns), opts);
-      { const sp = splitNext(res.text); out.text = sp.body; out.next = sp.next; } out.wait = false;
+      { const sp = splitNext(res.text); out.text = sp.body; out.next = sp.next; } out.wait = false; if (res.modele) { out.modele = res.modele; out.secours = !!res.secours; }   /* 0.33.0 */
       if (CHAT.talk && out.text && !(typeof voxFeed === 'function' && voxFeed(out, true))) setTimeout(() => { if (CHAT.open && CHAT.talk && VOX.on !== out) voxSpeak(out); }, 80);
       if (lit) lire(true);   /* 0.31.0 : la fin de la réponse part à la voix */
       else if (!CHAT.talk && out.text && typeof lireAuto === 'function') lireAuto(out);
@@ -7347,10 +7357,12 @@ void main(){
       list.replaceChildren(...(ms.length ? ms.map((m) => { const k = ST[m.status] || ST.envoyee; return h('details', {class: 'mis-it'},
         h('summary', {}, h('span', {class: 'pill ' + k[1], text: k[0]}), h('span', {class: 'mis-t', text: m.text}), h('small', {class: 'mis-d', text: fmt(new Date(m.done || m.at), {weekday: 'short', hour: '2-digit', minute: '2-digit'})})),
         m.essais > 1 ? h('p', {class: 'muted mis-rep', text: 'Reprise après un redémarrage du serveur.'}) : null,
+        m.etapes && m.etapes.length ? h('ol', {class: 'mis-etapes'}, m.etapes.map((e) => h('li', {class: e.s === 'fait' ? 'is-fait' : e.s === 'en cours' ? 'is-cours' : '', text: e.t}))) : null,   /* 0.33.0 */
+        m.outil ? h('p', {class: 'muted mis-outil', text: 'À l’instant : ' + m.outil}) : null,
         m.result ? h('div', {class: 'mis-r', text: m.result}) : null, m.status === 'terminee' ? plutot(m) : null, m.result ? null : h('p', {class: 'muted', text: m.status === 'attente' ? 'En attente : une autre mission passe avant.' : 'Claude y travaille : tu seras prévenu par une notification.'})); }) : [h('p', {class: 'muted', text: 'Aucune mission pour le moment.'})]));
-      clearTimeout(timer); if (ms.some((m) => ['attente', 'envoyee'].includes(m.status))) timer = setTimeout(() => { if (TAB === 'suivi' && document.body.contains(list)) load(); }, 20000);
+      clearTimeout(timer); if (ms.some((m) => ['attente', 'envoyee'].includes(m.status))) timer = setTimeout(() => { if (TAB === 'suivi' && document.body.contains(list)) load(); }, 5000);
     };
-    load();
+    load(); MIS_LOAD = load;   /* 0.33.0 : relu aussi quand l'activité voit une mission commencer ou finir */
     const launch = h('button', {type: 'button', class: 'btn main', onclick: async () => {
       const t = inp.value.trim(); if (t.length < 4) { out.textContent = 'Écris d’abord la mission.'; out.classList.add('is-bad'); return; }
       launch.disabled = true; const r = await JS.mission(t); launch.disabled = false;
@@ -7681,6 +7693,7 @@ void main(){
       h('div', {}, h('b', {text: hello() + ', Rabie'}), h('small', {text: cap1(fmt(TODAY, {weekday: 'long', day: 'numeric', month: 'long'})) + (pr ? ' · ' + CODE[pr] : '') + (ml ? ' · ' + ml : '')}),
         !ml && !window.__METEO ? h('button', {type: 'button', class: 'link hm-met', onclick: () => metLoad(true)}, 'Afficher la météo') : null)));
     el.append(bar);   /* 19/11/2026 : « Demander » repasse en haut (en bas, il ne servait à rien) */
+    if (typeof actCard === 'function') el.append(actCard());   /* 0.33.0 : ce que font Claude et tes bots, en direct */
     el.append(hsec('En un coup d’œil', null, homeKpis(D)));
     if (D.now.length) el.append(hsec('À faire maintenant', more('Tout voir', 'demandes'), nowRows(D)));
     const today = D.ag.filter((a) => a.n === 0), H0 = 7, H1 = 23, nowH = new Date().getHours() + new Date().getMinutes() / 60, pos = (x) => Math.max(0, Math.min(100, (x - H0) / (H1 - H0) * 100));
@@ -7979,6 +7992,52 @@ void main(){
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && GS.open) gsClose(); });
   (() => { const tools = document.getElementById('top-tools'); if (tools) tools.prepend(h('button', {type: 'button', class: 'btn icon-btn gs-btn', id: 'gs-btn', 'aria-label': 'Chercher partout', title: 'Chercher partout', onclick: gsOpen, html: icon('search', 18)})); })();
 
+  /* ================= JARVIS OS 0.33.0 : l'activité en direct (choix du propriétaire, QCM du 21/11/2026, après le comparatif avec les AI OS) =================
+     Ce que fait Claude à l'instant (missions, Siri, tour, revérification, comparatif, discussion), avec l'outil qu'il utilise et le plan d'une
+     mission, lu sur le serveur (GET /api/activite : 2,5 s quand quelque chose tourne, 5 s sinon, rien quand l'app est derrière) ; et les
+     ordres en attente chez tes bots (Canal, déjà lu par la page). Sur l'accueil (« En ce moment ») et sur l'orbe (pastille). */
+  var ACTV = {enCours: [], recent: [], missions: null, at: 0}, ACTV_T = 0, ACTV_ON = false;
+  const ACT_IC = {mission: 'bolt', siri: 'mic', tour: 'clock', bot: 'send', tache: 'list', verif: 'doc', comparatif: 'tag', idees: 'tag', page: 'chat', test: 'check'};
+  const ACT_MOD = {haiku: 'Haiku', sonnet: 'Sonnet', opus: 'Opus'};
+  function actLoad() {
+    const JS = window.JarvisServeur; if (!JS || !JS.activite || !JS.linked()) return;
+    clearTimeout(ACTV_T); ACTV_ON = true;
+    JS.activite().then((a) => { if (a && Array.isArray(a.enCours)) { ACTV = a; actPaint(); } }).catch(() => { /* rien */ })
+      .finally(() => { ACTV_T = setTimeout(() => { if (!document.hidden) actLoad(); else ACTV_ON = false; }, ACTV.enCours.length ? 2500 : 5000); });
+  }
+  window.JarvisActivite = () => actLoad();   /* le pont l'appelle après une mission lancée : elle apparaît tout de suite */
+  var MIS_LOAD = null, MIS_SIG = '';
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && !ACTV_ON) actLoad(); });
+  const actDuree = (ms) => { const sec = Math.max(0, Math.round(ms / 1000)); return sec < 60 ? sec + ' s' : Math.round(sec / 60) + ' min'; };
+  /* ordres en attente chez les bots : tes lignes encore « À faire » ou « En cours », des 3 derniers jours */
+  function actBots() { return (S.ordres || []).filter((o) => o.n >= -3 && /^(à faire|a faire|en cours)$/i.test(String(o.status || '').trim())).slice(0, 4); }
+  function actRows() {
+    const rows = (ACTV.enCours || []).filter((a) => a.genre !== 'preparation').map((a) => h('li', {class: 'act-row'},
+      h('span', {class: 'act-ic is-claude', html: icon(ACT_IC[a.genre] || 'bolt', 16)}),
+      h('span', {class: 'act-tx'}, h('b', {text: 'Claude · ' + a.nom + (a.modele ? ' · ' + (ACT_MOD[a.modele] || a.modele) : '')}),
+        h('small', {text: (a.titre ? '« ' + a.titre + ' » · ' : '') + (a.etape || 'démarre') + ' · ' + actDuree((ACTV.at || Date.now()) - a.depuis)}),
+        a.etapes && a.etapes.length ? h('ol', {class: 'mis-etapes act-etapes'}, a.etapes.map((e) => h('li', {class: e.s === 'fait' ? 'is-fait' : e.s === 'en cours' ? 'is-cours' : '', text: e.t}))) : null)));
+    actBots().forEach((o) => rows.push(h('li', {class: 'act-row'},
+      h('span', {class: 'act-ic', style: botVars(o.bot), html: icon('send', 16)}),
+      h('span', {class: 'act-tx'}, h('b', {text: (BOT[o.bot] ? BOT[o.bot].name : o.bot) + ' · ' + String(o.status).toLowerCase()}), h('small', {text: '« ' + String(o.text || '').slice(0, 90) + ' » · ' + (o.n === 0 ? "aujourd'hui" : o.n === -1 ? 'hier' : 'il y a ' + -o.n + ' jours')})))));
+    return rows;
+  }
+  function actCard() {
+    const rows = actRows();
+    const card = h('section', {class: 'hm-sec act-card', id: 'act-card', 'aria-live': 'polite'}, h('header', {class: 'hm-h'}, h('h2', {text: 'En ce moment'}), h('span', {class: 'aside', text: (ACTV.enCours || []).length ? 'en direct' : ''})),
+      h('ul', {class: 'hm-rows act-rows'}, rows));
+    card.hidden = !rows.length;
+    if (!ACTV_ON) setTimeout(actLoad, 300);
+    return card;
+  }
+  function actPaint() {
+    const card = document.getElementById('act-card');
+    if (card) { const rows = actRows(); card.hidden = !rows.length; const ul = card.querySelector('.act-rows'); if (ul) ul.replaceChildren(...rows); const as = card.querySelector('.aside'); if (as) as.textContent = (ACTV.enCours || []).length ? 'en direct' : ''; }
+    const n = (ACTV.enCours || []).filter((a) => a.genre !== 'page' && a.genre !== 'preparation').length;
+    const sig = (ACTV.enCours || []).filter((a) => a.genre === 'mission').map((a) => a.id).join('|');   /* une mission commence ou finit : Suivi relit ses missions */
+    if (sig !== MIS_SIG) { MIS_SIG = sig; if (MIS_LOAD && document.getElementById('missions')) MIS_LOAD(); }
+    document.querySelectorAll('.jv-btn').forEach((b) => { if (n) b.dataset.act = String(n); else delete b.dataset.act; b.setAttribute('aria-label', n ? 'Demander à Claude (' + n + ' en cours)' : 'Demander à Claude'); });
+  }
   /* ================= JARVIS OS 0.25.0 (choix QCM « En-tête et répétitions ») =================
      1. L'en-tête tient sur une ligne : JARVIS, l'état utile (pause de Grok, pour toi, au travail, en retard), l'heure de la dernière lecture,
         la loupe et la mise à jour. L'heure n'est plus écrite deux fois (l'horloge doublait « En direct · 14h41 » et la barre de l'iPhone) ;
