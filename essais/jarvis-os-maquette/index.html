@@ -1449,6 +1449,7 @@
   .pap-dates.panel { border-top: 0; padding-top: 0; }
   /* 0.37.0 : la mémoire durable */
   .mem-list { list-style: none; margin: 8px 0; padding: 0; display: grid; gap: 6px; } .mem-it { display: flex; gap: 8px; align-items: center; justify-content: space-between; padding: 6px 8px; border-radius: 10px; background: rgba(56, 189, 248, .08); } .mem-it span { min-width: 0; overflow-wrap: anywhere; }
+  .siri-auto { margin: 10px 0; } .siri-auto summary { cursor: pointer; font-weight: 600; } .auto-it { flex-wrap: wrap; }
   .rout-brief { margin: 8px 0 12px; padding: 10px; border-radius: 12px; background: rgba(56, 189, 248, .08); } .rout-heure { width: auto; } .rout-jours { flex: 1; min-width: 0; }
   .rout-it { flex-wrap: wrap; } .rout-it.is-off { opacity: .6; } .rout-act { display: flex; gap: 4px; flex-wrap: wrap; } .rout-apercu { margin: 6px 0; } .brief-tx { white-space: pre-wrap; line-height: 1.45; }
   .voixg-etapes { margin: 8px 0; padding-left: 20px; display: grid; gap: 4px; font-size: 14px; } .voixg-sel { flex: 1; min-width: 0; }
@@ -9106,6 +9107,17 @@ void main(){
       h('li', {text: 'Ajoute « Énoncer le texte » avec « Contenu de l’URL ».'}),
       h('li', {text: 'Bouton Action : Réglages de l’iPhone, Bouton Action, Raccourci, Jarvis. Avec Siri : « Dis Siri, Jarvis ».'}),
       h('li', {text: 'Menu Partager (facultatif) : dans les détails du raccourci, « Afficher dans la feuille de partage » ; ajoute dans le corps un champ « lien » = Entrée du raccourci.'}));
+    /* 0.43.0 (choix du 21/11/2026, « Automatisations iPhone ») : l'iPhone déclenche JARVIS tout seul (au réveil, en voiture, en arrivant),
+       avec des réponses sans IA, gratuites et immédiates ; mêmes adresse et clé que le raccourci « Jarvis » */
+    const AUTO = [['brief', 'Au réveil', 'Alarme, « Quand elle s’arrête »', 'le brief du matin (météo, agenda, ce qui t’attend)'], ['agenda', 'En montant en voiture', 'CarPlay, « Se connecte »', 'l’agenda du reste de la journée'],
+      ['pourmoi', 'En arrivant au bureau', 'Arrivée, choisis le lieu', 'ce qui attend ta réponse'], ['demain', 'Le soir', 'Heure de la journée, 21 h', 'l’agenda de demain'], ['meteo', 'Avant de sortir', 'Départ, ton domicile', 'la météo (ajoute la position : « Obtenir la position actuelle », champs « lat » et « lon »)']];
+    const autos = (url, cle) => h('details', {class: 'siri-auto'}, h('summary', {text: 'Automatisations : JARVIS te parle tout seul (sans IA, gratuit)'}),
+      h('p', {class: 'muted', text: 'Pour chacune : un petit raccourci (par exemple « Jarvis brief »), puis une automatisation de l’iPhone qui le lance. Noms des menus devinés.'}),
+      h('ol', {class: 'siri-steps'},
+        h('li', {}, 'Raccourcis, « + » : « Obtenir le contenu de l’URL » avec ', h('code', {text: url}), ', méthode POST, en-tête Authorization = ', h('code', {text: 'Bearer ' + (cle || '<ta clé>')}), ', corps JSON : champ « action » = le mot ci-dessous ; puis « Énoncer le texte » avec « Contenu de l’URL ».'),
+        h('li', {text: 'Raccourcis, onglet Automatisation, « + », le déclencheur ci-dessous, « Exécuter immédiatement », puis ce raccourci.'})),
+      h('ul', {class: 'mem-list'}, AUTO.map(([a, quand, decl, quoi]) => h('li', {class: 'mem-it auto-it'}, h('span', {}, h('b', {text: quand + ' · « ' + a + ' »'}), h('small', {class: 'muted', text: ' · ' + decl + ' · lit ' + quoi})),
+        h('button', {type: 'button', class: 'btn ghost sm', onclick: async () => { say('…'); say(await JS.raccourci.action(a)); }}, 'Essayer')))));
     if (!st.active) {
       card.append(h('p', {class: 'muted', text: 'Pose une question à JARVIS sans ouvrir l’app : « Dis Siri, Jarvis », ou le bouton Action de ton iPhone. Il lit ton agenda, ce qui t’attend et tes échéances, puis répond à voix haute en quelques phrases. Il n’envoie et n’écrit rien. Une question = un appel à Claude (rapide).'}),
         h('button', {type: 'button', class: 'btn main', onclick: async () => {
@@ -9113,12 +9125,12 @@ void main(){
           const key = h('code', {class: 'siri-key', text: r.cle});
           card.replaceChildren(h('b', {text: 'Siri et bouton Action'}), h('p', {class: 'muted', text: 'Ta clé, montrée une seule fois : copie-la dans le raccourci. Ne la donne à personne.'}), key,
             h('div', {class: 'row-actions'}, h('button', {type: 'button', class: 'btn main', onclick: async () => { try { await navigator.clipboard.writeText(r.cle); say('Clé copiée.'); } catch (e) { say('Copie impossible : sélectionne la clé.', true); } }}, 'Copier la clé')),
-            steps(r.url, r.cle), out);
+            steps(r.url, r.cle), autos(r.url, r.cle), out);
         }}, 'Créer la clé du Raccourci'), out);
       return card;
     }
     card.append(h('p', {class: 'muted', text: 'Clé active' + (st.at ? ' depuis le ' + fmt(new Date(st.at), {day: 'numeric', month: 'long'}) : '') + ' · ' + (st.uses || 0) + ' question' + ((st.uses || 0) > 1 ? 's' : '') + (st.last ? ', dernière ' + fmt(new Date(st.last), {weekday: 'short', hour: '2-digit', minute: '2-digit'}) : '') + '. Clé perdue : recrée-la (l’ancienne ne marchera plus).'}),
-      steps(st.url, null),
+      steps(st.url, null), autos(st.url, null),
       h('div', {class: 'row-actions'},
         h('button', {type: 'button', class: 'btn', onclick: async () => { say('Question envoyée…'); say(await JS.raccourci.essai('Quoi de neuf aujourd’hui ?')); }}, 'Essayer ici'),
         h('button', {type: 'button', class: 'btn', onclick: () => confirmSheet({bot: 'claude', title: 'Recréer la clé ?', ok: 'Oui, recréer', cost: 'free', say: 'Le raccourci actuel ne marchera plus tant que tu n’y auras pas collé la nouvelle clé.', run: async () => { await JS.raccourci.retirer(); VIEWS_RELOAD_SIRI(); }})}, 'Recréer la clé'),
