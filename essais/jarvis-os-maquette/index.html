@@ -2925,7 +2925,7 @@ void main(){
   let SAMPLE = null, SAMPLE_STATE = 'wait';
   (async () => {
     await null; /* attendre la fin du chargement du script */
-    try { const raw = window.claude && window.claude.use ? await window.claude.use('sample') : null; SAMPLE = raw ? Object.assign((input, opts) => { try { costCount('claude'); } catch (e) { /* rien */ } return raw(input, opts); }, {limits: (...a) => raw.limits(...a)}) : null; } catch (e) { SAMPLE = null; }
+    try { const raw = window.claude && window.claude.use ? await window.claude.use('sample') : null; SAMPLE = raw ? Object.assign((input, opts) => { try { costCount('claude'); } catch (e) { /* rien */ } return raw(input, opts); }, {limits: (...a) => raw.limits(...a), prepare: typeof raw.prepare === 'function' ? (...a) => raw.prepare(...a) : null}) : null; } catch (e) { SAMPLE = null; }
     SAMPLE_STATE = SAMPLE ? 'ok' : 'none';
     if (CHAT.open) renderChat();
   })();
@@ -3173,6 +3173,7 @@ void main(){
     ov.hidden = false;
     document.body.classList.add('noscroll');
     renderChat();
+    if (mode === 'claude') chatPrepare();   /* 0.30.0 : Claude prêt avant la première question */
     setTimeout(() => { const ta = $('chat-in'); if (ta) ta.focus({preventScroll: true}); }, 200);
   }
   /* JARVIS OS (demande du 16/11/2026) : glisser vers le bas ferme la fenêtre ouverte (feuille du bas, discussion, rubrique ouverte, page vocale).
@@ -3236,8 +3237,11 @@ void main(){
     const head = isMe ? null : h('div', {class: 'msg-h'}, h('b', {text: who === 'claude' ? 'Claude' : BOT[who] ? BOT[who].name : who}), m.date ? h('time', {text: m.date}) : null, m.sim ? h('em', {text: 'simulé'}) : null);
     const nx = !isMe && m.next && m.next.length ? h('div', {class: 'msg-next'}, m.next.map((x) => h('button', {type: 'button', class: 'btn sm', onclick: () => { const ta = $('chat-in'); if (ta) { ta.value = x; sendChat(); } }}, x))) : null;
     const vox = who === 'claude' && !m.wait && m.text && typeof voxSpeak === 'function' ? h('button', {type: 'button', class: 'btn sm vox-btn' + (VOX.on === m ? ' is-on' : ''), 'aria-pressed': String(VOX.on === m), onclick: () => voxSpeak(m)}, h('span', {class: 'ic', html: icon('sound', 15)}), VOX.on === m ? 'Arrêter' : 'Écouter') : null;
-    return h('div', {class: 'msg ' + (isMe ? 'me' : 'them') + (m.wait ? ' is-wait' : ''), style: BOT[who] ? botVars(who) : null}, head, h('p', {text: m.text}), vox, nx);
+    const pe = h('p', {text: m.text}), el = h('div', {class: 'msg ' + (isMe ? 'me' : 'them') + (m.wait ? ' is-wait' : ''), style: BOT[who] ? botVars(who) : null}, head, pe, vox, nx);
+    MSG_EL.set(m, {el, pe});   /* 0.30.0 : pendant le flux, seul ce texte change (le reste de la discussion, boutons compris, ne bouge pas) */
+    return el;
   };
+  const MSG_EL = new WeakMap();
   function renderChat() {
     if (!CHAT.open) return;
     const ov = $('chat'), T = THREADS[CHAT.key], who = CHAT.mode === 'claude' ? 'claude' : CHAT.bot;
@@ -3260,7 +3264,7 @@ void main(){
     ta.value = draft;
     ta.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); sendChat(); } });
     const sugg = h('div', {class: 'sugg'}, suggFor(CHAT.type, CHAT.item).map((s) => h('button', {type: 'button', class: 'btn sm', onclick: () => { ta.value = s; sendChat(); }}, s)));
-    const tier = CHAT.mode === 'claude' ? h('div', {class: 'tier', role: 'group', 'aria-label': 'Profondeur de la réponse'}, [['quick', 'Rapide'], ['default', 'Approfondi']].map(([k, l]) => h('button', {type: 'button', 'aria-pressed': String(CHAT.tier === k), onclick: () => { CHAT.tier = k; renderChat(); }}, l))) : null;
+    const tier = CHAT.mode === 'claude' ? h('div', {class: 'tier', role: 'group', 'aria-label': 'Profondeur de la réponse'}, [['quick', 'Rapide'], ['default', 'Approfondi']].map(([k, l]) => h('button', {type: 'button', 'aria-pressed': String(CHAT.tier === k), onclick: () => { const avant = CHAT.tier; CHAT.tier = k; renderChat(); if (avant !== k) chatPrepare(); }}, l))) : null;
     const send = CHAT.busy && CHAT.mode === 'claude'
       ? h('button', {type: 'button', class: 'btn icon-btn', 'aria-label': 'Arrêter', onclick: () => CHAT.ctl && CHAT.ctl.abort(), html: icon('x', 18)})
       : h('button', {type: 'button', class: 'btn main icon-btn', 'aria-label': 'Envoyer', onclick: sendChat, html: icon('send', 18)});
@@ -3273,6 +3277,41 @@ void main(){
     const lg = ov.querySelector('.chat-log');
     if (lg && (keep == null || CHAT.stick !== false)) lg.scrollTop = lg.scrollHeight;
     if (hadFocus) { const n = $('chat-in'); if (n) { try { n.focus({preventScroll: true}); n.setSelectionRange(n.value.length, n.value.length); } catch (e) { /* rien */ } } }
+  }
+  /* JARVIS OS 0.30.0 (Claude instantané) : les outils de la discussion, construits à un seul endroit : la question et la préparation
+     (à l'ouverture de la discussion) envoient exactement la même consigne au serveur, qui garde alors le même Claude ouvert */
+  function chatTools(T, out) {
+    return [{name: 'preparer_ordre', description: "Propose à Rabie d'envoyer un ordre à un bot. Rien ne part tant qu'il n'a pas touché « Envoyer ». Renvoie l'état de la proposition.",
+      inputSchema: {type: 'object', properties: {bot: {type: 'string', description: BOTS.map((x) => x.name).join(', ')}, message: {type: 'string', description: "L'ordre, complet et précis, tel que le bot le lira"}}, required: ['bot', 'message']},
+      execute: (input) => { const raw = String(input.bot || '').trim(), m = String(input.message || '').trim(); const b = (BOTS.find((x) => x.id === raw.toLowerCase() || x.name.toLowerCase() === raw.toLowerCase()) || {}).id; if (!b) throw new Error('Bot inconnu : ' + raw); if (!m) throw new Error('Message vide'); T.msgs.splice(T.msgs.indexOf(out), 0, {kind: 'proposal', bot: b, text: m, state: 'open'}); renderChat(); return 'Proposé à Rabie ; en attente de son bouton. Ne dis pas que c\'est envoyé.'; }},
+      {name: 'ajouter_tache', description: "Propose d'ajouter une tâche personnelle de Rabie (onglet Tâches). Rien n'est ajouté tant qu'il n'a pas touché « Ajouter ».",
+        inputSchema: {type: 'object', properties: {titre: {type: 'string', description: "La tâche, précise : l'objet exact et l'action"}, date: {type: 'string', description: 'AAAA-MM-JJ, facultatif'}}, required: ['titre']},
+        execute: (input) => { const t = String(input.titre || '').trim(); if (!t) throw new Error('Titre vide'); const iso = /^\d{4}-\d{2}-\d{2}$/.test(String(input.date || '')) ? input.date : null; const n = iso ? dayDiff(iso) : null;
+          T.msgs.splice(T.msgs.indexOf(out), 0, {kind: 'act', label: 'Tâche proposée', text: t + (n != null ? ' · ' + longDay(n) : ''), ok: 'Ajouter', state: 'open', fin: () => ({title: 'Tâche ajoutée', effect: "Une ligne « " + t + " » dans l'onglet Tâches" + (n != null ? ', pour ' + longDay(n) : '') + ' ; Iris te la rappelle à sa date.', mutate: () => S.taches.push({id: 't' + (++SEQ), title: t, n}), bot: 'hydra', say: 'Tâche notée.', work: false})});
+          renderChat(); return 'Proposée à Rabie ; en attente de son bouton.'; }},
+      {name: 'ajouter_echeance', description: "Propose d'ajouter une date à suivre dans l'onglet Échéances, avec le bot qui la suit. Rien n'est ajouté tant que Rabie n'a pas touché « Ajouter ».",
+        inputSchema: {type: 'object', properties: {sujet: {type: 'string'}, date: {type: 'string', description: 'AAAA-MM-JJ'}, nature: {type: 'string', description: "À faire par moi, Un bot s'en occupe, Un bot suit, Offre, Fin de validité ou Date à retenir"}, bot: {type: 'string', description: 'Le bot qui la suit, Iris par défaut'}, remarque: {type: 'string', description: "Le contexte : objet exact, source, ce qu'il faut faire"}}, required: ['sujet', 'date', 'remarque']},
+        execute: (input) => { const t = String(input.sujet || '').trim(), iso = String(input.date || ''); if (!t || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) throw new Error('Sujet ou date invalide'); const raw = String(input.bot || 'Iris').toLowerCase(); const b = (BOTS.find((x) => x.id === raw || x.name.toLowerCase() === raw) || {id: 'hydra'}).id; const nat = Object.keys(NATURE).find((k) => NATURE[k].toLowerCase() === String(input.nature || '').toLowerCase().replace('par moi', 'par toi')) || 'moi'; const note = String(input.remarque || '').trim(), n = dayDiff(iso);
+          T.msgs.splice(T.msgs.indexOf(out), 0, {kind: 'act', label: 'Échéance proposée · suivie par ' + BOT[b].name, text: t + ' · ' + longDay(n) + ' · ' + NATURE[nat] + (note ? ' — ' + note : ''), ok: 'Ajouter', state: 'open', fin: () => ({title: 'Échéance ajoutée', effect: "Une ligne « " + t + " » pour " + longDay(n) + " dans l'onglet Échéances (Nature : " + NATURE[nat] + ') ; ' + BOT[b].name + ' la suit.', mutate: () => S.echeances.push({id: 'e' + (++SEQ), iso, n, title: t, domain: 'Famille', bot: b, nature: nat, note, rem: ''}), bot: b, say: 'Échéance notée.', work: false})});
+          renderChat(); return 'Proposée à Rabie ; en attente de son bouton.'; }},
+      {name: 'confier_tache_claude', description: SRV_OS ? "Propose de confier la demande à la tâche Claude du serveur : elle répond aux lignes du Canal adressées à Claude ; ce qui touche une fiche, la Charte, une routine ou le dépôt revient « à valider en conversation ». Rien ne part tant que Rabie n'a pas touché le bouton." : "Propose de confier la demande à la tâche Claude « Ordres Jarvis » : une session complète, plus lente et plus coûteuse, seulement quand il faut modifier une fiche, la Charte, une routine, la structure de Pilotage ou le dépôt. Rien ne part tant que Rabie n'a pas touché le bouton.",
+        inputSchema: {type: 'object', properties: {demande: {type: 'string', description: 'La demande complète, telle que la tâche la lira'}}, required: ['demande']},
+        execute: (input) => { const m = String(input.demande || '').trim(); if (!m) throw new Error('Demande vide');
+          T.msgs.splice(T.msgs.indexOf(out), 0, {kind: 'act', label: SRV_OS ? 'Confier à la tâche Claude (sur ton serveur)' : 'Confier à la tâche Claude (session complète)', text: m, ok: 'Lancer la tâche', state: 'open', fin: () => ({title: 'Ordre à Claude', effect: 'Une ligne pour Claude dans le Canal, puis la tâche « Ordres Jarvis » lancée.', bot: 'claude', order: m, viaTask: true, say: 'Je lance la tâche.', reply: ''})});
+          renderChat(); return 'Proposée à Rabie ; en attente de son bouton.'; }}].concat(extraChatTools(T, out), relanceChatTool(T, out));
+  }
+  /* les données de la discussion (règles et état de Pilotage) restent les mêmes pendant 10 minutes : le serveur n'envoie à Claude que
+     la nouvelle question, et l'heure de Paris part avec chacune ; au-delà, elles sont relues (nouveau Claude, données à jour) */
+  function chatCtx(T) {
+    if (!T.ctx || Date.now() - (T.ctxAt || 0) > 10 * 60000) { T.ctx = rulesFor(); T.ctxAt = Date.now(); }
+    return T.ctx;
+  }
+  /* à l'ouverture de la discussion avec Claude (et quand il change de profondeur) : le serveur lance Claude et lui donne déjà les données
+     et l'historique de la discussion (gardé dans le téléphone) : la question suivante n'envoie que la question */
+  function chatPrepare() {
+    if (!CHAT.open || CHAT.mode !== 'claude' || !SAMPLE || typeof SAMPLE.prepare !== 'function') return;
+    const T = THREADS[CHAT.key]; if (!T || CHAT.busy) return;
+    try { SAMPLE.prepare([{role: 'user', content: chatCtx(T)}].concat(T.turns), {modelTier: CHAT.tier, tools: chatTools(T, null)}); } catch (e) { /* rien : la question partira avec les données */ }
   }
   async function sendChat() {
     const ta = $('chat-in'); if (!ta) return;
@@ -3300,30 +3339,19 @@ void main(){
     T.turns.push({role: 'user', content: text});
     CHAT.busy = true; CHAT.ctl = new AbortController();
     renderChat();
-    const tools = [{name: 'preparer_ordre', description: "Propose à Rabie d'envoyer un ordre à un bot. Rien ne part tant qu'il n'a pas touché « Envoyer ». Renvoie l'état de la proposition.",
-      inputSchema: {type: 'object', properties: {bot: {type: 'string', description: BOTS.map((x) => x.name).join(', ')}, message: {type: 'string', description: "L'ordre, complet et précis, tel que le bot le lira"}}, required: ['bot', 'message']},
-      execute: (input) => { const raw = String(input.bot || '').trim(), m = String(input.message || '').trim(); const b = (BOTS.find((x) => x.id === raw.toLowerCase() || x.name.toLowerCase() === raw.toLowerCase()) || {}).id; if (!b) throw new Error('Bot inconnu : ' + raw); if (!m) throw new Error('Message vide'); T.msgs.splice(T.msgs.indexOf(out), 0, {kind: 'proposal', bot: b, text: m, state: 'open'}); renderChat(); return 'Proposé à Rabie ; en attente de son bouton. Ne dis pas que c\'est envoyé.'; }},
-      {name: 'ajouter_tache', description: "Propose d'ajouter une tâche personnelle de Rabie (onglet Tâches). Rien n'est ajouté tant qu'il n'a pas touché « Ajouter ».",
-        inputSchema: {type: 'object', properties: {titre: {type: 'string', description: "La tâche, précise : l'objet exact et l'action"}, date: {type: 'string', description: 'AAAA-MM-JJ, facultatif'}}, required: ['titre']},
-        execute: (input) => { const t = String(input.titre || '').trim(); if (!t) throw new Error('Titre vide'); const iso = /^\d{4}-\d{2}-\d{2}$/.test(String(input.date || '')) ? input.date : null; const n = iso ? dayDiff(iso) : null;
-          T.msgs.splice(T.msgs.indexOf(out), 0, {kind: 'act', label: 'Tâche proposée', text: t + (n != null ? ' · ' + longDay(n) : ''), ok: 'Ajouter', state: 'open', fin: () => ({title: 'Tâche ajoutée', effect: "Une ligne « " + t + " » dans l'onglet Tâches" + (n != null ? ', pour ' + longDay(n) : '') + ' ; Iris te la rappelle à sa date.', mutate: () => S.taches.push({id: 't' + (++SEQ), title: t, n}), bot: 'hydra', say: 'Tâche notée.', work: false})});
-          renderChat(); return 'Proposée à Rabie ; en attente de son bouton.'; }},
-      {name: 'ajouter_echeance', description: "Propose d'ajouter une date à suivre dans l'onglet Échéances, avec le bot qui la suit. Rien n'est ajouté tant que Rabie n'a pas touché « Ajouter ».",
-        inputSchema: {type: 'object', properties: {sujet: {type: 'string'}, date: {type: 'string', description: 'AAAA-MM-JJ'}, nature: {type: 'string', description: "À faire par moi, Un bot s'en occupe, Un bot suit, Offre, Fin de validité ou Date à retenir"}, bot: {type: 'string', description: 'Le bot qui la suit, Iris par défaut'}, remarque: {type: 'string', description: "Le contexte : objet exact, source, ce qu'il faut faire"}}, required: ['sujet', 'date', 'remarque']},
-        execute: (input) => { const t = String(input.sujet || '').trim(), iso = String(input.date || ''); if (!t || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) throw new Error('Sujet ou date invalide'); const raw = String(input.bot || 'Iris').toLowerCase(); const b = (BOTS.find((x) => x.id === raw || x.name.toLowerCase() === raw) || {id: 'hydra'}).id; const nat = Object.keys(NATURE).find((k) => NATURE[k].toLowerCase() === String(input.nature || '').toLowerCase().replace('par moi', 'par toi')) || 'moi'; const note = String(input.remarque || '').trim(), n = dayDiff(iso);
-          T.msgs.splice(T.msgs.indexOf(out), 0, {kind: 'act', label: 'Échéance proposée · suivie par ' + BOT[b].name, text: t + ' · ' + longDay(n) + ' · ' + NATURE[nat] + (note ? ' — ' + note : ''), ok: 'Ajouter', state: 'open', fin: () => ({title: 'Échéance ajoutée', effect: "Une ligne « " + t + " » pour " + longDay(n) + " dans l'onglet Échéances (Nature : " + NATURE[nat] + ') ; ' + BOT[b].name + ' la suit.', mutate: () => S.echeances.push({id: 'e' + (++SEQ), iso, n, title: t, domain: 'Famille', bot: b, nature: nat, note, rem: ''}), bot: b, say: 'Échéance notée.', work: false})});
-          renderChat(); return 'Proposée à Rabie ; en attente de son bouton.'; }},
-      {name: 'confier_tache_claude', description: SRV_OS ? "Propose de confier la demande à la tâche Claude du serveur : elle répond aux lignes du Canal adressées à Claude ; ce qui touche une fiche, la Charte, une routine ou le dépôt revient « à valider en conversation ». Rien ne part tant que Rabie n'a pas touché le bouton." : "Propose de confier la demande à la tâche Claude « Ordres Jarvis » : une session complète, plus lente et plus coûteuse, seulement quand il faut modifier une fiche, la Charte, une routine, la structure de Pilotage ou le dépôt. Rien ne part tant que Rabie n'a pas touché le bouton.",
-        inputSchema: {type: 'object', properties: {demande: {type: 'string', description: 'La demande complète, telle que la tâche la lira'}}, required: ['demande']},
-        execute: (input) => { const m = String(input.demande || '').trim(); if (!m) throw new Error('Demande vide');
-          T.msgs.splice(T.msgs.indexOf(out), 0, {kind: 'act', label: SRV_OS ? 'Confier à la tâche Claude (sur ton serveur)' : 'Confier à la tâche Claude (session complète)', text: m, ok: 'Lancer la tâche', state: 'open', fin: () => ({title: 'Ordre à Claude', effect: 'Une ligne pour Claude dans le Canal, puis la tâche « Ordres Jarvis » lancée.', bot: 'claude', order: m, viaTask: true, say: 'Je lance la tâche.', reply: ''})});
-          renderChat(); return 'Proposée à Rabie ; en attente de son bouton.'; }}].concat(extraChatTools(T, out), relanceChatTool(T, out));
+    const tools = chatTools(T, out);
     let canTools = false;
     try { const lim = await SAMPLE.limits(); canTools = !!(lim && lim.tools); } catch (e) { canTools = false; }
     try {
-      const opts = {modelTier: CHAT.tier, signal: CHAT.ctl.signal, onText: ({text: t}) => { out.text = splitNext(t).body; out.wait = false; renderChat(); if (CHAT.av) CHAT.av.talk(0.8); if (CHAT.talk && typeof voxFeed === 'function') voxFeed(out, false); }};
+      /* 0.30.0 : la réponse arrive mot par mot ; la discussion est redessinée au plus une fois par image (pas à chaque morceau) */
+      const frame = () => { if (CHAT.raf) return; CHAT.raf = requestAnimationFrame(() => { CHAT.raf = 0;
+        const r = MSG_EL.get(out);
+        if (r && r.pe.isConnected && CHAT.open) { r.pe.textContent = out.text; r.el.classList.toggle('is-wait', !!out.wait); const lg = $('chat') && $('chat').querySelector('.chat-log'); if (lg && CHAT.stick !== false) lg.scrollTop = lg.scrollHeight; }
+        else renderChat(); }); };
+      const opts = {modelTier: CHAT.tier, signal: CHAT.ctl.signal, onText: ({text: t}) => { const bd = splitNext(t).body; if (bd) { out.text = bd; out.wait = false; } frame(); if (CHAT.av) CHAT.av.talk(0.8); if (CHAT.talk && typeof voxFeed === 'function') voxFeed(out, false); }};
       if (canTools) opts.tools = tools; else opts.cache = false;
-      const res = await SAMPLE([{role: 'user', content: rulesFor()}].concat(T.turns), opts);
+      opts.conversation = true;   /* 0.30.0 : le serveur garde le Claude de cette discussion ouvert */
+      const res = await SAMPLE([{role: 'user', content: chatCtx(T)}].concat(T.turns), opts);
       { const sp = splitNext(res.text); out.text = sp.body; out.next = sp.next; } out.wait = false;
       if (CHAT.talk && out.text && !(typeof voxFeed === 'function' && voxFeed(out, true))) setTimeout(() => { if (CHAT.open && CHAT.talk && VOX.on !== out) voxSpeak(out); }, 80);
       if (!CHAT.talk && out.text && typeof lireAuto === 'function') lireAuto(out);
@@ -6492,7 +6520,7 @@ void main(){
   /* JARVIS OS 0.18.0 : Claude peut proposer une relance (« je revérifie demain à 9 h si Iris a répondu ») ; programmée sur son bouton, gratuite */
   function relanceChatTool(T, out) {
     const JS = window.JarvisServeur; if (!SRV_OS || !JS || !JS.relance) return [];
-    return [{name: 'programmer_relance', description: "Propose à Rabie de programmer une relance : le serveur le préviendra à l'heure dite et, si tu donnes la ligne du Canal, regardera lui-même si le bot a répondu. Rien n'est programmé tant qu'il n'a pas touché « Programmer ». Aujourd'hui : " + new Date().toLocaleString('fr-FR', {timeZone: 'Europe/Paris'}) + '.',
+    return [{name: 'programmer_relance', description: "Propose à Rabie de programmer une relance : le serveur le préviendra à l'heure dite et, si tu donnes la ligne du Canal, regardera lui-même si le bot a répondu. Rien n'est programmé tant qu'il n'a pas touché « Programmer ». L'heure de Paris est donnée avec chaque question (« [Maintenant : …] »).",
       inputSchema: {type: 'object', properties: {quand: {type: 'string', description: 'AAAA-MM-JJTHH:MM, heure de Paris'}, quoi: {type: 'string', description: 'Ce qu’il faudra revérifier, une phrase'}, ligne: {type: 'number', description: 'Numéro de la ligne du Canal à vérifier, facultatif'}}, required: ['quand', 'quoi']},
       execute: (input) => { const q = String(input.quoi || '').trim(), w = String(input.quand || '').trim(), l = +input.ligne || 0; if (!q || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(w)) throw new Error('Relance incomplète');
         const t = new Date(w.slice(0, 16)); T.msgs.splice(T.msgs.indexOf(out), 0, {kind: 'act', label: 'Relance proposée' + (l ? ' · ligne ' + l + ' du Canal' : ''), text: q + ' · ' + (isNaN(t) ? w : quandFr(t.getTime())), ok: 'Programmer', state: 'open',

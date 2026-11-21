@@ -51,7 +51,7 @@ Règle (16/11/2026) : **aucune régression**. Chaque fonction de la page (copie 
 
 - [ ] Coût affiché sur chaque bouton (gratuit, 1 passage, chat Grok, Claude…)
 - [ ] Confirmation avant « Grok est reparti », « Iris les traite tous », « Confier à la tâche Claude », envoi et suppression d'un brouillon
-- [ ] Claude dans la page : discussion en direct (modèle « Rapide » par défaut), contexte allégé ; ses propositions (ordre, tâche, échéance, dossier, tâche Claude) marchent sur le serveur depuis 0.11.0 (banc de bout en bout), à essayer en vrai
+- [ ] Claude dans la page : discussion en direct (modèle « Rapide » par défaut), contexte allégé ; ses propositions (ordre, tâche, échéance, dossier, tâche Claude) marchent sur le serveur depuis 0.11.0 (banc de bout en bout), à essayer en vrai ; depuis 0.30.0, la réponse s'écrit mot par mot et le Claude de la discussion reste ouvert (banc de bout en bout)
 - [ ] Bouton retour avec position gardée ; version visible
 
 ## Nouveautés à ajouter (demandes du 16/11/2026)

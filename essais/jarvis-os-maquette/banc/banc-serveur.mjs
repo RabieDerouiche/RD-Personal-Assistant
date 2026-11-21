@@ -73,6 +73,28 @@ try {
   await p.evaluate(() => [...document.querySelectorAll('#chat .msg.proposal.is-act .btn.main')].pop().click()); await p.waitForTimeout(19000);
   const puts = FG.calls.slice(n0).filter((c) => c.method === 'PUT').map((c) => c.path.split('/values/')[1]);
   ok('tâche Claude : lancée par la page, faite par le serveur (réponse et statut dans le Canal)', puts.includes('Canal!G2') && puts.includes('Canal!F2'), puts.join(' | '));
+  /* 0.30.0 : Claude instantané — Claude préparé à l'ouverture de la discussion, réponse qui s'écrit mot par mot, « Arrêter » qui coupe Claude */
+  { const q = await ctx.newPage(); q.on('pageerror', (e) => errs.push('flux : ' + e.message));
+    const vus = {prep: 0, sample: 0, conv: 0}; q.on('request', (r) => { const u = r.url(); if (/\/api\/sample\/prepare$/.test(u)) vus.prep++; if (/\/api\/sample$/.test(u)) { vus.sample++; try { if (JSON.parse(r.postData() || '{}').conv) vus.conv++; } catch (e) { /* rien */ } } });
+    await q.addInitScript(() => { try { localStorage.setItem('jarvis.mains', 'non'); } catch (e) { /* rien */ } });
+    await q.goto(BASE + '/?serveur'); await q.waitForTimeout(3500);
+    await q.evaluate(() => window.JarvisAsk()); await q.waitForTimeout(600);
+    await q.evaluate(() => { const n = document.querySelector('#chat .dict-no'); if (n) n.click(); }); await q.waitForTimeout(1200);
+    const derniere = () => q.evaluate(() => { const m = [...document.querySelectorAll('#chat .msg.them p')]; return m.length ? m[m.length - 1].textContent : ''; });
+    await q.fill('#chat-in', 'Bonjour Claude'); await q.press('#chat-in', 'Enter'); await q.waitForTimeout(1500);
+    const r1 = await derniere();
+    ok('Claude instantané : Claude préparé à l\'ouverture de la discussion (avec son historique gardé dans le téléphone) ; la première question part seule, sans les données', vus.prep >= 1 && vus.conv >= 1 && /^Tu as dit : Bonjour Claude\. Session : reprise/.test(r1), JSON.stringify([vus, r1.slice(-120)]));
+    await q.fill('#chat-in', 'Raconte lentement'); await q.press('#chat-in', 'Enter'); await q.waitForTimeout(1300);
+    const enCours = await derniere(), arret = await q.evaluate(() => !!document.querySelector('#chat .chat-row .btn[aria-label="Arrêter"]'));
+    await q.screenshot({path: SH + 'discussion-flux.png'});
+    await q.click('#chat .chat-row .btn[aria-label="Arrêter"]'); await q.waitForTimeout(800);
+    const coupe = await derniere(), libre = await q.evaluate(() => !!document.querySelector('#chat .chat-row .btn[aria-label="Envoyer"]'));
+    ok('Claude instantané : la réponse s\'écrit pendant que Claude parle (pas d\'attente de la fin) ; « Arrêter » garde ce qui est écrit', /^Réponse lente\. bla/.test(enCours) && enCours.length > 40 && enCours.length < 6000 && arret && libre && coupe.length >= enCours.length && coupe.length < 6000, JSON.stringify([enCours.length, coupe.length, arret, libre]));
+    await q.fill('#chat-in', 'Et après ?'); await q.press('#chat-in', 'Enter'); await q.waitForTimeout(1500);
+    const r3 = await derniere(), tk3 = await q.evaluate(() => JSON.parse(localStorage.getItem('jarvis.settings')).serverToken);
+    const pg = (await fetch(BASE + '/api/status', {headers: {authorization: 'Bearer ' + tk3}}).then((x) => x.json())).page || {};
+    ok('Claude instantané : après « Arrêter », la question suivante repart sur un Claude neuf (avec les données et l\'historique) et reçoit sa réponse', r3.length > 10 && !/Je réfléchis|interrompue/.test(r3) && pg.dernier && pg.dernier.conv === true && pg.dernier.chaud === false && pg.dernier.ok === true, JSON.stringify([r3.slice(0, 60), pg.dernier]));
+    await q.close(); }
   /* notifications (0.12.0) : depuis Réglages, comme sur l'iPhone ouvert depuis l'écran d'accueil ; faux service de notifications et faux abonnement du navigateur */
   { const http = await import('node:http'), crypto = await import('node:crypto'); const got = [];
     const PS = http.createServer((q, res) => { const ch = []; q.on('data', (d) => ch.push(d)); q.on('end', () => { got.push({h: q.headers, n: Buffer.concat(ch).length}); res.writeHead(201); res.end(); }); });
@@ -203,6 +225,7 @@ try {
   { const v = await ctx.newPage(); v.on('pageerror', (e) => errs.push('voix : ' + e.message));
     const hits = {tts: 0, stt: 0, voix: 0, sample: 0}; v.on('request', (r) => { const u = r.url(); if (/\/api\/tts$/.test(u)) hits.tts++; if (/\/api\/stt$/.test(u)) hits.stt++; if (/\/api\/voix(\/|$)/.test(u)) hits.voix++; if (/\/api\/sample$/.test(u)) hits.sample++; });
     await v.addInitScript(() => {
+      try { localStorage.setItem('jarvis.mains', 'non'); } catch (e) { /* rien */ }   /* 0.31.0 : ici, la dictée d'une question (mains libres coupées) */
       const AC = window.AudioContext || window.webkitAudioContext; const ac = new AC(), osc = ac.createOscillator(), g = ac.createGain(), dest = ac.createMediaStreamDestination();
       g.gain.value = 0; osc.frequency.value = 220; osc.connect(g); g.connect(dest); osc.start();
       window.__talk = (ms) => { ac.resume(); const t0 = ac.currentTime + 0.02; g.gain.setValueAtTime(0.6, t0); g.gain.setValueAtTime(0, t0 + ms / 1000); };
