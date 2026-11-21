@@ -217,7 +217,7 @@ try {
   ok('tâche Claude : lancée par la page, faite par le serveur (réponse et statut dans le Canal)', puts.includes('Canal!G2') && puts.includes('Canal!F2'), puts.join(' | '));
   /* 0.30.0 : Claude instantané — Claude préparé à l'ouverture de la discussion, réponse qui s'écrit mot par mot, « Arrêter » qui coupe Claude */
   { const q = await ctx.newPage(); q.on('pageerror', (e) => errs.push('flux : ' + e.message));
-    const vus = {prep: 0, sample: 0, conv: 0}; q.on('request', (r) => { const u = r.url(); if (/\/api\/sample\/prepare$/.test(u)) vus.prep++; if (/\/api\/sample$/.test(u)) { vus.sample++; try { if (JSON.parse(r.postData() || '{}').conv) vus.conv++; } catch (e) { /* rien */ } } });
+    const vus = {prep: 0, sample: 0, conv: 0, oral: 0}; q.on('request', (r) => { const u = r.url(); if (/\/api\/sample\/prepare$/.test(u)) vus.prep++; if (/\/api\/sample$/.test(u)) { vus.sample++; try { const j = JSON.parse(r.postData() || '{}'); if (j.conv) vus.conv++; if (/À L'ORAL/.test(j.system || '')) vus.oral++; } catch (e) { /* rien */ } } });
     await q.addInitScript(() => { try { const s0 = JSON.parse(localStorage.getItem('jarvis.settings') || '{}'); s0.orbe = 'dictee'; localStorage.setItem('jarvis.settings', JSON.stringify(s0)); } catch (e) { /* rien */ } });
     await q.goto(BASE + '/?serveur'); await q.waitForTimeout(3500);
     await q.evaluate(() => window.JarvisAsk()); await q.waitForTimeout(600);
@@ -240,6 +240,7 @@ try {
     { await q.fill('#chat-in', 'Réponds en liste'); await q.press('#chat-in', 'Enter'); await q.waitForTimeout(1800);
       const md = await q.evaluate(() => { const ms = [...document.querySelectorAll('#chat .msg.them p')], p = ms[ms.length - 1]; return {b: p ? p.querySelectorAll('b').length : 0, li: p ? p.querySelectorAll('li').length : 0, i: p ? p.querySelectorAll('i').length : 0, brut: p ? /\*\*|^- /m.test(p.textContent) : true}; });
       ok('réponses : gras, italique et listes de Claude mis en forme (plus de ** ni de tirets bruts)', md.b === 1 && md.li === 2 && md.i === 1 && !md.brut, JSON.stringify(md)); }
+    ok('discussion écrite : consigne sobre, sans la personnalité de l\'oral (son choix : « la voix seulement »)', vus.sample >= 1 && vus.oral === 0, JSON.stringify(vus));
     await q.close(); }
   /* 0.34.0 : réponses illustrées — Claude montre la demande dont il parle : sa carte sous la réponse (l'élément inconnu est ignoré), un appui l'ouvre là où elle vit */
   { const avant = FG.sheet["'À toi'!A3:D300"], auj = new Intl.DateTimeFormat('fr-FR', {timeZone: 'Europe/Paris'}).format(new Date());
@@ -423,6 +424,7 @@ try {
   { const v = await ctx.newPage(); v.on('pageerror', (e) => errs.push('mains libres : ' + e.message));
     const hits = {tts: 0, stt: 0, sample: 0, rapide: 0, tour: [], plain: []}, entendu = []; v.on('request', (r) => { const u = r.url(); if (/\/api\/tts$/.test(u)) hits.tts++; if (/\/api\/stt$/.test(u)) { hits.stt++; (r.headers()['x-tour'] ? hits.tour : hits.plain).push(Date.now()); } if (/\/api\/sample$/.test(u)) hits.sample++; if (/\/api\/rapide$/.test(u)) hits.rapide++; });
     v.on('response', (r) => { if (/\/api\/stt$/.test(r.url())) r.text().then((t) => entendu.push(t.slice(0, 80))).catch(() => {}); });
+    const oral = []; v.on('request', (r) => { if (/\/api\/sample$/.test(r.url())) { try { oral.push(/À L'ORAL/.test(JSON.parse(r.postData() || '{}').system || '')); } catch (e) { /* rien */ } } });   /* 21/11/2026 : sa personnalité à l'oral */
     await v.addInitScript(() => {
       try { const s0 = JSON.parse(localStorage.getItem('jarvis.settings') || '{}'); s0.orbe = 'conversation'; localStorage.setItem('jarvis.settings', JSON.stringify(s0)); } catch (e) { /* rien */ }
       const AC = window.AudioContext || window.webkitAudioContext; const ac = new AC(), osc = ac.createOscillator(), g = ac.createGain(), dest = ac.createMediaStreamDestination();
@@ -455,6 +457,7 @@ try {
     await v.evaluate(() => { const n = document.querySelector('#chat .dict-no'); if (n) n.click(); }); await v.waitForTimeout(400);
     await v.tap('#chat .chat-head .btn.ghost'); await v.waitForTimeout(600); await v.tap('.talk-slot .jv-btn'); await v.waitForTimeout(1200); const s6 = await st();
     ok('mains libres : pas de bouton qui les coupe dans l\'en-tête ; le micro du champ dicte une question ; l\'orbe reprend la conversation continue', !s4.toggle && s4.dictBtn && dicte && s6.conv && /écoute/.test(s6.strip), JSON.stringify([s4.toggle, s4.dictBtn, dicte, s6.conv, s6.strip]));
+    ok('mains libres : la question lue à voix haute part avec la personnalité de JARVIS (« sarcastique assumé »)', oral.length >= 1 && oral.every(Boolean), JSON.stringify(oral));
     await v.tap('#chat .mains-fin').catch(() => {});
     await v.close(); }
   /* 0.33.0 : l'activité en direct — une mission lancée apparaît sur l'accueil (« En ce moment ») avec son plan et ce qu'elle fait, et sur l'orbe (pastille) ;

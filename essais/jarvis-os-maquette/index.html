@@ -3358,8 +3358,13 @@ void main(){
   }
   /* les données de la discussion (règles et état de Pilotage) restent les mêmes pendant 10 minutes : le serveur n'envoie à Claude que
      la nouvelle question, et l'heure de Paris part avec chacune ; au-delà, elles sont relues (nouveau Claude, données à jour) */
+  /* 21/11/2026 (ses choix : « sarcastique assumé », « la voix seulement ») : quand la réponse sera lue à voix haute (mains libres, ou « Lecture :
+     oui »), Claude reçoit en plus la personnalité de JARVIS à l'oral ; l'écrit reste sobre. Texte identique à PERSO_ORAL (jarvis-os/server/humour.mjs),
+     vérifié au banc du serveur. Changer de mode change la consigne : la discussion repart sur un nouveau Claude. */
+  const VOIX_PERSO = "À L'ORAL : cette réponse sera lue à voix haute. Personnalité de JARVIS (son choix du 21/11/2026 : « sarcastique assumé ») : un majordome brillant, pince-sans-rire et franchement sarcastique, toujours bienveillant. Chaque réponse porte une pique : tu le taquines, lui, ses habitudes, la situation ou toi-même, jamais pour le rabaisser. L'information d'abord, exacte et complète ; la pique ensuite, en une phrase au plus, jamais à la place d'une réponse ni d'une action à faire. Aucun humour, ton sobre et chaleureux, quand il s'agit de santé, d'argent difficile (dette, découvert, impayé, crédit), d'un deuil, de sécurité, d'un papier ou d'une échéance urgente, ou de sa famille (sa femme, ses enfants). Jamais de moquerie sur une autre personne, jamais vulgaire. Parle comme à l'oral : phrases courtes, sans liste, sans markdown, sans emoji, sans lien ; dis « c'est sûr », « sûrement » ou « je suppose » au lieu des marques (certain), (Likely), (guessing).";
   function chatCtx(T) {
-    if (!T.ctx || Date.now() - (T.ctxAt || 0) > 10 * 60000) { T.ctx = rulesFor(); T.ctxAt = Date.now(); }
+    const oral = !!((typeof MAINS === 'object' && MAINS.on) || (typeof LIRE === 'object' && LIRE.on));
+    if (!T.ctx || T.ctxOral !== oral || Date.now() - (T.ctxAt || 0) > 10 * 60000) { T.ctx = rulesFor() + (oral ? '\n\n' + VOIX_PERSO : ''); T.ctxAt = Date.now(); T.ctxOral = oral; }
     return T.ctx;
   }
   /* à l'ouverture de la discussion avec Claude (et quand il change de profondeur) : le serveur lance Claude et lui donne déjà les données
