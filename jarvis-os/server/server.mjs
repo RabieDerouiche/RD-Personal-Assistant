@@ -22,7 +22,7 @@ import {createFlux, SECOURS} from './flux.mjs';
 import {createActivite, outilNom} from './activite.mjs';
 const ACT = createActivite();   /* 0.33.0 : ce que fait Claude à l'instant */
 
-const VERSION = '0.34.1';
+const VERSION = '0.35.0';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PORT = +(process.env.PORT || 8787);
 const HOST = process.env.HOST || '127.0.0.1';
@@ -120,6 +120,9 @@ let MCP = {at: 0, servers: []};
 const rule = (name) => 'mcp__' + name.replace(/[^A-Za-z0-9_-]/g, '_');
 const googleRules = (re = /gmail|google/i) => MCP.servers.filter((x) => x.ok && re.test(x.name) && !/claude docs/i.test(x.name)).map((x) => rule(x.name));
 const hasServer = (re) => MCP.servers.some((x) => x.ok && re.test(x.name));
+/* 0.35.0 : une seule relecture en fond à la fois, sans faire attendre /api/status */
+let mcpFond = null;
+function mcpListFond() { if (!mcpFond) mcpFond = mcpList().catch(() => {}).finally(() => { mcpFond = null; }); }
 function mcpList() {
   return new Promise((resolve) => {
     execFile(CLAUDE, ['mcp', 'list'], {cwd: path.join(DATA, 'work'), env: childEnv(), timeout: 90000, maxBuffer: 1 << 20}, (err, out, errOut) => {
@@ -1123,7 +1126,7 @@ const server = http.createServer(async (req, res) => {
         }
         catch (e) { return json(res, e.code === 'server_not_connected' ? 409 : e.code === 'not_in_manifest' ? 404 : 502, {error: {code: e.code || 'tool_error', message: e.message, status: e.status || 0}}); }
       }
-      if (p === '/api/status') { const cs = await claudeStatus(); if (cs.loggedIn && (!MCP.at || now() - MCP.at > 600000)) await mcpList(); return json(res, 200, {version: VERSION, commit, claude: cs, connectors: connSummary(), google: (({configured, linked, account}) => ({configured, linked, account}))(GG.status('')), grokPauseUntil: await grokPauseMs().then((v) => (v ? new Date(v).toISOString() : '')).catch(() => S.config.grokPauseUntil), usage: S.usage, tache: {running: TACHE.running, last: TACHE.last}, push: {count: S.push.subs.length, last: S.push.last || null, prefs: S.push.prefs}, session: !!S.session, timing: S.lastTiming || null, page: FLUX.etat(), tts: ttsReady(), voiceInstall: VOICE_INSTALL.state, ecoute: ECOUTE.ready(), ecouteMoteur: ECOUTE.moteur(), ecouteInstall: ECOUTE_INSTALL.state}); }
+      if (p === '/api/status') { const cs = await claudeStatus(); if (cs.loggedIn && (!MCP.at || now() - MCP.at > 600000)) mcpListFond();   /* 0.35.0 : relue en fond (elle prenait plusieurs secondes et retardait l'orbe) */ return json(res, 200, {version: VERSION, commit, claude: cs, connectors: connSummary(), google: (({configured, linked, account}) => ({configured, linked, account}))(GG.status('')), grokPauseUntil: await grokPauseMs().then((v) => (v ? new Date(v).toISOString() : '')).catch(() => S.config.grokPauseUntil), usage: S.usage, tache: {running: TACHE.running, last: TACHE.last}, push: {count: S.push.subs.length, last: S.push.last || null, prefs: S.push.prefs}, session: !!S.session, timing: S.lastTiming || null, page: FLUX.etat(), tts: ttsReady(), voiceInstall: VOICE_INSTALL.state, ecoute: ECOUTE.ready(), ecouteMoteur: ECOUTE.moteur(), ecouteInstall: ECOUTE_INSTALL.state}); }
       if (p === '/api/update' && req.method === 'POST') return json(res, 200, await update());
       if (p === '/api/maj') return json(res, 200, await majVerifie(url.searchParams.get('force') === '1'));   /* 0.27.0 : une version plus récente ? */
       /* notifications : clé publique, abonnement de cet appareil, essai, préférences, vérification immédiate */

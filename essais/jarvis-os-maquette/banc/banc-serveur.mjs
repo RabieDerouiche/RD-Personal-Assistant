@@ -30,7 +30,7 @@ try {
   ok('Réglages : compte Google affiché', await p.evaluate(() => /proprietaire@example\.org/.test(document.querySelector('.set-wrap').textContent)));
   /* 0.32.0 : l'écoute du serveur est Whisper (faux moteur du banc) : Réglages le dit et propose de passer à Parakeet */
   { const e = await p.evaluate(() => ({txt: document.querySelector('.set-wrap').textContent, btn: (document.getElementById('set-ecoute') || {}).textContent || ''}));
-    ok('Réglages : écoute du serveur nommée (Whisper) et « Passer à Parakeet » proposé', /écoute Whisper prête/.test(e.txt) && /Passer à Parakeet/.test(e.btn) && /mains libres/.test(e.txt), e.btn); }
+    ok('Réglages : écoute du serveur nommée (Whisper) et « Passer à Parakeet » proposé', /écoute Whisper prête/.test(e.txt) && /Passer à Parakeet/.test(e.btn) && /conversation continue/.test(e.txt) && /L’orbe/.test(e.txt), e.btn); }
   await p.tap('button:has-text("Tester mes données")'); await p.waitForTimeout(1500);
   const t = await p.evaluate(() => document.querySelector('.set-card .set-msg').textContent); ok('test des données : Pilotage lu par le serveur', /Pilotage lu : 1 ligne dans/.test(t), t);
   await p.screenshot({path: SH + 'set-2.png'});
@@ -79,7 +79,7 @@ try {
   /* 0.30.0 : Claude instantané — Claude préparé à l'ouverture de la discussion, réponse qui s'écrit mot par mot, « Arrêter » qui coupe Claude */
   { const q = await ctx.newPage(); q.on('pageerror', (e) => errs.push('flux : ' + e.message));
     const vus = {prep: 0, sample: 0, conv: 0}; q.on('request', (r) => { const u = r.url(); if (/\/api\/sample\/prepare$/.test(u)) vus.prep++; if (/\/api\/sample$/.test(u)) { vus.sample++; try { if (JSON.parse(r.postData() || '{}').conv) vus.conv++; } catch (e) { /* rien */ } } });
-    await q.addInitScript(() => { try { localStorage.setItem('jarvis.mains', 'non'); } catch (e) { /* rien */ } });
+    await q.addInitScript(() => { try { const s0 = JSON.parse(localStorage.getItem('jarvis.settings') || '{}'); s0.orbe = 'dictee'; localStorage.setItem('jarvis.settings', JSON.stringify(s0)); } catch (e) { /* rien */ } });
     await q.goto(BASE + '/?serveur'); await q.waitForTimeout(3500);
     await q.evaluate(() => window.JarvisAsk()); await q.waitForTimeout(600);
     await q.evaluate(() => { const n = document.querySelector('#chat .dict-no'); if (n) n.click(); }); await q.waitForTimeout(1200);
@@ -97,12 +97,16 @@ try {
     const r3 = await derniere(), tk3 = await q.evaluate(() => JSON.parse(localStorage.getItem('jarvis.settings')).serverToken);
     const pg = (await fetch(BASE + '/api/status', {headers: {authorization: 'Bearer ' + tk3}}).then((x) => x.json())).page || {};
     ok('Claude instantané : après « Arrêter », la question suivante repart sur un Claude neuf (avec les données et l\'historique) et reçoit sa réponse', r3.length > 10 && !/Je réfléchis|interrompue/.test(r3) && pg.dernier && pg.dernier.conv === true && pg.dernier.chaud === false && pg.dernier.ok === true, JSON.stringify([r3.slice(0, 60), pg.dernier]));
+    /* 0.35.0 : les réponses de Claude mises en forme (gras, listes) au lieu des ** et des tirets bruts */
+    { await q.fill('#chat-in', 'Réponds en liste'); await q.press('#chat-in', 'Enter'); await q.waitForTimeout(1800);
+      const md = await q.evaluate(() => { const ms = [...document.querySelectorAll('#chat .msg.them p')], p = ms[ms.length - 1]; return {b: p ? p.querySelectorAll('b').length : 0, li: p ? p.querySelectorAll('li').length : 0, i: p ? p.querySelectorAll('i').length : 0, brut: p ? /\*\*|^- /m.test(p.textContent) : true}; });
+      ok('réponses : gras, italique et listes de Claude mis en forme (plus de ** ni de tirets bruts)', md.b === 1 && md.li === 2 && md.i === 1 && !md.brut, JSON.stringify(md)); }
     await q.close(); }
   /* 0.34.0 : réponses illustrées — Claude montre la demande dont il parle : sa carte sous la réponse (l'élément inconnu est ignoré), un appui l'ouvre là où elle vit */
   { const avant = FG.sheet["'À toi'!A3:D300"], auj = new Intl.DateTimeFormat('fr-FR', {timeZone: 'Europe/Paris'}).format(new Date());
     FG.sheet["'À toi'!A3:D300"] = [['Depuis le', 'Bot', 'Sujet', "Ce qu'on attend de toi"], [auj, 'Iris', 'Relance du syndic', "À faire : Dis-moi si je relance le syndic pour l'expert"]];
     const q = await ctx.newPage(); q.on('pageerror', (e) => errs.push('cartes : ' + e.message));
-    await q.addInitScript(() => { try { localStorage.setItem('jarvis.mains', 'non'); } catch (e) { /* rien */ } });
+    await q.addInitScript(() => { try { const s0 = JSON.parse(localStorage.getItem('jarvis.settings') || '{}'); s0.orbe = 'dictee'; localStorage.setItem('jarvis.settings', JSON.stringify(s0)); } catch (e) { /* rien */ } });
     await q.goto(BASE + '/?serveur#accueil'); await q.waitForTimeout(3500);
     await q.evaluate(() => window.JarvisAsk()); await q.waitForTimeout(600); await q.evaluate(() => { const n = document.querySelector('#chat .dict-no'); if (n) n.click(); }); await q.waitForTimeout(800);
     await q.fill('#chat-in', 'Montre-moi ce qui m’attend'); await q.press('#chat-in', 'Enter'); await q.waitForTimeout(2500);
@@ -243,7 +247,7 @@ try {
   { const v = await ctx.newPage(); v.on('pageerror', (e) => errs.push('voix : ' + e.message));
     const hits = {tts: 0, stt: 0, voix: 0, sample: 0}; v.on('request', (r) => { const u = r.url(); if (/\/api\/tts$/.test(u)) hits.tts++; if (/\/api\/stt$/.test(u)) hits.stt++; if (/\/api\/voix(\/|$)/.test(u)) hits.voix++; if (/\/api\/sample$/.test(u)) hits.sample++; });
     await v.addInitScript(() => {
-      try { localStorage.setItem('jarvis.mains', 'non'); } catch (e) { /* rien */ }   /* 0.31.0 : ici, la dictée d'une question (mains libres coupées) */
+      try { const s0 = JSON.parse(localStorage.getItem('jarvis.settings') || '{}'); s0.orbe = 'dictee'; localStorage.setItem('jarvis.settings', JSON.stringify(s0)); } catch (e) { /* rien */ }   /* 0.31.0 : ici, la dictée d'une question (mains libres coupées) */
       const AC = window.AudioContext || window.webkitAudioContext; const ac = new AC(), osc = ac.createOscillator(), g = ac.createGain(), dest = ac.createMediaStreamDestination();
       g.gain.value = 0; osc.frequency.value = 220; osc.connect(g); g.connect(dest); osc.start();
       window.__talk = (ms) => { ac.resume(); const t0 = ac.currentTime + 0.02; g.gain.setValueAtTime(0.6, t0); g.gain.setValueAtTime(0, t0 + ms / 1000); };
@@ -274,7 +278,7 @@ try {
     const hits = {tts: 0, stt: 0, sample: 0}, entendu = []; v.on('request', (r) => { const u = r.url(); if (/\/api\/tts$/.test(u)) hits.tts++; if (/\/api\/stt$/.test(u)) hits.stt++; if (/\/api\/sample$/.test(u)) hits.sample++; });
     v.on('response', (r) => { if (/\/api\/stt$/.test(r.url())) r.text().then((t) => entendu.push(t.slice(0, 80))).catch(() => {}); });
     await v.addInitScript(() => {
-      try { localStorage.removeItem('jarvis.mains'); } catch (e) { /* rien */ }
+      try { const s0 = JSON.parse(localStorage.getItem('jarvis.settings') || '{}'); s0.orbe = 'conversation'; localStorage.setItem('jarvis.settings', JSON.stringify(s0)); } catch (e) { /* rien */ }
       const AC = window.AudioContext || window.webkitAudioContext; const ac = new AC(), osc = ac.createOscillator(), g = ac.createGain(), dest = ac.createMediaStreamDestination();
       g.gain.value = 0; osc.frequency.value = 220; osc.connect(g); g.connect(dest); osc.start();
       window.__talk = (ms) => { ac.resume(); const t0 = ac.currentTime + 0.02; g.gain.setValueAtTime(0.6, t0); g.gain.setValueAtTime(0, t0 + ms / 1000); };
@@ -284,7 +288,7 @@ try {
     const st = () => v.evaluate(() => ({chat: !document.getElementById('chat').hidden, strip: (document.querySelector('#chat .mains-strip .dict-txt') || {}).textContent || '', etat: (document.querySelector('#chat .mains-strip') || {dataset: {}}).dataset.s || '', toggle: (document.querySelector('#chat .mains-toggle') || {}).textContent || '', dictBtn: !!document.getElementById('dict-btn'), val: (document.getElementById('chat-in') || {}).value, moi: [...document.querySelectorAll('#chat .msg.me')].map((x) => x.textContent), eux: [...document.querySelectorAll('#chat .msg.them p')].map((x) => x.textContent), conv: window.JarvisVoice.conversing(), gum: window.__gum, stops: window.__stops}));
     await v.tap('.talk-slot .jv-btn'); await v.waitForTimeout(1500);
     let s0 = await st(); const n0 = s0.moi.length;
-    ok('mains libres : l\'orbe ouvre la discussion avec Claude, micro ouvert pour toute la conversation (écoute Whisper du serveur)', s0.chat && s0.conv && /écoute/.test(s0.strip) && /Mains libres : oui/.test(s0.toggle) && !s0.dictBtn && s0.gum === 1, JSON.stringify(s0));
+    ok('mains libres : l\'orbe ouvre la discussion avec Claude, micro ouvert pour toute la conversation (écoute Whisper du serveur)', s0.chat && s0.conv && /écoute/.test(s0.strip) && !s0.toggle && !s0.dictBtn && s0.gum === 1, JSON.stringify(s0));
     await v.evaluate(() => window.__talk(900)); await v.waitForTimeout(4500); let s1 = await st();
     ok('mains libres : la phrase part seule à Claude (sans « Envoyer »), sa réponse est lue par Pierre, puis il réécoute, micro toujours ouvert', s1.moi.length === n0 + 1 && /quelle heure est-il/i.test(s1.moi[n0]) && hits.sample === 1 && hits.tts >= 1 && s1.conv && s1.stops === 0 && s1.etat === 'listening' && s1.val === '', JSON.stringify([s1.moi.slice(-1), s1.etat, s1.stops, hits]));
     await v.screenshot({path: SH + 'mains-libres.png'});
@@ -296,12 +300,12 @@ try {
     /* « c'est tout » : fin de la conversation, micro fermé ; l'orbe la reprend */
     await v.evaluate(() => window.__talk(3800)); await v.waitForTimeout(5200); const s3 = await st();
     ok('mains libres : « c\'est tout » termine la conversation et ferme le micro (rien n\'est envoyé à Claude)', !s3.conv && !s3.strip && s3.stops >= 1 && hits.sample === 3 && s3.moi.length === s2.moi.length, JSON.stringify([s3.conv, s3.stops, hits, s3.moi.length, s3.etat, entendu]));
-    /* dans la discussion, le bouton les reprend ; « Mains libres : non » les coupe (retenu sur l'iPhone) ; l'orbe revient alors à la dictée d'une question */
-    await v.tap('#chat .mains-toggle'); await v.waitForTimeout(800); const s4 = await st();
-    await v.tap('#chat .mains-toggle'); await v.waitForTimeout(500); const s5 = await st(); const pref = await v.evaluate(() => localStorage.getItem('jarvis.mains'));
-    await v.tap('#chat .chat-head .btn.ghost'); await v.waitForTimeout(600); await v.tap('.talk-slot .jv-btn'); await v.waitForTimeout(1200);
-    const s6 = await st(), dicte = await v.evaluate(() => window.JarvisVoice.dictating()); await v.evaluate(() => { const n = document.querySelector('#chat .dict-no'); if (n) n.click(); });
-    ok('mains libres : le bouton les reprend ; « Mains libres : non » les coupe (retenu sur l\'iPhone) et l\'orbe revient à la dictée d\'une question', s4.conv && /Mains libres : oui/.test(s4.toggle) && !s5.conv && /Mains libres : non/.test(s5.toggle) && s5.dictBtn && pref === 'non' && !s6.conv && dicte, JSON.stringify([s4.conv, s5.conv, s5.toggle, pref, s6.conv, dicte]));
+    /* après « c'est tout » : le micro du champ dicte une seule question ; l'orbe reprend la conversation continue (plus de bouton piège dans l'en-tête) */
+    const s4 = await st(); await v.tap('#dict-btn'); await v.waitForTimeout(700); const dicte = await v.evaluate(() => window.JarvisVoice.dictating());
+    await v.evaluate(() => { const n = document.querySelector('#chat .dict-no'); if (n) n.click(); }); await v.waitForTimeout(400);
+    await v.tap('#chat .chat-head .btn.ghost'); await v.waitForTimeout(600); await v.tap('.talk-slot .jv-btn'); await v.waitForTimeout(1200); const s6 = await st();
+    ok('mains libres : pas de bouton qui les coupe dans l\'en-tête ; le micro du champ dicte une question ; l\'orbe reprend la conversation continue', !s4.toggle && s4.dictBtn && dicte && s6.conv && /écoute/.test(s6.strip), JSON.stringify([s4.toggle, s4.dictBtn, dicte, s6.conv, s6.strip]));
+    await v.tap('#chat .mains-fin').catch(() => {});
     await v.close(); }
   /* 0.33.0 : l'activité en direct — une mission lancée apparaît sur l'accueil (« En ce moment ») avec son plan et ce qu'elle fait, et sur l'orbe (pastille) ;
      elle en part une fois finie ; Suivi montre ses étapes */

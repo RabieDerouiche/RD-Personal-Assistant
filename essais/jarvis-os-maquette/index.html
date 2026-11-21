@@ -129,6 +129,7 @@
   .dict-bar { flex: 0 0 46px; height: 4px; border-radius: 2px; background: rgba(255, 255, 255, .12); overflow: hidden; }
   .dict-bar i { display: block; width: 100%; height: 100%; background: linear-gradient(90deg, #22d3ee, #818cf8); transform: scaleX(.04); transform-origin: left; transition: transform .08s linear; }
   .dict-strip[data-s="transcribing"] .dict-bar { visibility: hidden; }
+  .msg .md-ul { margin: 4px 0 4px 2px; padding-left: 18px; display: grid; gap: 3px; } .msg .md-ul li { line-height: 1.45; }
   /* 0.34.0 : « Mains libres » et « Lecture » en boutons ronds dans l'en-tête de la discussion (en texte, les deux couvraient le titre) */
   .chat-head .head-tg { width: 40px; height: 40px; margin-left: 0; justify-content: center; }
   .chat-head .chat-id + .head-tg { margin-left: auto; } .chat-head .head-tg + .head-tg { margin-left: 6px; }
@@ -3264,11 +3265,29 @@ void main(){
     const head = isMe ? null : h('div', {class: 'msg-h'}, h('b', {text: who === 'claude' ? 'Claude' : BOT[who] ? BOT[who].name : who}), m.modele ? h('em', {class: 'msg-mod', text: ({haiku: 'Haiku', sonnet: 'Sonnet', opus: 'Opus'}[m.modele] || m.modele) + (m.secours ? ' · secours' : '')}) : null, m.date ? h('time', {text: m.date}) : null, m.sim ? h('em', {text: 'simulé'}) : null);
     const nx = !isMe && m.next && m.next.length ? h('div', {class: 'msg-next'}, m.next.map((x) => h('button', {type: 'button', class: 'btn sm', onclick: () => { const ta = $('chat-in'); if (ta) { ta.value = x; sendChat(); } }}, x))) : null;
     const vox = who === 'claude' && !m.wait && m.text && typeof voxSpeak === 'function' ? h('button', {type: 'button', class: 'btn sm vox-btn' + (VOX.on === m ? ' is-on' : ''), 'aria-pressed': String(VOX.on === m), onclick: () => voxSpeak(m)}, h('span', {class: 'ic', html: icon('sound', 15)}), VOX.on === m ? 'Arrêter' : 'Écouter') : null;
-    const pe = h('p', {text: m.text}), el = h('div', {class: 'msg ' + (isMe ? 'me' : 'them') + (m.wait ? ' is-wait' : ''), style: BOT[who] ? botVars(who) : null}, head, pe, vox, nx);
+    const pe = h('p', {}, ...mdNodes(m.text, !isMe && who === 'claude')), el = h('div', {class: 'msg ' + (isMe ? 'me' : 'them') + (m.wait ? ' is-wait' : ''), style: BOT[who] ? botVars(who) : null}, head, pe, vox, nx);
     MSG_EL.set(m, {el, pe});   /* 0.30.0 : pendant le flux, seul ce texte change (le reste de la discussion, boutons compris, ne bouge pas) */
     return el;
   };
   const MSG_EL = new WeakMap();
+  /* 0.35.0 : un peu de Markdown dans les réponses de Claude (gras, italique, listes à tirets, lignes) ; construit en nœuds, jamais en HTML */
+  function mdInline(t) {
+    const out = [], re = /\*\*([^*\n]+)\*\*|__([^_\n]+)__|\*([^*\n]+)\*/g; let i = 0, m;
+    while ((m = re.exec(t))) { if (m.index > i) out.push(t.slice(i, m.index)); out.push(m[1] || m[2] ? h('b', {text: m[1] || m[2]}) : h('i', {text: m[3]})); i = re.lastIndex; }
+    if (i < t.length) out.push(t.slice(i)); return out;
+  }
+  function mdNodes(text, on) {
+    const t = String(text || ''); if (!on) return [t];
+    const out = []; let ul = null;
+    t.split('\n').forEach((ln, k) => {
+      const li = /^\s*(?:[-•*]|\d+[.)])\s+(.*)$/.exec(ln), tt = /^\s*#{1,4}\s+(.*)$/.exec(ln);
+      if (li) { if (!ul) { ul = h('ul', {class: 'md-ul'}); out.push(ul); } ul.append(h('li', {}, ...mdInline(li[1]))); return; }
+      ul = null;
+      if (k && out.length) out.push(h('br'));
+      if (tt) out.push(h('b', {text: tt[1]})); else out.push(...mdInline(ln));
+    });
+    return out;
+  }
   function renderChat() {
     if (!CHAT.open) return;
     const ov = $('chat'), T = THREADS[CHAT.key], who = CHAT.mode === 'claude' ? 'claude' : CHAT.bot;
@@ -3280,7 +3299,6 @@ void main(){
       h('button', {type: 'button', class: 'btn ghost icon-btn', 'aria-label': 'Fermer la discussion', onclick: closeChat, html: icon('back', 20)}),
       avatar, h('div', {class: 'chat-id'}, h('b', {text: who === 'claude' ? 'Claude' : BOT[who].name + ' · ' + BOT[who].title}), h('span', {text: 'À propos de « ' + titleOf(CHAT.type, CHAT.item) + ' »'})),
       /* JARVIS OS 0.25.0 : plus de « Conversation » en continu ; à la place, « Lecture » (les réponses de Claude lues à voix haute, au choix) */
-      CHAT.mode === 'claude' && typeof mainsToggle === 'function' ? mainsToggle() : null,
       CHAT.mode === 'claude' && typeof lireToggle === 'function' && !(typeof MAINS === 'object' && MAINS.on) ? lireToggle() : null);
     const log = h('div', {class: 'chat-log', 'aria-live': 'polite'}, T.msgs.map(msgEl));
     let note = null;
@@ -3389,7 +3407,7 @@ void main(){
       /* 0.30.0 : la réponse arrive mot par mot ; la discussion est redessinée au plus une fois par image (pas à chaque morceau) */
       const frame = () => { if (CHAT.raf) return; CHAT.raf = requestAnimationFrame(() => { CHAT.raf = 0;
         const r = MSG_EL.get(out);
-        if (r && r.pe.isConnected && CHAT.open) { r.pe.textContent = out.text; r.el.classList.toggle('is-wait', !!out.wait); const lg = $('chat') && $('chat').querySelector('.chat-log'); if (lg && CHAT.stick !== false) lg.scrollTop = lg.scrollHeight; }
+        if (r && r.pe.isConnected && CHAT.open) { r.pe.replaceChildren(...mdNodes(out.text, true)); r.el.classList.toggle('is-wait', !!out.wait); const lg = $('chat') && $('chat').querySelector('.chat-log'); if (lg && CHAT.stick !== false) lg.scrollTop = lg.scrollHeight; }
         else renderChat(); }); };
       const opts = {modelTier: CHAT.tier, signal: CHAT.ctl.signal, onText: ({text: t}) => { const bd = splitNext(t).body; if (bd) { out.text = bd; out.wait = false; } frame(); lire(false); if (CHAT.av) CHAT.av.talk(0.8); if (CHAT.talk && typeof voxFeed === 'function') voxFeed(out, false); }};
       if (canTools) opts.tools = tools; else opts.cache = false;
@@ -7097,7 +7115,9 @@ void main(){
      parle (un bruit : il reprend). « Stop », « tais-toi » : il se tait ; « c'est tout », « au revoir » : fin. Il faut l'écoute du serveur
      (Parakeet depuis 0.32.0, sinon Whisper) ; sinon, et au choix (« Mains libres : non », retenu sur l'iPhone), la dictée d'une question à relire reste. */
   var MAINS = {on: false, state: '', busy: false, next: ''};
-  var MAINS_PREF = true; try { MAINS_PREF = localStorage.getItem('jarvis.mains') !== 'non'; } catch (e) { MAINS_PREF = true; }
+  /* 0.35.0 : ce que fait l'orbe se règle dans Réglages (« L'orbe ») : conversation continue par défaut, ou dictée d'une question.
+     Le bouton micro de l'en-tête qui coupait les mains libres pour de bon (pris pour « parler ») est retiré. */
+  const orbeDictee = () => { try { return !!(window.JarvisServeur && window.JarvisServeur.setting && window.JarvisServeur.setting('orbe') === 'dictee'); } catch (e) { return false; } };
   var MAINS_TXT = {listening: "Je t'écoute…", hearing: "Je t'entends…", transcribing: "J'écris ta phrase…", thinking: 'Claude réfléchit…', speaking: 'Claude parle · parle pour le couper'};
   function mainsDispo() { const v = JVX(); try { return !!(v && v.converse && v.dictKind && v.dictKind() === 'whisper'); } catch (e) { return false; } }
   function mainsPaint() {
@@ -7152,13 +7172,6 @@ void main(){
     if (MAINS.next && !CHAT.busy) { const x = MAINS.next; MAINS.next = ''; const ta = $('chat-in'); if (ta) { ta.value = x; sendChat(); } return; }
     if (!VOX.on && !CHAT.busy) mainsBusy('idle');
   }
-  function mainsToggle() {
-    if (!mainsDispo()) return null;
-    return h('button', {type: 'button', class: 'btn icon-btn talk-toggle head-tg mains-toggle' + (MAINS.on ? ' is-on' : ''), 'aria-pressed': String(!!MAINS.on), 'aria-label': MAINS.on ? 'Mains libres : actif' : 'Mains libres : coupé', title: 'Mains libres',
-      onclick: () => { if (MAINS.on) { MAINS_PREF = false; mainsStop(); toast('Mains libres', 'Coupées : l’orbe dicte une question à relire.', true); } else { MAINS_PREF = true; mainsStart(); toast('Mains libres', 'Je t’écoute ; « c’est tout » pour finir.', true); }
-        try { localStorage.setItem('jarvis.mains', MAINS_PREF ? 'oui' : 'non'); } catch (e) { /* rien */ } if (CHAT.open) renderChat(); }},
-      h('span', {class: 'ic', html: icon('mic', 18)}), h('span', {class: 'tg-txt', text: MAINS.on ? 'Mains libres : oui' : 'Mains libres : non'}));
-  }
   function mainsStrip() {
     if (!MAINS.on) return null;
     return h('div', {class: 'dict-strip mains-strip', 'data-s': MAINS.state, role: 'status'},
@@ -7170,7 +7183,8 @@ void main(){
   /* l'orbe : la discussion générale avec Claude, et l'écoute de la question tout de suite (l'appui sur l'orbe est le geste qu'attend l'iPhone) */
   function askOpen() {
     const v = JVX(); try { if (v && v.refresh) v.refresh(); } catch (e) { /* rien */ }
-    const mains = MAINS_PREF && mainsDispo();
+    const mains = mainsDispo() && !orbeDictee();   /* 0.35.0 : l'orbe = la conversation continue ; le micro du champ = la dictée d'une question */
+    if (typeof metLoad === 'function' && !window.__METEO) try { metLoad(true); } catch (e) { /* rien */ }   /* la météo pour Claude : position demandée une fois */
     if (CHAT.open && CHAT.mode === 'claude') { if (MAINS.on) { voxStop(); mainsBusy(CHAT.busy ? 'thinking' : 'idle'); return; } if (mains) { mainsStart(); return; } dictStart(); return; }
     CHAT.talk = false;
     openChat('claude', 'hydra', 'equipe', 'equipe');
@@ -8817,8 +8831,9 @@ void main(){
         h('small', {class: 'pick-label', text: 'Voix de JARVIS'}), seg('voiceEngine', [['serveur', 'Pierre (ton serveur)'], ['iphone', "Voix de l'iPhone"]], 'serveur'),
         /* 0.25.0 (choix QCM du 19/11/2026, « un seul Claude ») : plus de conversation continue ; l'orbe ouvre la discussion avec Claude et le micro
            écoute une question (Whisper du serveur, sinon l'iPhone), écrite dans le champ avant l'envoi */
+        h('small', {class: 'pick-label', text: 'L’orbe (le grand bouton du bas)'}), seg('orbe', [['conversation', 'Conversation continue'], ['dictee', 'Dictée d’une question']], 'conversation'),
         h('small', {class: 'pick-label', text: 'Écoute (le micro de la discussion avec Claude)'}), seg('ecoute', [['whisper', 'Ton serveur'], ['iphone', "Écoute de l'iPhone"]], 'whisper'),
-        h('p', {class: 'muted', text: "L'orbe ouvre la discussion avec Claude, qui a tes données sous les yeux. Avec l'écoute de ton serveur, il reste à l'écoute (mains libres) : tu parles, il répond à voix haute dès sa première phrase, puis il t'écoute de nouveau ; ta voix le coupe ; « c'est tout » termine. « Mains libres : non », en haut de la discussion, rend la dictée d'une question à relire. « Lecture : oui » fait lire les réponses écrites."}),
+        h('p', {class: 'muted', text: "L'orbe ouvre la discussion avec Claude, qui a tes données sous les yeux. Avec l'écoute de ton serveur, l'orbe lance la conversation continue : tu parles, il répond à voix haute dès sa première phrase, puis il t'écoute de nouveau ; ta voix le coupe ; « c'est tout » ou « Terminer » finit. Le micro à côté du champ dicte une seule question à relire. Le haut-parleur, en haut de la discussion, fait lire les réponses écrites."}),
         /* 0.32.0 : Parakeet (NVIDIA) écoute à la place de Whisper une fois installé : 2 à 2,5 fois moins de mots faux, une phrase écrite
            en 0,2 à 0,3 s au lieu de 1,6 s (mesure du 21/11/2026) ; « Passer à Parakeet » quand Whisper est déjà là */
         st && (!st.ecoute || (st.ecouteMoteur && st.ecouteMoteur.moteur === 'whisper')) ? h('button', {type: 'button', class: 'btn sm', id: 'set-ecoute', onclick: async (ev) => { const b = ev.currentTarget; b.disabled = true; const r = await JS.ecouteInstall(); upd.textContent = r ? "Installation de l'écoute lancée (5 à 15 minutes : environ 1 Go à télécharger). Reviens ici ensuite." : 'Installation impossible : serveur injoignable.'; const poll = async () => { const e = await JS.ecouteEtat(); if (!e || e.state === 'running') { setTimeout(poll, 8000); return; } upd.textContent = e.state === 'done' ? (/Parakeet installé/.test(String(e.tail || '')) ? 'Parakeet installé : c\'est lui qui t\'écoute maintenant.' : 'Écoute installée (Whisper).') : "L'installation a échoué : " + String(e.tail || '').slice(-200); upd.classList.toggle('is-bad', e.state !== 'done'); }; setTimeout(poll, 8000); }}, st.ecoute ? 'Passer à Parakeet (plus juste, plus rapide)' : "Installer l'écoute") : null,
