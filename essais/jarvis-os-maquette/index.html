@@ -1449,6 +1449,8 @@
   .pap-dates.panel { border-top: 0; padding-top: 0; }
   /* 0.37.0 : la mémoire durable */
   .mem-list { list-style: none; margin: 8px 0; padding: 0; display: grid; gap: 6px; } .mem-it { display: flex; gap: 8px; align-items: center; justify-content: space-between; padding: 6px 8px; border-radius: 10px; background: rgba(56, 189, 248, .08); } .mem-it span { min-width: 0; overflow-wrap: anywhere; }
+  .mcp-d { padding: 10px; margin: 8px 0; border-radius: 12px; border: 1px solid rgba(168, 85, 247, .5); background: rgba(168, 85, 247, .12); } .mcp-code { font: 700 18px/1 ui-monospace, monospace; letter-spacing: .2em; }
+  .mis-accord { margin: 8px 0; } .mis-par { font-size: 13px; margin: 4px 0; }
   .skill-it span { display: block; } .skill-it small { display: inline; }
   .mem-add { display: flex; gap: 8px; } .mem-in { flex: 1; min-width: 0; padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(56, 189, 248, .35); background: transparent; color: inherit; font: inherit; }
   .sav-tab summary { cursor: pointer; font-size: 14px; } .sav-tab ul { margin: 6px 0 0; padding-left: 18px; font-size: 13px; color: var(--muted); display: grid; gap: 4px; overflow-wrap: anywhere; }
@@ -7507,7 +7509,11 @@ void main(){
   /* JARVIS OS 0.15.0 : missions de Claude lancées d'ici ou par Siri (« mission … ») ; le serveur les fait à part et notifie quand c'est prêt */
   function missionsPanel() {
     const JS = window.JarvisServeur; if (!JS || !JS.mission || !JS.linked()) return null;
-    const ST = {attente: ['En attente', 'st-attendre'], envoyee: ['En cours', 'is-travail'], terminee: ['Terminée', 'st-achat'], echouee: ['En échec', 'st-exp']};
+    const ST = {attente: ['En attente', 'st-attendre'], envoyee: ['En cours', 'is-travail'], terminee: ['Terminée', 'st-achat'], echouee: ['En échec', 'st-exp'], a_approuver: ['À approuver', 'st-attendre'], approuvee: ['Approuvée', 'is-travail'], refusee: ['Refusée', 'st-exp']};
+    /* 0.39.0 : une proposition venue de l'app Claude ou de Grok Bot (serveur MCP) attend ton accord : « Approuver » la lance, « Refuser » l'écarte */
+    const accord = (m) => m.status !== 'a_approuver' ? null : h('div', {class: 'row-actions mis-accord'},
+      h('button', {type: 'button', class: 'btn main sm', onclick: async (ev) => { ev.currentTarget.disabled = true; await JS.missionStatut(m.id, 'approuvee'); load(); }}, m.agentNom ? 'Approuver (part à ' + m.agentNom + ')' : 'Approuver (part à Claude)'),
+      h('button', {type: 'button', class: 'btn ghost sm', onclick: async (ev) => { ev.currentTarget.disabled = true; await JS.missionStatut(m.id, 'refusee'); load(); }}, 'Refuser'));
     const list = h('div', {class: 'mis-list'}, h('p', {class: 'muted', text: 'Lecture des missions…'}));
     const inp = h('textarea', {class: 'inp mis-inp', rows: '2', maxlength: '800', placeholder: 'Ex. compare trois assurances habitation pour un T3 et résume en cinq points'});
     const out = h('p', {class: 'set-msg'});
@@ -7519,12 +7525,13 @@ void main(){
     const load = async () => {
       const ms = await JS.missions();
       if (!ms) { list.replaceChildren(h('p', {class: 'muted', text: 'Ton serveur ne les connaît pas encore : « Mettre à jour le serveur » dans Réglages.'})); return; }
-      list.replaceChildren(...(ms.length ? ms.map((m) => { const k = ST[m.status] || ST.envoyee; return h('details', {class: 'mis-it'},
-        h('summary', {}, h('span', {class: 'pill ' + k[1], text: k[0]}), h('span', {class: 'mis-t', text: m.text}), h('small', {class: 'mis-d', text: fmt(new Date(m.done || m.at), {weekday: 'short', hour: '2-digit', minute: '2-digit'})})),
+      list.replaceChildren(...(ms.length ? ms.map((m) => { const k = ST[m.status] || ST.envoyee; return h('details', Object.assign({class: 'mis-it'}, m.status === 'a_approuver' ? {open: ''} : {}),
+        h('summary', {}, h('span', {class: 'pill ' + k[1], text: k[0]}), h('span', {class: 'mis-t', text: (m.agentNom ? 'Ordre à ' + m.agentNom + ' : ' : '') + m.text}), h('small', {class: 'mis-d', text: fmt(new Date(m.done || m.at), {weekday: 'short', hour: '2-digit', minute: '2-digit'})})),
         m.essais > 1 ? h('p', {class: 'muted mis-rep', text: 'Reprise après un redémarrage du serveur.'}) : null,
+        m.par ? h('p', {class: 'muted mis-par', text: 'Proposée par ' + m.par + (m.status === 'a_approuver' ? ' : elle attend ton accord.' : '.')}) : null, accord(m),   /* 0.39.0 */
         m.etapes && m.etapes.length ? h('ol', {class: 'mis-etapes'}, m.etapes.map((e) => h('li', {class: e.s === 'fait' ? 'is-fait' : e.s === 'en cours' ? 'is-cours' : '', text: e.t}))) : null,   /* 0.33.0 */
         m.outil ? h('p', {class: 'muted mis-outil', text: 'À l’instant : ' + m.outil}) : null,
-        m.result ? h('div', {class: 'mis-r', text: m.result}) : null, m.status === 'terminee' ? plutot(m) : null, m.result ? null : h('p', {class: 'muted', text: m.status === 'attente' ? 'En attente : une autre mission passe avant.' : 'Claude y travaille : tu seras prévenu par une notification.'})); }) : [h('p', {class: 'muted', text: 'Aucune mission pour le moment.'})]));
+        m.result ? h('div', {class: 'mis-r', text: m.result}) : null, m.status === 'terminee' ? plutot(m) : null, m.result || ['a_approuver', 'refusee'].includes(m.status) ? null : h('p', {class: 'muted', text: m.status === 'attente' ? 'En attente : une autre mission passe avant.' : m.agentNom ? 'La ligne part dans le Canal pour ' + m.agentNom + ', avec sa sonnette.' : 'Claude y travaille : tu seras prévenu par une notification.'})); }) : [h('p', {class: 'muted', text: 'Aucune mission pour le moment.'})]));
       clearTimeout(timer); if (ms.some((m) => ['attente', 'envoyee'].includes(m.status))) timer = setTimeout(() => { if (TAB === 'suivi' && document.body.contains(list)) load(); }, 5000);
     };
     load(); MIS_LOAD = load;   /* 0.33.0 : relu aussi quand l'activité voit une mission commencer ou finir */
@@ -8892,6 +8899,40 @@ void main(){
     paint();
     return card;
   }
+  /* 0.39.0 (choix du 21/11/2026, « Serveur MCP ») : l'app Claude et Grok Bot reliés à JARVIS — l'adresse à donner, les demandes d'accès
+     à accorder (les mêmes 4 chiffres que sur la page de l'assistant), les assistants reliés (« Retirer »), un jeton fixe, les derniers accès */
+  async function mcpCard(JS) {
+    const card = h('section', {class: 'card set-card mcp-card', id: 'mcp-card'}, h('b', {text: 'Assistants reliés (MCP)'}));
+    let st = await JS.mcp.etat();
+    if (!st) { card.append(h('p', {class: 'muted', text: 'Ton serveur ne le connaît pas encore : touche « Mettre à jour le serveur » plus bas.'})); return card; }
+    const out = h('p', {class: 'set-msg'}), dem = h('div', {class: 'mcp-dem'}), rel = h('ul', {class: 'mem-list'}), jr = h('p', {class: 'muted mcp-jr'});
+    const copier = (t) => h('button', {type: 'button', class: 'btn ghost sm', onclick: async () => { try { await navigator.clipboard.writeText(t); toast('Copié', t.length > 60 ? t.slice(0, 24) + '…' : t); } catch (e) { /* le texte reste affiché */ } }}, 'Copier');
+    const maj = (r) => { if (r) { st = Object.assign({}, st, r); paint(); } return r; };
+    const paint = () => {
+      card.dataset.urgent = (st.demandes || []).length ? '1' : '';
+      dem.replaceChildren(...(st.demandes || []).map((d) => h('div', {class: 'mcp-d'},
+        h('p', {}, h('b', {text: d.nom}), document.createTextNode(' demande l’accès à JARVIS. Code : '), h('b', {class: 'mcp-code', text: d.chiffres}), document.createTextNode(' (le même doit s’afficher sur sa page).')),
+        h('div', {class: 'row-actions'}, h('button', {type: 'button', class: 'btn main sm', onclick: async () => { if (maj(await JS.mcp.decider(d.id, true))) out.textContent = d.nom + ' est relié à JARVIS.'; }}, 'Autoriser'),
+          h('button', {type: 'button', class: 'btn ghost sm', onclick: async () => { if (maj(await JS.mcp.decider(d.id, false))) out.textContent = 'Refusé.'; }}, 'Refuser')))));
+      const items = (st.relies || []).map((c) => h('li', {class: 'mem-it'}, h('span', {text: c.nom + (c.vu ? ' · dernier accès ' + fmt(new Date(c.vu), {weekday: 'short', hour: '2-digit', minute: '2-digit'}) : '')}),
+        h('button', {type: 'button', class: 'btn ghost sm', onclick: async () => { if (maj(await JS.mcp.retirer(c.id))) out.textContent = c.nom + ' n’a plus accès à JARVIS.'; }}, 'Retirer')));
+      if (st.fixe) items.push(h('li', {class: 'mem-it'}, h('span', {text: 'Jeton fixe : ' + st.fixe.nom}), h('button', {type: 'button', class: 'btn ghost sm', onclick: async () => { if (maj(await JS.mcp.retirer('fixe'))) out.textContent = 'Jeton fixe retiré.'; }}, 'Retirer')));
+      rel.replaceChildren(...(items.length ? items : [h('li', {class: 'muted', text: 'Aucun assistant relié pour l’instant.'})]));
+      const vus = (st.journal || []).filter((x) => x.genre === 'outil').slice(0, 3);
+      jr.textContent = vus.length ? 'Derniers accès : ' + vus.map((x) => x.nom + ', ' + x.outil.replace(/^jarvis_/, '').replace(/_/g, ' ') + ' (' + fmt(new Date(x.at), {hour: '2-digit', minute: '2-digit'}) + ')').join(' · ') : '';
+    };
+    card.append(h('p', {class: 'muted', text: 'L’app Claude (et Grok Bot) peut lire JARVIS (ta journée, tes missions, ce qu’il retient, la météo) et te proposer une mission ou un ordre à un bot : la proposition attend ton accord dans Suivi. Rien ne part sans toi.'}),
+      h('div', {class: 'set-uri'}, h('small', {text: 'Adresse à donner (app Claude : Réglages, Connecteurs, « Ajouter un connecteur personnalisé ») :'}), h('code', {text: st.adresse}), copier(st.adresse)),
+      dem, rel, jr,
+      h('details', {class: 'mcp-fixe'}, h('summary', {text: 'Jeton fixe, pour un client qui accepte un en-tête'}),
+        h('div', {class: 'row-actions'}, h('button', {type: 'button', class: 'btn sm', onclick: async () => { const r = maj(await JS.mcp.jeton('Jeton fixe')); if (r && r.jeton) out.replaceChildren(document.createTextNode('Jeton, montré une seule fois (en-tête « Authorization: Bearer … ») : '), h('code', {text: r.jeton}), copier(r.jeton)); }}, 'Créer un jeton fixe'))),
+      out);
+    paint();
+    /* une demande d'accès arrive pendant que Réglages est ouvert : elle apparaît d'elle-même */
+    const tick = async () => { if (!document.body.contains(card)) return; const r = await JS.mcp.etat(); if (r && JSON.stringify(r.demandes || []) !== JSON.stringify(st.demandes || [])) { st = r; paint(); } setTimeout(tick, 3000); };
+    setTimeout(tick, 3000);
+    return card;
+  }
   /* 0.38.0 (choix du 21/11/2026, « Skills ») : les modes d'emploi relus que les missions de Claude chargent */
   async function skillsCard(JS) {
     const card = h('section', {class: 'card set-card skills-card', id: 'skills-card'}, h('b', {text: 'Skills des missions'}));
@@ -8991,6 +9032,7 @@ void main(){
       if (JS.raccourci) parts.push(await siriCard(JS)); /* JARVIS OS 0.13.0 : Siri et bouton Action */
       if (JS.tour) parts.push(await tourCard(JS)); /* JARVIS OS 0.15.0 : tour de Claude */
       if (JS.sauvegarde) parts.push(await savCard(JS)); /* JARVIS OS 0.14.0 : sauvegarde de Pilotage */
+      if (JS.mcp) { const mc = await mcpCard(JS); if (mc.dataset.urgent) parts.unshift(mc); else parts.push(mc); } /* JARVIS OS 0.39.0 : assistants reliés (en tête si une demande attend) */
       if (JS.memoire) parts.push(await memoireCard(JS)); /* JARVIS OS 0.37.0 : la mémoire durable */
       if (JS.skills) parts.push(await skillsCard(JS)); /* JARVIS OS 0.38.0 : les skills des missions */
       /* 3. JARVIS : version, mise à jour du serveur, voix et modèle (repris de l'ancienne app) */
