@@ -9171,7 +9171,7 @@ void main(){
     return card;
   }
   /* 0.40.0 (choix du 21/11/2026 : l'essayer « tant que je suis notifié avant de passer sur du payant ») : la voix Google Chirp 3 HD,
-     plus naturelle que Pierre ; gratuite jusqu'à 1 million de caractères par mois ; JARVIS s'arrête de lui-même à 900 000 et reprend Pierre */
+     plus naturelle que Pierre ; gratuite jusqu'à 1 million de caractères par mois ; JARVIS s'arrête de lui-même à 990 000 et reprend Pierre */
   async function voixCard(JS) {
     const card = h('section', {class: 'card set-card voixg-card', id: 'voixg-card'}, h('b', {text: 'Voix du serveur : Pierre ou Google'}));
     let st = await JS.voixGoogle.etat();
@@ -9190,7 +9190,7 @@ void main(){
           h('button', {type: 'button', class: 'btn ghost sm', onclick: async () => { const r = await JS.voixGoogle.retirer(); if (r) { st = Object.assign({}, st, r); paint(); out.textContent = 'Clé retirée : Pierre parle.'; } }}, 'Retirer la clé Google'));
       } else {
         const inp = h('input', {type: 'password', class: 'mem-in', autocomplete: 'off', placeholder: 'Clé d’API Google (AIza…)', 'aria-label': 'Clé d’API Google Text-to-Speech'});
-        kids.push(h('ol', {class: 'muted voixg-etapes'}, ['Sur console.cloud.google.com, ouvre le projet de JARVIS (celui de son accès Google).', 'Active l’API « Cloud Text-to-Speech ».', 'Facturation : relie un compte de facturation (ta carte). Rien ne sera facturé : JARVIS s’arrête à 900 000 caractères par mois, sous la part gratuite d’un million.', 'Identifiants : « Créer une clé API », puis restreins-la à « Cloud Text-to-Speech API ».', 'Colle la clé ici : elle reste sur ton serveur, ni Claude ni l’app ne la relisent.'].map((t) => h('li', {text: t}))),
+        kids.push(h('ol', {class: 'muted voixg-etapes'}, ['Sur console.cloud.google.com, ouvre le projet de JARVIS (celui de son accès Google).', 'Active l’API « Cloud Text-to-Speech ».', 'Facturation : relie un compte de facturation (ta carte). Rien ne sera facturé : JARVIS s’arrête à 990 000 caractères par mois, sous la part gratuite d’un million.', 'Identifiants : « Créer une clé API », puis restreins-la à « Cloud Text-to-Speech API ».', 'Colle la clé ici : elle reste sur ton serveur, ni Claude ni l’app ne la relisent.'].map((t) => h('li', {text: t}))),
           h('p', {class: 'muted', text: 'Noms des menus Google devinés.'}),
           h('div', {class: 'row-actions mem-add'}, inp, h('button', {type: 'button', class: 'btn', onclick: async () => { const r = await JS.voixGoogle.cle(inp.value); inp.value = ''; if (r && r.pret) { st = Object.assign({}, st, r); out.textContent = 'Clé enregistrée. Choisis « Google » et écoute une voix.'; paint(); } else out.textContent = (r && r.error) || 'Clé refusée.'; }}, 'Enregistrer')));
       }

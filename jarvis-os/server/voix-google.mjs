@@ -1,7 +1,7 @@
 /* JARVIS OS 0.40.0 : la voix Google Chirp 3 HD, plus naturelle que Pierre (Piper). Choix du propriétaire (QCM du 21/11/2026) :
    l'essayer « tant que je suis notifié avant de passer sur du payant ». Gratuite jusqu'à 1 million de caractères par mois (puis 30 $
    le million : tarif Google relevé le 21/11/2026 par la recherche) : JARVIS compte les caractères envoyés, prévient à 80 % de son
-   plafond (900 000 par défaut, sous la part gratuite) et repasse sur Pierre au plafond jusqu'au mois suivant.
+   plafond (990 000 par défaut depuis 0.45.0, juste sous la part gratuite ; alerte aussi à 95 %) et repasse sur Pierre au plafond jusqu'au mois suivant.
    Rien ne part chez Google tant que le propriétaire n'a pas posé lui-même un accès sur le serveur (JARVIS ne le demande jamais) :
    fichier DATA/voix-google.json (mode 600), écrit par la session « Serveur JARVIS » : {"cle": "<clé d'API limitée à Text-to-Speech>"}
    ou le JSON d'un compte de service Google Cloud (type « service_account »). Synthèse : POST /v1/text:synthesize (synchrone),
@@ -16,7 +16,7 @@ export const VOIX_CHIRP = {Charon: 'homme', Orus: 'homme', Puck: 'homme', Fenrir
 export const VOIX_DEFAUT = 'fr-FR-Chirp3-HD-Charon';
 export const nomOk = (n) => /^fr-FR-Chirp3-HD-[A-Z][a-z]+$/.test(String(n || ''));
 
-export function createVoixGoogle({fichier, compteurFichier, base = 'https://texttospeech.googleapis.com', plafond = 900000, now = Date.now, alerte = () => {}, log = () => {}}) {
+export function createVoixGoogle({fichier, compteurFichier, base = 'https://texttospeech.googleapis.com', plafond = 990000, now = Date.now, alerte = () => {}, log = () => {}}) {
   let jet = {t: '', exp: 0}, LISTE = {at: 0, voix: null};
   /* l'accès posé par lui : une clé d'API, ou un compte de service ; null sinon */
   function acces() {
@@ -46,11 +46,12 @@ export function createVoixGoogle({fichier, compteurFichier, base = 'https://text
     if (!r.ok) throw new Error('Google ' + r.status + (j.error && j.error.message ? ' : ' + String(j.error.message).slice(0, 160) : ''));
     return j;
   }
-  /* le compteur du mois (UTC) : caractères envoyés, alertes déjà données */
-  const mois = () => new Date(now()).toISOString().slice(0, 7);
+  /* le compteur du mois : caractères envoyés, alertes déjà données */
+  /* 0.45.0 : le mois de facturation de Google suit l'heure du Pacifique : le compteur aussi (sinon il repartait à zéro 8 à 9 heures trop tôt) */
+  const mois = () => new Intl.DateTimeFormat('en-CA', {timeZone: 'America/Los_Angeles', year: 'numeric', month: '2-digit'}).format(new Date(now())).slice(0, 7);
   function compteur() {
     let c; try { c = JSON.parse(fs.readFileSync(compteurFichier, 'utf8')); } catch { c = null; }
-    if (!c || c.mois !== mois()) c = {mois: mois(), caracteres: 0, appels: 0, alerte80: false, alerteMax: false};
+    if (!c || c.mois !== mois()) c = {mois: mois(), caracteres: 0, appels: 0, alerte80: false, alerte95: false, alerteMax: false};
     return c;
   }
   const garder = (c) => { const tmp = compteurFichier + '.tmp'; fs.writeFileSync(tmp, JSON.stringify(c), {mode: 0o600}); fs.renameSync(tmp, compteurFichier); };
@@ -75,6 +76,7 @@ export function createVoixGoogle({fichier, compteurFichier, base = 'https://text
     fs.writeFileSync(sortie, Buffer.from(j.audioContent, 'base64'));
     const c2 = compteur(); c2.caracteres += n; c2.appels++;
     if (!c2.alerte80 && c2.caracteres >= plafond * 0.8) { c2.alerte80 = true; alerte({titre: 'Voix Google : 80 % du plafond', texte: c2.caracteres.toLocaleString('fr-FR') + ' caractères sur ' + plafond.toLocaleString('fr-FR') + ' ce mois-ci. Au plafond, Pierre reprend tout seul : rien de payant.'}); }
+    else if (!c2.alerte95 && c2.caracteres >= plafond * 0.95) { c2.alerte95 = true; alerte({titre: 'Voix Google : 95 % du plafond', texte: 'Plus que ' + (plafond - c2.caracteres).toLocaleString('fr-FR') + ' caractères ce mois-ci ; ensuite Pierre, jusqu’au 1er. Rien de payant.'}); }
     garder(c2);
     return sortie;
   }

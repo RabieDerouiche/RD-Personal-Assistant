@@ -77,6 +77,25 @@ def corrige(text, prompt):
     return re.sub(r"[A-Za-zÀ-ÿ]+", fix, text)
 
 
+# 0.45.0 (capture du 21/11/2026 : son « oui » écrit « Yeah. ») : Parakeet devine la langue de chaque phrase ; un mot court sort parfois
+# en anglais. Une phrase faite seulement de ces mots-là est remise en français ; rien d'autre n'est touché.
+ANGLAIS = {"yeah": "Oui", "yes": "Oui", "yep": "Oui", "yup": "Oui", "no": "Non", "nope": "Non", "okay": "D'accord", "ok": "D'accord",
+           "thanks": "Merci", "thank you": "Merci", "hello": "Bonjour", "hi": "Salut", "bye": "Au revoir", "goodbye": "Au revoir", "sorry": "Pardon"}
+
+
+def en_francais(text):
+    k = re.sub(r"[^a-z ]", " ", (text or "").lower())
+    k = re.sub(r"\s+", " ", k).strip()
+    if not k:
+        return text
+    if k in ANGLAIS:
+        return ANGLAIS[k] + "."
+    mots = k.split(" ")
+    if len(mots) <= 3 and all(m in ("yeah", "yes", "yep", "yup") for m in mots):
+        return "Oui."
+    return text
+
+
 print(json.dumps({"ready": True}), flush=True)
 for line in sys.stdin:
     req = None
@@ -84,6 +103,6 @@ for line in sys.stdin:
         req = json.loads(line)
         x = load(req["wav"])
         text = transcribe(x) if len(x) >= 1600 else ""   # moins de 0,1 s : rien à écrire
-        print(json.dumps({"id": req["id"], "ok": True, "text": corrige(text, req.get("prompt") or "")}), flush=True)
+        print(json.dumps({"id": req["id"], "ok": True, "text": en_francais(corrige(text, req.get("prompt") or ""))}), flush=True)
     except Exception as e:  # une phrase ratée ne doit pas arrêter l'écoute
         print(json.dumps({"id": req.get("id") if isinstance(req, dict) else None, "ok": False, "error": str(e)[:200]}), flush=True)
