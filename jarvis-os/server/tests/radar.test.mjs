@@ -123,10 +123,34 @@ try {
     const n0 = appelsT.length; await RQ.lireMaintenant();
     ok('Radar : un fil déjà lu et inchangé n’est pas relu (seule la liste du jour est demandée)', appelsT.length - n0 === 1, (appelsT.length - n0) + ' appels');
     /* une lecture interrompue reprend au mois où elle s'était arrêtée ; un ancien message anglais de Google est montré en français */
-    fs.writeFileSync(path.join(DIR, 'radar3.json'), JSON.stringify({scan: {enCours: false, debut: 0, mois: 2, total: 4, lus: 5, fini: null, erreur: "Quota exceeded for quota metric 'Total Query Cost'"}}));
+    fs.writeFileSync(path.join(DIR, 'radar3.json'), JSON.stringify({version: 2, scan: {enCours: false, debut: 0, mois: 2, total: 4, lus: 5, fini: null, erreur: "Quota exceeded for quota metric 'Total Query Cost'"}}));
     const qs = [], RR = createRadar({file: path.join(DIR, 'radar3.json'), gmail: {lie: () => true, chercher: async (q) => { qs.push(q); return {threads: []}; }, fil: async () => ({messages: []})}, now: () => Date.parse('2026-11-23T09:00:00Z'), moisDepart: 4});
     const msg = RR.etat().scan.erreur; await RR.traiter('GET', '/api/radar', null); await RR.attendre();
     ok('Radar : la lecture interrompue reprend au mois suivant (2 mois restants sur 4) ; l’ancien message de Google est traduit', qs.length === 2 && /after:2026\/10\/01/.test(qs[0]) && RR.etat().scan.fini && /Google a limité la lecture de tes mails/.test(msg), JSON.stringify([qs, msg])); }
+  /* 0.49.0 (« les dépenses relevées n'ont pas de sens ») : des achats fréquents n'en sont pas ; une facture sans montant compte ; le jour annoncé d'abord */
+  { const rr = (cle, service, montant, date, datePrel) => ({id: cle + date + Math.random(), dom: cle, cle, service, montant, date, datePrel: datePrel || null, genre: 'facture'});
+    const pp = regrouper([...['2026-08', '2026-09', '2026-10', '2026-11'].map((m) => rr('creche-exemple.fr', 'Crèche Exemple', null, m + '-01')),
+      ...['2026-08', '2026-09', '2026-10', '2026-11'].flatMap((m) => ['-03', '-12', '-21'].map((d) => rr('jeu-exemple.com', 'Jeu Exemple', 9.99, m + d))),
+      ...['2026-08', '2026-09', '2026-10', '2026-11'].map((m) => rr('tel2-exemple.fr', 'Tel Deux', 23.99, m + '-29', (m === '2026-11' ? '2026-12' : m.slice(0, 5) + String(+m.slice(5) + 1).padStart(2, '0')) + '-09')),
+      ...['2026-08', '2026-09', '2026-10', '2026-11'].map((m) => rr('energie2-exemple.fr', 'Énergie Deux', 62.88, m + '-09'))], lundi);
+    const pc = pp.find((x) => x.service === 'Crèche Exemple'), pt = pp.find((x) => x.service === 'Tel Deux'), pn = pp.find((x) => x.service === 'Énergie Deux');
+    ok('Radar : une facture dont le montant n’est que dans la pièce jointe → dépense proposée « montant à compléter » (vers le 1er)', !!pc && pc.montant === null && pc.jour === 1 && pc.jourApprox === true, JSON.stringify(pc));
+    ok('Radar : des achats plusieurs fois par mois (3 reçus de jeu par mois) ne font pas une dépense fixe', !pp.some((x) => x.service === 'Jeu Exemple'), JSON.stringify(pp.map((x) => x.service)));
+    ok('Radar : le jour annoncé (« prélevé le 9 ») passe avant le jour d’arrivée du mail (le 29) ; sans jour annoncé, « vers le 9 »', !!pt && pt.jour === 9 && !pt.jourApprox && !!pn && pn.jour === 9 && pn.jourApprox === true, JSON.stringify([pt, pn]));
+    const pn2 = regrouper([rr('communication-navigo.fr', 'Navigo Liberté + sur passe', 64.88, '2026-09-08', '2026-09-15'), rr('communication-navigo.fr', 'Navigo Liberté + sur passe', 58.10, '2026-10-08', '2026-10-15'), rr('iledefrance-mobilites.fr', 'Navigo Liberté + sur passe', 61.20, '2026-11-08', '2026-11-15')], lundi);
+    ok('Radar : un même service qui écrit depuis deux adresses reste une seule dépense (le 15, 3 mois)', pn2.length === 1 && pn2[0].jour === 15 && pn2[0].preuves === 3, JSON.stringify(pn2));
+    ok('Radar : un achat, une livraison ou une notification (« vous avez reçu un message ») n’est pas une facture ; une facture de commande, si', genre('Votre commande n° 123 est expédiée', 'Total : 39,90 €') === 'autre' && genre('Vous avez reçu un message', 'Votre conseiller vous a écrit.') === 'autre' && genre('Votre facture pour la commande 123', 'Montant : 39,90 €') === 'facture');
+    /* une facture que ni les règles ni Claude ne chiffrent reste comptée */
+    const F3 = {}; ['2026-09', '2026-10', '2026-11'].forEach((m, i) => { F3['c' + i] = {id: 'c' + i, messages: [{id: 'cm' + i, threadId: 'c' + i, sender: 'noreply@creche-exemple.fr', addressDisplayNames: [{displayName: 'Crèche Exemple', emailAddress: 'noreply@creche-exemple.fr'}], subject: 'Votre FACTURE n° 4311-' + i, plaintextBody: 'Bonjour,\nVeuillez trouver ci-joint votre facture.', date: m + '-01T11:00:00Z', labelIds: ['INBOX']}]}; });
+    const RC = createRadar({file: path.join(DIR, 'radar4.json'), gmail: {lie: () => true, chercher: async (q) => { const m = q.match(/after:(\d{4})\/(\d{2})/); return {threads: Object.keys(F3).filter((k) => m && F3[k].messages[0].date.startsWith(m[1] + '-' + m[2])).map((k) => ({id: k}))}; }, fil: async (id) => F3[id]},
+      claude: async (prompt) => ({ok: true, text: JSON.stringify([...prompt.matchAll(/\[mail (\w+)\]/g)].map((x) => ({id: x[1], genre: 'facture', service: 'Crèche Exemple', montant: null})))}), now: () => Date.parse('2026-11-23T09:00:00Z'), moisDepart: 4});
+    await RC.traiter('GET', '/api/radar', null); await RC.attendre();
+    const ec = RC.etat().propositions.find((x) => x.service === 'Crèche Exemple');
+    ok('Radar : une facture sans montant, ni pour les règles ni pour Claude, est gardée et proposée « à compléter »', !!ec && ec.montant === null, JSON.stringify(RC.etat().propositions));
+    /* la lecture d'avant 0.49.0 est oubliée (relevés, propositions), ses dépenses validées, sa paie et ses refus restent */
+    fs.writeFileSync(path.join(DIR, 'radar5.json'), JSON.stringify({fixes: [{id: 'f1', service: 'Crédit', montant: 900, jour: 5, rythme: 'mensuel', source: 'toi'}], revenus: {jour: 27, avance: true}, refus: ['x.fr'], releves: [{id: 'r', dom: 'x.fr', montant: 1, date: '2026-11-01', genre: 'facture'}], propositions: [{id: 'p1', service: 'Bruit'}], scan: {fini: 1}}));
+    const RV = createRadar({file: path.join(DIR, 'radar5.json'), gmail: {lie: () => false}, now: () => Date.parse('2026-11-23T09:00:00Z')}), bv = RV.brut();
+    ok('Radar : la lecture faite avec les anciennes règles est refaite (relevés et propositions oubliés) ; dépenses, paie et refus gardés', !bv.releves.length && !bv.propositions.length && !bv.scan && bv.fixes.length === 1 && bv.revenus.jour === 27 && bv.refus.includes('x.fr') && bv.version === 2); }
   /* la mémoire de JARVIS (lue par le serveur MCP, que Grok Bot peut joindre) refuse les chiffres d'un crédit */
   ok('Mémoire : refuse les chiffres d’un crédit (règle du 12/11/2026), garde le reste', interdit('Ma mensualité de crédit immobilier est de 1150 €') && interdit('Il reste 180 000 € à rembourser sur le prêt immobilier') && !interdit("J'ai un crédit immobilier à la banque") && !interdit('Je suis prêt à 8h'));
 } catch (e) { ok('exception', false, e.stack); }

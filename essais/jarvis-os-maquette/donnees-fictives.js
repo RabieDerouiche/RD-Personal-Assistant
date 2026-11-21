@@ -499,7 +499,8 @@
     /* ce que le serveur trouve dans les mails : un prélèvement ponctuel (paiement en 4 fois) et deux dépenses récurrentes à valider (inventés) */
     ponctuels: [{id: 'e1', date: rIso(2), service: 'Paiement en 4 fois : Boutique', montant: 29.55}],
     propositions: [{id: 'pa', service: 'Club de sport', cat: 'Autres', montant: 29.90, jour: 26, rythme: 'mensuel', source: 'mail', preuves: 6, dernier: rIso(-28), depuis: '05/2026'},
-      {id: 'pb', service: 'Stockage en ligne', cat: 'Abonnements', montant: 1.99, jour: 14, rythme: 'mensuel', source: 'mail', preuves: 12, dernier: rIso(-9), depuis: '11/2025'}],
+      {id: 'pb', service: 'Stockage en ligne', cat: 'Abonnements', montant: 1.99, jour: 14, rythme: 'mensuel', source: 'mail', preuves: 12, dernier: rIso(-9), depuis: '11/2025'},
+      {id: 'pc', service: 'Garde d’enfant (exemple)', cat: 'Autres', montant: null, jour: 5, jourApprox: true, rythme: 'mensuel', source: 'mail', preuves: 13, dernier: rIso(-18), depuis: '11/2025'}],
     scan: {enCours: false, mois: 13, total: 13, lus: 412, fini: Date.now(), erreur: ''}, google: true,
     navigo: {mois: rMoisL(1), conseil: 'liberte', joursSite: 9, liberte: 36.72, moisNet: 45.40, texte: '9 jours sur site prévus, avec une semaine de congés : reste en Liberté+ (environ 36,72 €). Le Navigo Mois coûterait 45,40 € après le remboursement de 50 %.'}};
   /* 0.23.0 : la météo de l'accueil (en vrai : Open-Meteo, à la position de l'iPhone) */
