@@ -331,6 +331,16 @@ try {
         const T = (text) => fetch(BASE + '/api/tts', {method: 'POST', headers: {authorization: 'Bearer ' + tok, 'content-type': 'application/json'}, body: JSON.stringify({text})}).then((x) => x.text());
         let g = await GJ('/api/voix/google'); const choix0 = await GJ('/api/voix/google', {voixServeur: 'google', nom: 'fr-FR-Chirp3-HD-Aoede'}), t0 = await T('Sans accès, Pierre parle.');
         ok('voix Google : sans accès posé sur le serveur, rien ne part chez Google ; Pierre parle', g.body.pret === false && choix0.body.choisie === true && /RIFF-faux:/.test(t0) && GTTS.calls.length === 0, JSON.stringify([g.body, GTTS.calls.length]));
+        /* 0.47.0 : la clé collée est essayée tout de suite (une vraie phrase) et Google choisi s'il répond ; « Vérifier » ; l'en-tête x-jarvis-voix et la dernière phrase disent qui parle */
+        { await GJ('/api/voix/google', {voixServeur: 'pierre'});
+          const k = await GJ('/api/voix/google/cle', {cle: 'AIzaSyTEST-0123456789abcdefghijklmnop'}), vf = await GJ('/api/voix/google/verifier', {});
+          const r1 = await fetch(BASE + '/api/tts', {method: 'POST', headers: {authorization: 'Bearer ' + tok, 'content-type': 'application/json'}, body: JSON.stringify({text: 'Oui.'})}), h1 = r1.headers.get('x-jarvis-voix'); await r1.text();
+          const d1 = (await GJ('/api/voix/google')).body.derniere;
+          await GJ('/api/voix/google', {voixServeur: 'pierre'});
+          const r2 = await fetch(BASE + '/api/tts', {method: 'POST', headers: {authorization: 'Bearer ' + tok, 'content-type': 'application/json'}, body: JSON.stringify({text: 'Non.'})}), h2 = r2.headers.get('x-jarvis-voix'); await r2.text();
+          const g2b = (await GJ('/api/voix/google')).body;
+          ok('voix Google : la clé collée est vérifiée auprès de Google et Google parle aussitôt ; « Vérifier » ; on sait qui a dit la dernière phrase (Google, puis Pierre et pourquoi)', k.body.verifie === true && k.body.choisie === true && vf.body.verifie === true && h1 === 'google' && d1 && d1.moteur === 'google' && h2 === 'pierre' && g2b.derniere.moteur === 'pierre' && /Google pas choisi/.test(g2b.derniere.raison) && g2b.caracteres === 2 * Buffer.byteLength('Bonjour, je suis Jarvis. Ma voix Google est prête.') + 4 && g2b.comptage === 'octets', JSON.stringify([k.body.verifie, k.body.erreurVerif, vf.body.verifie, h1, d1, h2, g2b.derniere, g2b.caracteres]));
+          await GJ('/api/voix/google', {voixServeur: 'google', nom: 'fr-FR-Chirp3-HD-Aoede'}); }
         fs.writeFileSync(path.join(DATA, 'voix-google.json'), JSON.stringify({cle: 'cle-de-test-0123456789'}), {mode: 0o600});
         const vx = await GJ('/api/voix/google/voix'), t1 = await T('Bonjour, il est 18 h 49.'), c1 = GTTS.calls.filter((x) => x.url === '/v1/text:synthesize').pop();
         ok('voix Google : avec une clé d\'API, la voix choisie (Aoede) lit le texte écrit comme on le dit ; les voix françaises Chirp 3 HD sont listées', vx.body.voix.map((x) => x.court).join(',') === 'Aoede,Charon' && /GOOGLE:fr-FR-Chirp3-HD-Aoede:Bonjour, il est 18 heures 49\./.test(t1) && c1.key === 'cle-de-test-0123456789' && JSON.parse(c1.body).audioConfig.audioEncoding === 'LINEAR16', JSON.stringify([vx.body, t1.slice(44), c1 && c1.body]));
@@ -339,7 +349,7 @@ try {
         ok('voix Google : avec un compte de service, jeton signé (JWT RS256) puis synthèse', /GOOGLE:fr-FR-Chirp3-HD-Aoede:Avec un compte de service\./.test(t2) && GTTS.calls.some((x) => x.url === '/token') && GTTS.calls.filter((x) => x.url === '/v1/text:synthesize').pop().auth === 'Bearer gtok', t2.slice(44));
         g = await GJ('/api/voix/google');
         const n1 = g.body.caracteres; await T('x'.repeat(150)); const t3 = await T('Au plafond, Pierre reprend.'); const g2 = await GJ('/api/voix/google'), st = await GJ('/api/status');
-        ok('voix Google : caractères comptés ; au plafond (220 ici), Pierre reprend tout seul, rien de payant', n1 === 'Bonjour, il est 18 heures 49.'.length + 'Avec un compte de service.'.length && g2.body.pause === true && /RIFF-faux:/.test(t3) && st.body.tts === true, JSON.stringify([n1, g2.body, t3.slice(44, 90)]));
+        ok('voix Google : comptés en octets avant l\'envoi ; au plafond (220 ici), Pierre reprend tout seul, rien de payant', n1 === 2 * Buffer.byteLength('Bonjour, je suis Jarvis. Ma voix Google est prête.') + 4 + 'Bonjour, il est 18 heures 49.'.length + 'Avec un compte de service.'.length && g2.body.pause === true && /RIFF-faux:/.test(t3) && st.body.tts === true, JSON.stringify([n1, g2.body, t3.slice(44, 90)]));
         await GJ('/api/voix/google', {voixServeur: 'pierre'}); }
       d = await V({text: 'Où en sont mes notes de frais ?'}); ok('voix : « notes de frais » n\'est pas la météo : Claude Haiku répond', !d.instant && /modèle : haiku/.test(d.reply), String(d.reply).slice(0, 120));
       d = await V({text: 'montre le contexte'}); ok('voix : Claude reçoit la date et l\'heure de Paris à chaque phrase', /^\[Maintenant : \S+ \d{1,2} \S+ \d{4} (à )?\d\d:\d\d, heure de Paris\]/.test(d.reply), String(d.reply).slice(0, 100));
@@ -630,9 +640,10 @@ try {
       /* 0.45.0 : JARVIS se connaît : le Claude de la discussion reçoit l'état du moment (voix, compteur Google, écoute…) avec la question, et le guide de ses réglages */
       { const q1 = await flux({input: [{role: 'user', content: 'La voix Google est-elle activée ?'}], tier: 'quick'});
         await call('/api/voix/google', {method: 'POST', headers: A, body: JSON.stringify({voixServeur: 'google'})});
+        await fetch(BASE + '/api/tts', {method: 'POST', headers: A, body: JSON.stringify({text: 'Une phrase.'})}).then((x) => x.arrayBuffer());   /* au plafond du banc : Pierre la dit */
         const q2 = await flux({input: [{role: 'user', content: 'La voix Google est-elle activée ?'}], tier: 'quick'});
         await call('/api/voix/google', {method: 'POST', headers: A, body: JSON.stringify({voixServeur: 'pierre'})});
-        ok('JARVIS se connaît : son Claude sait si la voix Google est choisie, son compteur et son plafond, l\'écoute ; il a le guide de ses réglages', /^Non ; plafond 220 ; guide : oui ; écoute : Whisper/.test(q1.fin || '') && /^Oui ; plafond 220 ; guide : oui/.test(q2.fin || ''), JSON.stringify([q1.fin, q2.fin])); }
+        ok('JARVIS se connaît : son Claude sait si la voix Google est choisie, son compteur et son plafond, l\'écoute ; il a le guide de ses réglages', /^Non ; plafond 220 ; guide : oui ; écoute : Whisper ; dernière : (Google|Pierre|aucune)/.test(q1.fin || '') && /^Oui ; plafond 220 ; guide : oui ; écoute : \w+ ; dernière : Pierre/.test(q2.fin || ''), JSON.stringify([q1.fin, q2.fin])); }
       /* 0.39.0 : le serveur MCP — découverte OAuth, inscription, accord donné dans l'app (4 chiffres), PKCE, jetons, outils, propositions à approuver */
       { const PK = (v) => crypto.createHash('sha256').update(v).digest('base64url');
         const raw = (u, o = {}) => fetch(BASE + u, {redirect: 'manual', ...o});

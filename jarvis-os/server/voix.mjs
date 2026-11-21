@@ -200,6 +200,7 @@ export const datePhrase = (d) => 'Nous sommes le ' + new Intl.DateTimeFormat('fr
 /* 0.22.1 : la diction de Pierre (Piper lit « 18 h 49 » « dix-huit ache », « 7° », « 30 % », « 18/11 » chiffre par chiffre) : écrit comme on le dit */
 const MOIS_DIT = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
 export const diction = (t) => String(t || '')
+  .replace(/\bJ\.A\.R\.V\.I\.S\b\.?/g, 'Jarvis').replace(/\bJARVIS\b/g, 'Jarvis').replace(/\bJarvis\s+OS\b\.?/g, 'Jarvis O.S.')   /* 0.47.0 : son nom, J.A.R.V.I.S OS, se dit « Jarvis O.S. » (Google épelait les majuscules) */
   .replace(/(\d),00(?!\d)/g, '$1')
   .replace(/\b(\d{1,2})\s*h\s*(\d{2})\b/g, (m, H, M) => H + (+H > 1 ? ' heures' : ' heure') + (M === '00' ? '' : ' ' + +M))
   .replace(/\b(\d{1,2})\s*h\b(?![\wÀ-ÿ'])/g, (m, H) => H + (+H > 1 ? ' heures' : ' heure'))

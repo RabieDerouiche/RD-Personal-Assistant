@@ -209,7 +209,8 @@
       choisir: (o) => req('/api/voix/google', o).then((r) => (r.status === 200 ? r.j : null)).catch(() => null),
       cle: (cle) => req('/api/voix/google/cle', {cle}).then((r) => r.j).catch(() => ({error: 'Serveur injoignable.'})),
       retirer: () => req('/api/voix/google/cle', {retirer: true}).then((r) => r.j).catch(() => null),
-      essai: async (nom) => { try { const r = await fetch(BASE + '/api/voix/google/essai', {method: 'POST', headers: {'content-type': 'application/json', authorization: 'Bearer ' + token()}, body: JSON.stringify({nom})}); return r.ok ? URL.createObjectURL(await r.blob()) : null; } catch (e) { return null; } }
+      essai: async (nom) => { try { const r = await fetch(BASE + '/api/voix/google/essai', {method: 'POST', headers: {'content-type': 'application/json', authorization: 'Bearer ' + token()}, body: JSON.stringify({nom})}); if (r.ok) return URL.createObjectURL(await r.blob()); const j = await r.json().catch(() => ({})); return {error: j.error || 'Pas de son de Google.'}; } catch (e) { return {error: 'Serveur injoignable.'}; } },
+      verifier: () => req('/api/voix/google/verifier', {}).then((r) => (r.status === 200 ? r.j : null)).catch(() => null)   /* 0.47.0 : une vraie phrase demandée à Google (comptée) */
     },
     /* 0.39.0 : le serveur MCP (assistants reliés : app Claude, Grok Bot) et l'accord sur une proposition venue d'eux */
     mcp: {
