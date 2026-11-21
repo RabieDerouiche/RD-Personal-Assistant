@@ -1,6 +1,7 @@
 /* Banc de bout en bout : vrai serveur JARVIS (faux Claude, faux Google) et la nouvelle app dans Chromium.
    Relier l'iPhone par code, enregistrer l'accès Google, se connecter, tester les données, page en direct.
    Lancer : NODE_PATH=/opt/node-tools/node_modules node essais/jarvis-os-maquette/banc/banc-serveur.mjs */
+import crypto from 'node:crypto';
 import {spawn, execFileSync} from 'node:child_process'; import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path'; import {createRequire} from 'node:module'; import {fileURLToPath} from 'node:url';
 const require = createRequire(process.env.NODE_PATH ? path.join(process.env.NODE_PATH, 'x') : import.meta.url); const {chromium, devices} = require('playwright');
 const HERE = path.dirname(fileURLToPath(import.meta.url)), SRV = path.join(HERE, '..', '..', '..', 'jarvis-os', 'server'), SH = path.join(os.tmpdir(), 'jarvis-os-banc') + path.sep; fs.mkdirSync(SH, {recursive: true});
@@ -94,6 +95,38 @@ try {
     await q.evaluate(() => [...document.querySelectorAll('#mem-card .mem-it')].find((x) => /train/.test(x.textContent)).querySelector('.btn').click()); await q.waitForTimeout(900);
     const c4 = await q.evaluate(() => ({n: document.querySelectorAll('#mem-card .mem-it').length, txt: document.getElementById('mem-card').textContent}));
     ok('mémoire : « Oublier » le retire', c4.n === 1 && !/train pour aller/.test(c4.txt), JSON.stringify(c4));
+    await q.close(); }
+  /* 0.39.0 : le serveur MCP — l'accord se donne dans Réglages (mêmes 4 chiffres) ; une proposition venue de l'assistant s'approuve dans Suivi */
+  { const q = await ctx.newPage(); q.on('pageerror', (e) => errs.push('mcp : ' + e.message));
+    const tk = await p.evaluate(() => JSON.parse(localStorage.getItem('jarvis.settings')).serverToken), RU = 'https://claude.ai/api/mcp/auth_callback';
+    const ins = await fetch(BASE + '/oauth/register', {method: 'POST', headers: {'content-type': 'application/json'}, body: JSON.stringify({redirect_uris: [RU], client_name: 'Claude'})}).then((x) => x.json());
+    const ver = crypto.randomBytes(32).toString('base64url'), ch = crypto.createHash('sha256').update(ver).digest('base64url');
+    const html = await fetch(BASE + '/oauth/authorize?' + new URLSearchParams({response_type: 'code', client_id: ins.client_id, redirect_uri: RU, state: 's1', code_challenge: ch, code_challenge_method: 'S256'})).then((x) => x.text());
+    const chiffres = (/>(\d{4})<\/p>/.exec(html) || [])[1], aid = (/var id="([\w-]+)"/.exec(html) || [])[1];
+    await q.goto(BASE + '/?serveur#reglages'); await q.waitForTimeout(3500);
+    const c1 = await q.evaluate(() => { const c = document.getElementById('mcp-card'); return c ? {txt: c.textContent, urgent: c.dataset.urgent === '1'} : null; });
+    ok('MCP : une demande d\'accès apparaît dans Réglages (en tête), avec les mêmes 4 chiffres que la page de l\'assistant', !!c1 && c1.txt.includes('Claude demande l’accès à JARVIS') && !!chiffres && c1.txt.includes(chiffres) && c1.urgent, JSON.stringify([chiffres, c1 && c1.txt.slice(0, 300)]));
+    await q.evaluate(() => document.querySelector('#mcp-card .mcp-d .btn.main').click()); await q.waitForTimeout(1200);
+    const att = await fetch(BASE + '/oauth/attente/' + aid).then((x) => x.json()), c2 = await q.evaluate(() => document.getElementById('mcp-card').textContent);
+    ok('MCP : « Autoriser » dans JARVIS renvoie l\'assistant à sa page avec un code', att.statut === 'accordee' && /code=/.test(att.redirect || '') && /Claude est relié à JARVIS/.test(c2), JSON.stringify([att.statut, c2.slice(-120)]));
+    const code = new URL(att.redirect).searchParams.get('code');
+    const tok = await fetch(BASE + '/oauth/token', {method: 'POST', headers: {'content-type': 'application/x-www-form-urlencoded'}, body: new URLSearchParams({grant_type: 'authorization_code', code, code_verifier: ver, client_id: ins.client_id, redirect_uri: RU}).toString()}).then((x) => x.json());
+    const rpc = (m, params, id) => fetch(BASE + '/mcp', {method: 'POST', headers: {'content-type': 'application/json', authorization: 'Bearer ' + tok.access_token}, body: JSON.stringify({jsonrpc: '2.0', id, method: m, params})}).then((x) => x.json());
+    await rpc('tools/call', {name: 'jarvis_proposer_mission', arguments: {texte: 'Compare trois box internet fibre'}}, 1);
+    await rpc('tools/call', {name: 'jarvis_proposer_ordre', arguments: {bot: 'Kairos', message: 'Surveille le prix de la box'}}, 2);
+    await q.goto(BASE + '/?serveur#suivi'); await q.waitForTimeout(2500); await q.evaluate(() => { const b = document.querySelector('#missions'); if (b) b.scrollIntoView(); }); await q.waitForTimeout(800);
+    const s1 = await q.evaluate(() => [...document.querySelectorAll('#missions .mis-it')].filter((x) => /box/.test(x.textContent)).map((x) => ({txt: x.textContent, btn: [...x.querySelectorAll('.mis-accord .btn')].map((b) => b.textContent)})));
+    ok('MCP : Suivi montre les propositions de l\'assistant (« Proposée par Claude »), un ordre à Kairos compris, avec « Approuver » et « Refuser »', s1.length === 2 && s1.some((x) => /Ordre à Kairos : Surveille le prix de la box/.test(x.txt) && /Proposée par Claude : elle attend ton accord/.test(x.txt) && x.btn.includes('Approuver (part à Kairos)') && x.btn.includes('Refuser')) && s1.some((x) => /Compare trois box internet fibre/.test(x.txt) && x.btn.includes('Approuver (part à Claude)')), JSON.stringify(s1).slice(0, 500));
+    await q.screenshot({path: SH + 'mcp-suivi.png'});
+    await q.evaluate(() => { const it = [...document.querySelectorAll('#missions .mis-it')].find((x) => /Compare trois box/.test(x.textContent)); it.querySelector('.mis-accord .btn.main').click(); }); await q.waitForTimeout(600);
+    await q.evaluate(() => { const it = [...document.querySelectorAll('#missions .mis-it')].find((x) => /Ordre à Kairos/.test(x.textContent)); it.querySelector('.mis-accord .btn.ghost').click(); }); await q.waitForTimeout(4500);
+    const ms = await fetch(BASE + '/api/missions', {headers: {authorization: 'Bearer ' + tk}}).then((x) => x.json()).then((j) => j.missions);
+    ok('MCP : « Approuver » lance la mission chez Claude ; « Refuser » écarte l\'ordre', ms.some((x) => /Compare trois box/.test(x.text) && ['envoyee', 'terminee'].includes(x.status)) && ms.some((x) => /Surveille le prix de la box/.test(x.text) && x.status === 'refusee'), JSON.stringify(ms.filter((x) => /box/.test(x.text)).map((x) => [x.text.slice(0, 24), x.status])));
+    await q.goto(BASE + '/?serveur#reglages'); await q.waitForTimeout(3000); await q.evaluate(() => { const c = document.getElementById('mcp-card'); if (c) c.scrollIntoView(); }); await q.screenshot({path: SH + 'mcp-reglages.png'});
+    for (const x of ms.filter((y) => /box/.test(y.text))) await fetch(BASE + '/api/missions/' + x.id, {method: 'DELETE', headers: {authorization: 'Bearer ' + tk}});   /* le banc suivant attend « Aucune mission » */
+    await q.close(); }
+  { const q = await ctx.newPage();
+    await q.goto(BASE + '/?serveur#reglages'); await q.waitForTimeout(3500);
     /* 0.38.0 : les skills des missions, listées dans Réglages */
     const sk = await q.evaluate(() => { const c = document.getElementById('skills-card'); return c ? {n: c.querySelectorAll('.skill-it').length, txt: c.textContent} : null; });
     ok('skills : Réglages liste les cinq skills des missions et à quoi sert chacune', !!sk && sk.n === 5 && /Recherche sur le web/.test(sk.txt) && /Démarche administrative/.test(sk.txt) && /Préparer un voyage/.test(sk.txt) && !/À charger/.test(sk.txt), JSON.stringify(sk && {n: sk.n, t: sk.txt.slice(0, 200)}));

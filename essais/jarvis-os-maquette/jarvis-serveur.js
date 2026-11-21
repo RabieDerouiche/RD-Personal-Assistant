@@ -187,6 +187,14 @@
     missions: () => req('/api/missions').then((r) => (r.status === 200 ? r.j.missions : null)).catch(() => null),
     /* 0.33.0 : ce que fait Claude à l'instant (missions, Siri, tour, discussion), avec l'outil utilisé et le plan d'une mission */
     activite: () => req('/api/activite').then((r) => (r.status === 200 ? r.j : null)).catch(() => null),
+    /* 0.39.0 : le serveur MCP (assistants reliés : app Claude, Grok Bot) et l'accord sur une proposition venue d'eux */
+    mcp: {
+      etat: () => req('/api/mcp').then((r) => (r.status === 200 ? r.j : null)).catch(() => null),
+      decider: (id, oui) => req('/api/mcp/decider', {id, oui}).then((r) => (r.status === 200 ? r.j : null)).catch(() => null),
+      retirer: (id) => req('/api/mcp/retirer', {id}).then((r) => (r.status === 200 ? r.j : null)).catch(() => null),
+      jeton: (nom) => req('/api/mcp/jeton', {nom}).then((r) => (r.status === 200 ? r.j : null)).catch(() => null)
+    },
+    missionStatut: (id, status) => req('/api/missions/' + encodeURIComponent(id), {status}).then((r) => (r.status === 200 ? r.j : null)).catch(() => null),
     /* 0.38.0 : les skills relues des missions */
     skills: () => req('/api/skills').then((r) => (r.status === 200 ? r.j.skills : null)).catch(() => null),
     /* 0.37.0 : la mémoire durable (ce qu'il a demandé de retenir, et l'état de son Profil) */
