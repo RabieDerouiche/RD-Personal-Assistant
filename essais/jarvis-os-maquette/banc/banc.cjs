@@ -551,9 +551,43 @@ srv.listen(0, async () => {
       await p.waitForTimeout(2500); await p.evaluate(() => { location.hash = '#sorties'; }); await p.waitForTimeout(1500);
       const t = await p.evaluate(() => [...document.querySelectorAll('#view .mchips')].map((x) => x.innerText.replace(/\s+/g, ' ')).join(' | '));
       ok('Sorties : un prix écrit en phrase donne son premier montant (« 18 € TTC au guichet », pas « 186 320 € »), 0 € = « Gratuit », trajet en une ligne', /18 € TTC au guichet/.test(t) && !/186/.test(t) && /Gratuit/.test(t) && /Voiture 9 min \(5,7 km\) · transports 14 min/.test(t) && !/rome2rio/i.test(t), t.slice(0, 200)); }
+    /* Radar (maquette du 21/11/2026, rubrique Argent) : prélèvements à venir, alertes, abonnements, total du mois, conseil Navigo ; données d'exemple */
+    { p = await page('#argent');
+      const r0 = await p.evaluate(() => ({t: document.getElementById('view-title').textContent, hero: (document.querySelector('.rad-hero b') || {}).textContent || '', p: (document.querySelector('.rad-hero p') || {}).textContent || '',
+        segs: [...document.querySelectorAll('.rad-seg button')].map((x) => x.textContent), due: document.querySelectorAll('.rad-due').length, nav: (document.querySelector('.rad-nav b') || {}).textContent || '',
+        large: document.documentElement.scrollWidth <= innerWidth + 1}));
+      ok('Radar : la rubrique Argent s\'ouvre avec le total du mois, 4 filtres, 6 prélèvements à venir et le conseil Navigo, sans déborder', r0.t === 'Argent' && /Ce mois-ci : 641,37 €/.test(r0.hero) && /\+7 %/.test(r0.p) && /2 prélèvements dans les 7 jours/.test(r0.p)
+        && r0.segs.length === 4 && /^À venir \(6\)$/.test(r0.segs[0]) && r0.due === 6 && /^Navigo de .+ : reste en Liberté\+$/.test(r0.nav) && r0.large, JSON.stringify(r0));
+      ok('Radar : à venir dans l\'ordre des dates ; le plus proche signalé, avec la hausse par rapport à l\'an dernier', await p.evaluate(() => { const c = [...document.querySelectorAll('.rad-due')], j = c.map((x) => +((x.querySelector('.ech-date span').textContent.match(/\d+/) || [0])[0]));
+        return c[0].classList.contains('is-soon') && /dans 3 j/.test(c[0].textContent) && /\+33 % \(avant : 59,99 €\)/.test(c[0].textContent) && j.every((v, i) => !i || v >= j[i - 1]) && /montant à venir/.test(c[5].textContent); }));
+      await p.evaluate(() => [...document.querySelectorAll('.rad-due')][0].querySelector('.row-actions button').click()); await p.waitForTimeout(500);
+      const r1 = await p.evaluate(() => ({kept: document.querySelector('.rad-due').classList.contains('is-kept') && /gardé/.test(document.querySelector('.rad-due .nature').textContent), toast: [...document.querySelectorAll('.toast')].some((x) => /Gardé/.test(x.textContent))}));
+      await p.reload(); await p.waitForTimeout(1800);
+      const r2 = await p.evaluate(() => ({kept: document.querySelector('.rad-due').classList.contains('is-kept'), p: document.querySelector('.rad-hero p').textContent}));
+      ok('Radar : « Je garde » marque le prélèvement, prévient, et tient après un rechargement (plus qu\'un prélèvement à surveiller dans les 7 jours)', r1.kept && r1.toast && r2.kept && /1 prélèvement dans les 7 jours/.test(r2.p), JSON.stringify([r1, r2]));
+      await p.evaluate(() => [...document.querySelectorAll('.rad-seg button')].find((x) => /^Alertes/.test(x.textContent)).click()); await p.waitForTimeout(400);
+      ok('Radar : 4 alertes, une icône par type (paiement échoué, essai, hausse, montant inhabituel) ; plus d\'alerte sur la facture mobile (seul le prix de l\'abonnement compte)', await p.evaluate(() => { const a = [...document.querySelectorAll('.rad-alert')];
+        return a.length === 4 && ['echec', 'essai', 'hausse', 'inhabituel'].every((k) => a.some((x) => x.classList.contains('is-' + k))) && !a.some((x) => /facture mobile/i.test(x.textContent)) && a.every((x) => x.querySelector('.hm-ic svg')) && /avant : 48,20 €/.test(a[3].textContent); }));
+      await p.evaluate(() => document.querySelector('.rad-alert .row-actions button').click()); await p.waitForTimeout(400);
+      ok('Radar : « Vu » retire l\'alerte et met les compteurs à jour', await p.evaluate(() => document.querySelectorAll('.rad-alert').length === 3 && [...document.querySelectorAll('.rad-seg button')].some((x) => x.textContent === 'Alertes (3)') && /3 alertes/.test(document.querySelector('.rad-hero .mchips').textContent)));
+      await p.evaluate(() => [...document.querySelectorAll('.rad-seg button')].find((x) => /^Abonnements/.test(x.textContent)).click()); await p.waitForTimeout(400);
+      ok('Radar : abonnements rangés par catégorie, total juste (991,60 € par an, 82,63 € par mois), aucune ligne ne déborde', await p.evaluate(() => { const v = document.getElementById('view').getBoundingClientRect();
+        return /9 abonnements : 991,60 € par an, soit 82,63 € par mois/.test(document.querySelector('.rad-tot').textContent) && document.querySelectorAll('#view .panel').length === 4 && document.querySelectorAll('.rad-abo').length === 9
+          && [...document.querySelectorAll('.rad-abo')].every((x) => x.getBoundingClientRect().right <= v.right + 1) && /119,88 € par an/.test(document.querySelector('.rad-abo').textContent); }));
+      await p.evaluate(() => [...document.querySelectorAll('.rad-seg button')].find((x) => x.textContent === 'Le mois').click()); await p.waitForTimeout(400);
+      ok('Radar : le mois, un poste par barre, la plus longue pour le plus gros poste, comparé au mois précédent', await p.evaluate(() => { const b = [...document.querySelectorAll('.rad-bar')], w = b.map((x) => parseFloat(x.querySelector('.rad-bar-t i').style.width));
+        return b.length === 5 && w[0] === 100 && w.every((v, i) => !i || v <= w[i - 1]) && /contre 598,20 €/.test(document.getElementById('view').textContent) && /10 commandes, 21,16 € en moyenne/.test(b[1].textContent); }));
+      await p.screenshot({path: path.join(SH, 'radar-mois.png')});
+      await p.evaluate(() => [...document.querySelectorAll('.rad-seg button')].find((x) => /^À venir/.test(x.textContent)).click()); await p.waitForTimeout(400);
+      await p.evaluate(() => [...document.querySelectorAll('.rad-due')][1].querySelectorAll('.row-actions button')[1].click()); await p.waitForTimeout(800);
+      ok('Radar : « Comparer avec Claude » ouvre la discussion avec la question déjà écrite (rien n\'est envoyé)', await p.evaluate(() => { const ta = document.getElementById('chat-in'); return !!ta && /Compare pour moi « Assistant IA » \(21,60 €, mensuel\)/.test(ta.value); }));
+      p = await page('');
+      await p.tap('.fav-handle'); await p.waitForTimeout(600);
+      ok('Radar : la rubrique Argent est dans « Toutes les rubriques » (maquette)', await p.evaluate(() => !!document.querySelector('.all-grid .tab[data-tab="argent"]')));
+      p = await page('#argent'); await p.screenshot({path: path.join(SH, 'radar.png')}); }
     /* aucune rubrique n'affiche de texte cassé */
     const broken = [];
-    for (const t of ['accueil', 'demandes', 'agenda', 'suivi', 'achats', 'voyages', 'sorties', 'papiers', 'equipe', 'automatisations', 'reglages']) {
+    for (const t of ['accueil', 'demandes', 'agenda', 'suivi', 'achats', 'voyages', 'sorties', 'papiers', 'argent', 'equipe', 'automatisations', 'reglages']) {
       p = await page('#' + t);
       if (await p.evaluate(() => /\[object \w+\]|\bundefined\b|\bNaN\b/.test(document.getElementById('view').innerText))) broken.push(t);
     }

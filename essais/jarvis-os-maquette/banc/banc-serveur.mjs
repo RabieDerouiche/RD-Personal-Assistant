@@ -40,6 +40,10 @@ try {
   const uniq = [...new Set(used)];
   ok('page en direct : Pilotage, agenda et Gmail lus par l’accès Google', uniq.some((u) => /sheets values Canal/.test(u)) && uniq.some((u) => /calendar events/.test(u)) && uniq.some((u) => /gmail threads/.test(u)), uniq.length + ' sources : ' + uniq.slice(0, 8).join(' | '));
   ok('aucune donnée d’exemple chargée', await p.evaluate(() => !document.querySelector('script[src="donnees-fictives.js"]')));
+  /* Radar (maquette du 21/11/2026) : tant que le serveur ne sait pas répondre, la rubrique Argent n'apparaît pas dans l'app en service */
+  { await p.tap('.fav-handle').catch(() => p.click('.fav-handle')); await p.waitForTimeout(600);
+    ok('Radar : sans réponse du serveur, pas de rubrique Argent dans « Toutes les rubriques » (l\'app en service ne change pas)', await p.evaluate(() => !!document.querySelector('.all-grid') && !document.querySelector('.all-grid .tab[data-tab="argent"]')));
+    await p.evaluate(() => { const c = document.querySelector('.all-close'); if (c) c.click(); }); await p.waitForTimeout(400); }
   await p.screenshot({path: SH + 'os-live.png'});
   await p.goto(BASE + '/?serveur#agenda'); await p.waitForTimeout(4000);
   ok('agenda en direct : carte Aujourd\'hui, 7 prochains jours, grille', await p.evaluate(() => !!document.querySelector('.agt .agt-date') && document.querySelectorAll('.agw-d').length === 7 && !!document.querySelector('.mgrid .mg-d.is-today')));
