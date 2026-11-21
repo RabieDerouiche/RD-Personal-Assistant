@@ -152,7 +152,7 @@ try {
     const RV = createRadar({file: path.join(DIR, 'radar5.json'), gmail: {lie: () => false}, now: () => Date.parse('2026-11-23T09:00:00Z')}), bv = RV.brut();
     ok('Radar : la lecture faite avec les anciennes règles est refaite (relevés et propositions oubliés) ; dépenses, paie et refus gardés', !bv.releves.length && !bv.propositions.length && !bv.scan && bv.fixes.length === 1 && bv.revenus.jour === 27 && bv.refus.includes('x.fr') && bv.version === 2); }
   /* 0.50.0 : catégories enfants et impôts ; la proposition montre son dernier mail */
-  ok('Radar : catégories « Enfants » (crèche, couches) et « Impôts » (DGFiP)', categorie('hoptis.com', 'Crèche Les Ptits Bouchons') === 'Enfants' && categorie('lespetitsculottes.fr', 'Lespetitsculottes') === 'Enfants' && categorie('dgfip.finances.gouv.fr', '') === 'Impôts');
+  ok('Radar : catégories « Enfants » (crèche, couches) et « Impôts » (DGFiP)', categorie('creche-exemple.fr', 'Crèche Les Lutins') === 'Enfants' && categorie('couches-exemple.fr', 'Couches Exemple') === 'Enfants' && categorie('dgfip.finances.gouv.fr', '') === 'Impôts');
   { const px = regrouper(['2026-09', '2026-10', '2026-11'].map((m) => ({id: 'x' + m, fil: 'f' + m, objet: 'Votre facture de ' + m, dom: 'tel3-exemple.fr', cle: 'tel3-exemple.fr', service: 'Tel Trois', montant: 9.99, date: m + '-05', datePrel: null, genre: 'facture'})), lundi)[0];
     ok('Radar : une dépense proposée garde son dernier mail (objet, date, lien vers Gmail)', !!px && px.exemple.objet === 'Votre facture de 2026-11' && px.exemple.date === '2026-11-05' && /#all\/f2026-11$/.test(px.exemple.url), JSON.stringify(px && px.exemple)); }
   /* la mémoire de JARVIS (lue par le serveur MCP, que Grok Bot peut joindre) refuse les chiffres d'un crédit */
