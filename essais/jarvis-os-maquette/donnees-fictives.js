@@ -461,11 +461,10 @@
       {date: rIso(12), service: 'Stockage photos', montant: 2.99, type: 'renouvellement', rythme: 'mensuel'},
       {date: rIso(55), service: 'Assurance auto', montant: null, type: 'fin', rythme: 'annuel', note: 'Échéance du contrat : un comparatif peut être prêt un mois avant.'}],
     alertes: [
-      {date: rIso(-2), type: 'facture_mobile', titre: 'Achat payé par la facture mobile', service: 'Forfait mobile', montant: 24.99, texte: 'L’opérateur ne nomme pas le marchand : regarde le détail de la facture.'},
       {date: rIso(-6), type: 'echec', titre: 'Paiement échoué', service: 'Plateforme vidéo', montant: 9.99, texte: '3 tentatives : l’abonnement s’arrête si le moyen de paiement n’est pas mis à jour.'},
       {date: rIso(-9), type: 'essai', titre: 'Essai gratuit qui devient payant', service: 'Appli de notes', montant: 7.99, texte: 'Premier prélèvement dans 24 jours.'},
       {date: rIso(-21), type: 'hausse', titre: 'Hausse de prix', service: 'Plateforme d’animation', montant: 69.99, avant: 59.99, texte: 'À partir du prochain renouvellement.'},
-      {date: rIso(-33), type: 'inhabituel', titre: 'Facture deux fois plus haute que d’habitude', service: 'Forfait mobile', montant: 37.98, avant: 12.99, texte: 'Habituellement 12,99 € par mois.'}],
+      {date: rIso(-33), type: 'inhabituel', titre: 'Facture deux fois plus haute que d’habitude', service: 'Électricité', montant: 96.40, avant: 48.20, texte: 'Habituellement 48,20 € par mois.'}],
     abonnements: [
       {service: 'Plateforme vidéo', cat: 'Vidéo et musique', prix: 9.99, rythme: 'mensuel', depuis: '03/2023'},
       {service: 'Plateforme d’animation', cat: 'Vidéo et musique', prix: 59.99, rythme: 'annuel', depuis: '01/2022', hausse: 'passe à 69,99 €'},
