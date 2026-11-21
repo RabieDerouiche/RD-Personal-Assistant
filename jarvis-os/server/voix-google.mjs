@@ -11,6 +11,11 @@
      un compteur présent mais illisible, sans copie lisible : Google est coupé jusqu'au mois suivant.
    - Un plafond du jour (100 000 par défaut) arrête une boucle qui viderait le mois en quelques heures.
    - Après une erreur de Google, Pierre parle un moment (1, 2, 4… jusqu'à 30 minutes) : pas d'attente à chaque phrase pendant une panne.
+   0.48.0 (sa demande du 21/11/2026 : « rajoute une alerte et un autre garde-fou ») :
+   - une alerte à la moitié du plafond, avec la date où il serait atteint au rythme du mois ;
+   - une coupure venue de Google lui-même : le serveur guette les mails d'alerte de budget de Google Cloud (la facturation réelle,
+     indépendante de ce compteur) ; dès qu'il en voit un, Google est coupé jusqu'à ce que le propriétaire le relance (coupure()).
+   La part gratuite est de 1 million de caractères par mois civil, remise à zéro le 1er à minuit, heure du Pacifique (9 h à Paris).
    Rien ne part chez Google tant que le propriétaire n'a pas posé lui-même un accès sur le serveur (JARVIS ne le demande jamais) :
    fichier DATA/voix-google.json (mode 600) : {"cle": "<clé d'API limitée à Text-to-Speech>"} (collée dans Réglages) ou le JSON
    d'un compte de service Google Cloud (type « service_account »). Synthèse : POST /v1/text:synthesize (synchrone), LINEAR16 à 24 kHz
@@ -31,7 +36,7 @@ export const longueur = (t) => Buffer.byteLength(String(t || ''), 'utf8');
 const MAX_APPEL = 4800;   /* Google refuse plus de 5 000 octets par demande ; JARVIS lui envoie une phrase à la fois */
 
 export function createVoixGoogle({fichier, compteurFichier, base = 'https://texttospeech.googleapis.com', plafond = 990000, plafondJour = 100000, now = Date.now, alerte = () => {}, log = () => {},
-  miroir = {lire: () => null, ecrire: () => {}}}) {
+  miroir = {lire: () => null, ecrire: () => {}}, coupure = () => null}) {
   let jet = {t: '', exp: 0}, LISTE = {at: 0, voix: null};
   let ERR = {n: 0, jusqu: 0, dernier: null}, OK = null, REFUS = '';
   /* l'accès posé par lui : une clé d'API, ou un compte de service ; null sinon */
@@ -68,7 +73,24 @@ export function createVoixGoogle({fichier, compteurFichier, base = 'https://text
   /* le mois et le jour de facturation de Google : heure du Pacifique (0.44.0 : le compteur repartait sinon 8 à 9 heures trop tôt) */
   const jourP = () => new Intl.DateTimeFormat('en-CA', {timeZone: 'America/Los_Angeles', year: 'numeric', month: '2-digit', day: '2-digit'}).format(new Date(now()));
   const mois = () => jourP().slice(0, 7);
-  const neuf = () => ({mois: mois(), caracteres: 0, appels: 0, jour: jourP(), jourOctets: 0, alerte80: false, alerte95: false, alerteMax: false, alerteJour: '', alerteIllisible: false});
+  const neuf = () => ({mois: mois(), caracteres: 0, appels: 0, jour: jourP(), jourOctets: 0, alerte50: false, alerte80: false, alerte95: false, alerteMax: false, alerteJour: '', alerteIllisible: false});
+  /* 0.48.0 : la remise à zéro de la part gratuite : le 1er du mois suivant, à minuit à Los Angeles (8 h ou 9 h à Paris selon les heures d'été) */
+  function remise() {
+    const [y, m] = mois().split('-').map(Number), ny = m === 12 ? y + 1 : y, nm = m === 12 ? 1 : m + 1;
+    for (const h of [6, 7, 8, 9]) {
+      const t = Date.UTC(ny, nm - 1, 1, h), p = Object.fromEntries(new Intl.DateTimeFormat('en-CA', {timeZone: 'America/Los_Angeles', day: '2-digit', hour: '2-digit', hourCycle: 'h23'}).formatToParts(new Date(t)).map((x) => [x.type, x.value]));
+      if (p.day === '01' && p.hour === '00') return t;
+    }
+    return Date.UTC(ny, nm - 1, 1, 8);
+  }
+  /* au rythme du mois (ce qui est compté, divisé par les jours passés, aujourd'hui compris) : le jour où le plafond serait atteint, ou 0 */
+  function rythme(c) {
+    const j = +jourP().slice(8, 10), [y, m] = c.mois.split('-').map(Number), fin = new Date(Date.UTC(y, m, 0)).getUTCDate();
+    if (!c.caracteres) return 0;
+    const jour = Math.ceil(plafond / (c.caracteres / j));
+    return jour <= fin ? jour : 0;
+  }
+  const rythmeTexte = (c) => { const j = rythme(c); return j ? 'À ce rythme, plafond vers le ' + j + ' (ensuite Pierre jusqu’au 1er).' : 'À ce rythme, le plafond ne sera pas atteint ce mois-ci.'; };
   /* une copie lue : {etat: 'absent' | 'illisible' | 'ok', c} */
   const lu = (f) => { try { const c = JSON.parse(fs.readFileSync(f, 'utf8')); return c && typeof c === 'object' && typeof c.mois === 'string' ? {etat: 'ok', c} : {etat: 'illisible'}; } catch (e) { return {etat: e && e.code === 'ENOENT' ? 'absent' : 'illisible'}; } };
   /* le compteur du mois : la plus haute des copies lisibles ; un fichier illisible sans autre copie lisible du mois : bloqué (Pierre) */
@@ -78,7 +100,7 @@ export function createVoixGoogle({fichier, compteurFichier, base = 'https://text
     for (const x of copies) {
       c.caracteres = Math.max(c.caracteres, +x.caracteres || 0); c.appels = Math.max(c.appels, +x.appels || 0);
       if (x.jour === c.jour) c.jourOctets = Math.max(c.jourOctets, +x.jourOctets || 0);
-      for (const k of ['alerte80', 'alerte95', 'alerteMax', 'alerteIllisible']) c[k] = c[k] || !!x[k];
+      for (const k of ['alerte50', 'alerte80', 'alerte95', 'alerteMax', 'alerteIllisible']) c[k] = c[k] || !!x[k];
       if (x.alerteJour === c.jour) c.alerteJour = c.jour;
     }
     if (f.etat === 'illisible' && !copies.length) c.bloque = true;
@@ -93,6 +115,8 @@ export function createVoixGoogle({fichier, compteurFichier, base = 'https://text
   /* peut-on envoyer n octets maintenant ? (seules les alertes sont écrites ici) */
   function verdict(n, force) {
     const c = compteur();
+    let k = null; try { k = coupure(); } catch { k = {raison: 'coupure illisible'}; }
+    if (k) return {ok: false, raison: 'coupée : ' + (k.raison || 'par prudence') + ' (Réglages, « Relancer Google »)', c};
     if (c.bloque || c.alerteIllisible) {
       if (!c.alerteIllisible) { c.alerteIllisible = true; c.alerteMax = true; c.caracteres = Math.max(c.caracteres, plafond); try { garder(c); } catch { /* rien */ }
         alerte({titre: 'Voix Google coupée', texte: 'Son compteur est illisible : par prudence, Pierre parle jusqu’au 1er du mois.'}); }
@@ -115,8 +139,9 @@ export function createVoixGoogle({fichier, compteurFichier, base = 'https://text
   /* l'état (sans rien écrire) : compteurs, plafonds, pauses, dernière erreur, dernière phrase dite par Google */
   function etat() {
     const c = compteur();
-    return {pret: !!acces(), mois: c.mois, caracteres: c.caracteres, appels: c.appels, plafond, gratuit: 1000000, comptage: 'octets',
-      aujourdhui: c.jourOctets, plafondJour, pause: !!(c.alerteMax || c.caracteres >= plafond || c.bloque || c.alerteIllisible), pauseJour: c.alerteJour === c.jour || c.jourOctets >= plafondJour,
+    let k = null; try { k = coupure(); } catch { k = {raison: 'coupure illisible'}; }
+    return {pret: !!acces(), mois: c.mois, caracteres: c.caracteres, appels: c.appels, plafond, gratuit: 1000000, comptage: 'octets', remise: remise(), rythme: rythme(c), coupee: k ? (k.raison || 'par prudence') : '',
+      aujourdhui: c.jourOctets, plafondJour, pause: !!(k || c.alerteMax || c.caracteres >= plafond || c.bloque || c.alerteIllisible), pauseJour: c.alerteJour === c.jour || c.jourOctets >= plafondJour,
       bloque: !!(c.bloque || c.alerteIllisible), erreur: ERR.dernier, horsErreurJusqu: ERR.jusqu > now() ? ERR.jusqu : 0, dernierSucces: OK, refus: REFUS};
   }
   /* la synthèse : le fichier écrit, ou null (pas d'accès, plafond, panne, erreur : l'appelant reprend Pierre) ; info.raison dit pourquoi.
@@ -129,11 +154,12 @@ export function createVoixGoogle({fichier, compteurFichier, base = 'https://text
     if (!v.ok) { REFUS = info.raison = v.raison; return null; }
     /* la place est prise avant l'appel, sans attente entre le contrôle et l'écriture ; rien n'est rendu ensuite */
     const c = v.c; c.caracteres += n; c.appels++; c.jourOctets += n;
-    const a95 = !c.alerte95 && c.caracteres >= plafond * 0.95, a80 = !a95 && !c.alerte80 && c.caracteres >= plafond * 0.8;
-    if (a95) c.alerte95 = c.alerte80 = true; else if (a80) c.alerte80 = true;
+    const a95 = !c.alerte95 && c.caracteres >= plafond * 0.95, a80 = !a95 && !c.alerte80 && c.caracteres >= plafond * 0.8, a50 = !a95 && !a80 && !c.alerte50 && c.caracteres >= plafond * 0.5;
+    if (a95) c.alerte95 = c.alerte80 = c.alerte50 = true; else if (a80) c.alerte80 = c.alerte50 = true; else if (a50) c.alerte50 = true;
     garder(c);
     if (a95) alerte({titre: 'Voix Google : 95 % du plafond', texte: 'Plus que ' + nbFr(plafond - c.caracteres) + ' ce mois-ci ; ensuite Pierre, jusqu’au 1er. Rien de payant.'});
-    else if (a80) alerte({titre: 'Voix Google : 80 % du plafond', texte: nbFr(c.caracteres) + ' sur ' + nbFr(plafond) + ' ce mois-ci. Au plafond, Pierre reprend tout seul : rien de payant.'});
+    else if (a80) alerte({titre: 'Voix Google : 80 % du plafond', texte: nbFr(c.caracteres) + ' sur ' + nbFr(plafond) + ' ce mois-ci. ' + rythmeTexte(c) + ' Rien de payant.'});
+    else if (a50) alerte({titre: 'Voix Google : la moitié du mois', texte: nbFr(c.caracteres) + ' sur ' + nbFr(plafond) + ' déjà ce mois-ci. ' + rythmeTexte(c) + ' Rien de payant.'});
     let j;
     try { j = await appel('/v1/text:synthesize', {input: {text: t}, voice: {languageCode: LANGUE, name: nomOk(nom) ? nom : VOIX_DEFAUT}, audioConfig: {audioEncoding: 'LINEAR16', sampleRateHertz: 24000}}); }
     catch (e) { erreur(e, info); return null; }

@@ -27,7 +27,7 @@ import {createActivite, outilNom} from './activite.mjs';
 import {createRadar} from './radar.mjs';
 const ACT = createActivite();   /* 0.33.0 : ce que fait Claude à l'instant */
 
-const VERSION = '0.47.0';
+const VERSION = '0.48.0';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PORT = +(process.env.PORT || 8787);
 const HOST = process.env.HOST || '127.0.0.1';
@@ -955,7 +955,7 @@ const MCP_OUTILS = [
    (stable : la discussion garde son Claude), et l'état du moment part avec chaque question dans une ligne [JARVIS …]. ---------- */
 const GUIDE_JARVIS = `\n\n[JARVIS OS ${VERSION} : ce que tu es et ce que tu sais faire. Tu es le Claude de J.A.R.V.I.S OS (on dit « Jarvis »), l'app du propriétaire sur son serveur ; son nom s'écrit J.A.R.V.I.S OS. « Réglages » s'ouvre par « Tout » (la petite barre au-dessus de l'orbe), puis Réglages.
 - Conversation continue : l'orbe. Écoute Parakeet et fin de phrase Smart Turn : Réglages, carte « JARVIS » (« Passer à Parakeet », « Installer la fin de phrase (Smart Turn) »).
-- Voix du serveur : Pierre (Piper, gratuit) ou Google Chirp 3 HD : Réglages, carte « Voix du serveur : Pierre ou Google » (il y colle sa clé d'API Google, puis choisit « Google » et une voix). Gratuite jusqu'à 1 million de caractères par mois ; JARVIS compte avant chaque envoi (en octets, au moins autant que Google), prévient à 80 % et à 95 %, s'arrête à son plafond (sous le million) jusqu'au mois suivant, et à un plafond du jour ; au moindre doute (compteur illisible, erreur de Google), Pierre parle : jamais rien de payant. Ces garde-fous existent déjà. Pour savoir si Google parle vraiment : la ligne [JARVIS …] (dernière phrase dite), ou Réglages, carte « Voix du serveur », « Vérifier ». Le réglage « Voix de JARVIS » doit être sur « Ton serveur ».
+- Voix du serveur : Pierre (Piper, gratuit) ou Google Chirp 3 HD : Réglages, carte « Voix du serveur : Pierre ou Google » (il y colle sa clé d'API Google, puis choisit « Google » et une voix). Gratuite jusqu'à 1 million de caractères par mois ; JARVIS compte avant chaque envoi (en octets, au moins autant que Google), prévient à 80 % et à 95 %, s'arrête à son plafond (sous le million) jusqu'au mois suivant, et à un plafond du jour ; au moindre doute (compteur illisible, erreur de Google), Pierre parle ; une alerte de budget de Google Cloud reçue par mail coupe Google jusqu'à « Relancer Google » ; alertes à 50 % (avec la date prévue du plafond), 80 % et 95 % : jamais rien de payant. Ces garde-fous existent déjà. La part gratuite : 1 million de caractères par mois civil, remise à zéro le 1er vers 9 h, heure de Paris. Pour savoir si Google parle vraiment : la ligne [JARVIS …] (dernière phrase dite), ou Réglages, carte « Voix du serveur », « Vérifier ». Le réglage « Voix de JARVIS » doit être sur « Ton serveur ».
 - Mémoire : « retiens que… » (outil retenir) ; Réglages, « Ce que JARVIS retient » ; Claude la range chaque dimanche à 18 h (propositions à valider).
 - Routines et brief du matin : « Tout », Automatisations, « Routines de Claude » (une routine en une phrase ; outil programmer_routine).
 - Automatisations de l'iPhone : Réglages, « Siri et bouton Action », « Automatisations » (actions brief, agenda, demain, pourmoi, meteo).
@@ -964,14 +964,16 @@ const GUIDE_JARVIS = `\n\n[JARVIS OS ${VERSION} : ce que tu es et ce que tu sais
 - Notifications : Réglages, « Notifications ». Mise à jour : proposée à l'ouverture, ou Réglages, carte « JARVIS », « Mettre à jour le serveur ».
 L'état du moment (voix, compteurs, écoute, mémoire, routines, assistants) arrive avec chaque question dans la ligne [JARVIS …] : réponds à partir d'elle, sans dire que tu ne peux pas vérifier. Pour un réglage : son état, puis les étapes exactes. Un changement du code de JARVIS se demande dans sa session de développement (Claude Code) : ne le confie jamais à la tâche Claude du serveur.]`;
 const nbFr = (n) => Number(n || 0).toLocaleString('fr-FR');
+/* « 1er décembre à 9 h », heure de Paris */
+const jourDit = (t) => { const q = Object.fromEntries(new Intl.DateTimeFormat('fr-FR', {timeZone: 'Europe/Paris', day: 'numeric', month: 'long', hour: 'numeric', minute: '2-digit'}).formatToParts(new Date(t)).map((x) => [x.type, x.value])); return (q.day === '1' ? '1er' : q.day) + ' ' + q.month + ' à ' + (+q.hour) + ' h' + (q.minute && q.minute !== '00' ? ' ' + q.minute : ''); };
 function etatJarvisLigne() {
   try {
     const vg = VG.etat(), g = (S.config || {}).voixServeur === 'google', nomG = String((S.config || {}).voixGoogleNom || VOIX_DEFAUT).split('-').pop();
     const hm = (t) => new Intl.DateTimeFormat('fr-FR', {timeZone: 'Europe/Paris', hour: '2-digit', minute: '2-digit'}).format(new Date(t));
-    const garde = vg.bloque ? ', coupée : compteur illisible, Pierre parle jusqu’au 1er' : vg.pause ? ', en pause : plafond atteint, Pierre parle jusqu’au 1er' : vg.pauseJour ? ', en pause : plafond du jour atteint, Pierre jusqu’à demain' : vg.horsErreurJusqu ? ', en erreur : Pierre jusqu’à ' + hm(vg.horsErreurJusqu) : '';
+    const garde = vg.coupee ? ', coupée : ' + vg.coupee + ', Pierre parle jusqu’à ce qu’il touche « Relancer Google » (Réglages)' : vg.bloque ? ', coupée : compteur illisible, Pierre parle jusqu’au 1er' : vg.pause ? ', en pause : plafond atteint, Pierre parle jusqu’au 1er' : vg.pauseJour ? ', en pause : plafond du jour atteint, Pierre jusqu’à demain' : vg.horsErreurJusqu ? ', en erreur : Pierre jusqu’à ' + hm(vg.horsErreurJusqu) : '';
     const voix = g && vg.pret ? 'voix du serveur Google (' + nomG + ')' + garde : 'voix du serveur Pierre' + (vg.pret ? ' (clé Google posée, Google pas choisi)' : ' (voix Google non activée : aucune clé)');
     /* 0.47.0 : on compte en octets (jamais moins que ce que Google facture) ; la dernière phrase dite et la dernière erreur */
-    const compteur = vg.pret ? ', ' + nbFr(vg.caracteres) + ' comptés ce mois sur un plafond de ' + nbFr(vg.plafond) + ' (en octets, au moins autant que les caractères facturés ; gratuit jusqu’à 1 million ; aujourd’hui ' + nbFr(vg.aujourdhui) + ' sur ' + nbFr(vg.plafondJour) + ')'
+    const compteur = vg.pret ? ', ' + nbFr(vg.caracteres) + ' comptés ce mois sur un plafond de ' + nbFr(vg.plafond) + ' (en octets, au moins autant que les caractères facturés ; gratuit jusqu’à 1 million par mois civil, remis à zéro le ' + jourDit(vg.remise) + ' ; aujourd’hui ' + nbFr(vg.aujourdhui) + ' sur ' + nbFr(vg.plafondJour) + (vg.rythme ? ' ; à ce rythme, plafond vers le ' + vg.rythme : '') + ')'
       + (VOIXD ? ', dernière phrase du serveur dite par ' + (VOIXD.moteur === 'google' ? 'Google à ' + hm(VOIXD.at) : 'Pierre à ' + hm(VOIXD.at) + (VOIXD.raison ? ' (' + VOIXD.raison + ')' : '')) : ', aucune phrase dite par le serveur depuis son démarrage')
       + (vg.erreur && (!vg.dernierSucces || vg.erreur.at > vg.dernierSucces.at) ? ', dernière erreur Google à ' + hm(vg.erreur.at) + ' : ' + vg.erreur.message : '') : '';
     const em = ECOUTE.moteur(), ecoute = ECOUTE.ready() ? 'écoute ' + (em.moteur === 'parakeet' ? 'Parakeet' : 'Whisper') + ', fin de phrase ' + (TOUR.ready() ? 'Smart Turn' : 'à 0,7 s de silence (Smart Turn pas installé)') : 'écoute du serveur pas installée';
@@ -1236,6 +1238,7 @@ const VG = createVoixGoogle({fichier: path.join(DATA, 'voix-google.json'), compt
   plafond: Math.min(+process.env.JARVIS_VOIX_GOOGLE_PLAFOND || 990000, 1000000), now,   /* 0.45.0 : 990 000, juste sous le million gratuit (sa demande : « qu'il ne bascule pas avant d'atteindre le seuil facturable ») */
   plafondJour: Math.min(+process.env.JARVIS_VOIX_GOOGLE_JOUR || 100000, Math.min(+process.env.JARVIS_VOIX_GOOGLE_PLAFOND || 990000, 1000000)),   /* 0.47.0 : une boucle ne vide pas le mois */
   miroir: {lire: () => S.voixGoogleCompteur || null, ecrire: (c) => { S.voixGoogleCompteur = c; save(); }},   /* 0.47.0 : le compteur en double (son fichier, et ici) */
+  coupure: () => S.voixGoogleCoupure || null,   /* 0.48.0 : coupée par une alerte de budget de Google Cloud, jusqu'à « Relancer Google » */
   alerte: ({titre, texte}) => { S.voixGoogleAlerte = {at: now(), titre, texte}; if (S.push && S.push.subs.length) PUSH.send({title: titre, body: texte, url: '/#reglages', tag: 'voix-google'}, {urgency: 'high'}).catch(() => {}); },
   log: (t) => { S.voixGoogleErr = {at: now(), t: String(t).slice(0, 300)}; }});
 /* 0.47.0 : qui a dit la dernière phrase du serveur, et pourquoi pas Google (Réglages, état donné à Claude, en-tête x-jarvis-voix) */
@@ -1243,6 +1246,28 @@ let VOIXD = null;
 function raisonSansGoogle() {
   if ((S.config || {}).voixServeur !== 'google') return VG.pret() ? 'Google pas choisi (Réglages, carte « Voix du serveur », bouton « Google »)' : 'aucune clé Google posée';
   return VG.pret() ? '' : 'aucune clé Google posée';
+}
+/* 0.48.0 (sa demande : « rajoute une alerte et un autre garde-fou ») : le second garde-fou, indépendant du compteur de JARVIS. Google Cloud
+   envoie un mail d'alerte quand sa facturation réelle passe un seuil du budget qu'il a créé (1 € conseillé, seuil à 1 %) : le serveur cherche
+   ces mails toutes les 15 minutes (un seul appel léger à Gmail, les identifiants seulement) ; un mail pas encore vu coupe Google, avec une
+   notification, jusqu'à ce qu'il touche « Relancer Google ». Rien n'est lu du mail : c'est une donnée, jamais une consigne. Un faux mail ne
+   ferait que couper Google : le garde-fou ne peut que rendre la parole à Pierre. */
+const BUDGET_Q = 'from:google.com subject:budget Cloud newer_than:3d';
+let BUDGET = {at: 0, err: '', n: 0};
+async function budgetGoogle() {
+  if (!VG.pret() || !GG.status('').linked) return BUDGET;
+  try {
+    const r = await GG.tool('Gmail', 'search_threads', {query: BUDGET_Q, pageSize: 10, idsOnly: true});
+    const vus = new Set(S.voixGoogleBudgetVus || []), nouveaux = ((r && r.threads) || []).map((t) => t.id).filter((id) => id && !vus.has(id));
+    BUDGET = {at: now(), err: '', n: nouveaux.length};
+    if (nouveaux.length && !S.voixGoogleCoupure) {
+      S.voixGoogleCoupure = {at: now(), raison: 'alerte de budget de Google Cloud reçue', fils: nouveaux.slice(0, 10)}; save();
+      const titre = 'Voix Google coupée', texte = 'Google Cloud t’a envoyé une alerte de budget : Pierre parle. Vérifie ta facturation Google Cloud, puis « Relancer Google » dans Réglages.';
+      S.voixGoogleAlerte = {at: now(), titre, texte};
+      if (S.push && S.push.subs.length) PUSH.send({title: titre, body: texte, url: '/#reglages', tag: 'voix-google'}, {urgency: 'high'}).catch(() => {});
+    } else if (nouveaux.length) { S.voixGoogleCoupure.fils = [...new Set([...(S.voixGoogleCoupure.fils || []), ...nouveaux])].slice(-20); save(); }
+  } catch (e) { BUDGET = {at: now(), err: String(e && e.message || e).slice(0, 160), n: 0}; }
+  return BUDGET;
 }
 /* la vérification de l'accès Google : une vraie phrase (comptée, une cinquantaine d'octets), même juste après une erreur.
    choisir (clé tout juste collée) : si Google répond, il parle aussitôt ; « Vérifier » ne change pas son choix */
@@ -1515,7 +1540,7 @@ const server = http.createServer(async (req, res) => {
       if (p === '/api/voice/install' && req.method === 'POST') return json(res, 200, installVoice());
       if (p === '/api/voice/install') return json(res, 200, VOICE_INSTALL);
       /* 0.40.0 : la voix Google — état (compteur du mois, plafond), voix françaises disponibles, choix, essai d'une voix */
-      if (p === '/api/voix/google' && req.method === 'GET') return json(res, 200, {...VG.etat(), choisie: (S.config || {}).voixServeur === 'google', nom: (S.config || {}).voixGoogleNom || VOIX_DEFAUT, derniere: VOIXD, alerte: S.voixGoogleAlerte || null, sansGoogle: raisonSansGoogle()});
+      if (p === '/api/voix/google' && req.method === 'GET') return json(res, 200, {...VG.etat(), choisie: (S.config || {}).voixServeur === 'google', nom: (S.config || {}).voixGoogleNom || VOIX_DEFAUT, derniere: VOIXD, alerte: S.voixGoogleAlerte || null, sansGoogle: raisonSansGoogle(), coupure: S.voixGoogleCoupure || null, budget: BUDGET});
       if (p === '/api/voix/google/voix' && req.method === 'GET') { try { return json(res, 200, {voix: await VG.voix()}); } catch (e) { return json(res, 200, {voix: [], erreur: String(e && e.message || e).slice(0, 200)}); } }
       if (p === '/api/voix/google' && req.method === 'POST') {
         const b = await readBody(req); S.config = S.config || {};
@@ -1531,6 +1556,11 @@ const server = http.createServer(async (req, res) => {
         fs.writeFileSync(path.join(DATA, 'voix-google.json'), JSON.stringify({cle}), {mode: 0o600});
         const v = await verifierGoogle({choisir: true});   /* 0.47.0 : la clé est essayée tout de suite ; si Google répond, il parle (sinon Pierre, et l'erreur est dite) */
         return json(res, 200, {...VG.etat(), ...v, choisie: (S.config || {}).voixServeur === 'google', nom: (S.config || {}).voixGoogleNom || VOIX_DEFAUT, derniere: VOIXD});
+      }
+      if (p === '/api/voix/google/budget/maintenant' && req.method === 'POST') { await budgetGoogle(); return json(res, 200, {...VG.etat(), coupure: S.voixGoogleCoupure || null, budget: BUDGET}); }
+      if (p === '/api/voix/google/relancer' && req.method === 'POST') {   /* 0.48.0 : lui seul relance Google après une alerte de budget ; ces mails-là ne coupent plus */
+        const k = S.voixGoogleCoupure; if (k) { S.voixGoogleBudgetVus = [...new Set([...(S.voixGoogleBudgetVus || []), ...(k.fils || [])])].slice(-50); S.voixGoogleCoupure = null; save(); }
+        return json(res, 200, {...VG.etat(), coupure: null, budget: BUDGET, relance: !!k});
       }
       if (p === '/api/voix/google/verifier' && req.method === 'POST') { const v = await verifierGoogle(); return json(res, 200, {...VG.etat(), ...v, choisie: (S.config || {}).voixServeur === 'google', nom: (S.config || {}).voixGoogleNom || VOIX_DEFAUT, derniere: VOIXD}); }
       if (p === '/api/voix/google/essai' && req.method === 'POST') {
@@ -1614,7 +1644,8 @@ server.listen(PORT, HOST, () => {
   ECOUTE.warm();   /* 0.22.0 : Whisper chargé une fois, pas à la première phrase */
   TOUR.warm();   /* 0.36.0 : Smart Turn aussi */
   ROUT.demarrer(+process.env.JARVIS_ROUTINES_MS || 30000);   /* 0.41.0 : l'horloge des routines */
-  RADAR.demarrer(+process.env.JARVIS_RADAR_TICK_MS || 60000);   /* Radar : lecture du matin (6 h 50), notification de la veille (19 h) */
+  RADAR.demarrer(+process.env.JARVIS_RADAR_TICK_MS || 60000);
+  { const t = setInterval(() => { budgetGoogle().catch(() => {}); }, +process.env.JARVIS_VOIX_BUDGET_MS || 900000); if (t.unref) t.unref(); setTimeout(() => { budgetGoogle().catch(() => {}); }, 60000).unref(); }   /* 0.48.0 : les alertes de budget de Google Cloud */   /* Radar : lecture du matin (6 h 50), notification de la veille (19 h) */
   setTimeout(() => { profilLire().catch(() => {}); }, 5000);   /* 0.37.0 : le Profil, lu une première fois */
   if (!S.tokens.length && !fs.existsSync(PAIR)) console.log('Aucun appareil relié. Code d\'appairage : ' + newPairing() + ' (30 minutes)');
 });
