@@ -89,6 +89,8 @@ function answer(raw) {
   /* discussion de la page sur le serveur : propositions en fin de réponse (⟦outil …⟧), seulement si la consigne décrit les outils */
   const lastQ = input.split('Lui : ').pop(), sys = (opt('--append-system-prompt') || '') + '\n' + (opt('--system-prompt') || '') + '\n' + FIRST;
   if (/relance demain pour Iris/.test(lastQ)) return {text: /programmer_relance/.test(sys) ? 'Je te propose une relance : elle attend ton bouton.\n⟦outil programmer_relance {"quand":"' + demain + 'T09:00","quoi":"Voir si Iris a répondu au syndic","ligne":2}⟧' : 'Pas d’outil de relance.'};
+  /* 0.34.0 : réponses illustrées — montre la première demande des données reçues (son titre exact), si l'outil est décrit */
+  if (/montre-moi/i.test(lastQ)) { const t = (/"demandes_a_rabie":\[\{"bot":"[^"]*","titre":"([^"]+)"/.exec(sys) || [])[1]; return {text: /outil montrer|- montrer :/.test(sys) && t ? 'Voici la demande qui t’attend.\n⟦outil montrer {"titre":' + JSON.stringify(t) + ',"type":"demande"}⟧\n⟦outil montrer {"titre":"Élément qui n’existe pas"}⟧' : 'Pas d’outil montrer (' + (t || 'aucune demande') + ').'}; }
   if (/ordre de test pour Kairos/.test(lastQ)) return {text: /outil preparer_ordre/.test(sys) ? 'Je te propose cet ordre pour Kairos : il attend ton bouton.\n⟦outil preparer_ordre {"bot":"Kairos","message":"Relève le prix du robot cuiseur."}⟧' : 'Pas d’outils décrits.'};
   if (/confie à la tâche/.test(lastQ)) return {text: 'Je te propose de lancer la tâche Claude.\n```\n⟦outil confier_tache_claude {"demande":"Vérifie les routines d’Iris."}⟧\n```'};
   if (/kairos/i.test(input)) return {text: 'Je prépare ça pour Kairos, la mission attend ton accord.\nMISSIONS: [{"agent":"kairos","text":"vérifier le prix du robot cuiseur"}]'};

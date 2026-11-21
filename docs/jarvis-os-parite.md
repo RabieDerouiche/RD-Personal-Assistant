@@ -56,6 +56,8 @@ Règle (16/11/2026) : **aucune régression**. Chaque fonction de la page (copie 
 
 ## Nouveautés à ajouter (demandes du 16/11/2026)
 
+- [x] Après le comparatif avec les AI OS (21/11/2026) : Claude instantané (0.30.0), mains libres et lecture au fil de la réponse (0.31.0), écoute Parakeet (0.32.0), activité en direct, routeur et secours, missions en parallèle (0.33.0), réponses illustrées (0.34.0) ; bancs maquette et bout en bout
+
 - [ ] Automatisations en suivi de livraison (dates, étapes, prochain passage)
 - [ ] Achats : ajout et retrait faciles, courbe des prix par objet
 - [ ] Papiers : recherche, regroupement, catégories (voiture, lui, épouse, fille, appartement et immobilier, entourage de la fille)

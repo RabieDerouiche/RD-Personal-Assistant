@@ -129,6 +129,11 @@
   .dict-bar { flex: 0 0 46px; height: 4px; border-radius: 2px; background: rgba(255, 255, 255, .12); overflow: hidden; }
   .dict-bar i { display: block; width: 100%; height: 100%; background: linear-gradient(90deg, #22d3ee, #818cf8); transform: scaleX(.04); transform-origin: left; transition: transform .08s linear; }
   .dict-strip[data-s="transcribing"] .dict-bar { visibility: hidden; }
+  /* 0.34.0 : réponses illustrées (la carte d'un élément sous la réponse de Claude) */
+  .msg.carte { display: flex; align-items: center; gap: 12px; width: 100%; max-width: 92%; text-align: left; padding: 12px 14px; border-radius: 16px; border: 1px solid rgba(56, 189, 248, .45); background: linear-gradient(135deg, rgba(8, 30, 70, .7), rgba(46, 16, 101, .45)); color: inherit; box-shadow: 0 0 16px rgba(56, 189, 248, .15); }
+  .carte-ic { flex: none; width: 36px; height: 36px; border-radius: 12px; display: grid; place-items: center; background: rgba(56, 189, 248, .16); color: #7dd3fc; }
+  .carte-tx { min-width: 0; flex: 1; display: grid; gap: 2px; } .carte-tx small { color: var(--muted); font-size: 12px; } .carte-tx b { font-family: 'Oxanium', system-ui, sans-serif; } .carte-sub { overflow-wrap: anywhere; }
+  .carte-go { flex: none; color: #7dd3fc; }
   /* 0.33.0 : activité en direct, étapes des missions, modèle de la réponse */
   .jv-btn[data-act]::before { content: attr(data-act); position: absolute; top: 2px; right: 2px; z-index: 2; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 10px; background: #a855f7; color: #fff; font: 700 12px/20px 'Oxanium', system-ui, sans-serif; text-align: center; box-shadow: 0 0 10px rgba(168, 85, 247, .8); }
   .act-card .act-row { display: flex; gap: 10px; align-items: flex-start; padding: 8px 4px; }
@@ -3131,6 +3136,7 @@ void main(){
     return "Tu es Claude, le chef de l'équipe d'assistants Grok Bot de Rabie (" + BOTS.map((x) => x.name).join(', ') + ") : tu lis Pilotage, tu réponds, tu répartis le travail. Il te parle depuis sa page Jarvis, sur iPhone. "
       + "Réponds en français, en phrases courtes et listes, sans introduction : commence par la réponse. Marque (certain), (Likely) ou (guessing) ce que tu affirmes sans preuve dans les données. "
       + "Pour une tâche personnelle de Rabie, appelle ajouter_tache ; pour une date à suivre, ajouter_echeance ; ces outils ne font que proposer, Rabie confirme d'un bouton. "
+      + (SRV_OS ? "Quand ta réponse parle d'éléments précis de ses données (une demande, un rendez-vous, une échéance, un achat, un voyage, une sortie, un dossier), montre-les avec l'outil montrer (trois au plus) : il les touche pour agir. " : '')
       + "Après la réponse, ajoute toujours une dernière ligne qui commence par « Suite : » puis 2 ou 3 relances courtes (6 mots au plus chacune), séparées par « | », formulées comme Rabie les dirait (exemple : Suite : Prépare l'ordre pour Iris | Ça peut attendre ? | Quels papiers ?).\n"
       + "Réponds toi-même ici à ce que Rabie te demande (question, analyse, conseil, rédaction) : c'est le moins cher. Seulement s'il faut modifier une fiche, la Charte, une routine, la structure de Pilotage ou le dépôt, appelle confier_tache_claude. Si Grok Bot est en pause (voir grok_bot dans l'état), dis-le et propose ce qui peut attendre la reprise. "
       + "Tu ne peux rien envoyer, payer, réserver, ni écrire dans Pilotage. Pour faire agir un bot (" + BOTS.map((x) => x.name).join(', ') + "), appelle l'outil preparer_ordre : Rabie le confirmera d'un bouton. "
@@ -3234,6 +3240,7 @@ void main(){
     if (CHAT.prev && CHAT.prev.isConnected) try { CHAT.prev.focus({preventScroll: true}); } catch (e) { /* rien */ }
   }
   const msgEl = (m) => {
+    if (m.kind === 'carte' && typeof carteEl === 'function') return carteEl(m);   /* 0.34.0 : réponses illustrées */
     if (m.kind === 'proposal') {
       const sent = m.state === 'sent', gone = m.state === 'dropped';
       return h('div', {class: 'msg proposal', style: botVars(m.bot)},
@@ -3314,7 +3321,7 @@ void main(){
         inputSchema: {type: 'object', properties: {demande: {type: 'string', description: 'La demande complète, telle que la tâche la lira'}}, required: ['demande']},
         execute: (input) => { const m = String(input.demande || '').trim(); if (!m) throw new Error('Demande vide');
           T.msgs.splice(T.msgs.indexOf(out), 0, {kind: 'act', label: SRV_OS ? 'Confier à la tâche Claude (sur ton serveur)' : 'Confier à la tâche Claude (session complète)', text: m, ok: 'Lancer la tâche', state: 'open', fin: () => ({title: 'Ordre à Claude', effect: 'Une ligne pour Claude dans le Canal, puis la tâche « Ordres Jarvis » lancée.', bot: 'claude', order: m, viaTask: true, say: 'Je lance la tâche.', reply: ''})});
-          renderChat(); return 'Proposée à Rabie ; en attente de son bouton.'; }}].concat(extraChatTools(T, out), relanceChatTool(T, out));
+          renderChat(); return 'Proposée à Rabie ; en attente de son bouton.'; }}].concat(extraChatTools(T, out), relanceChatTool(T, out), carteChatTool(T, out));
   }
   /* les données de la discussion (règles et état de Pilotage) restent les mêmes pendant 10 minutes : le serveur n'envoie à Claude que
      la nouvelle question, et l'heure de Paris part avec chacune ; au-delà, elles sont relues (nouveau Claude, données à jour) */
@@ -7992,6 +7999,36 @@ void main(){
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && GS.open) gsClose(); });
   (() => { const tools = document.getElementById('top-tools'); if (tools) tools.prepend(h('button', {type: 'button', class: 'btn icon-btn gs-btn', id: 'gs-btn', 'aria-label': 'Chercher partout', title: 'Chercher partout', onclick: gsOpen, html: icon('search', 18)})); })();
 
+  /* ================= JARVIS OS 0.34.0 : réponses illustrées (choix du propriétaire, QCM du 21/11/2026, « Réponses illustrées ») =================
+     Claude montre l'élément dont il parle (demande, échéance, rendez-vous, dossier, achat, sortie, voyage, papier, tâche) : sa carte
+     s'affiche sous la réponse, un appui ferme la discussion et l'ouvre là où il vit (mêmes ouvertures que la recherche partout).
+     Il le désigne par son titre, tel qu'il est dans les données qu'il a déjà : pas d'identifiant à inventer. */
+  const CARTE_GRP = {demande: 'Pour moi', echeance: 'Agenda et échéances', evenement: 'Agenda et échéances', rendezvous: 'Agenda et échéances', dossier: 'Dossiers', achat: 'Achats', sortie: 'Sorties', voyage: 'Voyages', papier: 'Papiers', tache: 'Mes tâches'};
+  function carteTrouve(titre, type, grp) {
+    const t = gsNorm(String(titre || '')).trim(); if (t.length < 2) return null;
+    const g = grp || CARTE_GRP[gsNorm(String(type || '')).replace(/[^a-z]/g, '')] || '';
+    const all = gsIndex().filter((x) => x.grp !== 'Rubriques' && x.grp !== 'Échanges avec les bots'), pool = g ? all.filter((x) => x.grp === g) : all;
+    return pool.find((x) => x.ht === t) || pool.find((x) => x.ht.indexOf(t) >= 0 || (x.ht.length >= 6 && t.indexOf(x.ht) >= 0))
+      || gsFind(titre).filter((x) => x.grp !== 'Rubriques' && (!g || x.grp === g)).sort((a, b) => b.score - a.score)[0] || null;
+  }
+  function carteChatTool(T, out) {
+    return [{name: 'montrer', description: "Montre à Rabie la carte d'un élément de l'app dont ta réponse parle (une demande, une échéance, un rendez-vous, un dossier, un achat, une sortie, un voyage, un papier, une tâche) : elle s'affiche sous ta réponse et il la touche pour l'ouvrir et agir. Donne son titre exact, tel qu'il est dans les données. Trois au plus par réponse ; seulement si c'est utile.",
+      inputSchema: {type: 'object', properties: {titre: {type: 'string', description: "Le titre exact de l'élément, tel qu'il est dans les données"}, type: {type: 'string', description: 'demande, echeance, evenement, dossier, achat, sortie, voyage, papier ou tache (facultatif)'}}, required: ['titre']},
+      execute: (input) => {
+        const it = carteTrouve(input.titre, input.type); if (!it) throw new Error('Élément introuvable : ' + input.titre);
+        const cle = out.cid || (out.cid = 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6));   /* la réponse qu'elle illustre (un repère, pas l'objet : la discussion est gardée en JSON) */
+        const deja = T.msgs.filter((m) => m.kind === 'carte' && m.after === cle);
+        if (deja.length >= 3 || deja.some((m) => m.title === it.title && m.grp === it.grp)) return 'Déjà montrée.';
+        T.msgs.splice(T.msgs.indexOf(out) + 1 + deja.length, 0, {kind: 'carte', after: cle, grp: it.grp, ic: it.ic, title: it.title, sub: it.sub});
+        renderChat(); return 'Carte affichée sous ta réponse.';
+      }}];
+  }
+  function carteEl(m) {
+    return h('button', {type: 'button', class: 'msg carte', onclick: () => { const it = carteTrouve(m.title, '', m.grp); closeChat(); if (it && it.open) setTimeout(it.open, 80); else toast('Introuvable', 'Cet élément n’est plus dans tes données.', true); }},
+      h('span', {class: 'carte-ic', html: icon(m.ic || 'doc', 18)}),
+      h('span', {class: 'carte-tx'}, h('small', {text: m.grp}), h('b', {text: m.title}), m.sub ? h('small', {class: 'carte-sub', text: m.sub}) : null),
+      h('span', {class: 'carte-go', html: icon('next', 16)}));
+  }
   /* ================= JARVIS OS 0.33.0 : l'activité en direct (choix du propriétaire, QCM du 21/11/2026, après le comparatif avec les AI OS) =================
      Ce que fait Claude à l'instant (missions, Siri, tour, revérification, comparatif, discussion), avec l'outil qu'il utilise et le plan d'une
      mission, lu sur le serveur (GET /api/activite : 2,5 s quand quelque chose tourne, 5 s sinon, rien quand l'app est derrière) ; et les
