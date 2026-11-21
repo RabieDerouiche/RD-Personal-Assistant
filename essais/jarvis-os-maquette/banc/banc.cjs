@@ -640,6 +640,15 @@ srv.listen(0, async () => {
         pr0.length === 3 && pr0.some((x) => /Stockage en ligne/.test(x) && /le 14 de chaque mois · vue 12 fois, depuis 11\/2025/.test(x)) && pr1.props === 1 && pr1.rules === 18 && pr1.deja.some((x) => /^lun\. 16\/11 Stockage en ligne Abonnements · décalé du sam\. 14\/11 1,99 €$/.test(x)), JSON.stringify([pr0, pr1]));
       ok('Reste à payer : une dépense « montant à compléter » (vers le 5 de chaque mois) s\'ajoute en saisissant son montant (310 €)', pr0.some((x) => /Garde d’enfant/.test(x) && /vers le 5 de chaque mois/.test(x) && /montant à compléter/.test(x)) && vide === '' && pr2.props === 0 && pr2.rules.length === 19
         && pr2.rules.some((x) => /Garde d’enfant \(exemple\) .*310,00 €/.test(x)), JSON.stringify([vide, pr2]));
+      /* 0.50.0 : la preuve de chaque proposition (dernier mail) ; les raccourcis pour ce qu'aucun mail n'annonce */
+      ok('Reste à payer : chaque dépense proposée montre son dernier mail (objet et date)', pr0.every((x) => /Dernier mail : « .+ », le \d\d\/\d\d/.test(x)), JSON.stringify(pr0));
+      const rac0 = await q.evaluate(() => [...document.querySelectorAll('.rad-raccourci')].map((x) => x.textContent));
+      await q.evaluate(() => [...document.querySelectorAll('.rad-raccourci')].find((x) => /Mutuelle/.test(x.textContent)).click()); await q.waitForTimeout(700);
+      const nomPre = await q.evaluate(() => document.querySelector('.rad-form input[type="text"]').value);
+      await q.fill('.rad-form input[inputmode="decimal"]', '24'); await q.fill('.rad-form input[type="number"]', '3'); await q.evaluate(() => document.querySelector('.rad-form button[type="submit"]').click()); await q.waitForTimeout(700);
+      const rac1 = await q.evaluate(() => ({chips: [...document.querySelectorAll('.rad-raccourci')].map((x) => x.textContent), rules: [...document.querySelectorAll('.rad-rule')].map((x) => x.innerText.replace(/\s+/g, ' '))}));
+      ok('Reste à payer : raccourcis « sans mail » (crédit déjà là : pas proposé ; « + Mutuelle » ouvre la feuille au nom écrit, et disparaît une fois ajoutée)', !rac0.some((x) => /Crédit immobilier/.test(x)) && rac0.some((x) => /Mutuelle/.test(x)) && nomPre === 'Mutuelle'
+        && !rac1.chips.some((x) => /Mutuelle/.test(x)) && rac1.rules.some((x) => /^Mutuelle le 3 de chaque mois · ajouté par toi 24,00 €$/.test(x)), JSON.stringify([rac0, nomPre, rac1.chips]));
       await q.screenshot({path: path.join(SH, 'radar-reste.png')}); await ctx.close(); }
     /* aucune rubrique n'affiche de texte cassé */
     const broken = [];
