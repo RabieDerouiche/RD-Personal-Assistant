@@ -187,6 +187,8 @@
     missions: () => req('/api/missions').then((r) => (r.status === 200 ? r.j.missions : null)).catch(() => null),
     /* 0.33.0 : ce que fait Claude à l'instant (missions, Siri, tour, discussion), avec l'outil utilisé et le plan d'une mission */
     activite: () => req('/api/activite').then((r) => (r.status === 200 ? r.j : null)).catch(() => null),
+    /* 0.38.0 : les skills relues des missions */
+    skills: () => req('/api/skills').then((r) => (r.status === 200 ? r.j.skills : null)).catch(() => null),
     /* 0.37.0 : la mémoire durable (ce qu'il a demandé de retenir, et l'état de son Profil) */
     memoire: {
       liste: () => req('/api/memoire').then((r) => (r.status === 200 ? r.j : null)).catch(() => null),
