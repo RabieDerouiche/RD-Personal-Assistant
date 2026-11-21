@@ -2,6 +2,7 @@
 /* Faux Claude Code pour le banc : imite `claude -p --output-format stream-json` (une demande sur l'entrée standard),
    l'entrée en flux (`--input-format stream-json`, une conversation qui reste ouverte), `claude auth status` et `claude mcp list`. */
 import fs from 'node:fs';
+import path from 'node:path';
 const args = process.argv.slice(2);
 if (args[0] === 'mcp') { console.log('Checking MCP server health…\n\nclaude.ai Claude Docs: https://api.example/v1/pages/mcp - ✓ Connected\nclaude.ai Google Calendar: https://calendarmcp.example/mcp/v1 - ✓ Connected\nclaude.ai Google Sheets: https://sheetsmcp.example/mcp/v1 - ✓ Connected\nclaude.ai Gmail: https://gmailmcp.example/mcp/v1 - ✓ Connected'); process.exit(0); }
 if (args[0] === 'auth') { console.log(JSON.stringify({loggedIn: true, authMethod: 'claude.ai'})); process.exit(0); }
@@ -85,6 +86,8 @@ function answer(raw) {
   }
   if (/Test d'accès aux données/.test(input)) return {tools: ['mcp__claude_ai_Google_Calendar__list_events', 'mcp__claude_ai_Gmail__search_threads'], text: 'Ton prochain événement est « Réunion ». Le dernier mail a pour objet « Facture ». Outils : ' + allow + '.'};
   if (/onglet Canal/.test(input)) return {text: 'Ligne écrite dans le Canal pour ' + (input.match(/pour le bot (\S+)/) || [])[1] + ' ; ' + (/N'envoie pas de sonnette/.test(input) ? 'pas de sonnette (pause).' : 'sonnette envoyée.') + ' Outils : ' + allow + '. Garde : ' + guard + '.'};
+  /* 0.38.0 : les skills posées dans le dossier de travail de la mission, et l'outil Skill permis */
+  if (/^Mission :.*liste tes skills/.test(input)) { let sk = []; try { sk = fs.readdirSync(path.join(process.cwd(), '.claude', 'skills')).sort(); } catch { sk = []; } return {text: 'Skills : ' + (sk.join(', ') || 'aucune') + ' ; outil Skill : ' + (/(^|,)Skill(,|$)/.test(allow) ? 'oui' : 'non') + '.'}; }
   if (/^Mission :/.test(input)) return {text: 'Compte rendu : mission faite (' + input.slice(10, 60) + ').'};
   if (/rapport/i.test(input)) return {text: 'Claude va préparer ce rapport, la mission attend ton accord.\nMISSIONS: [{"agent":"claude","text":"préparer un rapport sur la veille .NET"}]'};
   /* discussion de la page sur le serveur : propositions en fin de réponse (⟦outil …⟧), seulement si la consigne décrit les outils */

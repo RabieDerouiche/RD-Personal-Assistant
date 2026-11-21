@@ -584,6 +584,12 @@ try {
         const ef = await MP('/api/memoire/efface', {id: a1.body.item.id});
         ok('mémoire : « Oublier » retire le souvenir', ef.status === 200 && ef.body.items.length === 1 && !ef.body.items.some((x) => /vols directs/.test(x.texte)), JSON.stringify(ef.body.items));
         await G('/api/google/unlink', {}); }
+      /* 0.38.0 : les skills des missions — relues, posées dans le dossier de travail de chaque mission, outil Skill permis */
+      { const sk = await call('/api/skills', {headers: A});
+        ok('skills : cinq skills relues, chacune avec sa description', sk.status === 200 && sk.body.skills.map((x) => x.name).join(',') === 'comparatif-achat,courrier,demarche,recherche-web,voyage' && sk.body.skills.every((x) => x.description.length > 40), JSON.stringify((sk.body.skills || []).map((x) => x.name)));
+        const ms = await call('/api/mission', {method: 'POST', headers: A, body: JSON.stringify({texte: 'liste tes skills'})});
+        let mr = null; for (let i = 0; i < 60 && !(mr && ['terminee', 'echouee'].includes(mr.status)); i++) { await new Promise((z) => setTimeout(z, 250)); mr = ((await call('/api/missions', {headers: A})).body.missions || []).find((x) => x.id === ms.body.id); }
+        ok('skills : posées dans le dossier de travail de la mission, outil Skill permis', !!mr && /^Skills : comparatif-achat, courrier, demarche, recherche-web, voyage ; outil Skill : oui\./.test(mr.result || ''), JSON.stringify(mr && {s: mr.status, r: mr.result})); }
       /* 0.33.0 : missions en parallèle (deux à la fois), avec leur plan en étapes et ce qu'elles font à l'instant */
       const pm1 = await call('/api/mission', {method: 'POST', headers: A, body: JSON.stringify({texte: 'planifie la comparaison des assurances habitation'})});
       const pm2 = await call('/api/mission', {method: 'POST', headers: A, body: JSON.stringify({texte: 'planifie aussi le budget des vacances'})});

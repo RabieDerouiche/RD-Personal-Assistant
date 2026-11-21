@@ -1449,6 +1449,7 @@
   .pap-dates.panel { border-top: 0; padding-top: 0; }
   /* 0.37.0 : la mémoire durable */
   .mem-list { list-style: none; margin: 8px 0; padding: 0; display: grid; gap: 6px; } .mem-it { display: flex; gap: 8px; align-items: center; justify-content: space-between; padding: 6px 8px; border-radius: 10px; background: rgba(56, 189, 248, .08); } .mem-it span { min-width: 0; overflow-wrap: anywhere; }
+  .skill-it span { display: block; } .skill-it small { display: inline; }
   .mem-add { display: flex; gap: 8px; } .mem-in { flex: 1; min-width: 0; padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(56, 189, 248, .35); background: transparent; color: inherit; font: inherit; }
   .sav-tab summary { cursor: pointer; font-size: 14px; } .sav-tab ul { margin: 6px 0 0; padding-left: 18px; font-size: 13px; color: var(--muted); display: grid; gap: 4px; overflow-wrap: anywhere; }
   .face-note { font-size: 13px; margin: 6px 0 0; } .face-open { margin-top: 4px; }
@@ -8781,6 +8782,16 @@ void main(){
     paint();
     return card;
   }
+  /* 0.38.0 (choix du 21/11/2026, « Skills ») : les modes d'emploi relus que les missions de Claude chargent */
+  async function skillsCard(JS) {
+    const card = h('section', {class: 'card set-card skills-card', id: 'skills-card'}, h('b', {text: 'Skills des missions'}));
+    const sk = await JS.skills();
+    if (!sk) { card.append(h('p', {class: 'muted', text: 'Ton serveur ne les connaît pas encore : touche « Mettre à jour le serveur » plus bas.'})); return card; }
+    const NOMS = {'recherche-web': 'Recherche sur le web', 'comparatif-achat': 'Comparatif d’achat', voyage: 'Voyage', courrier: 'Réponse à un mail', demarche: 'Démarche administrative'};
+    card.append(h('p', {class: 'muted', text: 'Des modes d’emploi relus : une mission charge celui qui lui correspond (tu le vois dans « En ce moment » : « Skill : … »).'}),
+      h('ul', {class: 'mem-list'}, sk.map((x) => h('li', {class: 'mem-it skill-it'}, h('span', {}, h('b', {text: NOMS[x.name] || x.name}), h('small', {class: 'muted', text: ' · ' + String(x.description || '').replace(/\s*À charger[\s\S]*$/, '')}))))));
+    return card;
+  }
   async function savCard(JS) {
     const card = h('section', {class: 'card set-card sav-card'}, h('b', {text: 'Sauvegarde de Pilotage'}));
     const out = h('p', {class: 'set-msg'}), st = await JS.sauvegarde.etat();
@@ -8871,6 +8882,7 @@ void main(){
       if (JS.tour) parts.push(await tourCard(JS)); /* JARVIS OS 0.15.0 : tour de Claude */
       if (JS.sauvegarde) parts.push(await savCard(JS)); /* JARVIS OS 0.14.0 : sauvegarde de Pilotage */
       if (JS.memoire) parts.push(await memoireCard(JS)); /* JARVIS OS 0.37.0 : la mémoire durable */
+      if (JS.skills) parts.push(await skillsCard(JS)); /* JARVIS OS 0.38.0 : les skills des missions */
       /* 3. JARVIS : version, mise à jour du serveur, voix et modèle (repris de l'ancienne app) */
       const st = await JS.status(), upd = h('p', {class: 'set-msg'});
       const seg = (k, opts, def) => h('div', {class: 'seg set-seg', role: 'group'}, opts.map(([v, l]) => h('button', {type: 'button', 'aria-pressed': String((JS.setting(k) || def) === v), onclick: () => { JS.set(k, v); location.reload(); }}, l)));

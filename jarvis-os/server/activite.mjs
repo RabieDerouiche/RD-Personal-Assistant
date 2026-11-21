@@ -14,6 +14,7 @@ export function outilNom(name, input = {}) {
   if (n === 'WebSearch') return 'Recherche web : « ' + court(i.query, 60) + ' »';
   if (n === 'WebFetch') return 'Lecture de ' + hote(i.url);
   if (n === 'TodoWrite') return 'Plan : ' + (Array.isArray(i.todos) ? i.todos.length : 0) + ' étapes';
+  if (n === 'Skill') return 'Skill : ' + court(i.skill || i.command || i.name || '', 40);   /* 0.38.0 : une skill relue chargée */
   if (n === 'Read') return 'Lecture d’un document';
   if (n === 'Write' || n === 'Edit' || n === 'MultiEdit') return 'Rédaction';
   if (n === 'Glob' || n === 'Grep') return 'Recherche dans ses fichiers de travail';

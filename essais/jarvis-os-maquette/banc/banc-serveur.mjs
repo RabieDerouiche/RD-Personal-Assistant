@@ -90,6 +90,9 @@ try {
     await q.evaluate(() => [...document.querySelectorAll('#mem-card .mem-it')].find((x) => /train/.test(x.textContent)).querySelector('.btn').click()); await q.waitForTimeout(900);
     const c4 = await q.evaluate(() => ({n: document.querySelectorAll('#mem-card .mem-it').length, txt: document.getElementById('mem-card').textContent}));
     ok('mémoire : « Oublier » le retire', c4.n === 1 && !/train pour aller/.test(c4.txt), JSON.stringify(c4));
+    /* 0.38.0 : les skills des missions, listées dans Réglages */
+    const sk = await q.evaluate(() => { const c = document.getElementById('skills-card'); return c ? {n: c.querySelectorAll('.skill-it').length, txt: c.textContent} : null; });
+    ok('skills : Réglages liste les cinq skills des missions et à quoi sert chacune', !!sk && sk.n === 5 && /Recherche sur le web/.test(sk.txt) && /Démarche administrative/.test(sk.txt) && /Préparer un voyage/.test(sk.txt) && !/À charger/.test(sk.txt), JSON.stringify(sk && {n: sk.n, t: sk.txt.slice(0, 200)}));
     await q.evaluate(() => document.getElementById('mem-card').scrollIntoView()); await q.screenshot({path: SH + 'memoire.png'});
     await q.close(); }
   n0 = FG.calls.length;
