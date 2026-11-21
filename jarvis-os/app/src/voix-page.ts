@@ -238,6 +238,7 @@ export function converse(o: ConvOpts): Promise<boolean> {
   if (!(srv.serverEar() && canEar())) { try { if (o.onState) o.onState('error', "l'écoute n'est pas installée sur le serveur (Réglages)"); } catch { /* rien */ } return Promise.resolve(false); }
   const ear: Ecoute = new Ecoute({
     stt: (w, sig) => srv.stt(w, sig),
+    tour: srv.serverTour() ? (w, sig) => srv.sttTour(w, sig) : undefined,   /* 0.36.0 : fin de phrase par Smart Turn, si le serveur l'a */
     onState: (s, why) => { if (conv !== ear) return; try { if (o.onState) o.onState(s, why); } catch { /* rien */ } },
     onBargeStart: () => { if (conv !== ear) return; hold(true); try { if (o.onBarge) o.onBarge(); } catch { /* rien */ } },
     onBargeCancel: () => { if (conv !== ear) return; hold(false); try { if (o.onBargeCancel) o.onBargeCancel(); } catch { /* rien */ } },

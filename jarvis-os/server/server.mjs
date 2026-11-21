@@ -17,12 +17,12 @@ import {createSauvegarde} from './sauvegarde.mjs';
 import {createSante} from './sante.mjs';
 import {createComparatifs} from './comparatif.mjs';
 import {BOT_IDS, BOT_NOMS, BOT_LISTE} from './bots.mjs';
-import {createEcoute, wavOk, intention, quand, meteoPhrase, meteoUrl, heurePhrase, datePhrase, nrm, diction} from './voix.mjs';
+import {createEcoute, createTour, wavOk, intention, quand, meteoPhrase, meteoUrl, heurePhrase, datePhrase, nrm, diction} from './voix.mjs';
 import {createFlux, SECOURS} from './flux.mjs';
 import {createActivite, outilNom} from './activite.mjs';
 const ACT = createActivite();   /* 0.33.0 : ce que fait Claude à l'instant */
 
-const VERSION = '0.35.0';
+const VERSION = '0.36.0';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PORT = +(process.env.PORT || 8787);
 const HOST = process.env.HOST || '127.0.0.1';
@@ -242,6 +242,10 @@ const visible = (t) => { const i = t.search(/(^|\n)\s*M(I(S(S(I(O(N(S)?)?)?)?)?)
 
 let busy = Promise.resolve();
 const serial = (fn) => { const p = busy.then(fn, fn); busy = p.catch(() => {}); return p; };
+/* 0.36.0 (« Voix plus vive ») : Siri a sa propre file : une question à Siri n'attend plus derrière un tour, un ordre aux bots ou la
+   tâche Claude ; s'il reste moins de 400 Mo de mémoire libre, elle reprend la file commune (deux Claude à la fois ne tiendraient pas) */
+let busySiri = Promise.resolve();
+const serialSiri = (fn) => { if (os.freemem() < (+process.env.JARVIS_SIRI_MEM || 400e6)) return serial(fn); const p = busySiri.then(fn, fn); busySiri = p.catch(() => {}); return p; };
 /* missions longues (0.15.0) : leur propre file, pour ne bloquer ni la conversation, ni Siri, ni l'app ; une mission à la fois */
 /* 0.33.0 (choix du 21/11/2026, « Missions en parallèle ») : deux missions à la fois (JARVIS_MISSIONS), la suivante attend ; une seconde
    ne démarre que s'il reste 600 Mo de mémoire libre (le VPS-1 a 4 Go, l'écoute en prend 1 à 1,5) */
@@ -822,6 +826,8 @@ async function racContext() {
 const WHISPER_DIR = process.env.JARVIS_WHISPER_DIR || path.join(os.homedir(), 'whisper');
 const ECOUTE = createEcoute({dir: WHISPER_DIR, py: path.join(WHISPER_DIR, 'venv', 'bin', 'python'), helper: path.join(HERE, 'stt', 'whisper_helper.py'), parakeetHelper: path.join(HERE, 'stt', 'parakeet_helper.py'), model: process.env.JARVIS_WHISPER_MODEL || 'small', fakeHelper: process.env.JARVIS_STT_HELPER || '', log: (t) => { S.ecouteErr = {at: now(), t: String(t).slice(0, 300)}; }});
 let ECOUTE_INSTALL = {state: 'idle', at: 0, tail: ''};
+/* 0.36.0 : la fin de phrase reconnue à la voix (Smart Turn), installée avec l'écoute */
+const TOUR = createTour({dir: WHISPER_DIR, py: path.join(WHISPER_DIR, 'venv', 'bin', 'python'), helper: path.join(HERE, 'stt', 'tour_helper.py'), fakeHelper: process.env.JARVIS_TOUR_HELPER || '', log: (t) => { S.tourErr = {at: now(), t: String(t).slice(0, 300)}; }});
 /* 0.23.0 : le comparatif des produits suivis (comparatif.mjs) */
 /* 0.24.0 : une recherche d'idées prend 5 à 15 minutes (0.29.0 : deux passes d'Opus) : une notification quand elle est prête (ou impossible), qui ouvre ses propositions */
 /* 0.29.0 : le message dit aussi ce qui est « presque » (hors budget de peu, ou un critère absent) quand rien ne coche tout */
@@ -833,12 +839,12 @@ function installEcoute() {
   if (ECOUTE_INSTALL.state === 'running') return ECOUTE_INSTALL;
   const log = path.join(DATA, 'ecoute-install.log');
   ECOUTE_INSTALL = {state: 'running', at: now(), tail: ''};
-  ECOUTE.stop();
+  ECOUTE.stop(); TOUR.stop();
   const child = spawn('bash', [process.env.JARVIS_ECOUTE_SCRIPT || path.join(HERE, 'install', 'ecoute.sh')], {env: {...childEnv(), JARVIS_WHISPER_DIR: WHISPER_DIR}, stdio: ['ignore', 'pipe', 'pipe']});
   const out = fs.createWriteStream(log);
   const keep = (d) => { out.write(d); ECOUTE_INSTALL.tail = (ECOUTE_INSTALL.tail + d).slice(-600); };
   child.stdout.on('data', keep); child.stderr.on('data', keep);
-  child.on('close', (code) => { out.end(); ECOUTE_INSTALL.state = code === 0 && ECOUTE.ready() ? 'done' : 'error'; ECOUTE.warm(); });
+  child.on('close', (code) => { out.end(); ECOUTE_INSTALL.state = code === 0 && ECOUTE.ready() ? 'done' : 'error'; ECOUTE.warm(); TOUR.warm(); });
   child.on('error', () => { ECOUTE_INSTALL.state = 'error'; });
   return ECOUTE_INSTALL;
 }
@@ -1083,7 +1089,7 @@ const server = http.createServer(async (req, res) => {
       { const mm = q.match(/^(?:lance (?:une )?|nouvelle )?mission\s*[:,]?\s*(.{4,})$/i); if (mm) { newMission(mm[1]); return say(200, 'Mission lancée : ' + mm[1].slice(0, 120) + '. Je te préviens quand c’est prêt.'); } }
       const ctx = GG.status('').linked ? await racContext() : "Google n'est pas relié à JARVIS : tu n'as pas ses données.";
       const box = path.join(DATA, 'raccourci'); fs.mkdirSync(box, {recursive: true});
-      const r = await serial(() => runClaude({kind: 'siri', prompt: ctx + '\n\n[Question]\n' + (lien ? 'Lien partagé : ' + lien + '\n' : '') + (q || 'Que puis-je faire de ce lien ?'), system: RAC_SYSTEM, model: MODELS.rapide, cwd: box, timeoutMs: 60000, effort: 'low', settings: guardSettings('chat'),
+      const r = await serialSiri(() => runClaude({kind: 'siri', prompt: ctx + '\n\n[Question]\n' + (lien ? 'Lien partagé : ' + lien + '\n' : '') + (q || 'Que puis-je faire de ce lien ?'), system: RAC_SYSTEM, model: MODELS.rapide, cwd: box, timeoutMs: 60000, effort: 'low', settings: guardSettings('chat'),
         tools: {allow: [], deny: ['Bash', 'Read', 'Edit', 'Write', 'Glob', 'Grep', 'NotebookEdit', 'WebFetch', 'WebSearch', 'Task']}}));
       S.usage.raccourcis = (S.usage.raccourcis || 0) + 1; if (S.raccourci) { S.raccourci.uses = (S.raccourci.uses || 0) + 1; S.raccourci.last = now(); } save();
       return say(r.ok ? 200 : 502, r.ok ? relancesDuTexte(r.text, 'siri').text : r.error);   /* « rappelle-moi… » : la relance est notée, la ligne technique n'est pas lue */
@@ -1113,6 +1119,19 @@ const server = http.createServer(async (req, res) => {
         if (r.ok) send('done', {text: r.text, premier: r.premier, total: r.total, secours: r.secours, modele: r.modele, profondeur: r.profondeur}); else send('error', {message: r.error});
         S.lastPageTiming = FLUX.etat().dernier; if (!res.writableEnded) res.end(); return;
       }
+      /* 0.36.0 (choix du 21/11/2026, « Voix plus vive ») : les réponses instantanées en mains libres — heure, date, météo, agenda, ce qui
+         t'attend, où en est un bot — sans IA, en moins d'une seconde ; sinon {kind: null} et la page pose la question à Claude */
+      if (p === '/api/rapide' && req.method === 'POST') {
+        const b = await readBody(req), text = String(b.text || '').trim().slice(0, 500);
+        const la = Number(b.lat), lo = Number(b.lon);
+        if (b.lat != null && b.lon != null && isFinite(la) && isFinite(lo) && Math.abs(la) <= 90 && Math.abs(lo) <= 180) S.pos = {lat: Math.round(la * 100) / 100, lon: Math.round(lo * 100) / 100, at: now()};
+        const q = intention(text);
+        if (!q || (q.kind === 'meteo' && !q.court)) return json(res, 200, {kind: null});
+        let reply = null; try { reply = await instantReply(q, text); } catch { reply = null; }
+        if (!reply) return json(res, 200, {kind: null});
+        S.usage.instant = (S.usage.instant || 0) + 1; save();
+        return json(res, 200, {kind: q.kind, reply});
+      }
       if (p === '/api/sample/prepare' && req.method === 'POST') {
         const b = await readBody(req, 600000);
         return json(res, 200, FLUX.preparer({tier: b.tier, system: String(b.system || PAGE_SYS).slice(0, 16000), input: Array.isArray(b.input) ? b.input : [{role: 'user', content: String(b.input || '')}]}));
@@ -1126,7 +1145,7 @@ const server = http.createServer(async (req, res) => {
         }
         catch (e) { return json(res, e.code === 'server_not_connected' ? 409 : e.code === 'not_in_manifest' ? 404 : 502, {error: {code: e.code || 'tool_error', message: e.message, status: e.status || 0}}); }
       }
-      if (p === '/api/status') { const cs = await claudeStatus(); if (cs.loggedIn && (!MCP.at || now() - MCP.at > 600000)) mcpListFond();   /* 0.35.0 : relue en fond (elle prenait plusieurs secondes et retardait l'orbe) */ return json(res, 200, {version: VERSION, commit, claude: cs, connectors: connSummary(), google: (({configured, linked, account}) => ({configured, linked, account}))(GG.status('')), grokPauseUntil: await grokPauseMs().then((v) => (v ? new Date(v).toISOString() : '')).catch(() => S.config.grokPauseUntil), usage: S.usage, tache: {running: TACHE.running, last: TACHE.last}, push: {count: S.push.subs.length, last: S.push.last || null, prefs: S.push.prefs}, session: !!S.session, timing: S.lastTiming || null, page: FLUX.etat(), tts: ttsReady(), voiceInstall: VOICE_INSTALL.state, ecoute: ECOUTE.ready(), ecouteMoteur: ECOUTE.moteur(), ecouteInstall: ECOUTE_INSTALL.state}); }
+      if (p === '/api/status') { const cs = await claudeStatus(); if (cs.loggedIn && (!MCP.at || now() - MCP.at > 600000)) mcpListFond();   /* 0.35.0 : relue en fond (elle prenait plusieurs secondes et retardait l'orbe) */ return json(res, 200, {version: VERSION, commit, claude: cs, connectors: connSummary(), google: (({configured, linked, account}) => ({configured, linked, account}))(GG.status('')), grokPauseUntil: await grokPauseMs().then((v) => (v ? new Date(v).toISOString() : '')).catch(() => S.config.grokPauseUntil), usage: S.usage, tache: {running: TACHE.running, last: TACHE.last}, push: {count: S.push.subs.length, last: S.push.last || null, prefs: S.push.prefs}, session: !!S.session, timing: S.lastTiming || null, page: FLUX.etat(), tts: ttsReady(), voiceInstall: VOICE_INSTALL.state, ecoute: ECOUTE.ready(), ecouteMoteur: ECOUTE.moteur(), ecouteInstall: ECOUTE_INSTALL.state, finDeTour: ECOUTE.ready() && TOUR.ready()}); }
       if (p === '/api/update' && req.method === 'POST') return json(res, 200, await update());
       if (p === '/api/maj') return json(res, 200, await majVerifie(url.searchParams.get('force') === '1'));   /* 0.27.0 : une version plus récente ? */
       /* notifications : clé publique, abonnement de cet appareil, essai, préférences, vérification immédiate */
@@ -1195,9 +1214,14 @@ const server = http.createServer(async (req, res) => {
       if (p === '/api/stt' && req.method === 'POST') {
         if (!ECOUTE.ready()) return json(res, 503, {error: 'ecoute_absente', message: "L'écoute n'est pas installée sur le serveur (Réglages, « Installer l'écoute »)."});
         const raw = await readRaw(req, 3e6); if (!wavOk(raw)) return json(res, 400, {error: 'Son illisible.'});
+        /* 0.36.0 : « x-tour: 0.8 » : la phrase est-elle finie (Smart Turn) ? Non : {fin: false, p}, rien n'est écrit (il continue d'écouter) ;
+           oui : {fin: true, p, text}. Sans Smart Turn (ou s'il ne répond pas) : la phrase est écrite, comme avant. */
+        const seuil = Number(req.headers['x-tour']);
+        let tour = null;
+        if (seuil > 0 && seuil <= 1 && TOUR.ready()) { const v = await TOUR.verdict(raw, path.join(DATA, 'stt')); if (v.ok) { tour = v.p; S.usage.tour = (S.usage.tour || 0) + 1; if (v.p < seuil) return json(res, 200, {fin: false, p: v.p}); } }
         const r = await ECOUTE.transcribe(raw, path.join(DATA, 'stt'));
         S.usage.stt = (S.usage.stt || 0) + 1;
-        return json(res, r.ok ? 200 : 502, r.ok ? {text: r.text, ms: r.ms} : {error: r.error});
+        return json(res, r.ok ? 200 : 502, r.ok ? {text: r.text, ms: r.ms, fin: true, ...(tour === null ? {} : {p: tour})} : {error: r.error});
       }
       if (p === '/api/ecoute/install' && req.method === 'POST') return json(res, 200, installEcoute());
       if (p === '/api/ecoute/install') return json(res, 200, {...ECOUTE_INSTALL, ready: ECOUTE.ready()});
@@ -1275,5 +1299,6 @@ setTimeout(() => { mcpList().then(() => console.log('Connecteurs Google : ' + (r
 server.listen(PORT, HOST, () => {
   console.log('JARVIS OS serveur ' + VERSION + ' sur http://' + HOST + ':' + PORT);
   ECOUTE.warm();   /* 0.22.0 : Whisper chargé une fois, pas à la première phrase */
+  TOUR.warm();   /* 0.36.0 : Smart Turn aussi */
   if (!S.tokens.length && !fs.existsSync(PAIR)) console.log('Aucun appareil relié. Code d\'appairage : ' + newPairing() + ' (30 minutes)');
 });

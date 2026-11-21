@@ -7,7 +7,7 @@ const HERE = path.dirname(fileURLToPath(import.meta.url)), SRV = path.join(HERE,
 const {startFakeGoogle} = await import(SRV + '/tests/fake-google.mjs'); const FG = await startFakeGoogle();
 FG.sheet['Canal!A1:H3000'] = [['Date', 'De', 'Pour', 'Type', 'Message', 'Statut', 'Réponse', 'Objet'], ['15/11/2026', 'Rabie', 'Iris', 'Info', 'Le syndic a appelé.', 'Fait', 'Noté.', '']];
 const DATA = fs.mkdtempSync(path.join(os.tmpdir(), 'jarvis-e2e-')), PORT = 19000 + Math.floor(Math.random() * 900), BASE = 'http://127.0.0.1:' + PORT;
-const env = {...process.env, JARVIS_PUSH_ALLOW_HTTP: '1', JARVIS_NOTIFY_TICK_MS: '3600000', JARVIS_SANTE_TICK_MS: '3600000', JARVIS_GOOGLE_FAKE: FG.url, PORT: String(PORT), JARVIS_DATA: DATA, CLAUDE_BIN: SRV + '/tests/fake-claude.mjs', JARVIS_TTS_HELPER: SRV + '/tests/fake-tts.mjs', JARVIS_STT_HELPER: SRV + '/tests/fake-stt.mjs', JARVIS_VOICE_MODEL: path.join(DATA, 'fausse-voix.onnx'), JARVIS_MAJ: '0'};   /* 0.27.0 : pas de question de mise à jour pendant le banc (elle a son essai à part, sur un dépôt de test) */
+const env = {...process.env, JARVIS_PUSH_ALLOW_HTTP: '1', JARVIS_NOTIFY_TICK_MS: '3600000', JARVIS_SANTE_TICK_MS: '3600000', JARVIS_GOOGLE_FAKE: FG.url, PORT: String(PORT), JARVIS_DATA: DATA, CLAUDE_BIN: SRV + '/tests/fake-claude.mjs', JARVIS_TTS_HELPER: SRV + '/tests/fake-tts.mjs', JARVIS_STT_HELPER: SRV + '/tests/fake-stt.mjs', JARVIS_TOUR_HELPER: SRV + '/tests/fake-tour.mjs', JARVIS_VOICE_MODEL: path.join(DATA, 'fausse-voix.onnx'), JARVIS_MAJ: '0'};   /* 0.27.0 : pas de question de mise à jour pendant le banc (elle a son essai à part, sur un dépôt de test) */
 fs.mkdirSync(DATA, {recursive: true}); fs.writeFileSync(path.join(DATA, 'fausse-voix.onnx'), 'faux');   /* 0.25.0 : la voix Pierre « installée » (fausse), pour la lecture des réponses */
 const code = execFileSync(process.execPath, [SRV + '/server.mjs', 'pair'], {env}).toString().match(/: ([A-Z0-9]{4}-[A-Z0-9]{4})/)[1];
 const srv = spawn(process.execPath, [SRV + '/server.mjs'], {env, stdio: ['ignore', 'pipe', 'pipe']}); await new Promise((r) => srv.stdout.once('data', r));
@@ -275,7 +275,7 @@ try {
   /* 0.31.0 : mains libres — l'orbe garde le micro ouvert ; chaque phrase part seule à Claude (le même, avec ses données) ; la réponse est lue
      dès sa première phrase, puis il réécoute ; ta voix le coupe pendant qu'il parle ; « c'est tout » termine ; « Mains libres : non » rend la dictée */
   { const v = await ctx.newPage(); v.on('pageerror', (e) => errs.push('mains libres : ' + e.message));
-    const hits = {tts: 0, stt: 0, sample: 0}, entendu = []; v.on('request', (r) => { const u = r.url(); if (/\/api\/tts$/.test(u)) hits.tts++; if (/\/api\/stt$/.test(u)) hits.stt++; if (/\/api\/sample$/.test(u)) hits.sample++; });
+    const hits = {tts: 0, stt: 0, sample: 0, rapide: 0, tour: [], plain: []}, entendu = []; v.on('request', (r) => { const u = r.url(); if (/\/api\/tts$/.test(u)) hits.tts++; if (/\/api\/stt$/.test(u)) { hits.stt++; (r.headers()['x-tour'] ? hits.tour : hits.plain).push(Date.now()); } if (/\/api\/sample$/.test(u)) hits.sample++; if (/\/api\/rapide$/.test(u)) hits.rapide++; });
     v.on('response', (r) => { if (/\/api\/stt$/.test(r.url())) r.text().then((t) => entendu.push(t.slice(0, 80))).catch(() => {}); });
     await v.addInitScript(() => {
       try { const s0 = JSON.parse(localStorage.getItem('jarvis.settings') || '{}'); s0.orbe = 'conversation'; localStorage.setItem('jarvis.settings', JSON.stringify(s0)); } catch (e) { /* rien */ }
@@ -289,17 +289,21 @@ try {
     await v.tap('.talk-slot .jv-btn'); await v.waitForTimeout(1500);
     let s0 = await st(); const n0 = s0.moi.length;
     ok('mains libres : l\'orbe ouvre la discussion avec Claude, micro ouvert pour toute la conversation (écoute Whisper du serveur)', s0.chat && s0.conv && /écoute/.test(s0.strip) && !s0.toggle && !s0.dictBtn && s0.gum === 1, JSON.stringify(s0));
-    await v.evaluate(() => window.__talk(900)); await v.waitForTimeout(4500); let s1 = await st();
-    ok('mains libres : la phrase part seule à Claude (sans « Envoyer »), sa réponse est lue par Pierre, puis il réécoute, micro toujours ouvert', s1.moi.length === n0 + 1 && /quelle heure est-il/i.test(s1.moi[n0]) && hits.sample === 1 && hits.tts >= 1 && s1.conv && s1.stops === 0 && s1.etat === 'listening' && s1.val === '', JSON.stringify([s1.moi.slice(-1), s1.etat, s1.stops, hits]));
+    let tT = Date.now(); await v.evaluate(() => window.__talk(900)); await v.waitForTimeout(4500); let s1 = await st();
+    /* 0.36.0 : « Voix plus vive » — fin de phrase par Smart Turn (faux modèle : une phrase courte est finie) : elle part dès 0,25 s de pause,
+       écrite dans la même réponse (un seul envoi) ; l'heure est répondue par le serveur sans Claude (aucune question à Claude), lue par Pierre */
+    ok('mains libres : phrase finie (Smart Turn) : elle part dès 0,25 s de pause, écrite dans le même envoi ; l\'heure répondue sans Claude, lue par Pierre, puis il réécoute', s1.moi.length === n0 + 1 && /quelle heure est-il/i.test(s1.moi[n0]) && /^Il est \d{1,2} h/.test(s1.eux[s1.eux.length - 1] || '') && hits.sample === 0 && hits.rapide === 1 && hits.tour.length === 1 && hits.plain.length === 0 && hits.tour[0] - tT < 1500 && hits.tts >= 1 && s1.conv && s1.stops === 0 && s1.etat === 'listening' && s1.val === '', JSON.stringify([s1.moi.slice(-1), s1.eux.slice(-1), s1.etat, s1.stops, hits.sample, hits.rapide, hits.tour.map((x) => x - tT), hits.plain.length]));
+    ok('mains libres : la réponse instantanée porte l\'étiquette « Instantané »', await v.evaluate(() => [...document.querySelectorAll('#chat .msg-mod')].some((x) => x.textContent === 'Instantané')));
     await v.screenshot({path: SH + 'mains-libres.png'});
     /* une longue réponse (lente) est coupée par sa voix : sa nouvelle phrase part à la place */
-    await v.evaluate(() => window.__talk(1800)); await v.waitForTimeout(3200);
-    const mid = await st();
+    tT = Date.now(); await v.evaluate(() => window.__talk(1800)); await v.waitForTimeout(4400);   /* 0.36.0 : « pas finie » (Smart Turn) : il attend 1,6 s de silence au lieu de 0,7 */
+    const mid = await st(), tours = hits.tour.slice(1).map((x) => x - tT), plains = hits.plain.map((x) => x - tT);
+    ok('mains libres : phrase « pas finie » (Smart Turn) : rien ne part à 0,7 s de silence ; elle part après 1,6 s, à Claude', tours.length === 1 && tours[0] < 2400 && plains.length === 1 && plains[0] >= 3000 && hits.sample === 1 && /lentement/i.test(mid.moi[mid.moi.length - 1]), JSON.stringify([tours, plains, hits.sample, mid.moi.slice(-1)]));
     await v.evaluate(() => window.__talk(900)); await v.waitForTimeout(4500); const s2 = await st();
-    ok('mains libres : pendant que Claude répond (et parle), ta voix le coupe et ta nouvelle phrase part à la place', /lentement/i.test(mid.moi[mid.moi.length - 1]) && ['thinking', 'speaking', 'hearing', 'transcribing'].includes(mid.etat) && s2.moi.length === n0 + 3 && /quelle heure est-il/i.test(s2.moi[s2.moi.length - 1]) && hits.sample === 3 && s2.conv, JSON.stringify([mid.etat, mid.moi.slice(-1), s2.moi.slice(-2), hits]));
+    ok('mains libres : pendant que Claude répond (et parle), ta voix le coupe et ta nouvelle phrase part à la place', /lentement/i.test(mid.moi[mid.moi.length - 1]) && ['thinking', 'speaking', 'hearing', 'transcribing'].includes(mid.etat) && s2.moi.length === n0 + 3 && /quelle heure est-il/i.test(s2.moi[s2.moi.length - 1]) && hits.sample === 1 && hits.rapide === 3 && s2.conv, JSON.stringify([mid.etat, mid.moi.slice(-1), s2.moi.slice(-2), hits]));
     /* « c'est tout » : fin de la conversation, micro fermé ; l'orbe la reprend */
     await v.evaluate(() => window.__talk(3800)); await v.waitForTimeout(5200); const s3 = await st();
-    ok('mains libres : « c\'est tout » termine la conversation et ferme le micro (rien n\'est envoyé à Claude)', !s3.conv && !s3.strip && s3.stops >= 1 && hits.sample === 3 && s3.moi.length === s2.moi.length, JSON.stringify([s3.conv, s3.stops, hits, s3.moi.length, s3.etat, entendu]));
+    ok('mains libres : « c\'est tout » termine la conversation et ferme le micro (rien n\'est envoyé à Claude)', !s3.conv && !s3.strip && s3.stops >= 1 && hits.sample === 1 && hits.rapide === 3 && s3.moi.length === s2.moi.length, JSON.stringify([s3.conv, s3.stops, hits, s3.moi.length, s3.etat, entendu]));
     /* après « c'est tout » : le micro du champ dicte une seule question ; l'orbe reprend la conversation continue (plus de bouton piège dans l'en-tête) */
     const s4 = await st(); await v.tap('#dict-btn'); await v.waitForTimeout(700); const dicte = await v.evaluate(() => window.JarvisVoice.dictating());
     await v.evaluate(() => { const n = document.querySelector('#chat .dict-no'); if (n) n.click(); }); await v.waitForTimeout(400);

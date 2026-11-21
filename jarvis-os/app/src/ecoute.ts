@@ -11,6 +11,8 @@ export interface EarOpts {
   onBargeCancel: () => void;  /* ce n'était rien (bruit, écho) */
   onUtterance: (text: string) => void;
   onLevel?: (x: number) => void;
+  /* 0.36.0 : la fin de phrase reconnue à la voix (Smart Turn, serveur) : fin = phrase finie (son texte suit), p = probabilité */
+  tour?: (wav: Blob, signal: AbortSignal) => Promise<{fin: boolean; p?: number; text?: string}>;
 }
 const W = window as any;
 export const canEar = () => !!(navigator.mediaDevices && typeof navigator.mediaDevices.getUserMedia === 'function' && (W.AudioContext || W.webkitAudioContext));
@@ -42,6 +44,11 @@ export class Ecoute {
   paused = false;
   endMs = 700;   /* silence qui termine une phrase (0.22.1 : 0,7 s au lieu de 0,8) */
   maxMs = 20000;   /* durée maximale d'une phrase */
+  /* 0.36.0 (choix du 21/11/2026, « Voix plus vive ») : avec Smart Turn, une pause de 250 ms suffit quand le modèle dit « fini »
+     (p ≥ 0,8 : le texte revient dans la même réponse) ; à 700 ms, la phrase part comme avant, sauf si le modèle a dit « pas fini »
+     (p < 0,4 : « et puis… ») : il attend alors jusqu'à 1,6 s de silence. Sans Smart Turn : 700 ms, comme avant. */
+  pauseMs = 250; tourMaxMs = 1600;
+  private checking: AbortController | null = null; private checkedAt = -1; private lastP: number | null = null; private gen = 0;
   private sr = 16000;
   private closing = false;   /* fermé pendant que l'iPhone ouvrait le micro : le micro ne doit pas rester ouvert */
   constructor(private o: EarOpts) {}
@@ -85,7 +92,8 @@ export class Ecoute {
     const c = this.ctx; if (!c) return;
     try { const o = c.createOscillator(), g = c.createGain(); o.type = 'sine'; o.frequency.value = 1180; g.gain.setValueAtTime(0.0001, c.currentTime); g.gain.exponentialRampToValueAtTime(0.06, c.currentTime + 0.012); g.gain.exponentialRampToValueAtTime(0.0001, c.currentTime + 0.09); o.connect(g).connect(c.destination); o.start(); o.stop(c.currentTime + 0.1); } catch { /* rien */ }
   }
-  private reset() { this.inSpeech = false; this.voiced = 0; this.silence = 0; this.speechMs = 0; this.totalMs = 0; this.chunks = []; this.pre = []; this.preLen = 0; this.barge = false; }
+  private reset() { this.inSpeech = false; this.voiced = 0; this.silence = 0; this.speechMs = 0; this.totalMs = 0; this.chunks = []; this.pre = []; this.preLen = 0; this.barge = false; this.cancelCheck(); this.lastP = null; this.checkedAt = -1; }
+  private cancelCheck() { if (this.checking) { this.checking.abort(); this.checking = null; } }
 
   private frame(x: Float32Array, sr: number) {
     if (this.paused || !this.stream) return;
@@ -112,8 +120,30 @@ export class Ecoute {
       return;
     }
     this.chunks.push(copy); this.totalMs += ms;
-    if (db > off) { this.silence = 0; this.speechMs += ms; } else this.silence += ms;
-    if (this.silence >= this.endMs || this.totalMs > this.maxMs) this.finish(sr);
+    if (db > off) { if (this.silence >= this.pauseMs) { this.gen++; this.lastP = null; this.cancelCheck(); } this.silence = 0; this.speechMs += ms; } else this.silence += ms;
+    if (this.totalMs > this.maxMs) { this.finish(sr); return; }
+    if (this.o.tour && this.speechMs >= 260) {
+      if (this.silence >= this.pauseMs && !this.checking && this.checkedAt !== this.gen) this.check(sr);
+      if ((this.silence >= this.endMs && (this.lastP === null || this.lastP >= 0.4)) || this.silence >= this.tourMaxMs) this.finish(sr);
+      return;
+    }
+    if (this.silence >= this.endMs) this.finish(sr);
+  }
+  /* 0.36.0 : la phrase est-elle finie ? (Smart Turn) ; si oui, son texte arrive dans la même réponse */
+  private check(sr: number) {
+    const ctl = new AbortController(), g = this.gen, wasBarge = this.barge; this.checking = ctl; this.checkedAt = g;
+    this.o.tour!(toWav16k(this.chunks, sr), ctl.signal).then((v) => {
+      if (this.checking !== ctl) return; this.checking = null;
+      if (g !== this.gen || !this.inSpeech) return;   /* il a repris la parole, ou la phrase est déjà partie */
+      this.lastP = typeof v.p === 'number' ? v.p : null;
+      if (v.fin && typeof v.text === 'string') this.done(v.text, wasBarge);
+    }, () => { if (this.checking === ctl) this.checking = null; });
+  }
+  private done(t: string, wasBarge: boolean) {
+    this.reset(); this.tick();
+    const text = String(t || '').trim();
+    if (!text) { if (wasBarge) this.o.onBargeCancel(); this.o.onState('listening'); return; }
+    this.o.onUtterance(text);
   }
   /* 0.25.0 (dictée d'une question) : « j'ai fini » d'un appui : la phrase en cours part tout de suite ; faux s'il n'a encore rien dit */
   flush(): boolean { if (!this.inSpeech || !this.stream) return false; this.finish(this.sr); return true; }

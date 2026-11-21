@@ -9,7 +9,7 @@ console.log(JSON.stringify({ready: true}));
 let buf = '';
 const said = (w) => {
   const raw = w.subarray(44), t = raw.toString('utf8').replace(/\0+/g, '').trim();
-  if (t.startsWith('DIT:')) return t.slice(4);
+  if (t.startsWith('DIT:')) return t.slice(4).split('|TOUR:')[0];   /* 0.36.0 : « |TOUR:p » est pour la fausse fin de phrase */
   const n = Math.floor(raw.length / 2); let loud = 0;
   for (let i = 0; i < n; i++) if (Math.abs(raw.readInt16LE(i * 2)) > 1500) loud++;
   const sec = loud / 16000;
