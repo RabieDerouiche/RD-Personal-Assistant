@@ -24,9 +24,10 @@ import {createVoixGoogle, VOIX_DEFAUT, nomOk} from './voix-google.mjs';
 import {createRoutines, lirePhrase, quandDit} from './routines.mjs';
 import {createFlux, SECOURS} from './flux.mjs';
 import {createActivite, outilNom} from './activite.mjs';
+import {createRadar} from './radar.mjs';
 const ACT = createActivite();   /* 0.33.0 : ce que fait Claude à l'instant */
 
-const VERSION = '0.43.0';
+const VERSION = '0.44.0';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PORT = +(process.env.PORT || 8787);
 const HOST = process.env.HOST || '127.0.0.1';
@@ -995,6 +996,14 @@ const TOUR = createTour({dir: WHISPER_DIR, py: path.join(WHISPER_DIR, 'venv', 'b
 /* 0.29.0 : le message dit aussi ce qui est « presque » (hors budget de peu, ou un critère absent) quand rien ne coche tout */
 const ideeResume = (d) => { const n = d.propositions.length, m = (d.presque || []).length; return n ? n + (n > 1 ? ' propositions' : ' proposition') + (m ? ' et ' + m + ' presque' : '') : m ? 'Rien qui coche tout, mais ' + m + ' presque' : 'Rien trouvé, mais des pistes pour relancer'; };
 const ideeFinie = (x) => { if (S.push && S.push.subs.length) PUSH.send(x.statut === 'pret' ? {title: 'Idées prêtes', body: ideeResume(x.data) + ' pour « ' + x.idee + ' »' + (x.pour ? ' (' + x.pour + ')' : ''), url: '/#voir-idee-' + x.id, tag: 'idee-' + x.id} : {title: 'Recherche d’idées impossible', body: '« ' + x.idee + ' » : ' + (x.erreur || 'erreur'), url: '/#voir-idee-' + x.id, tag: 'idee-' + x.id}, {urgency: 'normal'}).catch(() => {}); };
+/* Radar (21/11/2026, radar.mjs) : ses dépenses fixes, sa paie, le reste à payer et ce que ses mails annoncent. Gardé à part, dans radar.json :
+   aucun outil MCP, aucune réponse de Siri, aucun brief ni aucune consigne de Claude ne le lit (sa mensualité de crédit y est : jamais chez les bots). */
+const RADAR = createRadar({file: path.join(DATA, 'radar.json'), now, log: (t) => console.log(t),
+  gmail: {lie: () => GG.status('').linked, chercher: (q, n) => GG.tool('Gmail', 'search_threads', {query: q, pageSize: n}), fil: (id) => GG.tool('Gmail', 'get_thread', {threadId: id})},
+  claude: (prompt, system) => { const box = path.join(DATA, 'radar'); fs.mkdirSync(box, {recursive: true, mode: 0o700});
+    return runClaude({kind: 'radar', titre: 'Radar : lecture de factures', prompt, system, model: MODELS.rapide, cwd: box, timeoutMs: 180000,
+      tools: {allow: [], deny: ['Bash', 'Read', 'Edit', 'Write', 'Glob', 'Grep', 'NotebookEdit', 'WebFetch', 'WebSearch', 'Task']}}); },
+  push: (msg) => (S.push && S.push.subs.length ? PUSH.send(msg, {urgency: 'high'}) : Promise.resolve([]))});
 const COMP = createComparatifs({S, save, DATA, runClaude, onIdee: ideeFinie, model: MODELS.equilibre, ideesModel: process.env.JARVIS_IDEES_MODELE || MODELS.profond, visionModel: MODELS.rapide,   /* 0.29.0 : Opus pour les idées (bien meilleur à chercher), JARVIS_IDEES_MODELE pour changer */
   steamBase: process.env.JARVIS_STEAM_URL || undefined, settings: guardSettings('chat'), now, log: (t) => { S.compErr = {at: now(), t: String(t).slice(0, 300)}; }});
 function installEcoute() {
@@ -1286,6 +1295,7 @@ const server = http.createServer(async (req, res) => {
     if (await JMCP.traiter(req, res, p, url)) return;   /* 0.39.0 : /mcp, /oauth/…, /.well-known/… (leur propre accès) */
     if (p.startsWith('/api/')) {
       if (!authed(req)) return json(res, 401, {error: 'Appareil non relié.'});
+      if (p.startsWith('/api/radar')) { const r = await RADAR.traiter(req.method, p, () => readBody(req)); if (r) return json(res, r.status, r.body); }   /* Radar (21/11/2026) */
       if (p === '/api/google') return json(res, 200, GG.status(googleRedirect(req)));
       if (p === '/api/google/config' && req.method === 'POST') { const r = GG.configure(await readBody(req)); return json(res, r.ok ? 200 : 400, {...r, google: GG.status(googleRedirect(req))}); }
       if (p === '/api/google/link' && req.method === 'POST') { const r = GG.link(googleRedirect(req)); return json(res, r.ok ? 200 : 400, r); }
@@ -1548,6 +1558,7 @@ server.listen(PORT, HOST, () => {
   ECOUTE.warm();   /* 0.22.0 : Whisper chargé une fois, pas à la première phrase */
   TOUR.warm();   /* 0.36.0 : Smart Turn aussi */
   ROUT.demarrer(+process.env.JARVIS_ROUTINES_MS || 30000);   /* 0.41.0 : l'horloge des routines */
+  RADAR.demarrer(+process.env.JARVIS_RADAR_TICK_MS || 60000);   /* Radar : lecture du matin (6 h 50), notification de la veille (19 h) */
   setTimeout(() => { profilLire().catch(() => {}); }, 5000);   /* 0.37.0 : le Profil, lu une première fois */
   if (!S.tokens.length && !fs.existsSync(PAIR)) console.log('Aucun appareil relié. Code d\'appairage : ' + newPairing() + ' (30 minutes)');
 });

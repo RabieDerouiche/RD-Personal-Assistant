@@ -12,9 +12,13 @@ import crypto from 'node:crypto';
 
 /* rien de bancaire, aucun secret : mots du domaine, IBAN, et toute suite de 12 chiffres ou plus (carte, compte ; un téléphone en a 10) */
 const MOTS = /\b(iban|bic|rib|cvv|cryptogramme|carte bancaire|carte bleue|num[ée]ro de (carte|compte)|identifiant bancaire|code (pin|secret|confidentiel|d'acc[eè]s)|mot de passe|mdp|password|solde (du|de mon|de son|bancaire)|(à|en) d[ée]couvert|d[ée]couvert (bancaire|autoris[ée]))\b/i;
+/* 21/11/2026 (Radar) : les chiffres d'un crédit (mensualité, restant dû, taux) ne vont pas en mémoire : elle est lue par le serveur MCP,
+   que Grok Bot peut joindre (règle du 12/11/2026 : ces chiffres jamais chez les bots). Le Radar les garde à part, sur le serveur seulement. */
+const CREDIT = '(?:cr[ée]dit|pr[eê]t (?:immobilier|personnel|auto|travaux|[àa] la consommation)|emprunt|mensualit[ée]s?|restant d[uû]|reste [àa] rembourser|assurance (?:de pr[eê]t|emprunteur)|taux)';
+const CREDIT_CHIFFRE = new RegExp('\\b' + CREDIT + '\\b[^\\n]{0,60}\\d|\\d[^\\n]{0,60}\\b' + CREDIT + '\\b', 'i');
 export function interdit(t) {
   const s = String(t || '');
-  return MOTS.test(s) || /\bFR\d{2}\s?\d{4}/i.test(s) || /\d{12,}/.test(s.replace(/[\s.\-]/g, ''));
+  return MOTS.test(s) || /\bFR\d{2}\s?\d{4}/i.test(s) || /\d{12,}/.test(s.replace(/[\s.\-]/g, '')) || CREDIT_CHIFFRE.test(s);
 }
 
 export function createMemoire({file, max = 200, maxLen = 300, now = Date.now}) {

@@ -496,6 +496,11 @@
       {id: 'f16', service: 'Plateforme d’animation', cat: 'Abonnements', montant: 69.99, jour: D(41).getDate(), mois: D(41).getMonth() + 1, rythme: 'annuel', source: 'mail'}],
     revenus: {jour: 28, avance: true},
     notif: {veille: true, seuil: 20, echec: true},
+    /* ce que le serveur trouve dans les mails : un prélèvement ponctuel (paiement en 4 fois) et deux dépenses récurrentes à valider (inventés) */
+    ponctuels: [{id: 'e1', date: rIso(2), service: 'Paiement en 4 fois : Boutique', montant: 29.55}],
+    propositions: [{id: 'pa', service: 'Club de sport', cat: 'Autres', montant: 29.90, jour: 26, rythme: 'mensuel', source: 'mail', preuves: 6, dernier: rIso(-28), depuis: '05/2026'},
+      {id: 'pb', service: 'Stockage en ligne', cat: 'Abonnements', montant: 1.99, jour: 14, rythme: 'mensuel', source: 'mail', preuves: 12, dernier: rIso(-9), depuis: '11/2025'}],
+    scan: {enCours: false, mois: 13, total: 13, lus: 412, fini: Date.now(), erreur: ''}, google: true,
     navigo: {mois: rMoisL(1), conseil: 'liberte', joursSite: 9, liberte: 36.72, moisNet: 45.40, texte: '9 jours sur site prévus, avec une semaine de congés : reste en Liberté+ (environ 36,72 €). Le Navigo Mois coûterait 45,40 € après le remboursement de 50 %.'}};
   /* 0.23.0 : la météo de l'accueil (en vrai : Open-Meteo, à la position de l'iPhone) */
   window.__METEO = {current: {temperature_2m: 9.4, apparent_temperature: 6.2, weather_code: 3}, daily: {time: [fr(D(0)), fr(D(1))], weather_code: [3, 61], temperature_2m_min: [4, 2], temperature_2m_max: [11, 7], precipitation_probability_max: [10, 70]}};
