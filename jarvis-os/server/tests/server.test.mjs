@@ -5,6 +5,7 @@ const HERE = path.dirname(fileURLToPath(import.meta.url)), HOME0 = os.homedir();
 import {startFakeGoogle} from './fake-google.mjs';
 import http from 'node:http'; import crypto from 'node:crypto';
 import {paris, pauseDepuisFaits, paliers} from '../notify.mjs';
+import {choixEcoute} from '../voix.mjs';
 const FG = await startFakeGoogle();
 const DATA = fs.mkdtempSync(path.join(os.tmpdir(), 'jarvis-'));
 /* 0.22.0 : faux Open-Meteo (prévisions de 8 jours à partir d'aujourd'hui, heure de Paris) */
@@ -37,6 +38,16 @@ const results = []; let fails = 0;
 { const a = paliers("3 mois, 1 mois, 1 semaine avant, vendredi d'avant", '15/02/2027').join(), b = paliers('6 mois, 60, 30 et 7 jours avant', '30/06/2027').join(), c = paliers('Le jour même', '01/12/2026').join(), d = paliers('3 mois avant, pour le budget', '02/09/2027').join(), e = paliers("vendredi d'avant", '23/10/2027').join();
   const okR = a === '2026-11-15,2027-01-15,2027-02-08,2027-02-12' && b === '2026-12-30,2027-05-01,2027-05-31,2027-06-23' && c === '2026-12-01' && d === '2027-06-02' && e === '2027-10-22';
   results.push((okR ? 'OK    ' : 'ÉCHEC ') + 'rappels à paliers : mois, semaines, jours, le jour même, vendredi d\'avant (lundi 15/02 → vendredi 12/02 ; samedi 23/10 → vendredi 22/10)' + (okR ? '' : ' :: ' + [a, b, c, d, e].join(' / '))); if (!okR) fails++; }
+
+/* 0.32.0 : le moteur d'écoute — Parakeet une fois installé (marque et variante), sinon Whisper ; JARVIS_ECOUTE_MOTEUR=whisper ; marque douteuse = Whisper */
+{ const d = fs.mkdtempSync(path.join(os.tmpdir(), 'ecoute-')), P = path.join(d, 'parakeet'), v0 = choixEcoute(d, {});
+  fs.mkdirSync(P); fs.writeFileSync(path.join(P, 'variante.json'), JSON.stringify({engine: 'sherpa', variante: 'int8'})); const v1 = choixEcoute(d, {});
+  fs.writeFileSync(path.join(P, 'ok'), ''); const v2 = choixEcoute(d, {}), v3 = choixEcoute(d, {JARVIS_ECOUTE_MOTEUR: 'whisper'});
+  fs.writeFileSync(path.join(P, 'variante.json'), JSON.stringify({engine: 'sherpa', variante: '../../etc'})); const v4 = choixEcoute(d, {});
+  fs.writeFileSync(path.join(P, 'variante.json'), '{pas du json'); const v5 = choixEcoute(d, {});
+  fs.writeFileSync(path.join(P, 'variante.json'), JSON.stringify({engine: 'onnxasr', variante: 'fine'})); const v6 = choixEcoute(d, {});
+  const okE = v0.moteur === 'whisper' && v1.moteur === 'whisper' && v2.moteur === 'parakeet' && v2.engine === 'sherpa' && v2.modelDir === path.join(P, 'int8') && v3.moteur === 'whisper' && v4.moteur === 'whisper' && v5.moteur === 'whisper' && v6.engine === 'onnxasr' && v6.modelDir === path.join(P, 'fine');
+  results.push((okE ? 'OK    ' : 'ÉCHEC ') + "écoute : Parakeet seulement une fois installé (marque et variante sûres), Whisper sinon ou sur demande" + (okE ? '' : ' :: ' + JSON.stringify([v0, v1, v2, v3, v4, v5, v6]))); if (!okE) fails++; }
 const ok = (name, cond, info) => { results.push((cond ? 'OK   ' : 'ÉCHEC') + ' ' + name + (info ? ' :: ' + info : '')); if (!cond) fails++; };
 const code = execFileSync(process.execPath, [path.join(HERE, '..', 'server.mjs'), 'pair'], {env}).toString().match(/: ([A-Z0-9]{4}-[A-Z0-9]{4})/)[1];
 let srv;
@@ -271,7 +282,7 @@ try {
       r = await stt(wav('quel temps fait-il demain')); ok('écoute : le son de l\'iPhone devient du texte (Whisper sur le serveur)', r.status === 200 && r.body.text === 'quel temps fait-il demain' && r.body.ms >= 0, JSON.stringify(r.body));
       r = await stt(wav('')); ok('écoute : la phrase inventée par Whisper sur un silence (« Amara.org ») n\'est jamais envoyée', r.status === 200 && r.body.text === '', JSON.stringify(r.body));
       r = await stt(Buffer.from('pas un son')); ok('écoute : un envoi qui n\'est pas un WAV est refusé', r.status === 400);
-      r = await G('/api/status'); ok('écoute : état dans /api/status', r.body.ecoute === true && /^0\.(2[2-9]|[3-9]\d)\./.test(r.body.version), JSON.stringify({e: r.body.ecoute, v: r.body.version}));
+      r = await G('/api/status'); ok('écoute : état dans /api/status (moteur compris : Whisper pour le faux moteur du banc)', r.body.ecoute === true && /^0\.(2[2-9]|[3-9]\d)\./.test(r.body.version) && r.body.ecouteMoteur && r.body.ecouteMoteur.moteur === 'whisper', JSON.stringify({e: r.body.ecoute, v: r.body.version, m: r.body.ecouteMoteur}));
       { const ei = await G('/api/ecoute/install', {}); let st = ei.body.state; for (let i = 0; i < 30 && st === 'running'; i++) { await new Promise((z) => setTimeout(z, 100)); st = (await G('/api/ecoute/install')).body.state; } ok('écoute : installation lancée par le serveur (bouton de Réglages)', st === 'done', st); }
       let d = await V({text: 'Quelle heure est-il ?'}); ok('voix : l\'heure tout de suite, sans Claude', d.instant === 'heure' && /^Il est \d{1,2} h( \d\d)?\.$/.test(d.reply) && d.timing.instant === true, JSON.stringify(d).slice(0, 160));
       d = await V({text: 'On est quel jour ?'}); ok('voix : la date, sans Claude', d.instant === 'date' && /^Nous sommes le \S+ \d{1,2} \S+ \d{4}\.$/.test(d.reply), d.reply);

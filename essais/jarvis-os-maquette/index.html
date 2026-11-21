@@ -129,6 +129,10 @@
   .dict-bar { flex: 0 0 46px; height: 4px; border-radius: 2px; background: rgba(255, 255, 255, .12); overflow: hidden; }
   .dict-bar i { display: block; width: 100%; height: 100%; background: linear-gradient(90deg, #22d3ee, #818cf8); transform: scaleX(.04); transform-origin: left; transition: transform .08s linear; }
   .dict-strip[data-s="transcribing"] .dict-bar { visibility: hidden; }
+  /* 0.31.0 : mains libres */
+  .mains-strip[data-s="thinking"] .dict-dot { background: #a855f7; box-shadow: 0 0 10px #a855f7; animation-duration: .9s; }
+  .mains-strip[data-s="speaking"] .dict-dot { background: #38bdf8; box-shadow: 0 0 12px #38bdf8; animation-duration: .5s; }
+  .mains-strip[data-s="thinking"] .dict-bar, .mains-strip[data-s="transcribing"] .dict-bar { visibility: hidden; }
   .dict-fin { flex: 0 0 auto; width: auto; min-height: 34px; }
   .dict-no { flex: 0 0 auto; color: var(--muted); font-size: 13px; min-height: 34px; }
   .dict-note { margin: 0 0 8px; font-size: 13px; color: var(--muted); }
@@ -3210,6 +3214,7 @@ void main(){
     document.addEventListener('touchend', end, {passive: true}); document.addEventListener('touchcancel', end, {passive: true});
   }
   function closeChat() {
+    if (typeof mainsStop === 'function') mainsStop();   /* 0.31.0 */
     if (typeof convPause === 'function' && EAR.session) convPause();
     if (typeof voxStop === 'function') voxStop();
     if (typeof dictCancel === 'function') dictCancel();
@@ -3253,7 +3258,8 @@ void main(){
       h('button', {type: 'button', class: 'btn ghost icon-btn', 'aria-label': 'Fermer la discussion', onclick: closeChat, html: icon('back', 20)}),
       avatar, h('div', {class: 'chat-id'}, h('b', {text: who === 'claude' ? 'Claude' : BOT[who].name + ' · ' + BOT[who].title}), h('span', {text: 'À propos de « ' + titleOf(CHAT.type, CHAT.item) + ' »'})),
       /* JARVIS OS 0.25.0 : plus de « Conversation » en continu ; à la place, « Lecture » (les réponses de Claude lues à voix haute, au choix) */
-      CHAT.mode === 'claude' && typeof lireToggle === 'function' ? lireToggle() : null);
+      CHAT.mode === 'claude' && typeof mainsToggle === 'function' ? mainsToggle() : null,
+      CHAT.mode === 'claude' && typeof lireToggle === 'function' && !(typeof MAINS === 'object' && MAINS.on) ? lireToggle() : null);
     const log = h('div', {class: 'chat-log', 'aria-live': 'polite'}, T.msgs.map(msgEl));
     let note = null;
     if (CHAT.mode === 'claude') {
@@ -3268,8 +3274,8 @@ void main(){
     const send = CHAT.busy && CHAT.mode === 'claude'
       ? h('button', {type: 'button', class: 'btn icon-btn', 'aria-label': 'Arrêter', onclick: () => CHAT.ctl && CHAT.ctl.abort(), html: icon('x', 18)})
       : h('button', {type: 'button', class: 'btn main icon-btn', 'aria-label': 'Envoyer', onclick: sendChat, html: icon('send', 18)});
-    const dOn = typeof DICT === 'object' && DICT.on;
-    const form = h('div', {class: 'chat-form'}, dOn ? null : sugg, typeof dictStrip === 'function' ? dictStrip() : null, h('div', {class: 'chat-row'}, ta, typeof dictBtn === 'function' ? dictBtn() : null, send), tier, CHAT.mode === 'claude' && typeof voxPanel === 'function' && typeof lireVoixIphone === 'function' && lireVoixIphone() ? voxPanel() : null);
+    const dOn = typeof DICT === 'object' && DICT.on, mOn = typeof MAINS === 'object' && MAINS.on;
+    const form = h('div', {class: 'chat-form'}, dOn || mOn ? null : sugg, mOn ? mainsStrip() : typeof dictStrip === 'function' ? dictStrip() : null, h('div', {class: 'chat-row'}, ta, typeof dictBtn === 'function' && !mOn ? dictBtn() : null, send), tier, CHAT.mode === 'claude' && typeof voxPanel === 'function' && typeof lireVoixIphone === 'function' && lireVoixIphone() ? voxPanel() : null);
     const conv = !!CHAT.talk && CHAT.mode === 'claude' && typeof talkStage === 'function';
     ov.classList.toggle('is-talk', conv);
     ov.classList.toggle('no-kb', conv && !EAR.kb && !!earKind());
@@ -3322,7 +3328,12 @@ void main(){
     if (CHAT.talk && CHAT.mode === 'claude' && typeof voxPrime === 'function' && !EAR.session) voxPrime();
     if (typeof dictSent === 'function') dictSent();
     T.msgs.push({who: 'toi', text});
-    if (CHAT.mode === 'claude' && typeof localCmd === 'function' && localCmd(text, T)) return;
+    if (CHAT.mode === 'claude' && typeof localCmd === 'function' && localCmd(text, T)) {
+      if (typeof MAINS === 'object' && MAINS.on) { const lm = T.msgs[T.msgs.length - 1], JVl = JVX();   /* 0.31.0 : la réponse locale est lue, puis il réécoute */
+        if (lm && lm.local && lm.text && JVl && JVl.sayFlux) { const fl = JVl.sayFlux({clean: voxClean, onStart: () => mainsBusy('speaking')}); VOX.on = lm; fl.push(lm.text); fl.end(); fl.done.then(() => { if (VOX.on === lm) VOX.on = null; if (CHAT.open) renderChat(); mainsApres(); }); }
+        else mainsApres(); }
+      return;
+    }
     if (CHAT.mode === 'bot') {
       const b = CHAT.bot;
       finish({title: 'Message à ' + BOT[b].name, effect: 'Une ligne pour ' + BOT[b].name + ' dans le Canal, à propos de « ' + titleOf(CHAT.type, CHAT.item) + ' » : « ' + text + ' », puis la sonnette.', bot: b, order: text, say: 'Bien reçu.', reply: 'Réponse simulée : en vrai, ' + BOT[b].name + ' répond à son passage.'});
@@ -3339,6 +3350,16 @@ void main(){
     T.turns.push({role: 'user', content: text});
     CHAT.busy = true; CHAT.ctl = new AbortController();
     renderChat();
+    /* 0.31.0 : la réponse est lue dès sa première phrase, pendant que la suite s'écrit (mains libres, ou « Lecture : oui ») */
+    /* Pierre (serveur) ou la voix de l'iPhone ; la voix de Claude (page claude.ai, ordinateur) garde sa lecture de la réponse entière */
+    const JVf = JVX(), vk = JVf && JVf.sayKind ? JVf.sayKind() : null, lit = !!((MAINS.on || LIRE.on) && JVf && JVf.sayFlux && (vk === 'serveur' || (vk === 'iphone' && !VOX.tts)));
+    let fl = null;
+    const lire = (final) => {
+      if (!lit || !out.text || out.wait || (VOX.on && VOX.on !== out)) return;
+      if (!fl) { fl = JVf.sayFlux({clean: voxClean, onStart: () => { if (MAINS.on) mainsBusy('speaking'); }}); VOX.on = out; fl.done.then(() => { if (VOX.on === out) { VOX.on = null; if (CHAT.open) renderChat(); } if (typeof mainsApres === 'function') mainsApres(); }); }
+      fl.push(out.text); if (final) fl.end();
+    };
+    if (MAINS.on) mainsBusy('thinking');
     const tools = chatTools(T, out);
     let canTools = false;
     try { const lim = await SAMPLE.limits(); canTools = !!(lim && lim.tools); } catch (e) { canTools = false; }
@@ -3348,13 +3369,14 @@ void main(){
         const r = MSG_EL.get(out);
         if (r && r.pe.isConnected && CHAT.open) { r.pe.textContent = out.text; r.el.classList.toggle('is-wait', !!out.wait); const lg = $('chat') && $('chat').querySelector('.chat-log'); if (lg && CHAT.stick !== false) lg.scrollTop = lg.scrollHeight; }
         else renderChat(); }); };
-      const opts = {modelTier: CHAT.tier, signal: CHAT.ctl.signal, onText: ({text: t}) => { const bd = splitNext(t).body; if (bd) { out.text = bd; out.wait = false; } frame(); if (CHAT.av) CHAT.av.talk(0.8); if (CHAT.talk && typeof voxFeed === 'function') voxFeed(out, false); }};
+      const opts = {modelTier: CHAT.tier, signal: CHAT.ctl.signal, onText: ({text: t}) => { const bd = splitNext(t).body; if (bd) { out.text = bd; out.wait = false; } frame(); lire(false); if (CHAT.av) CHAT.av.talk(0.8); if (CHAT.talk && typeof voxFeed === 'function') voxFeed(out, false); }};
       if (canTools) opts.tools = tools; else opts.cache = false;
       opts.conversation = true;   /* 0.30.0 : le serveur garde le Claude de cette discussion ouvert */
       const res = await SAMPLE([{role: 'user', content: chatCtx(T)}].concat(T.turns), opts);
       { const sp = splitNext(res.text); out.text = sp.body; out.next = sp.next; } out.wait = false;
       if (CHAT.talk && out.text && !(typeof voxFeed === 'function' && voxFeed(out, true))) setTimeout(() => { if (CHAT.open && CHAT.talk && VOX.on !== out) voxSpeak(out); }, 80);
-      if (!CHAT.talk && out.text && typeof lireAuto === 'function') lireAuto(out);
+      if (lit) lire(true);   /* 0.31.0 : la fin de la réponse part à la voix */
+      else if (!CHAT.talk && out.text && typeof lireAuto === 'function') lireAuto(out);
       T.turns.push({role: 'assistant', content: res.text});
       if (res.truncated) T.msgs.push({who: 'claude', text: 'Réponse coupée : demande-moi la suite.'});
     } catch (e) {
@@ -3363,10 +3385,12 @@ void main(){
       out.text = keepTxt || ({cancelled: 'Arrêté.', not_granted: "Tu n'as pas autorisé cette page à utiliser Claude.", sampling_disabled: "Claude n'est pas disponible pour ce compte.", rate_limited: 'Trop de questions d\'un coup : réessaie dans un moment.', refused: 'Je ne peux pas répondre à cette demande.'}[e && e.code] || 'Réponse interrompue : réessaie.');
       if (keepTxt) T.turns.push({role: 'assistant', content: keepTxt});
       if (e && (e.code === 'not_granted' || e.code === 'sampling_disabled')) { SAMPLE = null; SAMPLE_STATE = 'none'; }
+      if (fl && VOX.on === out) voxStop();   /* 0.31.0 : réponse coupée : la lecture s'arrête aussi */
     }
     CHAT.busy = false; CHAT.ctl = null;
     renderChat();
     if (typeof convAfter === 'function') convAfter();
+    if (typeof mainsApres === 'function' && (!fl || !VOX.on)) mainsApres();   /* 0.31.0 : la phrase suivante, ou de nouveau à l'écoute */
   }
 
   /* ---------- briques des écrans ---------- */
@@ -7045,12 +7069,90 @@ void main(){
       h('span', {class: 'ic', html: icon('sound', 15)}), LIRE.on ? 'Lecture : oui' : 'Lecture : non');
   }
   function lireAuto(m) { if (!LIRE.on || !m || !m.text) return; setTimeout(() => { if (CHAT.open && LIRE.on && VOX.on !== m && !DICT.on) voxSpeak(m); }, 80); }
+  /* ---------- JARVIS OS 0.31.0 : mains libres (choix du propriétaire, QCM du 21/11/2026, après le comparatif avec les AI OS) ----------
+     L'orbe ouvre la discussion avec Claude et garde le micro ouvert : chaque phrase est posée à Claude (le même, avec ses données et
+     ses boutons : un seul cerveau), sa réponse est lue dès sa première phrase, puis il t'écoute de nouveau. Ta voix le coupe quand il
+     parle (un bruit : il reprend). « Stop », « tais-toi » : il se tait ; « c'est tout », « au revoir » : fin. Il faut l'écoute du serveur
+     (Parakeet depuis 0.32.0, sinon Whisper) ; sinon, et au choix (« Mains libres : non », retenu sur l'iPhone), la dictée d'une question à relire reste. */
+  var MAINS = {on: false, state: '', busy: false, next: ''};
+  var MAINS_PREF = true; try { MAINS_PREF = localStorage.getItem('jarvis.mains') !== 'non'; } catch (e) { MAINS_PREF = true; }
+  var MAINS_TXT = {listening: "Je t'écoute…", hearing: "Je t'entends…", transcribing: "J'écris ta phrase…", thinking: 'Claude réfléchit…', speaking: 'Claude parle · parle pour le couper'};
+  function mainsDispo() { const v = JVX(); try { return !!(v && v.converse && v.dictKind && v.dictKind() === 'whisper'); } catch (e) { return false; } }
+  function mainsPaint() {
+    const n = document.querySelector('#chat .mains-strip');
+    if (!n || !MAINS.on) { if (CHAT.open) renderChat(); return; }
+    n.dataset.s = MAINS.state; const t = n.querySelector('.dict-txt'); if (t) t.textContent = MAINS_TXT[MAINS.state] || "Je t'écoute…";
+  }
+  function mainsBusy(b) {
+    MAINS.busy = b !== 'idle';
+    const v = JVX(); try { if (v && v.convBusy) v.convBusy(b); } catch (e) { /* rien */ }
+    if (MAINS.on) { MAINS.state = b === 'idle' ? 'listening' : b; mainsPaint(); }
+  }
+  function mainsStart() {
+    const v = JVX(); if (!mainsDispo()) return false;
+    if (MAINS.on) return true;
+    dictCancel(); voxStop();
+    MAINS.on = true; MAINS.state = 'listening'; MAINS.busy = false; MAINS.next = ''; DICT.note = '';
+    if (CHAT.open) renderChat();
+    v.converse({
+      onState: (st, why) => {
+        if (!MAINS.on) return;
+        if (st === 'error') { MAINS.on = false; DICT.note = 'Micro : ' + (why || 'indisponible') + ". Touche le champ, puis le micro du clavier de l'iPhone."; if (CHAT.open) renderChat(); return; }
+        if (st === 'hearing' || st === 'transcribing') { MAINS.state = st; mainsPaint(); }
+        else if (st === 'listening') { MAINS.state = MAINS.busy ? (VOX.on ? 'speaking' : 'thinking') : 'listening'; mainsPaint(); }
+      },
+      onUtterance: (t) => mainsHeard(t),
+      onBarge: () => { MAINS.state = 'hearing'; mainsPaint(); },
+      onBargeCancel: () => { MAINS.state = MAINS.busy ? (VOX.on ? 'speaking' : 'thinking') : 'listening'; mainsPaint(); },
+      onLevel: (x) => { const b = $('mains-lvl'); if (b) b.style.transform = 'scaleX(' + Math.max(0.04, Math.min(1, x)).toFixed(2) + ')'; }
+    }).then((ok) => { if (!ok && MAINS.on) { MAINS.on = false; if (CHAT.open) renderChat(); } });
+    return true;
+  }
+  function mainsStop() {
+    if (!MAINS.on) return;
+    MAINS.on = false; MAINS.busy = false; MAINS.next = '';
+    const v = JVX(); try { if (v && v.convStop) v.convStop(); } catch (e) { /* rien */ }
+    voxStop(); if (CHAT.open) renderChat();
+  }
+  /* une phrase entendue : un ordre à la voix (se taire, finir), sinon une question pour Claude */
+  function mainsHeard(t) {
+    const x = String(t || '').trim(); if (!x || !MAINS.on) return;
+    const n = x.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[’']/g, ' ').replace(/[.!?,;]+/g, ' ').replace(/\s+/g, ' ').trim();   /* « c'est tout » → « c est tout » */
+    if (n.length < 30 && /^(stop|tais toi|tais-toi|chut|silence|arrete|arrete toi|ca suffit)\b/.test(n)) { voxStop(); mainsBusy(CHAT.busy ? 'thinking' : 'idle'); return; }
+    if (n.length < 40 && /(c ?est tout|au revoir|fin de la conversation|on arrete la|termine la conversation)/.test(n)) { mainsStop(); toast('Mains libres', 'Conversation terminée. Touche l\'orbe pour reprendre.', true); return; }
+    voxStop();   /* il parlait : il se tait */
+    if (CHAT.busy) { MAINS.next = x; if (CHAT.ctl) CHAT.ctl.abort(); return; }   /* il réfléchissait : ta nouvelle phrase remplace l'ancienne */
+    const ta = $('chat-in'); if (!ta) return; ta.value = x; sendChat();
+  }
+  /* la réponse est finie (lue, coupée ou en erreur) : la phrase en attente part, sinon il t'écoute */
+  function mainsApres() {
+    if (!MAINS.on) return;
+    if (MAINS.next && !CHAT.busy) { const x = MAINS.next; MAINS.next = ''; const ta = $('chat-in'); if (ta) { ta.value = x; sendChat(); } return; }
+    if (!VOX.on && !CHAT.busy) mainsBusy('idle');
+  }
+  function mainsToggle() {
+    if (!mainsDispo()) return null;
+    return h('button', {type: 'button', class: 'btn sm talk-toggle mains-toggle' + (MAINS.on ? ' is-on' : ''), 'aria-pressed': String(!!MAINS.on), 'aria-label': MAINS.on ? 'Mains libres : actif' : 'Mains libres : coupé',
+      onclick: () => { if (MAINS.on) { MAINS_PREF = false; mainsStop(); } else { MAINS_PREF = true; mainsStart(); }
+        try { localStorage.setItem('jarvis.mains', MAINS_PREF ? 'oui' : 'non'); } catch (e) { /* rien */ } if (CHAT.open) renderChat(); }},
+      h('span', {class: 'ic', html: icon('mic', 15)}), MAINS.on ? 'Mains libres : oui' : 'Mains libres : non');
+  }
+  function mainsStrip() {
+    if (!MAINS.on) return null;
+    return h('div', {class: 'dict-strip mains-strip', 'data-s': MAINS.state, role: 'status'},
+      h('i', {class: 'dict-dot', 'aria-hidden': 'true'}), h('span', {class: 'dict-txt', text: MAINS_TXT[MAINS.state] || "Je t'écoute…"}),
+      h('span', {class: 'dict-bar', 'aria-hidden': 'true'}, h('i', {id: 'mains-lvl'})),
+      h('button', {type: 'button', class: 'btn sm dict-fin mains-fin', onclick: () => mainsStop()}, 'Terminer'));
+  }
+  document.addEventListener('visibilitychange', () => { if (document.hidden && MAINS.on) mainsStop(); });   /* l'app passe derrière : le micro se ferme */
   /* l'orbe : la discussion générale avec Claude, et l'écoute de la question tout de suite (l'appui sur l'orbe est le geste qu'attend l'iPhone) */
   function askOpen() {
     const v = JVX(); try { if (v && v.refresh) v.refresh(); } catch (e) { /* rien */ }
-    if (CHAT.open && CHAT.mode === 'claude') { dictStart(); return; }
+    const mains = MAINS_PREF && mainsDispo();
+    if (CHAT.open && CHAT.mode === 'claude') { if (MAINS.on) { voxStop(); mainsBusy(CHAT.busy ? 'thinking' : 'idle'); return; } if (mains) { mainsStart(); return; } dictStart(); return; }
     CHAT.talk = false;
     openChat('claude', 'hydra', 'equipe', 'equipe');
+    if (mains) { mainsStart(); return; }   /* 0.31.0 : mains libres */
     if (!dictStart() && !DICT.note) { const ta = $('chat-in'); if (ta) try { ta.focus({preventScroll: true}); } catch (e) { /* rien */ } }
   }
   window.JarvisAsk = askOpen;
@@ -8607,16 +8709,18 @@ void main(){
       const st = await JS.status(), upd = h('p', {class: 'set-msg'});
       const seg = (k, opts, def) => h('div', {class: 'seg set-seg', role: 'group'}, opts.map(([v, l]) => h('button', {type: 'button', 'aria-pressed': String((JS.setting(k) || def) === v), onclick: () => { JS.set(k, v); location.reload(); }}, l)));
       parts.push(h('section', {class: 'card set-card'}, h('b', {text: 'JARVIS'}),
-        h('p', {class: 'muted', text: st ? 'Serveur ' + st.version + (st.commit ? ' (' + String(st.commit).slice(0, 7) + ')' : '') + ' · Claude ' + (st.claude && st.claude.loggedIn ? 'connecté' : 'non connecté') + ' · voix du serveur ' + (st.tts ? 'prête' : 'absente') + ' · écoute Whisper ' + (st.ecoute ? 'prête' : st.ecouteInstall === 'running' ? 'en cours d’installation' : 'absente') : 'État du serveur indisponible.'}),
+        h('p', {class: 'muted', text: st ? 'Serveur ' + st.version + (st.commit ? ' (' + String(st.commit).slice(0, 7) + ')' : '') + ' · Claude ' + (st.claude && st.claude.loggedIn ? 'connecté' : 'non connecté') + ' · voix du serveur ' + (st.tts ? 'prête' : 'absente') + ' · écoute ' + (st.ecouteMoteur && st.ecouteMoteur.moteur === 'parakeet' ? 'Parakeet (' + (st.ecouteMoteur.variante || 'int8') + ')' : 'Whisper') + ' ' + (st.ecoute ? 'prête' : st.ecouteInstall === 'running' ? 'en cours d’installation' : 'absente') : 'État du serveur indisponible.'}),
         /* 0.27.0 : la mise à jour est proposée toute seule à l'ouverture de l'app ; ce bouton force la vérification et suit le même chemin */
         h('button', {type: 'button', class: 'btn main', id: 'set-maj', onclick: async () => { upd.textContent = 'Vérification…'; upd.classList.remove('is-bad'); let m = ''; try { m = await window.JarvisMaj.check(true); } catch (e) { m = 'Vérification impossible.'; } upd.textContent = m; upd.classList.toggle('is-bad', /injoignable|impossible|pas pu|pas relié/.test(m)); }}, 'Mettre à jour le serveur'), upd,
         h('p', {class: 'muted', text: 'Une nouvelle version est proposée toute seule à l’ouverture de JARVIS ; ce bouton force la vérification.'}),
         h('small', {class: 'pick-label', text: 'Voix de JARVIS'}), seg('voiceEngine', [['serveur', 'Pierre (ton serveur)'], ['iphone', "Voix de l'iPhone"]], 'serveur'),
         /* 0.25.0 (choix QCM du 19/11/2026, « un seul Claude ») : plus de conversation continue ; l'orbe ouvre la discussion avec Claude et le micro
            écoute une question (Whisper du serveur, sinon l'iPhone), écrite dans le champ avant l'envoi */
-        h('small', {class: 'pick-label', text: 'Dictée (le micro de la discussion avec Claude)'}), seg('ecoute', [['whisper', 'Whisper (ton serveur)'], ['iphone', "Écoute de l'iPhone"]], 'whisper'),
-        h('p', {class: 'muted', text: "L'orbe ouvre la discussion avec Claude, qui a tes données sous les yeux, et écoute une question : elle s'écrit dans le champ, tu la relis, tu envoies. « Lecture : oui », en haut de la discussion, fait lire les réponses par la voix choisie ci-dessus. La conversation en continu a été retirée (19/11/2026)."}),
-        st && !st.ecoute ? h('button', {type: 'button', class: 'btn sm', onclick: async (ev) => { const b = ev.currentTarget; b.disabled = true; const r = await JS.ecouteInstall(); upd.textContent = r ? "Installation de l'écoute Whisper lancée (5 à 10 minutes, modèle de 500 Mo). Reviens ici ensuite." : 'Installation impossible : serveur injoignable.'; const poll = async () => { const e = await JS.ecouteEtat(); if (!e || e.state === 'running') { setTimeout(poll, 8000); return; } upd.textContent = e.state === 'done' ? "Écoute Whisper installée : rouvre la conversation." : "L'installation a échoué : " + String(e.tail || '').slice(-200); upd.classList.toggle('is-bad', e.state !== 'done'); }; setTimeout(poll, 8000); }}, "Installer l'écoute Whisper") : null,
+        h('small', {class: 'pick-label', text: 'Écoute (le micro de la discussion avec Claude)'}), seg('ecoute', [['whisper', 'Ton serveur'], ['iphone', "Écoute de l'iPhone"]], 'whisper'),
+        h('p', {class: 'muted', text: "L'orbe ouvre la discussion avec Claude, qui a tes données sous les yeux. Avec l'écoute de ton serveur, il reste à l'écoute (mains libres) : tu parles, il répond à voix haute dès sa première phrase, puis il t'écoute de nouveau ; ta voix le coupe ; « c'est tout » termine. « Mains libres : non », en haut de la discussion, rend la dictée d'une question à relire. « Lecture : oui » fait lire les réponses écrites."}),
+        /* 0.32.0 : Parakeet (NVIDIA) écoute à la place de Whisper une fois installé : 2 à 2,5 fois moins de mots faux, une phrase écrite
+           en 0,2 à 0,3 s au lieu de 1,6 s (mesure du 21/11/2026) ; « Passer à Parakeet » quand Whisper est déjà là */
+        st && (!st.ecoute || (st.ecouteMoteur && st.ecouteMoteur.moteur === 'whisper')) ? h('button', {type: 'button', class: 'btn sm', id: 'set-ecoute', onclick: async (ev) => { const b = ev.currentTarget; b.disabled = true; const r = await JS.ecouteInstall(); upd.textContent = r ? "Installation de l'écoute lancée (5 à 15 minutes : environ 1 Go à télécharger). Reviens ici ensuite." : 'Installation impossible : serveur injoignable.'; const poll = async () => { const e = await JS.ecouteEtat(); if (!e || e.state === 'running') { setTimeout(poll, 8000); return; } upd.textContent = e.state === 'done' ? (/Parakeet installé/.test(String(e.tail || '')) ? 'Parakeet installé : c\'est lui qui t\'écoute maintenant.' : 'Écoute installée (Whisper).') : "L'installation a échoué : " + String(e.tail || '').slice(-200); upd.classList.toggle('is-bad', e.state !== 'done'); }; setTimeout(poll, 8000); }}, st.ecoute ? 'Passer à Parakeet (plus juste, plus rapide)' : "Installer l'écoute") : null,
         st && !st.tts ? h('button', {type: 'button', class: 'btn sm', onclick: async () => { const r = await JS.voiceInstall(); upd.textContent = r ? 'Installation de la voix : ' + r.state + '. Reviens dans quelques minutes.' : 'Installation impossible.'; }}, 'Installer la voix Pierre') : null,
         h('a', {class: 'link', href: '/ancienne/', text: 'Ancienne app (réglages avancés, diagnostic)'})));
       swap(parts);

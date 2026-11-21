@@ -18,12 +18,26 @@ export const VOCAB = 'JARVIS, Claude, Iris, Chronos, Kairos, Ulysse, Athéna, Ar
 const HALLU = /amara\.org|sous-titr|merci d'avoir regard|abonnez-vous|n'oubliez pas de vous abonner|merci de votre attention|^\W*(merci|bonjour|au revoir)?\W*$/i;
 export const halluc = (t) => HALLU.test(String(t || '').trim());
 
-export function createEcoute({dir, py, helper, model, fakeHelper, log = () => {}}) {
-  const ready = () => !!fakeHelper || (fs.existsSync(py) && fs.existsSync(path.join(dir, 'ok')));
+/* 0.32.0 : le moteur d'écoute. Parakeet (NVIDIA) une fois installé par install/ecoute.sh (marque parakeet/ok et parakeet/variante.json),
+   sinon Whisper ; JARVIS_ECOUTE_MOTEUR=whisper garde Whisper. Variante « int8 » (sherpa-onnx, serveur de 4 Go) ou « fine »
+   (encodeur requantifié, onnx-asr, 8 Go et plus) : mesures dans stt/parakeet_helper.py et docs/jarvis-os.md (0.32.0). */
+export function choixEcoute(dir, env = process.env) {
+  if (env.JARVIS_ECOUTE_MOTEUR === 'whisper') return {moteur: 'whisper'};
+  try {
+    if (fs.existsSync(path.join(dir, 'parakeet', 'ok'))) {
+      const v = JSON.parse(fs.readFileSync(path.join(dir, 'parakeet', 'variante.json'), 'utf8'));
+      if (v && ['sherpa', 'onnxasr'].includes(v.engine) && /^[a-z0-9]+$/.test(String(v.variante || ''))) return {moteur: 'parakeet', engine: v.engine, variante: v.variante, modelDir: path.join(dir, 'parakeet', v.variante)};
+    }
+  } catch { /* marque illisible : Whisper */ }
+  return {moteur: 'whisper'};
+}
+export function createEcoute({dir, py, helper, parakeetHelper, model, fakeHelper, log = () => {}}) {
+  const ready = () => !!fakeHelper || (fs.existsSync(py) && (fs.existsSync(path.join(dir, 'ok')) || choixEcoute(dir).moteur === 'parakeet'));
   let H = null;
   function proc() {
     if (H && !H.dead) return H;
-    const cmd = fakeHelper ? [process.execPath, [fakeHelper]] : [py, [helper, model, path.join(dir, 'models')]];
+    const c = choixEcoute(dir);
+    const cmd = fakeHelper ? [process.execPath, [fakeHelper]] : c.moteur === 'parakeet' && parakeetHelper ? [py, [parakeetHelper, c.engine, c.modelDir]] : [py, [helper, model, path.join(dir, 'models')]];
     const child = spawn(cmd[0], cmd[1], {stdio: ['pipe', 'pipe', 'pipe']});
     const h = {child, buf: '', waits: new Map(), dead: false, ready: false, err: ''};
     child.on('close', () => { h.dead = true; for (const w of h.waits.values()) w({ok: false, error: 'écoute arrêtée'}); h.waits.clear(); });
@@ -58,7 +72,9 @@ export function createEcoute({dir, py, helper, model, fakeHelper, log = () => {}
     return {ok: true, text: halluc(text) ? '' : text, ms: Date.now() - t0};
   }
   const stop = () => { if (H) { try { H.child.kill(); } catch { /* rien */ } H = null; } };
-  return {ready, warm, transcribe, stop};
+  /* ce qui écoute : « parakeet » (et sa variante) ou « whisper » ; le faux moteur du banc se dit Whisper, sauf JARVIS_FAUX_MOTEUR */
+  const moteur = () => { if (fakeHelper) return {moteur: process.env.JARVIS_FAUX_MOTEUR || 'whisper'}; const c = choixEcoute(dir); return c.moteur === 'parakeet' ? {moteur: 'parakeet', variante: c.variante} : {moteur: 'whisper', modele: model}; };
+  return {ready, warm, transcribe, stop, moteur};
 }
 
 /* un WAV mono 16 bits envoyé par l'iPhone : contrôle minimal (en-tête, taille) */

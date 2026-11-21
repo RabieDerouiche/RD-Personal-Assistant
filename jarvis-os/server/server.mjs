@@ -20,7 +20,7 @@ import {BOT_IDS, BOT_NOMS, BOT_LISTE} from './bots.mjs';
 import {createEcoute, wavOk, intention, quand, meteoPhrase, meteoUrl, heurePhrase, datePhrase, nrm, diction} from './voix.mjs';
 import {createFlux} from './flux.mjs';
 
-const VERSION = '0.30.0';
+const VERSION = '0.32.0';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PORT = +(process.env.PORT || 8787);
 const HOST = process.env.HOST || '127.0.0.1';
@@ -794,7 +794,7 @@ async function racContext() {
 
 /* ---------- 0.22.0 : la voix refaite (voix.mjs) — écoute Whisper, réponses instantanées, Haiku pour le reste ---------- */
 const WHISPER_DIR = process.env.JARVIS_WHISPER_DIR || path.join(os.homedir(), 'whisper');
-const ECOUTE = createEcoute({dir: WHISPER_DIR, py: path.join(WHISPER_DIR, 'venv', 'bin', 'python'), helper: path.join(HERE, 'stt', 'whisper_helper.py'), model: process.env.JARVIS_WHISPER_MODEL || 'small', fakeHelper: process.env.JARVIS_STT_HELPER || '', log: (t) => { S.ecouteErr = {at: now(), t: String(t).slice(0, 300)}; }});
+const ECOUTE = createEcoute({dir: WHISPER_DIR, py: path.join(WHISPER_DIR, 'venv', 'bin', 'python'), helper: path.join(HERE, 'stt', 'whisper_helper.py'), parakeetHelper: path.join(HERE, 'stt', 'parakeet_helper.py'), model: process.env.JARVIS_WHISPER_MODEL || 'small', fakeHelper: process.env.JARVIS_STT_HELPER || '', log: (t) => { S.ecouteErr = {at: now(), t: String(t).slice(0, 300)}; }});
 let ECOUTE_INSTALL = {state: 'idle', at: 0, tail: ''};
 /* 0.23.0 : le comparatif des produits suivis (comparatif.mjs) */
 /* 0.24.0 : une recherche d'idées prend 5 à 15 minutes (0.29.0 : deux passes d'Opus) : une notification quand elle est prête (ou impossible), qui ouvre ses propositions */
@@ -1100,7 +1100,7 @@ const server = http.createServer(async (req, res) => {
         }
         catch (e) { return json(res, e.code === 'server_not_connected' ? 409 : e.code === 'not_in_manifest' ? 404 : 502, {error: {code: e.code || 'tool_error', message: e.message, status: e.status || 0}}); }
       }
-      if (p === '/api/status') { const cs = await claudeStatus(); if (cs.loggedIn && (!MCP.at || now() - MCP.at > 600000)) await mcpList(); return json(res, 200, {version: VERSION, commit, claude: cs, connectors: connSummary(), google: (({configured, linked, account}) => ({configured, linked, account}))(GG.status('')), grokPauseUntil: await grokPauseMs().then((v) => (v ? new Date(v).toISOString() : '')).catch(() => S.config.grokPauseUntil), usage: S.usage, tache: {running: TACHE.running, last: TACHE.last}, push: {count: S.push.subs.length, last: S.push.last || null, prefs: S.push.prefs}, session: !!S.session, timing: S.lastTiming || null, page: FLUX.etat(), tts: ttsReady(), voiceInstall: VOICE_INSTALL.state, ecoute: ECOUTE.ready(), ecouteInstall: ECOUTE_INSTALL.state}); }
+      if (p === '/api/status') { const cs = await claudeStatus(); if (cs.loggedIn && (!MCP.at || now() - MCP.at > 600000)) await mcpList(); return json(res, 200, {version: VERSION, commit, claude: cs, connectors: connSummary(), google: (({configured, linked, account}) => ({configured, linked, account}))(GG.status('')), grokPauseUntil: await grokPauseMs().then((v) => (v ? new Date(v).toISOString() : '')).catch(() => S.config.grokPauseUntil), usage: S.usage, tache: {running: TACHE.running, last: TACHE.last}, push: {count: S.push.subs.length, last: S.push.last || null, prefs: S.push.prefs}, session: !!S.session, timing: S.lastTiming || null, page: FLUX.etat(), tts: ttsReady(), voiceInstall: VOICE_INSTALL.state, ecoute: ECOUTE.ready(), ecouteMoteur: ECOUTE.moteur(), ecouteInstall: ECOUTE_INSTALL.state}); }
       if (p === '/api/update' && req.method === 'POST') return json(res, 200, await update());
       if (p === '/api/maj') return json(res, 200, await majVerifie(url.searchParams.get('force') === '1'));   /* 0.27.0 : une version plus récente ? */
       /* notifications : clé publique, abonnement de cet appareil, essai, préférences, vérification immédiate */
@@ -1165,7 +1165,7 @@ const server = http.createServer(async (req, res) => {
       { const mi = /^\/api\/image\/([\w.]+)$/.exec(p); if (mi) { const f = COMP.image(mi[1]); if (!f) return json(res, 404, {error: 'Image inconnue.'}); res.writeHead(200, {'content-type': /png$/.test(f) ? 'image/png' : /webp$/.test(f) ? 'image/webp' : 'image/jpeg', 'cache-control': 'private, max-age=2592000'}); fs.createReadStream(f).pipe(res); return; } }
       if (p === '/api/voix/prechauffe' && req.method === 'POST') return json(res, 200, await prechauffe());
       if (p === '/api/stt' && req.method === 'POST') {
-        if (!ECOUTE.ready()) return json(res, 503, {error: 'ecoute_absente', message: "L'écoute Whisper n'est pas installée sur le serveur (Réglages)."});
+        if (!ECOUTE.ready()) return json(res, 503, {error: 'ecoute_absente', message: "L'écoute n'est pas installée sur le serveur (Réglages, « Installer l'écoute »)."});
         const raw = await readRaw(req, 3e6); if (!wavOk(raw)) return json(res, 400, {error: 'Son illisible.'});
         const r = await ECOUTE.transcribe(raw, path.join(DATA, 'stt'));
         S.usage.stt = (S.usage.stt || 0) + 1;
