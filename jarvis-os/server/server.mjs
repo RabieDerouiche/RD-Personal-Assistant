@@ -27,7 +27,7 @@ import {createActivite, outilNom} from './activite.mjs';
 import {createRadar} from './radar.mjs';
 const ACT = createActivite();   /* 0.33.0 : ce que fait Claude à l'instant */
 
-const VERSION = '0.46.0';
+const VERSION = '0.47.0';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PORT = +(process.env.PORT || 8787);
 const HOST = process.env.HOST || '127.0.0.1';
@@ -66,7 +66,7 @@ const GG = createGoogle({S, save});
 const publicBase = (req) => (req.headers['x-forwarded-proto'] || (req.socket.encrypted ? 'https' : 'http')).split(',')[0].trim() + '://' + req.headers.host;
 const googleRedirect = (req) => publicBase(req) + '/api/google/callback';
 const escHtml = (t) => String(t).replace(/[&<>"]/g, (c) => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
-const googlePage = (r) => '<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>JARVIS · Google</title>' +
+const googlePage = (r) => '<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>J.A.R.V.I.S OS · Google</title>' +
   '<body style="margin:0;min-height:100vh;display:grid;place-items:center;background:#02040e;color:#e6f2ff;font:16px/1.5 system-ui,sans-serif;text-align:center;padding:24px">' +
   '<div><h1 style="font-size:22px">' + (r.ok ? 'Google est relié à JARVIS' : 'Google n’est pas relié') + '</h1><p>' + escHtml(r.ok ? (r.account ? 'Compte : ' + r.account + '. ' : '') + (r.missing && r.missing.length ? 'Droits manquants : ' + r.missing.length + ' (refais « Connecter Google » en cochant tout). ' : '') + 'Tu peux revenir dans JARVIS.' : r.error) + '</p>' +
   '<p><a href="/" style="color:#67e8f9">Revenir dans JARVIS</a></p></div>' + (r.ok ? '<script>setTimeout(function(){location.replace("/")},2500)</script>' : '');
@@ -953,9 +953,9 @@ const MCP_OUTILS = [
 /* ---------- 0.45.0 : JARVIS se connaît (capture du 21/11/2026 : à « la voix Google est-elle activée ? », son Claude répondait
    « je ne peux pas vérifier » et proposait la tâche du serveur). Un guide fixe de ses fonctions et de leurs réglages va dans la consigne
    (stable : la discussion garde son Claude), et l'état du moment part avec chaque question dans une ligne [JARVIS …]. ---------- */
-const GUIDE_JARVIS = `\n\n[JARVIS OS ${VERSION} : ce que tu es et ce que tu sais faire. Tu es le Claude de JARVIS OS, l'app du propriétaire sur son serveur. « Réglages » s'ouvre par « Tout » (la petite barre au-dessus de l'orbe), puis Réglages.
+const GUIDE_JARVIS = `\n\n[JARVIS OS ${VERSION} : ce que tu es et ce que tu sais faire. Tu es le Claude de J.A.R.V.I.S OS (on dit « Jarvis »), l'app du propriétaire sur son serveur ; son nom s'écrit J.A.R.V.I.S OS. « Réglages » s'ouvre par « Tout » (la petite barre au-dessus de l'orbe), puis Réglages.
 - Conversation continue : l'orbe. Écoute Parakeet et fin de phrase Smart Turn : Réglages, carte « JARVIS » (« Passer à Parakeet », « Installer la fin de phrase (Smart Turn) »).
-- Voix du serveur : Pierre (Piper, gratuit) ou Google Chirp 3 HD : Réglages, carte « Voix du serveur : Pierre ou Google » (il y colle sa clé d'API Google, puis choisit « Google » et une voix). Gratuite jusqu'à 1 million de caractères par mois ; JARVIS compte, prévient à 80 % et à 95 %, et repasse seul sur Pierre à son plafond (sous le million) jusqu'au mois suivant : jamais rien de payant. Ce garde-fou existe déjà.
+- Voix du serveur : Pierre (Piper, gratuit) ou Google Chirp 3 HD : Réglages, carte « Voix du serveur : Pierre ou Google » (il y colle sa clé d'API Google, puis choisit « Google » et une voix). Gratuite jusqu'à 1 million de caractères par mois ; JARVIS compte avant chaque envoi (en octets, au moins autant que Google), prévient à 80 % et à 95 %, s'arrête à son plafond (sous le million) jusqu'au mois suivant, et à un plafond du jour ; au moindre doute (compteur illisible, erreur de Google), Pierre parle : jamais rien de payant. Ces garde-fous existent déjà. Pour savoir si Google parle vraiment : la ligne [JARVIS …] (dernière phrase dite), ou Réglages, carte « Voix du serveur », « Vérifier ». Le réglage « Voix de JARVIS » doit être sur « Ton serveur ».
 - Mémoire : « retiens que… » (outil retenir) ; Réglages, « Ce que JARVIS retient » ; Claude la range chaque dimanche à 18 h (propositions à valider).
 - Routines et brief du matin : « Tout », Automatisations, « Routines de Claude » (une routine en une phrase ; outil programmer_routine).
 - Automatisations de l'iPhone : Réglages, « Siri et bouton Action », « Automatisations » (actions brief, agenda, demain, pourmoi, meteo).
@@ -967,8 +967,13 @@ const nbFr = (n) => Number(n || 0).toLocaleString('fr-FR');
 function etatJarvisLigne() {
   try {
     const vg = VG.etat(), g = (S.config || {}).voixServeur === 'google', nomG = String((S.config || {}).voixGoogleNom || VOIX_DEFAUT).split('-').pop();
-    const voix = g && vg.pret ? 'voix du serveur Google (' + nomG + ')' + (vg.pause ? ', en pause : plafond atteint, Pierre parle jusqu’au 1er' : '') : 'voix du serveur Pierre' + (vg.pret ? ' (clé Google posée, Google pas choisi)' : ' (voix Google non activée : aucune clé)');
-    const compteur = vg.pret ? ', ' + nbFr(vg.caracteres) + ' caractères Google ce mois sur un plafond de ' + nbFr(vg.plafond) + ' (gratuit jusqu’à 1 million)' : '';
+    const hm = (t) => new Intl.DateTimeFormat('fr-FR', {timeZone: 'Europe/Paris', hour: '2-digit', minute: '2-digit'}).format(new Date(t));
+    const garde = vg.bloque ? ', coupée : compteur illisible, Pierre parle jusqu’au 1er' : vg.pause ? ', en pause : plafond atteint, Pierre parle jusqu’au 1er' : vg.pauseJour ? ', en pause : plafond du jour atteint, Pierre jusqu’à demain' : vg.horsErreurJusqu ? ', en erreur : Pierre jusqu’à ' + hm(vg.horsErreurJusqu) : '';
+    const voix = g && vg.pret ? 'voix du serveur Google (' + nomG + ')' + garde : 'voix du serveur Pierre' + (vg.pret ? ' (clé Google posée, Google pas choisi)' : ' (voix Google non activée : aucune clé)');
+    /* 0.47.0 : on compte en octets (jamais moins que ce que Google facture) ; la dernière phrase dite et la dernière erreur */
+    const compteur = vg.pret ? ', ' + nbFr(vg.caracteres) + ' comptés ce mois sur un plafond de ' + nbFr(vg.plafond) + ' (en octets, au moins autant que les caractères facturés ; gratuit jusqu’à 1 million ; aujourd’hui ' + nbFr(vg.aujourdhui) + ' sur ' + nbFr(vg.plafondJour) + ')'
+      + (VOIXD ? ', dernière phrase du serveur dite par ' + (VOIXD.moteur === 'google' ? 'Google à ' + hm(VOIXD.at) : 'Pierre à ' + hm(VOIXD.at) + (VOIXD.raison ? ' (' + VOIXD.raison + ')' : '')) : ', aucune phrase dite par le serveur depuis son démarrage')
+      + (vg.erreur && (!vg.dernierSucces || vg.erreur.at > vg.dernierSucces.at) ? ', dernière erreur Google à ' + hm(vg.erreur.at) + ' : ' + vg.erreur.message : '') : '';
     const em = ECOUTE.moteur(), ecoute = ECOUTE.ready() ? 'écoute ' + (em.moteur === 'parakeet' ? 'Parakeet' : 'Whisper') + ', fin de phrase ' + (TOUR.ready() ? 'Smart Turn' : 'à 0,7 s de silence (Smart Turn pas installé)') : 'écoute du serveur pas installée';
     const rs = ROUT.liste(), b = rs.find((x) => x.genre === 'brief'), nr = rs.filter((x) => x.genre === 'mission' && x.actif).length;
     const relies = JMCP.etat().relies.map((x) => x.nom);
@@ -1229,8 +1234,27 @@ const ttsReady = () => fs.existsSync(VOICE.model) && (fs.existsSync(PIPER_PY) ||
 /* 0.40.0 : la voix Google Chirp 3 HD (voix-google.mjs), choisie dans Réglages, plafonnée sous la part gratuite ; Pierre en secours */
 const VG = createVoixGoogle({fichier: path.join(DATA, 'voix-google.json'), compteurFichier: path.join(DATA, 'voix-google-compteur.json'), base: process.env.JARVIS_VOIX_GOOGLE_URL || 'https://texttospeech.googleapis.com',
   plafond: Math.min(+process.env.JARVIS_VOIX_GOOGLE_PLAFOND || 990000, 1000000), now,   /* 0.45.0 : 990 000, juste sous le million gratuit (sa demande : « qu'il ne bascule pas avant d'atteindre le seuil facturable ») */
-  alerte: ({titre, texte}) => { if (S.push && S.push.subs.length) PUSH.send({title: titre, body: texte, url: '/#reglages', tag: 'voix-google'}, {urgency: 'normal'}).catch(() => {}); },
+  plafondJour: Math.min(+process.env.JARVIS_VOIX_GOOGLE_JOUR || 100000, Math.min(+process.env.JARVIS_VOIX_GOOGLE_PLAFOND || 990000, 1000000)),   /* 0.47.0 : une boucle ne vide pas le mois */
+  miroir: {lire: () => S.voixGoogleCompteur || null, ecrire: (c) => { S.voixGoogleCompteur = c; save(); }},   /* 0.47.0 : le compteur en double (son fichier, et ici) */
+  alerte: ({titre, texte}) => { S.voixGoogleAlerte = {at: now(), titre, texte}; if (S.push && S.push.subs.length) PUSH.send({title: titre, body: texte, url: '/#reglages', tag: 'voix-google'}, {urgency: 'high'}).catch(() => {}); },
   log: (t) => { S.voixGoogleErr = {at: now(), t: String(t).slice(0, 300)}; }});
+/* 0.47.0 : qui a dit la dernière phrase du serveur, et pourquoi pas Google (Réglages, état donné à Claude, en-tête x-jarvis-voix) */
+let VOIXD = null;
+function raisonSansGoogle() {
+  if ((S.config || {}).voixServeur !== 'google') return VG.pret() ? 'Google pas choisi (Réglages, carte « Voix du serveur », bouton « Google »)' : 'aucune clé Google posée';
+  return VG.pret() ? '' : 'aucune clé Google posée';
+}
+/* la vérification de l'accès Google : une vraie phrase (comptée, une cinquantaine d'octets), même juste après une erreur.
+   choisir (clé tout juste collée) : si Google répond, il parle aussitôt ; « Vérifier » ne change pas son choix */
+async function verifierGoogle({choisir = false} = {}) {
+  const dir = path.join(DATA, 'tts'); fs.mkdirSync(dir, {recursive: true});
+  const nom = (S.config || {}).voixGoogleNom || VOIX_DEFAUT, phrase = 'Bonjour, je suis Jarvis. Ma voix Google est prête.', info = {};
+  const f = await VG.dire(phrase, nom, path.join(dir, sha('google' + nom + phrase).slice(0, 24) + '.wav'), {force: true, info});
+  if (!f) return {verifie: false, erreurVerif: info.raison || 'Google n’a pas répondu'};
+  if (choisir) { S.config = S.config || {}; S.config.voixServeur = 'google'; save(); }
+  VOIXD = {moteur: 'google', nom, at: now(), verif: true};
+  return {verifie: true};
+}
 const googleChoisie = () => (S.config || {}).voixServeur === 'google' && VG.pret();
 const voixPrete = () => ttsReady() || googleChoisie();
 function ttsHelper() {
@@ -1261,9 +1285,12 @@ async function tts(text) {
   const dir = path.join(DATA, 'tts'); fs.mkdirSync(dir, {recursive: true});
   if (googleChoisie()) {   /* 0.40.0 : la voix Google d'abord (gardée en cache comme Pierre) ; au plafond ou en erreur, Pierre */
     const g = diction(String(text || '').trim()).replace(/[*_#`>|]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 600), nom = S.config.voixGoogleNom || VOIX_DEFAUT;
-    if (g) { const og = path.join(dir, sha('google' + nom + g).slice(0, 24) + '.wav'); if (fs.existsSync(og)) return og; const f = await VG.dire(g, nom, og); if (f) return f; }
+    if (g) { const og = path.join(dir, sha('google' + nom + g).slice(0, 24) + '.wav'), info = {};
+      if (fs.existsSync(og)) { VOIXD = {moteur: 'google', nom, at: now(), cache: true}; return og; }   /* déjà dite : relue du disque, rien d'envoyé ni de compté */
+      const f = await VG.dire(g, nom, og, {info}); if (f) { VOIXD = {moteur: 'google', nom, at: now()}; return f; }
+      VOIXD = {moteur: 'pierre', at: now(), raison: info.raison || 'Google n’a pas répondu'}; }
     if (!ttsReady()) return null;
-  }
+  } else VOIXD = {moteur: 'pierre', at: now(), raison: raisonSansGoogle()};
   const clean = pronounce(String(text || '').trim()).slice(0, 600);
   if (!clean) return null;
   const out = path.join(dir, sha(VOICE.model + VOICE.speaker + clean).slice(0, 24) + '.wav');
@@ -1488,7 +1515,7 @@ const server = http.createServer(async (req, res) => {
       if (p === '/api/voice/install' && req.method === 'POST') return json(res, 200, installVoice());
       if (p === '/api/voice/install') return json(res, 200, VOICE_INSTALL);
       /* 0.40.0 : la voix Google — état (compteur du mois, plafond), voix françaises disponibles, choix, essai d'une voix */
-      if (p === '/api/voix/google' && req.method === 'GET') return json(res, 200, {...VG.etat(), choisie: (S.config || {}).voixServeur === 'google', nom: (S.config || {}).voixGoogleNom || VOIX_DEFAUT, erreur: S.voixGoogleErr || null});
+      if (p === '/api/voix/google' && req.method === 'GET') return json(res, 200, {...VG.etat(), choisie: (S.config || {}).voixServeur === 'google', nom: (S.config || {}).voixGoogleNom || VOIX_DEFAUT, derniere: VOIXD, alerte: S.voixGoogleAlerte || null, sansGoogle: raisonSansGoogle()});
       if (p === '/api/voix/google/voix' && req.method === 'GET') { try { return json(res, 200, {voix: await VG.voix()}); } catch (e) { return json(res, 200, {voix: [], erreur: String(e && e.message || e).slice(0, 200)}); } }
       if (p === '/api/voix/google' && req.method === 'POST') {
         const b = await readBody(req); S.config = S.config || {};
@@ -1502,20 +1529,22 @@ const server = http.createServer(async (req, res) => {
         if (b.retirer === true) { fs.rmSync(path.join(DATA, 'voix-google.json'), {force: true}); S.config = S.config || {}; S.config.voixServeur = 'pierre'; save(); return json(res, 200, {...VG.etat(), choisie: false}); }
         if (!/^[A-Za-z0-9_-]{30,80}$/.test(cle)) return json(res, 400, {error: 'Ce n’est pas une clé d’API Google (39 caractères, commence en général par AIza).'});
         fs.writeFileSync(path.join(DATA, 'voix-google.json'), JSON.stringify({cle}), {mode: 0o600});
-        return json(res, 200, {...VG.etat(), choisie: (S.config || {}).voixServeur === 'google'});
+        const v = await verifierGoogle({choisir: true});   /* 0.47.0 : la clé est essayée tout de suite ; si Google répond, il parle (sinon Pierre, et l'erreur est dite) */
+        return json(res, 200, {...VG.etat(), ...v, choisie: (S.config || {}).voixServeur === 'google', nom: (S.config || {}).voixGoogleNom || VOIX_DEFAUT, derniere: VOIXD});
       }
+      if (p === '/api/voix/google/verifier' && req.method === 'POST') { const v = await verifierGoogle(); return json(res, 200, {...VG.etat(), ...v, choisie: (S.config || {}).voixServeur === 'google', nom: (S.config || {}).voixGoogleNom || VOIX_DEFAUT, derniere: VOIXD}); }
       if (p === '/api/voix/google/essai' && req.method === 'POST') {
         const b = await readBody(req), nom = nomOk(b.nom) ? b.nom : (S.config || {}).voixGoogleNom || VOIX_DEFAUT, dir = path.join(DATA, 'tts'); fs.mkdirSync(dir, {recursive: true});
-        const phrase = 'Bonjour, je suis la voix de JARVIS. Voici comment je sonne.', out = path.join(dir, sha('google' + nom + phrase).slice(0, 24) + '.wav');
-        const f = fs.existsSync(out) ? out : await VG.dire(phrase, nom, out);
-        if (!f) return json(res, 502, {error: VG.pret() ? 'Google n’a pas répondu (ou plafond atteint).' : 'Aucun accès Google posé sur le serveur.'});
+        const phrase = 'Bonjour, je suis la voix de Jarvis. Voici comment je sonne.', out = path.join(dir, sha('google' + nom + phrase).slice(0, 24) + '.wav');
+        const info = {}, f = fs.existsSync(out) ? out : await VG.dire(phrase, nom, out, {force: true, info});
+        if (!f) return json(res, 502, {error: VG.pret() ? 'Pas de son de Google : ' + (info.raison || 'il n’a pas répondu') + '.' : 'Aucun accès Google posé sur le serveur.'});
         res.writeHead(200, {'content-type': 'audio/wav', 'cache-control': 'private, max-age=86400'}); fs.createReadStream(f).pipe(res); return;
       }
       if (p === '/api/tts' && req.method === 'POST') {
         if (!voixPrete()) return json(res, 503, {error: 'Voix du serveur pas installée.'});
         const b = await readBody(req); const f = await tts(b.text);
         if (!f) return json(res, 500, {error: 'Synthèse impossible.'});
-        res.writeHead(200, {'content-type': 'audio/wav', 'cache-control': 'private, max-age=86400'}); fs.createReadStream(f).pipe(res); return;
+        res.writeHead(200, {'content-type': 'audio/wav', 'cache-control': 'private, max-age=86400', 'x-jarvis-voix': VOIXD && VOIXD.moteur === 'google' ? 'google' : 'pierre'}); fs.createReadStream(f).pipe(res); return;
       }
       if (p === '/api/diag') { await probe(); return json(res, 200, await diag()); }
       if (p === '/api/test-data' && req.method === 'POST') {

@@ -16,10 +16,10 @@ self.addEventListener('fetch', (e) => {
     .catch(() => garde().then((m) => m || caches.match('./index.html'))));
 });
 self.addEventListener('push', (e) => {
-  let d = {}; try { d = e.data ? e.data.json() : {}; } catch (x) { d = {notification: {title: 'JARVIS', body: e.data ? e.data.text() : ''}}; }
+  let d = {}; try { d = e.data ? e.data.json() : {}; } catch (x) { d = {notification: {title: 'J.A.R.V.I.S OS', body: e.data ? e.data.text() : ''}}; }
   const n = d.notification || d, url = n.navigate || n.url || '/', badge = n.app_badge != null ? Number(n.app_badge) : null, nav = self.navigator;
   e.waitUntil(Promise.all([
-    self.registration.showNotification(n.title || 'JARVIS', {body: n.body || '', tag: n.tag || undefined, data: {url}, icon: 'icon-192.png', lang: 'fr-FR'}),
+    self.registration.showNotification(n.title || 'J.A.R.V.I.S OS', {body: n.body || '', tag: n.tag || undefined, data: {url}, icon: 'icon-192.png', lang: 'fr-FR'}),
     badge != null && nav && 'setAppBadge' in nav ? (badge > 0 ? nav.setAppBadge(badge) : nav.clearAppBadge()).catch(() => null) : null]));
 });
 self.addEventListener('notificationclick', (e) => {

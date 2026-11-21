@@ -22,7 +22,7 @@
     d.querySelector('button').onclick = function () { location.reload(); };
     document.body.appendChild(d);
   }, 400); });
-})();</script><script src="jarvis-voix.js"></script><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><link rel="manifest" href="manifest.webmanifest"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black"><meta name="theme-color" content="#02040e"><link rel="apple-touch-icon" href="icon-180.png"><link rel="icon" type="image/png" href="icon-192.png"><meta name="apple-mobile-web-app-title" content="JARVIS"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}
+})();</script><script src="jarvis-voix.js"></script><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><link rel="manifest" href="manifest.webmanifest"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black"><meta name="theme-color" content="#02040e"><link rel="apple-touch-icon" href="icon-180.png"><link rel="icon" type="image/png" href="icon-192.png"><meta name="apple-mobile-web-app-title" content="J.A.R.V.I.S OS"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}
   /* ---------- JARVIS OS : navigation et écrans ajoutés ---------- */
   .fab-talk { display: none !important; }
   /* 0.25.0 : en-tête sur une ligne */
@@ -458,8 +458,7 @@
   .aj:active { transform: scale(.95); }
   .aj { transition: box-shadow .25s ease, transform .14s ease; } .aj.is-on { box-shadow: 0 0 0 2px var(--bc, rgb(var(--c1))), 0 0 18px color-mix(in srgb, var(--bc, rgb(var(--c1))) 45%, transparent); }
   [id^="auto-"] { scroll-margin-top: calc(var(--toph, 96px) + 64px); }
-</style></head><body>
-<title>Jarvis v17 copie</title>
+</style><title>J.A.R.V.I.S OS</title></head><body>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sora:wght@400;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
 <style>
@@ -1453,6 +1452,7 @@
   .rout-brief { margin: 8px 0 12px; padding: 10px; border-radius: 12px; background: rgba(56, 189, 248, .08); } .rout-heure { width: auto; } .rout-jours { flex: 1; min-width: 0; }
   .rout-it { flex-wrap: wrap; } .rout-it.is-off { opacity: .6; } .rout-act { display: flex; gap: 4px; flex-wrap: wrap; } .rout-apercu { margin: 6px 0; } .brief-tx { white-space: pre-wrap; line-height: 1.45; }
   .voixg-etapes { margin: 8px 0; padding-left: 20px; display: grid; gap: 4px; font-size: 14px; } .voixg-sel { flex: 1; min-width: 0; }
+  .voixg-qui { margin: 6px 0 2px; font-weight: 600; } .voixg-qui.is-bad, .voixg-err { color: var(--danger); } .voixg-err { margin: 4px 0; font-size: 13.5px; }
   .mcp-d { padding: 10px; margin: 8px 0; border-radius: 12px; border: 1px solid rgba(168, 85, 247, .5); background: rgba(168, 85, 247, .12); } .mcp-code { font: 700 18px/1 ui-monospace, monospace; letter-spacing: .2em; }
   .mis-accord { margin: 8px 0; } .mis-par { font-size: 13px; margin: 4px 0; }
   .skill-it span { display: block; } .skill-it small { display: inline; }
@@ -6880,7 +6880,7 @@ void main(){
     const brief = el.querySelector('.brief-card');
     if (GP.on && brief && brief.parentNode) brief.parentNode.insertBefore(pauseBanner(), brief);
     if (LV.gave && !LV.mcp && el.firstChild) el.insertBefore(noLinkBanner(), el.firstChild);
-    el.append(h('p', {class: 'ver-foot', text: 'Jarvis v' + VERSION + ' · ' + (document.title || 'page') + (LV.mcp ? ' · en direct' : LV.gave ? ' · hors liaison' : '')}));
+    el.append(h('p', {class: 'ver-foot', text: (window.__JARVIS_MODE === 'serveur' ? 'J.A.R.V.I.S OS' : 'J.A.R.V.I.S OS · maquette') + (LV.mcp ? ' · en direct' : LV.gave ? ' · hors liaison' : '')}));   /* 0.47.0 : son nom, J.A.R.V.I.S OS (l'ancien venait du titre de l'ancienne page) */
     const st = el.querySelector('.stats');
     if (LINK.on && LV.t.jour && st && st.parentNode) st.parentNode.insertBefore(costChip(), st.nextSibling);
   };
@@ -7748,7 +7748,7 @@ void main(){
     if (LV.mcp) rows.push(['Sonnettes', own ? own + ' bot' + (own > 1 ? 's' : '') + ' en direct' + (LV.bell ? ', les autres par Iris' : '') : LV.bell ? 'Toutes par Iris (aucune sonnette directe dans Faits)' : 'Aucune adresse dans Faits', own ? 'ok' : LV.bell ? 'warn' : 'bad']);
     let task = null; try { task = localStorage.getItem('jarvis.tache'); } catch (e) { task = null; }
     rows.push(['Tâche Claude', task ? 'Reconnue (…' + task.slice(-6) + ')' : 'Pas encore lancée depuis cet appareil', task ? 'ok' : 'wait']);
-    rows.push(['Page', 'Jarvis v' + VERSION + ' · ' + (document.title || ''), 'ok']);
+    rows.push(['Page', 'J.A.R.V.I.S OS (page ' + VERSION + ')', 'ok']);
     return rows;
   }
   function sysBox() {
@@ -9175,28 +9175,66 @@ void main(){
     return card;
   }
   /* 0.40.0 (choix du 21/11/2026 : l'essayer « tant que je suis notifié avant de passer sur du payant ») : la voix Google Chirp 3 HD,
-     plus naturelle que Pierre ; gratuite jusqu'à 1 million de caractères par mois ; JARVIS s'arrête de lui-même à 990 000 et reprend Pierre */
+     plus naturelle que Pierre ; gratuite jusqu'à 1 million de caractères par mois ; JARVIS s'arrête de lui-même à 990 000 et reprend Pierre.
+     0.47.0 (sa demande du 21/11/2026 : « vérifie qu'on utilise bien Google », « pas le droit à l'erreur ») : la carte dit qui a dit
+     la dernière phrase et pourquoi pas Google, la dernière erreur, le compte du mois et du jour ; la clé collée est essayée aussitôt
+     et Google choisi s'il répond ; « Vérifier » ; les voix conseillées pour JARVIS d'abord, à comparer d'un appui */
+  const SILENCE_WAV = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=';
   async function voixCard(JS) {
     const card = h('section', {class: 'card set-card voixg-card', id: 'voixg-card'}, h('b', {text: 'Voix du serveur : Pierre ou Google'}));
     let st = await JS.voixGoogle.etat();
     if (!st) { card.append(h('p', {class: 'muted', text: 'Ton serveur ne la connaît pas encore : touche « Mettre à jour le serveur » plus bas.'})); return card; }
     const out = h('p', {class: 'set-msg'}), corps = h('div', {});
-    const nb = (n) => Number(n || 0).toLocaleString('fr-FR');
+    const nb = (n) => Number(n || 0).toLocaleString('fr-FR'), court = (n) => String(n || '').split('-').pop();
+    const hm = (t) => new Date(t).toLocaleTimeString('fr-FR', {hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris'});
+    /* le son est débloqué pendant l'appui (iPhone), puis joué quand Google a répondu */
+    const lecteur = () => { const a = new Audio(); try { a.src = SILENCE_WAV; a.play().catch(() => {}); } catch (e) { /* rien */ } return a; };
+    const jouer = (a, u) => new Promise((fin) => { try { a.onended = a.onerror = () => fin(); a.src = u; a.play().catch(() => fin()); } catch (e) { fin(); } });
+    const essai = async (a, nom) => { const u = await JS.voixGoogle.essai(nom); if (typeof u !== 'string') { out.textContent = (u && u.error) || 'Pas de son de Google.'; out.classList.add('is-bad'); return false; } await jouer(a, u); return true; };
+    const qui = () => !st.pret ? 'Pierre parle (gratuit, sur ton serveur). La voix Google, plus naturelle, est gratuite jusqu’à 1 million de caractères par mois :'
+      : !st.choisie ? 'Clé Google posée, mais c’est Pierre qui parle : touche « Google » ci-dessous.'
+      : st.bloque ? 'Google coupé par prudence (compteur illisible) : Pierre parle jusqu’au 1er du mois.'
+      : st.pause ? 'Plafond du mois atteint : Pierre parle jusqu’au 1er. Rien de payant.'
+      : st.pauseJour ? 'Plafond du jour atteint : Pierre parle jusqu’à demain, par prudence.'
+      : st.horsErreurJusqu ? 'Google en erreur : Pierre parle jusqu’à ' + hm(st.horsErreurJusqu) + ' (« Vérifier » le relance).'
+      : 'Google parle (' + court(st.nom) + ').';
     const paint = async () => {
-      const kids = [];
-      kids.push(h('p', {class: 'muted', text: st.pret ? (st.choisie ? 'Google parle (' + String(st.nom || '').split('-').pop() + ')' : 'Pierre parle') + ' · ' + nb(st.caracteres) + ' caractères Google ce mois sur ' + nb(st.plafond) + ' (gratuit jusqu’à 1 million)' + (st.pause ? ' · plafond atteint : Pierre jusqu’au 1er' : '') : 'Pierre parle (gratuit, sur ton serveur). La voix Google, plus naturelle, demande une clé Google une fois.'}));
+      const kids = [], bon = st.pret && st.choisie && !st.bloque && !st.pause && !st.pauseJour && !st.horsErreurJusqu;
+      kids.push(h('p', {class: 'voixg-qui' + (st.pret && !bon ? ' is-bad' : ''), text: qui()}));
       if (st.pret) {
-        kids.push(h('div', {class: 'seg set-seg', role: 'group'}, [['pierre', 'Pierre'], ['google', 'Google']].map(([v, l]) => h('button', {type: 'button', 'aria-pressed': String((st.choisie ? 'google' : 'pierre') === v), onclick: async () => { const r = await JS.voixGoogle.choisir({voixServeur: v}); if (r) { st = Object.assign({}, st, r); paint(); } }}, l))));
-        const vx = await JS.voixGoogle.voix(), sel = h('select', {class: 'inp voixg-sel', 'aria-label': 'Voix Google'}, ((vx && vx.voix) || []).map((v) => h('option', Object.assign({value: v.nom, text: v.court + (v.genre ? ' (' + v.genre + ')' : '')}, v.nom === st.nom ? {selected: ''} : {}))));
-        sel.onchange = async () => { const r = await JS.voixGoogle.choisir({nom: sel.value}); if (r) { st = Object.assign({}, st, r); out.textContent = 'Voix choisie : ' + sel.value.split('-').pop() + '.'; } };
-        const ecoute = h('button', {type: 'button', class: 'btn sm', onclick: async () => { ecoute.disabled = true; const u = await JS.voixGoogle.essai(sel.value); ecoute.disabled = false; if (!u) { out.textContent = 'Google n’a pas répondu (ou plafond atteint).'; return; } try { const a = new Audio(u); a.play().catch(() => {}); } catch (e) { /* rien */ } }}, 'Écouter');
+        const d = st.derniere;
+        kids.push(h('p', {class: 'muted voixg-derniere', text: d ? 'Dernière phrase du serveur : ' + (d.moteur === 'google' ? 'Google (' + court(d.nom) + ')' : 'Pierre') + ', à ' + hm(d.at) + (d.moteur !== 'google' && d.raison ? ' : ' + d.raison : '') + '.' : 'Aucune phrase dite par le serveur depuis son dernier démarrage.'}),
+          h('p', {class: 'muted', text: 'Ce mois : ' + nb(st.caracteres) + ' sur ' + nb(st.plafond) + ' · aujourd’hui : ' + nb(st.aujourdhui) + ' sur ' + nb(st.plafondJour) + '. Compté en octets avant chaque envoi : jamais moins que ce que Google facture (gratuit jusqu’à 1 million).'}));
+        if (st.erreur && (!st.dernierSucces || st.erreur.at > st.dernierSucces.at)) kids.push(h('p', {class: 'voixg-err', text: 'Dernière erreur de Google (' + hm(st.erreur.at) + ') : ' + st.erreur.message}));
+      }
+      if (JS.setting && JS.setting('voiceEngine') === 'iphone') kids.push(h('p', {class: 'voixg-err', text: '« Voix de JARVIS » (carte JARVIS, plus bas) est sur « Voix de l’iPhone » : ni Pierre ni Google ne parlent. Choisis « Ton serveur ».'}));
+      if (st.pret) {
+        kids.push(h('div', {class: 'seg set-seg', role: 'group'}, [['pierre', 'Pierre'], ['google', 'Google']].map(([v, l]) => h('button', {type: 'button', 'aria-pressed': String((st.choisie ? 'google' : 'pierre') === v), onclick: async () => { const r = await JS.voixGoogle.choisir({voixServeur: v}); if (r) { st = Object.assign({}, st, r); out.textContent = ''; paint(); } }}, l))));
+        const vx = await JS.voixGoogle.voix(), liste = (vx && vx.voix) || [], cons = liste.filter((v) => v.conseillee), autres = liste.filter((v) => !v.conseillee);
+        const opt = (v) => h('option', Object.assign({value: v.nom, text: v.court + (v.genre ? ' (' + v.genre + ')' : '')}, v.nom === st.nom ? {selected: ''} : {}));
+        const sel = h('select', {class: 'inp voixg-sel', 'aria-label': 'Voix Google'}, cons.length ? [h('optgroup', {label: 'Conseillées pour JARVIS'}, cons.map(opt)), autres.length ? h('optgroup', {label: 'Autres voix'}, autres.map(opt)) : null] : liste.map(opt));
+        sel.onchange = async () => { const r = await JS.voixGoogle.choisir({nom: sel.value}); if (r) { st = Object.assign({}, st, r); out.classList.remove('is-bad'); out.textContent = 'Voix choisie : ' + court(sel.value) + '.'; } };
+        const ecoute = h('button', {type: 'button', class: 'btn sm', onclick: async () => { const a = lecteur(); ecoute.disabled = true; out.classList.remove('is-bad'); await essai(a, sel.value); ecoute.disabled = false; }}, 'Écouter');
+        const comparer = h('button', {type: 'button', class: 'btn sm', onclick: async () => { const a = lecteur(); comparer.disabled = true; out.classList.remove('is-bad');
+          for (const v of cons) { out.textContent = 'Écoute : ' + v.court + '…'; if (!(await essai(a, v.nom))) break; }
+          if (!out.classList.contains('is-bad')) out.textContent = 'Choisis celle que tu préfères dans la liste.'; comparer.disabled = false; }}, 'Comparer les voix conseillées');
+        const verif = h('button', {type: 'button', class: 'btn sm', onclick: async () => { verif.disabled = true; out.classList.remove('is-bad'); out.textContent = 'Vérification auprès de Google…'; const r = await JS.voixGoogle.verifier(); verif.disabled = false;
+          if (!r) { out.textContent = 'Serveur injoignable.'; out.classList.add('is-bad'); return; }
+          st = Object.assign({}, st, r); out.classList.toggle('is-bad', !r.verifie);
+          out.textContent = r.verifie ? 'Google répond : sa voix marche' + (st.choisie ? ', et c’est elle qui parle.' : ', mais Pierre est choisi : touche « Google ».') : 'Google refuse : ' + (r.erreurVerif || 'pas de réponse') + '.'; paint(); }}, 'Vérifier');
         kids.push(h('div', {class: 'row-actions mem-add'}, sel, ecoute), (vx && vx.erreur) ? h('p', {class: 'muted', text: 'Liste des voix indisponible : ' + vx.erreur}) : null,
+          h('div', {class: 'row-actions'}, cons.length > 1 ? comparer : null, verif),
           h('button', {type: 'button', class: 'btn ghost sm', onclick: async () => { const r = await JS.voixGoogle.retirer(); if (r) { st = Object.assign({}, st, r); paint(); out.textContent = 'Clé retirée : Pierre parle.'; } }}, 'Retirer la clé Google'));
       } else {
         const inp = h('input', {type: 'password', class: 'mem-in', autocomplete: 'off', placeholder: 'Clé d’API Google (AIza…)', 'aria-label': 'Clé d’API Google Text-to-Speech'});
-        kids.push(h('ol', {class: 'muted voixg-etapes'}, ['Sur console.cloud.google.com, ouvre le projet de JARVIS (celui de son accès Google).', 'Active l’API « Cloud Text-to-Speech ».', 'Facturation : relie un compte de facturation (ta carte). Rien ne sera facturé : JARVIS s’arrête à 990 000 caractères par mois, sous la part gratuite d’un million.', 'Identifiants : « Créer une clé API », puis restreins-la à « Cloud Text-to-Speech API ».', 'Colle la clé ici : elle reste sur ton serveur, ni Claude ni l’app ne la relisent.'].map((t) => h('li', {text: t}))),
+        kids.push(h('ol', {class: 'muted voixg-etapes'}, ['Sur console.cloud.google.com, ouvre le projet de JARVIS (celui de son accès Google).', 'Active l’API « Cloud Text-to-Speech ».', 'Facturation : relie un compte de facturation (ta carte). Rien ne sera facturé : JARVIS compte avant chaque envoi et s’arrête à 990 000 par mois, sous la part gratuite d’un million.', 'Identifiants : « Créer une clé API », puis restreins-la à « Cloud Text-to-Speech API » (et, si tu peux, à l’adresse IP de ton serveur).', 'Colle la clé ici : elle reste sur ton serveur, ni Claude ni l’app ne la relisent. JARVIS l’essaie aussitôt et passe sur Google si elle marche.'].map((t) => h('li', {text: t}))),
           h('p', {class: 'muted', text: 'Noms des menus Google devinés.'}),
-          h('div', {class: 'row-actions mem-add'}, inp, h('button', {type: 'button', class: 'btn', onclick: async () => { const r = await JS.voixGoogle.cle(inp.value); inp.value = ''; if (r && r.pret) { st = Object.assign({}, st, r); out.textContent = 'Clé enregistrée. Choisis « Google » et écoute une voix.'; paint(); } else out.textContent = (r && r.error) || 'Clé refusée.'; }}, 'Enregistrer')));
+          h('div', {class: 'row-actions mem-add'}, inp, h('button', {type: 'button', class: 'btn', onclick: async () => { const a = lecteur(); out.classList.remove('is-bad'); out.textContent = 'Vérification de la clé auprès de Google…';
+            const r = await JS.voixGoogle.cle(inp.value); inp.value = '';
+            if (r && r.pret) { st = Object.assign({}, st, r); out.classList.toggle('is-bad', !r.verifie);
+              out.textContent = r.verifie ? 'Clé vérifiée : Google parle maintenant (' + court(st.nom) + ').' : 'Clé enregistrée, mais Google refuse : ' + (r.erreurVerif || 'pas de réponse') + '. Vérifie l’API et la facturation (étapes 2 et 3), puis touche « Vérifier ». En attendant, Pierre parle.';
+              await paint(); if (r.verifie) essai(a, st.nom); }
+            else { out.classList.add('is-bad'); out.textContent = (r && r.error) || 'Clé refusée.'; } }}, 'Enregistrer')));
       }
       corps.replaceChildren(...kids.filter(Boolean));
     };
@@ -9349,7 +9387,7 @@ void main(){
         /* 0.27.0 : la mise à jour est proposée toute seule à l'ouverture de l'app ; ce bouton force la vérification et suit le même chemin */
         h('button', {type: 'button', class: 'btn main', id: 'set-maj', onclick: async () => { upd.textContent = 'Vérification…'; upd.classList.remove('is-bad'); let m = ''; try { m = await window.JarvisMaj.check(true); } catch (e) { m = 'Vérification impossible.'; } upd.textContent = m; upd.classList.toggle('is-bad', /injoignable|impossible|pas pu|pas relié/.test(m)); }}, 'Mettre à jour le serveur'), upd,
         h('p', {class: 'muted', text: 'Une nouvelle version est proposée toute seule à l’ouverture de JARVIS ; ce bouton force la vérification.'}),
-        h('small', {class: 'pick-label', text: 'Voix de JARVIS'}), seg('voiceEngine', [['serveur', 'Pierre (ton serveur)'], ['iphone', "Voix de l'iPhone"]], 'serveur'),
+        h('small', {class: 'pick-label', text: 'Voix de JARVIS'}), seg('voiceEngine', [['serveur', 'Ton serveur (Pierre ou Google)'], ['iphone', "Voix de l'iPhone"]], 'serveur'),
         /* 0.25.0 (choix QCM du 19/11/2026, « un seul Claude ») : plus de conversation continue ; l'orbe ouvre la discussion avec Claude et le micro
            écoute une question (Whisper du serveur, sinon l'iPhone), écrite dans le champ avant l'envoi */
         h('small', {class: 'pick-label', text: 'L’orbe (le grand bouton du bas)'}), seg('orbe', [['conversation', 'Conversation continue'], ['dictee', 'Dictée d’une question']], 'conversation'),
