@@ -59,6 +59,10 @@ try {
     await p.reload(); await p.waitForTimeout(4000);
     const a3 = await p.evaluate(() => document.querySelectorAll('.rad-rule').length);
     ok('Radar (serveur) : « Ajouter » la garde sur le serveur (« lu dans tes mails »), toujours là après un rechargement', a2.props === 0 && a2.rules.length === 1 && /Énergie Exemple/.test(a2.rules[0]) && /lu dans tes mails/.test(a2.rules[0]) && a3 === 1, JSON.stringify([a2, a3]));
+    /* 0.46.0 : l'app plantait à l'ouverture d'Argent : chaque rendu relançait une lecture du serveur, sans fin */
+    { let n = 0; const compte = (r) => { try { if (new URL(r.url()).pathname === '/api/radar') n++; } catch { /* rien */ } };
+      p.on('request', compte); await p.waitForTimeout(8000); p.off('request', compte);
+      ok('Radar (serveur) : la page ne relit pas le serveur en boucle (au plus une lecture en 8 s, lecture des mails finie)', n <= 1, n + ' lectures'); }
     await p.screenshot({path: SH + 'radar-serveur.png'}); }
   await p.goto(BASE + '/?serveur#agenda'); await p.waitForTimeout(4000);
   ok('agenda en direct : carte Aujourd\'hui, 7 prochains jours, grille', await p.evaluate(() => !!document.querySelector('.agt .agt-date') && document.querySelectorAll('.agw-d').length === 7 && !!document.querySelector('.mgrid .mg-d.is-today')));

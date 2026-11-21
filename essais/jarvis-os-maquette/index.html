@@ -4290,11 +4290,15 @@ void main(){
   const radAPI = () => (SRV_OS && window.JarvisServeur && window.JarvisServeur.radar ? window.JarvisServeur : null);
   const radOn = () => (SRV_OS ? !!radAPI() : !!window.__RADAR);
   const radSave = () => { try { localStorage.setItem('jarvis.radar.vu', JSON.stringify([...RAD.vu])); localStorage.setItem('jarvis.radar.garde', JSON.stringify([...RAD.garde])); } catch (e) { /* rien */ } };
-  function radLoad() {
+  /* 0.46.0 (21/11/2026, l'app plantait à l'ouverture d'Argent) : le rendu qui suit une lecture relançait une lecture, sans fin.
+     Une lecture à la fois, et au plus une toutes les 30 s ; seule la relecture pendant la lecture des mails (toutes les 4 s) passe outre. */
+  const radSet = (r) => { RAD.data = r; RAD.at = Date.now(); };
+  function radLoad(force) {
     const JS = radAPI();
     if (!JS) { if (!RAD.data) RAD.data = window.__RADAR || null; return; }
-    if (RAD.loading) return; RAD.loading = true;
-    JS.radar().then((r) => { RAD.loading = false; if (r) { RAD.data = r; if (TAB === 'argent') renderView(true); } }).catch(() => { RAD.loading = false; });
+    if (RAD.loading || (!force && RAD.data && Date.now() - (RAD.at || 0) < 30000)) return;
+    RAD.loading = true;
+    JS.radar().then((r) => { RAD.loading = false; RAD.at = Date.now(); if (r) { RAD.data = r; if (TAB === 'argent') renderView(true); } }).catch(() => { RAD.loading = false; RAD.at = Date.now(); });
   }
   const radEur = (n) => (n == null || isNaN(n) ? '' : Number(n).toLocaleString('fr-FR', {minimumFractionDigits: 2, maximumFractionDigits: 2}).replace(/\u202f/g, '\u00a0') + ' €');   /* espace insécable visible : la fine (U+202F) ne s'affichait pas */
   const radDay = (iso) => { const d = new Date(iso + 'T12:00:00'), t = new Date(); t.setHours(12, 0, 0, 0); return Math.round((d - t) / 864e5); };
@@ -4372,7 +4376,7 @@ void main(){
   function radPut(k, v) {
     if (RAD.data) RAD.data[RAD_KEY[k]] = v;
     const JS = radAPI();
-    if (JS && JS.radarSet) { JS.radarSet(RAD_KEY[k], v).then((r) => { if (r) { RAD.data = r; if (TAB === 'argent') renderView(true); } }).catch((e) => toast('Radar', 'Pas enregistré sur ton serveur : ' + ((e && e.message) || 'réessaie') + '.')); return; }
+    if (JS && JS.radarSet) { JS.radarSet(RAD_KEY[k], v).then((r) => { if (r) { radSet(r); if (TAB === 'argent') renderView(true); } }).catch((e) => toast('Radar', 'Pas enregistré sur ton serveur : ' + ((e && e.message) || 'réessaie') + '.')); return; }
     RAD_FX[k] = v; radFxSave();
   }
   const radD = (y, m, j) => new Date(y, m, j, 12, 0, 0, 0);
@@ -4453,7 +4457,7 @@ void main(){
     const list = R.fx.slice().sort((a, b) => (parseInt(a.jour, 10) || 0) - (parseInt(b.jour, 10) || 0) || String(a.service).localeCompare(String(b.service), 'fr'));
     const props = (d.propositions || []).filter((x) => !(RAD_FX.pvus || []).includes(x.id)), sc = d.scan;
     return h('div', {class: 'stack rad-fixes'},
-      sc && sc.enCours ? h('p', {class: 'card rad-scan', role: 'status', text: 'Je lis tes ' + (sc.total || 13) + ' derniers mois de mails (' + (sc.mois || 0) + '/' + (sc.total || 13) + ') : les dépenses récurrentes trouvées arrivent ici, à valider une par une.'}) : null,
+      sc && sc.enCours ? h('p', {class: 'card rad-scan', role: 'status', text: 'Je lis tes ' + (sc.total || 13) + ' derniers mois de mails (' + (sc.mois || 0) + '/' + (sc.total || 13) + ') : les dépenses récurrentes trouvées arrivent ici, à valider une par une.' + (sc.pause ? ' ' + sc.pause : '')}) : null,
       SRV_OS && d.google === false ? h('p', {class: 'card rad-scan', text: 'Google n’est pas relié à JARVIS : le Radar ne lit pas tes mails. Relie-le dans Réglages ; tes dépenses fixes saisies à la main comptent déjà.'}) : null,
       sc && !sc.enCours && sc.erreur ? h('p', {class: 'muted', text: sc.erreur}) : null,
       panel(R.mois ? 'D’ici la fin du mois' : 'D’ici ta paie du ' + radJour(R.fin), h('span', {class: 'aside', text: radEur(R.tReste)}),
@@ -4468,7 +4472,7 @@ void main(){
           h('span', {class: 'hm-tx'}, h('b', {text: x.service}), h('small', {text: radRegle(x) + (x.source === 'mail' ? ' · lu dans tes mails' : ' · ajouté par toi') + (x.estime ? ' · estimé' : '')})),
           h('span', {class: 'rad-yr', text: (x.estime ? '≈ ' : '') + radEur(x.montant)})))),
       h('div', {class: 'rad-act'}, btn('Ajouter une dépense fixe', () => radEdit(null), 'main', 'plus'), btn('Ma paie : ' + radRegleP(R.rev), radPaieSheet, '', 'cal'),
-        SRV_OS && d.google !== false ? btn('Relire mes mails', () => { const JS = radAPI(); if (JS && JS.radarLire) JS.radarLire().then((r) => { if (r) { RAD.data = r; renderView(true); } toast('Radar', 'Je relis tes mails : les nouvelles dépenses arrivent dans « À valider ».'); }); }, 'ghost', 'refresh') : null),
+        SRV_OS && d.google !== false ? btn('Relire mes mails', () => { const JS = radAPI(); if (JS && JS.radarLire) JS.radarLire().then((r) => { if (r) { radSet(r); renderView(true); } toast('Radar', 'Je relis tes mails : les nouvelles dépenses arrivent dans « À valider ».'); }); }, 'ghost', 'refresh') : null),
       radNotifs(d, radGet(d, 'notif', {veille: true, seuil: 20, echec: true})));
   }
   function radNotifs(d, n) {
@@ -4493,7 +4497,7 @@ void main(){
   /* une dépense trouvée dans ses mails : « Ajouter » (telle quelle ou corrigée) ou « Pas une dépense fixe » */
   function radPropDo(p, oui, modif) {
     const JS = radAPI();
-    if (JS && JS.radarProposition) { JS.radarProposition(p.id, oui, modif).then((r) => { if (r) { RAD.data = r; renderView(true); toast(oui ? 'Ajoutée' : 'Écartée', p.service + (oui ? ' compte maintenant dans le reste à payer.' : ' ne sera plus proposée.')); } else toast('Radar', 'Pas enregistré sur ton serveur : réessaie.'); }); return; }
+    if (JS && JS.radarProposition) { JS.radarProposition(p.id, oui, modif).then((r) => { if (r) { radSet(r); renderView(true); toast(oui ? 'Ajoutée' : 'Écartée', p.service + (oui ? ' compte maintenant dans le reste à payer.' : ' ne sera plus proposée.')); } else toast('Radar', 'Pas enregistré sur ton serveur : réessaie.'); }); return; }
     RAD_FX.pvus = (RAD_FX.pvus || []).concat(p.id);
     if (oui) radPut('fx', radGet(RAD.data, 'fx', []).concat([Object.assign({}, p, modif || {}, {id: 'f' + p.id, source: 'mail'})])); else radFxSave();
     toast(oui ? 'Ajoutée' : 'Écartée', p.service + (oui ? ' compte maintenant dans le reste à payer.' : ' ne sera plus proposée.')); renderView(true);
@@ -4568,7 +4572,7 @@ void main(){
     const av = (d.avenir || []).map((x) => Object.assign({n: radDay(x.date), k: 'av:' + x.service + ':' + x.date}, x)).filter((x) => x.n >= -1 && x.n <= 60).sort((a, b) => a.n - b.n);
     const al = (d.alertes || []).map((x) => Object.assign({k: 'al:' + x.type + ':' + x.service + ':' + x.date}, x)).filter((x) => !RAD.vu.has(x.k));
     const ab = d.abonnements || [], m = d.mois || {total: 0, postes: []}, soon = av.filter((x) => x.n <= 7 && !RAD.garde.has(x.k)), R = radReste(d);
-    if (SRV_OS && d.scan && d.scan.enCours && !RAD.poll) RAD.poll = setTimeout(() => { RAD.poll = null; if (TAB === 'argent') radLoad(); }, 4000);
+    if (SRV_OS && d.scan && d.scan.enCours && !RAD.poll) RAD.poll = setTimeout(() => { RAD.poll = null; if (TAB === 'argent') radLoad(true); }, 4000);
     el.append(radHero(R, d, al, soon));
     if (d.navigo) el.append(radNavigo(d.navigo));
     const segs = [['fixes', 'Fixes (' + R.fx.length + ')'], ['avenir', 'À venir (' + av.length + ')'], ['alertes', 'Alertes (' + al.length + ')'], ['abos', 'Abonnements (' + ab.length + ')'], ['mois', 'Le mois']];

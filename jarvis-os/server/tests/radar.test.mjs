@@ -105,6 +105,28 @@ try {
     && !!v2 && /BOUTIQUE EXEMPLE : 29,55 €/.test(v2.body) && /d’ici ta paie du ven\. 27\/11 : 29,55 €/.test(v2.body), JSON.stringify([e3.ponctuels, v2 && v2.body]));
   const RD2 = createRadar({file, gmail, claude, push, now: () => maintenant, moisDepart: 4});
   ok('Radar : tout est relu après un redémarrage (dépenses, paie, réglages)', RD2.etat().fixes.length === 2 && RD2.etat().revenus.jour === 28 && RD2.etat().notif.seuil === 20 && RD2.etat().ponctuels.length === 1);
+  /* 0.46.0 : Google limitait la lecture (« Quota exceeded … Units per minute per user ») et la lecture de départ s'arrêtait */
+  { let horloge = 0; const attentes = [], vu = {pause: ''}, appelsT = [];
+    const FIL2 = {}; ['2026-08', '2026-09', '2026-10', '2026-11'].forEach((m, i) => { FIL2['q' + i] = {id: 'q' + i, messages: [{id: 'qm' + i, threadId: 'q' + i, sender: 'facturation@eau-exemple.fr', addressDisplayNames: [{displayName: 'Eau Exemple', emailAddress: 'facturation@eau-exemple.fr'}], subject: 'Votre facture', plaintextBody: 'Montant TTC : 21,30 €. Il sera prélevé le 6/' + m.slice(5) + '/' + m.slice(0, 4) + '.', date: m + '-02T08:00:00Z', labelIds: ['INBOX']}]}; });
+    let refus = 1;
+    const g2 = {lie: () => true,
+      chercher: async (q) => { appelsT.push(horloge); if (refus-- > 0) throw new Error("Quota exceeded for quota metric 'Total Query Cost' and limit 'Units per minute per user' of service 'gmail.googleapis.com'");
+        const m = q.match(/after:(\d{4})\/(\d{2})/); return {threads: Object.keys(FIL2).filter((k) => FIL2[k].messages[0].date.startsWith(m[1] + '-' + m[2])).map((k) => ({id: k, historyId: 'h' + k}))}; },
+      fil: async (id) => { appelsT.push(horloge); return FIL2[id]; }};
+    const f2 = path.join(DIR, 'radar2.json');
+    const RQ = createRadar({file: f2, gmail: g2, now: () => Date.parse('2026-11-23T09:00:00Z'), moisDepart: 4, budget: 30, horloge: () => horloge, pauseQuota: 65000,
+      attente: async (ms) => { attentes.push(ms); if (ms === 65000) vu.pause = RQ.brut().scan.pause; horloge += ms; }});
+    await RQ.traiter('GET', '/api/radar', null); await RQ.attendre();
+    const e = RQ.etat(), fenetre = appelsT.every((t) => appelsT.filter((u) => u > t - 60000 && u <= t).length * 10 <= 30);
+    ok('Radar : une limite de Google atteinte → une minute de pause annoncée en français, puis la lecture reprend et finit', attentes.includes(65000) && /Google limite les lectures par minute/.test(vu.pause) && !!e.scan.fini && !e.scan.erreur && e.propositions.some((x) => x.service === 'Eau Exemple' && x.montant === 21.3), JSON.stringify([attentes, vu, e.scan]));
+    ok('Radar : jamais plus que le budget de Gmail sur une minute glissante (30 unités ici, 4 000 en service)', fenetre && attentes.filter((ms) => ms !== 65000).length >= 1, JSON.stringify(appelsT));
+    const n0 = appelsT.length; await RQ.lireMaintenant();
+    ok('Radar : un fil déjà lu et inchangé n’est pas relu (seule la liste du jour est demandée)', appelsT.length - n0 === 1, (appelsT.length - n0) + ' appels');
+    /* une lecture interrompue reprend au mois où elle s'était arrêtée ; un ancien message anglais de Google est montré en français */
+    fs.writeFileSync(path.join(DIR, 'radar3.json'), JSON.stringify({scan: {enCours: false, debut: 0, mois: 2, total: 4, lus: 5, fini: null, erreur: "Quota exceeded for quota metric 'Total Query Cost'"}}));
+    const qs = [], RR = createRadar({file: path.join(DIR, 'radar3.json'), gmail: {lie: () => true, chercher: async (q) => { qs.push(q); return {threads: []}; }, fil: async () => ({messages: []})}, now: () => Date.parse('2026-11-23T09:00:00Z'), moisDepart: 4});
+    const msg = RR.etat().scan.erreur; await RR.traiter('GET', '/api/radar', null); await RR.attendre();
+    ok('Radar : la lecture interrompue reprend au mois suivant (2 mois restants sur 4) ; l’ancien message de Google est traduit', qs.length === 2 && /after:2026\/10\/01/.test(qs[0]) && RR.etat().scan.fini && /Google a limité la lecture de tes mails/.test(msg), JSON.stringify([qs, msg])); }
   /* la mémoire de JARVIS (lue par le serveur MCP, que Grok Bot peut joindre) refuse les chiffres d'un crédit */
   ok('Mémoire : refuse les chiffres d’un crédit (règle du 12/11/2026), garde le reste', interdit('Ma mensualité de crédit immobilier est de 1150 €') && interdit('Il reste 180 000 € à rembourser sur le prêt immobilier') && !interdit("J'ai un crédit immobilier à la banque") && !interdit('Je suis prêt à 8h'));
 } catch (e) { ok('exception', false, e.stack); }
