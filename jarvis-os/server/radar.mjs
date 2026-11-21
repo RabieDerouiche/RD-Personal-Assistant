@@ -126,7 +126,9 @@ export function nomService(nom, adresse) {
   return base.replace(/[-_]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
 /* catégorie : par le domaine et le nom (noms de grands services, publics) ; abonnements rangés par genre pour la page */
-const CATS = [['Logement', /\b(edf|engie|totalenergies|ekwateur|veolia|suez|saur|eau de paris|syndic|foncia|nexity|habitation|electricite|gaz)\b/],
+const CATS = [['Enfants', /\b(creche|creches|garderie|nounou|assistante maternelle|cantine|periscolaire|centre de loisirs|couches|petits culottes|lespetitsculottes|hoptis)\b/],
+  ['Impôts', /\b(dgfip|impots|impot|finances publiques|tresor public|taxe fonciere|taxe d'habitation|taxes foncieres)\b/],
+  ['Logement', /\b(edf|engie|totalenergies|ekwateur|veolia|suez|saur|eau de paris|syndic|foncia|nexity|habitation|electricite|gaz)\b/],
   ['Télécoms', /\b(orange|sosh|sfr|red|bouygues|bouyguestelecom|free|freebox|free mobile|prixtel|youprice|coriolis|nrj mobile|lebara|lycamobile|syma)\b/],
   ['Assurances', /\b(assurance|assurances|axa|maif|macif|matmut|groupama|allianz|generali|april|cardif|direct assurance|leocare|ornikar|mutuelle|harmonie|mgen|alan|swisslife)\b/],
   ['Transport', /\b(navigo|ratp|sncf|transilien|iledefrance mobilites|idfm|uber|bolt|blablacar|ulys|vinci autoroutes|sanef|autoroute)\b/],
@@ -151,7 +153,7 @@ export function lireMail(m) {
   const montant = aa ? aa.montant : trouverMontant(objet + '\n' + texte), datePrel = trouverDate(objet + '\n' + texte, ref);
   const dom = domaine(m.sender), inter = INTERMEDIAIRES.test(dom), mar = inter ? marchand(objet, texte, m.nom) : '';
   const service = inter ? (mar || nomService(m.nom, m.sender)) : nomService(m.nom, m.sender);
-  return {id: m.id, fil: m.fil || '', dom, cle: inter ? (mar ? dom + ':' + plat(mar).replace(/[^a-z0-9]/g, '') : '') : dom, service, genre: g, montant, avant: aa ? aa.avant : null, datePrel, date,
+  return {id: m.id, fil: m.fil || '', objet: objet.slice(0, 140), dom, cle: inter ? (mar ? dom + ':' + plat(mar).replace(/[^a-z0-9]/g, '') : '') : dom, service, genre: g, montant, avant: aa ? aa.avant : null, datePrel, date,
     sur: g === 'echec' || g === 'essai' || g === 'renouvellement' || (g === 'hausse' && !!montant) || ((g === 'facture' || g === 'echeance') && !!montant)};
 }
 /* ---------- les dépenses récurrentes, trouvées dans les factures ---------- */
@@ -188,7 +190,7 @@ export function regrouper(releves, auj) {
     const annonces = pts.filter((r) => r.datePrel), jour = plusFrequent((annonces.length ? annonces : pts).map((r) => +(r.datePrel || r.date).slice(8, 10)));
     out.push({id: 'p' + hash(dom), cle: dom, dom: der.dom || dom, service: der.service, cat: categorie(der.dom || dom, der.service), montant: !derC ? null : conn.length <= 2 || Math.abs(derC.montant - med2) <= med2 * tol ? derC.montant : med2, jour,
       ...(annonces.length ? {} : {jourApprox: true}), rythme, ...(rythme === 'mensuel' ? {} : {mois: derJ.getUTCMonth() + 1}), ...(varie > 0.05 ? {estime: true} : {}), source: 'mail', preuves: pts.length, dernier: ymd(derJ),
-      depuis: pts[0].date.slice(5, 7) + '/' + pts[0].date.slice(0, 4)});
+      depuis: pts[0].date.slice(5, 7) + '/' + pts[0].date.slice(0, 4), ...(der.objet || der.fil ? {exemple: {objet: der.objet || '', date: der.date, ...(der.fil ? {url: 'https://mail.google.com/mail/u/0/#all/' + der.fil} : {})}} : {})});
   }
   return out.sort((a, b) => (b.montant || 0) - (a.montant || 0));
 }
@@ -316,7 +318,7 @@ export function createRadar({file, gmail, claude = async () => ({ok: false, erro
   function retenir(lu, {depart}) {
     const t = auj(), age = lu.date ? Math.round((t - depuisYmd(lu.date)) / 864e5) : 0, fx = lu.cle ? R.fixes.find((f) => cleDe(f) === lu.cle) : null;
     /* un renouvellement chiffré compte aussi comme un paiement du service (pour repérer sa régularité) */
-    if (lu.genre === 'renouvellement' && lu.cle) R.releves.push({id: lu.id, dom: lu.dom, cle: lu.cle, service: lu.service, montant: lu.montant || null, date: lu.date, datePrel: lu.datePrel || null, genre: 'facture'});   /* 0.49.0 : même sans montant (une box livrée chaque mois) */
+    if (lu.genre === 'renouvellement' && lu.cle) R.releves.push({id: lu.id, fil: lu.fil || '', objet: lu.objet || '', dom: lu.dom, cle: lu.cle, service: lu.service, montant: lu.montant || null, date: lu.date, datePrel: lu.datePrel || null, genre: 'facture'});   /* 0.49.0 : même sans montant (une box livrée chaque mois) */
     /* une échéance datée (paiement en plusieurs fois) : un prélèvement ponctuel, compté dans le reste à payer jusqu'à son jour */
     if (lu.genre === 'echeance' && lu.montant && lu.datePrel && lu.datePrel >= ymd(t)) {
       R.ponctuels.push({id: 'e' + lu.id, date: lu.datePrel, service: lu.service, montant: lu.montant, fil: lu.fil});
@@ -326,7 +328,7 @@ export function createRadar({file, gmail, claude = async () => ({ok: false, erro
     if (lu.genre === 'facture') {
       if (!lu.cle) return;   /* un reçu d'intermédiaire sans marchand reconnu ne sert pas */
       /* 0.49.0 : une facture dont le montant n'est que dans la pièce jointe (crèche, transports…) compte aussi : sa régularité suffit, le montant sera à compléter */
-      R.releves.push({id: lu.id, dom: lu.dom, cle: lu.cle, service: lu.service, montant: lu.montant || null, date: lu.date, datePrel: lu.datePrel || null, genre: 'facture'});
+      R.releves.push({id: lu.id, fil: lu.fil || '', objet: lu.objet || '', dom: lu.dom, cle: lu.cle, service: lu.service, montant: lu.montant || null, date: lu.date, datePrel: lu.datePrel || null, genre: 'facture'});
       if (fx && lu.montant && !depart && !fx.estime) {
         if (lu.montant > fx.montant * 1.5) R.alertes.push({id: 'a' + lu.id, date: lu.date, type: 'inhabituel', titre: 'Montant inhabituel', service: fx.service, montant: lu.montant, avant: fx.montant, texte: 'Habituellement ' + eur(fx.montant) + '.', fil: lu.fil});
         else if (lu.montant > fx.montant * 1.02) { R.alertes.push({id: 'a' + lu.id, date: lu.date, type: 'hausse', titre: 'Hausse de prix', service: fx.service, montant: lu.montant, avant: fx.montant, texte: 'Le montant de ta dépense fixe passe à ' + eur(lu.montant) + '.', fil: lu.fil}); fx.montant = lu.montant; }
