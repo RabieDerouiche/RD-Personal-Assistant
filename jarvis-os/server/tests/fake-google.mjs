@@ -16,6 +16,9 @@ export function startFakeGoogle() {
   F.drive.find((f) => f.id === 'd6').text = 'quittance de loyer hors du dossier Papiers';
   F.drive.find((f) => f.id === 'd5').text = 'avis d’imposition, quittance';
   F.drivePage = 2;
+  /* 0.37.0 : son Profil (Google Doc dans RD Assistant), exporté en HTML ; la partie Finances ne doit jamais partir à Claude */
+  F.drive.push({id: 'profil1', name: 'Profil', mimeType: 'application/vnd.google-apps.document', parents: ['rda'], modifiedTime: '2026-11-20T09:00:00.000Z',
+    html: '<html><head><style>p { color: #000 }</style></head><body><h1>Profil</h1><h2>Voyages</h2><p>Préfère les vols directs et le hublot.</p><h2>Finances</h2><p>Banque principale et plafond de dépenses.</p><h2>Repas</h2><ul><li>Végétarien le lundi</li></ul></body></html>'});
   const msgMeta = (id, th) => ({id, threadId: th, labelIds: ['INBOX', 'CATEGORY_PERSONAL'], snippet: 'L&#39;expert passera mardi', internalDate: '1763290000000',
     payload: {headers: [{name: 'From', value: '"Syndic Dupont" <gestion@syndic.example>'}, {name: 'To', value: 'moi@example.org'}, {name: 'Subject', value: 'RE: Dégât des eaux'}, {name: 'Date', value: 'Sun, 16 Nov 2026 10:00:00 +0100'}]}});
   const full = (m, text) => ({...m, payload: {...m.payload, mimeType: 'multipart/alternative', parts: [{mimeType: 'text/plain', body: {data: b64u(text)}}, {mimeType: 'text/html', body: {data: b64u('<p>html</p>')}}]}});
@@ -59,6 +62,7 @@ export function startFakeGoogle() {
       }
       if (p === '/gmail/users/me/drafts/send') return send(res, 200, {id: 'sent1', threadId: 'th9', labelIds: ['SENT']});
       if (p === '/gmail/users/me/messages/send') return send(res, 200, {id: 'sent2', threadId: 'th10', labelIds: ['SENT']});
+      if ((m = p.match(/^\/drive\/files\/([^/]+)\/export$/)) && req.method === 'GET') { const f = F.drive.find((x) => x.id === m[1]); if (!f || !f.html) return send(res, 404, {error: {code: 404, message: 'pas de document'}}); res.writeHead(200, {'content-type': 'text/html'}); return res.end(f.html); }
       if (p === '/drive/files' && req.method === 'GET') {
         /* sous-ensemble de la syntaxe q de Drive : name = '…', '…' in parents (plusieurs, ou), mimeType = / != '…', trashed = false */
         const qq = q.q || '', un = (s) => s.replace(/\\'/g, "'").replace(/\\\\/g, '\\');

@@ -7,7 +7,7 @@ const HERE = path.dirname(fileURLToPath(import.meta.url)), SRV = path.join(HERE,
 const {startFakeGoogle} = await import(SRV + '/tests/fake-google.mjs'); const FG = await startFakeGoogle();
 FG.sheet['Canal!A1:H3000'] = [['Date', 'De', 'Pour', 'Type', 'Message', 'Statut', 'Réponse', 'Objet'], ['15/11/2026', 'Rabie', 'Iris', 'Info', 'Le syndic a appelé.', 'Fait', 'Noté.', '']];
 const DATA = fs.mkdtempSync(path.join(os.tmpdir(), 'jarvis-e2e-')), PORT = 19000 + Math.floor(Math.random() * 900), BASE = 'http://127.0.0.1:' + PORT;
-const env = {...process.env, JARVIS_PUSH_ALLOW_HTTP: '1', JARVIS_NOTIFY_TICK_MS: '3600000', JARVIS_SANTE_TICK_MS: '3600000', JARVIS_GOOGLE_FAKE: FG.url, PORT: String(PORT), JARVIS_DATA: DATA, CLAUDE_BIN: SRV + '/tests/fake-claude.mjs', JARVIS_TTS_HELPER: SRV + '/tests/fake-tts.mjs', JARVIS_STT_HELPER: SRV + '/tests/fake-stt.mjs', JARVIS_TOUR_HELPER: SRV + '/tests/fake-tour.mjs', JARVIS_VOICE_MODEL: path.join(DATA, 'fausse-voix.onnx'), JARVIS_MAJ: '0'};   /* 0.27.0 : pas de question de mise à jour pendant le banc (elle a son essai à part, sur un dépôt de test) */
+const env = {...process.env, JARVIS_PUSH_ALLOW_HTTP: '1', JARVIS_NOTIFY_TICK_MS: '3600000', JARVIS_SANTE_TICK_MS: '3600000', JARVIS_GOOGLE_FAKE: FG.url, PORT: String(PORT), JARVIS_DATA: DATA, CLAUDE_BIN: SRV + '/tests/fake-claude.mjs', JARVIS_TTS_HELPER: SRV + '/tests/fake-tts.mjs', JARVIS_STT_HELPER: SRV + '/tests/fake-stt.mjs', JARVIS_TOUR_HELPER: SRV + '/tests/fake-tour.mjs', JARVIS_RD_RACINE: 'rda', JARVIS_VOICE_MODEL: path.join(DATA, 'fausse-voix.onnx'), JARVIS_MAJ: '0'};   /* 0.27.0 : pas de question de mise à jour pendant le banc (elle a son essai à part, sur un dépôt de test) */
 fs.mkdirSync(DATA, {recursive: true}); fs.writeFileSync(path.join(DATA, 'fausse-voix.onnx'), 'faux');   /* 0.25.0 : la voix Pierre « installée » (fausse), pour la lecture des réponses */
 const code = execFileSync(process.execPath, [SRV + '/server.mjs', 'pair'], {env}).toString().match(/: ([A-Z0-9]{4}-[A-Z0-9]{4})/)[1];
 const srv = spawn(process.execPath, [SRV + '/server.mjs'], {env, stdio: ['ignore', 'pipe', 'pipe']}); await new Promise((r) => srv.stdout.once('data', r));
@@ -76,6 +76,26 @@ try {
   await p.evaluate(() => [...document.querySelectorAll('#chat .msg.proposal .btn.main')].pop().click()); await p.waitForTimeout(1500);
   { const tk = await p.evaluate(() => JSON.parse(localStorage.getItem('jarvis.settings')).serverToken); const rl = await fetch(BASE + '/api/relances', {headers: {authorization: 'Bearer ' + tk}}).then((x) => x.json());
     ok('discussion : la relance confirmée est programmée sur le serveur', rl.prevues.some((x) => x.source === 'conversation' && x.ligne === 2 && /Iris a répondu au syndic/.test(x.quoi)), JSON.stringify(rl.prevues)); }
+  /* 0.37.0 : la mémoire durable — Claude propose de retenir (carte « À retenir ») ; gardé sur le serveur seulement sur son bouton */
+  await p.fill('#chat-in', 'Retiens que je préfère le train pour Lyon'); await p.press('#chat-in', 'Enter').catch(() => {}); await p.waitForTimeout(2500);
+  if (!(await p.evaluate(() => /À retenir/.test(document.getElementById('chat').textContent)))) { await p.evaluate(() => { const f = document.querySelector('#chat form'); if (f) f.requestSubmit(); }); await p.waitForTimeout(2500); }
+  { const tk = await p.evaluate(() => JSON.parse(localStorage.getItem('jarvis.settings')).serverToken), M = () => fetch(BASE + '/api/memoire', {headers: {authorization: 'Bearer ' + tk}}).then((x) => x.json());
+    const avant = await M(), carte = await p.evaluate(() => /À retenir/.test(document.getElementById('chat').textContent) && /Préfère le train pour aller à Lyon/.test(document.getElementById('chat').textContent));
+    ok('mémoire : Claude propose de retenir (carte « À retenir ») ; rien n\'est retenu sans le bouton', carte && !avant.items.some((x) => /train/.test(x.texte)), JSON.stringify(avant.items));
+    await p.evaluate(() => [...document.querySelectorAll('#chat .msg.proposal .btn.main')].pop().click()); await p.waitForTimeout(1500); const apres = await M();
+    ok('mémoire : « Retenir » le garde sur le serveur (venu de la discussion)', apres.items.some((x) => x.texte === 'Préfère le train pour aller à Lyon' && x.source === 'discussion'), JSON.stringify(apres.items)); }
+  { const q = await ctx.newPage(); q.on('pageerror', (e) => errs.push('mémoire : ' + e.message));
+    await q.goto(BASE + '/?serveur#reglages'); await q.waitForTimeout(3500);
+    const c1 = await q.evaluate(() => { const c = document.getElementById('mem-card'); return c ? {txt: c.textContent, n: c.querySelectorAll('.mem-it').length} : null; });
+    ok('mémoire : Réglages montre ce que JARVIS retient et son Profil (lu dans Drive, sans sa partie finances)', !!c1 && /Préfère le train pour aller à Lyon/.test(c1.txt) && /Ton Profil \(Drive\) est lu, modifié le 20\/11\/2026, sans sa partie finances/.test(c1.txt), JSON.stringify(c1));
+    const ajoute = async (t) => { await q.fill('#mem-card .mem-in', t); await q.evaluate(() => [...document.querySelectorAll('#mem-card .mem-add .btn')].pop().click()); await q.waitForTimeout(900); return q.evaluate(() => ({n: document.querySelectorAll('#mem-card .mem-it').length, txt: document.getElementById('mem-card').textContent})); };
+    const c2 = await ajoute('Mon IBAN est FR76 3000 6000 0112 3456 7890 189'), c3 = await ajoute('Aime les randonnées le dimanche');
+    ok('mémoire : ajout à la main dans Réglages ; un IBAN est refusé', /Rien de bancaire/.test(c2.txt) && !/FR76/.test(c2.txt) && c2.n === 1 && c3.n === 2 && /randonnées le dimanche/.test(c3.txt), JSON.stringify([c2.n, c3.n, c2.txt.slice(-160)]));
+    await q.evaluate(() => [...document.querySelectorAll('#mem-card .mem-it')].find((x) => /train/.test(x.textContent)).querySelector('.btn').click()); await q.waitForTimeout(900);
+    const c4 = await q.evaluate(() => ({n: document.querySelectorAll('#mem-card .mem-it').length, txt: document.getElementById('mem-card').textContent}));
+    ok('mémoire : « Oublier » le retire', c4.n === 1 && !/train pour aller/.test(c4.txt), JSON.stringify(c4));
+    await q.evaluate(() => document.getElementById('mem-card').scrollIntoView()); await q.screenshot({path: SH + 'memoire.png'});
+    await q.close(); }
   n0 = FG.calls.length;
   await p.evaluate(() => [...document.querySelectorAll('#chat .msg.proposal.is-act .btn.main')].pop().click()); await p.waitForTimeout(19000);
   const puts = FG.calls.slice(n0).filter((c) => c.method === 'PUT').map((c) => c.path.split('/values/')[1]);

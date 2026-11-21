@@ -31,7 +31,7 @@ const VEND = http.createServer((q, rr) => { const VBx = 'http://127.0.0.1:' + VE
 await new Promise((z) => VEND.listen(0, '127.0.0.1', z)); const VB = 'http://127.0.0.1:' + VEND.address().port;
 const PORT = 18000 + Math.floor(Math.random() * 1000), BASE = 'http://127.0.0.1:' + PORT;
 const env = {...process.env, JARVIS_PUSH_ALLOW_HTTP: '1', JARVIS_NOTIFY_TICK_MS: '3600000', JARVIS_SANTE_TICK_MS: '3600000', JARVIS_PAUSE_CACHE_MS: '0', JARVIS_PAPIERS_ID: 'pap', JARVIS_BELL_DEDUP_MS: '0', JARVIS_GOOGLE_FAKE: FG.url, PORT: String(PORT), JARVIS_DATA: DATA, CLAUDE_BIN: path.join(HERE, 'fake-claude.mjs'), ANTHROPIC_API_KEY: 'sk-ant-faux-pour-le-test', ANTHROPIC_BASE_URL: 'https://exemple.invalid', JARVIS_ORIGINS: 'https://rabiederouiche.github.io', JARVIS_REPO: os.tmpdir(), JARVIS_OS_DIR: path.join(HERE, '..', '..', '..', 'essais', 'jarvis-os-maquette'), JARVIS_TTS_HELPER: path.join(HERE, 'fake-tts.mjs'), JARVIS_VOICE_MODEL: path.join(HERE, 'fake-tts.mjs'), JARVIS_VOICE_SCRIPT: path.join(DATA, 'fausse-install.sh')};
-Object.assign(env, {JARVIS_STEAM_URL: VB, JARVIS_STT_HELPER: path.join(HERE, 'fake-stt.mjs'), JARVIS_TOUR_HELPER: path.join(HERE, 'fake-tour.mjs'), JARVIS_PREP_MEM: '1', JARVIS_METEO_URL: 'http://127.0.0.1:' + MET.address().port + '/v1/forecast', JARVIS_ECOUTE_SCRIPT: path.join(DATA, 'fausse-install.sh')});
+Object.assign(env, {JARVIS_STEAM_URL: VB, JARVIS_STT_HELPER: path.join(HERE, 'fake-stt.mjs'), JARVIS_TOUR_HELPER: path.join(HERE, 'fake-tour.mjs'), JARVIS_PREP_MEM: '1', JARVIS_RD_RACINE: 'rda', JARVIS_METEO_URL: 'http://127.0.0.1:' + MET.address().port + '/v1/forecast', JARVIS_ECOUTE_SCRIPT: path.join(DATA, 'fausse-install.sh')});
 const results = []; let fails = 0;
 { const H = ['Domaine', 'Fait', 'Valeur'], v = (x) => pauseDepuisFaits([H, ['Grok Bot', "Grok en pause jusqu'au", x]]);
   const okP = v('17/11/2026 13h05') === Date.parse('2026-11-17T13:05:00+01:00') && v('14/07/2027 12h47') === Date.parse('2027-07-14T12:47:00+02:00') && v('Reprise faite, sonnettes envoyées') === null && pauseDepuisFaits([H, ['x', 'Autre', 'y']]) === undefined;
@@ -569,6 +569,21 @@ try {
       { const pa = await call('/api/sample/prepare', {method: 'POST', headers: A, body: JSON.stringify({tier: 'auto', system: SYSP, input: [{role: 'user', content: CTX + ' (auto)'}]})});
         const qa = await flux({conv: true, tier: 'auto', system: SYSP, input: [{role: 'user', content: CTX + ' (auto)'}, {role: 'user', content: 'Explique pourquoi le ciel est bleu'}]});
         ok('« Auto » : Haiku et Sonnet préparés à l\'ouverture ; une explication part sur le Sonnet prêt (seule la question part)', pa.body.ok && pa.body.aussi && pa.body.aussi.ok && qa.modele === 'sonnet' && tour(qa.fin) === 2 && /contexte : oui/.test(qa.fin), JSON.stringify([pa.body, qa.modele, tour(qa.fin)])); }
+      /* 0.37.0 : la mémoire durable — ajoutée par lui, rien de bancaire, donnée à Claude avec son Profil (sans les finances) */
+      { const MP = (u, b) => call(u, {method: 'POST', headers: A, body: JSON.stringify(b)}), G = (u, b) => call(u, b ? {method: 'POST', headers: A, body: JSON.stringify(b)} : {headers: A});
+        FG.refreshOk = true; { const lk = await G('/api/google/link', {}); await fetch(BASE + '/api/google/callback?state=' + new URL(lk.body.url).searchParams.get('state') + '&code=CODE-OK'); }   /* Google relié pour lire le Profil */
+        let me = await call('/api/memoire', {headers: A}); const vide = me.status === 200 && Array.isArray(me.body.items) && me.body.items.length === 0;
+        const a1 = await MP('/api/memoire', {texte: 'Préfère les vols directs, même plus chers', source: 'discussion'}), a2 = await MP('/api/memoire', {texte: 'préfère les vols directs, même plus chers'});
+        ok('mémoire : un souvenir ajouté (par lui), gardé sur le serveur ; le même deux fois n\'est pas doublé', vide && a1.status === 200 && a1.body.ok && a1.body.item.source === 'discussion' && a2.body.deja === true && a2.body.items.length === 1, JSON.stringify([a1.body.item, a2.body.deja]));
+        const b1 = await MP('/api/memoire', {texte: 'Mon IBAN est FR76 3000 6000 0112 3456 7890 189'}), b2 = await MP('/api/memoire', {texte: 'Le code PIN de la carte est 1234'}), b3 = await MP('/api/memoire', {texte: 'Carte 4970 1234 5678 9012'}), b4 = await MP('/api/memoire', {texte: 'Le portable de Léa : 06 12 34 56 78'});
+        ok('mémoire : rien de bancaire ni de secret (IBAN, code, numéro de carte refusés) ; un téléphone passe', b1.status === 400 && b2.status === 400 && b3.status === 400 && b4.status === 200 && b4.body.items.length === 2, JSON.stringify([b1.status, b2.status, b3.status, b4.status]));
+        me = await MP('/api/memoire/profil', {});
+        ok('mémoire : son Profil lu dans Drive (lecture seule), sans sa partie Finances', me.body.profil.lu === true && me.body.profil.retire === 1 && me.body.profil.modifie === '2026-11-20T09:00:00.000Z' && FG.calls.some((c) => /^\/drive\/files\/profil1\/export$/.test(c.path) && c.method === 'GET'), JSON.stringify(me.body.profil));
+        const fm = await flux({input: [{role: 'user', content: 'Que retiens-tu de moi ?'}], tier: 'quick'});
+        ok('mémoire : le Claude de la discussion reçoit ses souvenirs et son Profil, jamais les finances', /^Je retiens : vols directs ; Profil : lu ; finances : absentes\./.test(fm.fin || ''), fm.fin);
+        const ef = await MP('/api/memoire/efface', {id: a1.body.item.id});
+        ok('mémoire : « Oublier » retire le souvenir', ef.status === 200 && ef.body.items.length === 1 && !ef.body.items.some((x) => /vols directs/.test(x.texte)), JSON.stringify(ef.body.items));
+        await G('/api/google/unlink', {}); }
       /* 0.33.0 : missions en parallèle (deux à la fois), avec leur plan en étapes et ce qu'elles font à l'instant */
       const pm1 = await call('/api/mission', {method: 'POST', headers: A, body: JSON.stringify({texte: 'planifie la comparaison des assurances habitation'})});
       const pm2 = await call('/api/mission', {method: 'POST', headers: A, body: JSON.stringify({texte: 'planifie aussi le budget des vacances'})});

@@ -1447,6 +1447,9 @@
   .verdict-go { display: block; margin-top: 6px; padding: 0; font-weight: 600; }
   .pap-go { width: 100%; text-align: left; }
   .pap-dates.panel { border-top: 0; padding-top: 0; }
+  /* 0.37.0 : la mémoire durable */
+  .mem-list { list-style: none; margin: 8px 0; padding: 0; display: grid; gap: 6px; } .mem-it { display: flex; gap: 8px; align-items: center; justify-content: space-between; padding: 6px 8px; border-radius: 10px; background: rgba(56, 189, 248, .08); } .mem-it span { min-width: 0; overflow-wrap: anywhere; }
+  .mem-add { display: flex; gap: 8px; } .mem-in { flex: 1; min-width: 0; padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(56, 189, 248, .35); background: transparent; color: inherit; font: inherit; }
   .sav-tab summary { cursor: pointer; font-size: 14px; } .sav-tab ul { margin: 6px 0 0; padding-left: 18px; font-size: 13px; color: var(--muted); display: grid; gap: 4px; overflow-wrap: anywhere; }
   .face-note { font-size: 13px; margin: 6px 0 0; } .face-open { margin-top: 4px; }
   .siri-steps { margin: 0; padding-left: 20px; display: grid; gap: 6px; font-size: 13.5px; color: var(--muted); } .siri-steps code, .siri-key { font: 600 12.5px var(--tech); color: var(--fg); overflow-wrap: anywhere; }
@@ -3344,7 +3347,7 @@ void main(){
         inputSchema: {type: 'object', properties: {demande: {type: 'string', description: 'La demande complète, telle que la tâche la lira'}}, required: ['demande']},
         execute: (input) => { const m = String(input.demande || '').trim(); if (!m) throw new Error('Demande vide');
           T.msgs.splice(T.msgs.indexOf(out), 0, {kind: 'act', label: SRV_OS ? 'Confier à la tâche Claude (sur ton serveur)' : 'Confier à la tâche Claude (session complète)', text: m, ok: 'Lancer la tâche', state: 'open', fin: () => ({title: 'Ordre à Claude', effect: 'Une ligne pour Claude dans le Canal, puis la tâche « Ordres Jarvis » lancée.', bot: 'claude', order: m, viaTask: true, say: 'Je lance la tâche.', reply: ''})});
-          renderChat(); return 'Proposée à Rabie ; en attente de son bouton.'; }}].concat(extraChatTools(T, out), relanceChatTool(T, out), carteChatTool(T, out));
+          renderChat(); return 'Proposée à Rabie ; en attente de son bouton.'; }}].concat(extraChatTools(T, out), relanceChatTool(T, out), carteChatTool(T, out), memoireChatTool(T, out));
   }
   /* les données de la discussion (règles et état de Pilotage) restent les mêmes pendant 10 minutes : le serveur n'envoie à Claude que
      la nouvelle question, et l'heure de Paris part avec chacune ; au-delà, elles sont relues (nouveau Claude, données à jour) */
@@ -6707,6 +6710,16 @@ void main(){
   }
   SUGG.dosreply = ['Que dois-je répondre ?', "Qu'est-ce que ça change pour moi ?", 'Faut-il relancer ?', 'Propose la mise à jour'];
   /* JARVIS OS 0.18.0 : Claude peut proposer une relance (« je revérifie demain à 9 h si Iris a répondu ») ; programmée sur son bouton, gratuite */
+  /* 0.37.0 (choix du 21/11/2026, « Mémoire durable ») : Claude propose de retenir un fait sur lui ; rien n'est retenu sans son appui */
+  function memoireChatTool(T, out) {
+    const JS = window.JarvisServeur; if (!SRV_OS || !JS || !JS.memoire) return [];
+    return [{name: 'retenir', description: "Propose à Rabie de retenir durablement un fait sur lui (préférence, habitude, personne, lieu, contrainte) quand il le dit ou le demande (« retiens que… », « je préfère… ») : JARVIS s'en souviendra dans toutes ses discussions, missions et réponses à Siri. Une phrase courte et autonome. Jamais de donnée bancaire, de montant, de mot de passe ni de code. Rien n'est retenu tant qu'il n'a pas touché « Retenir ».",
+      inputSchema: {type: 'object', properties: {fait: {type: 'string', description: 'Le fait à retenir, une phrase courte et autonome (ex. « Préfère les vols directs, même plus chers »)'}}, required: ['fait']},
+      execute: (input) => { const f = String(input.fait || '').trim(); if (f.length < 3) throw new Error('Rien à retenir');
+        T.msgs.splice(T.msgs.indexOf(out), 0, {kind: 'act', label: 'À retenir', text: f, ok: 'Retenir', state: 'open',
+          fin: () => { JS.memoire.ajouter(f, 'discussion').then((r) => toast(r && r.ok ? (r.deja ? 'Déjà retenu' : 'Retenu') : 'Pas retenu', r && r.ok ? f : (r && r.error) || '')); return null; }});
+        renderChat(); return 'Proposé à Rabie ; en attente de son bouton.'; }}];
+  }
   function relanceChatTool(T, out) {
     const JS = window.JarvisServeur; if (!SRV_OS || !JS || !JS.relance) return [];
     return [{name: 'programmer_relance', description: "Propose à Rabie de programmer une relance : le serveur le préviendra à l'heure dite et, si tu donnes la ligne du Canal, regardera lui-même si le bot a répondu. Rien n'est programmé tant qu'il n'a pas touché « Programmer ». L'heure de Paris est donnée avec chaque question (« [Maintenant : …] »).",
@@ -8856,6 +8869,28 @@ void main(){
   const SETV = {box: null, at: 0, html: '', force: false};   /* dernier rendu de Réglages (voir VIEWS.reglages) */
   const VIEWS_RELOAD_SIRI = () => { SETV.force = true; if (TAB === 'reglages') renderView(true); };
   /* JARVIS OS 0.14.0 : carte « Sauvegarde de Pilotage » : la copie de la nuit, et ce qui a changé d'une copie à l'autre (valeurs avant et après) */
+  /* 0.37.0 (choix du 21/11/2026, « Mémoire durable ») : ce que JARVIS retient de toi, et ton Profil (lu dans Drive, sans les finances) */
+  async function memoireCard(JS) {
+    const card = h('section', {class: 'card set-card mem-card', id: 'mem-card'}, h('b', {text: 'Ce que JARVIS retient'}));
+    const out = h('p', {class: 'set-msg'});
+    let st = await JS.memoire.liste();
+    if (!st) { card.append(h('p', {class: 'muted', text: 'Ton serveur ne la connaît pas encore : touche « Mettre à jour le serveur » plus bas.'})); return card; }
+    const list = h('ul', {class: 'mem-list'}), prof = h('p', {class: 'muted mem-prof'});
+    const paint = () => {
+      list.replaceChildren(...(st.items.length ? st.items.slice().reverse().map((x) => h('li', {class: 'mem-it'}, h('span', {text: x.texte}),
+        h('button', {type: 'button', class: 'btn ghost sm', 'aria-label': 'Oublier : ' + x.texte, onclick: async () => { const r = await JS.memoire.effacer(x.id); if (r) { st = r; paint(); out.textContent = 'Oublié.'; } }}, 'Oublier')))
+        : [h('li', {class: 'muted', text: 'Rien pour l’instant. Dis à Claude « retiens que… », ou écris-le ci-dessous.'})]));
+      const p = st.profil || {};
+      prof.textContent = p.lu ? 'Ton Profil (Drive) est lu' + (p.modifie ? ', modifié le ' + new Date(p.modifie).toLocaleDateString('fr-FR') : '') + (p.retire ? ', sans ' + (p.retire > 1 ? 'ses ' + p.retire + ' parties' : 'sa partie') + ' finances' : '') + (p.doublons ? ' ; ' + p.doublons + ' autre' + (p.doublons > 1 ? 's' : '') + ' « Profil » dans Drive : le plus récent est lu' : '') + '.'
+        : p.err === 'introuvable' ? 'Aucun Google Doc « Profil » dans RD Assistant.' : p.err ? 'Profil illisible pour l’instant : ' + p.err : 'Profil pas encore lu (Google relié ?).';
+    };
+    const inp = h('input', {type: 'text', class: 'mem-in', maxlength: '300', placeholder: 'Ex. : je préfère les vols directs', 'aria-label': 'Quelque chose à retenir'});
+    card.append(h('p', {class: 'muted', text: 'Claude s’en souvient dans toutes ses discussions, ses missions, ses réponses à Siri et son tour. Gardé sur ton serveur seulement ; rien de bancaire, aucun mot de passe ni code.'}),
+      list, h('div', {class: 'row-actions mem-add'}, inp, h('button', {type: 'button', class: 'btn', onclick: async () => { const t = inp.value.trim(); if (!t) return; const r = await JS.memoire.ajouter(t, 'reglages'); if (r && r.ok) { st = r; inp.value = ''; paint(); out.textContent = r.deja ? 'Déjà retenu.' : 'Retenu.'; } else out.textContent = (r && r.error) || 'Pas retenu.'; }}, 'Retenir')),
+      prof, h('button', {type: 'button', class: 'btn ghost sm', onclick: async () => { out.textContent = 'Lecture du Profil…'; const r = await JS.memoire.profil(); if (r) { st = r; paint(); out.textContent = ''; } }}, 'Relire le Profil'), out);
+    paint();
+    return card;
+  }
   async function savCard(JS) {
     const card = h('section', {class: 'card set-card sav-card'}, h('b', {text: 'Sauvegarde de Pilotage'}));
     const out = h('p', {class: 'set-msg'}), st = await JS.sauvegarde.etat();
@@ -8945,6 +8980,7 @@ void main(){
       if (JS.raccourci) parts.push(await siriCard(JS)); /* JARVIS OS 0.13.0 : Siri et bouton Action */
       if (JS.tour) parts.push(await tourCard(JS)); /* JARVIS OS 0.15.0 : tour de Claude */
       if (JS.sauvegarde) parts.push(await savCard(JS)); /* JARVIS OS 0.14.0 : sauvegarde de Pilotage */
+      if (JS.memoire) parts.push(await memoireCard(JS)); /* JARVIS OS 0.37.0 : la mémoire durable */
       /* 3. JARVIS : version, mise à jour du serveur, voix et modèle (repris de l'ancienne app) */
       const st = await JS.status(), upd = h('p', {class: 'set-msg'});
       const seg = (k, opts, def) => h('div', {class: 'seg set-seg', role: 'group'}, opts.map(([v, l]) => h('button', {type: 'button', 'aria-pressed': String((JS.setting(k) || def) === v), onclick: () => { JS.set(k, v); location.reload(); }}, l)));
