@@ -108,6 +108,13 @@ try {
     await q.evaluate(() => [...document.querySelectorAll('#mem-card .mem-it')].find((x) => /train/.test(x.textContent)).querySelector('.btn').click()); await q.waitForTimeout(900);
     const c4 = await q.evaluate(() => ({n: document.querySelectorAll('#mem-card .mem-it').length, txt: document.getElementById('mem-card').textContent}));
     ok('mémoire : « Oublier » le retire', c4.n === 1 && !/train pour aller/.test(c4.txt), JSON.stringify(c4));
+    /* 0.42.0 : la mémoire qui se range seule — « Ranger maintenant » : Claude relit les échanges et propose ; « Retenir » remplace le souvenir dépassé, « Non » écarte */
+    await q.evaluate(() => [...document.querySelectorAll('#mem-card .btn')].find((b) => b.textContent === 'Ranger maintenant').click()); await q.waitForTimeout(3000);
+    const r1 = await q.evaluate(() => ({props: [...document.querySelectorAll('#mem-card .mem-prop p')].map((x) => x.textContent), msg: (document.querySelector('#mem-card .set-msg') || {}).textContent || ''}));
+    await q.evaluate(() => [...document.querySelectorAll('#mem-card .mem-prop')].find((x) => /samedi/.test(x.textContent)).querySelector('.btn.main').click()); await q.waitForTimeout(900);
+    await q.evaluate(() => [...document.querySelectorAll('#mem-card .mem-prop')].find((x) => /trains de nuit/.test(x.textContent)).querySelector('.btn.ghost').click()); await q.waitForTimeout(900);
+    const r2 = await q.evaluate(() => ({items: [...document.querySelectorAll('#mem-card .mem-it span')].map((x) => x.textContent), props: document.querySelectorAll('#mem-card .mem-prop').length}));
+    ok('mémoire qui se range : « Ranger maintenant » montre les propositions de Claude ; « Retenir » remplace « dimanche » par « samedi », « Non » écarte', r1.props.length === 2 && r1.props.some((x) => /Aime les randonnées le samedi \(à la place de « Aime les randonnées le dimanche »\)/.test(x)) && /2 propositions/.test(r1.msg) && r2.props === 0 && r2.items.includes('Aime les randonnées le samedi') && !r2.items.some((x) => /dimanche|trains de nuit/.test(x)), JSON.stringify([r1, r2]));
     await q.close(); }
   /* 0.39.0 : le serveur MCP — l'accord se donne dans Réglages (mêmes 4 chiffres) ; une proposition venue de l'assistant s'approuve dans Suivi */
   { const q = await ctx.newPage(); q.on('pageerror', (e) => errs.push('mcp : ' + e.message));

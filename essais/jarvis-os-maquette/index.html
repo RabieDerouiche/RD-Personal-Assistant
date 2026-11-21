@@ -9110,8 +9110,15 @@ void main(){
     const out = h('p', {class: 'set-msg'});
     let st = await JS.memoire.liste();
     if (!st) { card.append(h('p', {class: 'muted', text: 'Ton serveur ne la connaît pas encore : touche « Mettre à jour le serveur » plus bas.'})); return card; }
-    const list = h('ul', {class: 'mem-list'}), prof = h('p', {class: 'muted mem-prof'});
+    const list = h('ul', {class: 'mem-list'}), prof = h('p', {class: 'muted mem-prof'}), props = h('div', {class: 'mem-props'}), rang = h('p', {class: 'muted mem-rang'});
     const paint = () => {
+      /* 0.42.0 : ce que Claude propose de retenir après avoir relu la semaine (chaque dimanche à 18 h), validé une à une */
+      const ps = st.propositions || [];
+      props.replaceChildren(...(ps.length ? [h('small', {class: 'pick-label', text: 'Claude propose de retenir'})].concat(ps.map((x) => h('div', {class: 'mcp-d mem-prop'}, h('p', {text: x.texte + (x.remplace ? ' (à la place de « ' + x.remplace + ' »)' : '')}),
+        h('div', {class: 'row-actions'}, h('button', {type: 'button', class: 'btn main sm', onclick: async () => { const r = await JS.memoire.proposition(x.id, true); if (r && r.items) { st = r; paint(); out.textContent = r.ok === false ? (r.error || 'Pas retenu.') : 'Retenu.'; } }}, 'Retenir'),
+          h('button', {type: 'button', class: 'btn ghost sm', onclick: async () => { const r = await JS.memoire.proposition(x.id, false); if (r && r.items) { st = r; paint(); out.textContent = 'Écarté.'; } }}, 'Non'))))) : []));
+      const rg = st.rangement || {};
+      rang.textContent = 'Chaque dimanche à 18 h, Claude relit vos échanges de la semaine et propose des choses à retenir' + (rg.dernier ? ' (dernier rangement : ' + fmt(new Date(rg.dernier), {weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'}) + ')' : '') + '.';
       list.replaceChildren(...(st.items.length ? st.items.slice().reverse().map((x) => h('li', {class: 'mem-it'}, h('span', {text: x.texte}),
         h('button', {type: 'button', class: 'btn ghost sm', 'aria-label': 'Oublier : ' + x.texte, onclick: async () => { const r = await JS.memoire.effacer(x.id); if (r) { st = r; paint(); out.textContent = 'Oublié.'; } }}, 'Oublier')))
         : [h('li', {class: 'muted', text: 'Rien pour l’instant. Dis à Claude « retiens que… », ou écris-le ci-dessous.'})]));
@@ -9122,7 +9129,8 @@ void main(){
     const inp = h('input', {type: 'text', class: 'mem-in', maxlength: '300', placeholder: 'Ex. : je préfère les vols directs', 'aria-label': 'Quelque chose à retenir'});
     card.append(h('p', {class: 'muted', text: 'Claude s’en souvient dans toutes ses discussions, ses missions, ses réponses à Siri et son tour. Gardé sur ton serveur seulement ; rien de bancaire, aucun mot de passe ni code.'}),
       list, h('div', {class: 'row-actions mem-add'}, inp, h('button', {type: 'button', class: 'btn', onclick: async () => { const t = inp.value.trim(); if (!t) return; const r = await JS.memoire.ajouter(t, 'reglages'); if (r && r.ok) { st = r; inp.value = ''; paint(); out.textContent = r.deja ? 'Déjà retenu.' : 'Retenu.'; } else out.textContent = (r && r.error) || 'Pas retenu.'; }}, 'Retenir')),
-      prof, h('button', {type: 'button', class: 'btn ghost sm', onclick: async () => { out.textContent = 'Lecture du Profil…'; const r = await JS.memoire.profil(); if (r) { st = r; paint(); out.textContent = ''; } }}, 'Relire le Profil'), out);
+      prof, h('button', {type: 'button', class: 'btn ghost sm', onclick: async () => { out.textContent = 'Lecture du Profil…'; const r = await JS.memoire.profil(); if (r) { st = r; paint(); out.textContent = ''; } }}, 'Relire le Profil'),
+      props, rang, JS.memoire.ranger ? h('button', {type: 'button', class: 'btn ghost sm', onclick: async (ev) => { const b = ev.currentTarget; b.disabled = true; out.textContent = 'Claude relit vos échanges…'; const r = await JS.memoire.ranger(); b.disabled = false; if (r && r.items) { st = r; paint(); } out.textContent = r && r.ok ? (r.rien ? 'Aucun échange nouveau à relire.' : r.nouvelles ? r.nouvelles + (r.nouvelles > 1 ? ' propositions' : ' proposition') + ' ci-dessus.' : 'Rien de nouveau à retenir.') : (r && r.error) || 'Rangement impossible.'; }}, 'Ranger maintenant') : null, out);
     paint();
     return card;
   }

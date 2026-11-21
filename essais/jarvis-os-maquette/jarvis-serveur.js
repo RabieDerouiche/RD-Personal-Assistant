@@ -224,7 +224,10 @@
       liste: () => req('/api/memoire').then((r) => (r.status === 200 ? r.j : null)).catch(() => null),
       ajouter: (texte, source) => req('/api/memoire', {texte, source}).then((r) => r.j).catch(() => ({ok: false, error: 'Serveur injoignable.'})),
       effacer: (id) => req('/api/memoire/efface', {id}).then((r) => (r.status === 200 ? r.j : null)).catch(() => null),
-      profil: () => req('/api/memoire/profil', {}).then((r) => (r.status === 200 ? r.j : null)).catch(() => null)
+      profil: () => req('/api/memoire/profil', {}).then((r) => (r.status === 200 ? r.j : null)).catch(() => null),
+      /* 0.42.0 : la mémoire qui se range seule */
+      ranger: () => req('/api/memoire/ranger', {}).then((r) => r.j).catch(() => null),
+      proposition: (id, oui) => req('/api/memoire/proposition', {id, oui}).then((r) => r.j).catch(() => null)
     },
     /* 0.36.0 : réponse instantanée du serveur, sans IA (heure, date, météo, agenda, ce qui t'attend, un bot), ou null : Claude répond */
     rapide: (text, pos) => req('/api/rapide', Object.assign({text}, pos && isFinite(pos.lat) && isFinite(pos.lon) ? {lat: pos.lat, lon: pos.lon} : {})).then((r) => (r.status === 200 && r.j && r.j.reply ? r.j : null)).catch(() => null),
