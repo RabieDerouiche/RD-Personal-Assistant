@@ -85,8 +85,8 @@ try {
     await q.evaluate(() => { const n = document.querySelector('#chat .dict-no'); if (n) n.click(); }); await q.waitForTimeout(1200);
     const derniere = () => q.evaluate(() => { const m = [...document.querySelectorAll('#chat .msg.them p')]; return m.length ? m[m.length - 1].textContent : ''; });
     await q.fill('#chat-in', 'Bonjour Claude'); await q.press('#chat-in', 'Enter'); await q.waitForTimeout(1500);
-    const r1 = await derniere();
-    ok('Claude instantané : Claude préparé à l\'ouverture de la discussion (avec son historique gardé dans le téléphone) ; la première question part seule, sans les données', vus.prep >= 1 && vus.conv >= 1 && /^Tu as dit : Bonjour Claude\. Session : reprise/.test(r1), JSON.stringify([vus, r1.slice(-120)]));
+    const r1 = await derniere(), mod1 = await q.evaluate(() => { const m = [...document.querySelectorAll('#chat .msg.them .msg-mod')]; return m.length ? m[m.length - 1].textContent : ''; });
+    ok('Claude instantané : Claude préparé à l\'ouverture de la discussion (avec son historique gardé dans le téléphone) ; la première question part seule, sans les données ; « Auto » l\'a confiée à Haiku, dit sous la réponse', vus.prep >= 1 && vus.conv >= 1 && /^Tu as dit : Bonjour Claude\. Session : reprise/.test(r1) && mod1 === 'Haiku', JSON.stringify([vus, mod1, r1.slice(-120)]));
     await q.fill('#chat-in', 'Raconte lentement'); await q.press('#chat-in', 'Enter'); await q.waitForTimeout(1300);
     const enCours = await derniere(), arret = await q.evaluate(() => !!document.querySelector('#chat .chat-row .btn[aria-label="Arrêter"]'));
     await q.screenshot({path: SH + 'discussion-flux.png'});
@@ -288,6 +288,24 @@ try {
     const s6 = await st(), dicte = await v.evaluate(() => window.JarvisVoice.dictating()); await v.evaluate(() => { const n = document.querySelector('#chat .dict-no'); if (n) n.click(); });
     ok('mains libres : le bouton les reprend ; « Mains libres : non » les coupe (retenu sur l\'iPhone) et l\'orbe revient à la dictée d\'une question', s4.conv && /Mains libres : oui/.test(s4.toggle) && !s5.conv && /Mains libres : non/.test(s5.toggle) && s5.dictBtn && pref === 'non' && !s6.conv && dicte, JSON.stringify([s4.conv, s5.conv, s5.toggle, pref, s6.conv, dicte]));
     await v.close(); }
+  /* 0.33.0 : l'activité en direct — une mission lancée apparaît sur l'accueil (« En ce moment ») avec son plan et ce qu'elle fait, et sur l'orbe (pastille) ;
+     elle en part une fois finie ; Suivi montre ses étapes */
+  { const q = await ctx.newPage(); q.on('pageerror', (e) => errs.push('activité : ' + e.message));
+    await q.goto(BASE + '/?serveur#accueil'); await q.waitForTimeout(3000);
+    await q.evaluate(() => window.JarvisServeur.mission('planifie la comparaison des assurances habitation'));
+    await q.waitForTimeout(1500);
+    const a1 = await q.evaluate(() => { const c = document.getElementById('act-card'); return {vu: !!c && !c.hidden, txt: c ? c.textContent : '', badge: (document.querySelector('.jv-btn') || {dataset: {}}).dataset.act || '', etapes: c ? c.querySelectorAll('.act-etapes li').length : 0}; });
+    await q.screenshot({path: SH + 'activite-en-direct.png'});
+    ok('activité en direct : la mission apparaît sur l\'accueil avec son plan et ce qu\'elle fait à l\'instant, et l\'orbe porte une pastille', a1.vu && /Claude · Mission/.test(a1.txt) && /Recherche web : « assurance habitation T3/.test(a1.txt) && a1.etapes === 3 && a1.badge === '1', JSON.stringify([a1.badge, a1.etapes, a1.txt.slice(0, 200)]));
+    await q.waitForTimeout(4500);
+    const a2 = await q.evaluate(() => { const c = document.getElementById('act-card'); return {txt: c && !c.hidden ? c.textContent : '', badge: (document.querySelector('.jv-btn') || {dataset: {}}).dataset.act || ''}; });
+    ok('activité en direct : la mission finie quitte « En ce moment » et la pastille de l\'orbe', !/Claude · Mission/.test(a2.txt) && !a2.badge, JSON.stringify(a2));
+    await q.goto(BASE + '/?serveur#suivi'); await q.waitForTimeout(800);
+    await q.evaluate(() => window.JarvisServeur.mission('planifie aussi le budget des vacances')); await q.waitForTimeout(400);
+    await q.evaluate(() => { const b = document.querySelector('#missions'); if (b) b.scrollIntoView(); }); await q.waitForTimeout(1400);
+    const a3 = await q.evaluate(() => { const it = [...document.querySelectorAll('#missions .mis-it')].find((x) => /budget des vacances/.test(x.textContent)); if (it) it.open = true; return it ? {etapes: it.querySelectorAll('.mis-etapes li').length, outil: (it.querySelector('.mis-outil') || {}).textContent || '', txt: it.textContent.slice(0, 160)} : null; });
+    ok('missions : Suivi montre le plan de la mission en cours et ce qu\'elle fait à l\'instant', a3 && a3.etapes === 3 && /À l’instant : Recherche web/.test(a3.outil), JSON.stringify(a3));
+    await q.close(); }
   /* 0.24.0 : chercher un produit à partir d'une idée, par le serveur (faux Claude) */
   { await p.goto(BASE + '/?serveur#achats'); await p.waitForTimeout(3500);
     await p.evaluate(() => document.querySelectorAll('#toasts .toast').forEach((t) => t.remove()));

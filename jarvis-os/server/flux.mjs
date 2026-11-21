@@ -24,8 +24,17 @@ export const texteDe = (c) => (typeof c === 'string' ? c : Array.isArray(c) ? c.
 /* plusieurs messages en un seul texte (comme avant 0.30.0) : un seul message = son texte ; sinon « Lui : … » et « Toi (réponse précédente) : … » */
 export const aplatir = (msgs) => (msgs.length === 1 ? msgs[0].text : msgs.map((m) => (m.role === 'assistant' ? 'Toi (réponse précédente) : ' : 'Lui : ') + m.text).join('\n\n'));
 const MAX_MSG = 60000;
+/* 0.33.0 (choix du 21/11/2026, « Routeur et secours ») : en « Auto », la profondeur est choisie d'après la question, sans appel de plus.
+   « réfléchis bien », « à fond », « en profondeur », une stratégie → Opus ; une analyse, une rédaction, une comparaison, un conseil,
+   une question longue → Sonnet ; le reste (une donnée à lire, l'agenda, une date, un oui ou un non) → Haiku, le plus rapide. */
+export function routeur(texte) {
+  const t = String(texte || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[’']/g, ' ');
+  if (/(reflechis (bien|a fond|serieusement|longuement)|\ba fond\b|en profondeur|strategi|analyse (complete|approfondie|detaillee)|plan detaille|pese le pour et le contre)/.test(t)) return 'deep';
+  if (t.length > 280 || /\b(pourquoi|compare[rz]?|analyse[rz]?|redige[rz]?|ecri[st]|resume[rz]?|explique[rz]?|conseille[rz]?|conseil|penses?|avis|choisir|decider|prepare[rz]?|planifie[rz]?|calcule[rz]?|budget|negocie[rz]?|argumente[rz]?|lettre|reclamation|traduis|corrige[rz]?)\b/.test(t)) return 'default';
+  return 'quick';
+}
 
-export function createFlux({bin, env, settings, cwd, conso, models, friendly, dateLigne, maxActifs = 2, inactifMs = 15 * 60000, ageMaxMs = 2 * 3600000, timeoutMs = 120000}) {
+export function createFlux({bin, env, settings, cwd, conso, models, friendly, dateLigne, activite, maxActifs = 2, inactifMs = 15 * 60000, ageMaxMs = 2 * 3600000, timeoutMs = 120000}) {
   const now = () => Date.now();
   const CONV = {};   /* par modèle : la conversation de la discussion {p, cle, qs (empreintes de ses questions)} */
   const stats = {questions: 0, reprises: 0, preparees: 0, secours: 0, dernier: null};
@@ -102,9 +111,10 @@ export function createFlux({bin, env, settings, cwd, conso, models, friendly, da
   /* une question de la page. conv = la discussion (Claude gardé ouvert) ; sinon un Claude ponctuel, fermé après la réponse.
      onDelta reçoit chaque morceau de texte ; coupe(fn) donne de quoi arrêter (la page a fermé la discussion ou touché « Arrêter »). */
   async function demander({tier, system, input, conv, onDelta, coupe}) {
-    const model = models[tier] || models.default;
     const msgs = lire(input);
     if (!msgs.length) return {ok: false, error: 'Demande vide.'};
+    const prof = tier === 'auto' ? routeur(msgs[msgs.length - 1].text) : tier, model = models[prof] || models.default;   /* 0.33.0 : « Auto » */
+    const act = activite ? activite.debut({genre: 'page', titre: msgs[msgs.length - 1].text, modele: model}) : null;
     let p, blocs, ponctuel = false, reprise = false;
     if (conv && msgs.length >= 2 && msgs[msgs.length - 1].role === 'user') {
       const cle = cleDe(model, system, msgs[0].text), qs = msgs.slice(1).filter((m) => m.role === 'user').map((m) => empreinte(m.text)), c = CONV[model];
@@ -130,12 +140,13 @@ export function createFlux({bin, env, settings, cwd, conso, models, friendly, da
     else if (!r.ok && CONV[model] && CONV[model].p === p) fermer(model);
     stats.questions++; if (reprise) stats.reprises++; if (r.secours) stats.secours++;
     if (!coupee) stats.dernier = {at: now(), premier: r.premier, total: r.total, model, chaud: reprise, conv: !!conv, ok: r.ok, secours: !!r.secours};
-    return r;
+    if (act) act.fin(r.ok);
+    return {...r, modele: model, profondeur: prof};
   }
   /* la discussion s'ouvre : Claude est lancé et lit tout de suite les données (le premier message) et l'historique de la discussion
      s'il y en a un (gardé dans le téléphone) ; la question suivante n'envoie que la question */
   function preparer({tier, system, input}) {
-    const model = models[tier] || models.default;
+    const model = models[tier === 'auto' ? 'quick' : tier] || models.default;   /* « Auto » : la plupart des questions vont à Haiku */
     const msgs = lire(input);
     if (!msgs.length) return {ok: false, error: 'Rien à préparer.'};
     const cle = cleDe(model, system, msgs[0].text), hist = msgs.slice(1), qs = hist.filter((m) => m.role === 'user').map((m) => empreinte(m.text)), c = CONV[model];

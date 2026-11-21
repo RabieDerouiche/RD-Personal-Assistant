@@ -6,6 +6,7 @@ import {startFakeGoogle} from './fake-google.mjs';
 import http from 'node:http'; import crypto from 'node:crypto';
 import {paris, pauseDepuisFaits, paliers} from '../notify.mjs';
 import {choixEcoute} from '../voix.mjs';
+import {routeur} from '../flux.mjs';
 const FG = await startFakeGoogle();
 const DATA = fs.mkdtempSync(path.join(os.tmpdir(), 'jarvis-'));
 /* 0.22.0 : faux Open-Meteo (prévisions de 8 jours à partir d'aujourd'hui, heure de Paris) */
@@ -39,6 +40,10 @@ const results = []; let fails = 0;
   const okR = a === '2026-11-15,2027-01-15,2027-02-08,2027-02-12' && b === '2026-12-30,2027-05-01,2027-05-31,2027-06-23' && c === '2026-12-01' && d === '2027-06-02' && e === '2027-10-22';
   results.push((okR ? 'OK    ' : 'ÉCHEC ') + 'rappels à paliers : mois, semaines, jours, le jour même, vendredi d\'avant (lundi 15/02 → vendredi 12/02 ; samedi 23/10 → vendredi 22/10)' + (okR ? '' : ' :: ' + [a, b, c, d, e].join(' / '))); if (!okR) fails++; }
 
+/* 0.33.0 : le routeur de la discussion (« Auto ») : Haiku pour lire une donnée, Sonnet pour analyser ou rédiger, Opus sur demande */
+{ const R = (t) => routeur(t), cas = [["Qu'est-ce que j'ai demain ?", 'quick'], ['Où en est Iris ?', 'quick'], ['Quelle heure est-il', 'quick'], ['Explique-moi pourquoi Kairos attend', 'default'], ['Rédige une réponse au syndic', 'default'], ['Compare les deux offres de prêt', 'default'], ['Réfléchis bien à ma stratégie pour le rachat', 'deep'], ['Analyse approfondie de mes abonnements', 'deep'], ['x'.repeat(300), 'default']];
+  const bad = cas.filter(([t, k]) => R(t) !== k);
+  results.push((bad.length ? 'ÉCHEC ' : 'OK    ') + 'routeur : Haiku pour lire une donnée, Sonnet pour analyser ou rédiger, Opus quand il le demande' + (bad.length ? ' :: ' + JSON.stringify(bad.map(([t, k]) => [t.slice(0, 30), k, R(t)])) : '')); if (bad.length) fails++; }
 /* 0.32.0 : le moteur d'écoute — Parakeet une fois installé (marque et variante), sinon Whisper ; JARVIS_ECOUTE_MOTEUR=whisper ; marque douteuse = Whisper */
 { const d = fs.mkdtempSync(path.join(os.tmpdir(), 'ecoute-')), P = path.join(d, 'parakeet'), v0 = choixEcoute(d, {});
   fs.mkdirSync(P); fs.writeFileSync(path.join(P, 'variante.json'), JSON.stringify({engine: 'sherpa', variante: 'int8'})); const v1 = choixEcoute(d, {});
@@ -508,7 +513,7 @@ try {
     { const flux = async (body, signal) => { const t0 = Date.now(); const r = await fetch(BASE + '/api/sample', {method: 'POST', headers: {'content-type': 'application/json', ...A}, body: JSON.stringify({...body, stream: true}), signal});
         const t = await r.text(); const evs = []; for (const b of t.split('\n\n')) { const m = /^event: (\w+)\ndata: (.*)$/s.exec(b.trim()); if (m) evs.push({ev: m[1], d: JSON.parse(m[2])}); }
         const done = evs.find((e) => e.ev === 'done'), err = evs.find((e) => e.ev === 'error'), deltas = evs.filter((e) => e.ev === 'delta');
-        return {status: r.status, type: r.headers.get('content-type'), deltas: deltas.length, texte: deltas.map((e) => e.d.d).join(''), fin: done ? done.d.text : null, err: err ? err.d.message : null, ms: Date.now() - t0}; };
+        return {status: r.status, type: r.headers.get('content-type'), deltas: deltas.length, texte: deltas.map((e) => e.d.d).join(''), fin: done ? done.d.text : null, modele: done ? done.d.modele : null, err: err ? err.d.message : null, ms: Date.now() - t0}; };
       const pid = (s) => (/processus : (\d+)/.exec(s || '') || [])[1], tour = (s) => +((/tour : (\d+)/.exec(s || '') || [])[1] || 0);
       let f = await flux({input: [{role: 'user', content: 'Explique en clair'}], tier: 'quick'});
       ok('Claude instantané : réponse mot par mot (SSE), même texte à la fin', f.status === 200 && /event-stream/.test(f.type) && f.deltas >= 3 && f.fin && f.texte.trim() === f.fin && /^Tu as dit : Explique en clair\. Session : nouvelle, modèle : haiku/.test(f.fin), JSON.stringify([f.deltas, String(f.fin).slice(0, 80)]));
@@ -541,6 +546,19 @@ try {
       const ph = await call('/api/sample/prepare', {method: 'POST', headers: A, body: JSON.stringify({tier: 'quick', system: SYSP, input: H})});
       const q5 = await flux({conv: true, tier: 'quick', system: SYSP, input: H.concat([{role: 'user', content: 'Nouvelle question'}])});
       ok('Claude instantané : discussion reprise avec son historique : préparée avec lui, la nouvelle question part seule', ph.body.ok && !ph.body.deja && /^Tu as dit : Nouvelle question\. Session : reprise/.test(q5.fin) && tour(q5.fin) === 2, String(q5.fin).slice(0, 90));
+      /* 0.33.0 : « Auto » choisit le modèle d'après la question, et la réponse dit lequel a répondu */
+      const au1 = await flux({input: [{role: 'user', content: 'Quelle heure est-il'}], tier: 'auto'}), au2 = await flux({input: [{role: 'user', content: 'Explique pourquoi le ciel est bleu'}], tier: 'auto'});
+      ok('routeur : « Auto » envoie une question simple à Haiku et une explication à Sonnet ; la réponse dit le modèle', au1.modele === 'haiku' && /modèle : haiku/.test(au1.fin) && au2.modele === 'sonnet' && /modèle : sonnet/.test(au2.fin) && /secours : haiku/.test(au2.fin), JSON.stringify([au1.modele, au2.modele]));
+      /* 0.33.0 : missions en parallèle (deux à la fois), avec leur plan en étapes et ce qu'elles font à l'instant */
+      const pm1 = await call('/api/mission', {method: 'POST', headers: A, body: JSON.stringify({texte: 'planifie la comparaison des assurances habitation'})});
+      const pm2 = await call('/api/mission', {method: 'POST', headers: A, body: JSON.stringify({texte: 'planifie aussi le budget des vacances'})});
+      await new Promise((z) => setTimeout(z, 1300));
+      const acv = await call('/api/activite', {headers: A}), mis = await call('/api/missions', {headers: A});
+      const enc = (acv.body.enCours || []).filter((a) => a.genre === 'mission'), m1 = (mis.body.missions || []).find((x) => x.id === pm1.body.id);
+      ok('missions en parallèle : deux à la fois, chacune avec son plan (3 étapes) et ce qu\'elle fait à l\'instant', pm1.body.ok && pm2.body.ok && enc.length === 2 && acv.body.missions.actives === 2 && enc.every((a) => a.etapes && a.etapes.length === 3 && a.etapes[0].s === 'en cours' && /^Recherche web : « assurance habitation T3/.test(a.etape)) && m1 && m1.status === 'envoyee' && m1.etapes && m1.etapes.length === 3 && /Recherche web/.test(m1.outil), JSON.stringify([enc.map((a) => [a.titre, a.etape, a.etapes && a.etapes.length]), acv.body.missions, m1 && [m1.status, m1.outil]]));
+      await new Promise((z) => setTimeout(z, 3200));
+      const ac2 = await call('/api/activite', {headers: A}), mis2 = await call('/api/missions', {headers: A});
+      ok('missions en parallèle : finies ensemble, gardées dans « récent » de l\'activité', !(ac2.body.enCours || []).some((a) => a.genre === 'mission') && (ac2.body.recent || []).filter((a) => a.genre === 'mission' && a.ok).length >= 2 && (mis2.body.missions || []).filter((x) => [pm1.body.id, pm2.body.id].includes(x.id)).every((x) => x.status === 'terminee' && /Compte rendu planifié/.test(x.result)), JSON.stringify((ac2.body.recent || []).map((a) => [a.genre, a.ok])));
       const st = await call('/api/status', {headers: A});
       ok('Claude instantané : état dans /api/status (questions, reprises, préparées, dernier délai)', st.body.page && st.body.page.questions >= 6 && st.body.page.reprises >= 2 && st.body.page.preparees >= 1 && st.body.page.dernier && st.body.page.dernier.premier != null, JSON.stringify(st.body.page)); }
     let os1 = await fetch(BASE + '/os/?x=1', {redirect: 'manual'}); ok('ancienne adresse /os/ renvoie à la racine', os1.status === 301 && os1.headers.get('location') === '/?x=1');
