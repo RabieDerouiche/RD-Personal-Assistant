@@ -78,9 +78,11 @@ try {
     const vi = await call('/api/voice/install', {method: 'POST', headers: A}); let st = vi.body.state;
     for (let i = 0; i < 30 && st === 'running'; i++) { await new Promise((z) => setTimeout(z, 100)); st = (await call('/api/voice/install', {headers: A})).body.state; }
     ok('installation de la voix lancée par le serveur', vi.status === 200 && st === 'done', st); }
-  r = await call('/api/status', {headers: A}); ok('état de Claude Code', r.status === 200 && r.body.claude.loggedIn === true, JSON.stringify(r.body.claude));
+  { const t0 = Date.now(); r = await call('/api/status', {headers: A}); ok('état de Claude Code (sans attendre la relecture des connecteurs)', r.status === 200 && r.body.claude.loggedIn === true && Date.now() - t0 < 1500, JSON.stringify(r.body.claude) + ' · ' + (Date.now() - t0) + ' ms'); }
   { const d = await call('/api/diag', {headers: A}); ok('diagnostic des connecteurs', d.status === 200 && /claude\.ai Gmail/.test(d.body.mcpList) && d.body.rules.length === 3, d.body.mcpList.split('\n')[0]); }
   { const td = await call('/api/test-data', {method: 'POST', headers: A}); ok('essai réel des données : outils utilisés rapportés', td.body.ok && td.body.used.length === 2 && /prochain événement/.test(td.body.answer), td.body.used.join(', ')); }
+  /* 0.35.0 : la relecture des connecteurs se fait en fond (elle ne retarde plus /api/status) : elle est faite à l'appel suivant */
+  r = await call('/api/status', {headers: A});
   ok('connecteurs relevés sans appel au modèle', r.body.connectors.gmail && r.body.connectors.sheets && r.body.connectors.calendar && r.body.connectors.read === 3, JSON.stringify(r.body.connectors).slice(0, 120));
   let evs = await sse({text: 'Bonjour JARVIS', model: 'rapide'}, tok);
   const done = evs.find((e) => e.ev === 'done');

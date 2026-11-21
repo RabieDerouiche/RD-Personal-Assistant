@@ -46,15 +46,22 @@ export function unpair() { store.settings.serverToken = ''; store.save(); }
 
 export interface Conn { checked: boolean; gmail: boolean; calendar: boolean; sheets: boolean; drive: boolean; read: number }
 export interface Status { ok: boolean; claude?: {installed: boolean; loggedIn: boolean; method: string}; version?: string; commit?: string; connectors?: Conn; grokPauseUntil?: string; tts?: boolean; ecoute?: boolean; version2?: string; timing?: {total: number; first: number | null; tools: number; warm: boolean; model: string} | null; error?: string }
-let last: Status = {ok: false};
+/* 0.35.0 : l'écoute et la voix du serveur, gardées sur l'iPhone d'une ouverture à l'autre. Avant, elles restaient inconnues jusqu'à
+   la réponse de /api/status (plusieurs secondes au lancement) : un appui rapide sur l'orbe donnait la dictée de l'iPhone au lieu
+   de la conversation mains libres (capture du propriétaire, 21/11/2026, « Quelle est la méthode aujourd'hui ? »). */
+const DISPO = 'jarvis.dispo';
+const dispo = (): {ecoute?: boolean; tts?: boolean} => { try { return JSON.parse(localStorage.getItem(DISPO) || '{}') || {}; } catch { return {}; } };
+let last: Status = {ok: false, ...dispo()};
 export const lastStatus = () => last;
 export async function status(): Promise<Status> {
   if (!linked()) return (last = {ok: false, error: 'non relié'});
   try {
     const r = await call('/api/status');
     if (r.status === 401) return (last = {ok: false, error: 'appareil plus reconnu : relie-le de nouveau'});
-    const b = await r.json(); return (last = {ok: true, claude: b.claude, version: b.version, commit: b.commit, connectors: b.connectors, grokPauseUntil: b.grokPauseUntil, tts: !!b.tts, ecoute: !!b.ecoute, timing: b.timing});
-  } catch { return (last = {ok: false, error: 'serveur injoignable'}); }
+    const b = await r.json(); last = {ok: true, claude: b.claude, version: b.version, commit: b.commit, connectors: b.connectors, grokPauseUntil: b.grokPauseUntil, tts: !!b.tts, ecoute: !!b.ecoute, timing: b.timing};
+    try { localStorage.setItem(DISPO, JSON.stringify({ecoute: last.ecoute, tts: last.tts})); } catch { /* rien */ }
+    return last;
+  } catch { return (last = {ok: false, error: 'serveur injoignable', ...dispo()}); }
 }
 
 /* le serveur fait foi pour la mémoire et les missions */
