@@ -9191,20 +9191,25 @@ void main(){
     const lecteur = () => { const a = new Audio(); try { a.src = SILENCE_WAV; a.play().catch(() => {}); } catch (e) { /* rien */ } return a; };
     const jouer = (a, u) => new Promise((fin) => { try { a.onended = a.onerror = () => fin(); a.src = u; a.play().catch(() => fin()); } catch (e) { fin(); } });
     const essai = async (a, nom) => { const u = await JS.voixGoogle.essai(nom); if (typeof u !== 'string') { out.textContent = (u && u.error) || 'Pas de son de Google.'; out.classList.add('is-bad'); return false; } await jouer(a, u); return true; };
+    const jour = (t) => { const q = Object.fromEntries(new Intl.DateTimeFormat('fr-FR', {timeZone: 'Europe/Paris', day: 'numeric', month: 'long', hour: 'numeric', minute: '2-digit'}).formatToParts(new Date(t)).map((x) => [x.type, x.value])); return (q.day === '1' ? '1er' : q.day) + ' ' + q.month + ' à ' + (+q.hour) + ' h' + (q.minute && q.minute !== '00' ? ' ' + q.minute : ''); };
     const qui = () => !st.pret ? 'Pierre parle (gratuit, sur ton serveur). La voix Google, plus naturelle, est gratuite jusqu’à 1 million de caractères par mois :'
       : !st.choisie ? 'Clé Google posée, mais c’est Pierre qui parle : touche « Google » ci-dessous.'
+      : st.coupee ? 'Google coupé : ' + st.coupee + (st.coupure && st.coupure.at ? ' (le ' + jour(st.coupure.at) + ')' : '') + '. Vérifie ta facturation Google Cloud, puis « Relancer Google ».'
       : st.bloque ? 'Google coupé par prudence (compteur illisible) : Pierre parle jusqu’au 1er du mois.'
       : st.pause ? 'Plafond du mois atteint : Pierre parle jusqu’au 1er. Rien de payant.'
       : st.pauseJour ? 'Plafond du jour atteint : Pierre parle jusqu’à demain, par prudence.'
       : st.horsErreurJusqu ? 'Google en erreur : Pierre parle jusqu’à ' + hm(st.horsErreurJusqu) + ' (« Vérifier » le relance).'
       : 'Google parle (' + court(st.nom) + ').';
     const paint = async () => {
-      const kids = [], bon = st.pret && st.choisie && !st.bloque && !st.pause && !st.pauseJour && !st.horsErreurJusqu;
+      const kids = [], bon = st.pret && st.choisie && !st.coupee && !st.bloque && !st.pause && !st.pauseJour && !st.horsErreurJusqu;
       kids.push(h('p', {class: 'voixg-qui' + (st.pret && !bon ? ' is-bad' : ''), text: qui()}));
       if (st.pret) {
         const d = st.derniere;
         kids.push(h('p', {class: 'muted voixg-derniere', text: d ? 'Dernière phrase du serveur : ' + (d.moteur === 'google' ? 'Google (' + court(d.nom) + ')' : 'Pierre') + ', à ' + hm(d.at) + (d.moteur !== 'google' && d.raison ? ' : ' + d.raison : '') + '.' : 'Aucune phrase dite par le serveur depuis son dernier démarrage.'}),
-          h('p', {class: 'muted', text: 'Ce mois : ' + nb(st.caracteres) + ' sur ' + nb(st.plafond) + ' · aujourd’hui : ' + nb(st.aujourdhui) + ' sur ' + nb(st.plafondJour) + '. Compté en octets avant chaque envoi : jamais moins que ce que Google facture (gratuit jusqu’à 1 million).'}));
+          h('p', {class: 'muted', text: 'Ce mois : ' + nb(st.caracteres) + ' sur ' + nb(st.plafond) + ' · aujourd’hui : ' + nb(st.aujourdhui) + ' sur ' + nb(st.plafondJour) + '. Compté en octets avant chaque envoi : jamais moins que ce que Google facture (gratuit jusqu’à 1 million).'}),
+          /* 0.48.0 : la part gratuite, sa remise à zéro, le rythme du mois, et la surveillance des alertes de budget de Google Cloud */
+          h('p', {class: 'muted voixg-remise', text: 'Gratuit : 1 million de caractères par mois civil, remis à zéro le ' + (st.remise ? jour(st.remise) : '1er') + '.' + (st.rythme ? ' À ce rythme, plafond vers le ' + st.rythme + ' (ensuite Pierre).' : '')}),
+          h('p', {class: 'muted voixg-budget', text: st.budget && st.budget.err ? 'Alertes de budget Google Cloud : contrôle impossible (' + st.budget.err + ').' : st.budget && st.budget.at ? 'Alertes de budget Google Cloud : lues à ' + hm(st.budget.at) + ' (toutes les 15 minutes) ; une alerte coupe Google.' : 'Alertes de budget Google Cloud : lues toutes les 15 minutes dans ta boîte mail ; une alerte coupe Google.'}));
         if (st.erreur && (!st.dernierSucces || st.erreur.at > st.dernierSucces.at)) kids.push(h('p', {class: 'voixg-err', text: 'Dernière erreur de Google (' + hm(st.erreur.at) + ') : ' + st.erreur.message}));
       }
       if (JS.setting && JS.setting('voiceEngine') === 'iphone') kids.push(h('p', {class: 'voixg-err', text: '« Voix de JARVIS » (carte JARVIS, plus bas) est sur « Voix de l’iPhone » : ni Pierre ni Google ne parlent. Choisis « Ton serveur ».'}));
@@ -9222,7 +9227,8 @@ void main(){
           if (!r) { out.textContent = 'Serveur injoignable.'; out.classList.add('is-bad'); return; }
           st = Object.assign({}, st, r); out.classList.toggle('is-bad', !r.verifie);
           out.textContent = r.verifie ? 'Google répond : sa voix marche' + (st.choisie ? ', et c’est elle qui parle.' : ', mais Pierre est choisi : touche « Google ».') : 'Google refuse : ' + (r.erreurVerif || 'pas de réponse') + '.'; paint(); }}, 'Vérifier');
-        kids.push(h('div', {class: 'row-actions mem-add'}, sel, ecoute), (vx && vx.erreur) ? h('p', {class: 'muted', text: 'Liste des voix indisponible : ' + vx.erreur}) : null,
+        const relancer = st.coupee ? h('button', {type: 'button', class: 'btn sm', onclick: async () => { relancer.disabled = true; const r = await JS.voixGoogle.relancer(); relancer.disabled = false; if (!r) { out.textContent = 'Serveur injoignable.'; out.classList.add('is-bad'); return; } st = Object.assign({}, st, r); out.classList.remove('is-bad'); out.textContent = 'Google relancé. Une nouvelle alerte de budget le coupera de nouveau.'; paint(); }}, 'Relancer Google') : null;
+        kids.push(relancer, h('div', {class: 'row-actions mem-add'}, sel, ecoute), (vx && vx.erreur) ? h('p', {class: 'muted', text: 'Liste des voix indisponible : ' + vx.erreur}) : null,
           h('div', {class: 'row-actions'}, cons.length > 1 ? comparer : null, verif),
           h('button', {type: 'button', class: 'btn ghost sm', onclick: async () => { const r = await JS.voixGoogle.retirer(); if (r) { st = Object.assign({}, st, r); paint(); out.textContent = 'Clé retirée : Pierre parle.'; } }}, 'Retirer la clé Google'));
       } else {

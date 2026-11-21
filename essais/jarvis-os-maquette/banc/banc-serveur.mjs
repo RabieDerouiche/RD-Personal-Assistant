@@ -167,6 +167,13 @@ try {
     await q.evaluate(() => [...document.querySelectorAll('#voixg-card button')].find((b) => b.textContent === 'Vérifier').click()); await q.waitForTimeout(1500);
     const v2 = await q.evaluate(() => document.getElementById('voixg-card').textContent);
     ok('voix Google : « Vérifier » demande une phrase à Google et le dit', /Google répond : sa voix marche, et c’est elle qui parle\./.test(v2), v2.slice(0, 200));
+    /* 0.48.0 : une alerte de budget de Google Cloud (faux Gmail) coupe Google ; la carte le dit ; « Relancer Google » le relance ; la remise à zéro du 1er est affichée */
+    FG.budget = ['bud-e2e']; const bm = await fetch(BASE + '/api/voix/google/budget/maintenant', {method: 'POST', headers: {authorization: 'Bearer ' + tk, 'content-type': 'application/json'}, body: '{}'}).then((x) => x.json());
+    await q.reload(); await q.waitForTimeout(3500);   /* même adresse : goto ne rechargerait pas la page */
+    const v4 = await q.evaluate(() => document.getElementById('voixg-card').textContent);
+    await q.evaluate(() => { const b = [...document.querySelectorAll('#voixg-card button')].find((x) => x.textContent === 'Relancer Google'); if (b) b.click(); }); await q.waitForTimeout(1500);
+    const v5 = await q.evaluate(() => document.getElementById('voixg-card').textContent); FG.budget = [];
+    ok('voix Google : une alerte de budget de Google Cloud coupe Google et la carte le dit ; « Relancer Google » le relance ; la remise à zéro du 1er est affichée', /Google coupé : alerte de budget de Google Cloud reçue/.test(v4) && /remis à zéro le 1er \S+ à \d+ h/.test(v4) && /Google relancé/.test(v5) && /Google parle \(Charon\)\./.test(v5), JSON.stringify([bm.coupure, bm.budget, v4.slice(0, 240), v5.slice(0, 160)]));
     await q.evaluate(() => [...document.querySelectorAll('#voixg-card .set-seg button')].find((b) => b.textContent === 'Google').click()); await q.waitForTimeout(1000);
     const tv = await fetch(BASE + '/api/tts', {method: 'POST', headers: {authorization: 'Bearer ' + tk, 'content-type': 'application/json'}, body: JSON.stringify({text: 'Bonjour de Google.'})}).then((x) => x.text());
     const sv = await fetch(BASE + '/api/status', {headers: {authorization: 'Bearer ' + tk}}).then((x) => x.json());

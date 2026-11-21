@@ -23,7 +23,7 @@ const fabrique = (nom, o = {}) => {
   fs.writeFileSync(path.join(d, 'cle.json'), JSON.stringify({cle: 'cle-de-test-0123456789'}));
   const A = [], M = {c: o.miroir || null};
   const vg = createVoixGoogle({fichier: path.join(d, 'cle.json'), compteurFichier: path.join(d, 'compteur.json'), base: BASE, plafond: o.plafond || 1000, plafondJour: o.jour || 100000, now: () => T,
-    alerte: (a) => A.push(a.titre), miroir: {lire: () => M.c, ecrire: (c) => { M.c = c; }}});
+    alerte: (a) => { A.push(a.titre); A.textes = (A.textes || []).concat(a.texte); }, miroir: {lire: () => M.c, ecrire: (c) => { M.c = c; }}, coupure: () => o.coupure || null});
   return {vg, A, M, d, sortie: (i) => path.join(d, 'son-' + i + '.wav')};
 };
 try {
@@ -48,7 +48,7 @@ try {
   { const {vg, A, sortie} = fabrique('plafond', {plafond: 100}); let tot = 0, i = 0;
     for (const n of [79, 1, 15, 4, 1, 1]) { const f = await vg.dire('z'.repeat(n), '', sortie(++i)); if (f) tot += n; }
     const e = vg.etat(), n0 = G.synth.length, f = await vg.dire('a', '', sortie(99)), n1 = G.synth.length;
-    ok('plafond du mois : jamais dépassé (100 sur 100 : la dernière phrase qui ne tient pas reste à Pierre), alertes 80 % puis 95 %, puis pause ; plus rien ne part chez Google', tot === 100 && e.caracteres === 100 && A.join('|') === 'Voix Google : 80 % du plafond|Voix Google : 95 % du plafond|Voix Google en pause' && e.pause === true && f === null && n1 === n0, JSON.stringify([tot, e.caracteres, A, e.pause]));
+    ok('plafond du mois : jamais dépassé (100 sur 100 : la dernière phrase qui ne tient pas reste à Pierre), alertes 50 %, 80 % puis 95 %, puis pause ; plus rien ne part chez Google', tot === 100 && e.caracteres === 100 && A.join('|') === 'Voix Google : la moitié du mois|Voix Google : 80 % du plafond|Voix Google : 95 % du plafond|Voix Google en pause' && e.pause === true && f === null && n1 === n0, JSON.stringify([tot, e.caracteres, A, e.pause]));
     T = Date.parse('2026-12-01T07:59:00Z'); const g1 = vg.etat();   /* 23 h 59 le 30 novembre à Los Angeles */
     T = Date.parse('2026-12-01T08:01:00Z'); const g2 = vg.etat(), f2 = await vg.dire('Décembre.', '', sortie(100));   /* 0 h 01 le 1er décembre là-bas */
     ok('mois de facturation de Google (heure du Pacifique) : encore novembre à 8 h 59 à Paris le 1er, puis un nouveau mois', g1.mois === '2026-11' && g1.pause === true && g2.mois === '2026-12' && g2.caracteres === 0 && !!f2, JSON.stringify([g1.mois, g2.mois]));
@@ -77,6 +77,17 @@ try {
   /* 8. Google qui ne répond pas : coupé à 15 s (ici simulé par une erreur), Pierre ensuite */
   { const {vg, sortie} = fabrique('refus'); G.mode = 'refus'; const info = {}; const f = await vg.dire('Bonjour.', '', sortie(1), {info}); G.mode = 'ok'; const e = vg.etat();
     ok('API pas activée (403) : l\'erreur exacte de Google est gardée pour Réglages', f === null && /has not been used in project/.test(e.erreur && e.erreur.message) && /Google 403/.test(info.raison), JSON.stringify(e.erreur)); }
+  /* 10. 0.48.0 : l'alerte de la moitié, avec le jour où le plafond serait atteint au rythme du mois */
+  { const T0 = T; T = Date.parse('2026-11-02T20:00:00Z'); const {vg, A, sortie} = fabrique('moitie', {plafond: 100}); await vg.dire('m'.repeat(50), '', sortie(1)); const e = vg.etat();
+    T = Date.parse('2026-11-21T20:00:00Z'); const b = fabrique('moitie2', {plafond: 100}); await b.vg.dire('n'.repeat(50), '', b.sortie(1)); T = T0;
+    ok('alerte à la moitié du plafond : au rythme du 2 novembre, plafond vers le 4 ; au rythme du 21, pas atteint ce mois-ci', A.join() === 'Voix Google : la moitié du mois' && /plafond vers le 4 /.test(A.textes[0]) && e.rythme === 4 && /ne sera pas atteint ce mois-ci/.test(b.A.textes[0]) && b.vg.etat().rythme === 0, JSON.stringify([A.textes, b.A.textes, e.rythme])); }
+  /* 11. 0.48.0 : la coupure venue de Google Cloud (alerte de budget) : rien ne part, même « Vérifier », jusqu'à la relance */
+  { const {vg, sortie} = fabrique('coupure', {coupure: {raison: 'alerte de budget de Google Cloud reçue'}}); const n0 = G.synth.length, info = {}, info2 = {};
+    const f = await vg.dire('Bonjour.', '', sortie(1), {info}), f2 = await vg.dire('Vérifie.', '', sortie(2), {force: true, info: info2}), e = vg.etat();
+    ok('alerte de budget de Google Cloud : Google coupé (même « Vérifier »), rien ne part, rien n\'est compté', f === null && f2 === null && G.synth.length === n0 && /coupée : alerte de budget/.test(info.raison) && /coupée/.test(info2.raison) && e.coupee === 'alerte de budget de Google Cloud reçue' && e.pause === true && e.caracteres === 0, JSON.stringify([info, info2, e.coupee])); }
+  /* 12. 0.48.0 : la remise à zéro de la part gratuite : le 1er à minuit à Los Angeles */
+  { const T0 = T, {vg} = fabrique('remise'); const r1 = vg.etat().remise; T = Date.parse('2026-07-10T12:00:00Z'); const r2 = vg.etat().remise; T = Date.parse('2026-12-31T23:00:00Z'); const r3 = vg.etat().remise; T = T0;
+    ok('remise à zéro : 1er décembre 2026 à 9 h à Paris (minuit à Los Angeles), 1er août à 9 h (heures d\'été des deux côtés), 1er janvier 2027', r1 === Date.parse('2026-12-01T08:00:00Z') && r2 === Date.parse('2026-08-01T07:00:00Z') && r3 === Date.parse('2027-01-01T08:00:00Z'), JSON.stringify([new Date(r1), new Date(r2), new Date(r3)])); }
   /* 9. les voix conseillées, et la diction de son nom */
   { const {vg} = fabrique('voix'); const v = await vg.voix();
     ok('voix : les conseillées pour JARVIS sont marquées (Charon, Iapetus, Algieba, Orus)', v.filter((x) => x.conseillee).map((x) => x.court).sort().join(',') === [...VOIX_CONSEILLEES].sort().join(',') && v.find((x) => x.court === 'Aoede').conseillee === false, JSON.stringify(v)); }
