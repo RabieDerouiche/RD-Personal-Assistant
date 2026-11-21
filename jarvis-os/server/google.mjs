@@ -195,6 +195,7 @@ export function createGoogle({S, save, log = () => {}}) {
         const q = new URLSearchParams({q: i.query || '', maxResults: String(Math.min(+i.pageSize || 20, 100))});
         const j = await api('GET', `${URLS.gmail}/users/me/threads?${q}`);
         if (!(j.threads || []).length) return {};
+        if (i.idsOnly) return {threads: j.threads.map((t) => ({id: t.id, historyId: t.historyId}))};   /* 0.46.0 (Radar) : sans les en-têtes, 10 unités au lieu de 10 par fil */
         const meta = ['From', 'To', 'Subject', 'Date'].map((h) => 'metadataHeaders=' + h).join('&');
         const threads = await pool(j.threads, 8, async (t) => { const x = await api('GET', `${URLS.gmail}/users/me/threads/${enc(t.id)}?format=metadata&${meta}`); const ms = (x.messages || []).map((m) => mailMsg(m, false)); return {id: x.id, messageCount: ms.length, messages: ms, viewUrl: 'https://mail.google.com/mail/#all/' + x.id}; });
         return {threads};
