@@ -89,6 +89,9 @@ function answer(raw) {
   if (/rapport/i.test(input)) return {text: 'Claude va préparer ce rapport, la mission attend ton accord.\nMISSIONS: [{"agent":"claude","text":"préparer un rapport sur la veille .NET"}]'};
   /* discussion de la page sur le serveur : propositions en fin de réponse (⟦outil …⟧), seulement si la consigne décrit les outils */
   const lastQ = input.split('Lui : ').pop(), sys = (opt('--append-system-prompt') || '') + '\n' + (opt('--system-prompt') || '') + '\n' + FIRST;
+  /* 0.37.0 : la mémoire durable — ce qu'il reçoit dans sa consigne, et la proposition de retenir (si l'outil est décrit) */
+  if (/que retiens-tu/i.test(lastQ)) return {text: 'Je retiens : ' + (/- Préfère les vols directs/.test(sys) ? 'vols directs' : 'rien') + ' ; Profil : ' + (/Végétarien le lundi/.test(sys) ? 'lu' : 'non lu') + ' ; finances : ' + (/plafond de dépenses/.test(sys) ? 'présentes' : 'absentes') + '.'};
+  if (/retiens que/i.test(lastQ)) return {text: /outil retenir|- retenir :/.test(sys) ? 'Je te propose de le retenir.\n⟦outil retenir {"fait":"Préfère le train pour aller à Lyon"}⟧' : 'Pas d’outil pour retenir.'};
   if (/relance demain pour Iris/.test(lastQ)) return {text: /programmer_relance/.test(sys) ? 'Je te propose une relance : elle attend ton bouton.\n⟦outil programmer_relance {"quand":"' + demain + 'T09:00","quoi":"Voir si Iris a répondu au syndic","ligne":2}⟧' : 'Pas d’outil de relance.'};
   /* 0.34.0 : réponses illustrées — montre la première demande des données reçues (son titre exact), si l'outil est décrit */
   if (/montre-moi/i.test(lastQ)) { const t = (/"demandes_a_rabie":\[\{"bot":"[^"]*","titre":"([^"]+)"/.exec(sys) || [])[1]; return {text: /outil montrer|- montrer :/.test(sys) && t ? 'Voici la demande qui t’attend.\n⟦outil montrer {"titre":' + JSON.stringify(t) + ',"type":"demande"}⟧\n⟦outil montrer {"titre":"Élément qui n’existe pas"}⟧' : 'Pas d’outil montrer (' + (t || 'aucune demande') + ').'}; }

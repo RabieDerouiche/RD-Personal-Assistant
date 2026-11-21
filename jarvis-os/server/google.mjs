@@ -140,6 +140,15 @@ export function createGoogle({S, save, log = () => {}}) {
     return j;
   }
   const enc = encodeURIComponent;
+  /* 0.37.0 : une réponse en texte (l'export d'un Google Doc) */
+  async function apiText(url, retry = true) {
+    const t = await token();
+    const r = await fetch(url, {headers: {authorization: 'Bearer ' + t}});
+    if (r.status === 401 && retry) { access = {token: '', exp: 0}; return apiText(url, false); }
+    const tx = await r.text();
+    if (!r.ok) throw new ToolError(r.status === 401 ? 'needs_reauth' : 'tool_error', 'HTTP ' + r.status, r.status);
+    return tx;
+  }
 
   /* ---------- les outils de la page, un par un ---------- */
   const SEARCH_CACHE = new Map();
@@ -204,6 +213,15 @@ export function createGoogle({S, save, log = () => {}}) {
       unlabel_thread: (i) => api('POST', `${URLS.gmail}/users/me/threads/${enc(i.threadId)}/modify`, {removeLabelIds: [].concat(i.labelIds || [])})
     },
     'Google Drive': {
+      /* 0.37.0 : un Google Doc par son nom dans un dossier (le Profil), en lecture seule : le plus récent de ce nom, exporté en HTML */
+      doc_html: async (i) => {
+        const qs = (v) => "'" + String(v).replace(/\\/g, '\\\\').replace(/'/g, "\\'") + "'";
+        const p = new URLSearchParams({q: `name = ${qs(i.name)} and ${qs(i.parent)} in parents and trashed = false and mimeType = 'application/vnd.google-apps.document'`, orderBy: 'modifiedTime desc', pageSize: '5', fields: 'files(id,name,modifiedTime)'});
+        const j = await api('GET', `${URLS.drive}/files?${p}`), docs = j.files || [];
+        if (!docs.length) return {found: false};
+        const f = docs.slice().sort((a, b) => String(b.modifiedTime || '').localeCompare(String(a.modifiedTime || '')))[0];
+        return {found: true, id: f.id, modifiedTime: f.modifiedTime || '', doublons: docs.length - 1, html: await apiText(`${URLS.drive}/files/${enc(f.id)}/export?mimeType=text%2Fhtml`)};
+      },
       /* JARVIS OS (16/11/2026) : l'arborescence complète de dossiers (Papiers), en lecture seule et en peu d'appels :
          les dossiers niveau par niveau, puis les fichiers par lots de 40 dossiers parents. Une racine se donne par id, ou par nom et parent ('root' = Mon Drive). */
       /* JARVIS OS (17/11/2026) : chercher dans le TEXTE des documents (Google lit le texte des PDF et des photos), limité à l'arborescence des racines

@@ -187,6 +187,13 @@
     missions: () => req('/api/missions').then((r) => (r.status === 200 ? r.j.missions : null)).catch(() => null),
     /* 0.33.0 : ce que fait Claude à l'instant (missions, Siri, tour, discussion), avec l'outil utilisé et le plan d'une mission */
     activite: () => req('/api/activite').then((r) => (r.status === 200 ? r.j : null)).catch(() => null),
+    /* 0.37.0 : la mémoire durable (ce qu'il a demandé de retenir, et l'état de son Profil) */
+    memoire: {
+      liste: () => req('/api/memoire').then((r) => (r.status === 200 ? r.j : null)).catch(() => null),
+      ajouter: (texte, source) => req('/api/memoire', {texte, source}).then((r) => r.j).catch(() => ({ok: false, error: 'Serveur injoignable.'})),
+      effacer: (id) => req('/api/memoire/efface', {id}).then((r) => (r.status === 200 ? r.j : null)).catch(() => null),
+      profil: () => req('/api/memoire/profil', {}).then((r) => (r.status === 200 ? r.j : null)).catch(() => null)
+    },
     /* 0.36.0 : réponse instantanée du serveur, sans IA (heure, date, météo, agenda, ce qui t'attend, un bot), ou null : Claude répond */
     rapide: (text, pos) => req('/api/rapide', Object.assign({text}, pos && isFinite(pos.lat) && isFinite(pos.lon) ? {lat: pos.lat, lon: pos.lon} : {})).then((r) => (r.status === 200 && r.j && r.j.reply ? r.j : null)).catch(() => null),
     /* tour de Claude (0.15.0) : réglage, dernier tour, tour immédiat */
