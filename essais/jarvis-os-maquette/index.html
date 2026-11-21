@@ -4210,13 +4210,123 @@ void main(){
     draw();
   };
 
+  /* ================= JARVIS OS, Radar (maquette du 21/11/2026 ; choix QCM du propriétaire : « Radar », sur le plan du même jour) =================
+     Rubrique « Argent » : ce qui va être prélevé (renouvellements, fins de contrat et d'essai), les alertes (hausse, essai qui devient
+     payant, paiement échoué, achat sur la facture mobile, montant inhabituel), les abonnements, le total du mois par poste et le conseil
+     Navigo du mois suivant. Sur le serveur, ces données viendront des mails, lus chaque matin sans Claude ; les montants resteront sur
+     le serveur, jamais dans Pilotage ni chez les bots. En maquette : données d'exemple (window.__RADAR, donnees-fictives.js).
+     En mode serveur, la rubrique n'apparaît que si le serveur sait répondre (JarvisServeur.radar) : l'app en service ne change pas avant. */
+  ICONS.euro = '<path d="M16.5 7.2A6 6 0 1 0 16.5 16.8"/><path d="M5 10.5h8.5M5 13.5h8.5"/>';
+  ICONS.metro = '<rect x="6" y="3.5" width="12" height="13" rx="3"/><path d="M6 11h12M9 20.5l1.5-4M15 20.5l-1.5-4"/>';
+  const RAD = {data: null, loading: false, f: 'avenir', vu: new Set(), garde: new Set()};
+  try { JSON.parse(localStorage.getItem('jarvis.radar.vu') || '[]').forEach((k) => RAD.vu.add(k)); JSON.parse(localStorage.getItem('jarvis.radar.garde') || '[]').forEach((k) => RAD.garde.add(k)); } catch (e) { /* rien */ }
+  const radAPI = () => (SRV_OS && window.JarvisServeur && window.JarvisServeur.radar ? window.JarvisServeur : null);
+  const radOn = () => (SRV_OS ? !!radAPI() : !!window.__RADAR);
+  const radSave = () => { try { localStorage.setItem('jarvis.radar.vu', JSON.stringify([...RAD.vu])); localStorage.setItem('jarvis.radar.garde', JSON.stringify([...RAD.garde])); } catch (e) { /* rien */ } };
+  function radLoad() {
+    const JS = radAPI();
+    if (!JS) { if (!RAD.data) RAD.data = window.__RADAR || null; return; }
+    if (RAD.loading) return; RAD.loading = true;
+    JS.radar().then((r) => { RAD.loading = false; if (r) { RAD.data = r; if (TAB === 'argent') renderView(true); } }).catch(() => { RAD.loading = false; });
+  }
+  const radEur = (n) => (n == null || isNaN(n) ? '' : Number(n).toLocaleString('fr-FR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' €');
+  const radDay = (iso) => { const d = new Date(iso + 'T12:00:00'), t = new Date(); t.setHours(12, 0, 0, 0); return Math.round((d - t) / 864e5); };
+  const radWhen = (n) => (n === 0 ? "aujourd'hui" : n === 1 ? 'demain' : n < 0 ? 'il y a ' + (-n) + ' j' : 'dans ' + n + ' j');
+  const radDate = (iso) => { const d = new Date(String(iso).slice(0, 10) + 'T12:00:00'); return pad2(d.getDate()) + '/' + pad2(d.getMonth() + 1); };
+  const radPct = (a, b) => (a && b ? Math.round((a - b) / b * 100) : null);
+  const radLu = (iso) => { if (!iso) return 'jamais'; const d = new Date(iso), n = Math.round((new Date(d.getFullYear(), d.getMonth(), d.getDate()) - new Date(TODAY.getFullYear(), TODAY.getMonth(), TODAY.getDate())) / 864e5);
+    return (n === 0 ? "aujourd'hui" : n === -1 ? 'hier' : 'le ' + radDate(iso)) + ' à ' + d.getHours() + 'h' + pad2(d.getMinutes()); };
+  const RAD_T = {renouvellement: 'Renouvellement', fin: 'Fin de contrat', hausse: 'Hausse', essai: 'Fin d’essai', echeance: 'Échéance'};
+  const RAD_A = {hausse: ['Hausse de prix', 'percent'], essai: ['Essai qui devient payant', 'hourglass'], echec: ['Paiement échoué', 'x'], facture_mobile: ['Achat sur la facture mobile', 'inbox'], inhabituel: ['Montant inhabituel', 'pulse']};
+  const RAD_K = {mensuel: 12, annuel: 1, trimestriel: 4, hebdomadaire: 52};
+  function radAsk(q) { openChat('claude', 'hydra', 'equipe', 'equipe'); const ta = $('chat-in'); if (ta) { ta.value = q; try { ta.focus(); } catch (e) { /* rien */ } } }
+  function radDue(x) {
+    const up = x.avant ? radPct(x.montant, x.avant) : null, kept = RAD.garde.has(x.k);
+    return h('article', {class: 'card item ech rad-due' + (x.n <= 7 ? ' is-soon' : '') + (kept ? ' is-kept' : '')},
+      h('div', {class: 'ech-date'}, h('b', {text: radDate(x.date)}), h('span', {text: radWhen(x.n)})),
+      h('div', {class: 'ech-main'},
+        h('span', {class: 'nature', text: (RAD_T[x.type] || 'Prélèvement') + (x.rythme ? ' · ' + x.rythme : '') + (kept ? ' · gardé' : '')}),
+        h('h3', {class: 'item-title', text: x.service}),
+        h('p', {class: 'rad-amt'}, h('b', {text: x.montant != null ? radEur(x.montant) : 'montant à venir'}), up ? h('span', {class: 'rad-up', text: (up > 0 ? '+' : '') + up + ' % (avant : ' + radEur(x.avant) + ')'}) : null),
+        x.note ? h('p', {class: 'item-why', text: x.note}) : null,
+        h('div', {class: 'row-actions'},
+          kept ? btn('Ne plus garder', () => { RAD.garde.delete(x.k); radSave(); renderView(true); }, 'sm') : btn('Je garde', () => { RAD.garde.add(x.k); radSave(); toast('Gardé', x.service + ' : plus de rappel avant le ' + radDate(x.date) + '.'); renderView(true); }, 'sm', 'check'),
+          btn('Comparer avec Claude', () => radAsk('Compare pour moi « ' + x.service + ' » (' + (x.montant != null ? radEur(x.montant) : 'montant inconnu') + (x.rythme ? ', ' + x.rythme : '') + ') avec ce qui existe aujourd’hui en France, en total TTC, et dis-moi s’il vaut mieux garder, changer ou résilier avant le ' + radDate(x.date) + '.'), 'sm', 'chat'),
+          btn('Résilier', () => toast(SRV_OS ? 'Résiliation' : 'Maquette', 'Sur ton serveur, ce bouton ouvrira la page de résiliation du service ou préparera un brouillon de lettre dans Gmail. Rien ne part sans toi.'), 'sm'))));
+  }
+  function radAlert(x) {
+    const t = RAD_A[x.type] || ['Alerte', 'pulse'];
+    return h('article', {class: 'card item rad-alert is-' + x.type},
+      h('div', {class: 'rad-al-h'}, h('span', {class: 'hm-ic', html: icon(t[1], 17)}), h('div', {class: 'hm-tx'}, h('b', {text: x.titre || t[0]}), h('small', {text: x.service + ' · ' + radDate(x.date)}))),
+      h('p', {class: 'rad-amt'}, h('b', {text: radEur(x.montant)}), x.avant ? h('span', {class: 'rad-up', text: 'avant : ' + radEur(x.avant)}) : null),
+      x.texte ? h('p', {class: 'item-why', text: x.texte}) : null,
+      h('div', {class: 'row-actions'}, btn('Vu', () => { RAD.vu.add(x.k); radSave(); renderView(true); }, 'sm', 'check'),
+        btn('Demander à Claude', () => radAsk('Le Radar signale : ' + (x.titre || t[0]) + ' pour « ' + x.service + ' » (' + radEur(x.montant) + '). ' + (x.texte || '') + ' Que dois-je faire ?'), 'sm', 'chat')));
+  }
+  function radAbos(ab) {
+    const yr = (x) => (x.prix || 0) * (RAD_K[x.rythme] || 12), tot = ab.reduce((s, x) => s + yr(x), 0), cats = [...new Set(ab.map((x) => x.cat || 'Autres'))];
+    return h('div', {class: 'stack'},
+      h('p', {class: 'lead rad-tot', text: ab.length + ' abonnements : ' + radEur(tot) + ' par an, soit ' + radEur(tot / 12) + ' par mois.'}),
+      cats.map((c) => { const lst = ab.filter((x) => (x.cat || 'Autres') === c);
+        return panel(c, h('span', {class: 'aside', text: radEur(lst.reduce((s, x) => s + yr(x), 0)) + ' par an'}), lst.map((x) => h('div', {class: 'hm-row rad-abo'},
+          h('span', {class: 'hm-tx'}, h('b', {text: x.service}), h('small', {text: radEur(x.prix) + (x.rythme === 'annuel' ? ' par an' : ' par mois') + (x.depuis ? ' · depuis ' + x.depuis : '') + (x.hausse ? ' · ' + x.hausse : '')})),
+          h('span', {class: 'rad-yr', text: radEur(yr(x)) + ' par an'})))); }));
+  }
+  function radMois(m) {
+    const max = Math.max(1, ...m.postes.map((p) => p.montant || 0));
+    return h('div', {class: 'stack'},
+      h('p', {class: 'lead', text: (m.libelle ? 'En ' + m.libelle + ' : ' : '') + radEur(m.total) + (m.precedent ? ', contre ' + radEur(m.precedent) + (m.precedentLibelle ? ' en ' + m.precedentLibelle : ' le mois précédent') : '') + '.'}),
+      m.postes.map((p) => h('div', {class: 'rad-bar'}, h('div', {class: 'rad-bar-h'}, h('b', {text: p.label}), h('span', {text: radEur(p.montant)})),
+        h('div', {class: 'rad-bar-t'}, h('i', {style: 'width:' + Math.max(2, Math.round((p.montant || 0) / max * 100)) + '%'})),
+        h('small', {class: 'muted', text: p.note || (p.n ? p.n + (p.n > 1 ? ' paiements' : ' paiement') : '')}))),
+      h('p', {class: 'muted', text: 'Seuls les paiements annoncés par un mail sont comptés : pas les achats par carte en magasin.'}));
+  }
+  function radNavigo(nv) {
+    const mo = nv.conseil === 'mois';
+    return h('section', {class: 'card rad-nav' + (mo ? ' is-mois' : '')}, h('span', {class: 'hm-ic', html: icon('metro', 18)}),
+      h('div', {class: 'hm-tx'}, h('b', {text: 'Navigo de ' + nv.mois + ' : ' + (mo ? 'prends le Navigo Mois' : 'reste en Liberté+')}),
+        h('small', {text: nv.texte || ((nv.joursSite != null ? nv.joursSite + ' jours sur site prévus. ' : '') + 'Liberté+ estimé : ' + radEur(nv.liberte) + ' ; Navigo Mois : ' + radEur(nv.moisNet) + ' après le remboursement de 50 %.')})));
+  }
+  document.head.append(h('style', {text: '.rad-hero .rad-coin{flex:0 0 58px;height:58px;border-radius:18px;display:grid;place-items:center;color:var(--accent);border:1px solid var(--line);background:var(--glass)}'
+    + '.rad-hero{margin-bottom:0}.rad-hero p{margin:4px 0 8px;color:var(--muted);font-size:13.5px}.rad-seg{display:flex;max-width:100%;overflow-x:auto;scrollbar-width:none;margin:0;box-sizing:border-box}.rad-seg::-webkit-scrollbar{display:none}.rad-seg button{flex:0 0 auto;padding:0 12px}'
+    + '.rad-amt{margin:2px 0;display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}.rad-amt b{font:600 17px var(--display)}.rad-up{font:600 12.5px var(--sans);color:#fde68a}'
+    + '.rad-due.is-soon .ech-date b{color:#fde68a}.rad-due.is-kept{opacity:.72}.rad-al-h{display:flex;gap:10px;align-items:center}'
+    + '.rad-alert.is-echec .hm-ic,.rad-alert.is-facture_mobile .hm-ic{color:#fda4af;border-color:rgba(253,164,175,.45)}.rad-alert.is-hausse .hm-ic,.rad-alert.is-essai .hm-ic,.rad-alert.is-inhabituel .hm-ic{color:#fde68a;border-color:rgba(var(--warn),.45)}'
+    + '.rad-abo{box-sizing:border-box}.rad-abo .rad-yr{font:600 13px var(--sans);color:var(--muted);white-space:nowrap}.rad-bar{display:flex;flex-direction:column;gap:6px;padding:10px 12px;border:1px solid var(--line);border-radius:16px;background:var(--glass)}'
+    + '.rad-bar-h{display:flex;justify-content:space-between;gap:10px;font-size:14px}.rad-bar-h b{font-weight:600;min-width:0}.rad-bar-h span{color:var(--muted);white-space:nowrap}'
+    + '.rad-bar-t{height:8px;border-radius:99px;background:rgba(var(--c1),.12);overflow:hidden}.rad-bar-t i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,rgb(var(--c1)),rgb(var(--c3)))}'
+    + '.rad-nav{display:flex;gap:12px;align-items:center;padding:12px 14px;margin:0;border:1px solid var(--line);background:var(--glass)}.rad-nav.is-mois{border-color:rgba(var(--c5),.55)}.rad-foot{margin-top:14px;font-size:12.5px}'}));
+  TITLES.argent = 'Argent';
+  TABS.push({id: 'argent', label: 'Argent', ic: 'euro'});
+  VIEWS.argent = (el) => {
+    radLoad();
+    const d = RAD.data;
+    if (!d) { el.append(emptyState(radAPI() ? 'Lecture de tes mails en cours…' : 'Le Radar n’est pas encore branché sur ton serveur.')); return; }
+    const av = (d.avenir || []).map((x) => Object.assign({n: radDay(x.date), k: 'av:' + x.service + ':' + x.date}, x)).filter((x) => x.n >= -1 && x.n <= 60).sort((a, b) => a.n - b.n);
+    const al = (d.alertes || []).map((x) => Object.assign({k: 'al:' + x.type + ':' + x.service + ':' + x.date}, x)).filter((x) => !RAD.vu.has(x.k));
+    const ab = d.abonnements || [], m = d.mois || {total: 0, postes: []}, pct = radPct(m.total, m.precedent), soon = av.filter((x) => x.n <= 7 && !RAD.garde.has(x.k));
+    el.append(h('section', {class: 'card shop-hero rad-hero'}, h('span', {class: 'rad-coin', html: icon('euro', 30)}),
+      h('div', {}, h('b', {text: 'Ce mois-ci : ' + radEur(m.total)}),
+        h('p', {text: (pct == null ? '' : (pct > 0 ? '+' : '') + pct + ' % par rapport à ' + (m.precedentLibelle || 'le mois dernier') + '. ') + (soon.length ? soon.length + (soon.length > 1 ? ' prélèvements' : ' prélèvement') + ' dans les 7 jours.' : 'Rien de prélevé dans les 7 jours.')}),
+        h('div', {class: 'mchips'}, h('span', {class: 'mchip' + (al.length ? ' is-amber' : ''), text: al.length + (al.length > 1 ? ' alertes' : ' alerte')}), h('span', {class: 'mchip', text: av.length + ' à venir sur 60 jours'}), h('span', {class: 'mchip', text: 'lu ' + radLu(d.maj)})))));
+    if (d.navigo) el.append(radNavigo(d.navigo));
+    const segs = [['avenir', 'À venir (' + av.length + ')'], ['alertes', 'Alertes (' + al.length + ')'], ['abos', 'Abonnements (' + ab.length + ')'], ['mois', 'Le mois']];
+    el.append(h('div', {class: 'seg rad-seg', role: 'group', 'aria-label': 'Radar'}, segs.map(([k, l]) => h('button', {type: 'button', 'aria-pressed': String(RAD.f === k), onclick: () => { RAD.f = k; renderView(true); }}, l))));
+    if (RAD.f === 'avenir') el.append(av.length ? h('div', {class: 'stack'}, av.map(radDue)) : emptyState('Rien à prélever dans les 60 jours.'));
+    if (RAD.f === 'alertes') el.append(al.length ? h('div', {class: 'stack'}, al.map(radAlert)) : emptyState('Aucune alerte. Le Radar te prévient dès qu’un mail en annonce une.'));
+    if (RAD.f === 'abos') el.append(radAbos(ab));
+    if (RAD.f === 'mois') el.append(radMois(m));
+    el.append(h('p', {class: 'muted rad-foot', text: SRV_OS ? 'Lu dans tes mails par ton serveur, chaque matin à 6 h 50. Les montants restent sur le serveur : jamais dans Pilotage, ni chez les bots.' : 'Maquette : données d’exemple. Sur ton serveur, le Radar lira tes mails chaque matin à 6 h 50, sans Claude ; les montants resteront sur le serveur, jamais dans Pilotage ni chez les bots.'}));
+  };
+
   function boot() {
     const nav = $('tabs');
     /* JARVIS OS : barre à tes 4 favoris, l'orbe au centre ; la poignée (ou un geste vers le haut) montre toutes les rubriques */
     /* ordre du 16/11/2026 : le quotidien d'abord (accueil, ce qui attend sa réponse, agenda, ce qui est en cours), puis les domaines, puis l'équipe et les réglages */
     ICONS.home = '<path d="M4 11.5 12 5l8 6.5"/><path d="M6.5 10v9.5h11V10"/><path d="M10 19.5v-5h4v5"/>';
     const ALL = [['accueil', 'Accueil', 'home'], ['demandes', 'Pour moi', 'chat'], ['agenda', 'Agenda', 'cal'], ['suivi', 'Suivi', 'folder'], ['achats', 'Achats', 'tag'], ['voyages', 'Voyages', 'plane'], ['sorties', 'Sorties', 'map'], ['papiers', 'Papiers', 'doc'], ['equipe', 'Équipe', 'pulse'], ['automatisations', 'Automatisations', 'clock'], ['reglages', 'Réglages', 'gear']];
-    const FAV0 = ['accueil', 'demandes', 'agenda', 'achats'];
+    if (radOn()) ALL.splice(ALL.findIndex((a) => a[0] === 'equipe'), 0, ['argent', 'Argent', 'euro']); /* Radar (maquette du 21/11/2026) */
+    const FAV0 =['accueil', 'demandes', 'agenda', 'achats'];
     let FAV = null; try { FAV = JSON.parse(localStorage.getItem('jarvis.fav')); if (localStorage.getItem('jarvis.fav.v') !== '2') { FAV = null; localStorage.setItem('jarvis.fav.v', '2'); } } catch (e) { /* rien */ }
     if (!Array.isArray(FAV) || FAV.length !== 4 || FAV.some((f) => !ALL.find((a) => a[0] === f))) FAV = FAV0.slice();
     const sheet = h('div', {class: 'all-sheet', hidden: true, role: 'dialog', 'aria-label': 'Toutes les rubriques'});

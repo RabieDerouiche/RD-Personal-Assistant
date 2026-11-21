@@ -442,6 +442,41 @@
       presque: [Object.assign(PROP('Maison lumineuse Étoile', 'Kidoria', 69.9, 'Grande Enseigne', 'dès 3 ans', 'Éclairage LED dans chaque pièce, très demandé à cet âge.', ['Lumières LED', 'Bois solide'], ['Piles non fournies'], 8.3, 7.4, house('#fbcfe8', '#be185d')), {ecart: '10 € au-dessus'})],
       pistes: [{texte: 'Monte le maximum à 70 € : la maison lumineuse Étoile entre', idee: '', min: null, max: 70}, {texte: 'Cherche plutôt une maison en tissu, plus légère', idee: 'maison de poupée en tissu', min: null, max: null}],
       hors_budget: 1, certitude: 'likely', sources: ['https://example.org/guide-jouets-3-ans', 'https://example.org/tests-maisons']}}];
+  /* Radar (maquette du 21/11/2026) : ce que le serveur tirera des mails (prélèvements à venir, alertes, abonnements, total du mois,
+     conseil Navigo). Tout est inventé : aucun service ni montant réel du propriétaire (dépôt public). */
+  const rIso = (n) => { const d = D(n); return d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate()); };
+  const rMoisL = (k) => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() + k); return d.toLocaleDateString('fr-FR', {month: 'long', year: 'numeric'}); };
+  window.__RADAR = {maj: (() => { const d = new Date(); d.setHours(6, 50, 0, 0); return d.toISOString(); })(),
+    mois: {libelle: rMoisL(0), precedentLibelle: rMoisL(-1), total: 641.37, precedent: 598.20, postes: [
+      {id: 'contrats', label: 'Contrats : box, mobile, énergie, assurance', montant: 251.43, n: 5},
+      {id: 'repas', label: 'Repas livrés', montant: 211.60, n: 10, note: '10 commandes, 21,16 € en moyenne'},
+      {id: 'achats', label: 'Achats en ligne', montant: 62.75, n: 4},
+      {id: 'abonnements', label: 'Abonnements', montant: 61.47, n: 6},
+      {id: 'transport', label: 'Transport', montant: 54.12, n: 1}]},
+    avenir: [
+      {date: rIso(41), service: 'Plateforme d’animation', montant: 69.99, avant: 59.99, type: 'hausse', rythme: 'annuel', note: 'Hausse annoncée par mail ; elle s’applique au renouvellement.'},
+      {date: rIso(3), service: 'Console de jeux, abonnement en ligne', montant: 79.99, avant: 59.99, type: 'renouvellement', rythme: 'annuel', note: 'Payé 59,99 € l’an dernier en promotion : le prix normal revient.'},
+      {date: rIso(6), service: 'Assistant IA', montant: 21.60, type: 'renouvellement', rythme: 'mensuel', note: 'Passé en note de frais chaque mois.'},
+      {date: rIso(24), service: 'Appli de notes', montant: 7.99, type: 'essai', rythme: 'mensuel', note: 'Fin de l’essai gratuit : premier prélèvement si rien n’est fait.'},
+      {date: rIso(12), service: 'Stockage photos', montant: 2.99, type: 'renouvellement', rythme: 'mensuel'},
+      {date: rIso(55), service: 'Assurance auto', montant: null, type: 'fin', rythme: 'annuel', note: 'Échéance du contrat : un comparatif peut être prêt un mois avant.'}],
+    alertes: [
+      {date: rIso(-2), type: 'facture_mobile', titre: 'Achat payé par la facture mobile', service: 'Forfait mobile', montant: 24.99, texte: 'L’opérateur ne nomme pas le marchand : regarde le détail de la facture.'},
+      {date: rIso(-6), type: 'echec', titre: 'Paiement échoué', service: 'Plateforme vidéo', montant: 9.99, texte: '3 tentatives : l’abonnement s’arrête si le moyen de paiement n’est pas mis à jour.'},
+      {date: rIso(-9), type: 'essai', titre: 'Essai gratuit qui devient payant', service: 'Appli de notes', montant: 7.99, texte: 'Premier prélèvement dans 24 jours.'},
+      {date: rIso(-21), type: 'hausse', titre: 'Hausse de prix', service: 'Plateforme d’animation', montant: 69.99, avant: 59.99, texte: 'À partir du prochain renouvellement.'},
+      {date: rIso(-33), type: 'inhabituel', titre: 'Facture deux fois plus haute que d’habitude', service: 'Forfait mobile', montant: 37.98, avant: 12.99, texte: 'Habituellement 12,99 € par mois.'}],
+    abonnements: [
+      {service: 'Plateforme vidéo', cat: 'Vidéo et musique', prix: 9.99, rythme: 'mensuel', depuis: '03/2023'},
+      {service: 'Plateforme d’animation', cat: 'Vidéo et musique', prix: 59.99, rythme: 'annuel', depuis: '01/2022', hausse: 'passe à 69,99 €'},
+      {service: 'Musique en famille', cat: 'Vidéo et musique', prix: 17.99, rythme: 'mensuel', depuis: '05/2025'},
+      {service: 'Console de jeux, abonnement en ligne', cat: 'Jeux', prix: 79.99, rythme: 'annuel', depuis: '11/2025'},
+      {service: 'Stockage photos', cat: 'Services en ligne', prix: 2.99, rythme: 'mensuel', depuis: '02/2022'},
+      {service: 'Assistant IA', cat: 'Services en ligne', prix: 21.60, rythme: 'mensuel', depuis: '02/2026'},
+      {service: 'VPN', cat: 'Services en ligne', prix: 89.00, rythme: 'annuel', depuis: '08/2021', hausse: '2 ans prépayés'},
+      {service: 'Livraison de repas, abonnement', cat: 'Livraison', prix: 5.99, rythme: 'mensuel', depuis: '05/2023'},
+      {service: 'Achats en ligne, livraison rapide', cat: 'Livraison', prix: 59.90, rythme: 'annuel', depuis: '2018'}],
+    navigo: {mois: rMoisL(1), conseil: 'liberte', joursSite: 9, liberte: 36.72, moisNet: 45.40, texte: '9 jours sur site prévus, avec une semaine de congés : reste en Liberté+ (environ 36,72 €). Le Navigo Mois coûterait 45,40 € après le remboursement de 50 %.'}};
   /* 0.23.0 : la météo de l'accueil (en vrai : Open-Meteo, à la position de l'iPhone) */
   window.__METEO = {current: {temperature_2m: 9.4, apparent_temperature: 6.2, weather_code: 3}, daily: {time: [fr(D(0)), fr(D(1))], weather_code: [3, 61], temperature_2m_min: [4, 2], temperature_2m_max: [11, 7], precipitation_probability_max: [10, 70]}};
   window.__G = G; window.__MAIL = MAIL; window.__CAL = CAL;
