@@ -98,6 +98,21 @@ try {
     const pg = (await fetch(BASE + '/api/status', {headers: {authorization: 'Bearer ' + tk3}}).then((x) => x.json())).page || {};
     ok('Claude instantané : après « Arrêter », la question suivante repart sur un Claude neuf (avec les données et l\'historique) et reçoit sa réponse', r3.length > 10 && !/Je réfléchis|interrompue/.test(r3) && pg.dernier && pg.dernier.conv === true && pg.dernier.chaud === false && pg.dernier.ok === true, JSON.stringify([r3.slice(0, 60), pg.dernier]));
     await q.close(); }
+  /* 0.34.0 : réponses illustrées — Claude montre la demande dont il parle : sa carte sous la réponse (l'élément inconnu est ignoré), un appui l'ouvre là où elle vit */
+  { const avant = FG.sheet["'À toi'!A3:D300"], auj = new Intl.DateTimeFormat('fr-FR', {timeZone: 'Europe/Paris'}).format(new Date());
+    FG.sheet["'À toi'!A3:D300"] = [['Depuis le', 'Bot', 'Sujet', "Ce qu'on attend de toi"], [auj, 'Iris', 'Relance du syndic', "À faire : Dis-moi si je relance le syndic pour l'expert"]];
+    const q = await ctx.newPage(); q.on('pageerror', (e) => errs.push('cartes : ' + e.message));
+    await q.addInitScript(() => { try { localStorage.setItem('jarvis.mains', 'non'); } catch (e) { /* rien */ } });
+    await q.goto(BASE + '/?serveur#accueil'); await q.waitForTimeout(3500);
+    await q.evaluate(() => window.JarvisAsk()); await q.waitForTimeout(600); await q.evaluate(() => { const n = document.querySelector('#chat .dict-no'); if (n) n.click(); }); await q.waitForTimeout(800);
+    await q.fill('#chat-in', 'Montre-moi ce qui m’attend'); await q.press('#chat-in', 'Enter'); await q.waitForTimeout(2500);
+    const c1 = await q.evaluate(() => { const cs = [...document.querySelectorAll('#chat .msg.carte')], ms = [...document.querySelectorAll('#chat .msg.them p')]; return {n: cs.length, t: cs.map((c) => c.textContent), brut: /⟦|outil montrer/.test(document.getElementById('chat').textContent), der: ms.length ? ms[ms.length - 1].textContent.slice(0, 120) : ''}; });
+    await q.screenshot({path: SH + 'reponse-illustree.png'});
+    if (c1.n) await q.click('#chat .msg.carte');
+    await q.waitForTimeout(900);
+    const c2 = await q.evaluate(() => ({chat: !document.getElementById('chat').hidden, hash: location.hash}));
+    ok('réponses illustrées : la carte de la demande s\'affiche sous la réponse (une seule : l\'élément inconnu est ignoré) ; un appui ferme la discussion et ouvre Pour moi', c1.n === 1 && /Pour moi/.test(c1.t[0]) && /Relance du syndic/.test(c1.t[0]) && !c1.brut && !c2.chat && /demandes/.test(c2.hash), JSON.stringify([c1, c2]));
+    await q.close(); FG.sheet["'À toi'!A3:D300"] = avant; }
   /* notifications (0.12.0) : depuis Réglages, comme sur l'iPhone ouvert depuis l'écran d'accueil ; faux service de notifications et faux abonnement du navigateur */
   { const http = await import('node:http'), crypto = await import('node:crypto'); const got = [];
     const PS = http.createServer((q, res) => { const ch = []; q.on('data', (d) => ch.push(d)); q.on('end', () => { got.push({h: q.headers, n: Buffer.concat(ch).length}); res.writeHead(201); res.end(); }); });
