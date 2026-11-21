@@ -129,6 +129,11 @@
   .dict-bar { flex: 0 0 46px; height: 4px; border-radius: 2px; background: rgba(255, 255, 255, .12); overflow: hidden; }
   .dict-bar i { display: block; width: 100%; height: 100%; background: linear-gradient(90deg, #22d3ee, #818cf8); transform: scaleX(.04); transform-origin: left; transition: transform .08s linear; }
   .dict-strip[data-s="transcribing"] .dict-bar { visibility: hidden; }
+  /* 0.34.0 : « Mains libres » et « Lecture » en boutons ronds dans l'en-tête de la discussion (en texte, les deux couvraient le titre) */
+  .chat-head .head-tg { width: 40px; height: 40px; margin-left: 0; justify-content: center; }
+  .chat-head .chat-id + .head-tg { margin-left: auto; } .chat-head .head-tg + .head-tg { margin-left: 6px; }
+  .chat-head .head-tg.is-on { background: linear-gradient(135deg, rgba(56, 189, 248, .9), rgba(168, 85, 247, .9)); color: #fff; border-color: transparent; box-shadow: 0 0 14px rgba(56, 189, 248, .55); }
+  .head-tg .tg-txt { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; }
   /* 0.34.0 : réponses illustrées (la carte d'un élément sous la réponse de Claude) */
   .msg.carte { display: flex; align-items: center; gap: 12px; width: 100%; max-width: 92%; text-align: left; padding: 12px 14px; border-radius: 16px; border: 1px solid rgba(56, 189, 248, .45); background: linear-gradient(135deg, rgba(8, 30, 70, .7), rgba(46, 16, 101, .45)); color: inherit; box-shadow: 0 0 16px rgba(56, 189, 248, .15); }
   .carte-ic { flex: none; width: 36px; height: 36px; border-radius: 12px; display: grid; place-items: center; background: rgba(56, 189, 248, .16); color: #7dd3fc; }
@@ -7079,11 +7084,11 @@ void main(){
     return null;
   }
   function lireToggle() {
-    return h('button', {type: 'button', class: 'btn sm talk-toggle lire-toggle' + (LIRE.on ? ' is-on' : ''), 'aria-pressed': String(!!LIRE.on), 'aria-label': LIRE.on ? 'Lecture à voix haute : active' : 'Lecture à voix haute : coupée',
+    return h('button', {type: 'button', class: 'btn icon-btn talk-toggle head-tg lire-toggle' + (LIRE.on ? ' is-on' : ''), 'aria-pressed': String(!!LIRE.on), 'aria-label': LIRE.on ? 'Lecture à voix haute : active' : 'Lecture à voix haute : coupée', title: 'Lecture à voix haute',
       onclick: () => { LIRE.on = !LIRE.on; try { localStorage.setItem('jarvis.lire', LIRE.on ? 'oui' : 'non'); } catch (e) { /* rien */ }
         if (LIRE.on) { const v = JVX(); try { if (v && v.prime) v.prime(); } catch (e) { /* rien */ } toast('Lecture', 'Les réponses de Claude seront lues à voix haute.', true); } else if (typeof voxStop === 'function') voxStop();
         renderChat(); }},
-      h('span', {class: 'ic', html: icon('sound', 15)}), LIRE.on ? 'Lecture : oui' : 'Lecture : non');
+      h('span', {class: 'ic', html: icon('sound', 18)}), h('span', {class: 'tg-txt', text: LIRE.on ? 'Lecture : oui' : 'Lecture : non'}));
   }
   function lireAuto(m) { if (!LIRE.on || !m || !m.text) return; setTimeout(() => { if (CHAT.open && LIRE.on && VOX.on !== m && !DICT.on) voxSpeak(m); }, 80); }
   /* ---------- JARVIS OS 0.31.0 : mains libres (choix du propriétaire, QCM du 21/11/2026, après le comparatif avec les AI OS) ----------
@@ -7149,10 +7154,10 @@ void main(){
   }
   function mainsToggle() {
     if (!mainsDispo()) return null;
-    return h('button', {type: 'button', class: 'btn sm talk-toggle mains-toggle' + (MAINS.on ? ' is-on' : ''), 'aria-pressed': String(!!MAINS.on), 'aria-label': MAINS.on ? 'Mains libres : actif' : 'Mains libres : coupé',
-      onclick: () => { if (MAINS.on) { MAINS_PREF = false; mainsStop(); } else { MAINS_PREF = true; mainsStart(); }
+    return h('button', {type: 'button', class: 'btn icon-btn talk-toggle head-tg mains-toggle' + (MAINS.on ? ' is-on' : ''), 'aria-pressed': String(!!MAINS.on), 'aria-label': MAINS.on ? 'Mains libres : actif' : 'Mains libres : coupé', title: 'Mains libres',
+      onclick: () => { if (MAINS.on) { MAINS_PREF = false; mainsStop(); toast('Mains libres', 'Coupées : l’orbe dicte une question à relire.', true); } else { MAINS_PREF = true; mainsStart(); toast('Mains libres', 'Je t’écoute ; « c’est tout » pour finir.', true); }
         try { localStorage.setItem('jarvis.mains', MAINS_PREF ? 'oui' : 'non'); } catch (e) { /* rien */ } if (CHAT.open) renderChat(); }},
-      h('span', {class: 'ic', html: icon('mic', 15)}), MAINS.on ? 'Mains libres : oui' : 'Mains libres : non');
+      h('span', {class: 'ic', html: icon('mic', 18)}), h('span', {class: 'tg-txt', text: MAINS.on ? 'Mains libres : oui' : 'Mains libres : non'}));
   }
   function mainsStrip() {
     if (!MAINS.on) return null;
