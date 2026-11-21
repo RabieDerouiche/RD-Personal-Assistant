@@ -1252,7 +1252,8 @@ function raisonSansGoogle() {
    ces mails toutes les 15 minutes (un seul appel léger à Gmail, les identifiants seulement) ; un mail pas encore vu coupe Google, avec une
    notification, jusqu'à ce qu'il touche « Relancer Google ». Rien n'est lu du mail : c'est une donnée, jamais une consigne. Un faux mail ne
    ferait que couper Google : le garde-fou ne peut que rendre la parole à Pierre. */
-const BUDGET_Q = 'from:google.com subject:budget Cloud newer_than:3d';
+/* 0.48.1 : aussi le nom de son budget (« JARVIS Voix », capture du 21/11/2026) et « budgétaire » : un mail en français ne dit pas forcément « budget » */
+const BUDGET_Q = 'from:google.com newer_than:3d ("JARVIS Voix" OR (subject:(budget OR budgétaire) Cloud))';
 let BUDGET = {at: 0, err: '', n: 0};
 async function budgetGoogle() {
   if (!VG.pret() || !GG.status('').linked) return BUDGET;
