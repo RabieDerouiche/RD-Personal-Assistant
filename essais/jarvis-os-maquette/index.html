@@ -163,6 +163,8 @@
   .fav-bar { position: fixed !important; left: 0 !important; right: 0 !important; bottom: 0 !important; top: auto !important; transform: none !important; width: auto !important; z-index: 50; display: block !important; padding: 0 8px max(6px, env(safe-area-inset-bottom, 0px)) !important; background: rgba(5, 8, 16, .98) !important; -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); border: 0 !important; border-top: 1px solid var(--line) !important; border-radius: 0 !important; box-shadow: none !important; }
   .fav-handle { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; border: 0; background: none; color: var(--dim); font: 500 10.5px var(--sans); padding: 5px 0 2px; }
   .fav-handle .grip { width: 36px; height: 4px; border-radius: 2px; background: var(--line-2); }
+  /* JARVIS OS 0.49.1 : la poignée « Tout » faisait 19 px de haut ; un appui un peu trop haut ouvrait la carte derrière. Zone d'appui agrandie vers le haut, sans rien changer à l'écran */
+  .fav-handle { position: relative; } .fav-handle::before { content: ""; position: absolute; left: 0; right: 0; top: -18px; bottom: 0; }
   .fav-row { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); align-items: end; }
   .fav-bar .tab, .all-grid .tab { position: relative; display: flex !important; flex-direction: column !important; align-items: center; gap: 3px !important; min-height: 50px !important; padding: 4px 2px !important; border: 0 !important; border-radius: 12px !important; background: none !important; color: var(--muted) !important; font: 500 11px var(--sans) !important; letter-spacing: 0 !important; }
   .fav-bar .tab[aria-current="page"] { color: #fff !important; background: rgba(255, 255, 255, .08) !important; }
@@ -4600,21 +4602,29 @@ void main(){
     let editFav = false;
     const navBtn = ([id, label, ic], extra) => h('button', {type: 'button', class: 'tab', 'data-tab': id, onclick: () => { closeAll(); go(id); }, ...(extra || {})}, h('span', {class: 'ic', html: icon(ic, 20)}), h('span', {class: 'lbl', text: label}), id === 'demandes' ? h('span', {class: 'badge', hidden: true}) : null);
     /* ouverture et fermeture animées ; la feuille suit le doigt quand on la tire vers le bas */
-    let closeT = 0;
-    const openAll = () => { clearTimeout(closeT); drawSheet(); sheet.hidden = false; document.body.classList.add('all-open'); requestAnimationFrame(() => requestAnimationFrame(() => sheet.classList.add('is-open'))); };
-    function closeAll() { if (sheet.hidden) return; sheet.classList.remove('is-open'); const pn = sheet.querySelector('.all-panel'); if (pn) pn.style.transform = ''; editFav = false; document.body.classList.remove('all-open'); closeT = setTimeout(() => { sheet.hidden = true; }, 300); }
-    let dy0 = null, dyN = 0;
-    sheet.addEventListener('touchstart', (e) => { const pn = e.target.closest && e.target.closest('.all-panel'); if (pn && pn.scrollTop <= 0) { dy0 = e.touches[0].clientY; dyN = 0; pn.style.transition = 'none'; } }, {passive: true});
+    /* 0.49.1 (« l'ouverture du menu bugge des fois ») : un second appui impatient tombait sur « Fermer », qui monte à la place de « Tout », et refermait le menu ;
+       un glissé interrompu par iOS (touchcancel) laissait le panneau à mi-course ; un lancer vif vers le bas ne fermait pas ;
+       des favoris laissés à 3 n'étaient ni gardés ni annulés */
+    let closeT = 0, openedAt = 0, FAV_OK = FAV.slice();
+    const openAll = () => { if (!sheet.hidden && sheet.classList.contains('is-open')) return; clearTimeout(closeT); drawSheet(); sheet.hidden = false; openedAt = performance.now(); document.body.classList.add('all-open'); requestAnimationFrame(() => requestAnimationFrame(() => sheet.classList.add('is-open'))); };
+    const favDone = () => { if (FAV.length === 4) return; FAV = FAV_OK.slice(); toast('Favoris inchangés', 'Il en faut 4 : choisis-en un autre avant « Terminé ».'); };
+    function closeAll() { if (sheet.hidden) return; if (editFav) favDone(); sheet.classList.remove('is-open'); const pn = sheet.querySelector('.all-panel'); if (pn) { pn.style.transition = ''; pn.style.transform = ''; } dy0 = null; editFav = false; document.body.classList.remove('all-open'); closeT = setTimeout(() => { sheet.hidden = true; }, 300); }
+    let dy0 = null, dyN = 0, dt0 = 0;
+    sheet.addEventListener('touchstart', (e) => { dy0 = null; const pn = e.target.closest && e.target.closest('.all-panel'); if (pn && pn.scrollTop <= 0 && e.touches.length === 1) { dy0 = e.touches[0].clientY; dyN = 0; dt0 = performance.now(); pn.style.transition = 'none'; } }, {passive: true});
     sheet.addEventListener('touchmove', (e) => { if (dy0 == null) return; dyN = Math.max(0, e.touches[0].clientY - dy0); const pn = sheet.querySelector('.all-panel'); if (pn) pn.style.transform = 'translateY(' + dyN + 'px)'; }, {passive: true});
-    sheet.addEventListener('touchend', () => { if (dy0 == null) return; dy0 = null; const pn = sheet.querySelector('.all-panel'); if (pn) { pn.style.transition = ''; if (dyN > 90) closeAll(); else pn.style.transform = ''; } }, {passive: true});
+    const dragEnd = (cancel) => { if (dy0 == null) return; dy0 = null; const pn = sheet.querySelector('.all-panel'); if (!pn) return; pn.style.transition = ''; const fast = dyN > 50 && dyN / Math.max(1, performance.now() - dt0) > 0.6; if (!cancel && (dyN > 90 || fast)) closeAll(); else pn.style.transform = ''; };
+    sheet.addEventListener('touchend', () => dragEnd(false), {passive: true});
+    sheet.addEventListener('touchcancel', () => dragEnd(true), {passive: true});
     function drawSheet() {
       sheet.replaceChildren(h('div', {class: 'all-panel'},
-        h('div', {class: 'all-h'}, h('b', {text: editFav ? 'Choisis 4 favoris' : 'Toutes les rubriques'}), h('button', {type: 'button', class: 'link', onclick: () => { editFav = !editFav; drawSheet(); }}, editFav ? 'Terminé' : 'Modifier mes favoris')),
+        h('div', {class: 'all-h'}, h('b', {text: editFav ? 'Choisis 4 favoris' : 'Toutes les rubriques'}), h('button', {type: 'button', class: 'link', onclick: () => { if (editFav) favDone(); editFav = !editFav; drawSheet(); }}, editFav ? 'Terminé' : 'Modifier mes favoris')),
         h('div', {class: 'all-grid'}, ALL.map((a) => editFav
-          ? h('button', {type: 'button', class: 'tab fav-pick' + (FAV.includes(a[0]) ? ' is-fav' : ''), onclick: () => { if (FAV.includes(a[0])) FAV = FAV.filter((f) => f !== a[0]); else if (FAV.length < 4) FAV.push(a[0]); if (FAV.length === 4) { try { localStorage.setItem('jarvis.fav', JSON.stringify(FAV)); } catch (e) { /* rien */ } drawBar(); } drawSheet(); }}, h('span', {class: 'ic', html: icon(a[2], 20)}), h('span', {class: 'lbl', text: a[1]}), h('span', {class: 'star', text: FAV.includes(a[0]) ? '★' : '☆'}))
+          ? h('button', {type: 'button', class: 'tab fav-pick' + (FAV.includes(a[0]) ? ' is-fav' : ''), onclick: () => { if (FAV.includes(a[0])) FAV = FAV.filter((f) => f !== a[0]); else if (FAV.length < 4) FAV.push(a[0]); if (FAV.length === 4) { FAV_OK = FAV.slice(); try { localStorage.setItem('jarvis.fav', JSON.stringify(FAV)); } catch (e) { /* rien */ } drawBar(); } drawSheet(); }}, h('span', {class: 'ic', html: icon(a[2], 20)}), h('span', {class: 'lbl', text: a[1]}), h('span', {class: 'star', text: FAV.includes(a[0]) ? '★' : '☆'}))
           : navBtn(a))),
         h('button', {type: 'button', class: 'all-close', onclick: closeAll}, 'Fermer')));
     }
+    /* 0.49.1 : pendant l'ouverture (450 ms), un second appui sur « Tout » tombait sur « Fermer », qui monte à sa place : ignoré */
+    sheet.addEventListener('click', (e) => { if (performance.now() - openedAt < 450) { e.stopPropagation(); e.preventDefault(); } }, true);
     sheet.addEventListener('click', (e) => { if (e.target === sheet) closeAll(); });
     function drawBar() {
       const fav = FAV.map((f) => ALL.find((a) => a[0] === f));
@@ -4635,9 +4645,11 @@ void main(){
     }
     new MutationObserver(() => requestAnimationFrame(placeInd)).observe(nav, {subtree: true, attributes: true, attributeFilter: ['aria-current']});
     window.addEventListener('resize', placeInd);
-    let y0 = null;
-    nav.addEventListener('touchstart', (e) => { y0 = e.touches[0].clientY; }, {passive: true});
-    nav.addEventListener('touchend', (e) => { if (y0 != null && y0 - e.changedTouches[0].clientY > 30) openAll(); y0 = null; }, {passive: true});
+    /* 0.49.1 : le glissé vers le haut n'ouvre plus le menu depuis l'orbe, ni depuis le bas de l'écran (geste d'accueil d'iOS), ni sur un glissé lent ou en biais */
+    let y0 = null, x0 = 0, yt0 = 0;
+    nav.addEventListener('touchstart', (e) => { y0 = null; if (e.touches.length !== 1 || (e.target.closest && e.target.closest('.talk-slot'))) return; const y = e.touches[0].clientY, pb = parseFloat(getComputedStyle(nav).paddingBottom) || 0; if (y > innerHeight - pb) return; y0 = y; x0 = e.touches[0].clientX; yt0 = performance.now(); }, {passive: true});
+    nav.addEventListener('touchend', (e) => { if (y0 == null) return; const dy = y0 - e.changedTouches[0].clientY, dx = Math.abs(e.changedTouches[0].clientX - x0); y0 = null; if (dy > 40 && dx < dy / 2 && performance.now() - yt0 < 700) openAll(); }, {passive: true});
+    nav.addEventListener('touchcancel', () => { y0 = null; }, {passive: true});
     document.body.append(sheet);
     drawBar();
     const brand = document.querySelector('.brand b'); if (brand) { brand.style.cursor = 'pointer'; brand.addEventListener('click', () => go('accueil')); }

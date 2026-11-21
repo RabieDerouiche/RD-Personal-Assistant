@@ -27,7 +27,7 @@ import {createActivite, outilNom} from './activite.mjs';
 import {createRadar} from './radar.mjs';
 const ACT = createActivite();   /* 0.33.0 : ce que fait Claude à l'instant */
 
-const VERSION = '0.49.0';
+const VERSION = '0.49.1';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PORT = +(process.env.PORT || 8787);
 const HOST = process.env.HOST || '127.0.0.1';
