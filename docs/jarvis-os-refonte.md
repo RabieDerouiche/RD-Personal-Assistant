@@ -168,3 +168,4 @@ Ses demandes, dans ses mots (résumées) :
 - **22/11/2026, chargement, brief et barre (serveur 0.59.0)** : son retour (capture : accueil au chargement, brief en un paragraphe, appuis sur Espaces qui buggent) ; reproduit sur le serveur de test et corrigé ; détail dans `docs/jarvis-os.md` (0.59.0).
 - **22/11/2026, la voix qui agit (serveur 0.60.0)** : sa demande (gestion des tâches à la voix, sans bouton, validation orale, plus fin) ; détail dans `docs/jarvis-os.md` (0.60.0).
 - **22/11/2026, la voix plus rapide, les tâches entières à la voix (serveur 0.61.0)** : sa demande (optimiser la voix et les tâches : rapidité, simplicité, fluidité) ; détail dans `docs/jarvis-os.md` (0.61.0).
+- **22/11/2026, à la voix, la justesse avant la vitesse (serveur 0.62.0)** : son choix (« une réflexion solide et juste plutôt qu'une réponse rapide ») ; voix : Opus, effort élevé, réflexion ; détail dans `docs/jarvis-os.md` (0.62.0).
