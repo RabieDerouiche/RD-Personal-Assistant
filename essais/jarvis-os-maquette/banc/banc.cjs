@@ -114,6 +114,16 @@ srv.listen(0, async () => {
       const a = await p.evaluate(() => ({hero: getComputedStyle(document.querySelector('#view .rad-hero')).backgroundImage, pg: document.documentElement.style.getPropertyValue('--pg')}));
       ok('cartes : plus de bleu marine (verre presque noir), la couleur de la rubrique (rose pour Sorties), une teinte de fond par page (Argent en vert), le bord irisé sur la carte phare',
         /rgb\(21, 23, 31\)/.test(c.tile) && /0\.95\d*,? 0\.44\d*,? 0\.71|244, 114, 182/.test(c.tile) && c.pg === '#22d3ee' && a.pg === '#34d399' && /conic-gradient/.test(a.hero) && !/rgb\(4, 11, 31\)/.test(c.top), JSON.stringify({tile: c.tile.slice(0, 160), top: c.top, pg: [c.pg, a.pg]})); }
+    /* 0.59.0 (son retour du 22/11 : chargement de l'accueil, appuis sur la barre qui buggent) */
+    { const html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
+      ok('démarrage : ni « Maquette » ni « Vue d’ensemble » avant que l’app soit prête, une lueur à la place, l’orbe de la barre esquissée', /<p class="demo" id="demo"><\/p>/.test(html) && /<h1 class="view-title" id="view-title"><\/h1>/.test(html) && /#view:empty \{/.test(html) && /\.talk-slot:not\(:has\(\.jv-btn\)\)::before/.test(html));
+      await p.goto(base + '#agenda'); await p.waitForTimeout(1500);
+      const hit = await p.evaluate(() => { const t = document.querySelector('.tab[data-tab="espaces"]'), row = document.querySelector('.fav-row').getBoundingClientRect(), r = t.getBoundingClientRect(); const e = document.elementFromPoint(r.left + r.width / 2, row.top + 3); return {ok: !!(e && e.closest('.tab[data-tab="espaces"]')), h: Math.round(r.height)}; });
+      ok('barre : un appui tout en haut de l’onglet compte (avant : 12 px morts au-dessus de chaque onglet)', hit.ok && hit.h >= 60, JSON.stringify(hit));
+      await p.evaluate(() => { document.querySelector('.tab[data-tab="espaces"]').click(); setTimeout(() => document.querySelector('.tab[data-tab="accueil"]').click(), 90); }); await p.waitForTimeout(1000);
+      const cur = await p.evaluate(() => (document.querySelector('.tab[aria-current="page"]') || {dataset: {}}).dataset.tab);
+      await p.evaluate(() => document.querySelector('.tab[data-tab="accueil"]').click()); await p.waitForTimeout(900);
+      ok('barre : un second appui pendant la transition est ignoré (la page ne repart pas), un appui après passe', cur === 'espaces' && await p.evaluate(() => (document.querySelector('.tab[aria-current="page"]') || {dataset: {}}).dataset.tab === 'accueil'), cur); }
     { const ctxR = await b.newContext({...devices['iPhone 15 Pro Max'], reducedMotion: 'reduce'}); const q = await ctxR.newPage(); await q.goto(base + '#espaces'); await q.waitForTimeout(2500);
       await q.evaluate(() => document.querySelector('.esp-tile[data-go="achats"]').click()); await q.waitForTimeout(40);
       ok('fluidité : « réduire les animations » de l’iPhone respecté (aucun calque, aucun glissé)', await q.evaluate(() => !document.querySelector('.ux-ghost') && !document.querySelector('#view .view-in.ux-in'))); await ctxR.close(); }

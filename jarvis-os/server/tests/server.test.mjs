@@ -714,6 +714,8 @@ try {
         const b1 = await RJ('/api/routines', {genre: 'brief', jours: [1, 2, 3, 4, 5], heure: '07:30'}), b2 = await RJ('/api/routines', {genre: 'brief', jours: [0, 6], heure: '09:00'});
         ok('brief du matin : une seule routine de brief, réglée par la seconde demande', b1.body.ok && b2.body.ok && b2.body.routines.filter((x) => x.genre === 'brief').length === 1 && b2.body.routines.find((x) => x.genre === 'brief').heure === '09:00', JSON.stringify(b2.body.routines.filter((x) => x.genre === 'brief')));
         const bm = await RJ('/api/brief/maintenant', {}), bg = await RJ('/api/brief');
+        { const ps = bm.body.brief.parts || [];   /* 0.59.0 : ses rubriques, pour l'affichage (le texte reste celui qui est lu) */
+          ok('brief du matin : ses rubriques pour l\'app (météo, missions), dans l\'ordre du texte lu', ps.some((x) => x.k === 'meteo' && /degrés/.test(x.t)) && ps.some((x) => x.k === 'missions') && bm.body.brief.texte.endsWith(ps.map((x) => x.t).join(' ')) && bg.body.brief.parts.length === ps.length, JSON.stringify(ps).slice(0, 300)); }
         ok('brief du matin : fait sans IA (date, météo à sa position, missions finies), gardé pour l\'app', /^Bonjour\. Nous sommes /.test(bm.body.brief.texte) && /degrés/.test(bm.body.brief.texte) && /mission/.test(bm.body.brief.texte) && bg.body.brief.texte === bm.body.brief.texte, bm.body.brief.texte.slice(0, 300));
         for (const x of (await RJ('/api/routines')).body.routines) await RJ('/api/routines/' + x.id, null, 'DELETE');
         ok('routines : supprimées', (await RJ('/api/routines')).body.routines.length === 0); }
