@@ -4391,7 +4391,7 @@ void main(){
   const radLu = (iso) => { if (!iso) return 'jamais'; const d = new Date(iso), n = Math.round((new Date(d.getFullYear(), d.getMonth(), d.getDate()) - new Date(TODAY.getFullYear(), TODAY.getMonth(), TODAY.getDate())) / 864e5);
     return (n === 0 ? "aujourd'hui" : n === -1 ? 'hier' : 'le ' + radDate(iso)) + ' à ' + d.getHours() + 'h' + pad2(d.getMinutes()); };
   const RAD_T = {renouvellement: 'Renouvellement', fin: 'Fin de contrat', hausse: 'Hausse', essai: 'Fin d’essai', echeance: 'Échéance'};
-  const RAD_A = {hausse: ['Hausse de prix', 'percent'], essai: ['Essai qui devient payant', 'hourglass'], echec: ['Paiement échoué', 'x'], inhabituel: ['Montant inhabituel', 'pulse'], resiliation: ['Résiliation', 'x'], silence: ['Plus de facture', 'hourglass'], mensualite: ['Nouvelle mensualité', 'percent']};
+  const RAD_A = {hausse: ['Hausse de prix', 'percent'], essai: ['Essai qui devient payant', 'hourglass'], echec: ['Paiement échoué', 'x'], inhabituel: ['Montant inhabituel', 'pulse'], resiliation: ['Résiliation', 'x'], silence: ['Plus de facture', 'hourglass'], mensualite: ['Nouvelle mensualité', 'percent'], calendrier: ['Montants de ton contrat', 'cal'], corrige: ['Montant corrigé', 'percent']};
   const RAD_K = {mensuel: 12, annuel: 1, trimestriel: 4, hebdomadaire: 52};
   function radAsk(q) { openChat('claude', 'hydra', 'equipe', 'equipe'); const ta = $('chat-in'); if (ta) { ta.value = q; try { ta.focus(); } catch (e) { /* rien */ } } }
   function radDue(x) {
@@ -4417,16 +4417,21 @@ void main(){
       /* 0.56.0 (son choix : « il me demande ») : une résiliation ou des factures qui ont cessé : Retirer ou Garder, rien ne change sans lui */
       x.fixe && (x.type === 'resiliation' || x.type === 'silence') ? h('div', {class: 'row-actions'}, btn('Retirer', () => radAlerteDo(x, 'retirer'), 'sm main', 'x'), btn('Garder', () => radAlerteDo(x, 'garder'), 'sm', 'check'),
         x.url ? btn('Ouvrir le mail', () => window.open(x.url, '_blank', 'noopener'), 'sm', 'inbox') : null) :
+      /* 0.65.0 (sa demande : « mon assurance emprunteur n'est pas fixe, le contrat a toutes les infos ») : les montants de son contrat, mois par mois */
+      x.fixe && x.type === 'calendrier' ? h('div', {class: 'row-actions'}, btn('Appliquer', () => radAlerteDo(x, 'appliquer'), 'sm main', 'check'), btn('Garder mon montant', () => radAlerteDo(x, 'garder'), 'sm'),
+        x.url ? btn('Voir le contrat', () => window.open(x.url, '_blank', 'noopener'), 'sm', 'inbox') : null) :
       h('div', {class: 'row-actions'}, btn('Vu', () => { RAD.vu.add(x.k); radSave(); renderView(true); }, 'sm', 'check'),
         x.url ? btn('Ouvrir le mail', () => window.open(x.url, '_blank', 'noopener'), 'sm', 'inbox') : null,
         btn('Demander à Claude', () => radAsk('Le Radar signale : ' + (x.titre || t[0]) + ' pour « ' + x.service + ' » (' + radEur(x.montant) + '). ' + (x.texte || '') + ' Que dois-je faire ?'), 'sm', 'chat')));
   }
   function radAlerteDo(x, action) {
     const JS = radAPI(), fin = action === 'retirer' && x.fin && x.fin >= radYmd(radAuj()) ? x.fin : null;
-    const dit = () => toast(action === 'retirer' ? (fin ? 'S’arrête le ' + radDate(fin) : 'Retirée') : 'Gardée', x.service + (action === 'retirer' ? (fin ? ' compte encore jusqu’à cette date.' : ' ne compte plus dans le reste à payer.') : ' reste dans tes dépenses fixes.'));
+    const dit = () => (action === 'appliquer' ? toast('Montants appliqués', x.service + ' suit le tableau de ton contrat : ' + radEur(x.montant) + ' ce mois-ci.') : action === 'garder' && x.type === 'calendrier' ? toast('Gardé', x.service + ' garde son montant.')
+      : toast(action === 'retirer' ? (fin ? 'S’arrête le ' + radDate(fin) : 'Retirée') : 'Gardée', x.service + (action === 'retirer' ? (fin ? ' compte encore jusqu’à cette date.' : ' ne compte plus dans le reste à payer.') : ' reste dans tes dépenses fixes.')));
     if (JS && JS.radarAlerte) { JS.radarAlerte(x.id, action).then((r) => { if (r) { radSet(r); renderView(true); dit(); } else toast('Radar', 'Pas enregistré sur ton serveur : réessaie.'); }); return; }
     const fx = radGet(RAD.data, 'fx', []).slice(), i = fx.findIndex((y) => y.id === x.fixe);   /* maquette : dans le téléphone */
     if (action === 'retirer' && i >= 0) { if (fin) fx[i] = Object.assign({}, fx[i], {fin}); else fx.splice(i, 1); radPut('fx', fx); }
+    if (action === 'appliquer' && i >= 0 && x.calendrier) { const c = x.calendrier, it = Object.assign({}, fx[i], {paliers: c.paliers, rythme: 'mensuel', jour: c.jour || fx[i].jour, debut: c.debut, fin: c.fin, contrat: c.contrat}); delete it.mois; delete it.estime; fx[i] = it; radPut('fx', fx); }
     RAD.vu.add(x.k); radSave(); renderView(true); dit();
   }
   function radAbos(ab) {
@@ -4504,6 +4509,7 @@ void main(){
       let raw = radD(Y, M, Math.min(j, radDim(Y, M))), due = radShift(raw, 1), xx = x;
       if (x.debut && radYmd(due) < x.debut) continue;   /* 0.51.0 : une dépense qui commence plus tard (impôts mensualisés) */
       if (x.fin && radYmd(due) > x.fin) continue;   /* 0.56.0 : une dépense qui s'arrête (résiliée, échéancier terminé) */
+      if (x.paliers && x.paliers.length) { const v = radPalier(x.paliers, radYmd(due).slice(0, 7)); if (v == null) continue; xx = Object.assign({}, x, {montant: v, estime: false, exact: true}); }   /* 0.65.0 */
       /* 0.51.0 : la facture du mois est arrivée : son vrai montant et son jour, à la place de l'habituel */
       if (x.prochain && x.prochain.date && String(x.prochain.date).slice(0, 7) === radYmd(due).slice(0, 7)) { const [py, pm, pd] = String(x.prochain.date).split('-').map(Number); raw = due = radD(py, pm - 1, pd); xx = Object.assign({}, x, {montant: x.prochain.montant, estime: false, exact: true}); }
       if (due >= a && due <= b) out.push({x: xx, raw, date: due});
@@ -4535,7 +4541,10 @@ void main(){
   const radRegleP = (rev) => (rev.des ? 'entre le ' + radLe(rev.des) + ' et ' : '') + (rev.jour === 'dernier' ? 'le dernier jour du mois' : 'le ' + radLe(parseInt(rev.jour, 10) || 28)) + (rev.avance === false ? '' : ', avancée si week-end ou férié');
   /* 0.52.0 : une paie qui arrive « entre le 5 et le 10 » : le reste court jusqu'au plus tard, et le dit */
   const radPaieFin = (R) => (R.rev && R.rev.des ? '(au plus tard le ' + radJour(R.fin) + ')' : 'du ' + radJour(R.fin));
-  const radParMois = (x) => radC(x.montant) * (x.rythme === 'annuel' ? 1 : x.rythme === 'trimestriel' ? 4 : 12) / 12 / 100;
+  /* 0.65.0 : une dépense dont le montant suit le tableau de son contrat (assurance de prêt) : le montant du mois */
+  const radPalier = (pl, mo) => { let v = null; for (const p of pl || []) { if (p.du <= mo) v = p.montant; else break; } return v; };
+  const radMoisDe = (d) => radYmd(d).slice(0, 7), radMontantMois = (x, d) => (x.paliers && x.paliers.length ? radPalier(x.paliers, radMoisDe(d || radAuj())) ?? x.montant : x.montant);
+  const radParMois = (x) => radC(radMontantMois(x)) * (x.rythme === 'annuel' ? 1 : x.rythme === 'trimestriel' ? 4 : 12) / 12 / 100;
   function radHero(R, d, al, soon) {
     const tot = R.tReste + R.tDeja, pc = tot ? Math.round(R.tDeja / tot * 100) : 0, nx = R.reste[0];
     return h('section', {class: 'card shop-hero rad-hero'}, h('span', {class: 'rad-coin', html: icon('euro', 24)}),
@@ -4568,14 +4577,14 @@ void main(){
         R.reste.length ? R.reste.map((o) => row(o, false)) : h('p', {class: 'muted', text: 'Rien d’ici là.'})),
       props.length ? panel('À valider (' + props.length + ')', h('span', {class: 'aside', text: 'trouvées dans tes mails'}), props.map((x) => h('article', {class: 'card item rad-prop'},
         h('div', {class: 'rad-al-h'}, h('span', {class: 'hm-ic', html: icon('inbox', 17)}), h('div', {class: 'hm-tx'}, h('b', {text: x.service}), h('small', {text: radRegle(x) + radDes(x) + (x.decalage ? ' (jour estimé)' : '') + (x.preuves > 1 ? ' · vue ' + x.preuves + ' fois' : '') + (x.depuis && !x.debut ? ', depuis ' + x.depuis : '')}))),
-        h('p', {class: 'rad-amt'}, h('b', {text: x.montant == null ? 'montant à compléter' : (x.estime ? 'environ ' : '') + radEur(x.montant)}), h('span', {class: 'muted', text: x.montant == null ? (x.aide || 'il est dans la pièce jointe du mail') : (x.variable ? 'varie chaque mois · ' : '') + (x.cat || '')})),
+        h('p', {class: 'rad-amt'}, h('b', {text: x.montant == null ? 'montant à compléter' : (x.estime ? 'environ ' : '') + radEur(x.montant)}), h('span', {class: 'muted', text: x.montant == null ? (x.aide || 'il est dans la pièce jointe du mail') : (x.paliers && x.paliers.length ? 'selon ton contrat, il change avec les mois · ' : x.variable ? 'varie chaque mois · ' : '') + (x.cat || '')})),
         x.exemple && x.exemple.objet ? h('p', {class: 'muted rad-preuve', text: 'Dernier mail : « ' + x.exemple.objet + ' »' + (x.exemple.date ? ', le ' + radDate(x.exemple.date) : '')}) : null,
         h('div', {class: 'row-actions'}, btn('Ajouter', () => (x.montant == null ? radEdit(x, x) : radPropDo(x, true, null)), 'sm main', 'check'), btn('Modifier', () => radEdit(x, x), 'sm'), x.exemple && x.exemple.url ? btn('Voir le mail', () => window.open(x.exemple.url, '_blank', 'noopener'), 'sm', 'inbox') : null, btn('Pas une dépense fixe', () => radPropDo(x, false, null), 'sm ghost'))))) : null,
       R.deja.length ? h('details', {class: 'card rad-deja'}, h('summary', {text: 'Déjà prélevé (' + R.deja.length + ') : ' + radEur(R.tDeja)}), h('div', {class: 'stack'}, R.deja.map((o) => row(o, true)))) : null,
       panel('Mes dépenses fixes (' + list.length + ')', h('span', {class: 'aside', text: radEur(list.reduce((s, x) => s + radParMois(x), 0)) + ' par mois'}),
         list.map((x) => h('button', {type: 'button', class: 'hm-row rad-fx rad-rule', onclick: () => radEdit(x)},
-          h('span', {class: 'hm-tx'}, h('b', {text: x.service}), h('small', {text: radRegle(x) + radDes(x) + (x.source === 'mail' ? ' · lu dans tes mails' : ' · ajouté par toi') + (x.estime ? ' · estimé' : '') + (x.prochain && x.prochain.date >= radYmd(radAuj()) ? ' · facture du mois : ' + radEur(x.prochain.montant) : '')})),
-          h('span', {class: 'rad-yr', text: (x.estime ? '≈ ' : '') + radEur(x.montant)})))),
+          h('span', {class: 'hm-tx'}, h('b', {text: x.service}), h('small', {text: radRegle(x) + radDes(x) + (x.source === 'mail' ? ' · lu dans tes mails' : ' · ajouté par toi') + (x.paliers && x.paliers.length ? ' · selon ton contrat' : '') + (x.estime ? ' · estimé' : '') + (x.prochain && x.prochain.date >= radYmd(radAuj()) ? ' · facture du mois : ' + radEur(x.prochain.montant) : '')})),
+          h('span', {class: 'rad-yr', text: (x.estime ? '≈ ' : '') + radEur(radMontantMois(x))})))),
       h('div', {class: 'rad-act'}, btn('Ajouter une dépense fixe', () => radEdit(null), 'main', 'plus'), btn('Ma paie : ' + radRegleP(R.rev), radPaieSheet, '', 'cal'),
         SRV_OS && d.google !== false ? btn('Relire mes mails', () => { const JS = radAPI(); if (JS && JS.radarLire) JS.radarLire().then((r) => { if (r) { radSet(r); renderView(true); } toast('Radar', 'Je relis tes mails : les nouvelles dépenses arrivent dans « À valider ».'); }); }, 'ghost', 'refresh') : null),
       radRaccourcis(R.fx),
@@ -4625,6 +4634,15 @@ void main(){
     const jr = h('input', {class: 'inp', id: ids[3], type: 'number', inputmode: 'numeric', min: '1', max: '31', step: '1', value: x ? String(x.jour) : '', placeholder: '1 à 31'});
     const mo = h('select', {class: 'inp', id: ids[4]}, RAD_MOIS.map((l, i) => h('option', {value: String(i + 1), selected: (x ? parseInt(x.mois, 10) || 1 : radAuj().getMonth() + 1) === i + 1}, l)));
     const est = h('input', {type: 'checkbox', checked: !!(x && x.estime)});
+    /* 0.65.0 : le montant de chaque mois vient du tableau de son contrat : coché, il le suit ; décoché, le montant saisi devient fixe */
+    const pal = x && x.paliers && x.paliers.length ? x.paliers : null, suit = h('input', {type: 'checkbox', checked: !!pal});
+    if (pal) { const deux = () => Number(radMontantMois(x)).toFixed(2).replace('.', ','); mt.value = deux(); mt.readOnly = true; suit.addEventListener('change', () => { mt.readOnly = suit.checked; if (suit.checked) mt.value = deux(); }); }
+    const palBloc = () => { if (!pal) return null; const mo = radMoisDe(radAuj()), lmo = (k) => RAD_MOIS[+k.slice(5, 7) - 1] + ' ' + k.slice(0, 4), apres = pal.filter((p) => p.du > mo).slice(0, 4);
+      return h('div', {class: 'rad-hist rad-pal'}, h('p', {class: 'pick-label', text: 'Montant selon ton contrat'}),
+        h('ul', {class: 'rad-hist-l'}, h('li', {text: 'Ce mois-ci : ' + radEur(radPalier(pal, mo) ?? x.montant)}), apres.map((p) => h('li', {text: 'Dès ' + lmo(p.du) + ' : ' + radEur(p.montant)})),
+          x.fin ? h('li', {text: 'Dernier prélèvement : ' + lmo(x.fin.slice(0, 7))}) : null),
+        x.contrat && x.contrat.objet ? h('p', {class: 'muted', text: 'Lu dans « ' + x.contrat.objet + ' »' + (x.contrat.date ? ', le ' + radDate(x.contrat.date) : '') + '.'}) : null,
+        h('label', {class: 'check'}, suit, ' Suivre le tableau du contrat')); };
     const moWrap = h('div', {class: 'field'}, h('label', {for: ids[4], class: 'pick-label', text: 'Mois (premier prélèvement de l’année)'}), mo);
     const sync = () => { moWrap.hidden = ry.value === 'mensuel'; };
     ry.addEventListener('change', sync); sync();
@@ -4637,7 +4655,10 @@ void main(){
       if (est.checked) it.estime = true;
       /* 0.51.0 : son début et la facture du mois déjà annoncée restent (ils viennent de ses mails) */
       if (x && x.debut) it.debut = x.debut; if (x && x.fin) it.fin = x.fin; if (x && x.variable && est.checked) it.variable = true; if (x && x.prochain && !prop) it.prochain = x.prochain;
-      if (prop) { closeSheet(); radPropDo(prop, true, {service: it.service, montant: it.montant, jour: it.jour, rythme: it.rythme, mois: it.mois, estime: !!it.estime}); return; }
+      /* 0.65.0 : ce qui vient de ses mails reste attaché (avant, une modification le perdait) ; le tableau du contrat, s'il le suit */
+      if (x && x.dom) it.dom = x.dom; if (x && x.cle) it.cle = x.cle; if (x && x.depuis) it.depuis = x.depuis;
+      if (pal && suit.checked) { it.paliers = pal; it.rythme = 'mensuel'; delete it.mois; delete it.estime; if (x.contrat) it.contrat = x.contrat; it.montant = radMontantMois(x); }
+      if (prop) { closeSheet(); radPropDo(prop, true, {service: it.service, montant: it.montant, jour: it.jour, rythme: it.rythme, mois: it.mois, estime: !!it.estime, ...(pal && !suit.checked ? {paliers: []} : {})}); return; }
       const i = x ? fx.findIndex((y) => y.id === x.id) : -1;
       if (i >= 0) fx[i] = it; else fx.push(it);
       radPut('fx', fx); closeSheet(); toast(nv ? 'Ajoutée' : 'Enregistrée', n + ' : ' + radEur(it.montant) + ', ' + radRegle(it) + '.'); renderView(true);
@@ -4650,9 +4671,10 @@ void main(){
         h('div', {class: 'two'}, h('div', {class: 'field'}, h('label', {for: ids[1], class: 'pick-label', text: 'Montant (€)'}), mt), h('div', {class: 'field'}, h('label', {for: ids[3], class: 'pick-label', text: 'Jour du prélèvement'}), jr)),
         h('div', {class: 'two'}, h('div', {class: 'field'}, h('label', {for: ids[2], class: 'pick-label', text: 'Rythme'}), ry), moWrap),
         h('div', {class: 'checks'}, h('label', {class: 'check'}, est, ' Montant estimé (il varie un peu)')),
+        palBloc(),
         /* 0.56.0 : ses dernières factures lues (montant, jour du prélèvement), pour vérifier d'un coup d'œil */
-        (() => { const hl = (prop ? x.historique : ((RAD.data && RAD.data.historiques) || {})[x && x.id]) || []; return hl.length ? h('div', {class: 'rad-hist'}, h('p', {class: 'pick-label', text: 'Dernières factures lues'}),
-          h('ul', {class: 'rad-hist-l'}, hl.map((r) => h('li', {text: radDate(r.date) + ' : ' + (r.montant != null ? radEur(r.montant) : 'montant dans la pièce jointe') + (r.datePrel ? ', prélevé le ' + radDate(r.datePrel) : '')})))) : null; })(),
+        (() => { const hl = (prop ? x.historique : ((RAD.data && RAD.data.historiques) || {})[x && x.id]) || []; return hl.length ? h('div', {class: 'rad-hist'}, h('p', {class: 'pick-label', text: 'Derniers prélèvements lus'}),
+          h('ul', {class: 'rad-hist-l'}, hl.map((r) => h('li', {text: (r.datePrel ? radDate(r.datePrel) : 'vers le ' + radDate(r.date)) + ' : ' + (r.montant != null ? radEur(r.montant) : 'montant dans la pièce jointe') + (r.hors ? ' (dont ' + radEur(r.hors) + ' ponctuel)' : '') + (r.datePrel ? ' · mail du ' + radDate(r.date) : '')})))) : null; })(),
         h('button', {type: 'submit', class: 'btn main'}, nv ? 'Ajouter' : 'Enregistrer'),
         nv ? null : h('button', {type: 'button', class: 'btn ghost danger', onclick: del}, 'Retirer cette dépense'))});
   }

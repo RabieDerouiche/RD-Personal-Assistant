@@ -1,6 +1,6 @@
 /* Banc du Radar : node tests/radar.test.mjs (aucun vrai Google, aucun vrai Claude, aucun coût). Mails et montants inventés. */
 import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path';
-import {J, ymd, feries, occurrences, paies, resteA, trouverMontant, trouverDate, genre, avantApres, lireMail, regrouper, nomService, categorie, montantDe, createRadar, domaine, montantPdf, rythmeDe, sansPub} from '../radar.mjs';
+import {J, ymd, feries, occurrences, paies, resteA, trouverMontant, trouverDate, genre, avantApres, lireMail, regrouper, nomService, categorie, montantDe, createRadar, domaine, montantPdf, rythmeDe, sansPub, prelevementsPdf, calendrierPdf, montantPalier} from '../radar.mjs';
 import {textOf} from '../google.mjs';
 import {texteDePdf} from '../pdf.mjs';
 import zlib from 'node:zlib';
@@ -127,10 +127,10 @@ try {
     const n0 = appelsT.length; await RQ.lireMaintenant();
     ok('Radar : un fil déjà lu et inchangé n’est pas relu (seules les listes du jour sont demandées : objet, phrases de prélèvement, fournisseurs connus)', appelsT.length - n0 === 3, (appelsT.length - n0) + ' appels');
     /* une lecture interrompue reprend au mois où elle s'était arrêtée ; un ancien message anglais de Google est montré en français */
-    fs.writeFileSync(path.join(DIR, 'radar3.json'), JSON.stringify({version: 5, scan: {enCours: false, debut: 0, mois: 2, total: 4, lus: 5, fini: null, erreur: "Quota exceeded for quota metric 'Total Query Cost'"}}));
+    fs.writeFileSync(path.join(DIR, 'radar3.json'), JSON.stringify({version: 6, scan: {enCours: false, debut: 0, mois: 2, total: 4, lus: 5, fini: null, erreur: "Quota exceeded for quota metric 'Total Query Cost'"}}));
     const qs = [], RR = createRadar({file: path.join(DIR, 'radar3.json'), gmail: {lie: () => true, chercher: async (q) => { qs.push(q); return {threads: []}; }, fil: async () => ({messages: []})}, now: () => Date.parse('2026-11-23T09:00:00Z'), moisDepart: 4});
     const msg = RR.etat().scan.erreur; await RR.traiter('GET', '/api/radar', null); await RR.attendre();
-    ok('Radar : la lecture interrompue reprend au mois suivant (2 mois restants sur 4) ; l’ancien message de Google est traduit', qs.length === 4 && /after:2026\/10\/01/.test(qs[0]) && RR.etat().scan.fini && /Google a limité la lecture de tes mails/.test(msg), JSON.stringify([qs, msg])); }
+    ok('Radar : la lecture interrompue reprend au mois suivant (2 mois restants sur 4), puis cherche ses contrats (0.65.0) ; l’ancien message de Google est traduit', qs.length === 5 && /after:2026\/10\/01/.test(qs[0]) && /^has:attachment filename:pdf .*newer_than:4y$/.test(qs[4]) && RR.etat().scan.fini && /Google a limité la lecture de tes mails/.test(msg), JSON.stringify([qs, msg])); }
   /* 0.49.0 (« les dépenses relevées n'ont pas de sens ») : des achats fréquents n'en sont pas ; une facture sans montant compte ; le jour annoncé d'abord */
   { const rr = (cle, service, montant, date, datePrel) => ({id: cle + date + Math.random(), dom: cle, cle, service, montant, date, datePrel: datePrel || null, genre: 'facture'});
     const pp = regrouper([...['2026-08', '2026-09', '2026-10', '2026-11'].map((m) => rr('creche-exemple.fr', 'Crèche Exemple', null, m + '-01')),
@@ -156,7 +156,7 @@ try {
     /* la lecture d'avant 0.49.0 est oubliée (relevés, propositions), ses dépenses validées, sa paie et ses refus restent */
     fs.writeFileSync(path.join(DIR, 'radar5.json'), JSON.stringify({fixes: [{id: 'f1', service: 'Crédit', montant: 900, jour: 5, rythme: 'mensuel', source: 'toi'}], revenus: {jour: 27, avance: true}, refus: ['x.fr'], releves: [{id: 'r', dom: 'x.fr', montant: 1, date: '2026-11-01', genre: 'facture'}], propositions: [{id: 'p1', service: 'Bruit'}], scan: {fini: 1}}));
     const RV = createRadar({file: path.join(DIR, 'radar5.json'), gmail: {lie: () => false}, now: () => Date.parse('2026-11-23T09:00:00Z')}), bv = RV.brut();
-    ok('Radar : la lecture faite avec les anciennes règles est refaite (relevés et propositions oubliés) ; dépenses, paie et refus gardés', !bv.releves.length && !bv.propositions.length && !bv.scan && bv.fixes.length === 1 && bv.revenus.jour === 27 && bv.refus.includes('x.fr') && bv.version === 5); }
+    ok('Radar : la lecture faite avec les anciennes règles est refaite (relevés et propositions oubliés) ; dépenses, paie et refus gardés', !bv.releves.length && !bv.propositions.length && !bv.scan && bv.fixes.length === 1 && bv.revenus.jour === 27 && bv.refus.includes('x.fr') && bv.version === 6); }
   /* 0.50.0 : catégories enfants et impôts ; la proposition montre son dernier mail */
   ok('Radar : catégories « Enfants » (crèche, couches) et « Impôts » (DGFiP)', categorie('creche-exemple.fr', 'Crèche Les Lutins') === 'Enfants' && categorie('couches-exemple.fr', 'Couches Exemple') === 'Enfants' && categorie('dgfip.finances.gouv.fr', '') === 'Impôts');
   { const px = regrouper(['2026-09', '2026-10', '2026-11'].map((m) => ({id: 'x' + m, fil: 'f' + m, objet: 'Votre facture de ' + m, dom: 'tel3-exemple.fr', cle: 'tel3-exemple.fr', service: 'Tel Trois', montant: 9.99, date: m + '-05', datePrel: null, genre: 'facture'})), lundi)[0];
@@ -245,6 +245,70 @@ try {
     await R6.traiter('GET', '/api/radar', null); await R6.attendre();
     const p6 = R6.etat().propositions.find((x) => x.cle === 'creche-exemple.fr');
     ok('Radar 0.52 (serveur) : 3 factures dont le montant n’est que dans le PDF → proposée à 268,40 € le 5, lue dans les PDF, sans Claude', !!p6 && p6.montant === 268.4 && p6.jour === 5 && !p6.jourApprox && appelsPj.length === 3 && appelsClaude === 0 && R6.brut().scan.pdf === 3, JSON.stringify([p6, appelsPj.length, appelsClaude]));
+    /* 0.65.0 (sa remarque du 22/11/2026, données inventées) : ce qui est vraiment prélevé, écrit dans l'échéancier d'un appel de charges,
+       l'emporte sur « montant de l'appel » ; un relevé annuel « reporté sur votre appel » n'est pas un prélèvement ; le tableau des cotisations
+       d'un contrat donne le montant de chaque mois */
+    { const appel = 'APPEL PREVISIONNEL Période du 01/01/2027 au 31/03/2027 Montant de l\'appel de fonds400,00€ ALUR31,93 ECHEANCIER DES PRELEVEMENTS Id. Créancier SEPA FR00ZZZ000000 Votre RUM 2023000LeMONTANTLeMONTANTPAR PRELEVEMENT10/01/2027431.93Sur votre compte BANQUE EXEMPLE Solde au 01/12/2026546.22';
+      ok('Radar 0.65 : l’échéancier des prélèvements d’un appel de charges donne la date et le montant prélevés (431,93 €, pas l’appel de 400,00 € ni le solde)', JSON.stringify(prelevementsPdf(appel)) === JSON.stringify([{date: '2027-01-10', montant: 431.93}]) && montantPdf(appel) !== 431.93, JSON.stringify(prelevementsPdf(appel)));
+      ok('Radar 0.65 : prélevé en trois fois (« 10/01/2027 143,98 10/02/2027 143,98 10/03/2027 143,97 ») : trois prélèvements ; un solde daté sans « prélèvement » : rien',
+        prelevementsPdf('PAR PRELEVEMENT 10/01/2027 143,98 10/02/2027 143,98 10/03/2027 143,97 Sur votre compte').length === 3 && prelevementsPdf('Solde au 01/12/2026 546,22 € Appel 400,00 €').length === 0);
+      ok('Radar 0.65 : un relevé de charges annuel dont le solde « sera reporté sur votre appel de fonds » n’est pas un prélèvement ; l’appel l’est',
+        genre('Votre relevé de charges annuel', 'Il fait suite à l\'approbation des comptes. Ce montant sera reporté sur votre appel de fonds du 3ème trimestre.') === 'autre' && genre('Votre appel de charges du 1er trimestre', 'Nous vous prions de trouver votre appel de charges du trimestre.') === 'facture');
+      /* un contrat : 15 mois de cotisations (frais de dossier le premier mois, cotisation d'association en septembre, baisse en octobre) */
+      const lignes = [['2025-09', 61.2], ...['10', '11', '12'].map((m) => ['2025-' + m, 31.2]), ...['01', '02', '03', '04', '05', '06', '07'].map((m) => ['2026-' + m, 31.2]), ['2026-08', 32.5], ['2026-09', 35.9], ['2026-10', 30.9], ['2026-11', 30.9]];
+      const tableau = 'Cotisations\nPériodes\nDate Paiement\nTotal\nDébut\nFin\n' + lignes.map(([k, v]) => '02/' + k.slice(5) + '/' + k.slice(0, 4) + '\n01/' + String(+k.slice(5) % 12 + 1).padStart(2, '0') + '/' + (+k.slice(5) === 12 ? +k.slice(0, 4) + 1 : k.slice(0, 4)) + '\n' + k.slice(5) + '/' + k.slice(0, 4) + '\n' + String(v.toFixed(2)).replace('.', ',') + ' €').join('\n');
+      const cal = calendrierPdf('Contrat EXEMPLE EMPRUNTEUR. Assurance de prêt. Cotisation qui sera prélevée le 05/09/2025.\n' + tableau);
+      ok('Radar 0.65 : le tableau des cotisations d’un contrat → un montant par mois, en paliers (15 mois, 5 paliers, total juste)', !!cal && cal.debut === '2025-09' && cal.fin === '2026-11' && cal.mois === 15 && cal.paliers.length === 5 && cal.total === 503.4
+        && montantPalier(cal.paliers, '2026-03') === 31.2 && montantPalier(cal.paliers, '2026-09') === 35.9 && montantPalier(cal.paliers, '2025-08') === null, JSON.stringify(cal));
+      ok('Radar 0.65 : des dates éparses (moins de 12 mois, ou qui ne se suivent pas) ne font pas un tableau de cotisations', calendrierPdf(tableau.split('\n').slice(0, 30).join('\n')) === null);
+      const fPal = {jour: 5, montant: 31.2, rythme: 'mensuel', paliers: cal.paliers, fin: '2026-11-05'};
+      ok('Radar 0.65 : une dépense à paliers compte le montant de chaque mois (août 32,50 €, septembre 35,90 €, octobre 30,90 €), rien après la fin',
+        occurrences(fPal, J(2026, 7, 1), J(2026, 11, 31)).map((o) => o.f.montant).join() === '32.5,35.9,30.9,30.9');
+      /* de bout en bout : appels de charges trimestriels (PDF), un relevé annuel reporté, un certificat d'adhésion ; une assurance saisie à la main */
+      const AP = (q, d, v) => pdfMain([['F1', 10, 'APPEL PREVISIONNEL ' + q], ['F1', 10, 'Montant de l\'appel de fonds 400,00 \x80'], ['F1', 10, 'ECHEANCIER DES PRELEVEMENTS'], ['F1', 10, 'PAR PRELEVEMENT ' + d + ' ' + v]]).toString('base64').replace(/\+/g, '-').replace(/\//g, '_');
+      const CE = (() => { const l = [['F1', 9, 'Certificat d\'adh\xe9sion - Assurance de pr\xeat'], ['F1', 9, 'Cotisation qui sera pr\xe9lev\xe9e le 05/09/2025'], ['F1', 9, 'Nom du cr\xe9ancier : EXEMPLE ASSUR']];
+        for (const [k, v] of lignes) l.push(['F1', 9, '02/' + k.slice(5) + '/' + k.slice(0, 4) + ' 01/' + String(+k.slice(5) % 12 + 1).padStart(2, '0') + '/' + (+k.slice(5) === 12 ? +k.slice(0, 4) + 1 : k.slice(0, 4)) + ' ' + k.slice(5) + '/' + k.slice(0, 4) + ' ' + String(v.toFixed(2)).replace('.', ',') + ' \x80']);
+        return pdfMain(l).toString('base64').replace(/\+/g, '-').replace(/\//g, '_'); })();
+      const M = (id, sujet, d, texte, pj, nom) => ({id: 't' + id, messages: [{id, threadId: 't' + id, sender: id.startsWith('c') ? 'gestion@courtier-exemple.fr' : 'comptabilite@syndic-exemple.fr', addressDisplayNames: [{displayName: '', emailAddress: ''}], subject: sujet, plaintextBody: texte, date: d + 'T09:00:00Z',
+        attachments: pj ? [{filename: 'CG-exemple.pdf', mimeType: 'application/pdf', attachmentId: 'cg'}, {filename: nom || 'appel.pdf', mimeType: 'application/octet-stream', attachmentId: 'a' + id}] : []}]});
+      const PJ = {s1: AP('2T 2026', '10/04/2026', '431.93'), s2: AP('3T 2026', '10/07/2026', '512.50'), s3: AP('4T 2026', '10/10/2026', '431.93'), c1: CE};
+      const F9 = {ts1: M('s1', 'Votre appel de charges du 2E TRIMESTRE 2026', '2026-03-16', 'Veuillez trouver votre appel de charges du trimestre.', true), ts2: M('s2', 'Votre appel de charges du 3E TRIMESTRE 2026', '2026-06-25', 'Veuillez trouver votre appel de charges du trimestre.', true),
+        tr: M('r1', 'Votre releve de charges annuel', '2026-06-25', 'Votre relevé de charges annuel. Ce montant sera reporté sur votre appel de fonds du 3ème trimestre 2026.', false), ts3: M('s3', 'Votre appel de charges du 4E TRIMESTRE 2026', '2026-09-15', 'Veuillez trouver votre appel de charges du trimestre.', true),
+        tc1: M('c1', 'Votre contrat pour votre changement d\'assurance', '2025-07-30', 'Vous trouverez ci-joint votre contrat d\'assurance de prêt.', true, 'Certificat d\'adhésion.pdf')};
+      const pjLus = [], R10 = createRadar({file: path.join(DIR, 'radar20.json'), gmail: {lie: () => true, chercher: async (q) => ({threads: Object.values(F9).filter((t) => /has:attachment/.test(q) || t.messages[0].date >= '2025-09').map((x) => ({id: x.id}))}), fil: async (id) => F9[id],
+        pj: async (mid, aid) => { pjLus.push(aid); return {data: PJ[mid]}; }}, now: () => Date.parse('2026-11-04T09:00:00Z'), moisDepart: 13});
+      R10.regler('fixes', [{service: 'Mon assurance de prêt', montant: 31.2, jour: 5, rythme: 'mensuel'}]);
+      await R10.traiter('GET', '/api/radar', null); await R10.attendre();
+      const e10 = R10.etat(), sy = e10.propositions.find((x) => x.cle === 'syndic-exemple.fr'), al = e10.alertes.find((a) => a.type === 'calendrier');
+      ok('Radar 0.65 (serveur) : appels de charges → le montant prélevé (431,93 €, le 10, trimestriel), l’historique des vrais prélèvements (431,93 / 512,50 / 431,93), sans le relevé annuel',
+        !!sy && sy.montant === 431.93 && sy.jour === 10 && sy.rythme === 'trimestriel' && sy.historique.map((h) => h.montant).join() === '431.93,512.5,431.93' && sy.historique.every((h) => /-10$/.test(h.datePrel)), JSON.stringify(sy));
+      ok('Radar 0.65 (serveur) : le certificat d’adhésion (son PDF, pas les conditions générales) → une alerte sur l’assurance saisie à la main : 30,90 € ce mois-ci, « Appliquer ces montants ? »',
+        !!al && al.fixe && al.montant === 30.9 && /30,90 € ce mois-ci/.test(al.texte) && /Appliquer/.test(al.texte) && al.calendrier.jour === 5 && al.calendrier.paliers.length === 5 && pjLus.includes('ac1') && !pjLus.includes('cg') && !e10.propositions.some((p) => p.paliers), JSON.stringify(al));
+      R10.alerte(al.id, 'appliquer'); const fx10 = R10.brut().fixes[0], r10 = resteA(R10.brut().fixes, {jour: 28, avance: true}, J(2026, 10, 4), 'mois');
+      ok('Radar 0.65 : « Appliquer » : sa dépense suit le tableau du contrat (paliers, fin en novembre 2026, le 5), le reste à payer compte 30,90 €',
+        fx10.paliers.length === 5 && fx10.fin === '2026-11-05' && fx10.jour === 5 && fx10.montant === 30.9 && r10.liste.some((o) => o.f.service === 'Mon assurance de prêt' && o.f.montant === 30.9), JSON.stringify([fx10, r10.liste.map((o) => [o.f.service, o.f.montant])]));
+      const garde = R10.regler('fixes', R10.brut().fixes.concat([{service: 'Autre', montant: 1, jour: 2, rythme: 'mensuel', paliers: [{du: '2026-13', montant: 1}, {du: 'x', montant: 2}]}]));
+      ok('Radar 0.65 : les paliers d’une dépense restent quand la page renvoie la liste ; des paliers illisibles sont écartés', garde.ok && R10.brut().fixes[0].paliers.length === 5 && !('paliers' in R10.brut().fixes[1]));
+      /* une dépense du syndic déjà acceptée avec l'ancien montant (celui de l'appel) : relue, elle prend le montant prélevé, et le dit */
+      fs.writeFileSync(path.join(DIR, 'radar23.json'), JSON.stringify({version: 5, fixes: [{id: 'fsy', service: 'Syndic Exemple', cat: 'Logement', montant: 400, jour: 10, rythme: 'trimestriel', mois: 1, source: 'mail', dom: 'syndic-exemple.fr', cle: 'syndic-exemple.fr'},
+        {id: 'fmain', service: 'Loyer à la main', montant: 700, jour: 3, rythme: 'mensuel', source: 'toi'}]}));
+      const R13 = createRadar({file: path.join(DIR, 'radar23.json'), gmail: {lie: () => true, chercher: async (q) => ({threads: /has:attachment/.test(q) ? [] : Object.values(F9).filter((t) => t.messages[0].date >= '2025-09' && !t.id.startsWith('tc')).map((x) => ({id: x.id}))}), fil: async (id) => F9[id], pj: async (mid) => ({data: PJ[mid]})},
+        now: () => Date.parse('2026-11-04T09:00:00Z'), moisDepart: 13});
+      await R13.traiter('GET', '/api/radar', null); await R13.attendre();
+      const fs13 = R13.brut().fixes, ac = R13.etat().alertes.find((a) => a.type === 'corrige');
+      ok('Radar 0.65 : relue avec les nouvelles règles, la dépense du syndic déjà acceptée passe de 400,00 € (l’appel) à 431,93 € (le prélèvement), avec l’alerte « Montant corrigé » ; une dépense saisie à la main n’est pas touchée',
+        fs13[0].montant === 431.93 && !!ac && ac.avant === 400 && ac.montant === 431.93 && fs13[1].montant === 700 && !R13.brut().revise, JSON.stringify([fs13, ac]));
+      /* sans dépense à la main : proposée, avec ses paliers ; « Garder mon montant » : plus de question */
+      const R11 = createRadar({file: path.join(DIR, 'radar21.json'), gmail: {lie: () => true, chercher: async (q) => ({threads: /has:attachment/.test(q) ? [{id: 'tc1'}] : []}), fil: async (id) => F9[id], pj: async (mid) => ({data: PJ[mid]})}, now: () => Date.parse('2026-11-04T09:00:00Z'), moisDepart: 2});
+      await R11.traiter('GET', '/api/radar', null); await R11.attendre();
+      const p11 = R11.etat().propositions.find((x) => x.paliers);
+      ok('Radar 0.65 : sans dépense saisie, l’assurance est proposée : « Assurance de prêt (Exemple Assur) », 30,90 €, le 5, catégorie Assurances, avec ses paliers et sa fin',
+        !!p11 && p11.service === 'Assurance de prêt (Exemple Assur)' && p11.montant === 30.9 && p11.jour === 5 && p11.cat === 'Assurances' && p11.paliers.length === 5 && p11.fin === '2026-11-05', JSON.stringify(p11));
+      const R12 = createRadar({file: path.join(DIR, 'radar22.json'), gmail: {lie: () => true, chercher: async (q) => ({threads: /has:attachment/.test(q) ? [{id: 'tc1'}] : []}), fil: async (id) => F9[id], pj: async (mid) => ({data: PJ[mid]})}, now: () => Date.parse('2026-11-04T09:00:00Z'), moisDepart: 2});
+      R12.regler('fixes', [{service: 'Assurance emprunteur', montant: 40, jour: 5, rythme: 'mensuel'}]); await R12.traiter('GET', '/api/radar', null); await R12.attendre();
+      const a12 = R12.etat().alertes.find((a) => a.type === 'calendrier'); R12.alerte(a12.id, 'garder');
+      R12.brut().fils = {}; R12.brut().vus = []; R12.brut().scan = null; await R12.traiter('GET', '/api/radar', null); await R12.attendre();
+      ok('Radar 0.65 : « Garder mon montant » : sa dépense garde 40 €, et la question ne revient pas à la relecture', R12.brut().fixes[0].montant === 40 && !R12.brut().fixes[0].paliers && !R12.etat().alertes.some((a) => a.type === 'calendrier'), JSON.stringify(R12.etat().alertes)); }
     /* la paie « entre le 5 et le 10 » : le reste à payer court jusqu'au 10 ; la notification de la veille le dit */
     const R7 = createRadar({file: path.join(DIR, 'radar9.json'), gmail: {lie: () => false}, now: () => Date.parse('2026-12-03T18:00:00Z'), push: async (m) => { R7m.push(m); return []; }}), R7m = [];
     const ok1 = R7.regler('revenus', {jour: 10, des: 5, avance: true}).ok, ok2 = R7.regler('fixes', [{service: 'Loyer exemple', montant: 50, jour: 4, rythme: 'mensuel'}]).ok;

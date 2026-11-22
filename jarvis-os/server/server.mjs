@@ -29,7 +29,7 @@ import {pique, PERSO_ORAL} from './humour.mjs';   /* 21/11/2026 : sa personnalit
 import {createAudio} from './audio.mjs';   /* 0.64.0 : le message vocal d'un proche, mis au format de l'écoute */
 const ACT = createActivite();   /* 0.33.0 : ce que fait Claude à l'instant */
 
-const VERSION = '0.64.0';
+const VERSION = '0.65.0';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PORT = +(process.env.PORT || 8787);
 const HOST = process.env.HOST || '127.0.0.1';
