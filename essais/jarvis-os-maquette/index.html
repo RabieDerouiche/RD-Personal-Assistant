@@ -3938,11 +3938,14 @@ void main(){
   ];
   const TITLES = {accueil: "Vue d'ensemble", demandes: 'Ce qui attend ta réponse', agenda: 'Agenda et dates clés', equipe: 'Les bots', suivi: 'Dossiers, papiers, tâches', achats: 'Achats et prix suivis', voyages: 'Projets de voyage'};
   let TAB = 'accueil';
+  /* refonte UX (22/11/2026) : la porte de la barre à laquelle appartient chaque page */
+  function rootOf(id) { return id === 'accueil' || id === 'demandes' || id === 'agenda' ? id : 'espaces'; }
+  const NAVLBL = {accueil: 'Aujourd’hui', demandes: 'Pour moi', agenda: 'Agenda', espaces: 'Espaces', equipe: 'Équipe', suivi: 'Équipe', automatisations: 'Équipe', reglages: 'Réglages', argent: 'Argent', papiers: 'Papiers', sorties: 'Sorties', achats: 'Achats', voyages: 'Voyages'};
   /* le retour en arrière : chaque écran quitté est gardé, avec sa position ; « up » = remonter d'un niveau sans empiler */
   const NAV = {stack: [], cur: null, up: false, y: null};
   const navState = () => ({tab: TAB, agent: AGENT, ach: SEL.achats, voy: SEL.voyages});
   const navKey = (x) => [x.tab, x.agent, x.ach, x.voy].join('|');
-  const navLabel = (x) => x.ach ? ((S.ach.find((f) => f.id === x.ach) || {}).title || 'Achats') : x.voy ? ((S.voyages.find((v) => v.id === x.voy) || {}).title || 'Voyages') : x.agent && BOT[x.agent] ? BOT[x.agent].name : ((TABS.find((t) => t.id === x.tab) || {}).label || (x.tab === 'equipe' ? 'Équipe' : 'Accueil'));
+  const navLabel = (x) => x.ach ? ((S.ach.find((f) => f.id === x.ach) || {}).title || 'Achats') : x.voy ? ((S.voyages.find((v) => v.id === x.voy) || {}).title || 'Voyages') : x.agent && BOT[x.agent] ? BOT[x.agent].name : (NAVLBL[x.tab] || (TABS.find((t) => t.id === x.tab) || {}).label || 'Aujourd’hui');
   function navTrack(y) {
     const cur = navState();
     if (NAV.cur && navKey(NAV.cur) !== navKey(cur)) {
@@ -3951,12 +3954,14 @@ void main(){
       else { NAV.stack.push(Object.assign({}, NAV.cur, {y})); if (NAV.stack.length > 40) NAV.stack.shift(); }
     }
     NAV.up = false; NAV.cur = cur;
-    const b = $('nav-back'), top = NAV.stack[NAV.stack.length - 1];
-    const deep = !!(AGENT || SEL.achats || SEL.voyages); const br = document.querySelector('.brand'); if (br) br.classList.toggle('is-deep', deep && !!top);
+    const b = $('nav-back'), espDeep = rootOf(TAB) === 'espaces' && TAB !== 'espaces' && !AGENT && !SEL.achats && !SEL.voyages;
+    const top = NAV.stack[NAV.stack.length - 1] || (espDeep ? {tab: 'espaces'} : null);   /* une page de domaine ouverte directement remonte à Espaces */
+    const deep = !!(AGENT || SEL.achats || SEL.voyages) || espDeep; const br = document.querySelector('.brand'); if (br) br.classList.toggle('is-deep', deep && !!top);
     if (b) { b.hidden = !top || !deep; if (top) { b.replaceChildren(h('span', {class: 'ic', html: icon('back', 16)}), h('span', {class: 'nb-l', text: navLabel(top)})); b.setAttribute('aria-label', 'Retour : ' + navLabel(top)); } }
   }
   function navBack() {
-    const x = NAV.stack.pop(); if (!x) return;
+    const x = NAV.stack.pop();
+    if (!x) { if (rootOf(TAB) === 'espaces' && TAB !== 'espaces') { NAV.up = true; go('espaces'); } return; }
     closeSheet(true); closeApp(); if (CHAT.open) closeChat();
     TAB = VIEWS[x.tab] ? x.tab : 'accueil'; AGENT = x.agent; SEL.achats = x.ach; SEL.voyages = x.voy;
     NAV.cur = navState(); NAV.y = x.y;
@@ -3972,7 +3977,7 @@ void main(){
     $('view-title').textContent = VIEWTITLE[TAB] ? VIEWTITLE[TAB]() : TAB === 'equipe' && AGENT ? BOT[AGENT].name + ' · ' + BOT[AGENT].title : TITLES[TAB];
     VIEWS[TAB](body);
     v.replaceChildren(body);
-    document.querySelectorAll('.tab').forEach((t) => { const on = t.dataset.tab === TAB; t.setAttribute('aria-current', on ? 'page' : 'false'); if (on) try { t.scrollIntoView({inline: 'center', block: 'nearest'}); } catch (e) { /* rien */ } });
+    document.querySelectorAll('.tab').forEach((t) => { const on = t.dataset.tab === rootOf(TAB); t.setAttribute('aria-current', on ? 'page' : 'false'); });
     header();
     const to = keep ? y : NAV.y != null ? NAV.y : 0; NAV.y = null;
     if (sc) sc.scrollTop = to; else window.scrollTo(0, to);
@@ -4618,69 +4623,85 @@ void main(){
     el.append(h('p', {class: 'muted rad-foot', text: SRV_OS ? 'Lu dans tes mails par ton serveur, chaque matin à 6 h 50. Les montants restent sur le serveur : jamais dans Pilotage, ni chez les bots.' : 'Maquette : données d’exemple. Sur ton serveur, le Radar lira tes mails chaque matin à 6 h 50, sans Claude, et gardera tes dépenses fixes et ta paie ; les montants resteront sur le serveur, jamais dans Pilotage ni chez les bots.'}));
   };
 
+  /* ================= refonte UX (22/11/2026) : Espaces, la porte de tous les domaines ; chaque tuile dit déjà l'essentiel ================= */
+  TITLES.espaces = 'Espaces';
+  ICONS.team = '<circle cx="9" cy="9" r="3.2"/><circle cx="17" cy="10" r="2.4"/><path d="M3.5 19.5c.6-3.3 2.8-5 5.5-5s4.9 1.7 5.5 5M14.5 15c2.6-.4 4.8.9 5.5 4.5"/>';
+  document.head.append(h('style', {text: ''
+    + '.esp-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0 0 6px}'
+    + '.esp-tile{position:relative;overflow:hidden;display:grid;align-content:start;gap:3px;min-height:140px;padding:14px;text-align:left;border-radius:20px;color:var(--fg);font:inherit;cursor:pointer;border:1px solid rgba(var(--c1),.28);background:linear-gradient(180deg,rgba(var(--k7),.42),rgba(var(--k1),.82));box-shadow:inset 0 1px 0 rgba(var(--c6),.12),0 10px 26px rgba(0,0,0,.35);transition:transform .12s}'
+    + '.esp-tile:active{transform:scale(.97)}.esp-tile.amb{border-color:rgba(var(--warn),.6)}.esp-tile.amb .esp-s b{color:#fde68a;font-weight:600}'
+    + '.esp-ic{width:34px;height:34px;border-radius:11px;display:grid;place-items:center;margin-bottom:6px;color:rgb(var(--c2));background:rgba(var(--c1),.12);border:1px solid rgba(var(--c1),.3)}'
+    + '.esp-n{font:600 12.5px var(--display);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}.esp-v{font:700 21px/1.15 var(--display)}.esp-s{color:var(--muted);font-size:13px;line-height:1.3}'
+    + '.esp-tile.pic{align-content:end;min-height:160px}.esp-tile.pic img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0}'
+    + '.esp-tile.pic::after{content:"";position:absolute;inset:0;z-index:0;background:linear-gradient(180deg,rgba(2,6,20,.12),rgba(2,6,20,.9) 70%)}'
+    + '.esp-tile.pic>span,.esp-tile.pic>b{position:relative;z-index:1}.esp-tile.pic .esp-n{color:rgb(var(--c2))}.esp-tile.pic .esp-s{color:#d6e9ff}.esp-tile.pic .esp-ic{position:absolute;top:12px;left:12px;background:rgba(2,6,20,.6)}'
+    + '.esp-rows{display:grid;gap:8px}.esp-row{display:flex;align-items:center;gap:12px;width:100%;min-height:60px;padding:10px 14px;text-align:left;font:inherit;color:var(--fg);border-radius:18px;border:1px solid rgba(var(--c1),.22);background:linear-gradient(180deg,rgba(var(--k7),.34),rgba(var(--k1),.78));cursor:pointer}'
+    + '.esp-row .esp-ic{margin:0;flex:0 0 auto}.esp-row b{display:block;font-weight:600;font-size:15px}.esp-row small{display:block;color:var(--muted);font-size:13px}.esp-row>span:nth-child(2){flex:1;min-width:0}'
+    + '.esp-lead{color:var(--muted);margin:0 0 12px}'}));
+  const escH = (x) => String(x == null ? '' : x).replace(/[&<>"]/g, (c) => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
+  VIEWS.espaces = (el) => {
+    const tile = (id, ic, name, v, sub, o) => { o = o || {}; const b = h('button', {type: 'button', class: 'esp-tile' + (o.amb ? ' amb' : ''), 'data-go': id, onclick: () => go(id)}, h('span', {class: 'esp-ic', html: icon(ic, 18)}), h('span', {class: 'esp-n', text: name}), h('b', {class: 'esp-v', text: v}), h('span', {class: 'esp-s', html: sub}));
+      if (o.photo) o.photo((url) => { if (!url || b.querySelector('img')) return; b.classList.add('pic'); b.prepend(h('img', {src: url, alt: '', decoding: 'async'})); });
+      return b; };
+    const T = [];
+    /* Argent (le Radar) */
+    if (radOn()) {
+      radLoad(); const d = RAD.data, R = d ? radReste(d) : null, nv = d ? (d.propositions || []).length : 0;
+      T.push(tile('argent', 'euro', 'Argent', R ? radEur(R.tReste) : 'Radar', R ? (R.mois ? 'd’ici la fin du mois' : 'd’ici ta paie') + (nv ? ', <b>' + nv + ' à valider</b>' : '') : 'lecture de tes mails…', {amb: nv > 0}));
+    }
+    /* Achats */
+    const live = S.ach.filter((f) => !['achete', 'retire'].includes(famState(f))), hot = live.filter((f) => ACH_HOT.includes(famState(f)));
+    T.push(tile('achats', 'tag', 'Achats', hot.length ? hot.length + ' à décider' : live.length + ' suivis', hot.length ? escH(hot[0].title) : 'Kairos surveille les prix', {amb: hot.length > 0}));
+    /* Voyages : le prochain départ, avec sa photo */
+    const trips = S.voyages.filter((v) => !v.gone), nx = trips.filter((v) => !v.demo && v.depart != null && v.depart >= 0).sort((a, b) => a.depart - b.depart)[0];
+    T.push(tile('voyages', 'plane', 'Voyages', nx ? 'J-' + nx.depart : trips.length + ' projet' + (trips.length > 1 ? 's' : ''), nx ? escH(nx.title) : 'tes envies de voyage', {photo: nx ? (cb) => { try { voyPhoto(voyDests(nx), cb); } catch (e) { /* rien */ } } : null}));
+    /* Sorties */
+    const open = S.sorties.filter((x) => x.status === 'proposee' && !sorExpired(x)), wk = open.filter(sorInWeekend);
+    T.push(tile('sorties', 'map', 'Sorties', wk.length ? wk.length + (wk.length > 1 ? ' idées' : ' idée') : open.length + (open.length > 1 ? ' idées' : ' idée'), wk.length ? 'ce week-end' : 'pour les prochains week-ends'));
+    /* Papiers */
+    T.push(tile('papiers', 'doc', 'Papiers', (S.papiers || []).length + ' suivis', 'rangés par Iris dans ton Drive'));
+    /* Équipe : l'état de Grok */
+    const asking = new Set((S.demandes || []).map((x) => x.bot).filter(Boolean)).size;
+    T.push(tile('equipe', 'team', 'Équipe', GP.on ? 'Grok en pause' : asking ? asking + (asking > 1 ? ' bots t’attendent' : ' bot t’attend') : 'Tout roule', GP.on ? (GP.until ? 'reprise ' + escH(fmt(GP.until, {weekday: 'short'}).replace('.', '') + ' ' + hmFr(GP.until)) : 'les sonnettes attendent la reprise') : 'tes bots, leurs routines, le coût', {amb: GP.on || asking > 0}));
+    const row = (id, ic, t, sub) => h('button', {type: 'button', class: 'esp-row', 'data-go': id, onclick: () => go(id)}, h('span', {class: 'esp-ic', html: icon(ic, 18)}), h('span', {}, h('b', {text: t}), h('small', {text: sub})), h('span', {class: 'ic', html: icon('next', 16)}));
+    el.append(h('p', {class: 'esp-lead', text: 'Chaque domaine montre déjà l’essentiel : un appui pour le détail.'}), h('div', {class: 'esp-grid'}, T),
+      panel('Coulisses', null, h('div', {class: 'esp-rows'}, row('equipe', 'team', 'Équipe, routines et dossiers', 'Les bots, ce que tu leur as demandé, leurs passages, le coût'), row('reglages', 'gear', 'Réglages', 'Serveur, voix, notifications, Google, mémoire'))));
+  };
+
   function boot() {
     const nav = $('tabs');
-    /* JARVIS OS : barre à tes 4 favoris, l'orbe au centre ; la poignée (ou un geste vers le haut) montre toutes les rubriques */
-    /* ordre du 16/11/2026 : le quotidien d'abord (accueil, ce qui attend sa réponse, agenda, ce qui est en cours), puis les domaines, puis l'équipe et les réglages */
+    /* JARVIS OS, refonte UX (22/11/2026, maquette validée par le propriétaire) : 5 portes fixes, l'orbe au centre ; plus de favoris ni de menu « Tout ».
+       Les autres rubriques sont dans Espaces ; l'onglet allumé est celui de la racine de la page (Espaces pour Achats, Équipe, Réglages…). */
     ICONS.home = '<path d="M4 11.5 12 5l8 6.5"/><path d="M6.5 10v9.5h11V10"/><path d="M10 19.5v-5h4v5"/>';
-    const ALL = [['accueil', 'Accueil', 'home'], ['demandes', 'Pour moi', 'chat'], ['agenda', 'Agenda', 'cal'], ['suivi', 'Suivi', 'folder'], ['achats', 'Achats', 'tag'], ['voyages', 'Voyages', 'plane'], ['sorties', 'Sorties', 'map'], ['papiers', 'Papiers', 'doc'], ['equipe', 'Équipe', 'pulse'], ['automatisations', 'Automatisations', 'clock'], ['reglages', 'Réglages', 'gear']];
-    if (radOn()) ALL.splice(ALL.findIndex((a) => a[0] === 'equipe'), 0, ['argent', 'Argent', 'euro']); /* Radar (maquette du 21/11/2026) */
-    const FAV0 =['accueil', 'demandes', 'agenda', 'achats'];
-    let FAV = null; try { FAV = JSON.parse(localStorage.getItem('jarvis.fav')); if (localStorage.getItem('jarvis.fav.v') !== '2') { FAV = null; localStorage.setItem('jarvis.fav.v', '2'); } } catch (e) { /* rien */ }
-    if (!Array.isArray(FAV) || FAV.length !== 4 || FAV.some((f) => !ALL.find((a) => a[0] === f))) FAV = FAV0.slice();
-    const sheet = h('div', {class: 'all-sheet', hidden: true, role: 'dialog', 'aria-label': 'Toutes les rubriques'});
-    let editFav = false;
-    const navBtn = ([id, label, ic], extra) => h('button', {type: 'button', class: 'tab', 'data-tab': id, onclick: () => { closeAll(); go(id); }, ...(extra || {})}, h('span', {class: 'ic', html: icon(ic, 20)}), h('span', {class: 'lbl', text: label}), id === 'demandes' ? h('span', {class: 'badge', hidden: true}) : null);
-    /* ouverture et fermeture animées ; la feuille suit le doigt quand on la tire vers le bas */
-    /* 0.49.1 (« l'ouverture du menu bugge des fois ») : un second appui impatient tombait sur « Fermer », qui monte à la place de « Tout », et refermait le menu ;
-       un glissé interrompu par iOS (touchcancel) laissait le panneau à mi-course ; un lancer vif vers le bas ne fermait pas ;
-       des favoris laissés à 3 n'étaient ni gardés ni annulés */
-    let closeT = 0, openedAt = 0, FAV_OK = FAV.slice();
-    const openAll = () => { if (!sheet.hidden && sheet.classList.contains('is-open')) return; clearTimeout(closeT); drawSheet(); sheet.hidden = false; openedAt = performance.now(); document.body.classList.add('all-open'); requestAnimationFrame(() => requestAnimationFrame(() => sheet.classList.add('is-open'))); };
-    const favDone = () => { if (FAV.length === 4) return; FAV = FAV_OK.slice(); toast('Favoris inchangés', 'Il en faut 4 : choisis-en un autre avant « Terminé ».'); };
-    function closeAll() { if (sheet.hidden) return; if (editFav) favDone(); sheet.classList.remove('is-open'); const pn = sheet.querySelector('.all-panel'); if (pn) { pn.style.transition = ''; pn.style.transform = ''; } dy0 = null; editFav = false; document.body.classList.remove('all-open'); closeT = setTimeout(() => { sheet.hidden = true; }, 300); }
-    let dy0 = null, dyN = 0, dt0 = 0;
-    sheet.addEventListener('touchstart', (e) => { dy0 = null; const pn = e.target.closest && e.target.closest('.all-panel'); if (pn && pn.scrollTop <= 0 && e.touches.length === 1) { dy0 = e.touches[0].clientY; dyN = 0; dt0 = performance.now(); pn.style.transition = 'none'; } }, {passive: true});
-    sheet.addEventListener('touchmove', (e) => { if (dy0 == null) return; dyN = Math.max(0, e.touches[0].clientY - dy0); const pn = sheet.querySelector('.all-panel'); if (pn) pn.style.transform = 'translateY(' + dyN + 'px)'; }, {passive: true});
-    const dragEnd = (cancel) => { if (dy0 == null) return; dy0 = null; const pn = sheet.querySelector('.all-panel'); if (!pn) return; pn.style.transition = ''; const fast = dyN > 50 && dyN / Math.max(1, performance.now() - dt0) > 0.6; if (!cancel && (dyN > 90 || fast)) closeAll(); else pn.style.transform = ''; };
-    sheet.addEventListener('touchend', () => dragEnd(false), {passive: true});
-    sheet.addEventListener('touchcancel', () => dragEnd(true), {passive: true});
-    function drawSheet() {
-      sheet.replaceChildren(h('div', {class: 'all-panel'},
-        h('div', {class: 'all-h'}, h('b', {text: editFav ? 'Choisis 4 favoris' : 'Toutes les rubriques'}), h('button', {type: 'button', class: 'link', onclick: () => { if (editFav) favDone(); editFav = !editFav; drawSheet(); }}, editFav ? 'Terminé' : 'Modifier mes favoris')),
-        h('div', {class: 'all-grid'}, ALL.map((a) => editFav
-          ? h('button', {type: 'button', class: 'tab fav-pick' + (FAV.includes(a[0]) ? ' is-fav' : ''), onclick: () => { if (FAV.includes(a[0])) FAV = FAV.filter((f) => f !== a[0]); else if (FAV.length < 4) FAV.push(a[0]); if (FAV.length === 4) { FAV_OK = FAV.slice(); try { localStorage.setItem('jarvis.fav', JSON.stringify(FAV)); } catch (e) { /* rien */ } drawBar(); } drawSheet(); }}, h('span', {class: 'ic', html: icon(a[2], 20)}), h('span', {class: 'lbl', text: a[1]}), h('span', {class: 'star', text: FAV.includes(a[0]) ? '★' : '☆'}))
-          : navBtn(a))),
-        h('button', {type: 'button', class: 'all-close', onclick: closeAll}, 'Fermer')));
-    }
-    /* 0.49.1 : pendant l'ouverture (450 ms), un second appui sur « Tout » tombait sur « Fermer », qui monte à sa place : ignoré */
-    sheet.addEventListener('click', (e) => { if (performance.now() - openedAt < 450) { e.stopPropagation(); e.preventDefault(); } }, true);
-    sheet.addEventListener('click', (e) => { if (e.target === sheet) closeAll(); });
+    ICONS.sun = '<circle cx="12" cy="12" r="4"/><path d="M12 2.8v2.4M12 18.8v2.4M2.8 12h2.4M18.8 12h2.4M5.5 5.5l1.7 1.7M16.8 16.8l1.7 1.7M5.5 18.5l1.7-1.7M16.8 7.2l1.7-1.7"/>';
+    ICONS.grid = '<rect x="4" y="4" width="6.5" height="6.5" rx="2"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="2"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="2"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="2"/>';
+    const PORTES = [['accueil', 'Aujourd’hui', 'sun'], ['demandes', 'Pour moi', 'chat'], ['agenda', 'Agenda', 'cal'], ['espaces', 'Espaces', 'grid']];
+    /* un appui sur l'onglet de la page ouverte remonte en haut ; sur l'onglet d'une page plus profonde (Achats sous Espaces), il revient à sa racine */
+    const navBtn = ([id, label, ic]) => h('button', {type: 'button', class: 'tab', 'data-tab': id, onclick: () => { if (TAB === id && !AGENT && !SEL.achats && !SEL.voyages) { const sc = $('scroller'); if (sc) try { sc.scrollTo({top: 0, behavior: 'smooth'}); } catch (e) { sc.scrollTop = 0; } return; } go(id); }},
+      h('span', {class: 'ic', html: icon(ic, 20)}), h('span', {class: 'lbl', text: label}), id === 'demandes' ? h('span', {class: 'badge', hidden: true}) : null);
     function drawBar() {
-      const fav = FAV.map((f) => ALL.find((a) => a[0] === f));
-      nav.replaceChildren(h('button', {type: 'button', class: 'fav-handle', 'aria-label': 'Toutes les rubriques', onclick: openAll}, h('span', {class: 'grip'}), h('span', {text: 'Tout'})),
-        h('div', {class: 'fav-row'}, h('span', {class: 'fav-ind', 'aria-hidden': 'true'}), navBtn(fav[0]), navBtn(fav[1]), h('div', {class: 'talk-slot'}), navBtn(fav[2]), navBtn(fav[3])));
+      nav.replaceChildren(h('div', {class: 'fav-row'}, h('span', {class: 'fav-ind', 'aria-hidden': 'true'}), navBtn(PORTES[0]), navBtn(PORTES[1]), h('div', {class: 'talk-slot'}), navBtn(PORTES[2]), navBtn(PORTES[3])));
       if (window.JarvisVoice) try { window.JarvisVoice.mountButton(nav.querySelector('.talk-slot')); } catch (e) { /* rien */ }
       try { renderView(true); } catch (e) { /* rien */ }
       placeInd();
     }
-    /* l'indicateur lumineux glisse jusqu'à la rubrique ouverte ; hors de la barre, c'est « Tout » qui s'allume */
+    /* l'indicateur lumineux glisse jusqu'à l'onglet allumé */
     function placeInd() {
       const ind = nav.querySelector('.fav-ind'), row = nav.querySelector('.fav-row'); if (!ind || !row) return;
       const t = row.querySelector('.tab[aria-current="page"]');
-      nav.classList.toggle('is-elsewhere', !t);
       if (!t) { ind.style.opacity = '0'; return; }
       const r = row.getBoundingClientRect(), b = t.getBoundingClientRect();
       ind.style.opacity = '1'; ind.style.transform = 'translateX(' + (b.left - r.left + b.width / 2 - 28) + 'px)';
     }
     new MutationObserver(() => requestAnimationFrame(placeInd)).observe(nav, {subtree: true, attributes: true, attributeFilter: ['aria-current']});
     window.addEventListener('resize', placeInd);
-    /* 0.49.1 : le glissé vers le haut n'ouvre plus le menu depuis l'orbe, ni depuis le bas de l'écran (geste d'accueil d'iOS), ni sur un glissé lent ou en biais */
-    let y0 = null, x0 = 0, yt0 = 0;
-    nav.addEventListener('touchstart', (e) => { y0 = null; if (e.touches.length !== 1 || (e.target.closest && e.target.closest('.talk-slot'))) return; const y = e.touches[0].clientY, pb = parseFloat(getComputedStyle(nav).paddingBottom) || 0; if (y > innerHeight - pb) return; y0 = y; x0 = e.touches[0].clientX; yt0 = performance.now(); }, {passive: true});
-    nav.addEventListener('touchend', (e) => { if (y0 == null) return; const dy = y0 - e.changedTouches[0].clientY, dx = Math.abs(e.changedTouches[0].clientX - x0); y0 = null; if (dy > 40 && dx < dy / 2 && performance.now() - yt0 < 700) openAll(); }, {passive: true});
-    nav.addEventListener('touchcancel', () => { y0 = null; }, {passive: true});
-    document.body.append(sheet);
+    /* glisser depuis le bord gauche de l'écran : retour, comme dans une app iPhone (seulement quand « ‹ Retour » est affiché, rien d'ouvert par-dessus) */
+    let E = null;
+    document.addEventListener('touchstart', (e) => { E = null; const b = $('nav-back'); if (e.touches.length !== 1 || e.touches[0].clientX > 24 || !b || b.hidden || !$('sheet').hidden || CHAT.open || APP.id) return; E = {x0: e.touches[0].clientX, y0: e.touches[0].clientY, t0: performance.now(), on: false}; }, {passive: true});
+    document.addEventListener('touchmove', (e) => { if (!E) return; const dx = e.touches[0].clientX - E.x0, dy = e.touches[0].clientY - E.y0; if (!E.on) { if (Math.abs(dy) > Math.abs(dx)) { E = null; return; } if (dx < 10) return; E.on = true; } const v = $('view'); v.style.transition = 'none'; v.style.transform = 'translateX(' + Math.max(0, dx) + 'px)'; v.style.opacity = String(1 - Math.min(0.5, dx / innerWidth)); }, {passive: true});
+    const eEnd = (e, cancel) => { const g = E; E = null; if (!g || !g.on) return; const v = $('view'); v.style.transition = ''; v.style.transform = ''; v.style.opacity = ''; if (cancel) return; const dx = e.changedTouches[0].clientX - g.x0, fast = dx / Math.max(1, performance.now() - g.t0) > 0.5; if (dx > 100 || (dx > 40 && fast)) navBack(); };
+    document.addEventListener('touchend', (e) => eEnd(e, false), {passive: true});
+    document.addEventListener('touchcancel', (e) => eEnd(e, true), {passive: true});
     drawBar();
     const brand = document.querySelector('.brand b'); if (brand) { brand.style.cursor = 'pointer'; brand.addEventListener('click', () => go('accueil')); }
     $('sheet-back').addEventListener('click', () => closeSheet());

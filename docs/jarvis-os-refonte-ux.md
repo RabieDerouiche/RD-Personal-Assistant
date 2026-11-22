@@ -51,6 +51,16 @@ Conséquence retenue : le travail se fait sur une branche, poussée régulièrem
 7. Une seule couche : les rubriques par-dessus (`#app`) deviennent des pages de la pile ; la discussion devient la feuille plein écran.
 8. Bancs (maquette, bout en bout, serveur, check-up), liste de parité, captures, puis fusion et entrée dans `docs/jarvis-os.md`.
 
+## Carte du code (par nom : les numéros de ligne bougent)
+
+- Page : `essais/jarvis-os-maquette/index.html`, un seul script (IIFE) ; les couches « JARVIS OS » réassignent les fonctions plus haut (la dernière gagne). Défilement dans `#scroller`, pas `window`.
+- Coquille : `boot()` (barre à favoris, feuille « Tout », `drawBar`, `placeInd`), `VIEWS`, `TITLES`, `VIEWTITLE`, `TAB`, `NAV`/`navTrack`/`navBack`, `renderView`, `go` (réassignée pour le mode « une par une »), `hashchange`, `voirUrl` (`#voir-…` → Pour moi). Le serveur envoie des liens vers `/#suivi` et `/#demandes` (`server.mjs`, `sante.mjs`, `notify.mjs`) : **`#suivi` doit rester une adresse valide**.
+- Couches : `#sheet` (`openSheet(cfg)`/`closeSheet`), `#app` (`openApp`, `SCREEN.*` : taches, papiers, depot réutilisés ailleurs), `#chat` (`openChat`/`closeChat`/`renderChat`, `window.JarvisAsk` = `askOpen`), `swipeToClose()`.
+- Vues effectives : accueil = `homeDash` (récolte `ACC_ORIG` dans un bloc hors écran) ; Pour moi = sections `#pm-dec`, `#pm-todo`, `#pm-proj`, `#pm-rep`, `#pm-wait`, `#pm-mail` ; suivi = 13 panneaux (`pendPanel`, réponses reçues, `costPanel`, `queuePanel`, `claudePanel`, dossiers, ligne Papiers, `SCREEN.taches`, `missionsPanel`, relances, `consoPanel`, `sysBox`+`santeBox`, `histPanel`) ; equipe = `agentPage` si `AGENT`, sinon héros de Claude, `mateCard`, `teamStats`, `liveFil`, « Tes ordres » ; automatisations = `routinesPanel` + une frise par bot.
+- À réutiliser : `C(bot, taille)` (personnages, ids internes hydra, medusa…), `JarvisVoice.holo(o)` (globe, états idle, listening, thinking, speaking ; `mountButton` ne rend pas l'objet du globe), `voyPhoto`, `compImg`, `priceChart`, `radLoad`/`radReste`/`radEur`, `metLoad`/`metLine`, `pourMoiN()`, `homeData()`, `dayItems()`.
+- Claude : `sendChat` (attente, flux `onText`, fin) ; `mainsBusy(b)` reçoit déjà idle, thinking, speaking : c'est là que le globe doit être piloté.
+- Bancs liés à la navigation : `banc.cjs` (favoris, « Tout », `.talk-slot .jv-btn`, `#voir-…`, routes, Équipe `.team .mate`, `.lf`, Suivi `.pend-x .track`, Automatisations `.auto.card`), `banc-serveur.mjs` (`.fav-handle`, `#missions`, `.mis-panel`, `.rel-panel`, `.conso-panel`, `.sante-box`, `#routines`, routes `#suivi` et `#automatisations`), `audit.cjs` (liste des routes, `.all-sheet`).
+
 ## État
 
 - 22/11/2026 : décisions prises, plan écrit ; cartographie du code en cours.
