@@ -47,9 +47,9 @@ try {
   ok('page en direct : Pilotage, agenda et Gmail lus par l’accès Google', uniq.some((u) => /sheets values Canal/.test(u)) && uniq.some((u) => /calendar events/.test(u)) && uniq.some((u) => /gmail threads/.test(u)), uniq.length + ' sources : ' + uniq.slice(0, 8).join(' | '));
   ok('aucune donnée d’exemple chargée', await p.evaluate(() => !document.querySelector('script[src="donnees-fictives.js"]')));
   /* Radar (21/11/2026) : le serveur répond, la rubrique Argent apparaît ; sa première ouverture lit les mails (faux Google : 3 factures inventées) */
-  { await p.tap('.fav-handle').catch(() => p.click('.fav-handle')); await p.waitForTimeout(600);
-    ok('Radar : le serveur répond, la rubrique Argent est dans « Toutes les rubriques »', await p.evaluate(() => !!document.querySelector('.all-grid .tab[data-tab="argent"]')));
-    await p.evaluate(() => { const c = document.querySelector('.all-close'); if (c) c.click(); }); await p.waitForTimeout(400); }
+  { await p.tap('.tab[data-tab="espaces"]').catch(() => p.click('.tab[data-tab="espaces"]')); await p.waitForTimeout(800);   /* refonte UX : Argent est une tuile d'Espaces */
+    ok('Radar : le serveur répond, la rubrique Argent est une tuile d’Espaces', await p.evaluate(() => !!document.querySelector('.esp-tile[data-go="argent"]')));
+    await p.tap('.tab[data-tab="accueil"]').catch(() => p.click('.tab[data-tab="accueil"]')); await p.waitForTimeout(600); }
   await p.screenshot({path: SH + 'os-live.png'});
   { await p.goto(BASE + '/?serveur#argent'); await p.waitForTimeout(9000);
     const a1 = await p.evaluate(() => ({props: [...document.querySelectorAll('.rad-prop')].map((x) => x.innerText.replace(/\s+/g, ' ')), defaut: !!document.querySelector('.rad-paie-defaut'), big: (document.querySelector('.rad-big') || {}).textContent || '', vide: /Rien de validé pour l’instant/.test((document.querySelector('.rad-hero p') || {}).textContent || '')}));
@@ -76,7 +76,8 @@ try {
   ok('papiers en direct : arborescence demandée au Drive (lecture seule)', FG.calls.some((c) => c.path === '/drive/files') && FG.calls.filter((c) => c.path.startsWith('/drive')).every((c) => c.method === 'GET') && await p.evaluate(() => !!document.querySelector('.pap-n')));
   /* outils de Claude dans la discussion et « Confier à la tâche Claude », sur le serveur (16/11/2026) */
   await p.goto(BASE + '/?serveur'); await p.waitForTimeout(4000);
-  await p.fill('.intent-input', 'Fais un ordre de test pour Kairos'); await p.press('.intent-input', 'Enter'); await p.waitForTimeout(2500);
+  await p.evaluate(() => [...document.querySelectorAll('.hud-act button')].find((x) => /Parler à JARVIS/.test(x.textContent)).click()); await p.waitForTimeout(800);   /* refonte UX : « Parler à JARVIS » sur l'écran de JARVIS */
+  await p.fill('#chat-in', 'Fais un ordre de test pour Kairos'); await p.click('#chat .chat-row .btn.main'); await p.waitForTimeout(2500);
   ok('discussion : Claude propose un ordre, la page l\'affiche avec son bouton', await p.evaluate(() => { const c = document.getElementById('chat'); return !c.hidden && /Ordre proposé à Kairos/.test(c.textContent) && /Relève le prix du robot cuiseur/.test(c.textContent) && !/⟦|outil preparer_ordre/.test(c.textContent); }));
   await p.screenshot({path: SH + 'discussion-ordre.png'});
   let n0 = FG.calls.length;
@@ -228,6 +229,8 @@ try {
     ok('Claude instantané : Claude préparé à l\'ouverture de la discussion (avec son historique gardé dans le téléphone) ; la première question part seule, sans les données ; « Auto » l\'a confiée à Haiku, dit sous la réponse', vus.prep >= 1 && vus.conv >= 1 && /^Tu as dit : Bonjour Claude\. Session : reprise/.test(r1) && mod1 === 'Haiku', JSON.stringify([vus, mod1, r1.slice(-120)]));
     await q.fill('#chat-in', 'Raconte lentement'); await q.press('#chat-in', 'Enter'); await q.waitForTimeout(1300);
     const enCours = await derniere(), arret = await q.evaluate(() => !!document.querySelector('#chat .chat-row .btn[aria-label="Arrêter"]'));
+    const globeFlux = await q.evaluate(() => [(document.querySelector('#chat .chat-globe .holo-stage') || {dataset: {}}).dataset.s, (document.querySelector('.talk-slot .holo-stage') || {dataset: {}}).dataset.s, (document.querySelector('#chat .cl-state') || {}).textContent]);
+    ok('refonte UX : pendant que la réponse s’écrit, le globe de la discussion et celui de la barre « répondent »', globeFlux[0] === 'speaking' && globeFlux[1] === 'speaking' && globeFlux[2] === 'Répond', JSON.stringify(globeFlux));
     await q.screenshot({path: SH + 'discussion-flux.png'});
     await q.click('#chat .chat-row .btn[aria-label="Arrêter"]'); await q.waitForTimeout(800);
     const coupe = await derniere(), libre = await q.evaluate(() => !!document.querySelector('#chat .chat-row .btn[aria-label="Envoyer"]'));
@@ -321,7 +324,7 @@ try {
   /* 0.15.0 : missions de Claude (Suivi), tour de Claude (Réglages), recherche dans le texte des papiers */
   { const q = await ctx.newPage(); q.on('pageerror', (e) => errs.push(e.message));
     await q.goto(BASE + '/?serveur#suivi'); await q.waitForTimeout(2500);
-    ok('Suivi : panneau « Missions de Claude » (avant l\'état des systèmes)', await q.evaluate(() => { const m = document.querySelector('.mis-panel'), hs = [...document.querySelectorAll('.panel h2')].map((x) => x.textContent); return !!m && /Aucune mission/.test(m.textContent) && hs.indexOf('Missions de Claude') >= 0 && hs.indexOf('Missions de Claude') < hs.indexOf('Relances') && hs.indexOf('Relances') < hs.indexOf('État des systèmes'); }));
+    ok('Suivi (Équipe, Demandes) : panneau « Missions de Claude », avant les relances ; l\'état des systèmes est dans Réglages', await q.evaluate(() => { const m = document.querySelector('.mis-panel'), hs = [...document.querySelectorAll('.panel h2')].map((x) => x.textContent); return !!m && /Aucune mission/.test(m.textContent) && hs.indexOf('Missions de Claude') >= 0 && hs.indexOf('Missions de Claude') < hs.indexOf('Relances') && hs.indexOf('État des systèmes') < 0; }));
     await q.fill('.mis-inp', 'Compare trois assurances habitation'); await q.evaluate(() => [...document.querySelectorAll('.mis-panel button')].find((b) => /Lancer la mission/.test(b.textContent)).click()); await q.waitForTimeout(2500);
     await q.reload(); await q.waitForTimeout(2500); await q.evaluate(() => { const d = document.querySelector('.mis-it'); if (d) d.open = true; });
     ok('missions : lancée depuis Suivi, terminée, compte rendu lisible', await q.evaluate(() => { const m = document.querySelector('.mis-it'); return !!m && /Terminée/.test(m.textContent) && /Compte rendu : mission faite/.test(m.textContent); }));
@@ -334,14 +337,17 @@ try {
     ok('missions : « Non, plutôt… » relance Claude avec sa version précédente et ta consigne', await q.evaluate(() => { const t = (document.querySelector('.mis-it') || {}).textContent || ''; return /Reprise : Compare trois assurances/.test(t) && /Version 2 : Plus court, en trois points/.test(t); }));
     await q.fill('.rel-panel input[type=text]', 'Voir si le syndic a répondu'); await q.evaluate(() => [...document.querySelectorAll('.rel-panel button')].find((b) => /Programmer/.test(b.textContent)).click()); await q.waitForTimeout(1500);
     ok('Suivi : relance programmée (demain 9 h par défaut), visible dans la liste', await q.evaluate(() => /Programmée : /.test(document.querySelector('.rel-panel').textContent) && [...document.querySelectorAll('.rel-it:not(.is-done)')].some((x) => /Voir si le syndic a répondu/.test(x.textContent) && /09:00/.test(x.textContent))));
-    ok('Suivi : « Claude cette semaine » par usage (missions, conversation…)', await q.evaluate(() => { const t = (document.querySelector('.conso-panel') || {}).textContent || ''; return document.querySelectorAll('.conso-panel tbody tr').length >= 2 && /Missions/.test(t) && /jetons sur/.test(t); }));
+    await q.evaluate(() => document.querySelector('.ux-seg [data-f="cout"]').click()); await q.waitForTimeout(600);   /* refonte UX : la consommation de Claude est sous « Coût » */
+    ok('Équipe, Coût : « Claude cette semaine » par usage (missions, conversation…)', await q.evaluate(() => { const t = (document.querySelector('.conso-panel') || {}).textContent || ''; return document.querySelectorAll('.conso-panel tbody tr').length >= 2 && /Missions/.test(t) && /jetons sur/.test(t); }));
+    await q.evaluate(() => document.querySelector('.ux-seg [data-f="dem"]').click()); await q.waitForTimeout(600);
     await q.evaluate(() => { const c = document.querySelector('.rel-panel'), sc = document.getElementById('scroller'); sc.scrollTop += c.getBoundingClientRect().top - 140; }); await q.waitForTimeout(300);
     await q.screenshot({path: SH + 'suivi-relances.png'});
     await q.evaluate(() => [...document.querySelectorAll('.rel-it:not(.is-done)')].find((x) => /Voir si le syndic a répondu/.test(x.textContent)).querySelector('button').click()); await q.waitForTimeout(1500);
     ok('Suivi : relance annulée', await q.evaluate(() => ![...document.querySelectorAll('.rel-it:not(.is-done)')].some((x) => /Voir si le syndic a répondu/.test(x.textContent))));
-    /* 0.16.0 : santé du serveur dans « État des systèmes » */
+    /* 0.16.0 : santé du serveur dans « État des systèmes » (refonte UX : dans Réglages) */
+    await q.goto(BASE + '/?serveur#reglages'); await q.waitForTimeout(2500);
     await q.evaluate(() => [...document.querySelectorAll('.sante-box button')].find((b) => /Vérifier maintenant/.test(b.textContent)).click()); await q.waitForTimeout(1500);
-    ok('Suivi : santé du serveur (Google relié, Claude connecté), vérifiable à la demande', await q.evaluate(() => { const t = (document.querySelector('.sante-box') || {}).textContent || ''; return /Accès Google\s*relié/.test(t) && /Claude sur le serveur\s*connecté/.test(t) && document.querySelectorAll('.sante-box .sys-row.is-ok').length >= 2; }));
+    ok('Réglages : santé du serveur (Google relié, Claude connecté), vérifiable à la demande', await q.evaluate(() => { const t = (document.querySelector('.sante-box') || {}).textContent || ''; return /Accès Google\s*relié/.test(t) && /Claude sur le serveur\s*connecté/.test(t) && document.querySelectorAll('.sante-box .sys-row.is-ok').length >= 2; }));
     await q.evaluate(() => { const c = document.querySelector('.sante-box'), sc = document.getElementById('scroller'); sc.scrollTop += c.getBoundingClientRect().top - 200; }); await q.waitForTimeout(300);
     await q.screenshot({path: SH + 'suivi-sante.png'});
     await q.goto(BASE + '/?serveur#reglages'); await q.waitForTimeout(2500);

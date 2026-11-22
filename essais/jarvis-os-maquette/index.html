@@ -9564,7 +9564,7 @@ void main(){
     VIEWS.equipe = (el) => {
       if (AGENT) { V_EQ(el); return; }
       const f = EQF.f;
-      el.append(segBar(f, [['bots', 'Bots'], ['dem', 'Demandes'], ['rout', 'Routines'], ['cout', 'Coût']], (k) => { EQF.f = k; const sc = $('scroller'); renderView(true); if (sc) sc.scrollTop = 0; }));
+      el.append(segBar(f, [['bots', 'Bots'], ['dem', 'Demandes'], ['rout', 'Routines'], ['cout', 'Coût']], (k) => { EQF.f = k; const sc = $('scroller'); renderView(true); if (sc) sc.scrollTop = 0; eqHash(); }));
       if (f === 'bots') { harvest(V_EQ).filter((n) => !ORD.test(h2Of(n))).forEach((n) => el.append(n)); return; }
       if (f === 'rout') { V_AUTO(el); return; }
       const parts = harvest(V_SUIVI).filter((n) => !SYS.test(h2Of(n)) && !TACHES.test(h2Of(n)) && !PAPL.test(h2Of(n)));
@@ -9573,10 +9573,13 @@ void main(){
       harvest(V_EQ).filter((n) => ORD.test(h2Of(n))).forEach((n) => el.append(n));   /* tes ordres : ce que tu as demandé */
     };
     TITLES.suivi = TITLES.equipe; TITLES.automatisations = TITLES.equipe;
-    const alias = (k) => (el) => { EQF.f = k; TAB = 'equipe'; try { history.replaceState(null, '', '#equipe'); } catch (e) { /* rien */ } VIEWS.equipe(el); };
+    /* chaque filtre garde son adresse d'avant (#suivi, #automatisations) : un rechargement ou un lien de notification rouvre le bon filtre */
+    const EQHASH = {bots: 'equipe', dem: 'suivi', rout: 'automatisations', cout: 'equipe'};
+    function eqHash() { try { if (TAB === 'equipe' && !AGENT && location.hash.slice(1) !== EQHASH[EQF.f]) history.replaceState(null, '', '#' + EQHASH[EQF.f]); } catch (e) { /* rien */ } }
+    const alias = (k) => (el) => { EQF.f = k; TAB = 'equipe'; VIEWS.equipe(el); };
     VIEWS.suivi = alias('dem'); VIEWS.automatisations = alias('rout');
     const GO_UX = go;
-    go = function (id, keep) { if (id === 'suivi' || id === 'automatisations') { EQF.f = id === 'suivi' ? 'dem' : 'rout'; id = 'equipe'; } if (id === 'demandes') PMF.f = 'tout'; return GO_UX(id, keep); };   /* Pour moi s'ouvre toujours sur « Tout » (les liens #voir-… y mènent à une section) */
+    go = function (id, keep) { if (id === 'suivi' || id === 'automatisations') { EQF.f = id === 'suivi' ? 'dem' : 'rout'; id = 'equipe'; } if (id === 'demandes') PMF.f = 'tout'; const r = GO_UX(id, keep); if (id === 'equipe') eqHash(); return r; };   /* Pour moi s'ouvre toujours sur « Tout » (les liens #voir-… y mènent à une section) */
     /* Réglages : l'état des systèmes (venu de Suivi) en bas */
     VIEWS.reglages = (el) => { V_REG(el); harvest(V_SUIVI).filter((n) => SYS.test(h2Of(n))).forEach((n) => el.append(n)); };
     /* Pour moi : Tout, Décider, À faire, Infos ; « Mes tâches » (venues de Suivi) dans À faire */

@@ -72,9 +72,9 @@ srv.listen(0, async () => {
       await p.tap('.esp-tile[data-go="achats"]'); await p.waitForTimeout(500); await p.tap('.tab[data-tab="espaces"]'); await p.waitForTimeout(500);
       ok('onglet Espaces touché depuis un domaine : retour à Espaces', await p.evaluate(() => location.hash === '#espaces')); }
     await p.goto(base + '#suivi'); await p.waitForTimeout(2500);
-    ok('#suivi (liens des notifications) : Équipe, filtre Demandes, avec les panneaux de Suivi', await p.evaluate(() => location.hash === '#equipe' && document.querySelector('.ux-seg [aria-pressed="true"]').dataset.f === 'dem' && !!document.querySelector('.pend-x') && [...document.querySelectorAll('#view h2')].some((x) => /Tes ordres/.test(x.textContent))));
+    ok('#suivi (liens des notifications) : Équipe, filtre Demandes, avec les panneaux de Suivi ; l’adresse reste #suivi', await p.evaluate(() => location.hash === '#suivi' && document.getElementById('view-title').textContent === 'Les bots' && document.querySelector('.ux-seg [aria-pressed="true"]').dataset.f === 'dem' && !!document.querySelector('.pend-x') && [...document.querySelectorAll('#view h2')].some((x) => /Tes ordres/.test(x.textContent))));
     await p.goto(base + '#automatisations'); await p.waitForTimeout(2500);
-    ok('#automatisations : Équipe, filtre Routines (frises de suivi de livraison)', await p.evaluate(() => location.hash === '#equipe' && document.querySelector('.ux-seg [aria-pressed="true"]').dataset.f === 'rout' && document.querySelectorAll('.auto.card').length > 0));
+    ok('#automatisations : Équipe, filtre Routines (frises de suivi de livraison)', await p.evaluate(() => location.hash === '#automatisations' && document.querySelector('.ux-seg [aria-pressed="true"]').dataset.f === 'rout' && document.querySelectorAll('.auto.card').length > 0));
     await p.evaluate(() => document.querySelector('.ux-seg [data-f="cout"]').click()); await p.waitForTimeout(400);
     ok('Équipe, filtre Coût : coût de la semaine et file d’attente', await p.evaluate(() => [...document.querySelectorAll('#view h2')].some((x) => /Coût de la semaine/.test(x.textContent)) && ![...document.querySelectorAll('#view h2')].some((x) => /En cours chez tes bots/.test(x.textContent))));
     await p.goto(base + '#reglages'); await p.waitForTimeout(2500);

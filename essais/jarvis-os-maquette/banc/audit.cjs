@@ -93,7 +93,7 @@ const SNAP = () => { const g = (s) => { const e = document.querySelector(s); ret
 /* les écrans : nom, adresse, gestes pour y arriver, portée des boutons */
 const SCREENS = [
   {id: 'accueil', url: ''},
-  {id: 'tout', url: '', go: async (p) => { await p.tap('.fav-handle'); await p.waitForTimeout(600); }, scope: '.all-sheet'},
+  {id: 'espaces', url: '#espaces'},   /* refonte UX (22/11/2026) : Espaces remplace le menu « Tout » */
   {id: 'pour-moi', url: '#demandes'},
   {id: 'agenda', url: '#agenda'},
   {id: 'suivi', url: '#suivi'},
