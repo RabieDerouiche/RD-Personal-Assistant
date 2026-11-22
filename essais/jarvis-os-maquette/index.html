@@ -3333,7 +3333,7 @@ void main(){
     ta.value = draft;
     ta.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); sendChat(); } });
     const sugg = h('div', {class: 'sugg'}, suggFor(CHAT.type, CHAT.item).map((s) => h('button', {type: 'button', class: 'btn sm', onclick: () => { ta.value = s; sendChat(); }}, s)));
-    const tier = CHAT.mode === 'claude' ? h('div', {class: 'tier', role: 'group', 'aria-label': 'Profondeur de la réponse'}, (SRV_OS ? [['auto', 'Auto'], ['quick', 'Rapide'], ['default', 'Approfondi']] : [['quick', 'Rapide'], ['default', 'Approfondi']]).map(([k, l]) => h('button', {type: 'button', 'aria-pressed': String(CHAT.tier === k), onclick: () => { const avant = CHAT.tier; CHAT.tier = k; renderChat(); if (avant !== k) chatPrepare(); }}, l))) : null;
+    const tier = CHAT.mode === 'claude' ? h('div', {class: 'tier', role: 'group', 'aria-label': 'Profondeur de la réponse'}, (SRV_OS ? [['auto', 'Réfléchi'], ['quick', 'Rapide']] : [['quick', 'Rapide'], ['default', 'Approfondi']]).map(([k, l]) => h('button', {type: 'button', 'aria-pressed': String(CHAT.tier === k || (SRV_OS && k === 'auto' && CHAT.tier === 'default')), onclick: () => { const avant = CHAT.tier; CHAT.tier = k; renderChat(); if (avant !== k) chatPrepare(); }}, l))) : null;
     const send = CHAT.busy && CHAT.mode === 'claude'
       ? h('button', {type: 'button', class: 'btn icon-btn', 'aria-label': 'Arrêter', onclick: () => CHAT.ctl && CHAT.ctl.abort(), html: icon('x', 18)})
       : h('button', {type: 'button', class: 'btn main icon-btn', 'aria-label': 'Envoyer', onclick: sendChat, html: icon('send', 18)});
@@ -3382,6 +3382,9 @@ void main(){
   }
   /* 0.60.0 : la conversation à la voix (mains libres) : Claude agit et fait valider de vive voix, sans bouton */
   const voixOn = () => typeof MAINS === 'object' && !!MAINS.on;
+  /* 0.62.0 (ses choix : « une réflexion solide et juste plutôt qu'une réponse rapide », « oui, partout ») : sur le serveur, la discussion
+     a Opus qui réfléchit (à la voix comme à l'écrit), sauf s'il choisit « Rapide » à l'écrit */
+  const chatTier = () => (!SRV_OS ? CHAT.tier : voixOn() ? 'voix' : CHAT.tier === 'quick' ? 'quick' : 'juste');
   /* une phrase qui demande d'agir part directement à Claude (pas de détour par les réponses instantanées) */
   const voixAction = (x) => /\b(ajoute[rz]?|note[rz]?|rappelle[rz]?|programme[rz]?|envoie[rz]?|dis a|demande a|previens|relance[rz]?|cree[rz]?|confie[rz]?|retiens|reporte[rz]?|decale[rz]?|deplace[rz]?|supprime[rz]?|annule[rz]?|coche[rz]?|termine[rz]?|j ai (fini|fait|appele|envoye|paye|regle)|c est fait|marque[rz]?|prepare[rz]?|organise[rz]?)\b/.test(lvLow(x).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' '));   /* 0.61.0 : au niveau de sendChat (déclarée plus bas, elle restait invisible pour lui) */
   /* 0.62.0 (son choix : « je préfère une réflexion solide et juste qu'une réponse rapide, travaille sur la qualité ») : la justesse d'abord */
@@ -3398,7 +3401,7 @@ void main(){
   function chatPrepare() {
     if (!CHAT.open || CHAT.mode !== 'claude' || !SAMPLE || typeof SAMPLE.prepare !== 'function') return;
     const T = THREADS[CHAT.key]; if (!T || CHAT.busy) return;
-    try { SAMPLE.prepare([{role: 'user', content: chatCtx(T)}].concat(T.turns), {modelTier: voixOn() && CHAT.tier === 'auto' && SRV_OS ? 'voix' : CHAT.tier, voix: voixOn(), tools: chatTools(T, null)}); } catch (e) { /* rien : la question partira avec les données */ }
+    try { SAMPLE.prepare([{role: 'user', content: chatCtx(T)}].concat(T.turns), {modelTier: chatTier(), voix: voixOn(), tools: chatTools(T, null)}); } catch (e) { /* rien : la question partira avec les données */ }
   }
   async function sendChat() {
     const ta = $('chat-in'); if (!ta) return;
@@ -3465,7 +3468,7 @@ void main(){
         const r = MSG_EL.get(out);
         if (r && r.pe.isConnected && CHAT.open) { r.pe.replaceChildren(...mdNodes(out.text, true)); r.el.classList.toggle('is-wait', !!out.wait); const lg = $('chat') && $('chat').querySelector('.chat-log'); if (lg && CHAT.stick !== false) lg.scrollTop = lg.scrollHeight; }
         else renderChat(); }); };
-      const opts = {modelTier: voixOn() && CHAT.tier === 'auto' && SRV_OS ? 'voix' : CHAT.tier, voix: voixOn(), signal: CHAT.ctl.signal, onText: ({text: t}) => { const bd = splitNext(t).body; if (bd) { out.text = bd; out.wait = false; } frame(); lire(false); if (CHAT.av) CHAT.av.talk(0.8); if (CHAT.talk && typeof voxFeed === 'function') voxFeed(out, false); }};
+      const opts = {modelTier: chatTier(), voix: voixOn(), signal: CHAT.ctl.signal, onText: ({text: t}) => { const bd = splitNext(t).body; if (bd) { out.text = bd; out.wait = false; } frame(); lire(false); if (CHAT.av) CHAT.av.talk(0.8); if (CHAT.talk && typeof voxFeed === 'function') voxFeed(out, false); }};
       if (canTools) opts.tools = tools; else opts.cache = false;
       opts.conversation = true;   /* 0.30.0 : le serveur garde le Claude de cette discussion ouvert */
       const res = await SAMPLE([{role: 'user', content: chatCtx(T)}].concat(T.turns), opts);

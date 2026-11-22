@@ -50,7 +50,8 @@ export function routeurVoix(texte) {
   return 'default';
 }
 
-/* 0.62.0 : la conversation à la voix : Opus, effort élevé, réflexion permise (les autres discussions gardent l'effort réduit, sans réflexion) */
+/* 0.62.0 : la discussion avec Claude (à la voix « voix », à l'écrit « juste ») : Opus, effort élevé, réflexion permise ; « Rapide » et les
+   petites lectures de la page gardent l'effort réduit, sans réflexion */
 export const PENSE = {effort: 'high'};
 
 export function createFlux({bin, env, settings, cwd, conso, models, friendly, dateLigne, activite, maxActifs = 2, inactifMs = 15 * 60000, ageMaxMs = 2 * 3600000, timeoutMs = 120000, memLibre = () => os.freemem(), prepMem = +process.env.JARVIS_PREP_MEM || 900e6}) {
@@ -133,7 +134,7 @@ export function createFlux({bin, env, settings, cwd, conso, models, friendly, da
   async function demander({tier, system, input, conv, onDelta, coupe}) {
     const msgs = lire(input);
     if (!msgs.length) return {ok: false, error: 'Demande vide.'};
-    const pense = tier === 'voix', prof = tier === 'auto' ? routeur(msgs[msgs.length - 1].text) : pense ? 'deep' : tier, model = models[prof] || models.default, mk = model + (pense ? '+pense' : '');   /* 0.33.0 : « Auto » ; 0.62.0 : « voix » = Opus qui réfléchit */
+    const pense = tier === 'voix' || tier === 'juste', prof = tier === 'auto' ? routeur(msgs[msgs.length - 1].text) : pense ? 'deep' : tier, model = models[prof] || models.default, mk = model + (pense ? '+pense' : '');   /* 0.33.0 : « Auto » ; 0.62.0 : « voix » = Opus qui réfléchit */
     const act = activite ? activite.debut({genre: 'page', titre: msgs[msgs.length - 1].text, modele: model}) : null;
     let p, blocs, ponctuel = false, reprise = false;
     if (conv && msgs.length >= 2 && msgs[msgs.length - 1].role === 'user') {
@@ -175,7 +176,7 @@ export function createFlux({bin, env, settings, cwd, conso, models, friendly, da
   function preparer({tier, system, input}) {
     const msgs = lire(input);
     if (!msgs.length) return {ok: false, error: 'Rien à préparer.'};
-    if (tier === 'voix') return prep1(models.deep || models.default, system, msgs, true);   /* 0.62.0 : la voix : Opus qui réfléchit, prêt dès l'ouverture des mains libres */
+    if (tier === 'voix' || tier === 'juste') return prep1(models.deep || models.default, system, msgs, true);   /* « juste » : la discussion écrite, même Claude */   /* 0.62.0 : la voix : Opus qui réfléchit, prêt dès l'ouverture des mains libres */
     if (tier !== 'auto') return prep1(models[tier] || models.default, system, msgs);
     const r = prep1(models.quick || models.default, system, msgs);
     if (r.ok && models.default && models.default !== models.quick) {
