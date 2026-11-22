@@ -107,6 +107,13 @@ srv.listen(0, async () => {
       await p.evaluate(() => { const sc = document.getElementById('scroller'); sc.scrollTop = sc.scrollHeight; }); await p.waitForTimeout(1300);
       const vis = await p.evaluate(() => [...document.querySelectorAll('#view .ux-rv:not(.ux-rv-on)')].filter((x) => { const r = x.getBoundingClientRect(); return r.height && r.bottom > 90 && r.top < innerHeight * 0.9; }).length);
       ok('waouh : les blocs plus bas apparaissent en 3D quand on y arrive (aucun bloc caché dans l’écran)', rv > 0 && vis === 0, 'en attente au départ : ' + rv + ', cachés à l’écran : ' + vis); }
+    /* 0.58.0 : fini les blocs bleus (son choix : verre noir, une couleur par rubrique, bord irisé sur les cartes phares) */
+    { await p.goto(base + '#espaces'); await p.waitForTimeout(1800);
+      const c = await p.evaluate(() => { const bg = (s) => { const e = document.querySelector(s); return e ? getComputedStyle(e).backgroundImage : ''; }; return {tile: bg('.esp-tile[data-go="sorties"]'), pg: document.documentElement.style.getPropertyValue('--pg'), top: getComputedStyle(document.querySelector('.top')).backgroundColor}; });
+      await p.goto(base + '#argent'); await p.waitForTimeout(1800);
+      const a = await p.evaluate(() => ({hero: getComputedStyle(document.querySelector('#view .rad-hero')).backgroundImage, pg: document.documentElement.style.getPropertyValue('--pg')}));
+      ok('cartes : plus de bleu marine (verre presque noir), la couleur de la rubrique (rose pour Sorties), une teinte de fond par page (Argent en vert), le bord irisé sur la carte phare',
+        /rgb\(21, 23, 31\)/.test(c.tile) && /0\.95\d*,? 0\.44\d*,? 0\.71|244, 114, 182/.test(c.tile) && c.pg === '#22d3ee' && a.pg === '#34d399' && /conic-gradient/.test(a.hero) && !/rgb\(4, 11, 31\)/.test(c.top), JSON.stringify({tile: c.tile.slice(0, 160), top: c.top, pg: [c.pg, a.pg]})); }
     { const ctxR = await b.newContext({...devices['iPhone 15 Pro Max'], reducedMotion: 'reduce'}); const q = await ctxR.newPage(); await q.goto(base + '#espaces'); await q.waitForTimeout(2500);
       await q.evaluate(() => document.querySelector('.esp-tile[data-go="achats"]').click()); await q.waitForTimeout(40);
       ok('fluidité : « réduire les animations » de l’iPhone respecté (aucun calque, aucun glissé)', await q.evaluate(() => !document.querySelector('.ux-ghost') && !document.querySelector('#view .view-in.ux-in'))); await ctxR.close(); }
