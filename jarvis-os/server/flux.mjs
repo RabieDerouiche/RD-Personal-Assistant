@@ -35,6 +35,16 @@ export function routeur(texte) {
   return 'quick';
 }
 
+/* 0.60.0 (sa demande : « la gestion des tâches par la voix doit être plus sharp, pas grave si ça consomme plus de jetons ») : en conversation
+   à la voix, jamais Haiku. Une action à faire (ajouter, noter, rappeler, programmer, envoyer, prévenir un bot…), une réflexion ou une
+   question longue → Opus, le plus sûr pour comprendre et agir ; le reste → Sonnet. L'heure, la météo, l'agenda restent instantanés (sans IA). */
+export function routeurVoix(texte) {
+  const t = String(texte || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[’']/g, ' ');
+  if (routeur(texte) === 'deep') return 'deep';
+  if (t.length > 160 || /\b(ajoute[rz]?|note[rz]?|rappelle[rz]?|programme[rz]?|planifie[rz]?|envoie[rz]?|envoyer|dis a|demande a|previens|prevenir|relance[rz]?|cree[rz]?|organise[rz]?|prepare[rz]?|confie[rz]?|retiens|souviens|echeance|taches?|ordre|routine|change[rz]?|modifie[rz]?|annule[rz]?|deplace[rz]?|reporte[rz]?|iris|chronos|kairos|ulysse|athena|argus|plutus|pourquoi|compare[rz]?|conseille|avis|decide[rz]?|choisi[rs]?|strategie|plan)\b/.test(t)) return 'deep';
+  return 'default';
+}
+
 export function createFlux({bin, env, settings, cwd, conso, models, friendly, dateLigne, activite, maxActifs = 2, inactifMs = 15 * 60000, ageMaxMs = 2 * 3600000, timeoutMs = 120000, memLibre = () => os.freemem(), prepMem = +process.env.JARVIS_PREP_MEM || 900e6}) {
   const now = () => Date.now();
   const CONV = {};   /* par modèle : la conversation de la discussion {p, cle, qs (empreintes de ses questions)} */
@@ -114,7 +124,7 @@ export function createFlux({bin, env, settings, cwd, conso, models, friendly, da
   async function demander({tier, system, input, conv, onDelta, coupe}) {
     const msgs = lire(input);
     if (!msgs.length) return {ok: false, error: 'Demande vide.'};
-    const prof = tier === 'auto' ? routeur(msgs[msgs.length - 1].text) : tier, model = models[prof] || models.default;   /* 0.33.0 : « Auto » */
+    const prof = tier === 'auto' ? routeur(msgs[msgs.length - 1].text) : tier === 'voix' ? routeurVoix(msgs[msgs.length - 1].text) : tier, model = models[prof] || models.default;   /* 0.33.0 : « Auto » ; 0.60.0 : « voix » */
     const act = activite ? activite.debut({genre: 'page', titre: msgs[msgs.length - 1].text, modele: model}) : null;
     let p, blocs, ponctuel = false, reprise = false;
     if (conv && msgs.length >= 2 && msgs[msgs.length - 1].role === 'user') {
@@ -156,6 +166,11 @@ export function createFlux({bin, env, settings, cwd, conso, models, friendly, da
   function preparer({tier, system, input}) {
     const msgs = lire(input);
     if (!msgs.length) return {ok: false, error: 'Rien à préparer.'};
+    if (tier === 'voix') {   /* 0.60.0 : la conversation à la voix : Sonnet prêt, et Opus aussi s'il reste de la mémoire */
+      const r = prep1(models.default, system, msgs);
+      if (r.ok && models.deep && models.deep !== models.default) r.aussi = memLibre() > prepMem ? prep1(models.deep, system, msgs) : {ok: false, error: 'mémoire'};
+      return r;
+    }
     if (tier !== 'auto') return prep1(models[tier] || models.default, system, msgs);
     const r = prep1(models.quick || models.default, system, msgs);
     if (r.ok && models.default && models.default !== models.quick) {
