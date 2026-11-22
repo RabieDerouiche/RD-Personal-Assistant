@@ -2,7 +2,7 @@
    anneau en orbite) posé sur un socle d'anneaux concentriques. Canvas 2D, sans bibliothèque ; même interface que l'orbe.
    Refonte UX (22/11/2026) : vivant (réfléchit : paquets de lumière sur le réseau ; parle : cœur qui bat et couronne d'ondes ;
    écoute : ondes ; repos : respiration) et, option « hud », l'écran de JARVIS de l'accueil (anneaux gradués, arcs, balayage, poussière).
-   0.56.0 (« ralentissements sur la page d'accueil », mesuré : 11 images par seconde au repos, processeur ralenti comme un téléphone) :
+   0.57.0 (« ralentissements sur la page d'accueil », mesuré : 11 images par seconde au repos, processeur ralenti comme un téléphone) :
    moteur réécrit pour la vitesse : tout ce qui ne change pas d'une image à l'autre (anneaux, graduations, arcs, balayage, halo,
    poussière) est dessiné une fois dans des calques que l'affichage fait tourner lui-même (animations du navigateur, sans calcul) ;
    seul le réseau du globe est redessiné, avec des taches de lumière toutes prêtes ; 2 pixels par point au plus ; 30 images par

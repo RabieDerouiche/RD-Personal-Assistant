@@ -67,9 +67,9 @@ function piecesDe(part, out = []) {
 export function textOf(part) {
   const t = partOf(part, 'text/plain');
   const bouchon = t.trim().length < 400 && /ne (prend|supporte) pas (en charge )?(le format |les messages |les e-?mails |l.affichage )?html|n.affiche pas (le format|les messages) html|(does not|doesn.t|cannot|can.t) (support|display) html|(view|voir|afficher|consulter|lire) (this|ce|le|cet) (e-?mail|message|courriel|mail) (in|dans) (your|votre|un) (web )?(browser|navigateur)/i.test(t);
-  if (t && !bouchon) return t;
-  const h = partOf(part, 'text/html');
-  return h ? sansBalises(h) : t;
+  const h = partOf(part, 'text/html'), hx = h ? sansBalises(h) : '';
+  if (t && !bouchon && !(t.trim().length < 150 && hx.length > t.trim().length * 3)) return t;   /* 0.56.0 : une partie texte qui n'a que l'objet */
+  return hx || t;
 }
 function mailMsg(m, withBody) {
   const from = addrs(hdr(m, 'From'))[0] || {displayName: '', emailAddress: ''};
