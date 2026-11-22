@@ -7,7 +7,7 @@
    La page (essais/jarvis-os-maquette/index.html) décide de ce qu'ouvre l'orbe : la discussion avec Claude, qui a ses données.
    0.31.0 (choix du 21/11/2026) : les mains libres reviennent, mais sur ce même Claude (plus de cerveau à part) : micro ouvert pendant
    la conversation (converse), réponse lue au fil de l'eau (sayFlux), coupure à la voix (hold). */
-import {createOrb} from './orb';
+import {createOrb, type Orb} from './orb';
 import {createHolo, type HoloOpts} from './holo';
 import {Ecoute, canEar} from './ecoute';
 import {store} from './store';
@@ -258,14 +258,16 @@ export function convStop() { const e = conv; conv = null; held = false; if (e) {
 export function mountButton(host: HTMLElement = document.body, onTap?: () => void) {
   const b = document.createElement('button'); b.type = 'button'; b.className = 'jv-btn'; b.setAttribute('aria-label', 'Demander à Claude');
   if (!document.getElementById('jv-css')) { const s = document.createElement('style'); s.id = 'jv-css'; s.textContent = CSS; document.head.append(s); }
-  const o = makeOrb({nodes: 46}); b.append(o.el);
+  const o = makeOrb({nodes: 60, voice: false}); b.append(o.el); barOrb = o;   /* refonte UX : la page pilote ses états (réfléchit, répond) */
   b.onclick = () => { const f = onTap || W.JarvisAsk; if (typeof f === 'function') f(); };
   host.append(b);
   if (srv.linked()) srv.status().catch(() => {});
   return b;
 }
+let barOrb: Orb | null = null;
+export const bar = () => barOrb;
 /* un globe autonome (thème hologramme) pour l'accueil de la page */
 export function holo(o: HoloOpts = {}) { return createHolo(o); }
 /* l'état du serveur (écoute et voix installées) : relu à l'ouverture de la discussion */
 export const refresh = () => (srv.linked() ? srv.status().then(() => true, () => false) : Promise.resolve(false));
-W.JarvisVoice = {mountButton, holo, dictate, dictStop, dictating, dictKind, say, hush, speaking, sayKind, prime, refresh, sayFlux, hold, converse, convBusy, convStop, conversing};
+W.JarvisVoice = {mountButton, holo, bar, dictate, dictStop, dictating, dictKind, say, hush, speaking, sayKind, prime, refresh, sayFlux, hold, converse, convBusy, convStop, conversing};

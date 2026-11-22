@@ -8177,16 +8177,89 @@ void main(){
         h('ol', {class: 'trip-steps'}, STEPS.map((x, i) => h('li', {class: i < v.step ? 'is-done' : i === v.step ? 'is-now' : '', text: x}))),
         mine.length ? h('p', {class: 'trip-todo'}, h('b', {text: 'Pour toi : '}), mine.map((c) => cap1(String(c.t).replace(/^Rabie\s+/i, ''))).join(' ; ')) : h('p', {class: 'trip-todo muted', text: lvName(v.bot) + ' s’en occupe'})));
   }
+  /* ---------- l'écran de JARVIS : l'heure qui défile, le globe et ses anneaux, 4 relevés reliés au globe, la phrase du jour dite à l'ouverture ---------- */
+  const HUD = {g: null, done: false, timer: null, i: 0};
+  document.head.append(h('style', {text: ''
+    + '.hud{position:relative;margin:0 0 6px}.hud-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}'
+    + '.hud-clock{font:700 46px/1 Orbitron,var(--display);letter-spacing:.04em;color:#eaf8ff;text-shadow:0 0 22px rgba(var(--c1),.65),0 0 2px #fff}.hud-clock small{font-size:18px;color:rgb(var(--c2));margin-left:3px}'
+    + '.hud-date{margin-top:8px;font:600 12px var(--display);letter-spacing:.2em;text-transform:uppercase;color:var(--muted)}'
+    + '.hud-on{text-align:right;font:700 12px Orbitron,var(--display);letter-spacing:.18em;color:rgb(var(--c2));padding-top:4px}.hud-on i{display:inline-block;width:8px;height:8px;border-radius:50%;background:#34d399;box-shadow:0 0 10px #34d399;margin-right:7px;animation:hudblink 1.6s ease-in-out infinite}'
+    + '.hud-on small{display:block;margin-top:5px;font:500 12px var(--sans);letter-spacing:.02em;color:var(--muted);white-space:nowrap}'
+    + '.hud-core{position:relative;height:340px;margin:2px -8px 0}.hud-core .holo-stage{position:absolute;inset:0;width:auto;height:auto}.hud-core .holo-stage canvas{width:100%;height:100%;display:block}'
+    + '.hud-lines{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible}.hud-lines path{fill:none;stroke:rgb(var(--c2));stroke-opacity:.85;stroke-width:1.5;stroke-dasharray:4 3;animation:hudflow 1.2s linear infinite;filter:drop-shadow(0 0 3px rgba(var(--c1),.9))}.hud-lines circle{fill:#e0faff;filter:drop-shadow(0 0 5px rgb(var(--c1)))}'
+    + '.hud-ro{position:absolute;z-index:1;width:128px;text-align:left;padding:8px 10px 9px;border-radius:4px 14px 4px 14px;color:var(--fg);font:inherit;cursor:pointer;background:rgba(3,10,28,.74);border:1px solid rgba(var(--c1),.45);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);box-shadow:0 0 18px rgba(14,165,233,.18),inset 0 0 14px rgba(var(--c1),.08);animation:hudhover 5s ease-in-out infinite}'
+    + '.hud-ro::before,.hud-ro::after{content:"";position:absolute;width:10px;height:10px;border:2px solid rgb(var(--c2))}.hud-ro::before{left:-2px;top:-2px;border-right:0;border-bottom:0;border-radius:4px 0 0 0}.hud-ro::after{right:-2px;bottom:-2px;border-left:0;border-top:0;border-radius:0 0 4px 0}'
+    + '.hud-ro small{display:block;font:700 11px var(--display);letter-spacing:.16em;color:rgb(var(--c2))}.hud-ro b{display:block;font:700 18px/1.15 var(--display);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.hud-ro span{display:block;font-size:12px;color:var(--muted);margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}'
+    + '.hud-ro.amb{border-color:rgba(var(--warn),.65);box-shadow:0 0 18px rgba(var(--warn),.2)}.hud-ro.amb::before,.hud-ro.amb::after{border-color:rgb(var(--warn))}.hud-ro.amb small{color:#fde68a}.hud-ro.amb b{color:#fde68a;text-shadow:0 0 12px rgba(var(--warn),.55)}'
+    + '.hud-ro.q-tl{left:8px;top:4px}.hud-ro.q-tr{right:8px;top:4px;animation-delay:-1.2s}.hud-ro.q-bl{left:8px;bottom:4px;animation-delay:-2.5s}.hud-ro.q-br{right:8px;bottom:4px;animation-delay:-3.7s}'
+    + '.hud-say{min-height:72px;margin:10px 6px 0;font:500 16px/1.5 var(--sans);color:#dbeafe;text-align:center}.hud-hi{font:700 19px var(--display);color:rgb(var(--c2))}'
+    + '.hud-caret{display:inline-block;width:2px;height:1.05em;vertical-align:-3px;background:rgb(var(--c2));margin-left:3px;box-shadow:0 0 6px rgb(var(--c1));animation:hudblink 1s steps(2) infinite}'
+    + '.hud-act{display:flex;justify-content:center;gap:8px;flex-wrap:wrap;margin:12px 0 4px}'
+    + '@keyframes hudblink{50%{opacity:.15}}@keyframes hudflow{to{stroke-dashoffset:-12}}@keyframes hudhover{50%{transform:translateY(-3px)}}'
+    + '.hud .hud-ro,.hud .hud-ro:hover,.hud .hud-ro:focus{background:rgba(3,10,28,.74);background-image:none}.hud .hud-ro b{font-size:16.5px}.hud .hud-ro{width:142px}'
+    + '#dir:has(.hud) #view-title{display:none}'
+    + '@media (prefers-reduced-motion: reduce){.hud-ro,.hud-lines path{animation:none}}'}));
+  const p2h = (n) => String(n).padStart(2, '0');
+  const hudClock = () => { const d = new Date(); return p2h(d.getHours()) + ':' + p2h(d.getMinutes()) + '<small>' + p2h(d.getSeconds()) + '</small>'; };
+  setInterval(() => { const c = $('hud-clock'); if (c) c.innerHTML = hudClock(); }, 1000);
+  function hudLines() {
+    const core = document.querySelector('.hud-core'), svg = core && core.querySelector('.hud-lines'); if (!svg || !core.isConnected) return;
+    const W = core.clientWidth, H = core.clientHeight, cx = W / 2, cy = H / 2, R = Math.min(W, H) * 0.235 * 1.08, cr = core.getBoundingClientRect();
+    svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+    svg.innerHTML = [...core.querySelectorAll('.hud-ro')].map((ro) => {
+      const r = ro.getBoundingClientRect(), left = r.left - cr.left < W / 2, top = r.top - cr.top < H / 2;
+      const x0 = left ? r.right - cr.left : r.left - cr.left, y0 = top ? r.bottom - cr.top - 14 : r.top - cr.top + 14, x1 = x0 + (left ? 12 : -12);
+      const an = Math.atan2(y0 - cy, x1 - cx), tx = cx + Math.cos(an) * R, ty = cy + Math.sin(an) * R, f = (v) => v.toFixed(1);
+      return '<path d="M' + f(x0) + ' ' + f(y0) + ' H' + f(x1) + ' L' + f(tx) + ' ' + f(ty) + '"/><circle cx="' + f(tx) + '" cy="' + f(ty) + '" r="2.6"/><circle cx="' + f(x0) + '" cy="' + f(y0) + '" r="1.8"/>';
+    }).join('');
+  }
+  window.addEventListener('resize', () => { if (document.querySelector('.hud-core')) hudLines(); });
+  function hudScreen(D, pr, ml) {
+    const holoOk = document.documentElement.classList.contains('theme-holo') && window.JarvisVoice && window.JarvisVoice.holo;
+    if (!HUD.g && holoOk) HUD.g = window.JarvisVoice.holo({hud: true, nodes: 150});
+    const today = D.ag.filter((a) => a.n === 0), nowH = new Date().getHours() + new Date().getMinutes() / 60;
+    const tOf = (a) => { const m = String(a.time || '').match(/(\d{1,2})h(\d{2})?/); return m ? +m[1] + (+m[2] || 0) / 60 : null; };
+    const next = today.filter((a) => tOf(a) != null && tOf(a) > nowH).sort((a, b) => tOf(a) - tOf(b))[0];
+    const pm = pourMoiN(), urg = D.dem.filter((d) => d.due != null && d.due <= 2).length;
+    const ro = (pos, act, k, b, sub, amb) => h('button', {type: 'button', class: 'hud-ro q-' + pos + (amb ? ' amb' : ''), onclick: act}, h('small', {text: k}), h('b', {text: b}), h('span', {text: sub}));
+    const metB = ml ? (ml.match(/-?\d+°/) || [''])[0] || ml.split(' · ')[0] : '', metS = ml ? ml.replace(/^-?\d+° · /, '') : 'Afficher la météo';
+    let argB = null, argS = '';
+    if (typeof radOn === 'function' && radOn()) { radLoad(); const R = RAD.data ? radReste(RAD.data) : null; if (R) { argB = radEur(R.tReste); argS = R.mois ? 'd’ici la fin du mois' : 'd’ici ta paie'; } }
+    const deals = (S.ach || []).filter((f) => ['achat', 'bon'].includes(famState(f)));
+    const core = h('div', {class: 'hud-core'}, HUD.g ? HUD.g.el : C('claude', 150).el, h('svg', {class: 'hud-lines', 'aria-hidden': 'true'}),
+      ro('tl', () => go('agenda'), 'AGENDA', today.length + (today.length > 1 ? ' rendez-vous' : today.length ? ' rendez-vous' : ' rendez-vous'), next ? next.time + ' ' + next.title : today.length ? 'fini pour aujourd’hui' : 'journée libre'),
+      ro('tr', () => metLoad(true), 'MÉTÉO', metB || '—', metS),
+      ro('bl', () => go('demandes'), 'POUR TOI', pm + (pm > 1 ? ' décisions' : pm ? ' décision' : ''), urg ? urg + (urg > 1 ? ' urgentes' : ' urgente') : pm ? 'à décider ou à faire' : 'rien ne t’attend', pm > 0),
+      argB ? ro('br', () => go('argent'), 'ARGENT', argB, argS) : ro('br', () => go('achats'), 'BONS PRIX', String(deals.length), deals.length ? deals[0].title : 'rien sous tes seuils'));
+    const hi = h('span', {class: 'hud-hi'}), say = h('span'), A = hello() + ', Rabie.';
+    const B = (pm ? pm + (pm > 1 ? ' décisions t’attendent' : ' décision t’attend') + (urg ? ', dont ' + urg + (urg > 1 ? ' urgentes' : ' urgente') : '') + '. ' : 'Rien ne t’attend. ')
+      + (today.length ? today.length + (today.length > 1 ? ' rendez-vous' : ' rendez-vous') + ' aujourd’hui' + (next ? ', le prochain à ' + next.time.replace('h', ' h ') : '') + '. ' : 'Journée libre dans ton agenda. ')
+      + (GP.on ? 'Grok est en pause' + (GP.until ? ' jusqu’à ' + fmt(GP.until, {weekday: 'long'}) + ' ' + hmFr(GP.until) : '') + '.' : 'Tes bots sont au travail.');
+    const scr = h('section', {class: 'hud', 'aria-label': 'JARVIS'},
+      h('div', {class: 'hud-top'}, h('div', {}, h('div', {class: 'hud-clock', id: 'hud-clock', html: hudClock()}), h('div', {class: 'hud-date', html: escH(cap1(fmt(TODAY, {weekday: 'long', day: 'numeric', month: 'long'}))) + (pr ? '<br>' + escH(CODE[pr]) : '')})),
+        h('div', {class: 'hud-on'}, h('i'), 'J.A.R.V.I.S', h('small', {text: 'en ligne · ' + (BOTS.length + 1) + ' agents'}))),
+      core, h('p', {class: 'hud-say'}, hi, ' ', say, h('i', {class: 'hud-caret'})),
+      h('div', {class: 'hud-act'}, h('button', {type: 'button', class: 'btn main', onclick: () => (window.JarvisAsk || (() => openChat('claude')))()}, 'Parler à JARVIS'), typeof briefCard === 'function' ? null : null));
+    requestAnimationFrame(() => requestAnimationFrame(hudLines));
+    /* la phrase du jour : dite une fois par ouverture de l'app, pendant que le globe parle ; elle continue si la page est redessinée (données qui arrivent) */
+    HUD.hi = hi; HUD.say = say; HUD.A = A; HUD.txt = A + ' ' + B;
+    const put = (n) => { const x = HUD.txt.slice(0, n); HUD.hi.textContent = x.slice(0, HUD.A.length); HUD.say.textContent = x.length > HUD.A.length ? x.slice(HUD.A.length + 1) : ''; };
+    if (HUD.done || reduced) put(HUD.txt.length);
+    else if (HUD.timer) put(HUD.i);
+    else {
+      HUD.i = 0; if (HUD.g) HUD.g.set('speaking');
+      HUD.timer = setInterval(() => { HUD.i += 2; put(HUD.i); if (HUD.i >= HUD.txt.length) { clearInterval(HUD.timer); HUD.timer = null; HUD.done = true; setTimeout(() => HUD.g && HUD.g.set('idle'), 500); } }, 34);
+    }
+    return scr;
+  }
   function homeDash(el, D, bar) {
     metLoad(false);
     const pr = S.presence && S.presence[isoOf(TODAY)], ml = metLine();
-    el.append(h('header', {class: 'hm-hello'}, h('span', {class: 'hm-glb'}, globe({nodes: 60, size: 52, ring: false})),
-      h('div', {}, h('b', {text: hello() + ', Rabie'}), h('small', {text: cap1(fmt(TODAY, {weekday: 'long', day: 'numeric', month: 'long'})) + (pr ? ' · ' + CODE[pr] : '') + (ml ? ' · ' + ml : '')}),
-        !ml && !window.__METEO ? h('button', {type: 'button', class: 'link hm-met', onclick: () => metLoad(true)}, 'Afficher la météo') : null)));
-    el.append(bar);   /* 19/11/2026 : « Demander » repasse en haut (en bas, il ne servait à rien) */
+    /* refonte UX (22/11/2026, maquette validée : « le bloc bleu est trop banal ; impressionnant, futuriste, vivant ») : l'écran de JARVIS */
+    void bar; el.append(hudScreen(D, pr, ml));
     if (typeof briefCard === 'function') { const bc = briefCard(); if (bc) el.append(bc); }   /* 0.41.0 : le brief du jour */
     if (typeof actCard === 'function') el.append(actCard());   /* 0.33.0 : ce que font Claude et tes bots, en direct */
-    el.append(hsec('En un coup d’œil', null, homeKpis(D)));
+    { const k = homeKpis(D); [...k.querySelectorAll('.kpi-t')].filter((x) => /pour toi/.test(x.textContent)).forEach((x) => x.remove()); el.append(hsec('En un coup d’œil', null, k)); }   /* « pour toi » est dans l'écran de JARVIS ; mails et bons prix restent (son choix du 19/11) */
     if (D.now.length) el.append(hsec('À faire maintenant', more('Tout voir', 'demandes'), nowRows(D)));
     const today = D.ag.filter((a) => a.n === 0), H0 = 7, H1 = 23, nowH = new Date().getHours() + new Date().getMinutes() / 60, pos = (x) => Math.max(0, Math.min(100, (x - H0) / (H1 - H0) * 100));
     const axis = h('div', {class: 'tl-axis'}, h('span', {class: 'tl-now', style: 'left:' + pos(nowH) + '%'}, h('small', {text: hm(new Date())})));
@@ -9518,6 +9591,41 @@ void main(){
       el.querySelectorAll('.pm-sum').forEach((x) => { x.hidden = true; });   /* les filtres donnent les mêmes nombres */
       if (f !== 'tout') el.querySelectorAll('.pm-sec, #pm-mail').forEach((x) => { if (!PM[f].includes(x.id)) x.hidden = true; });
     };
+  }
+
+  /* ================= refonte UX (22/11/2026) : le globe vit avec Claude ; il réfléchit pendant l'attente, répond pendant que le texte arrive (ou que la voix lit),
+     écoute en mains libres ; le même état dans la barre et en grand en haut de la discussion ================= */
+  {
+    let G_CL = null, last = '';
+    document.head.append(h('style', {text: '.chat-globe{position:relative;height:170px;margin:0 0 8px;flex:0 0 auto}.chat-globe .holo-stage{position:absolute;inset:0;width:auto;height:auto}.chat-globe .holo-stage canvas{width:100%;height:100%;display:block}'
+      + '.cl-state{position:absolute;left:0;right:0;bottom:2px;text-align:center;font:600 12px var(--display);letter-spacing:.2em;text-transform:uppercase;color:rgb(var(--c2))}.cl-state[data-s="thinking"]{color:#d8b4fe}.cl-state[data-s="speaking"]{color:#93c5fd}'}));
+    const LBL = {idle: 'Prêt', listening: 'À l’écoute', thinking: 'Réfléchit…', speaking: 'Répond'};
+    function uxState() {
+      if (!CHAT.open) { const b0 = window.JarvisVoice && window.JarvisVoice.bar && window.JarvisVoice.bar(); if (b0 && last !== 'idle') { b0.set('idle'); last = 'idle'; } return; }
+      const T = THREADS[CHAT.key], m = T && T.msgs[T.msgs.length - 1];
+      let st = CHAT.busy ? (m && m.wait ? 'thinking' : 'speaking') : 'idle';
+      if (typeof MAINS === 'object' && MAINS.on) st = MAINS.state === 'thinking' ? 'thinking' : MAINS.state === 'speaking' ? 'speaking' : st === 'idle' ? 'listening' : st;
+      const b = window.JarvisVoice && window.JarvisVoice.bar && window.JarvisVoice.bar();
+      if (st !== last || (G_CL && G_CL.el.dataset.s !== st)) { if (G_CL) G_CL.set(st); if (b) b.set(st); }
+      const l = document.querySelector('#chat .cl-state'); if (l) { l.dataset.s = st; l.textContent = LBL[st] || ''; }
+      last = st;
+    }
+    const RC = renderChat;
+    renderChat = function () {
+      RC.apply(this, arguments);
+      if (!CHAT.open || CHAT.mode !== 'claude') return;
+      const log = $('chat').querySelector('.chat-log'), hv = window.JarvisVoice && window.JarvisVoice.holo;
+      if (log && hv && document.documentElement.classList.contains('theme-holo')) {
+        if (!G_CL) G_CL = hv({ring: true, nodes: 140});
+        if (!log.querySelector('.chat-globe')) log.prepend(h('div', {class: 'chat-globe'}, G_CL.el, h('div', {class: 'cl-state'})));
+      }
+      uxState();
+    };
+    const MB = mainsBusy;
+    mainsBusy = function (b) { MB(b); uxState(); };
+    setInterval(() => { if (CHAT.open || last !== 'idle') uxState(); }, 150);   /* la réponse s'écrit sans redessiner toute la discussion : l'état est relu en continu, discussion ouverte */
+    const CC = closeChat;
+    closeChat = function () { CC.apply(this, arguments); uxState(); };
   }
 
   boot();
