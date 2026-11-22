@@ -9474,6 +9474,52 @@ void main(){
     draw(/[?&#]google=ok/.test(location.href) ? msg('Google est relié.') : null);
   };
 
+  /* ================= refonte UX (22/11/2026, maquette validée) : Équipe absorbe Suivi et Automatisations ; Pour moi en filtres =================
+     Rien n'est réécrit : les panneaux d'origine (mêmes boutons, mêmes données) sont rangés sous un filtre. Suivi et Automatisations restent des
+     adresses valides (#suivi, #automatisations : liens des notifications du serveur), qui ouvrent Équipe sur le bon filtre. */
+  {
+    const V_EQ = VIEWS.equipe, V_SUIVI = VIEWS.suivi, V_AUTO = VIEWS.automatisations, V_DEM = VIEWS.demandes, V_REG = VIEWS.reglages;
+    const EQF = {f: 'bots'}, PMF = {f: 'tout'};
+    const segBar = (cur, opts, on) => h('div', {class: 'seg ux-seg', role: 'group', 'aria-label': 'Filtre'}, opts.map(([k, l, n]) => h('button', {type: 'button', 'aria-pressed': String(cur === k), 'data-f': k, onclick: () => on(k)}, l, n ? h('b', {text: String(n)}) : null)));
+    const harvest = (fn) => { const box = h('div'); try { fn(box); } catch (e) { console.warn('refonte UX', e); } return [...box.children]; };
+    const h2Of = (n) => { const x = n.querySelector && n.querySelector('h2'); return x ? x.textContent.trim() : ''; };
+    const COUT = /^(Coût de la semaine|File d'attente des bots|Claude cette semaine)/, SYS = /^État des systèmes/, TACHES = /^Mes tâches/, PAPL = /^Papiers$/, ORD = /^Tes ordres/;
+    document.head.append(h('style', {text: '.ux-seg{position:sticky;top:calc(var(--top-h, 64px) + 4px);z-index:5;display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:4px;padding:4px;margin:0 0 14px;border-radius:14px;background:rgba(4,10,28,.92);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);border:1px solid rgba(var(--c1),.25)}'
+      + '.ux-seg button{min-height:38px;border:0;border-radius:10px;background:none;color:var(--muted);font:600 13.5px var(--sans);white-space:nowrap;cursor:pointer}'
+      + '.ux-seg button[aria-pressed="true"]{color:#031022;background:linear-gradient(90deg,rgb(var(--c2)),rgb(var(--c1)))}.ux-seg b{font:600 12px var(--display);margin-left:4px;opacity:.85}'}));
+    /* Équipe : Bots, Demandes, Routines, Coût */
+    VIEWS.equipe = (el) => {
+      if (AGENT) { V_EQ(el); return; }
+      const f = EQF.f;
+      el.append(segBar(f, [['bots', 'Bots'], ['dem', 'Demandes'], ['rout', 'Routines'], ['cout', 'Coût']], (k) => { EQF.f = k; const sc = $('scroller'); renderView(true); if (sc) sc.scrollTop = 0; }));
+      if (f === 'bots') { harvest(V_EQ).filter((n) => !ORD.test(h2Of(n))).forEach((n) => el.append(n)); return; }
+      if (f === 'rout') { V_AUTO(el); return; }
+      const parts = harvest(V_SUIVI).filter((n) => !SYS.test(h2Of(n)) && !TACHES.test(h2Of(n)) && !PAPL.test(h2Of(n)));
+      if (f === 'cout') { parts.filter((n) => COUT.test(h2Of(n))).forEach((n) => el.append(n)); return; }
+      parts.filter((n) => !COUT.test(h2Of(n))).forEach((n) => el.append(n));
+      harvest(V_EQ).filter((n) => ORD.test(h2Of(n))).forEach((n) => el.append(n));   /* tes ordres : ce que tu as demandé */
+    };
+    TITLES.suivi = TITLES.equipe; TITLES.automatisations = TITLES.equipe;
+    const alias = (k) => (el) => { EQF.f = k; TAB = 'equipe'; try { history.replaceState(null, '', '#equipe'); } catch (e) { /* rien */ } VIEWS.equipe(el); };
+    VIEWS.suivi = alias('dem'); VIEWS.automatisations = alias('rout');
+    const GO_UX = go;
+    go = function (id, keep) { if (id === 'suivi' || id === 'automatisations') { EQF.f = id === 'suivi' ? 'dem' : 'rout'; id = 'equipe'; } if (id === 'demandes') PMF.f = 'tout'; return GO_UX(id, keep); };   /* Pour moi s'ouvre toujours sur « Tout » (les liens #voir-… y mènent à une section) */
+    /* Réglages : l'état des systèmes (venu de Suivi) en bas */
+    VIEWS.reglages = (el) => { V_REG(el); harvest(V_SUIVI).filter((n) => SYS.test(h2Of(n))).forEach((n) => el.append(n)); };
+    /* Pour moi : Tout, Décider, À faire, Infos ; « Mes tâches » (venues de Suivi) dans À faire */
+    const PM = {decider: ['pm-dec'], faire: ['pm-todo', 'pm-proj', 'pm-mail', 'pm-taches', 'pm-wait'], infos: ['pm-rep']};
+    VIEWS.demandes = (el) => {
+      V_DEM(el);
+      if (typeof FOCUS === 'object' && FOCUS && FOCUS.on) return;
+      if ((S.taches || []).some((t) => t.status !== 'Fait')) { const tt = h('div', {class: 'stack'}); try { SCREEN.taches(tt); el.append(h('section', {class: 'panel pm-sec', id: 'pm-taches'}, h('header', {class: 'panel-h'}, h('h2', {text: 'Mes tâches'})), tt)); } catch (e) { /* rien */ } }
+      const n = (ids) => ids.reduce((s, id) => { const x = el.querySelector('#' + id + ' .pm-list'); return s + (x ? x.children.length : 0); }, 0);
+      const f = PMF.f, bar = segBar(f, [['tout', 'Tout'], ['decider', 'Décider', n(PM.decider)], ['faire', 'À faire', n(['pm-todo', 'pm-proj'])], ['infos', 'Infos', n(PM.infos)]], (k) => { PMF.f = k; renderView(true); });
+      const start = el.querySelector('#fc-start'); if (start && start.parentNode === el) start.after(bar); else el.prepend(bar);
+      el.querySelectorAll('.pm-sum').forEach((x) => { x.hidden = true; });   /* les filtres donnent les mêmes nombres */
+      if (f !== 'tout') el.querySelectorAll('.pm-sec, #pm-mail').forEach((x) => { if (!PM[f].includes(x.id)) x.hidden = true; });
+    };
+  }
+
   boot();
 })();
 </script>
