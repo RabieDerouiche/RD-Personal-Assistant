@@ -9964,6 +9964,11 @@ void main(){
     }
     const RV1 = renderView;
     renderView = function (keep) {
+      /* 0.65.0 (« au chargement, toujours du clignotement sur l'accueil ; les menus, Espaces, pas réactifs des fois ») : une page redessinée
+         parce que des données arrivent attend que le doigt soit levé (sinon l'élément touché est remplacé et l'appui perdu) et que la
+         transition soit finie (sinon la page qui arrive est remplacée en plein vol) ; un seul rafraîchissement ensuite */
+      if (keep && !(UXM.next && performance.now() - UXM.t < 700) && (UXM.down || performance.now() < (UXM.animUntil || 0))) { uxPlusTard(); return; }
+      UXM.later = false;
       const now = SNAPS();
       let kind = null;
       if (!reduced && UXM.prev) kind = keep ? (UXM.next && performance.now() - UXM.t < 700 ? UXM.next : null) : kindOf(UXM.prev, now);
@@ -9993,9 +9998,23 @@ void main(){
         setTimeout(() => nw.classList.remove('ux-in', 'ux-in-' + kind), 900);
       }
       if (nw && (!keep || kind)) countUp(nw);
-      if (nw) { decorate(nw, !keep || kind); if (!keep || kind) reveal(nw); if (kind) UXM.navAt = performance.now(); if (raw != null) { nw.__raw = raw; nw.__dec = uxNorm(nw); } }
+      if (nw) { decorate(nw, !keep || kind); if (!keep || kind) reveal(nw); if (kind) { UXM.navAt = performance.now(); UXM.navTab = rootOf(TAB); UXM.animUntil = performance.now() + 560; } if (raw != null) { nw.__raw = raw; nw.__dec = uxNorm(nw); } }
+      /* 0.65.0 : les lignes de l'écran de JARVIS tout de suite (avant : deux images sans elles à chaque rafraîchissement) ; les animations
+         qui tournent en boucle reprennent où elles en étaient (avant : elles repartaient toutes à zéro, d'où le clignotement) */
+      if (nw && nw.querySelector('.hud') && typeof hudLines === 'function') try { hudLines(); } catch (e) { /* rien */ }
+      if (nw) uxCale(nw);
       return r;
     };
+    function uxPlusTard() {
+      if (UXM.later) return; UXM.later = true;
+      const essai = () => { if (!UXM.later) return; if (UXM.down || performance.now() < (UXM.animUntil || 0)) { setTimeout(essai, 120); return; } renderView(true); };
+      setTimeout(essai, 120);
+    }
+    function uxCale(root) {
+      if (!root.getAnimations || typeof CSSAnimation === 'undefined') return;
+      try { root.getAnimations({subtree: true}).forEach((a) => { const tm = a.effect && a.effect.getTiming ? a.effect.getTiming() : null; if (tm && tm.iterations === Infinity && a instanceof CSSAnimation && a.startTime !== 0) a.startTime = 0; }); } catch (e) { /* rien */ }
+    }
+    window.__uxRerender = () => renderView(true);   /* bancs : un rafraîchissement de données, comme à l'arrivée de Pilotage */
     const uxNorm = (x) => x.innerHTML.replace(/ ux-rv(?:-on)?\b| ux-tilt\b/g, '');
     function keepImgs(old, nw) {
       const have = new Map(); old.querySelectorAll('img').forEach((i) => { if (i.complete && i.naturalWidth && i.getAttribute('src')) have.set(i.getAttribute('src'), i); });
@@ -10071,12 +10090,11 @@ void main(){
       root.querySelectorAll(HALOS).forEach((x) => jobs.push([x, 'ux-halo']));
       const tilts = [...root.querySelectorAll(TILTS)].filter((x) => !x.classList.contains('ux-tiltable')); tilts.forEach((x) => jobs.push([x, 'ux-lit']));
       const todo = jobs.filter(([x, c]) => !has(x, c)), stat = todo.map(([x]) => getComputedStyle(x).position === 'static');
-      const t = performance.now() / 1000; let n = 0;
+      let n = 0;
       todo.forEach(([x, c], i) => {
         if (stat[i]) x.style.position = 'relative';
         const d = h('i', {class: 'ux-deco ' + c, 'aria-hidden': 'true'});
-        if (c === 'ux-shine') { const sw = 6.5 + (n % 3), off = (n++ * 1.37) % 6; d.style.setProperty('--sw', sw + 's'); d.style.setProperty('--sd', (-(((t - off) % sw) + sw) % sw).toFixed(2) + 's'); }
-        if (c === 'ux-neon') d.style.setProperty('--nd', (-(t % 4.2)).toFixed(2) + 's');
+        if (c === 'ux-shine') { const sw = 6.5 + (n % 3), off = (n++ * 1.37) % 6; d.style.setProperty('--sw', sw + 's'); d.style.setProperty('--sd', off.toFixed(2) + 's'); }   /* 0.65.0 : phase tenue par uxCale */
         if (c === 'ux-halo') x.style.animation = 'none';
         x.append(d);
       });
@@ -10118,13 +10136,18 @@ void main(){
     closeChat = function () { const ov = $('chat'), vis = ov && !ov.hidden; const r = CC2.apply(this, arguments); if (ov) ov.classList.remove('ux-circ', 'ux-circd'); if (vis && !reduced) { const g = document.querySelector('body > .ux-ov-out:last-of-type'); if (g) { const [x, y] = orbXY(); g.style.setProperty('--ox', x); g.style.setProperty('--oy', y); g.classList.add('ux-circ-out'); } } return r; };
     /* 0.59.0 (« l'appui sur les boutons du menu, Espaces surtout, bugge ») : l'onglet s'allume dès que le doigt le touche (avant : rien jusqu'à la fin du calcul de la page),
        et un second appui pendant la transition est ignoré (avant : il relançait la page ou la remontait pendant qu'elle arrivait) */
+    document.addEventListener('pointerdown', () => { UXM.down = true; }, {passive: true, capture: true});
+    const leve = () => { UXM.down = false; };
+    document.addEventListener('pointerup', leve, {passive: true, capture: true}); document.addEventListener('pointercancel', leve, {passive: true, capture: true});
     document.addEventListener('pointerdown', (e) => { const t = e.target.closest && e.target.closest('.tab'); if (!t) return; t.classList.add('is-press'); setTimeout(() => t.classList.remove('is-press'), 380); }, {passive: true, capture: true});
-    document.addEventListener('click', (e) => { const t = e.target.closest && e.target.closest('.tab'); if (!t) return; if (UXM.navAt && performance.now() - UXM.navAt < 450) { e.stopImmediatePropagation(); e.preventDefault(); } }, true);
+    document.addEventListener('click', (e) => { const t = e.target.closest && e.target.closest('.tab'); if (!t) return; if (UXM.navAt && performance.now() - UXM.navAt < 450 && t.dataset.tab === UXM.navTab) { e.stopImmediatePropagation(); e.preventDefault(); } }, true);
+    /* 0.65.0 : la barre sort de la zone qui défile ; sur iPhone, un appui pendant que la page glisse encore ne servait qu'à l'arrêter (« pas réactif des fois ») */
+    { const nav = $('tabs'); if (nav && nav.parentElement !== document.body) document.body.appendChild(nav); }
     document.head.append(h('style', {text: '.fav-bar{touch-action:manipulation;-webkit-tap-highlight-color:transparent}.fav-row{align-items:stretch!important}.fav-bar .tab{justify-content:flex-end;min-height:62px!important}.fav-row .tab{transition:transform .18s ' + EASE + ',color .18s}.fav-row .tab.is-press{transform:scale(.9);color:var(--fg)}.fav-row .tab.is-press .ic{filter:drop-shadow(0 0 8px var(--pg,#22d3ee))}'}));
     /* parallaxe : le ciel glisse plus lentement que la page */
     { const sc = $('scroller'), sky = document.querySelector('.ux-sky'); let raf = 0; if (sc && sky) sc.addEventListener('scroll', () => { if (raf) return; raf = requestAnimationFrame(() => { raf = 0; sky.style.setProperty('--sy', String(sc.scrollTop)); }); }, {passive: true}); }
     /* au premier affichage aussi */
-    setTimeout(() => { const v = $('view') && $('view').firstElementChild; if (v) { decorate(v, true); reveal(v); } }, 0);
+    setTimeout(() => { const v = $('view') && $('view').firstElementChild; if (v) { decorate(v, true); reveal(v); uxCale(v); } }, 0);
     /* ================= 0.60.0 : la voix qui agit (sa demande du 22/11/2026 : « améliore la gestion des tâches par les conversations vocales,
        pas besoin d'appui de bouton, il demande la validation oralement si besoin ; il doit être plus sharp, pas grave si ça consomme plus »).
        En conversation à la voix : une tâche, un souvenir, une relance sont faits aussitôt ; un ordre à un bot, une échéance, une routine,
