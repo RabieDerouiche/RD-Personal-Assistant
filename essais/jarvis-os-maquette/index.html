@@ -6363,8 +6363,12 @@ void main(){
     if (pend.length) put(pendPanel(pend, 5));
     const nNew = S.demandes.filter((d) => d.isNew).length + (S.newReplies || 0);
     if (nNew) put(h('div', {class: 'new-banner'}, h('span', {class: 'ic', html: icon('bolt', 16)}), h('span', {text: nNew + ' nouveauté' + (nNew > 1 ? 's' : '') + ' depuis ta dernière visite'}), h('button', {type: 'button', class: 'btn sm', onclick: () => { lvMarkSeen(); refresh(); }}, 'Tout vu')));
+    const mb = mailPanelBox(); if (mb) put(mb);
+  };
+  /* 0.57.0 : le panneau du courrier arrivé depuis le tour d'Iris, construit seul (avant, Pour moi reconstruisait tout l'ancien accueil pour le récupérer) */
+  function mailPanelBox() {
     const m = S.mailAfter;
-    if (!m || !m.items.length) return;
+    if (!m || !m.items.length) return null;
     const when = fmt(m.since, {weekday: 'short', day: 'numeric', month: 'short'}) + ' à ' + pad2(m.since.getHours()) + 'h' + pad2(m.since.getMinutes());
     const box = panel('Arrivés depuis le dernier tour d\'Iris', h('span', {class: 'aside', text: m.items.length + ' fil' + (m.items.length > 1 ? 's' : '') + ' · boîte principale'}),
       h('p', {class: 'muted', text: 'Reçus après son dernier tour de Gmail (' + when + '). Le courrier prioritaire est déjà traité à son arrivée. Trie ici : « Pour Iris » pour ce seul mail, « Rien à faire » pour l\'archiver.'}),
@@ -6372,8 +6376,8 @@ void main(){
         h('div', {class: 'tri-b'}, h('button', {type: 'button', class: 'btn sm', onclick: () => mailToIris(x)}, 'Pour Iris', costTag({cost: 'bot'})), h('button', {type: 'button', class: 'btn sm ghost', onclick: () => mailNothing(x)}, 'Rien à faire', costTag({cost: 'free'})))))),
       h('div', {class: 'row-actions'}, h('button', {type: 'button', class: 'btn main', onclick: () => confirmSheet({bot: 'hydra', title: 'Iris traite tous ces mails ?', ok: 'Oui, Iris les traite tous', cost: 'bot', say: 'Un passage d\'Iris pour les ' + m.items.length + ' mails. Pour un seul mail, « Pour Iris » sur ce mail suffit.', run: () => finish({title: 'Courrier à traiter', bot: 'hydra', order: 'Traite maintenant les ' + m.items.length + ' fils arrivés dans la boîte principale depuis ton dernier tour de Gmail (' + when + '), comme dans ta veille du matin.', effect: 'Une ligne pour Iris dans le Canal, puis la sonnette.', say: 'Je regarde ton courrier.'})})}, 'Iris les traite tous', costTag({cost: 'bot'}))));
     box.classList.add('live-mail');
-    put(box);
-  };
+    return box;
+  }
 
   /* ---------- mettre à jour : relire tout de suite (gratuit), ou faire passer Iris sur tes mails et ton Drive (un passage) ---------- */
   ICONS.refresh = '<path d="M20 11a8 8 0 0 0-14.3-4.9L4 8"/><path d="M4 4v4h4"/><path d="M4 13a8 8 0 0 0 14.3 4.9L20 16"/><path d="M20 20v-4h-4"/>';
@@ -8202,7 +8206,7 @@ void main(){
     + '.hud-on{text-align:right;font:700 12px Orbitron,var(--display);letter-spacing:.18em;color:rgb(var(--c2));padding-top:4px}.hud-on i{display:inline-block;width:8px;height:8px;border-radius:50%;background:#34d399;box-shadow:0 0 10px #34d399;margin-right:7px;animation:hudblink 1.6s ease-in-out infinite}'
     + '.hud-on small{display:block;margin-top:5px;font:500 12px var(--sans);letter-spacing:.02em;color:var(--muted);white-space:nowrap}'
     + '.hud-core{position:relative;height:340px;margin:2px -8px 0}.hud-core .holo-stage{position:absolute;inset:0;width:auto;height:auto}.hud-core .holo-stage canvas{width:100%;height:100%;display:block}'
-    + '.hud-lines{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible}.hud-lines path{fill:none;stroke:rgb(var(--c2));stroke-opacity:.85;stroke-width:1.5;stroke-dasharray:4 3;animation:hudflow 1.2s linear infinite;filter:drop-shadow(0 0 3px rgba(var(--c1),.9))}.hud-lines circle{fill:#e0faff;filter:drop-shadow(0 0 5px rgb(var(--c1)))}'
+    + '.hud-lines{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible}.hud-lines path{fill:none;stroke:rgb(var(--c2));stroke-opacity:.85;stroke-width:1.5;stroke-dasharray:4 3}.hud-lines{animation:hudpulse 2.4s ease-in-out infinite;filter:drop-shadow(0 0 3px rgba(var(--c1),.9))}@keyframes hudpulse{50%{opacity:.55}}.hud-lines circle{fill:#e0faff;filter:drop-shadow(0 0 5px rgb(var(--c1)))}'
     + '.hud-ro{position:absolute;z-index:1;width:128px;text-align:left;padding:8px 10px 9px;border-radius:4px 14px 4px 14px;color:var(--fg);font:inherit;cursor:pointer;background:rgba(3,10,28,.74);border:1px solid rgba(var(--c1),.45);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);box-shadow:0 0 18px rgba(14,165,233,.18),inset 0 0 14px rgba(var(--c1),.08);animation:hudhover 5s ease-in-out infinite}'
     + '.hud-ro::before,.hud-ro::after{content:"";position:absolute;width:10px;height:10px;border:2px solid rgb(var(--c2))}.hud-ro::before{left:-2px;top:-2px;border-right:0;border-bottom:0;border-radius:4px 0 0 0}.hud-ro::after{right:-2px;bottom:-2px;border-left:0;border-top:0;border-radius:0 0 4px 0}'
     + '.hud-ro small{display:block;font:700 11px var(--display);letter-spacing:.16em;color:rgb(var(--c2))}.hud-ro b{display:block;font:700 18px/1.15 var(--display);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.hud-ro span{display:block;font-size:12px;color:var(--muted);margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}'
@@ -8295,10 +8299,8 @@ void main(){
     const tr = homeTrip(D); if (tr) el.append(hsec('Voyage en préparation', more('Voyages', 'voyages'), tr));
   }
   VIEWS.accueil = (el) => {
-    const src = h('div'); ACC_ORIG(src);
-    const bar = src.querySelector('.intent'), D = homeData();
-    el.append.apply(el, homeTop(src));
-    homeDash(el, D, bar || h('div'));   /* 0.23.0 : le tableau de bord remplace le « Fil du jour » */
+    /* 0.57.0 : l'ancien accueil n'est plus reconstruit en coulisse à chaque affichage (77 ms) : on n'en gardait plus rien */
+    homeDash(el, homeData(), h('div'));   /* 0.23.0 : le tableau de bord remplace le « Fil du jour » */
   };
   /* rien n'est perdu : ce que l'ancien accueil montrait va dans sa rubrique */
   const VDM_OS = VIEWS.demandes;
@@ -8421,7 +8423,7 @@ void main(){
     ].filter(Boolean));
     const rp = pmReplies(); if (rp) el.append(rp);
     const cp = cotePanel(); if (cp) { cp.id = 'pm-wait'; el.append(cp); }
-    const src = h('div'); ACC_ORIG(src); const mail = hpanel(src, 'Arrivés depuis');
+    const mail = mailPanelBox();   /* 0.57.0 : construit seul, sans reconstruire l'ancien accueil */
     if (mail) { const n = mail.querySelectorAll('.card, article, li').length; el.append(h('details', {class: 'panel pm-sec', id: 'pm-mail'}, h('summary', {}, h('h2', {text: 'Courrier à trier'}), h('span', {class: 'aside', text: n ? n + ' mail' + (n > 1 ? 's' : '') : 'depuis le dernier tour d\'Iris'})), mail)); }
   };
   /* ================= JARVIS OS 0.25.0 (revue UX du 19/11/2026, choix QCM « Pour moi, une par une ») =================
@@ -9725,7 +9727,7 @@ void main(){
       old.classList.remove('is-enter', 'ux-in'); old.style.left = rect.left + 'px'; old.style.top = (rect.top - topB) + 'px'; old.style.width = rect.width + 'px';
       if (kind === 'pop' && UXM.dragX) old.style.setProperty('--ux-from', UXM.dragX + 'px');
       g.append(old);
-      if (title) { const c = title.node; c.removeAttribute('id'); c.classList.add('view-in'); c.style.left = title.r.left + 'px'; c.style.top = (title.r.top - topB) + 'px'; c.style.width = title.r.width + 'px'; c.style.margin = '0'; g.append(c); }   /* le titre part avec sa page */
+      if (title) { const c = title.node; c.removeAttribute('id'); c.classList.remove('ux-holo', 'ux-tin', 'ux-in-push', 'ux-in-pop', 'ux-in-left', 'ux-in-right', 'ux-in-fade', 'ux-in-zoom'); c.classList.add('view-in', 'ux-gt'); c.style.left = title.r.left + 'px'; c.style.top = (title.r.top - topB) + 'px'; c.style.width = title.r.width + 'px'; c.style.margin = '0'; g.append(c); }   /* le titre part avec sa page */
       document.body.append(g);
       setTimeout(() => g.remove(), kind === 'fade' ? 260 : 400);
     }
@@ -9748,6 +9750,9 @@ void main(){
       let kind = null;
       if (!reduced && UXM.prev) kind = keep ? (UXM.next && performance.now() - UXM.t < 700 ? UXM.next : null) : kindOf(UXM.prev, now);
       UXM.next = null;
+      /* 0.57.0 : une page ouverte depuis une tuile, un relevé, une ligne s'ouvre DEPUIS cet élément (zoom) */
+      const from = UXM.from && performance.now() - UXM.from.t < 900 ? UXM.from.r : null; UXM.from = null;
+      if (from && (kind === 'push' || kind === 'right' || kind === 'left')) kind = 'zoom';
       const v = $('view'), old = v && v.firstElementChild;
       let rect = null, topB = 0, botT = innerHeight;
       let title = null; const vt = $('view-title');
@@ -9759,11 +9764,13 @@ void main(){
       if (kind && old && nw && old !== nw) {
         const tNew = vt && getComputedStyle(vt).display !== 'none';
         ghostOut(old, rect, topB, botT, kind, title && (title.t !== (vt && vt.textContent) || !tNew) ? title : null); UXM.dragX = 0;
-        if (vt && tNew && (!title || title.t !== vt.textContent)) { vt.classList.remove('ux-in-push', 'ux-in-pop', 'ux-in-left', 'ux-in-right', 'ux-in-fade'); void vt.offsetWidth; vt.classList.add('ux-tin', 'ux-in-' + kind); setTimeout(() => vt.classList.remove('ux-tin', 'ux-in-' + kind), 900); }
+        if (vt && tNew && (!title || title.t !== vt.textContent)) { vt.classList.remove('ux-in-push', 'ux-in-pop', 'ux-in-left', 'ux-in-right', 'ux-in-fade', 'ux-in-zoom'); void vt.offsetWidth; vt.classList.add('ux-tin', 'ux-in-' + kind); setTimeout(() => vt.classList.remove('ux-tin', 'ux-in-' + kind), 900); }
         nw.classList.remove('is-enter'); nw.classList.add('ux-in', 'ux-in-' + kind);
+        if (kind === 'zoom') { const q = nw.getBoundingClientRect(); nw.style.setProperty('--zt', Math.max(0, from.top - q.top) + 'px'); nw.style.setProperty('--zl', Math.max(0, from.left - q.left) + 'px'); nw.style.setProperty('--zr', Math.max(0, q.right - from.right) + 'px'); nw.style.setProperty('--zb', Math.max(0, q.bottom - from.bottom) + 'px'); }
         setTimeout(() => nw.classList.remove('ux-in', 'ux-in-' + kind), 900);
       }
       if (nw && (!keep || kind)) countUp(nw);
+      if (nw) { decorate(nw); if (!keep || kind) reveal(nw); }
       return r;
     };
     /* un filtre (puces, segments, onglets d'une page) touché : le contenu se fond au lieu de sauter */
@@ -9775,6 +9782,105 @@ void main(){
     const sinkOut = (ov) => { if (!ov || ov.hidden || reduced) return; const g = cloneVisual(ov); g.className = ov.className + ' ux-ov-out'; g.setAttribute('aria-hidden', 'true'); g.setAttribute('inert', ''); g.hidden = false; g.style.cssText = ov.style.cssText; document.body.append(g); setTimeout(() => g.remove(), 320); };
     const CC1 = closeChat; closeChat = function () { sinkOut($('chat')); return CC1.apply(this, arguments); };
     const CA1 = closeApp; closeApp = function () { sinkOut($('app')); return CA1.apply(this, arguments); };
+
+    /* ================= 0.57.0 : l'effet « waouh » (« je veux l'effet wow partout, de l'animé, des transitions, des effets lumineux 3D,
+       que toute l'app ait l'air d'une seule page ») ; tout n'anime que la position et la transparence : la puce graphique de l'iPhone s'en charge ================= */
+    document.head.append(h('style', {text: ''
+      /* profondeur : la page qui part recule, celle qui arrive avance ; l'onglet traverse en zoom */
+      + '.ux-out-push>.view-in{animation:uxRecede .42s ' + EASE + ' both}.ux-out-zoom>.view-in{animation:uxRecede .5s ' + EASE + ' both}'
+      + '.ux-out-right>.view-in{animation:uxThroughOutL .36s ' + EASE + ' both}.ux-out-left>.view-in{animation:uxThroughOutR .36s ' + EASE + ' both}'
+      + '.view-in.ux-in-right{animation:uxThroughInR .46s ' + EASE + ' both}.view-in.ux-in-left{animation:uxThroughInL .46s ' + EASE + ' both}'
+      + '.view-in.ux-in-zoom{animation:uxZoomIn .56s ' + EASE + ' both}.ux-tin.ux-in-zoom{animation:uxInF .5s ' + EASE + ' .08s both}'
+      + '@keyframes uxRecede{40%{opacity:.25}to{transform:scale(.9) translateY(10px);opacity:0}}'
+      + '@keyframes uxThroughOutL{45%{opacity:.1}to{transform:translateX(-8%) scale(.94);opacity:0}}@keyframes uxThroughOutR{45%{opacity:.1}to{transform:translateX(8%) scale(.94);opacity:0}}'
+      + '@keyframes uxThroughInR{from{transform:translateX(10%) scale(1.04);opacity:0}}@keyframes uxThroughInL{from{transform:translateX(-10%) scale(1.04);opacity:0}}'
+      + '@keyframes uxZoomIn{from{-webkit-clip-path:inset(var(--zt,40%) var(--zr,10%) var(--zb,40%) var(--zl,10%) round 22px);clip-path:inset(var(--zt,40%) var(--zr,10%) var(--zb,40%) var(--zl,10%) round 22px);opacity:.35}35%{opacity:1}to{-webkit-clip-path:inset(0 0 0 0 round 0);clip-path:inset(0 0 0 0 round 0)}}'
+      + '.view-in.ux-in-zoom>*{animation:uxRise .6s ' + EASE + ' both}'
+      /* l'orbe s'ouvre en cercle de lumière sur la discussion, et s'y referme */
+      + '#chat.ux-circ{animation:uxCircIn .6s ' + EASE + ' both!important}#chat.ux-circd{animation:none!important}.ux-ov-out.ux-circ-out{animation:uxCircOut .42s ' + EASE + ' both!important}'
+      + '@keyframes uxCircIn{from{-webkit-clip-path:circle(36px at var(--ox,50%) var(--oy,92%));clip-path:circle(36px at var(--ox,50%) var(--oy,92%));opacity:.6}to{-webkit-clip-path:circle(150% at var(--ox,50%) var(--oy,92%));clip-path:circle(150% at var(--ox,50%) var(--oy,92%))}}'
+      + '@keyframes uxCircOut{to{-webkit-clip-path:circle(30px at var(--ox,50%) var(--oy,92%));clip-path:circle(30px at var(--ox,50%) var(--oy,92%));opacity:.2}}'
+      /* lumière : reflet qui balaie, bord néon qui tourne, halo ambre qui respire, reflet qui suit le doigt */
+      + '.ux-deco{position:absolute;inset:0;border-radius:inherit;pointer-events:none;overflow:hidden;z-index:1}'
+      + '.ux-shine::before{content:"";position:absolute;top:-60%;bottom:-60%;width:38%;left:-60%;background:linear-gradient(100deg,transparent,rgba(190,240,255,.16) 45%,rgba(255,255,255,.28) 50%,rgba(190,240,255,.16) 55%,transparent);transform:translateX(0) rotate(12deg);animation:uxSweep var(--sw,7s) ease-in-out var(--sd,0s) infinite}'
+      + '@keyframes uxSweep{0%,62%{transform:translateX(0) rotate(12deg)}100%{transform:translateX(560%) rotate(12deg)}}'
+      + '.ux-neon{inset:-1.5px;padding:2px;overflow:hidden;-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask:linear-gradient(#000 0 0) content-box exclude,linear-gradient(#000 0 0)}'
+      + '.ux-neon::before{content:"";position:absolute;left:50%;top:50%;width:160%;aspect-ratio:1;background:conic-gradient(from 0deg,transparent 0 42%,rgba(var(--c2),.15) 50%,#e8fbff 66%,rgb(var(--c2)) 72%,rgb(var(--c3)) 84%,transparent 96%);animation:uxSpin 4.2s linear infinite}'
+      /* liseré de lumière en haut des cartes : éclairées par-dessus, même à l'arrêt */
+      + '.ux-shine::after{content:"";position:absolute;left:12%;right:12%;top:0;height:1px;background:linear-gradient(90deg,transparent,rgba(220,250,255,.75),transparent);box-shadow:0 0 10px rgba(var(--c2),.6)}'
+      + '@keyframes uxSpin{from{transform:translate(-50%,-50%) rotate(0)}to{transform:translate(-50%,-50%) rotate(360deg)}}'
+      + '.ux-halo{inset:-2px;overflow:visible;box-shadow:0 0 26px rgba(var(--warn),.42),inset 0 0 0 1px rgba(var(--warn),.5);opacity:.25;animation:uxHalo 3.2s ease-in-out infinite;z-index:0}@keyframes uxHalo{50%{opacity:1}}'
+      + '.ux-lit{opacity:0;transition:opacity .25s ease;background:radial-gradient(160px circle at var(--lx,50%) var(--ly,50%),rgba(200,245,255,.28),rgba(120,200,255,.08) 40%,transparent 70%);mix-blend-mode:screen}.ux-tilt .ux-lit{opacity:1}'
+      /* 3D sous le doigt (les cartes s'inclinent vers le doigt), retour en ressort */
+      + '.ux-tiltable{transition:transform .5s cubic-bezier(.2,1.5,.4,1)!important;transform-style:preserve-3d;will-change:transform}.ux-tiltable.ux-tilt{transition:transform .12s ease-out!important}'
+      /* apparition en 3D au défilement */
+      + '.ux-rv{opacity:0;transform:perspective(900px) translateY(26px) rotateX(10deg) scale(.98);transition:opacity .6s ease,transform .7s ' + EASE + '}.ux-rv.ux-rv-on{opacity:1;transform:none}'
+      /* titres holographiques : un reflet passe sur le titre à chaque page */
+      + 'html.theme-holo .view-title{background:linear-gradient(100deg,#e6f7ff 0%,#e6f7ff 38%,rgb(var(--c2)) 48%,#fff 52%,rgb(var(--c3)) 58%,#e6f7ff 68%,#e6f7ff 100%);background-size:260% 100%;background-position:100% 0;-webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-fill-color:transparent}'
+      + 'html.theme-holo .view-title.ux-holo{animation:uxHoloTxt 1.6s ' + EASE + ' .15s both}html.theme-holo .view-title.ux-holo.ux-tin{animation:uxInF .42s ' + EASE + ' .13s both,uxHoloTxt 1.6s ' + EASE + ' .2s both}.ux-ghost>.ux-gt{animation:uxOutF .14s ease both!important}@keyframes uxHoloTxt{from{background-position:100% 0}to{background-position:0 0}}'
+      /* profondeur derrière tout : un sol en grille qui défile, en perspective, et le ciel en parallaxe */
+      + '.ux-floor{position:fixed;left:-50%;right:-50%;bottom:-6vh;height:44vh;pointer-events:none;overflow:hidden;perspective:300px;-webkit-mask-image:linear-gradient(to top,rgba(0,0,0,.9),transparent 90%);mask-image:linear-gradient(to top,rgba(0,0,0,.9),transparent 90%);opacity:.8}'
+      + '.ux-floor i{position:absolute;left:0;right:0;top:-100%;height:300%;background-image:linear-gradient(rgba(var(--c1),.3) 1px,transparent 1px),linear-gradient(90deg,rgba(var(--c1),.3) 1px,transparent 1px);background-size:48px 48px;transform-origin:50% 100%;transform:rotateX(64deg);animation:uxFloor 6s linear infinite}'
+      + '@keyframes uxFloor{from{transform:rotateX(64deg) translateY(0)}to{transform:rotateX(64deg) translateY(48px)}}'
+      + '.ux-sky{transform:translateY(calc(var(--sy,0) * -0.06px))}'
+      /* la barre : l'onglet allumé s'éclaire d'une lueur */
+      + '.fav-row .tab[aria-current="page"]::before{content:"";position:absolute;left:50%;top:50%;width:64px;height:64px;margin:-32px 0 0 -32px;border-radius:50%;background:radial-gradient(circle,rgba(var(--c1),.28),transparent 65%);animation:uxBloom .5s ' + EASE + ' both;pointer-events:none}@keyframes uxBloom{from{transform:scale(.3);opacity:0}}'
+      + '@media (prefers-reduced-motion: reduce){.ux-shine::before,.ux-neon::before,.ux-halo,.ux-floor i,.view-title.ux-holo{animation:none!important}.ux-rv{opacity:1;transform:none}.ux-tiltable{transition:none!important}}'}));
+    if (document.documentElement.classList.contains('theme-holo')) document.body.prepend(h('div', {class: 'ux-floor', 'aria-hidden': 'true'}, h('i')));
+    /* ce qui s'ouvre depuis un élément touché : tuiles, relevés, lignes, cartes */
+    const ZOOMS = '.esp-tile, .esp-row, .hud-ro, .kpi-t, .hm-row, .mate, .voy, .fam, .canal-row, .tl-chip, .agw-d, .pap-go, [data-go]';
+    const TILTS = '.esp-tile, .esp-row, .hud-ro, .kpi-t, .hm-row, .mate, .voy, .fam, .canal-row, .pm-card, .card.item, .brief-card, .shop-hero, .rad-hero';
+    const SHINES = '.esp-tile, .hud-ro, .kpi-t, .mate, .voy, .fam, .shop-hero, .rad-hero, .trip-hero, .brief-card, .hero, .pm-card, .card.item, .sor';
+    const NEONS = '.hero, .shop-hero, .rad-hero, .trip-hero, .brief-card, .esp-tile.amb, .hud-ro.amb';
+    const HALOS = '.esp-tile.amb, .hud-ro.amb, .mate[data-mode="demande"]';
+    const posRel = (x) => { if (getComputedStyle(x).position === 'static') x.style.position = 'relative'; };
+    const deco = (x, cls) => { if (x.querySelector(':scope > .' + cls)) return null; posRel(x); const d = h('i', {class: 'ux-deco ' + cls, 'aria-hidden': 'true'}); x.append(d); return d; };
+    function decorate(root) {
+      if (reduced) return;
+      let n = 0;
+      root.querySelectorAll(SHINES).forEach((x) => { const d = deco(x, 'ux-shine'); if (d) { d.style.setProperty('--sd', ((n++ * 1.37) % 6).toFixed(2) + 's'); d.style.setProperty('--sw', (6.5 + (n % 3)) + 's'); } });
+      [...root.querySelectorAll(NEONS)].slice(0, 3).forEach((x) => deco(x, 'ux-neon'));
+      root.querySelectorAll(HALOS).forEach((x) => { x.style.animation = 'none'; deco(x, 'ux-halo'); });
+      root.querySelectorAll(TILTS).forEach((x) => { if (!x.classList.contains('ux-tiltable')) { x.classList.add('ux-tiltable'); deco(x, 'ux-lit'); } });
+      const vt = $('view-title'); if (vt && !vt.classList.contains('ux-holo')) { vt.classList.add('ux-holo'); setTimeout(() => vt.classList.remove('ux-holo'), 1900); }
+    }
+    /* apparition en 3D : ce qui est sous le bas de l'écran apparaît en montant quand on y arrive */
+    let IO = null;
+    function reveal(root) {
+      if (reduced || !('IntersectionObserver' in window)) return;
+      if (!IO) IO = new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) rvOn(e.target); }), {root: $('scroller'), rootMargin: '0px 0px -6% 0px'});
+      const H = innerHeight;
+      root.querySelectorAll(':scope > *, :scope > * > .panel, :scope .hm-sec, :scope .esp-tile, :scope .pm-card, :scope .mate, :scope .fam, :scope .voy, :scope .sor, :scope .card.item').forEach((x) => { const r = x.getBoundingClientRect(); if (r.top > H * 0.92 && r.height) { x.classList.add('ux-rv'); IO.observe(x); RVP.add(x); } });
+    }
+    /* filet : un bloc affiché après coup (filtre, courrier chargé) n'est pas toujours signalé par l'observateur ; au repos du défilement, tout ce qui est à l'écran apparaît */
+    const RVP = new Set();
+    function rvOn(x) { RVP.delete(x); if (IO) IO.unobserve(x); x.classList.add('ux-rv-on'); setTimeout(() => x.classList.remove('ux-rv', 'ux-rv-on'), 900); }
+    function rvSweep() { if (!RVP.size) return; const H = innerHeight, go = []; RVP.forEach((x) => { if (!x.isConnected) { RVP.delete(x); return; } const r = x.getBoundingClientRect(); if (r.height && r.top < H * 0.97 && r.bottom > 0) go.push(x); }); go.forEach(rvOn); }
+    { let tm = 0; const sc0 = $('scroller'); if (sc0) sc0.addEventListener('scroll', () => { clearTimeout(tm); tm = setTimeout(rvSweep, 110); }, {passive: true}); document.addEventListener('click', () => setTimeout(rvSweep, 450), true); }
+    /* 3D sous le doigt : la carte s'incline vers le doigt et un reflet le suit */
+    let TL = null;
+    const tiltAt = (el, x, y) => { const r = el.getBoundingClientRect(), dx = (x - r.left) / r.width - 0.5, dy = (y - r.top) / r.height - 0.5, k = Math.min(9, 2600 / Math.max(120, r.width));
+      el.style.transform = 'perspective(700px) rotateX(' + (-dy * k).toFixed(2) + 'deg) rotateY(' + (dx * k).toFixed(2) + 'deg) scale(.975)';
+      el.style.setProperty('--lx', ((dx + 0.5) * 100).toFixed(1) + '%'); el.style.setProperty('--ly', ((dy + 0.5) * 100).toFixed(1) + '%'); };
+    document.addEventListener('pointerdown', (e) => {
+      const z = e.target.closest && e.target.closest(ZOOMS); UXM.from = null; UXM.fromEl = z && z.closest('#view') ? z : null;
+      if (reduced) return; const el = e.target.closest && e.target.closest('.ux-tiltable'); if (!el || e.target.closest('input, textarea, select')) return;
+      TL = {el, x0: e.clientX, y0: e.clientY}; el.classList.add('ux-tilt'); tiltAt(el, e.clientX, e.clientY);
+    }, {passive: true, capture: true});
+    document.addEventListener('pointermove', (e) => { if (!TL) return; if (Math.abs(e.clientY - TL.y0) > 14 || Math.abs(e.clientX - TL.x0) > 24) { untilt(); return; } tiltAt(TL.el, e.clientX, e.clientY); }, {passive: true});
+    const untilt = () => { if (!TL) return; const el = TL.el; TL = null; el.classList.remove('ux-tilt'); el.style.transform = ''; };
+    document.addEventListener('pointerup', (e) => { const z = UXM.fromEl; UXM.fromEl = null; if (z && z.isConnected) UXM.from = {r: z.getBoundingClientRect(), t: performance.now()}; untilt(); void e; }, {passive: true, capture: true});
+    document.addEventListener('pointercancel', () => { UXM.fromEl = null; untilt(); }, {passive: true});
+    /* la discussion s'ouvre en cercle de lumière depuis l'orbe (ou l'endroit touché), et s'y referme */
+    const orbXY = () => { const o = document.querySelector('.talk-slot'); if (!o) return ['50%', '92%']; const r = o.getBoundingClientRect(); return [(r.left + r.width / 2) + 'px', (r.top + r.height / 2) + 'px']; };
+    const OC1 = openChat;
+    openChat = function () { const wasOpen = CHAT.open, r = OC1.apply(this, arguments); const ov = $('chat'); if (!reduced && ov && !wasOpen && !ov.hidden) { const [x, y] = orbXY(); ov.style.setProperty('--ox', x); ov.style.setProperty('--oy', y); ov.classList.remove('ux-circ', 'ux-circd'); void ov.offsetWidth; ov.classList.add('ux-circ'); setTimeout(() => { if (CHAT.open) ov.classList.add('ux-circd'); ov.classList.remove('ux-circ'); }, 700); }   /* ux-circd : sans lui, l'animation de feuille repartait à la fin du cercle (la discussion remontait une seconde fois) */ return r; };
+    const CC2 = closeChat;
+    closeChat = function () { const ov = $('chat'), vis = ov && !ov.hidden; const r = CC2.apply(this, arguments); if (ov) ov.classList.remove('ux-circ', 'ux-circd'); if (vis && !reduced) { const g = document.querySelector('body > .ux-ov-out:last-of-type'); if (g) { const [x, y] = orbXY(); g.style.setProperty('--ox', x); g.style.setProperty('--oy', y); g.classList.add('ux-circ-out'); } } return r; };
+    /* parallaxe : le ciel glisse plus lentement que la page */
+    { const sc = $('scroller'), sky = document.querySelector('.ux-sky'); let raf = 0; if (sc && sky) sc.addEventListener('scroll', () => { if (raf) return; raf = requestAnimationFrame(() => { raf = 0; sky.style.setProperty('--sy', String(sc.scrollTop)); }); }, {passive: true}); }
+    /* au premier affichage aussi */
+    setTimeout(() => { const v = $('view') && $('view').firstElementChild; if (v) { decorate(v); reveal(v); } }, 0);
   }
 
   boot();

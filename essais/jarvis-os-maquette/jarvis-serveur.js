@@ -65,6 +65,8 @@
   const outilsDe = (opts) => (Array.isArray(opts.tools) ? opts.tools.filter((t) => t && t.name && typeof t.execute === 'function') : []);
   /* 0.30.0 (Claude instantané) : la réponse arrive mot par mot (SSE) ; conversation = la discussion, dont le serveur garde le Claude ouvert ;
      « Arrêter » (opts.signal) coupe la réponse et Claude avec elle */
+  /* 0.57.0 : l'abonnement refusé (message anglais de Claude Code, arrivé comme une réponse) devient une erreur claire, en français */
+  const ABO = /can.?t use your Claude subscription|payment is past due|claude\.ai\/settings\/billing/i, ABO_FR = 'Claude ne peut plus utiliser ton abonnement sur le serveur : Anthropic signale un paiement en retard ou un abonnement à renouveler. Vérifie sur claude.ai (Réglages, Facturation) ; si tout est payé, reconnecte Claude sur le serveur (claude auth login, depuis la session Serveur JARVIS).';
   async function flux(input, opts, tools) {
     let r;
     try { r = await fetch(BASE + '/api/sample', {method: 'POST', headers: {'content-type': 'application/json', authorization: 'Bearer ' + token()}, signal: opts.signal,
@@ -72,7 +74,8 @@
     catch (e) { if (opts.signal && opts.signal.aborted) throw {code: 'cancelled', message: 'Arrêté.'}; throw {code: 'tool_error', message: 'Serveur JARVIS injoignable.'}; }
     if (r.status !== 200 || !r.body || !r.body.getReader) {
       let j = {}; try { j = await r.json(); } catch (e) { j = {}; }
-      if (r.status === 200 && j.text != null) return {text: String(j.text)};
+      if (r.status === 200 && j.text != null) { if (ABO.test(String(j.text))) throw {code: 'tool_error', message: ABO_FR}; return {text: String(j.text)}; }
+      if (j && j.error && ABO.test(String(j.error))) throw {code: 'tool_error', message: ABO_FR};
       throw {code: r.status === 401 ? 'server_not_connected' : 'tool_error', message: (j && j.error) || 'Claude indisponible sur le serveur.'};
     }
     const rd = r.body.getReader(), dec = new TextDecoder(); let buf = '', brut = '', fin = null, err = null, modele = '', secours = false;
@@ -84,7 +87,7 @@
           const bloc = buf.slice(0, i).trim(); buf = buf.slice(i + 2);
           const m = /^event: (\w+)\ndata: (.*)$/s.exec(bloc); if (!m) continue;
           let d = {}; try { d = JSON.parse(m[2]); } catch (e) { continue; }
-          if (m[1] === 'delta') { brut += d.d || ''; if (opts.onText) try { opts.onText({text: enCours(brut), delta: d.d || ''}); } catch (e) { /* rien */ } }
+          if (m[1] === 'delta') { brut += d.d || ''; if (ABO.test(brut)) continue; if (opts.onText) try { opts.onText({text: enCours(brut), delta: d.d || ''}); } catch (e) { /* rien */ } }
           else if (m[1] === 'done') { fin = String(d.text != null ? d.text : brut); modele = String(d.modele || ''); secours = !!d.secours; }   /* 0.33.0 : le modèle qui a répondu */
           else if (m[1] === 'error') err = String(d.message || 'Claude indisponible sur le serveur.');
         }
@@ -94,6 +97,7 @@
       if (opts.signal && opts.signal.aborted) throw {code: 'cancelled', message: 'Arrêté.', text: deja || undefined};
       throw {code: 'tool_error', message: 'Réponse interrompue.', text: deja || undefined};
     }
+    if ((err && ABO.test(err)) || ABO.test(brut) || (fin != null && ABO.test(fin))) throw {code: 'tool_error', message: ABO_FR};
     if (err) throw {code: 'tool_error', message: err, text: enCours(brut) || undefined};
     if (fin == null) throw {code: 'tool_error', message: 'Réponse interrompue.', text: enCours(brut) || undefined};
     return {text: fin, modele, secours};
