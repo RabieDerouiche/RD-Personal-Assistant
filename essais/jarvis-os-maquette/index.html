@@ -4321,7 +4321,7 @@ void main(){
   const radLu = (iso) => { if (!iso) return 'jamais'; const d = new Date(iso), n = Math.round((new Date(d.getFullYear(), d.getMonth(), d.getDate()) - new Date(TODAY.getFullYear(), TODAY.getMonth(), TODAY.getDate())) / 864e5);
     return (n === 0 ? "aujourd'hui" : n === -1 ? 'hier' : 'le ' + radDate(iso)) + ' à ' + d.getHours() + 'h' + pad2(d.getMinutes()); };
   const RAD_T = {renouvellement: 'Renouvellement', fin: 'Fin de contrat', hausse: 'Hausse', essai: 'Fin d’essai', echeance: 'Échéance'};
-  const RAD_A = {hausse: ['Hausse de prix', 'percent'], essai: ['Essai qui devient payant', 'hourglass'], echec: ['Paiement échoué', 'x'], inhabituel: ['Montant inhabituel', 'pulse'], resiliation: ['Résiliation', 'x'], silence: ['Plus de facture', 'hourglass']};
+  const RAD_A = {hausse: ['Hausse de prix', 'percent'], essai: ['Essai qui devient payant', 'hourglass'], echec: ['Paiement échoué', 'x'], inhabituel: ['Montant inhabituel', 'pulse'], resiliation: ['Résiliation', 'x'], silence: ['Plus de facture', 'hourglass'], mensualite: ['Nouvelle mensualité', 'percent']};
   const RAD_K = {mensuel: 12, annuel: 1, trimestriel: 4, hebdomadaire: 52};
   function radAsk(q) { openChat('claude', 'hydra', 'equipe', 'equipe'); const ta = $('chat-in'); if (ta) { ta.value = q; try { ta.focus(); } catch (e) { /* rien */ } } }
   function radDue(x) {
@@ -4610,7 +4610,7 @@ void main(){
     + '.rad-hero{margin-bottom:0}.rad-hero p{margin:4px 0 8px;color:var(--muted);font-size:13.5px}.rad-seg{display:flex;max-width:100%;overflow-x:auto;scrollbar-width:none;margin:0;box-sizing:border-box}.rad-seg::-webkit-scrollbar{display:none}.rad-seg button{flex:0 0 auto;padding:0 12px}'
     + '.rad-amt{margin:2px 0;display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}.rad-amt b{font:600 17px var(--display)}.rad-up{font:600 12.5px var(--sans);color:#fde68a}'
     + '.rad-due.is-soon .ech-date b{color:#fde68a}.rad-due.is-kept{opacity:.72}.rad-al-h{display:flex;gap:10px;align-items:center}'
-    + '.rad-hist-l{margin:2px 0 12px;padding-left:18px;color:var(--muted);font-size:13px;line-height:1.5}.rad-alert.is-echec .hm-ic,.rad-alert.is-resiliation .hm-ic{color:#fda4af;border-color:rgba(253,164,175,.45)}.rad-alert.is-silence .hm-ic{color:#fde68a;border-color:rgba(253,230,138,.45)}.rad-alert.is-hausse .hm-ic,.rad-alert.is-essai .hm-ic,.rad-alert.is-inhabituel .hm-ic{color:#fde68a;border-color:rgba(var(--warn),.45)}'
+    + '.rad-hist-l{margin:2px 0 12px;padding-left:18px;color:var(--muted);font-size:13px;line-height:1.5}.rad-alert.is-echec .hm-ic,.rad-alert.is-resiliation .hm-ic{color:#fda4af;border-color:rgba(253,164,175,.45)}.rad-alert.is-silence .hm-ic,.rad-alert.is-mensualite .hm-ic{color:#fde68a;border-color:rgba(253,230,138,.45)}.rad-alert.is-hausse .hm-ic,.rad-alert.is-essai .hm-ic,.rad-alert.is-inhabituel .hm-ic{color:#fde68a;border-color:rgba(var(--warn),.45)}'
     + '.rad-abo{box-sizing:border-box}.rad-abo .rad-yr{font:600 13px var(--sans);color:var(--muted);white-space:nowrap}.rad-bar{display:flex;flex-direction:column;gap:6px;padding:10px 12px;border:1px solid var(--line);border-radius:16px;background:var(--glass)}'
     + '.rad-bar-h{display:flex;justify-content:space-between;gap:10px;font-size:14px}.rad-bar-h b{font-weight:600;min-width:0}.rad-bar-h span{color:var(--muted);white-space:nowrap}'
     + '.rad-bar-t{height:8px;border-radius:99px;background:rgba(var(--c1),.12);overflow:hidden}.rad-bar-t i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,rgb(var(--c1)),rgb(var(--c3)))}'

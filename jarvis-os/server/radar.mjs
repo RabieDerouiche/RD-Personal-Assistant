@@ -72,7 +72,8 @@ const NB = '(\\d{1,3}(?:[ .,\\u00a0\\u202f]\\d{3})+(?:[.,]\\d{1,2})?|\\d+(?:[.,]
 export function montantDe(s) {
   let t = String(s).replace(/[\s  ]/g, '');
   if (/,\d{1,2}$/.test(t)) t = t.replace(/\./g, '').replace(',', '.'); else if (/\.\d{3}$/.test(t)) t = t.replace(/\./g, ''); else t = t.replace(/,/g, '');
-  const n = Math.round(parseFloat(t) * 100) / 100;
+  let n = Math.round(parseFloat(t) * 100) / 100;
+  if (/^\d{5,6}$/.test(String(s).trim())) n = n / 100;   /* 0.56.0 : « 15359€ » collé (virgule perdue dans la mise en page) = 153,59 € ; pas « 56 800 € » */
   return isFinite(n) && n > 0 && n < 20000 ? n : null;
 }
 const CLES = '(?:montant|total|somme|pr[ée]lev[ée]?|pr[ée]l[èe]vement|d[ée]bit[ée]?|[àa] payer|ttc|amount|charged|paid|pay[ée]|r[ée]gl[ée]|[ée]ch[ée]ance|mensualit[ée]|cotisation|abonnement|facture|price|prix|tarif)';
@@ -134,7 +135,7 @@ export function rythmeDe(texte, montant) {
   return null;
 }
 export function mensualiteDe(texte) {
-  const m = String(texte || '').replace(/[\u00a0\u202f]/g, ' ').match(new RegExp('(?:mensualit[ée]s?|pr[ée]l[èe]vements? mensuels?|[ée]ch[ée]ances? mensuelles?)\\s*(?:de|:)\\s*' + NB + EURO, 'i'));
+  const m = String(texte || '').replace(/[\u00a0\u202f]/g, ' ').match(new RegExp('(?:mensualit[ée]s?|pr[ée]l[èe]vements? mensuels?|[ée]ch[ée]ances? mensuelles?)(?:\\s*(?:de|:)\\s*|[^\\d€\\n.]{1,40}?)' + NB + EURO, 'i'));
   return m ? montantDe(m[1]) : null;
 }
 export function genre(objet, texte) {
@@ -143,6 +144,10 @@ export function genre(objet, texte) {
   if (/(votre|ta) commande|commande (n°|no|#|\d)|order (confirm|#|no|n°)|your order|livraison|expedi|\bcolis\b|vous avez recu (un|une|des|\d+) (message|offre|avis|commentaire|colis|nouveau|nouvelle|document)/.test(o) && !/facture|invoice|echeance|prelevement/.test(o)) return 'autre';
   /* de l'argent qui arrive (paiement reçu, virement, remboursement) n'est pas une dépense */
   if (/vous avez recu (un |une |des )?(paiement|virement|remboursement|versement)|you('ve| have)? received (a |an )?(payment|transfer|refund)|remboursement (a ete )?(effectue|emis|recu|de votre commande)|refund (has been )?(issued|processed)/.test(s)) return 'autre';
+  /* 0.56.0 : un montant « en votre faveur », crédité ou remboursé (régularisation, remboursement) n'est pas une dépense */
+  if (/en votre faveur|sera credite(e)? sur votre compte|a votre credit\b|vous sera rembourse|sera rembourse(e)? (sur|par)/.test(s)) return 'autre';
+  /* 0.56.0 : une mensualité qui change (« votre mensualité s'élèvera désormais à … ») */
+  if (/(vos|votre) mensualites? (evoluent|evolue|change|changent|va changer|vont changer|augmente|baisse)|(votre )?(nouvelle )?mensualite (s'elevera|sera|passe|passera|est desormais)/.test(s)) return 'mensualite';
   /* 0.51.0 : un reçu fiscal (dons) n'est pas une facture */
   if (/recu fiscal|vos dons|votre don\b|reduction d'impot (de|sur) (vos|votre) don/.test(s)) return 'autre';
   /* 0.51.0 : l'adhésion à un prélèvement mensuel (impôts) : une dépense qui commence, sans montant encore */
@@ -155,23 +160,28 @@ export function genre(objet, texte) {
   if (/(essai|trial|periode d'essai)[^.\n]{0,60}(se termine|prend fin|termine|ends|ending|will end|expire|arrive a (son )?terme)|fin de (votre|ta) (periode d'essai|essai)|trial (ends|ending|is ending|expires|will end)/.test(s))
     return /(add|ajoute[rz]?) (a |un |une |votre )?(payment method|moyen de paiement|carte)|return to (the |your )?free (plan|tier)|repasse(ra|z|r)? (a|au|en|sur) (l'offre |la formule |le plan )?gratuit|no charges? will (apply|be made)|aucun (frais|prelevement|paiement|montant) ne (vous )?sera|vous ne serez pas (debite|preleve|facture)/.test(s) ? 'autre' : 'essai';
   /* 0.51.0 : « modification de votre abonnement » (la date d'une livraison) n'est pas une hausse */
-  if (/(augmentation|hausse|evolution|changement|modification) (de|du|des|de vos|de votre|de ton) (prix|tarifs?|cotisation)|(augmentation|hausse) (de|du) (votre |ton )?abonnement|nouveaux? tarifs?|price (increase|change)|new price|(prix|tarif) (va|vont|passe|passera) (augmenter|a|de)|passera de/.test(s)) return 'hausse';
+  if (/(augmentation|hausse|evolution|changement|modification) (de|du|des|de vos|de votre|de ton) (prix|tarifs?|cotisation)|(augmentation|hausse) (de|du) (votre |ton )?abonnement|nouveaux? tarifs?|evolution (reglementaire|tarifaire) de (votre|ton) contrat|evolution de (vos|nos) (prix|tarifs)|price (increase|change)|new price|(prix|tarif) (va|vont|passe|passera) (augmenter|a|de)|passera de/.test(s)) return 'hausse';
   if (/(sera|va etre|seront) (automatiquement )?renouvel|renouvellement (automatique|de (votre|ton) abonnement|annuel)|will (automatically )?renew|renews on|auto-renew|prochain renouvellement|sur le point de se renouveler|se renouvelle(ra)? (automatiquement|le)/.test(s)) return 'renouvellement';
   /* une échéance datée d'un paiement en plusieurs fois : un prélèvement ponctuel, pas une dépense fixe */
   if (/prochaine echeance|echeance de votre paiement|(paiement|achat|payer) en \d+ ?(x|fois)\b|\d+ ?(e|eme) echeance|pay in \d|installment (payment|due)/.test(s)) return 'echeance';
-  if (/(facture|avis d'echeance|echeancier|\brecu\b|receipt|invoice|votre paiement|payment received|confirmation de paiement|prelevement|mensualite|cotisation)/.test(s)) return 'facture';   /* « abonnement » seul : trop de lettres d'information */
+  if (/(facture|avis d'echeance|echeancier|\brecu\b|receipt|invoice|votre paiement|payment received|confirmation de paiement|paiement reussi|paiement accepte|payment successful|merci pour votre paiement|prelevement|mensualite|cotisation|appel de charges|appel de fonds)/.test(s)) return 'facture';   /* « abonnement » seul : trop de lettres d'information */
   return 'autre';
 }
 /* 0.52.0 : le montant d'une facture lue dans son PDF : d'abord « à régler », « net à payer », « total à payer » (le bas de la facture),
    puis « total TTC », sinon la règle des mails */
 export function montantPdf(texte) {
-  const s = String(texte || '').replace(/[\u00a0\u202f]/g, ' ');
+  /* 0.56.0 : un tableau mis à plat met le montant sous son libellé (« Total » puis « 52,25 € ») : la ligne du montant rejoint celle d'avant */
+  const s = String(texte || '').replace(/[\u00a0\u202f]/g, ' ').replace(/\n(?=[ \t]*[-–]?[ \t]*\d[\d .,]*[ \t]?(?:€|EUR\b))/g, ' ');
   for (const re of [new RegExp('(?:net|montant|total|reste|solde|somme)\\s+(?:[àa]\\s+)?(?:payer|r[ée]gler|pr[ée]lever|acquitter)[^\\n\\d€]{0,25}' + NB + EURO, 'gi'),
-    new RegExp('(?:[àa]\\s+(?:payer|r[ée]gler))\\s*:?[^\\n\\d€]{0,10}' + NB + EURO, 'gi'), new RegExp('total\\s+(?:ttc|g[ée]n[ée]ral|de la facture)[^\\n\\d€]{0,25}' + NB + EURO, 'gi')]) {
+    new RegExp('(?:[àa]\\s+(?:payer|r[ée]gler))\\s*:?[^\\n\\d€]{0,10}' + NB + EURO, 'gi'), new RegExp('total\\s+(?:ttc|g[ée]n[ée]ral|de la facture)[^\\n\\d€]{0,25}' + NB + EURO, 'gi'),
+    new RegExp('(?:^|\\n)[ \\t]*(?:total|montant total)[ \\t]*:?[ \\t]*' + NB + EURO, 'gi')]) {
     const l = [...s.matchAll(re)].map((m) => montantDe(m[1])).filter(Boolean); if (l.length) return l[l.length - 1];
   }
   return trouverMontant(s);
 }
+/* 0.56.0 : une phrase publicitaire ou une estimation ne donne pas de prix (« 12,39 € par mois, c'est notre estimation ») */
+const PUB = /a titre indicatif|sans valeur contractuelle|estimation|\bestime(e|s)?\b|impact estime|et si vous|parrain|code promo|offre speciale|jusqu'a -?\d+ ?%|economisez|reduction de \d|offert|gratuit pendant|en moyenne|recevez|gagnez|regroupez|cashback|au capital|capital (social )?de|\brcs\b|siren|siret|tva intracom|orias/;   /* et les mentions légales (« SAS au capital de 56 800 € ») */
+export const sansPub = (texte) => String(texte || '').split(/\n|(?<=[.!?])\s+|\s\|\s/).filter((l) => !PUB.test(plat(l))).join('\n');
 /* « passera de 59,99 € à 69,99 € » : l'ancien et le nouveau prix */
 export function avantApres(texte) {
   const s = String(texte || '').replace(/[  ]/g, ' ');
@@ -183,7 +193,7 @@ export function avantApres(texte) {
 export function domaine(adresse) { const d = String(adresse || '').toLowerCase().split('@')[1] || ''; const p = d.split('.').filter(Boolean); return p.slice(p.length >= 3 && /^(gouv|co|com|org|ac|gov|asso)$/.test(p[p.length - 2]) ? -3 : -2).join('.'); }   /* 0.51.0 : « finances.gouv.fr », pas « gouv.fr » */
 const GENERIQUE = /^(no-?reply|ne[- ]pas[- ]repondre|service client(e|ele)?|facturation|billing|notifications?|info(rmation)?s?|contact|support|team|equipe|mon compte|account|clientele|newsletter|hello|bonjour)$/i;
 export function nomService(nom, adresse) {
-  const n = String(nom || '').replace(/["']/g, '').replace(/^\s*(espace|service|relation) cli(ent|ents|entele)s?\s+/i, '').replace(/\s*(-|\||via)\s*(service client|facturation|billing|no-?reply|notifications?).*$/i, '').replace(/\s+(votre |ton |le )?(service|espace|relation) cli(ent|ents|entele)s?\b.*$/i, '').trim();
+  const n = String(nom || '').replace(/["']/g, '').replace(/^\s*(espace|service|relation) cli(ent|ents|entele)s?\s+/i, '').replace(/^\s*[A-ZÉ][a-zéèï]+\s+(from|de chez|de)\s+(?=[A-Z])/, '').replace(/\s*(-|\||via)\s*(service client|facturation|billing|no-?reply|notifications?).*$/i, '').replace(/\s+(votre |ton |le )?(service|espace|relation) cli(ent|ents|entele)s?\b.*$/i, '').trim();
   if (n && !GENERIQUE.test(plat(n)) && !/@/.test(n) && n.length <= 48) return n;
   const base = domaine(adresse).split('.')[0] || 'Service';
   return base.replace(/[-_]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
@@ -191,9 +201,9 @@ export function nomService(nom, adresse) {
 /* catégorie : par le domaine et le nom (noms de grands services, publics) ; abonnements rangés par genre pour la page */
 const CATS = [['Enfants', /\b(creche|creches|garderie|nounou|assistante maternelle|cantine|periscolaire|centre de loisirs|couches|pampers|lillydoo|joone|love and green|petits culottes|lespetitsculottes|hoptis|meeko|kidizz|babilou|people and baby|petits chaperons rouges)\b/],
   ['Impôts', /\b(dgfip|impots|impot|finances publiques|tresor public|taxe fonciere|taxe d'habitation|taxes foncieres)\b/],
-  ['Logement', /\b(edf|engie|totalenergies|alpiq|octopus|mint energie|ohm energie|vattenfall|eni|plenitude|ilek|enercoop|wekiwi|happ e|llum|iberdrola|ekwateur|veolia|suez|saur|eau de paris|syndic|foncia|nexity|habitation|electricite|gaz)\b/],
+  ['Logement', /\b(citya|foncia|oralia|sergic|loiselet|square habitat|immo de france|copropriete|appel de charges|edf|engie|totalenergies|alpiq|octopus|mint energie|ohm energie|vattenfall|eni|plenitude|ilek|enercoop|wekiwi|happ e|llum|iberdrola|ekwateur|veolia|suez|saur|eau de paris|syndic|foncia|nexity|habitation|electricite|gaz)\b/],
   ['Télécoms', /\b(orange|sosh|sfr|red|bouygues|bouyguestelecom|free|freebox|free mobile|prixtel|youprice|coriolis|nrj mobile|lebara|lycamobile|syma)\b/],
-  ['Assurances', /\b(assurance|assurances|axa|maif|macif|matmut|groupama|allianz|generali|april|cardif|direct assurance|leocare|ornikar|mutuelle|harmonie|mgen|alan|swisslife)\b/],
+  ['Assurances', /\b(assurance|assurances|axa|maif|macif|matmut|groupama|allianz|generali|april|cardif|direct assurance|directassurance|leocare|ornikar|lemonade|luko|acheel|hiscox|magnolia|assurance de pret|emprunteur|mutuelle|harmonie|mgen|alan|swisslife)\b/],
   ['Transport', /\b(navigo|ratp|sncf|transilien|iledefrance mobilites|idfm|uber|bolt|blablacar|ulys|vinci autoroutes|sanef|autoroute)\b/],
   ['Abonnements', /\b(netflix|spotify|deezer|disney|disneyplus|canal|canalplus|primevideo|amazon|apple|icloud|google|youtube|microsoft|xbox|playstation|nintendo|steam|dropbox|adobe|openai|anthropic|claude|chatgpt|notion|evernote|nordvpn|surfshark|expressvpn|protonvpn|ubereats|uber eats|deliveroo|lemonde|le monde|lefigaro|le figaro|mediapart|audible|kindle|molotov|salto|ocs|dazn|bein|crunchyroll|patreon|twitch)\b/]];
 const SOUS = [['Vidéo et musique', /\b(netflix|spotify|deezer|disney|disneyplus|canal|canalplus|primevideo|youtube|molotov|salto|ocs|dazn|bein|crunchyroll|apple music)\b/], ['Jeux', /\b(xbox|playstation|nintendo|steam|twitch)\b/],
@@ -228,11 +238,15 @@ export function lireMail(m) {
   if (long) g = 'mensualisation';
   if (g === 'echec' && (CARTES.test(dom) || /titres?[- ]resto|titres?[- ]restaurant|il ne reste que/.test(s))) g = 'autre';
   const aa = g === 'hausse' ? avantApres(tout) : null;
-  const montant0 = plusieurs ? ech[ech.length - 1].montant : aa ? aa.montant : trouverMontant(tout), datePrel = trouverDate(tout, ref);
+  const utile = sansPub(tout), montant0 = plusieurs ? ech[ech.length - 1].montant : aa ? aa.montant : trouverMontant(utile);
+  /* 0.56.0 : une date de prélèvement plus de 4 mois après la facture (fin de garantie de prix, fin de contrat) ou bien avant n'en est pas une */
+  let datePrel = trouverDate(tout, ref);
+  if (datePrel && date && ['facture', 'renouvellement', 'echec', 'hausse'].includes(g)) { const k = Math.round((depuisYmd(datePrel) - depuisYmd(date)) / 864e5); if (k > (g === 'renouvellement' ? 400 : 120) || k < -45) datePrel = null; }
   /* 0.54.0 : un contrat avec son prix et son rythme devient une dépense proposée dès ce mail ; une mensualité écrite l'emporte sur le total */
-  const mens = mensualiteDe(texte), ry = mens ? 'mensuel' : rythmeDe(tout, montant0);
+  const mens = mensualiteDe(sansPub(texte)), ry = mens ? 'mensuel' : rythmeDe(utile, montant0);
   if (['facture', 'autre'].includes(g) && CONTRAT.test(s) && (mens || montant0) && ry) g = 'contrat';
-  const montant = g === 'contrat' && mens ? mens : montant0;
+  else if (g === 'facture' && CONTRAT.test(s) && !/facture|appel de (charges|fonds)|\brecu\b|receipt|invoice/.test(plat(objet))) g = 'autre';   /* 0.56.0 : une souscription sans prix n'est pas une facture */
+  const montant = (g === 'contrat' || g === 'mensualite') && mens ? mens : montant0;
   const inter = INTERMEDIAIRES.test(dom), mar = inter ? marchand(objet, texte, m.nom) : '';
   let service = inter ? (mar || nomService(m.nom, m.sender)) : nomService(m.nom, m.sender);
   /* 0.51.0 : les impôts, par leur nom (« Taxe foncière ») et dans la catégorie Impôts */
@@ -241,17 +255,19 @@ export function lireMail(m) {
   const hs = texte.match(new RegExp('dont\\s+' + NB + EURO + '\\s+de\\s+suppl[ée]ment', 'i')) || texte.match(new RegExp('collect[ée] pour compte de tiers[^\\d€]{0,30}' + NB, 'i')), hors = hs ? montantDe(hs[1]) : null;
   /* 0.51.0 : une échéance déjà débitée (« a été débité le 23 novembre ») n'est plus à venir */
   const paye = /a ete (debite|preleve|paye|regle)|vous avez effectue un paiement|has been (charged|paid)|was charged/.test(s);
+  /* 0.56.0 : le jour de prélèvement écrit une fois (souscription, contrat) : « Votre date de prélèvement : le 20 de chaque mois » */
+  const jm = s.match(/prelev(?:ement|e|ee|es)?\b[^.\n|]{0,30}?\ble (\d{1,2})(?:er)? (?:de chaque mois|du mois|chaque mois)/), jourMois = jm && +jm[1] >= 1 && +jm[1] <= 31 ? +jm[1] : null;
   const cle = inter ? (mar ? dom + ':' + plat(mar).replace(/[^a-z0-9]/g, '') : '') : dom + (/^(finances|impots)\.gouv\.fr$/.test(dom) ? ':' + plat(service).replace(/[^a-z0-9]/g, '') : '');
   return {id: m.id, fil: m.fil || '', objet: objet.slice(0, 140), dom, cle, service, genre: g, montant, avant: aa ? aa.avant : null, datePrel, date,
     ...(plusieurs ? {echeances: ech, fois: +((s.match(/(?:en |divise en )(\d{1,2}) ?(?:fois|x|echeances)\b/) || [])[1]) || null} : {}), ...(hors && montant && hors < montant ? {hors} : {}), ...(paye ? {paye: true} : {}),
-    ...(ry ? {rythme: ry} : {}), ...(long ? {debut: ech[0].date, fin: ech[ech.length - 1].date} : {}),
-    sur: ['echec', 'essai', 'renouvellement', 'adhesion', 'resiliation', 'contrat', 'mensualisation'].includes(g) || (g === 'hausse' && !!montant) || ((g === 'facture' || g === 'echeance') && !!montant)};
+    ...(ry ? {rythme: ry} : {}), ...(long ? {debut: ech[0].date, fin: ech[ech.length - 1].date} : {}), ...(jourMois ? {jourMois} : {}),
+    sur: ['echec', 'essai', 'renouvellement', 'adhesion', 'resiliation', 'contrat', 'mensualisation'].includes(g) || (g === 'mensualite' && !!montant) || (g === 'hausse' && !!montant) || ((g === 'facture' || g === 'echeance') && !!montant)};
 }
 /* ---------- les dépenses récurrentes, trouvées dans les factures ---------- */
 const mediane = (l) => { const s = l.slice().sort((a, b) => a - b); return s.length ? s[Math.floor((s.length - 1) / 2)] : 0; };
 const plusFrequent = (l) => { const n = new Map(); l.forEach((x) => n.set(x, (n.get(x) || 0) + 1)); return [...n].sort((a, b) => b[1] - a[1] || a[0] - b[0])[0][0]; };
 const hash = (s) => crypto.createHash('sha1').update(String(s)).digest('hex').slice(0, 10);
-export function regrouper(releves, auj) {
+export function regrouper(releves, auj, joursCle = {}) {
   const par = new Map(), parNom = new Map();
   /* 0.56.0 : le délai habituel entre une facture et son prélèvement, appris de ses factures qui donnent les deux (au moins 3) : une facture
      muette sur le jour est prélevée « vers » sa date plus ce délai, et non le jour d'arrivée du mail */
@@ -265,7 +281,9 @@ export function regrouper(releves, auj) {
   const out = [];
   for (const [dom, l] of par) {
     const parMois = new Map(), nMois = new Map();
-    for (const r of l.slice().sort((a, b) => ((a.datePrel || a.date) < (b.datePrel || b.date) ? -1 : 1))) { const m = (r.datePrel || r.date).slice(0, 7); parMois.set(m, r); nMois.set(m, (nMois.get(m) || 0) + 1); }
+    for (const r of l.slice().sort((a, b) => ((a.datePrel || a.date) < (b.datePrel || b.date) ? -1 : 1))) { const m = (r.datePrel || r.date).slice(0, 7), d = parMois.get(m);
+      /* 0.56.0 : plusieurs mails le même mois (facture, rappel, commande) : le plus récent, complété par le montant et le jour des autres */
+      parMois.set(m, d ? {...(r.montant || !d.montant ? r : d), montant: r.montant || d.montant, datePrel: r.datePrel || d.datePrel} : r); nMois.set(m, (nMois.get(m) || 0) + 1); }
     /* 0.51.0 : le montant habituel d'un mois = sa facture moins sa part ponctuelle, lue dans le mail qui l'explique (même mois, même total) */
     const pts = [...parMois].map(([m, r]) => { const h = l.find((y) => y.hors && (y.datePrel || y.date).slice(0, 7) === m && Math.abs((y.montant || 0) - (r.montant || 0)) < 0.01); return h && r.montant > h.hors ? {...r, montant: Math.round((r.montant - h.hors) * 100) / 100} : r; });
     if (pts.length < 2) continue;
@@ -280,14 +298,16 @@ export function regrouper(releves, auj) {
     const mts = conn.map((r) => r.montant), med2 = mts.length ? mediane(mts) : null, pres = mts.filter((v) => Math.abs(v - med2) <= med2 * tol), der = pts[pts.length - 1], derC = conn[conn.length - 1];
     /* 0.51.0 : une facture prélevée chaque mois dont le montant change (transports au trajet, électricité) reste une dépense fixe, estimée */
     const preleve = pts.filter((r) => r.datePrel).length >= Math.ceil(pts.length * 0.6), variable = mts.length >= 2 && pres.length < Math.ceil(mts.length * 0.6);
-    if (variable && !preleve) continue;
+    const utilite = ['Logement', 'Télécoms', 'Transport', 'Enfants', 'Assurances', 'Impôts'].includes(categorie(der.dom || dom, der.service)) && pts.length >= 3;
+    if (variable && !preleve && !utilite) continue;
     const mx = pres.length ? Math.max(...pres) : 0, mn = pres.length ? Math.min(...pres) : 0, varie = mx ? (mx - mn) / mx : 0;
     const derJ = jours[jours.length - 1], age = Math.round((auj - derJ) / 864e5);
     if (age > {mensuel: 31, trimestriel: 92, annuel: 366}[rythme] + 45) continue;   /* plus rien depuis longtemps : arrêtée */
     /* le jour : celui annoncé dans les mails (« sera prélevé le … ») ; à défaut, le jour d'arrivée du mail, signalé « vers le » */
-    const annonces = pts.filter((r) => r.datePrel), jour = plusFrequent(annonces.length ? annonces.map((r) => +r.datePrel.slice(8, 10)) : pts.map((r) => +ymd(plus(depuisYmd(r.date), lag)).slice(8, 10)));
+    const ecrit = joursCle[dom] || joursCle[der.cle] || null, annonces = pts.filter((r) => r.datePrel);
+    const jour = annonces.length ? plusFrequent(annonces.map((r) => +r.datePrel.slice(8, 10))) : ecrit || plusFrequent(pts.map((r) => +ymd(plus(depuisYmd(r.date), lag)).slice(8, 10)));
     out.push({id: 'p' + hash(dom), cle: dom, dom: der.dom || dom, service: der.service, cat: categorie(der.dom || dom, der.service), montant: !derC ? null : variable ? mediane(mts.slice(-6)) : conn.length <= 2 || Math.abs(derC.montant - med2) <= med2 * tol ? derC.montant : med2, jour,
-      ...(annonces.length ? {} : {jourApprox: true, ...(lag ? {decalage: lag} : {})}), rythme, historique: pts.slice(-6).reverse().map((r) => ({date: r.date, ...(r.datePrel ? {datePrel: r.datePrel} : {}), montant: r.montant})), ...(rythme === 'mensuel' ? {} : {mois: derJ.getUTCMonth() + 1}), ...(varie > 0.05 || variable ? {estime: true} : {}), ...(variable ? {variable: true} : {}), source: 'mail', preuves: pts.length, dernier: ymd(derJ),
+      ...(annonces.length || ecrit ? {} : {jourApprox: true, ...(lag ? {decalage: lag} : {})}), rythme, historique: pts.slice(-6).reverse().map((r) => ({date: r.date, ...(r.datePrel ? {datePrel: r.datePrel} : {}), montant: r.montant})), ...(rythme === 'mensuel' ? {} : {mois: derJ.getUTCMonth() + 1}), ...(varie > 0.05 || variable ? {estime: true} : {}), ...(variable ? {variable: true} : {}), source: 'mail', preuves: pts.length, dernier: ymd(derJ),
       depuis: pts[0].date.slice(5, 7) + '/' + pts[0].date.slice(0, 4), ...(der.objet || der.fil ? {exemple: {objet: der.objet || '', date: der.date, ...(der.fil ? {url: 'https://mail.google.com/mail/u/0/#all/' + der.fil} : {})}} : {})});
   }
   return out.sort((a, b) => (b.montant || 0) - (a.montant || 0));
@@ -296,7 +316,7 @@ export function regrouper(releves, auj) {
 /* ---------- ce que le serveur garde et fait ---------- */
 /* 0.49.0 : d'après l'objet seulement. Avant, le texte des mails était cherché aussi : en octobre 2026, 90 fils dont des lettres d'information,
    des avis de virement reçu et des reçus d'achats ; d'après l'objet, 25, presque tous des factures et des échéances. */
-const REQUETE = 'subject:(facture OR échéance OR échéancier OR prélèvement OR prelevement OR mensualité OR cotisation OR reçu OR receipt OR invoice OR renouvellement OR renouveler OR abonnement OR subscription OR "votre paiement" OR "confirmation de paiement" OR "paiement refusé" OR "échec de paiement" OR "payment failed" OR "payment declined" OR "essai gratuit" OR "free trial" OR résiliation OR resiliation OR résilié OR mensualisation OR souscription OR adhésion OR "votre contrat") -in:spam -in:trash -in:sent -category:promotions -category:social -category:forums';
+const REQUETE = 'subject:(facture OR échéance OR échéancier OR prélèvement OR prelevement OR mensualité OR cotisation OR reçu OR receipt OR invoice OR renouvellement OR renouveler OR abonnement OR subscription OR "votre paiement" OR "confirmation de paiement" OR "paiement refusé" OR "échec de paiement" OR "payment failed" OR "payment declined" OR "essai gratuit" OR "free trial" OR résiliation OR resiliation OR résilié OR mensualisation OR souscription OR adhésion OR "votre contrat" OR mensualités OR "appel de charges" OR "appel de fonds" OR copropriété OR "Paiement en 4X" OR "plan de paiements" OR "paiement réussi" OR "police d\'assurance" OR renews OR renew OR membership) -in:spam -in:trash -in:sent -category:promotions -category:social -category:forums';
 /* 0.54.0 : des factures dont l'objet ne dit rien (« Votre espace client », « Information importante ») : cherchées par les phrases d'un prélèvement */
 const FILTRE = ' -in:spam -in:trash -in:sent -category:promotions -category:social -category:forums';
 const REQUETE_CORPS = '("sera prélevé" OR "sera prélevée" OR "seront prélevés" OR "date de prélèvement" OR "prélèvement aura lieu" OR "montant prélevé" OR "will be charged" OR "mensualité de" OR "avis d\'échéance")' + FILTRE;
@@ -465,7 +485,7 @@ export function createRadar({file, gmail, claude = async () => ({ok: false, erro
   function retenir(lu, {depart}) {
     const t = auj(), age = lu.date ? Math.round((t - depuisYmd(lu.date)) / 864e5) : 0, fx = lu.cle ? R.fixes.find((f) => cleDe(f) === lu.cle) : null;
     /* un renouvellement chiffré compte aussi comme un paiement du service (pour repérer sa régularité) */
-    if (lu.genre === 'mensualisation') { if (lu.cle && lu.fin && lu.fin >= ymd(t)) annonce(lu, {montant: lu.montant, jour: +lu.debut.slice(8, 10), debut: lu.debut, fin: lu.fin}); return; }
+    if (lu.genre === 'mensualisation') { if (lu.cle) R.joursCle = {...(R.joursCle || {}), [lu.cle]: +lu.debut.slice(8, 10)}; if (lu.cle && lu.fin && lu.fin >= ymd(t)) annonce(lu, {montant: lu.montant, jour: +lu.debut.slice(8, 10), debut: lu.debut, fin: lu.fin}); return; }
     if (lu.genre === 'contrat') { if (lu.cle && lu.montant) { const j0 = lu.datePrel || lu.date, ry = lu.rythme || 'mensuel'; annonce(lu, {montant: lu.montant, jour: +j0.slice(8, 10), ...(lu.datePrel ? {} : {jourApprox: true}), rythme: ry, ...(ry !== 'mensuel' ? {mois: +j0.slice(5, 7)} : {}), ...(lu.datePrel && lu.datePrel > ymd(t) ? {debut: lu.datePrel} : {})}); } return; }
     if (lu.genre === 'resiliation') {
       if (lu.cle) R.finis = [...new Set([...R.finis, lu.cle])].slice(-200);
@@ -474,7 +494,19 @@ export function createRadar({file, gmail, claude = async () => ({ok: false, erro
         ...(lu.datePrel ? {fin: lu.datePrel} : {}), texte: (lu.datePrel ? 'Fin annoncée le ' + jourCourt(depuisYmd(lu.datePrel)) + '. ' : '') + 'La retirer de tes dépenses fixes ?', fil: lu.fil});
       return;
     }
-    if (lu.genre === 'renouvellement' && lu.cle && lu.montant && lu.rythme === 'annuel' && lu.datePrel) annonce(lu, {montant: lu.montant, jour: +lu.datePrel.slice(8, 10), rythme: 'annuel', mois: +lu.datePrel.slice(5, 7)});
+    /* 0.56.0 : une mensualité qui change : la dépense fixe prend le nouveau montant (alerte) ; sinon, proposée avec ce montant */
+    if (lu.genre === 'mensualite') {
+      if (!lu.cle || !lu.montant) return;
+      const f = R.fixes.find((x) => !x.fin && ((cleDe(x) && cleDe(x) === lu.cle) || nomPlat(x.service) === nomPlat(lu.service)));
+      if (f) { if (Math.abs(f.montant - lu.montant) >= 0.01 && age <= 120) { R.alertes.push({id: 'a' + lu.id, date: lu.date, type: 'mensualite', titre: 'Nouvelle mensualité', service: f.service, montant: lu.montant, avant: f.montant, texte: 'Ta dépense fixe passe à ' + eur(lu.montant) + ' par mois.', fil: lu.fil}); f.montant = lu.montant; delete f.estime; } }
+      else { const prec = R.releves.filter((r) => (r.cle || r.dom) === lu.cle && r.datePrel).map((r) => +r.datePrel.slice(8, 10)), ancien = R.mandats.find((m) => m.cle === lu.cle && !m.jourApprox), j0 = lu.datePrel || lu.date;
+        const connu = (R.joursCle || {})[lu.cle], jour = ancien ? ancien.jour : connu || (prec.length ? plusFrequent(prec) : +j0.slice(8, 10));
+        annonce(lu, {montant: lu.montant, jour, ...(ancien || connu || prec.length || lu.datePrel ? {} : {jourApprox: true}), rythme: 'mensuel', mensualite: true}); }
+      return;
+    }
+    /* 0.56.0 : un renouvellement chiffré (assurance, abonnement) : proposé à son rythme ; un renouvellement annuel sans prix : proposé « montant à compléter » */
+    if (lu.genre === 'renouvellement' && lu.cle && lu.datePrel && (lu.montant ? lu.rythme : lu.rythme === 'annuel'))
+      annonce(lu, {montant: lu.montant || null, jour: +lu.datePrel.slice(8, 10), rythme: lu.rythme, ...(lu.rythme !== 'mensuel' ? {mois: +lu.datePrel.slice(5, 7)} : {}), ...(lu.montant ? {} : {aide: 'le prix n’est pas écrit dans le mail'})});
     if (lu.genre === 'renouvellement' && lu.cle) R.releves.push({id: lu.id, fil: lu.fil || '', objet: lu.objet || '', dom: lu.dom, cle: lu.cle, service: lu.service, montant: lu.montant || null, date: lu.date, datePrel: lu.datePrel || null, genre: 'facture'});   /* 0.49.0 : même sans montant (une box livrée chaque mois) */
     /* une échéance datée (paiement en plusieurs fois) : un prélèvement ponctuel, compté dans le reste à payer jusqu'à son jour */
     /* 0.51.0 : un échéancier complet (paiement en 4 fois) : chaque échéance à venir ; une échéance déjà débitée ne compte plus */
@@ -531,9 +563,10 @@ export function createRadar({file, gmail, claude = async () => ({ok: false, erro
     R.ponctuels = unique(uniq(R.ponctuels).filter((v) => v.date >= ymd(t))).slice(-60);
     R.avenir = R.avenir.filter((v) => v.type !== 'echeance').concat(unique(R.avenir.filter((v) => v.type === 'echeance'))).sort((a, b) => (a.date < b.date ? -1 : 1));
     for (const f of R.fixes) if (f.prochain && f.prochain.date < ymd(t)) delete f.prochain;
-    const rg = regrouper(R.releves, t), rgCles = new Set(rg.map((p) => p.cle || p.dom)), mois0 = ymd(J(t.getUTCFullYear(), t.getUTCMonth() - 1, 1));   /* une dépense déjà vue dans les factures prime sur son annonce */
+    const mois0 = ymd(J(t.getUTCFullYear(), t.getUTCMonth() - 1, 1)), adh = new Set(R.mandats.filter((m) => m.debut && m.montant == null && m.debut >= mois0).map((m) => m.cle));
+    const rg = regrouper(R.releves, t, R.joursCle || {}).filter((p) => !(adh.has(p.cle || p.dom) && p.rythme === 'annuel')), rgCles = new Set(rg.map((p) => p.cle || p.dom));   /* 0.56.0 : la mensualisation remplace le paiement annuel */   /* une dépense déjà vue dans les factures prime sur son annonce */
     /* une annonce reste proposée tant qu'elle vaut : un échéancier jusqu'à sa fin, une adhésion jusqu'au mois de son début, un contrat 2 mois (un an s'il est annuel) */
-    const frais = (m) => (m.fin ? m.fin >= ymd(t) : m.debut && m.montant == null ? m.debut >= mois0 : Math.round((t - depuisYmd(m.dernier)) / 864e5) <= ({annuel: 400, trimestriel: 120}[m.rythme] || 62));
+    const frais = (m) => (m.fin ? m.fin >= ymd(t) : m.debut && m.montant == null ? m.debut >= mois0 : Math.round((t - depuisYmd(m.dernier)) / 864e5) <= 400);   /* 0.56.0 : une annonce vaut un an (un contrat ne renvoie pas de mail chaque mois) */
     R.propositions = rg.concat(R.mandats.filter((m) => !rgCles.has(m.cle) && frais(m))).map((p) => ({...p, cle: p.cle || p.dom})).filter((p) => !R.refus.includes(cleDe(p)) && !R.finis.includes(cleDe(p)) && !connue(p));
     /* 0.54.0 : une dépense fixe lue dans ses mails dont les factures ont cessé (deux échéances sans facture) : « toujours d'actualité ? » */
     const per = {mensuel: 31, trimestriel: 92, annuel: 366};
@@ -553,17 +586,21 @@ export function createRadar({file, gmail, claude = async () => ({ok: false, erro
     let reste = o.depart ? Math.max(0, maxPdf - ((R.scan && R.scan.pdf) || 0)) : 20;
     for (const x of lus) {
       /* 0.54.0 : le PDF est lu aussi quand le mail a le montant mais pas le jour du prélèvement */
-      if (!x.pdf || x.lu.genre !== 'facture' || (x.lu.montant && x.lu.datePrel) || reste <= 0 || (!x.pdf.data && !gmail.pj)) continue;
+      if (!x.pdf || !['facture', 'renouvellement'].includes(x.lu.genre) || (x.lu.montant && x.lu.datePrel) || reste <= 0 || (!x.pdf.data && !gmail.pj)) continue;
       reste--; if (R.scan && o.depart) R.scan.pdf = (R.scan.pdf || 0) + 1;
       let d = x.pdf.data;
       if (!d) { try { d = ((await gm(() => gmail.pj(x.pdf.mid, x.pdf.aid), 10)) || {}).data || ''; } catch (e) { if (estQuota(e)) throw e; log('radar : pièce jointe illisible (' + TXT(e.message || e, 120) + ')'); continue; } }
       const texte = texteDePdf(Buffer.from(String(d).replace(/-/g, '+').replace(/_/g, '/'), 'base64')), v = texte ? montantPdf(texte) : null, dp = texte ? trouverDate(texte, x.lu.date ? depuisYmd(x.lu.date) : null) : null;
+      /* 0.56.0 : un échéancier en PDF (5 mensualités égales ou plus) : une mensualisation, avec son début et sa fin */
+      const ech = texte ? echeancier(texte, x.lu.date ? depuisYmd(x.lu.date) : null) : [], mt = ech.map((e) => e.montant);
+      if (ech.length >= 5 && Math.max(...mt) <= Math.min(...mt) * 1.1 + 0.05) { x.lu = {...x.lu, genre: 'mensualisation', montant: mediane(mt), debut: ech[0].date, fin: ech[ech.length - 1].date, pdf: true, sur: true}; continue; }
       if (!v && !dp) continue;
       x.lu = {...x.lu, montant: x.lu.montant || v, datePrel: x.lu.datePrel || dp, pdf: true, sur: !!(x.lu.montant || v)};
     }
   }
   async function lire(q, n, o) {
     const lus0 = await lireRequete(q, n); await parPdf(lus0, o);
+    for (const x of lus0) if (x.lu.jourMois && x.lu.cle) R.joursCle = {...(R.joursCle || {}), [x.lu.cle]: x.lu.jourMois};   /* 0.56.0 : même d'un mail qui n'est pas une facture (souscription) */
     const lus = lus0, surs = lus.filter((x) => x.lu.sur), aClaude = lus.filter((x) => !x.lu.sur && x.lu.genre === 'facture');
     const envoyes = aClaude.slice(0, o.depart ? Math.max(0, maxClaude - ((R.scan && R.scan.claude) || 0)) : 16);   /* au départ 60 mails au plus pour Claude, ensuite 16 par jour */
     const compris = envoyes.length ? await parClaude(envoyes) : [], lus2 = new Set(compris.map((x) => x.lu.id));

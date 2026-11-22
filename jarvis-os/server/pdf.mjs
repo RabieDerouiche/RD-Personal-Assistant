@@ -17,7 +17,7 @@ function objets(buf) {
     const corps = s.slice(debut, fin), k = corps.search(/\bstream\r?\n/);
     if (k < 0) { out.set(+m[1], {dict: corps, flux: null}); re.lastIndex = fin; continue; }
     const dict = corps.slice(0, k), d0 = debut + k + corps.slice(k).match(/^stream\r?\n/)[0].length;
-    const lg = dict.match(/\/Length\s+(\d+)(?!\s+\d+\s+R)/), f = s.indexOf('endstream', d0);
+    const lg = dict.match(/\/Length\s+(\d+)\b(?!\s+\d+\s+R)/), f = s.indexOf('endstream', d0);
     const brut = buf.subarray(d0, lg && d0 + +lg[1] <= (f < 0 ? s.length : f) ? d0 + +lg[1] : (f < 0 ? s.length : f));
     out.set(+m[1], {dict, flux: decode(dict, brut)});
     re.lastIndex = f < 0 ? fin : Math.max(f, fin);
@@ -32,12 +32,25 @@ function objets(buf) {
   }
   return out;
 }
+/* 0.56.0 : ASCII85 et ASCIIHex (souvent devant FlateDecode, chez ReportLab par exemple) */
+function a85(b) {
+  let s = b.toString('latin1').replace(/\s+/g, ''); if (s.startsWith('<~')) s = s.slice(2); const e = s.indexOf('~>'); if (e >= 0) s = s.slice(0, e);
+  const out = []; let g = [];
+  const groupe = (l, n) => { let v = 0; for (const x of l) v = v * 85 + x; const o = [Math.floor(v / 16777216) & 255, Math.floor(v / 65536) & 255, Math.floor(v / 256) & 255, v & 255]; out.push(...o.slice(0, n)); };
+  for (const ch of s) { if (ch === 'z' && !g.length) { out.push(0, 0, 0, 0); continue; } const c = ch.charCodeAt(0) - 33; if (c < 0 || c > 84) continue; g.push(c); if (g.length === 5) { groupe(g, 4); g = []; } }
+  if (g.length > 1) { const n = g.length - 1; while (g.length < 5) g.push(84); groupe(g, n); }
+  return Buffer.from(out);
+}
+const ahx = (b) => { let s = b.toString('latin1'); const e = s.indexOf('>'); if (e >= 0) s = s.slice(0, e); s = s.replace(/[^0-9a-fA-F]/g, ''); return Buffer.from(s.length % 2 ? s + '0' : s, 'hex'); };
+function inflate(b) { for (const f of [(x) => zlib.inflateSync(x), (x) => zlib.inflateSync(x, {finishFlush: zlib.constants.Z_SYNC_FLUSH}), (x) => zlib.inflateRawSync(x)]) { try { return f(b); } catch { /* suivant */ } } return null; }
 function decode(dict, brut) {
-  const filtres = (dict.match(/\/Filter\s*(\[[^\]]*\]|\/\w+)/) || [])[1] || '';
-  if (!filtres) return Buffer.from(brut);
-  if (!/^\/?\[?\s*\/FlateDecode\s*\]?$/.test(filtres.trim())) return null;   /* images (DCT, CCITT…) : pas du texte */
-  for (const f of [(b) => zlib.inflateSync(b), (b) => zlib.inflateSync(b, {finishFlush: zlib.constants.Z_SYNC_FLUSH}), (b) => zlib.inflateRawSync(b)]) { try { return f(brut); } catch { /* suivant */ } }
-  return null;
+  const f = (dict.match(/\/Filter\s*(\[[^\]]*\]|\/\w+)/) || [])[1] || '', l = f.match(/\/\w+/g) || [];
+  let b = Buffer.from(brut);
+  for (const x of l) {   /* les filtres dans l'ordre ; une image (DCT, CCITT, JBIG2…) n'est pas du texte */
+    if (x === '/FlateDecode' || x === '/Fl') b = inflate(b); else if (x === '/ASCII85Decode' || x === '/A85') b = a85(b); else if (x === '/ASCIIHexDecode' || x === '/AHx') b = ahx(b); else return null;
+    if (!b) return null;
+  }
+  return b;
 }
 const ref = (txt) => { const m = String(txt || '').match(/^\s*(\d+)\s+\d+\s+R/); return m ? +m[1] : null; };
 /* le dictionnaire après une clé (« /Font << … >> » ou « /Font 12 0 R ») */
@@ -69,7 +82,7 @@ function tableau(dict, cle, objs) {
 }
 /* la largeur de chaque code (millièmes de la taille du texte) : /Widths d'une police simple, /W et /DW d'une police composée */
 function largeurs(objs, o) {
-  const nombre = (d, k, def) => { const m = d.match(new RegExp('/' + k + '\\s+([\\d.]+)(?!\\s+\\d+\\s+R)')); return m ? +m[1] : def; };
+  const nombre = (d, k, def) => { const m = d.match(new RegExp('/' + k + '\\s+([\\d.]+)\\b(?!\\s+\\d+\\s+R)')); return m ? +m[1] : def; };
   if (/\/Subtype\s*\/Type0/.test(o.dict)) {
     const dt = tableau(o.dict, 'DescendantFonts', objs), dr = ref((dt.match(/(\d+\s+\d+\s+R)/) || [])[1]), d = dr != null && objs.get(dr) ? objs.get(dr).dict : '';
     const dw = nombre(d, 'DW', 1000), w = new Map(), tk = (tableau(d, 'W', objs).slice(1, -1).match(/\[[^\]]*\]|[\d.]+/g) || []);
@@ -110,7 +123,9 @@ function lireChaine(bytes, pol) {
   return o;
 }
 /* le texte d'un flux de page, avec des retours à la ligne quand le texte change de ligne */
-function texteFlux(c, polices) {
+/* 0.56.0 : les noms d'une ressource (« /Font << /F1 5 0 R >> », « /XObject << /Fm0 3 0 R >> ») → numéro d'objet */
+function ressources(dict, cle, objs) { const m = new Map(); for (const x of sousDict(dict, cle, objs).matchAll(/\/([^\s/<>[\]()]+)\s+(\d+)\s+\d+\s+R/g)) m.set(x[1], +x[2]); return m; }
+function texteFlux(c, polices, ctx = null) {
   const s = c.toString('latin1'), out = []; let pile = [], pol = null, i = 0;
   const pousse = (t) => { if (t) out.push(t); };
   /* la matrice de ligne [a b c d e f], la taille du texte, l'avance depuis le début de la ligne (espace du texte) */
@@ -155,6 +170,11 @@ function texteFlux(c, polices) {
     const op = s.slice(i).match(/^[A-Za-z'"*]+[0-9]?\*?/); if (!op) { i++; continue; }
     i += op[0].length; const o = op[0], a = pile; pile = [];
     if (o === 'ID') { const e = s.indexOf('EI', i); i = e < 0 ? s.length : e + 2; continue; }   /* image incluse : sautée */
+    /* 0.56.0 : un formulaire (« /Fm0 Do ») porte souvent tout le texte de la page : lu avec ses propres polices */
+    if (o === 'Do' && ctx && ctx.prof < 4) { const n = a.find((v) => v && v.nom), num = n ? ctx.xobjs.get(n.nom.slice(1)) : null, x = num != null ? ctx.objs.get(num) : null;
+      if (x && x.flux && /\/Subtype\s*\/Form/.test(x.dict)) { const res = sousDict(x.dict, 'Resources', ctx.objs) || '', pol2 = new Map(polices); for (const [k, v] of ressources(res, 'Font', ctx.objs)) pol2.set(k, ctx.pol(v));
+        const xo2 = new Map(ctx.xobjs); for (const [k, v] of ressources(res, 'XObject', ctx.objs)) xo2.set(k, v); pousse('\n' + texteFlux(x.flux, pol2, {...ctx, xobjs: xo2, prof: ctx.prof + 1}) + '\n'); }
+      continue; }
     if (o === 'Tf') { const n = a.find((v) => v && v.nom); pol = n ? polices.get(n.nom.slice(1)) || null : null; const z = a.find((v) => typeof v === 'number'); if (z) fs = z; }
     else if (o === 'BT') { avant = out.length ? ici() : null; tlm = [1, 0, 0, 1, 0, 0]; x = 0; }
     else if (o === 'Tm' && a.length >= 6) place(a.slice(-6).map(Number));
@@ -183,8 +203,9 @@ export function texteDePdf(buf, max = 100000) {
       const f = sousDict(p.dict, 'Font', objs) || sousDict(sousDict(p.dict, 'Resources', objs), 'Font', objs), noms = new Map(global);
       for (const m of f.matchAll(/\/([^\s/<>[\]()]+)\s+(\d+)\s+\d+\s+R/g)) noms.set(m[1], +m[2]);
       const polices = new Map([...noms].map(([n, num]) => [n, pol(num)]));
+      const res = sousDict(p.dict, 'Resources', objs) || p.dict, xobjs = ressources(res, 'XObject', objs), ctx = {objs, xobjs, pol, prof: 0};
       const c = p.dict.match(/\/Contents\s*(\[[^\]]*\]|\d+\s+\d+\s+R)/), refs = c ? [...c[1].matchAll(/(\d+)\s+\d+\s+R/g)].map((x) => +x[1]) : [];
-      for (const r of refs) { const o = objs.get(r); if (o && o.flux) txt += texteFlux(o.flux, polices) + '\n'; if (txt.length > max) break; }
+      for (const r of refs) { const o = objs.get(r); if (o && o.flux) txt += texteFlux(o.flux, polices, ctx) + '\n'; if (txt.length > max) break; }
       if (txt.length > max) break;
     }
     return txt.replace(/[ \t]+/g, ' ').replace(/ *\n[ \n]*/g, '\n').trim().slice(0, max);
