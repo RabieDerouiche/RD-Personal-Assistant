@@ -86,6 +86,27 @@ srv.listen(0, async () => {
       await p.evaluate(() => document.querySelector('.talk-slot .jv-btn').click()); await p.waitForTimeout(700); await p.evaluate(() => document.querySelector('#chat .chat-head button').click()); await p.waitForTimeout(40);
       const sink = await p.evaluate(() => document.querySelectorAll('.ux-ov-out').length); await p.waitForTimeout(500);
       ok('fluidité : la discussion redescend en s’effaçant, puis disparaît ; le ciel vit derrière', sink === 1 && await p.evaluate(() => !document.querySelector('.ux-ov-out') && document.getElementById('chat').hidden && !!document.querySelector('.ux-sky i'))); }
+    /* 0.56.0 : l'effet « waouh » et la vitesse */
+    { await p.goto(base + '#espaces'); await p.waitForTimeout(2500);
+      await p.tap('.esp-tile[data-go="achats"]'); await p.waitForTimeout(60);
+      const z = await p.evaluate(() => { const v = document.querySelector('#view .view-in'); return {cls: [...v.classList].filter((c) => /^ux-in-/.test(c)).join(''), zt: v.style.getPropertyValue('--zt'), g: (document.querySelector('.ux-ghost') || {}).className}; });
+      ok('waouh : une tuile touchée s’ouvre en page depuis la tuile (zoom découpé), l’ancienne page recule', z.cls === 'ux-in-zoom' && /px$/.test(z.zt) && /ux-out-zoom/.test(z.g || ''), JSON.stringify(z));
+      await p.waitForTimeout(900);
+      ok('waouh : lumière sur la page (reflets qui balaient, bord néon tournant sur la carte phare, 3 au plus), cartes inclinables, titre holographique', await p.evaluate(() => document.querySelectorAll('#view .ux-shine').length > 0 && document.querySelectorAll('#view .ux-neon').length >= 1 && document.querySelectorAll('#view .ux-neon').length <= 3 && document.querySelectorAll('#view .ux-tiltable').length > 0 && !!document.querySelector('.ux-floor i')));
+      { const el = await p.$('#view .shop-hero'); const bb = await el.boundingBox(); await p.mouse.move(bb.x + bb.width * 0.85, bb.y + bb.height * 0.2); await p.mouse.down(); await p.waitForTimeout(200);
+        const tf = await p.evaluate(() => document.querySelector('#view .shop-hero').style.transform); await p.mouse.up(); await p.waitForTimeout(700);
+        ok('waouh : la carte s’incline vers le doigt (3D) puis revient', /perspective\(700px\) rotateX\(.+\) rotateY\(.+\)/.test(tf) && await p.evaluate(() => !document.querySelector('#view .shop-hero').style.transform), tf); }
+      await p.goto(base); await p.waitForTimeout(2500);
+      ok('vitesse : le globe de l’écran de JARVIS en calques que l’affichage fait tourner (pas de redessin), 2 pixels par point au plus', await p.evaluate(() => { const st = document.querySelector('.hud-core .holo-stage'), c = st && st.querySelector(':scope > canvas'); return !!st && st.querySelectorAll('.hl > i').length >= 7 && document.getAnimations().filter((a) => a.effect && a.effect.target && a.effect.target.closest && a.effect.target.closest('.hud-core .hl')).length >= 5 && c.width <= Math.ceil(st.clientWidth * 2) + 2; }));
+      await p.evaluate(() => document.querySelector('.talk-slot .jv-btn').click()); await p.waitForTimeout(80);
+      ok('waouh : l’orbe s’ouvre en cercle de lumière sur la discussion', await p.evaluate(() => { const c = document.getElementById('chat'); return !c.hidden && c.classList.contains('ux-circ') && /px$/.test(c.style.getPropertyValue('--ox')); }));
+      await p.waitForTimeout(800); await p.evaluate(() => document.querySelector('#chat .chat-head button').click()); await p.waitForTimeout(60);
+      ok('waouh : elle se referme dans l’orbe', await p.evaluate(() => !!document.querySelector('.ux-ov-out.ux-circ-out')));
+      await p.goto(base + '#demandes'); await p.waitForTimeout(2500);
+      const rv = await p.evaluate(() => document.querySelectorAll('#view .ux-rv').length);
+      await p.evaluate(() => { const sc = document.getElementById('scroller'); sc.scrollTop = sc.scrollHeight; }); await p.waitForTimeout(1300);
+      const vis = await p.evaluate(() => [...document.querySelectorAll('#view .ux-rv:not(.ux-rv-on)')].filter((x) => { const r = x.getBoundingClientRect(); return r.height && r.bottom > 90 && r.top < innerHeight * 0.9; }).length);
+      ok('waouh : les blocs plus bas apparaissent en 3D quand on y arrive (aucun bloc caché dans l’écran)', rv > 0 && vis === 0, 'en attente au départ : ' + rv + ', cachés à l’écran : ' + vis); }
     { const ctxR = await b.newContext({...devices['iPhone 15 Pro Max'], reducedMotion: 'reduce'}); const q = await ctxR.newPage(); await q.goto(base + '#espaces'); await q.waitForTimeout(2500);
       await q.evaluate(() => document.querySelector('.esp-tile[data-go="achats"]').click()); await q.waitForTimeout(40);
       ok('fluidité : « réduire les animations » de l’iPhone respecté (aucun calque, aucun glissé)', await q.evaluate(() => !document.querySelector('.ux-ghost') && !document.querySelector('#view .view-in.ux-in'))); await ctxR.close(); }

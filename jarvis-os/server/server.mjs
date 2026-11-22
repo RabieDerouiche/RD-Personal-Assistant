@@ -28,7 +28,7 @@ import {createRadar} from './radar.mjs';
 import {pique, PERSO_ORAL} from './humour.mjs';   /* 21/11/2026 : sa personnalité à l'oral (« sarcastique assumé ») */
 const ACT = createActivite();   /* 0.33.0 : ce que fait Claude à l'instant */
 
-const VERSION = '0.55.0';
+const VERSION = '0.56.0';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PORT = +(process.env.PORT || 8787);
 const HOST = process.env.HOST || '127.0.0.1';
@@ -248,6 +248,8 @@ function runClaude({prompt, system, model, resume, tools, cwd, timeoutMs, onDelt
   });
 }
 function friendly(s) {
+  /* 0.56.0 (capture du propriétaire : le message anglais de Claude Code s'affichait tel quel dans la discussion) */
+  if (/can.?t use your Claude subscription|payment is past due|settings\/billing|subscription.*(expired|inactive|past due)/i.test(s)) return 'Claude ne peut plus utiliser ton abonnement sur le serveur : Anthropic signale un paiement en retard ou un abonnement à renouveler. Vérifie sur claude.ai (Réglages, Facturation) ; si tout est payé, reconnecte Claude sur le serveur (claude auth login, depuis la session Serveur JARVIS).';
   if (/log ?in|auth|credential|401|unauthori/i.test(s)) return 'Claude Code n\'est pas connecté à ton abonnement sur le serveur : lance « claude auth login » sur le serveur.';
   if (/usage limit|rate limit|limit reached|quota/i.test(s)) return 'Limite d\'utilisation de ton abonnement Claude atteinte pour le moment.';
   return 'Claude n\'a pas pu répondre (' + s.trim().slice(0, 140) + ').';
