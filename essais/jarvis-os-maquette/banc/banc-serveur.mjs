@@ -13,7 +13,8 @@ const GV = {calls: []}; const GVS = (await import('node:http')).createServer(asy
   if (q.url.startsWith('/v1/voices')) return res.end(JSON.stringify({voices: [{name: 'fr-FR-Chirp3-HD-Charon'}, {name: 'fr-FR-Chirp3-HD-Aoede'}]}));
   const j = JSON.parse(b || '{}'), h = Buffer.alloc(44); h.write('RIFF', 0); h.write('WAVE', 8); res.end(JSON.stringify({audioContent: Buffer.concat([h, Buffer.from('GOOGLE:' + ((j.voice || {}).name || '') + ':' + ((j.input || {}).text || ''))]).toString('base64')})); });
 await new Promise((z) => GVS.listen(0, '127.0.0.1', z)); GVS.unref();   /* le banc se termine sans attendre ce faux serveur */
-const env = {...process.env, JARVIS_VOIX_GOOGLE_URL: 'http://127.0.0.1:' + GVS.address().port, JARVIS_PUSH_ALLOW_HTTP: '1', JARVIS_NOTIFY_TICK_MS: '3600000', JARVIS_SANTE_TICK_MS: '3600000', JARVIS_GOOGLE_FAKE: FG.url, PORT: String(PORT), JARVIS_DATA: DATA, CLAUDE_BIN: SRV + '/tests/fake-claude.mjs', JARVIS_TTS_HELPER: SRV + '/tests/fake-tts.mjs', JARVIS_STT_HELPER: SRV + '/tests/fake-stt.mjs', JARVIS_TOUR_HELPER: SRV + '/tests/fake-tour.mjs', JARVIS_RD_RACINE: 'rda', JARVIS_VOICE_MODEL: path.join(DATA, 'fausse-voix.onnx'), JARVIS_MAJ: '0'};   /* 0.27.0 : pas de question de mise à jour pendant le banc (elle a son essai à part, sur un dépôt de test) */
+const env = {...process.env, JARVIS_VOIX_GOOGLE_URL: 'http://127.0.0.1:' + GVS.address().port, JARVIS_PUSH_ALLOW_HTTP: '1', JARVIS_NOTIFY_TICK_MS: '3600000', JARVIS_SANTE_TICK_MS: '3600000', JARVIS_GOOGLE_FAKE: FG.url, PORT: String(PORT), JARVIS_DATA: DATA, CLAUDE_BIN: SRV + '/tests/fake-claude.mjs', JARVIS_TTS_HELPER: SRV + '/tests/fake-tts.mjs', JARVIS_STT_HELPER: SRV + '/tests/fake-stt.mjs', JARVIS_TOUR_HELPER: SRV + '/tests/fake-tour.mjs', JARVIS_RD_RACINE: 'rda', JARVIS_VOICE_MODEL: path.join(DATA, 'fausse-voix.onnx'), JARVIS_MAJ: '0',
+  JARVIS_AUDIO_PY: process.execPath, JARVIS_AUDIO_HELPER: SRV + '/tests/fake-audio.mjs', JARVIS_FFMPEG: ''};   /* 0.64.0 : le faux convertisseur à la place de PyAV ; pas de ffmpeg */   /* 0.27.0 : pas de question de mise à jour pendant le banc (elle a son essai à part, sur un dépôt de test) */
 fs.mkdirSync(DATA, {recursive: true}); fs.writeFileSync(path.join(DATA, 'fausse-voix.onnx'), 'faux');   /* 0.25.0 : la voix Pierre « installée » (fausse), pour la lecture des réponses */
 const code = execFileSync(process.execPath, [SRV + '/server.mjs', 'pair'], {env}).toString().match(/: ([A-Z0-9]{4}-[A-Z0-9]{4})/)[1];
 const srv = spawn(process.execPath, [SRV + '/server.mjs'], {env, stdio: ['ignore', 'pipe', 'pipe']}); await new Promise((r) => srv.stdout.once('data', r));
@@ -108,6 +109,47 @@ try {
       a0.titre === 'Une tâche pour Sami' && !/cle=/.test(a0.adresse) && a0.gardee && a0.siri === 'Tâche pour Sami' && /\/api\/invite\/tache$/.test(a0.url) && a0.large
       && a1.msg === 'C’est noté : « Acheter des couches pour demain », pour demain.' && a1.liste.length === 1 && /Acheter des couches pour demain/.test(a1.liste[0]) && /À faire/.test(a1.liste[0]), JSON.stringify([a0, a1]));
     await qi.screenshot({path: SH + 'invite.png'}); await ci.close(); }
+  /* 0.64.0 (ses choix du 22/11/2026) : son message vocal, enregistré sur sa page (micro de test de Chromium), arrive dans JARVIS : sa voix joue
+     d'elle-même, la fiche propose « C’est fait », « Dans 5 min », « Dans 15 min » ; elle voit « Faite ✓ » (prénoms inventés) */
+  { const tk = await p.evaluate(() => JSON.parse(localStorage.getItem('jarvis.settings')).serverToken), AH = {authorization: 'Bearer ' + tk, 'content-type': 'application/json'};
+    const iv = await fetch(BASE + '/api/invites', {method: 'POST', headers: AH, body: JSON.stringify({nom: 'Nour'})}).then((x) => x.json());
+    const b2 = await chromium.launch({args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream', '--autoplay-policy=no-user-gesture-required']});
+    const ci = await b2.newContext({...devices['iPhone 15 Pro Max'], permissions: ['microphone']}), qi = await ci.newPage(); qi.on('pageerror', (e) => errs.push('invité vocal : ' + e.message));
+    await qi.goto(iv.lien + '&pour=Sami'); await qi.waitForTimeout(1500);
+    const v0 = await qi.evaluate(() => ({vocal: !document.getElementById('vocal').hidden, siri: document.getElementById('vnomrac').textContent, url: document.getElementById('vurl').textContent, dest: document.getElementById('vdest').textContent, encoder: getComputedStyle(document.getElementById('v-encoder')).display !== 'none', etapes: [...document.querySelectorAll('ol li')].filter((li) => !li.hidden).every((li) => getComputedStyle(li).display === 'list-item'), large: document.documentElement.scrollWidth <= innerWidth + 1}));
+    await qi.click('#enr'); await qi.waitForTimeout(2600); const enCours = await qi.evaluate(() => ({bouton: document.getElementById('enr').textContent, chrono: document.getElementById('chrono').textContent}));
+    await qi.click('#enr'); await qi.waitForTimeout(2500);
+    const v1 = await qi.evaluate(() => ({msg: document.getElementById('msg3').textContent, liste: [...document.querySelectorAll('#liste li')].map((x) => x.innerText.replace(/\s+/g, ' ').trim())}));
+    ok('vocal (sa page) : « Message pour Sami » vers /api/invite/vocal, sans étape AIFF (le serveur lit le m4a), étapes en liste numérotée (plus coupées en colonnes) ; le bouton enregistre (« ■ Envoyer », chrono), envoie sa voix, et la liste la marque 🎤',
+      v0.vocal && v0.siri === 'Message pour Sami' && /\/api\/invite\/vocal$/.test(v0.url) && v0.dest === 'Sami' && !v0.encoder && v0.etapes && v0.large && enCours.bouton === '■ Envoyer' && /^● 0:0[2-3]$/.test(enCours.chrono)
+      && /^Message vocal envoyé/.test(v1.msg) && v1.liste.length === 1 && /^🎤/.test(v1.liste[0]) && /À faire/.test(v1.liste[0]), JSON.stringify([v0, enCours, v1]));
+    await qi.evaluate(() => { document.querySelectorAll('details').forEach((d) => { d.open = true; }); }); await qi.screenshot({path: SH + 'invite-vocal.png', fullPage: true});
+    /* JARVIS ouvert : la page relit ce qu'elle a envoyé ; un lecteur espion note chaque son joué */
+    const q = await ctx.newPage(); q.on('pageerror', (e) => errs.push('vocal reçu : ' + e.message));
+    await q.addInitScript(() => { try { localStorage.removeItem('jarvis.recues.vues'); } catch (e) { /* rien */ } window.__joue = []; const o = HTMLMediaElement.prototype.play; HTMLMediaElement.prototype.play = function () { if (/^blob:/.test(this.src)) window.__joue.push(this.src); return o.call(this); }; });
+    await q.goto(BASE + '/?serveur'); await q.waitForTimeout(4500);
+    const fiche = () => q.evaluate(() => { const s = document.getElementById('sheet'); return {ouverte: !!s && !s.hidden, kicker: ((s && s.querySelector('.sheet-kicker')) || {}).textContent || '', titre: ((s && s.querySelector('.sheet-title')) || {}).textContent || '', boutons: s ? [...s.querySelectorAll('button')].map((b) => b.textContent.trim()) : [], etat: ((s && s.querySelector('.rec-etat')) || {}).textContent || '', joue: window.__joue.length}; });
+    const r0 = await fiche();
+    ok('vocal (JARVIS ouvert) : sa voix joue d’elle-même, la fiche s’ouvre (« Écouter sa voix », « C’est fait », « Dans 5 min », « Dans 15 min ») et dit le prochain rappel',
+      r0.ouverte && /^Message vocal de Nour · /.test(r0.kicker) && r0.boutons.some((x) => /^▶ Écouter sa voix/.test(x)) && ['C’est fait', 'Dans 5 min', 'Dans 15 min'].every((x) => r0.boutons.some((y) => y.startsWith(x))) && /^Rappel à \d\d:\d\d \(encore 6 au plus\)/.test(r0.etat) && r0.joue >= 1, JSON.stringify(r0));
+    await q.screenshot({path: SH + 'vocal-recu.png'});
+    await q.evaluate(() => { const b = [...document.querySelectorAll('#sheet button')].find((x) => x.textContent.trim().startsWith('C’est fait')); if (b) b.click(); }); await q.waitForTimeout(1500);
+    let rc = await fetch(BASE + '/api/invites/recues', {headers: AH}).then((x) => x.json()); const fait = rc.recues.find((x) => x.nom === 'Nour' && x.vocal);
+    await qi.reload(); await qi.waitForTimeout(1500); const v2 = await qi.evaluate(() => [...document.querySelectorAll('#liste li')].map((x) => x.innerText.replace(/\s+/g, ' ').trim()));
+    ok('vocal : « C’est fait » arrête les rappels ; sur sa page, « Faite ✓ »', fait && fait.fait === true && fait.rappel === null && /Faite ✓/.test(v2[0] || ''), JSON.stringify([fait, v2]));
+    /* une tâche écrite, ouverte par la notification (#recue=…) : « Me la lire », puis « Dans 15 min » */
+    await fetch(BASE + '/api/invite/tache', {method: 'POST', headers: {authorization: 'Bearer ' + iv.cle, 'content-type': 'application/json'}, body: JSON.stringify({texte: 'Rappelle le plombier'})});
+    rc = await fetch(BASE + '/api/invites/recues', {headers: AH}).then((x) => x.json()); const pl = rc.recues.find((x) => x.texte === 'Rappelle le plombier');
+    await q.evaluate((id) => { location.hash = '#recue=' + id; }, pl.id); await q.waitForTimeout(2000);
+    const r1 = await fiche();
+    await q.evaluate(() => { const b = [...document.querySelectorAll('#sheet button')].find((x) => x.textContent.trim().startsWith('Dans 15 min')); if (b) b.click(); }); await q.waitForTimeout(1500);
+    rc = await fetch(BASE + '/api/invites/recues', {headers: AH}).then((x) => x.json()); const pl2 = rc.recues.find((x) => x.id === pl.id);
+    ok('vocal : la notification ouvre la tâche (« Tâche de Nour », « Me la lire ») ; « Dans 15 min » repousse le rappel', r1.ouverte && /^Tâche de Nour · /.test(r1.kicker) && r1.titre === 'Rappelle le plombier' && r1.boutons.includes('🔊 Me la lire') && pl2 && pl2.rappel && Math.abs(pl2.rappel.prochain - Date.now() - 900000) < 15000, JSON.stringify([r1, pl2]));
+    await q.goto(BASE + '/?serveur#reglages'); await q.waitForTimeout(3500);
+    const r2 = await q.evaluate(() => { const c = document.querySelector('.invite-card'); if (c) c.scrollIntoView(); return c ? {rap: !!c.querySelector('#iv-rap') && c.querySelector('#iv-rap').checked, det: [...c.querySelectorAll('details summary')].map((x) => x.textContent), url: c.textContent.includes('/api/raccourci/vocal')} : null; });
+    ok('vocal (Réglages) : rappels cochés ; « Entendre sa voix quand JARVIS est fermé » (adresse de son automatisation) ; « Avec tes AirPods »', r2 && r2.rap && r2.det.includes('Entendre sa voix quand JARVIS est fermé') && r2.det.includes('Avec tes AirPods') && r2.url, JSON.stringify(r2));
+    await q.evaluate(() => { const c = document.querySelector('.invite-card'); if (c) { c.querySelectorAll('details').forEach((d) => { d.open = true; }); c.scrollIntoView(); } }); await q.screenshot({path: SH + 'reglages-invite.png'});
+    await q.close(); await ci.close(); await b2.close(); }
   /* 0.37.0 : la mémoire durable — Claude propose de retenir (carte « À retenir ») ; gardé sur le serveur seulement sur son bouton */
   await p.fill('#chat-in', 'Retiens que je préfère le train pour Lyon'); await p.press('#chat-in', 'Enter').catch(() => {}); await p.waitForTimeout(2500);
   if (!(await p.evaluate(() => /À retenir/.test(document.getElementById('chat').textContent)))) { await p.evaluate(() => { const f = document.querySelector('#chat form'); if (f) f.requestSubmit(); }); await p.waitForTimeout(2500); }

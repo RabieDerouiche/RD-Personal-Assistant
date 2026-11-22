@@ -1467,6 +1467,14 @@
   .face-note { font-size: 13px; margin: 6px 0 0; } .face-open { margin-top: 4px; }
   .siri-steps { margin: 0; padding-left: 20px; display: grid; gap: 6px; font-size: 13.5px; color: var(--muted); } .siri-steps code, .siri-key { font: 600 12.5px var(--tech); color: var(--fg); overflow-wrap: anywhere; }
   .siri-key { display: block; padding: 10px 12px; border-radius: 12px; border: 1px dashed var(--line-2); -webkit-user-select: all; user-select: all; }
+  /* 0.64.0 : ce que sa femme envoie (message vocal, tâche), dans « Mes tâches » et dans la fiche d'arrivée */
+  .rec-list { display: grid; gap: 8px; }
+  .rec-it { display: grid; gap: 2px; text-align: left; width: 100%; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--line-2); background: var(--card, transparent); color: var(--fg); font: inherit; cursor: pointer; }
+  .rec-it b { font-weight: 600; overflow-wrap: anywhere; } .rec-it small { color: var(--muted); }
+  .rec-it.is-new { border-color: var(--accent, #4f46e5); } .rec-it.is-done { opacity: .6; }
+  .rec-top { display: grid; gap: 6px; margin: 4px 0 10px; } .rec-etat { margin: 0; font-size: 13.5px; }
+  .invite-rap { display: flex; gap: 10px; align-items: flex-start; margin: 10px 0 0; font-size: 14px; } .invite-rap input { margin-top: 3px; }
+  .invite-det { margin-top: 10px; } .invite-det summary { font-weight: 600; cursor: pointer; }
   /* JARVIS OS (17/11/2026, retour du propriétaire sur capture) : boutons d'une feuille et de « Toutes les actions » tous pareils.
      Même pilule, même marge, texte à gauche, pastille de coût calée à droite, chevron après elle ; texte long sur deux lignes sans toucher les bords. */
   .sa-main .btn, .sa-grid .btn { min-height: 48px; padding: 10px 18px; border-radius: 999px; justify-content: flex-start; gap: 8px; font-size: 15px; line-height: 1.25; text-align: left; }
@@ -2878,6 +2886,7 @@ void main(){
       el.append(sec('Ajouter une échéance', newEcheanceForm()));
     },
     taches(el) {
+      try { const r = recSection(); if (r) el.append(r); } catch (e) { /* rien : 0.64.0, ce que sa femme envoie */ }
       el.append(newTaskForm());
       const list = S.taches.slice().sort((a, b) => (a.n == null ? 999 : a.n) - (b.n == null ? 999 : b.n));
       el.append(sec('En cours', list.length ? list.map((t) => simpleCard('tache', t, t.title, null, (t.n == null ? 'sans date' : (t.n < 0 ? 'en retard, prévue ' : 'pour ') + short(t.n)) + (t.de ? ' · de ' + t.de : ''), 'hydra', 2)) : emptyState('Aucune tâche en cours.')));
@@ -9364,9 +9373,27 @@ void main(){
   async function inviteCard(JS) {
     const card = h('section', {class: 'card set-card invite-card'}, h('b', {text: 'Tâches envoyées par un proche'}));
     const out = h('p', {class: 'set-msg'}), say = (x, bad) => { out.textContent = x; out.classList.toggle('is-bad', !!bad); };
-    const l = await JS.invites.liste();
-    if (l === null) { card.append(h('p', {class: 'muted', text: 'Ton serveur ne le connaît pas encore : touche « Mettre à jour le serveur » plus bas.'})); return card; }
-    card.append(h('p', {class: 'muted', text: 'Elle dit « Dis Siri, tâche pour toi » et dicte : la tâche arrive dans tes tâches, marquée « de » son prénom, avec une notification. Elle voit si ses tâches sont faites, rien d’autre de JARVIS.'}));
+    const st = JS.invites.etat ? await JS.invites.etat() : {invites: await JS.invites.liste()}, l = st ? st.invites : null;
+    if (!l) { card.append(h('p', {class: 'muted', text: 'Ton serveur ne le connaît pas encore : touche « Mettre à jour le serveur » plus bas.'})); return card; }
+    card.append(h('p', {class: 'muted', text: 'Elle dit « Dis Siri, tâche pour toi » et dicte, ou t’envoie un message vocal (sa voix) : la tâche arrive dans tes tâches, marquée « de » son prénom, avec une notification. Elle voit si ses tâches sont faites, rien d’autre de JARVIS.'}));
+    /* 0.64.0 (ses choix du 22/11/2026) : rappels toutes les 5 minutes (6 fois, la nuit aussi) ; sa voix JARVIS fermé ; les AirPods */
+    if ('rappels' in st) {
+      const cb = h('input', {type: 'checkbox', id: 'iv-rap'});
+      cb.checked = st.rappels !== false;
+      cb.addEventListener('change', async () => { const r = await JS.invites.reglages({rappels: cb.checked}); if (!r) { cb.checked = !cb.checked; say('Le serveur ne répond pas : rien n’est changé.', true); return; } say(r.rappels ? 'Rappels toutes les 5 minutes, jusqu’à « C’est fait ».' : 'Plus de rappel : seulement la notification à l’arrivée.'); });
+      card.append(h('label', {class: 'invite-rap', for: 'iv-rap'}, cb, h('span', {text: 'Me rappeler ses tâches toutes les 5 minutes (6 fois au plus, la nuit aussi), jusqu’à « C’est fait ». Une tâche pour un autre jour n’est pas rappelée.'})));
+      if (st.m4a === false) card.append(h('p', {class: 'muted', text: 'Ton serveur ne lit pas encore le son de l’iPhone tel quel (l’écoute n’est pas installée) : sa page lui fait ajouter « Encoder le média » (AIFF) à son raccourci vocal.'}));
+      const vurl = location.origin + '/api/raccourci/vocal';
+      card.append(h('details', {class: 'invite-det'}, h('summary', {text: 'Entendre sa voix quand JARVIS est fermé'}),
+        h('p', {class: 'muted', text: 'Son raccourci vocal t’envoie aussi un message « 🔔 ». Une automatisation de ton iPhone joue alors sa voix (iOS 17 ou plus ; noms des menus devinés) :'}),
+        h('ol', {class: 'siri-steps'},
+          h('li', {text: 'App Raccourcis, onglet Automatisation, « + », « Message ». Expéditeur : elle ; « Le message contient » : 🔔 ; choisis « Exécuter immédiatement ».'}),
+          h('li', {}, 'Action « Obtenir le contenu de l’URL » : ', h('code', {text: vurl}), ' ; en-tête Authorization = Bearer suivi de la clé de ton raccourci « Jarvis » (carte Siri ci-dessus ; si tu ne l’as plus, recrée-la et mets-la aussi dans « Jarvis »).'),
+          h('li', {text: 'Action « Lire le son », avec « Contenu de l’URL ».'})),
+        h('div', {class: 'row-actions'}, h('button', {type: 'button', class: 'btn ghost sm', onclick: async () => { try { await navigator.clipboard.writeText(vurl); say('Adresse copiée.'); } catch (e) { say('Copie impossible : sélectionne l’adresse.', true); } }}, 'Copier l’adresse'))));
+      card.append(h('details', {class: 'invite-det'}, h('summary', {text: 'Avec tes AirPods'}),
+        h('p', {class: 'muted', text: 'Réglages de l’iPhone, Notifications, « Annoncer les notifications » : active-le, puis Messages (Siri te lit son « 🔔 », l’automatisation joue sa voix). Si JARVIS est dans la liste, active-le aussi pour les rappels.'})));
+    }
     if (l.length) card.append(h('ul', {class: 'mem-list'}, l.map((x) => h('li', {class: 'mem-it'},
       h('span', {}, h('b', {text: x.nom}), h('small', {class: 'muted', text: ' · depuis le ' + fmt(new Date(x.at), {day: 'numeric', month: 'long'}) + ' · ' + x.taches + ' tâche' + (x.taches > 1 ? 's' : '') + (x.last ? ', dernière le ' + fmt(new Date(x.last), {day: 'numeric', month: 'short'}) : '')})),
       h('button', {type: 'button', class: 'btn ghost sm danger', onclick: () => confirmSheet({bot: 'claude', title: 'Retirer l’accès de ' + x.nom + ' ?', ok: 'Oui, retirer', cost: 'free', say: 'Son raccourci et sa page ne marcheront plus ; ses tâches déjà envoyées restent.', run: async () => { await JS.invites.retirer(x.id); VIEWS_RELOAD_SIRI(); }})}, 'Retirer l’accès')))));
@@ -9425,6 +9452,84 @@ void main(){
      la dernière phrase et pourquoi pas Google, la dernière erreur, le compte du mois et du jour ; la clé collée est essayée aussitôt
      et Google choisi s'il répond ; « Vérifier » ; les voix conseillées pour JARVIS d'abord, à comparer d'un appui */
   const SILENCE_WAV = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=';
+  /* ---------- 0.64.0 (ses choix du 22/11/2026) : ce que sa femme envoie. « Sa propre voix » : son message vocal joue dès qu'il arrive quand
+     JARVIS est ouvert (relu toutes les 15 secondes, et au retour dans l'app) ; une tâche écrite est lue par la voix de JARVIS. La fiche :
+     « Écouter », « C'est fait » (plus de rappel, « Fait » dans Pilotage), « Dans 5 min », « Dans 15 min ». Les rappels (toutes les 5 minutes,
+     6 fois, la nuit aussi) sont envoyés par le serveur ; une notification ouvre « #recue=<id> ». ---------- */
+  const RECUES = {vues: new Set((() => { try { return JSON.parse(localStorage.getItem('jarvis.recues.vues') || '[]'); } catch (e) { return []; } })()), liste: [], son: null, url: '', debloque: false, box: null};
+  const recAPI = () => { const JS = window.JarvisServeur; return SRV_OS && JS && JS.invites && JS.invites.recues && JS.linked && JS.linked() ? JS.invites : null; };
+  const recVu = (id) => { RECUES.vues.add(id); try { localStorage.setItem('jarvis.recues.vues', JSON.stringify([...RECUES.vues].slice(-200))); } catch (e) { /* rien */ } };
+  const recQuand = (t) => { const m = Math.round((Date.now() - t) / 60000); return m < 1 ? 'à l’instant' : m < 60 ? 'il y a ' + m + ' min' : fmt(new Date(t), {weekday: 'short', hour: '2-digit', minute: '2-digit'}); };
+  const recHeure = (t) => new Date(t).toLocaleTimeString('fr-FR', {hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris'});
+  /* le lecteur de sa voix, débloqué au premier toucher : l'iPhone ne joue un son sans geste que sur un lecteur déjà joué une fois */
+  const recLecteur = () => { if (!RECUES.son) { try { RECUES.son = new Audio(); RECUES.son.preload = 'auto'; } catch (e) { RECUES.son = null; } } return RECUES.son; };
+  document.addEventListener('pointerdown', () => { if (RECUES.debloque) return; const a = recLecteur(); if (!a) return; try { a.src = SILENCE_WAV; const p = a.play(); if (p && p.then) p.then(() => { RECUES.debloque = true; }, () => {}); } catch (e) { /* rien */ } }, {capture: true, passive: true});
+  async function recJouer(x) {
+    const JS = recAPI(); if (!JS) return false;
+    try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) { /* rien */ }
+    try { const v = window.JarvisVoice; if (v && v.hush) v.hush(); } catch (e) { /* rien */ }
+    if (!x.vocal) { const v = window.JarvisVoice; if (!v || !v.say) return false; try { await v.say((x.nom ? 'Tâche de ' + x.nom + ' : ' : '') + x.texte); return true; } catch (e) { return false; } }
+    const a = recLecteur(); if (!a) return false;
+    const u = await JS.audio(x.id); if (!u) return false;
+    if (RECUES.url) { try { URL.revokeObjectURL(RECUES.url); } catch (e) { /* rien */ } } RECUES.url = u;
+    return new Promise((fin) => { try { a.onended = () => fin(true); a.onerror = () => fin(false); a.src = u; const p = a.play(); if (p && p.then) p.then(() => { RECUES.debloque = true; }, () => fin(false)); } catch (e) { fin(false); } });
+  }
+  function recOuvrir(x, jouer) {
+    const JS = recAPI(); if (!JS) return;
+    recVu(x.id);
+    const etat = h('p', {class: 'muted rec-etat'});
+    const peint = () => { etat.textContent = x.fait ? 'Faite : plus de rappel.' : x.rappel ? 'Rappel à ' + recHeure(x.rappel.prochain) + ' (encore ' + x.rappel.restants + ' au plus), jusqu’à « C’est fait ».' : 'Pas de rappel prévu.'; };
+    peint();
+    const ecoute = h('button', {type: 'button', class: 'btn main2 rec-play', onclick: async () => { ecoute.disabled = true; const ok = await recJouer(x); ecoute.disabled = false; if (ok) JS.agir(x.id, 'ecoute'); else toast(x.vocal ? 'Message vocal' : 'Lecture', x.vocal ? 'Le son ne part pas : monte le volume, puis réessaie.' : 'La voix ne part pas : réessaie.', true); }},
+      x.vocal ? '▶ Écouter sa voix' + (x.duree ? ' (' + Math.max(1, Math.round(x.duree)) + ' s)' : '') : '🔊 Me la lire');
+    const plusTard = (m) => act('Dans ' + m + ' min', {cost: 'free', go: () => { JS.agir(x.id, 'plustard', m).then((r) => { if (r && r.prochain) { x.rappel = {prochain: r.prochain, restants: 6}; x.fait = false; recPeindre(); toast('Rappel', 'Je te la rappelle à ' + recHeure(r.prochain) + '.'); } else toast('Rappel', 'Le serveur ne répond pas : rien n’est changé.', true); }); return null; }});
+    const compris = !/^Message vocal de /.test(x.texte);
+    openSheet({kicker: (x.vocal ? 'Message vocal de ' : 'Tâche de ') + (x.nom || 'ton invitée') + ' · ' + recQuand(x.at), title: x.texte,
+      say: x.vocal ? (compris ? 'Ce que j’ai compris de sa voix : écoute-la pour être sûr.' : 'Je n’ai pas compris les mots : écoute-la.') : 'Elle te l’a envoyée' + (x.pour ? ' pour le ' + fmt(new Date(x.pour + 'T12:00:00'), {weekday: 'long', day: 'numeric', month: 'long'}) : '') + '.',
+      extraTop: () => h('div', {class: 'rec-top'}, h('div', {class: 'row-actions'}, ecoute), etat),
+      actions: x.fait ? [] : [act('C’est fait', {tone: 'main', cost: 'free', go: () => { JS.agir(x.id, 'fait').then((r) => { if (r && r.ok) { x.fait = true; x.rappel = null; recPeindre(); toast('C’est fait', r.pilotage ? 'Plus de rappel ; elle voit « Faite ✓ ».' : 'Plus de rappel. Pilotage n’a pas été mis à jour : coche-la aussi dans tes tâches.', !r.pilotage); } else toast('C’est fait', 'Le serveur ne répond pas : réessaie.', true); }); return null; }}), plusTard(5), plusTard(15)]});
+    if (jouer) setTimeout(async () => { const ok = await recJouer(x); if (ok) JS.agir(x.id, 'ecoute'); }, 400);
+  }
+  /* « Mes tâches » : ce qu'elle a envoyé depuis 48 heures, à faire d'abord */
+  function recPeindre() {
+    const box = RECUES.box; if (!box) return;
+    const l = RECUES.liste.filter((x) => !x.fait).concat(RECUES.liste.filter((x) => x.fait).slice(0, 3));
+    if (!l.length) { box.replaceChildren(); return; }
+    const noms = [...new Set(l.map((x) => x.nom).filter(Boolean))].join(' et ') || 'ton invitée';
+    box.replaceChildren(sec('Envoyées par ' + noms, h('div', {class: 'rec-list'}, l.map((x) => h('button', {type: 'button', class: 'rec-it' + (x.fait ? ' is-done' : x.rappel ? ' is-new' : ''), onclick: () => recOuvrir(x, false)},
+      h('b', {text: (x.vocal ? '🎤 ' : '') + x.texte}), h('small', {text: recQuand(x.at) + (x.fait ? ' · faite' : x.rappel ? ' · rappel à ' + recHeure(x.rappel.prochain) : '')}))))));
+  }
+  function recSection() { if (!recAPI()) return null; RECUES.box = h('div', {class: 'rec-box'}); recPeindre(); recRelire(false).catch(() => {}); return RECUES.box; }
+  async function recRelire(auto) {
+    const JS = recAPI(); if (!JS || document.hidden) return;
+    const r = await JS.recues(); if (!r || !Array.isArray(r.recues)) return;
+    RECUES.liste = r.recues; recPeindre();
+    if (!auto) return;
+    /* à l'arrivée (ou à la première ouverture après) : jouée une fois par appareil, tant qu'elle n'est pas faite et qu'un rappel court */
+    const neuves = r.recues.filter((x) => !RECUES.vues.has(x.id) && !x.fait && (x.rappel || Date.now() - x.at < 15 * 60000));
+    if (!neuves.length) return;
+    /* pendant une conversation à la voix (ou une réponse lue) : rien ne la coupe, la tâche attend la relecture suivante */
+    const v = window.JarvisVoice; try { if (v && ((v.conversing && v.conversing()) || (v.speaking && v.speaking()))) return; } catch (e) { /* rien */ }
+    neuves.forEach((x) => recVu(x.id));
+    const x = neuves[0], sh = $('sheet');
+    /* il est déjà dans une fiche ou dans la discussion : sa voix joue, un bandeau (à toucher) remplace la fiche, qui ne lui prend pas la main */
+    if ((sh && !sh.hidden) || CHAT.open) { alertShow((x.vocal ? 'Message vocal de ' : 'Tâche de ') + (x.nom || 'ton invitée'), x.texte, () => recOuvrir(x, false)); recJouer(x).then((ok) => { if (ok) recAPI().agir(x.id, 'ecoute'); }).catch(() => {}); }
+    else recOuvrir(x, true);
+    if (neuves.length > 1) toast('Envoyées par ' + (x.nom || 'ton invitée'), 'Et ' + (neuves.length - 1) + ' autre' + (neuves.length > 2 ? 's' : '') + ' : dans Mes tâches.', true);
+  }
+  async function recHash() {
+    const m = String(location.hash || '').match(/^#recue=([a-f0-9]{12})$/); if (!m) return false;
+    try { history.replaceState(null, '', location.pathname + location.search); } catch (e) { /* rien */ }
+    const JS = recAPI(); if (!JS) return true;
+    const r = await JS.recues(), x = r && (r.recues || []).find((y) => y.id === m[1]);
+    if (r && Array.isArray(r.recues)) { RECUES.liste = r.recues; recPeindre(); }
+    if (!x) { toast('Tâche', 'Elle n’est plus là (plus de 48 heures).', true); return true; }
+    recOuvrir(x, true); return true;
+  }
+  window.addEventListener('hashchange', () => { recHash().catch(() => {}); });
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) setTimeout(() => recRelire(true).catch(() => {}), 600); });
+  setInterval(() => { recRelire(true).catch(() => {}); }, 15000);
+  setTimeout(() => { recHash().then((vu) => { if (!vu) recRelire(true).catch(() => {}); }).catch(() => {}); }, 1200);
   async function voixCard(JS) {
     const card = h('section', {class: 'card set-card voixg-card', id: 'voixg-card'}, h('b', {text: 'Voix du serveur : Pierre ou Google'}));
     let st = await JS.voixGoogle.etat();
@@ -9837,7 +9942,7 @@ void main(){
     }
     const RV1 = renderView;
     renderView = function (keep) {
-      /* 0.64.0 (« au chargement, toujours du clignotement sur l'accueil ; les menus, Espaces, pas réactifs des fois ») : une page redessinée
+      /* 0.65.0 (« au chargement, toujours du clignotement sur l'accueil ; les menus, Espaces, pas réactifs des fois ») : une page redessinée
          parce que des données arrivent attend que le doigt soit levé (sinon l'élément touché est remplacé et l'appui perdu) et que la
          transition soit finie (sinon la page qui arrive est remplacée en plein vol) ; un seul rafraîchissement ensuite */
       if (keep && !(UXM.next && performance.now() - UXM.t < 700) && (UXM.down || performance.now() < (UXM.animUntil || 0))) { uxPlusTard(); return; }
@@ -9872,7 +9977,7 @@ void main(){
       }
       if (nw && (!keep || kind)) countUp(nw);
       if (nw) { decorate(nw, !keep || kind); if (!keep || kind) reveal(nw); if (kind) { UXM.navAt = performance.now(); UXM.navTab = rootOf(TAB); UXM.animUntil = performance.now() + 560; } if (raw != null) { nw.__raw = raw; nw.__dec = uxNorm(nw); } }
-      /* 0.64.0 : les lignes de l'écran de JARVIS tout de suite (avant : deux images sans elles à chaque rafraîchissement) ; les animations
+      /* 0.65.0 : les lignes de l'écran de JARVIS tout de suite (avant : deux images sans elles à chaque rafraîchissement) ; les animations
          qui tournent en boucle reprennent où elles en étaient (avant : elles repartaient toutes à zéro, d'où le clignotement) */
       if (nw && nw.querySelector('.hud') && typeof hudLines === 'function') try { hudLines(); } catch (e) { /* rien */ }
       if (nw) uxCale(nw);
@@ -9967,7 +10072,7 @@ void main(){
       todo.forEach(([x, c], i) => {
         if (stat[i]) x.style.position = 'relative';
         const d = h('i', {class: 'ux-deco ' + c, 'aria-hidden': 'true'});
-        if (c === 'ux-shine') { const sw = 6.5 + (n % 3), off = (n++ * 1.37) % 6; d.style.setProperty('--sw', sw + 's'); d.style.setProperty('--sd', off.toFixed(2) + 's'); }   /* 0.64.0 : phase tenue par uxCale */
+        if (c === 'ux-shine') { const sw = 6.5 + (n % 3), off = (n++ * 1.37) % 6; d.style.setProperty('--sw', sw + 's'); d.style.setProperty('--sd', off.toFixed(2) + 's'); }   /* 0.65.0 : phase tenue par uxCale */
         if (c === 'ux-halo') x.style.animation = 'none';
         x.append(d);
       });
@@ -10014,7 +10119,7 @@ void main(){
     document.addEventListener('pointerup', leve, {passive: true, capture: true}); document.addEventListener('pointercancel', leve, {passive: true, capture: true});
     document.addEventListener('pointerdown', (e) => { const t = e.target.closest && e.target.closest('.tab'); if (!t) return; t.classList.add('is-press'); setTimeout(() => t.classList.remove('is-press'), 380); }, {passive: true, capture: true});
     document.addEventListener('click', (e) => { const t = e.target.closest && e.target.closest('.tab'); if (!t) return; if (UXM.navAt && performance.now() - UXM.navAt < 450 && t.dataset.tab === UXM.navTab) { e.stopImmediatePropagation(); e.preventDefault(); } }, true);
-    /* 0.64.0 : la barre sort de la zone qui défile ; sur iPhone, un appui pendant que la page glisse encore ne servait qu'à l'arrêter (« pas réactif des fois ») */
+    /* 0.65.0 : la barre sort de la zone qui défile ; sur iPhone, un appui pendant que la page glisse encore ne servait qu'à l'arrêter (« pas réactif des fois ») */
     { const nav = $('tabs'); if (nav && nav.parentElement !== document.body) document.body.appendChild(nav); }
     document.head.append(h('style', {text: '.fav-bar{touch-action:manipulation;-webkit-tap-highlight-color:transparent}.fav-row{align-items:stretch!important}.fav-bar .tab{justify-content:flex-end;min-height:62px!important}.fav-row .tab{transition:transform .18s ' + EASE + ',color .18s}.fav-row .tab.is-press{transform:scale(.9);color:var(--fg)}.fav-row .tab.is-press .ic{filter:drop-shadow(0 0 8px var(--pg,#22d3ee))}'}));
     /* parallaxe : le ciel glisse plus lentement que la page */

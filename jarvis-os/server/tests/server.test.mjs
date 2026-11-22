@@ -40,7 +40,9 @@ const GSRV = http.createServer(async (q, res) => { let b = ''; for await (const 
 await new Promise((z) => GSRV.listen(0, '127.0.0.1', z)); const GURL = 'http://127.0.0.1:' + GSRV.address().port;
 const PORT = 18000 + Math.floor(Math.random() * 1000), BASE = 'http://127.0.0.1:' + PORT;
 const env = {...process.env, JARVIS_HUMOUR: '0' /* réponses exactes : la pique a son propre banc (humour.test.mjs) */, JARVIS_PUSH_ALLOW_HTTP: '1', JARVIS_NOTIFY_TICK_MS: '3600000', JARVIS_SANTE_TICK_MS: '3600000', JARVIS_PAUSE_CACHE_MS: '0', JARVIS_PAPIERS_ID: 'pap', JARVIS_BELL_DEDUP_MS: '0', JARVIS_GOOGLE_FAKE: FG.url, PORT: String(PORT), JARVIS_DATA: DATA, CLAUDE_BIN: path.join(HERE, 'fake-claude.mjs'), ANTHROPIC_API_KEY: 'sk-ant-faux-pour-le-test', ANTHROPIC_BASE_URL: 'https://exemple.invalid', JARVIS_ORIGINS: 'https://rabiederouiche.github.io', JARVIS_REPO: os.tmpdir(), JARVIS_OS_DIR: path.join(HERE, '..', '..', '..', 'essais', 'jarvis-os-maquette'), JARVIS_TTS_HELPER: path.join(HERE, 'fake-tts.mjs'), JARVIS_VOICE_MODEL: path.join(HERE, 'fake-tts.mjs'), JARVIS_VOICE_SCRIPT: path.join(DATA, 'fausse-install.sh')};
-Object.assign(env, {JARVIS_STEAM_URL: VB, JARVIS_STT_HELPER: path.join(HERE, 'fake-stt.mjs'), JARVIS_TOUR_HELPER: path.join(HERE, 'fake-tour.mjs'), JARVIS_PREP_MEM: '1', JARVIS_RD_RACINE: 'rda', JARVIS_VOIX_GOOGLE_URL: GURL, JARVIS_VOIX_GOOGLE_PLAFOND: '220', JARVIS_ROUTINES_MS: '400', JARVIS_METEO_URL: 'http://127.0.0.1:' + MET.address().port + '/v1/forecast', JARVIS_ECOUTE_SCRIPT: path.join(DATA, 'fausse-install.sh')});
+Object.assign(env, {JARVIS_STEAM_URL: VB, JARVIS_STT_HELPER: path.join(HERE, 'fake-stt.mjs'), JARVIS_TOUR_HELPER: path.join(HERE, 'fake-tour.mjs'), JARVIS_PREP_MEM: '1', JARVIS_RD_RACINE: 'rda', JARVIS_VOIX_GOOGLE_URL: GURL, JARVIS_VOIX_GOOGLE_PLAFOND: '220', JARVIS_ROUTINES_MS: '400', JARVIS_METEO_URL: 'http://127.0.0.1:' + MET.address().port + '/v1/forecast', JARVIS_ECOUTE_SCRIPT: path.join(DATA, 'fausse-install.sh'),
+  /* 0.64.0 : message vocal (faux convertisseur à la place de PyAV, pas de ffmpeg) et rappels toutes les 0,7 s au lieu de 5 min */
+  JARVIS_AUDIO_PY: process.execPath, JARVIS_AUDIO_HELPER: path.join(HERE, 'fake-audio.mjs'), JARVIS_FFMPEG: '', JARVIS_RAPPEL_MS: '700', JARVIS_RAPPEL_TICK_MS: '150', JARVIS_TACHES_CACHE_MS: '0'});
 const results = []; let fails = 0;
 { const H = ['Domaine', 'Fait', 'Valeur'], v = (x) => pauseDepuisFaits([H, ['Grok Bot', "Grok en pause jusqu'au", x]]);
   const okP = v('17/11/2026 13h05') === Date.parse('2026-11-17T13:05:00+01:00') && v('14/07/2027 12h47') === Date.parse('2027-07-14T12:47:00+02:00') && v('Reprise faite, sonnettes envoyées') === null && pauseDepuisFaits([H, ['x', 'Autre', 'y']]) === undefined;
@@ -182,7 +184,7 @@ try {
         && FG.calls.filter((x) => /:append$/.test(x.path)).length === n0 + 1 && /Tâches!A1/.test(decodeURIComponent(ap.path)) && ap.body.values[0][1] === 'Prendre rendez-vous chez le pédiatre pour demain' && ap.body.values[0][3] === 'À faire' && ap.body.values[0][4] === 'De Lina' && /^\d{2}\/\d{2}\/\d{4}$/.test(ap.body.values[0][2]), msg + ' ' + JSON.stringify(ap && ap.body));
       const rowN = 100 + FG.appends.length, vals = Array.from({length: rowN}, () => []); vals[0] = ['Ajoutée le', 'Tâche', 'Pour le', 'Statut', 'Remarque']; vals[rowN - 1] = ['22/11/2026', 'Prendre rendez-vous chez le pédiatre pour demain', '', 'Fait', 'De Lina']; FG.sheet['Tâches!A1:E500'] = vals;
       const st = await fetch(BASE + '/api/invite/taches', {headers: IH}), sj = await st.json();
-      ok('invité : elle voit le statut de ses tâches (« Fait »), rien d’autre', st.status === 200 && sj.nom === 'Lina' && sj.taches.length === 1 && sj.taches[0].statut === 'Fait' && Object.keys(sj).sort().join() === 'nom,taches', JSON.stringify(sj));
+      ok('invité : elle voit le statut de ses tâches (« Fait »), rien d’autre', st.status === 200 && sj.nom === 'Lina' && sj.taches.length === 1 && sj.taches[0].statut === 'Fait' && Object.keys(sj).sort().join() === 'm4a,nom,taches', JSON.stringify(sj));
       const autres = await Promise.all(['/api/snap', '/api/radar', '/api/memory', '/api/invites', '/api/missions', '/api/google'].map((u) => fetch(BASE + u, {headers: IH}).then((x) => x.status)));
       ok('invité : sa clé n’ouvre rien d’autre de JARVIS (401 partout)', autres.every((s) => s === 401), JSON.stringify(autres));
       const vide = await fetch(BASE + '/api/invite/tache', {method: 'POST', headers: IH, body: JSON.stringify({texte: ' '})}), faux = await fetch(BASE + '/api/invite/tache', {method: 'POST', headers: {authorization: 'Bearer faux', 'content-type': 'application/json'}, body: JSON.stringify({texte: 'Une tâche'})});
@@ -192,6 +194,69 @@ try {
       const del = await call('/api/invites/' + li.body.invites[0].id, {method: 'DELETE', headers: A}), apres = await fetch(BASE + '/api/invite/tache', {method: 'POST', headers: IH, body: JSON.stringify({texte: 'Encore une'})});
       ok('invité : accès retiré → sa clé est refusée', del.status === 200 && apres.status === 401);
       const pg = await fetch(BASE + '/invite/'); ok('invité : sa page est servie (/invite/), sans rien de JARVIS dedans', pg.status === 200 && /Envoyer une tâche/.test(await pg.text())); }
+    /* 0.64.0 (ses choix du 22/11/2026) : son message vocal (sa propre voix), gardé et transcrit ; rappels jusqu'à « C'est fait » (prénom inventé) */
+    { const cr = await G('/api/invites', {nom: 'Nour'}), k = cr.body.cle, IV = {authorization: 'Bearer ' + k};
+      const wav16 = (txt) => { const d = Buffer.from('DIT:' + txt), n = Math.max(16000, Math.ceil(d.length / 2)), w = Buffer.alloc(44 + n * 2); w.write('RIFF', 0); w.writeUInt32LE(36 + n * 2, 4); w.write('WAVEfmt ', 8); w.writeUInt32LE(16, 16); w.writeUInt16LE(1, 20); w.writeUInt16LE(1, 22); w.writeUInt32LE(16000, 24); w.writeUInt32LE(32000, 28); w.writeUInt16LE(2, 32); w.writeUInt16LE(16, 34); w.write('data', 36); w.writeUInt32LE(n * 2, 40); d.copy(w, 44); return w; };
+      /* un AIFF comme celui de l'iPhone (« Encoder le média ») : 44,1 kHz stéréo, 16 bits gros-boutiste ; son = 1 s de la, ou du silence */
+      const aiff = (son) => { const fr = 44100, n = fr, d = Buffer.alloc(n * 4); for (let i = 0; i < n; i++) { const v = son ? Math.round(16000 * Math.sin(2 * Math.PI * 440 * i / fr)) : 0; d.writeInt16BE(v, i * 4); d.writeInt16BE(v, i * 4 + 2); }
+        const comm = Buffer.alloc(26); comm.write('COMM', 0); comm.writeUInt32BE(18, 4); comm.writeUInt16BE(2, 8); comm.writeUInt32BE(n, 10); comm.writeUInt16BE(16, 14); comm.writeUInt16BE(0x400e, 16); comm.writeUInt32BE(0xac440000, 18); comm.writeUInt32BE(0, 22);
+        const ss = Buffer.alloc(16); ss.write('SSND', 0); ss.writeUInt32BE(8 + d.length, 4); const f = Buffer.alloc(12); f.write('FORM', 0); f.writeUInt32BE(4 + comm.length + ss.length + d.length, 4); f.write('AIFF', 8); return Buffer.concat([f, comm, ss, d]); };
+      const vocal = (body, h = IV) => fetch(BASE + '/api/invite/vocal', {method: 'POST', headers: {...h, 'content-type': 'application/octet-stream'}, body}).then(async (x) => ({status: x.status, t: await x.text()}));
+      /* un « téléphone » abonné aux notifications : il déchiffre chaque message (RFC 8291) */
+      const got = []; const PS = http.createServer((q, res) => { const ch = []; q.on('data', (d) => ch.push(d)); q.on('end', () => { got.push(Buffer.concat(ch)); res.writeHead(201); res.end(); }); }); await new Promise((z) => PS.listen(0, '127.0.0.1', z));
+      const ua = crypto.createECDH('prime256v1'); ua.generateKeys(); const auth = crypto.randomBytes(16), ep = 'http://127.0.0.1:' + PS.address().port + '/push/vocal';
+      const hm = (kk, d) => crypto.createHmac('sha256', kk).update(d).digest();
+      const ouvre = (b) => { const salt = b.subarray(0, 16), idl = b[20], asPub = b.subarray(21, 21 + idl), ct = b.subarray(21 + idl), ikm = hm(hm(auth, ua.computeSecret(asPub)), Buffer.concat([Buffer.from('WebPush: info\0'), ua.getPublicKey(), asPub, Buffer.from([1])])), prk = hm(salt, ikm);
+        const dc = crypto.createDecipheriv('aes-128-gcm', hm(prk, Buffer.from('Content-Encoding: aes128gcm\0\x01')).subarray(0, 16), hm(prk, Buffer.from('Content-Encoding: nonce\0\x01')).subarray(0, 12)); dc.setAuthTag(ct.subarray(ct.length - 16)); const pt = Buffer.concat([dc.update(ct.subarray(0, ct.length - 16)), dc.final()]); return JSON.parse(pt.subarray(0, pt.lastIndexOf(2)).toString()).notification; };
+      await G('/api/push/subscribe', {subscription: {endpoint: ep, keys: {p256dh: ua.getPublicKey().toString('base64url'), auth: auth.toString('base64url')}}});
+      const notes = () => got.map(ouvre), attends = (ms) => new Promise((z) => setTimeout(z, ms));
+      const n0 = FG.appends.length;
+      let v = await vocal(wav16('Acheter du pain'));
+      const ap = FG.appends[FG.appends.length - 1], rowP = 100 + FG.appends.length, rowA = rowP + 1;
+      /* Pilotage tel que les rappels le reliront : la 1re tâche « À faire », la 2e (à venir) déjà « Fait » */
+      const rows = Array.from({length: 120}, () => []); rows[0] = ['Ajoutée le', 'Tâche', 'Pour le', 'Statut', 'Remarque']; rows[rowP - 1] = ['22/11/2026', 'Acheter du pain', '', 'À faire', 'De Nour'];
+      rows[rowA - 1] = ['22/11/2026', 'quelle heure est-il', '', 'Fait', 'De Nour']; FG.sheet['Tâches!A1:E500'] = rows;
+      ok('vocal : sa voix est transcrite ; Siri (et le message « 🔔 » qu’elle lui envoie) disent « Message vocal envoyé : « … » »', v.status === 200 && v.t === 'Message vocal envoyé : « Acheter du pain ».', JSON.stringify(v));
+      ok('vocal : la tâche part dans Pilotage avec le texte entendu, « De Nour »', FG.appends.length === n0 + 1 && ap.values[0][1] === 'Acheter du pain' && ap.values[0][3] === 'À faire' && ap.values[0][4] === 'De Nour', JSON.stringify(ap));
+      let rc = await G('/api/invites/recues'); const r1 = rc.body.recues && rc.body.recues[0];
+      ok('vocal : JARVIS voit la tâche reçue (vocale, 6 rappels prévus)', rc.status === 200 && r1 && r1.nom === 'Nour' && r1.texte === 'Acheter du pain' && r1.vocal === true && r1.duree >= 0.9 && r1.rappel && r1.rappel.restants >= 5 && !r1.fait, JSON.stringify(rc.body).slice(0, 300));
+      const fv = path.join(DATA, 'invites', r1.id + '.wav'), mode = fs.existsSync(fv) ? (fs.statSync(fv).mode & 0o777) : 0;
+      const au = await fetch(BASE + '/api/invites/audio/' + r1.id, {headers: A}), aub = Buffer.from(await au.arrayBuffer()), auInv = await fetch(BASE + '/api/invites/audio/' + r1.id, {headers: IV});
+      ok('vocal : sa voix est gardée sur le serveur (fichier 600) et JARVIS la lit (WAV) ; sa clé à elle ne l’ouvre pas', mode === 0o600 && au.status === 200 && /audio\/wav/.test(au.headers.get('content-type')) && aub.toString('ascii', 0, 4) === 'RIFF' && auInv.status === 401, mode.toString(8) + ' ' + au.status + ' ' + auInv.status);
+      v = await vocal(aiff(true)); const v2 = await vocal(aiff(false)), v3 = await vocal(Buffer.from('FAUXM4A Appelle le pédiatre' + ' '.repeat(80))), v4 = await vocal(Buffer.from('ceci n’est pas du son, juste du texte qui dépasse soixante-quatre octets pour le banc'));
+      ok('vocal : l’AIFF de l’iPhone (44,1 kHz stéréo) est converti puis transcrit', v.status === 200 && v.t === 'Message vocal envoyé : « quelle heure est-il ».', JSON.stringify(v));
+      ok('vocal : rien de compris (silence) → la voix part quand même, « Message vocal de Nour »', v2.status === 200 && v2.t === 'Message vocal envoyé.' && FG.appends[FG.appends.length - 2].values[0][1] === 'Message vocal de Nour (1 s)', JSON.stringify(v2) + ' ' + JSON.stringify(FG.appends[FG.appends.length - 2]));
+      ok('vocal : le m4a de « Enregistrer de l’audio » passe par le convertisseur (PyAV sur le serveur)', v3.status === 200 && v3.t === 'Message vocal envoyé : « Appelle le pédiatre ».', JSON.stringify(v3));
+      ok('vocal : un fichier qui n’est pas du son → refusé (415), sans tâche', v4.status === 415 && /illisible/.test(v4.t), JSON.stringify(v4));
+      const fx = await vocal(wav16('Une tâche'), {authorization: 'Bearer faux'}); ok('vocal : une autre clé → refusée', fx.status === 401);
+      /* les rappels : la notification à l'arrivée, puis toutes les 0,7 s ici (5 min en vrai) ; « Fait » dans Pilotage les arrête */
+      await attends(1600);
+      const ns = notes(), arr = ns.filter((x) => x.tag === 'invite-' + r1.id), rap = ns.filter((x) => (x.tag || '').startsWith('invite-' + r1.id + '-'));
+      ok('rappels : notification à l’arrivée (« Message vocal de Nour »), qui ouvre la tâche dans JARVIS', arr.length === 1 && arr[0].title === 'Message vocal de Nour' && arr[0].body === 'Acheter du pain' && arr[0].navigate === '/#recue=' + r1.id, JSON.stringify(arr));
+      ok('rappels : puis « Rappel : message vocal de Nour », une étiquette par rappel (l’iPhone sonne à chaque fois)', rap.length >= 1 && rap[0].title === 'Rappel : message vocal de Nour' && /^Acheter du pain — envoyée il y a \d+ min$/.test(rap[0].body) && new Set(rap.map((x) => x.tag)).size === rap.length, JSON.stringify(rap.slice(0, 2)));
+      rc = await G('/api/invites/recues'); const rA = rc.body.recues.find((x) => x.texte === 'quelle heure est-il');
+      ok('rappels : « Fait » dans Pilotage → plus de rappel, JARVIS la voit faite', rA && rA.fait === true && rA.rappel === null && !ns.some((x) => (x.tag || '').startsWith('invite-' + rA.id + '-')), JSON.stringify(rA));
+      const pu = FG.calls.filter((x) => x.method === 'PUT').length;
+      const fa = await G('/api/invites/recues/' + r1.id, {action: 'fait'}), put = FG.calls.filter((x) => x.method === 'PUT').pop();
+      ok('« C’est fait » : statut « Fait » écrit dans Pilotage, sur sa ligne (vérifiée par le texte)', fa.status === 200 && fa.body.pilotage === true && FG.calls.filter((x) => x.method === 'PUT').length === pu + 1 && decodeURIComponent(put.path).endsWith('Tâches!D' + rowP) && put.body.values[0][0] === 'Fait', JSON.stringify(fa.body) + ' ' + (put && decodeURIComponent(put.path)));
+      await attends(300); const nAvant = notes().filter((x) => (x.tag || '').startsWith('invite-' + r1.id)).length; await attends(1000);
+      ok('« C’est fait » : les rappels s’arrêtent', notes().filter((x) => (x.tag || '').startsWith('invite-' + r1.id)).length === nAvant);
+      rc = await G('/api/invites/recues'); const r3 = rc.body.recues.find((x) => x.texte === 'Appelle le pédiatre');
+      const pl = await G('/api/invites/recues/' + r3.id, {action: 'plustard', minutes: 15}); rc = await G('/api/invites/recues'); const r3b = rc.body.recues.find((x) => x.id === r3.id);
+      ok('« Dans 15 min » : le rappel suivant attend 15 minutes, puis reprend (6 fois)', pl.status === 200 && r3b.rappel && Math.abs(r3b.rappel.prochain - Date.now() - 900000) < 5000 && r3b.rappel.restants === 6, JSON.stringify(r3b));
+      /* son automatisation (« message de Nour contenant 🔔 ») : la clé de son Raccourci joue le dernier message vocal */
+      const rk = (await G('/api/raccourci/cle', {})).body.cle, rv = await fetch(BASE + '/api/raccourci/vocal', {headers: {authorization: 'Bearer ' + rk}}), rvb = Buffer.from(await rv.arrayBuffer());
+      const rvInv = await fetch(BASE + '/api/raccourci/vocal', {headers: IV});
+      ok('Raccourci : son automatisation joue le dernier message vocal (WAV) ; la clé de Nour ne l’ouvre pas', rv.status === 200 && /audio\/wav/.test(rv.headers.get('content-type')) && rvb.toString('ascii', 0, 4) === 'RIFF' && rvInv.status === 401, rv.status + ' ' + rvInv.status);
+      const st = await fetch(BASE + '/api/invite/taches', {headers: IV}).then((x) => x.json());
+      ok('vocal : sa page sait que le serveur lit le m4a, et marque ses messages vocaux', st.m4a === true && st.taches.filter((x) => x.vocal).length === 4 && st.taches.some((x) => x.texte === 'quelle heure est-il' && x.statut === 'Fait'), JSON.stringify(st).slice(0, 300));
+      const off = await G('/api/invites/reglages', {rappels: false}); rc = await G('/api/invites/recues'); const li = await G('/api/invites');
+      ok('Réglages : rappels coupés → plus aucun rappel prévu', off.body.rappels === false && rc.body.recues.every((x) => x.rappel === null) && li.body.rappels === false && li.body.m4a === true, JSON.stringify(off.body));
+      await G('/api/invites/reglages', {rappels: true});
+      const del = await call('/api/invites/' + cr.body.id, {method: 'DELETE', headers: A}), au2 = await fetch(BASE + '/api/invites/audio/' + r1.id, {headers: A});
+      ok('accès retiré : ses messages vocaux sont effacés du serveur', del.status === 200 && au2.status === 404 && !fs.existsSync(fv));
+      await G('/api/push/unsubscribe', {endpoint: ep}); PS.close();
+      const pg = await fetch(BASE + '/invite/').then((x) => x.text()); ok('invité : sa page explique le message vocal (raccourci et bouton d’enregistrement)', /Message vocal/.test(pg) && /\/api\/invite\/vocal/.test(pg) && /Enregistrer de l’audio/.test(pg)); }
     r = await T('Google Calendar', 'list_events', {startTime: '2026-11-15T00:00:00', endTime: '2026-07-13T00:00:00', orderBy: 'startTime', pageSize: 250}); c = FG.calls.filter((x) => /\/events$/.test(x.path) && x.method === 'GET').pop();
     ok('Agenda list_events : heures de Paris (hiver +01:00, été +02:00), instances dépliées', r.body.payload.events[0].id === 'ev1' && c.q.timeMin === '2026-11-15T00:00:00+01:00' && c.q.timeMax === '2026-07-13T00:00:00+02:00' && c.q.singleEvents === 'true', c.q.timeMin + ' / ' + c.q.timeMax);
     r = await T('Google Calendar', 'create_event', {calendarId: 'pres@group.calendar.google.com', summary: 'Télétravail', allDay: true, startTime: '2026-11-18T00:00:00', endTime: '2026-11-19T00:00:00', availability: 'AVAILABILITY_FREE', useDefaultReminders: false});

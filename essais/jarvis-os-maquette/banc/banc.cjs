@@ -120,13 +120,13 @@ srv.listen(0, async () => {
       await p.goto(base + '#agenda'); await p.waitForTimeout(1500);
       const hit = await p.evaluate(() => { const t = document.querySelector('.tab[data-tab="espaces"]'), row = document.querySelector('.fav-row').getBoundingClientRect(), r = t.getBoundingClientRect(); const e = document.elementFromPoint(r.left + r.width / 2, row.top + 3); return {ok: !!(e && e.closest('.tab[data-tab="espaces"]')), h: Math.round(r.height)}; });
       ok('barre : un appui tout en haut de l’onglet compte (avant : 12 px morts au-dessus de chaque onglet)', hit.ok && hit.h >= 60, JSON.stringify(hit));
-      /* 0.64.0 : seul un second appui sur le MÊME onglet pendant sa transition est ignoré ; un autre onglet répond tout de suite */
+      /* 0.65.0 : seul un second appui sur le MÊME onglet pendant sa transition est ignoré ; un autre onglet répond tout de suite */
       await p.evaluate(() => { window.__g = 0; new MutationObserver((ms) => ms.forEach((m) => m.addedNodes.forEach((n) => { if (n.classList && n.classList.contains('ux-ghost')) window.__g++; }))).observe(document.body, {childList: true});
         document.querySelector('.tab[data-tab="espaces"]').click(); setTimeout(() => document.querySelector('.tab[data-tab="espaces"]').click(), 90); }); await p.waitForTimeout(1000);
       const deux = await p.evaluate(() => ({cur: (document.querySelector('.tab[aria-current="page"]') || {dataset: {}}).dataset.tab, g: window.__g}));
       await p.evaluate(() => { document.querySelector('.tab[data-tab="accueil"]').click(); setTimeout(() => document.querySelector('.tab[data-tab="agenda"]').click(), 120); }); await p.waitForTimeout(1000);
-      ok('barre : un second appui sur le même onglet pendant sa transition est ignoré ; un autre onglet touché aussitôt répond tout de suite (0.64.0)', deux.cur === 'espaces' && deux.g === 1 && await p.evaluate(() => (document.querySelector('.tab[aria-current="page"]') || {dataset: {}}).dataset.tab === 'agenda'), JSON.stringify(deux)); }
-    /* 0.64.0 (son retour : « au chargement, toujours du clignotement sur l'accueil ; les menus, Espaces, pas réactifs des fois ») */
+      ok('barre : un second appui sur le même onglet pendant sa transition est ignoré ; un autre onglet touché aussitôt répond tout de suite (0.65.0)', deux.cur === 'espaces' && deux.g === 1 && await p.evaluate(() => (document.querySelector('.tab[aria-current="page"]') || {dataset: {}}).dataset.tab === 'agenda'), JSON.stringify(deux)); }
+    /* 0.65.0 (son retour : « au chargement, toujours du clignotement sur l'accueil ; les menus, Espaces, pas réactifs des fois ») */
     { await p.goto(base + '#espaces'); await p.waitForTimeout(2000);
       ok('barre : hors de la zone qui défile (sur iPhone, un appui pendant que la page glisse ne sert plus seulement à l’arrêter)', await p.evaluate(() => document.getElementById('tabs').parentElement === document.body && !document.getElementById('scroller').contains(document.getElementById('tabs'))));
       /* doigt posé sur une tuile pendant que des données arrivent : la page n'est pas remplacée sous le doigt ; l'appui ouvre la tuile ; un seul rafraîchissement ensuite */

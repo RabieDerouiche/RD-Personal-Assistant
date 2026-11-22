@@ -8,7 +8,9 @@
 <meta name="apple-mobile-web-app-title" content="Tâches">
 <title>Envoyer une tâche</title>
 <!-- JARVIS OS 0.62.0 (son choix du 22/11/2026) : la page d'un proche invité. Sa clé (dans le lien d'invitation, puis gardée dans ce
-     téléphone) n'ouvre que deux adresses du serveur : ajouter une tâche, voir le statut des siennes. Rien d'autre de JARVIS n'est lisible ici. -->
+     téléphone) n'ouvre que trois adresses du serveur : ajouter une tâche, envoyer un message vocal (0.64.0), voir le statut des siennes.
+     Rien d'autre de JARVIS n'est lisible ici. 0.64.0 (ses choix du 22/11/2026) : « sa propre voix » ; il l'entend dès qu'il ouvre JARVIS,
+     une notification part, puis un rappel toutes les 5 minutes jusqu'à « C'est fait ». -->
 <style>
   :root { --bg: #f5f6fa; --carte: #ffffff; --texte: #141826; --doux: #5b6478; --ligne: #e2e5ee; --accent: #2f6fed; --ok: #1f9d55; --attente: #b7791f; --rayon: 16px; color-scheme: light dark; }
   @media (prefers-color-scheme: dark) { :root { --bg: #0b1020; --carte: #141a2e; --texte: #e8eefc; --doux: #9fb0d0; --ligne: #26304d; --accent: #7cc4ff; --ok: #4ade80; --attente: #fbbf24; } }
@@ -28,9 +30,12 @@
   button.discret { background: transparent; color: var(--accent); border: 1px solid var(--ligne); padding: 10px 14px; font-size: 15px; }
   .msg { min-height: 1.4em; margin: 10px 0 0; }
   .msg.erreur { color: #d64545; }
+  [hidden] { display: none !important; }
   ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
-  li { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; border-bottom: 1px solid var(--ligne); padding: 8px 0; }
-  li:last-child { border-bottom: 0; }
+  /* 0.64.0 : la mise en ligne de la liste des tâches ne vaut que pour elle (elle coupait en colonnes les étapes du raccourci, et montrait une étape cachée) */
+  #liste li { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; border-bottom: 1px solid var(--ligne); padding: 8px 0; }
+  #liste li:last-child { border-bottom: 0; }
+  ol li { line-height: 1.5; }
   .t { overflow-wrap: anywhere; }
   .t small { display: block; color: var(--doux); }
   .statut { white-space: nowrap; font-size: 14px; font-weight: 600; color: var(--attente); }
@@ -39,6 +44,11 @@
   ol { padding-left: 20px; margin: 10px 0 0; display: grid; gap: 8px; }
   code { font: 13px ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--bg); border: 1px solid var(--ligne); border-radius: 8px; padding: 2px 6px; overflow-wrap: anywhere; }
   .vide { color: var(--doux); margin: 0; }
+  .micro { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .micro button.enr { background: #d64545; color: #fff; }
+  .chrono { font-variant-numeric: tabular-nums; color: var(--doux); }
+  .chrono.actif { color: #d64545; font-weight: 600; }
+  h2 { font-size: 18px; margin: 0 0 8px; }
 </style>
 </head>
 <body>
@@ -53,10 +63,16 @@
       <p class="msg" id="msg" role="status"></p>
     </form>
   </section>
-  <section class="carte" id="liste-c" hidden><h2 style="font-size:18px;margin:0 0 8px">Tes tâches envoyées</h2><ul id="liste"></ul><p class="vide" id="vide" hidden>Rien d’envoyé pour l’instant.</p></section>
+  <section class="carte" id="vocal" hidden>
+    <h2>Message vocal</h2>
+    <p class="sous" style="margin:0 0 10px">Il l’entend avec ta voix dès qu’il ouvre JARVIS ; une notification part, puis un rappel toutes les 5 minutes jusqu’à ce que ce soit fait.</p>
+    <div class="micro"><button type="button" id="enr">🎤 Enregistrer</button><button type="button" class="discret" id="annuler" hidden>Annuler</button><span class="chrono" id="chrono"></span></div>
+    <p class="msg" id="msg3" role="status"></p>
+  </section>
+  <section class="carte" id="liste-c" hidden><h2>Tes tâches envoyées</h2><ul id="liste"></ul><p class="vide" id="vide" hidden>Rien d’envoyé pour l’instant.</p></section>
   <section class="carte" id="siri" hidden>
     <details>
-      <summary>Avec Siri : « Dis Siri, <span id="phrase">tâche pour lui</span> »</summary>
+      <summary>Tâche écrite avec Siri : « Dis Siri, <span id="phrase">tâche pour lui</span> »</summary>
       <p class="sous" style="margin-top:8px">Une fois, dans l’app Raccourcis de ton iPhone (noms des menus devinés, ils peuvent varier un peu) :</p>
       <ol>
         <li>Touche « + », puis nomme le raccourci « <b id="nomrac">Tâche pour lui</b> » : c’est la phrase à dire à Siri.</li>
@@ -67,6 +83,23 @@
         <li>Essaie : « Dis Siri, <span id="phrase2">tâche pour lui</span> », puis dicte la tâche (« … pour demain » met la date).</li>
       </ol>
       <p class="msg" id="msg2" role="status"></p>
+    </details>
+  </section>
+  <section class="carte" id="siri-vocal" hidden>
+    <details>
+      <summary>Message vocal avec Siri : « Dis Siri, <span id="vphrase">message pour lui</span> »</summary>
+      <p class="sous" style="margin-top:8px">Une fois, dans l’app Raccourcis (noms des menus devinés, ils peuvent varier un peu) :</p>
+      <ol>
+        <li>Touche « + », puis nomme le raccourci « <b id="vnomrac">Message pour lui</b> ».</li>
+        <li>Ajoute « Enregistrer de l’audio » ; touche la flèche : « Commencer l’enregistrement » = <b>Immédiatement</b> (tu touches l’écran pour arrêter).</li>
+        <li id="v-encoder" hidden>Ajoute « Encoder le média » : active <b>Audio seulement</b>, format <b>AIFF</b> (ton serveur ne lit pas encore le son de l’iPhone tel quel).</li>
+        <li>Ajoute « Obtenir le contenu de l’URL », avec l’adresse <code id="vurl"></code> <button class="discret" type="button" data-copie="vurl">Copier</button></li>
+        <li>Touche la flèche de cette action : méthode <b>POST</b> ; en-tête <b>Authorization</b> = <code id="vcle">Bearer …</code> <button class="discret" type="button" data-copie="cle">Copier</button> ; corps de la requête <b>Fichier</b> = « <span id="vfichier">Audio enregistré</span> ».</li>
+        <li>Ajoute « Énoncer le texte » avec « Contenu de l’URL » : Siri te dira « Message vocal envoyé ».</li>
+        <li>Ajoute « Envoyer un message » : à <b id="vdest">lui</b>, message = « 🔔 » suivi de « Contenu de l’URL » ; touche la flèche et désactive « Afficher lors de l’exécution ». C’est la sonnette : son iPhone joue ta voix même quand JARVIS est fermé.</li>
+        <li>Essaie : « Dis Siri, <span id="vphrase2">message pour lui</span> », parle, puis touche l’écran.</li>
+      </ol>
+      <p class="msg" id="msg4" role="status"></p>
     </details>
   </section>
 </main>
@@ -80,13 +113,14 @@
   if (h.get('cle')) { ecrire('jarvis.invite.cle', h.get('cle')); if (h.get('pour')) ecrire('jarvis.invite.pour', h.get('pour')); history.replaceState(null, '', location.pathname); }
   const cle = lire('jarvis.invite.cle'), pour = lire('jarvis.invite.pour');
   if (!cle) { $('sans-cle').hidden = false; return; }
-  ['envoi', 'liste-c', 'siri'].forEach((id) => { $(id).hidden = false; });
-  if (pour) { $('titre').textContent = 'Une tâche pour ' + pour; ['phrase', 'phrase2'].forEach((id) => { $(id).textContent = 'tâche pour ' + pour; }); $('nomrac').textContent = 'Tâche pour ' + pour; }
-  const url = location.origin + '/api/invite/tache';
-  $('url').textContent = url; $('cle').textContent = 'Bearer ' + cle;
+  ['envoi', 'vocal', 'liste-c', 'siri', 'siri-vocal'].forEach((id) => { $(id).hidden = false; });
+  if (pour) { $('titre').textContent = 'Une tâche pour ' + pour; ['phrase', 'phrase2'].forEach((id) => { $(id).textContent = 'tâche pour ' + pour; }); $('nomrac').textContent = 'Tâche pour ' + pour;
+    ['vphrase', 'vphrase2'].forEach((id) => { $(id).textContent = 'message pour ' + pour; }); $('vnomrac').textContent = 'Message pour ' + pour; $('vdest').textContent = pour; }
+  const url = location.origin + '/api/invite/tache', vurl = location.origin + '/api/invite/vocal';
+  $('url').textContent = url; $('vurl').textContent = vurl; $('cle').textContent = 'Bearer ' + cle; $('vcle').textContent = 'Bearer ' + cle;
   document.querySelectorAll('[data-copie]').forEach((b) => b.addEventListener('click', async () => {
-    const v = b.dataset.copie === 'url' ? url : 'Bearer ' + cle;
-    try { await navigator.clipboard.writeText(v); $('msg2').textContent = 'Copié.'; } catch (e) { $('msg2').textContent = 'Copie impossible : sélectionne le texte et copie-le.'; }
+    const v = b.dataset.copie === 'url' ? url : b.dataset.copie === 'vurl' ? vurl : 'Bearer ' + cle, out = b.closest('#siri-vocal') ? $('msg4') : $('msg2');
+    try { await navigator.clipboard.writeText(v); out.textContent = 'Copié.'; } catch (e) { out.textContent = 'Copie impossible : sélectionne le texte et copie-le.'; }
   }));
   const hdr = {'content-type': 'application/json', authorization: 'Bearer ' + cle};
   const jour = (iso) => new Date(iso + 'T12:00:00').toLocaleDateString('fr-FR', {weekday: 'short', day: 'numeric', month: 'short'});
@@ -95,8 +129,10 @@
       const r = await fetch('/api/invite/taches', {headers: hdr});
       if (r.status === 401) { $('msg').textContent = 'Ton invitation a été retirée : demande-en une nouvelle.'; $('msg').classList.add('erreur'); return; }
       const j = await r.json(), l = (j && j.taches) || [];
+      /* 0.64.0 : le serveur ne lit pas le son de l'iPhone tel quel → une étape de plus dans le raccourci (AIFF) */
+      if (j && j.m4a === false) { $('v-encoder').hidden = false; $('vfichier').textContent = 'Média encodé'; }
       $('liste').replaceChildren(...l.map((x) => { const li = document.createElement('li'), t = document.createElement('span'), s = document.createElement('span');
-        t.className = 't'; t.textContent = x.texte; const sm = document.createElement('small'); sm.textContent = 'envoyée le ' + new Date(x.at).toLocaleDateString('fr-FR', {day: 'numeric', month: 'short'}) + (x.pour ? ' · pour ' + jour(x.pour) : ''); t.append(sm);
+        t.className = 't'; t.textContent = (x.vocal ? '🎤 ' : '') + x.texte; const sm = document.createElement('small'); sm.textContent = 'envoyée le ' + new Date(x.at).toLocaleDateString('fr-FR', {day: 'numeric', month: 'short'}) + (x.pour ? ' · pour ' + jour(x.pour) : ''); t.append(sm);
         const fait = /^fait/i.test(x.statut); s.className = 'statut' + (fait ? ' fait' : ''); s.textContent = fait ? 'Faite ✓' : x.statut; li.append(t, s); return li; }));
       $('vide').hidden = l.length > 0;
     } catch (e) { $('msg').textContent = 'Le serveur ne répond pas : réessaie dans un moment.'; }
@@ -111,6 +147,45 @@
       if (r.ok) { $('texte').value = ''; $('pour').value = ''; charger(); }
     } catch (err) { $('msg').textContent = 'Le serveur ne répond pas : réessaie dans un moment.'; $('msg').classList.add('erreur'); }
   });
+  /* 0.64.0 : le message vocal depuis cette page : le micro, enregistré en WAV 16 kHz (ce que l'écoute du serveur lit), 90 secondes au plus */
+  const REC = {flux: null, ctx: null, src: null, proc: null, morceaux: [], t0: 0, minuteur: 0};
+  const chrono = (on) => { const c = $('chrono'); c.classList.toggle('actif', on); if (!on) { clearInterval(REC.minuteur); c.textContent = ''; return; }
+    const maj = () => { const s = Math.floor((Date.now() - REC.t0) / 1000); c.textContent = '● ' + Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); if (s >= 90) finir(true); }; maj(); REC.minuteur = setInterval(maj, 250); };
+  function arreter() {
+    try { REC.proc && REC.proc.disconnect(); REC.src && REC.src.disconnect(); } catch (e) { /* rien */ }
+    try { REC.flux && REC.flux.getTracks().forEach((t) => t.stop()); } catch (e) { /* rien */ }
+    const fr = REC.ctx ? REC.ctx.sampleRate : 48000; try { REC.ctx && REC.ctx.close(); } catch (e) { /* rien */ }
+    REC.flux = REC.ctx = REC.src = REC.proc = null; chrono(false); $('enr').textContent = '🎤 Enregistrer'; $('enr').classList.remove('enr'); $('annuler').hidden = true; return fr;
+  }
+  function versWav(morceaux, fr) {   /* un canal, rééchantillonné à 16 kHz, 16 bits */
+    const total = morceaux.reduce((n, m) => n + m.length, 0), x = new Float32Array(total); let o = 0; for (const m of morceaux) { x.set(m, o); o += m.length; }
+    const n = Math.min(Math.floor(total * 16000 / fr), 16000 * 90), r = fr / 16000, v = new DataView(new ArrayBuffer(44 + n * 2)), txt = (k, t) => { for (let i = 0; i < t.length; i++) v.setUint8(k + i, t.charCodeAt(i)); };
+    txt(0, 'RIFF'); v.setUint32(4, 36 + n * 2, true); txt(8, 'WAVEfmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true); v.setUint32(24, 16000, true); v.setUint32(28, 32000, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true); txt(36, 'data'); v.setUint32(40, n * 2, true);
+    for (let i = 0; i < n; i++) { const p = i * r, k = Math.floor(p), f = p - k, s = (x[k] || 0) * (1 - f) + (x[k + 1] || 0) * f; v.setInt16(44 + i * 2, Math.max(-32768, Math.min(32767, Math.round(s * 32767))), true); }
+    return new Blob([v.buffer], {type: 'audio/wav'});
+  }
+  async function finir(envoyer) {
+    if (!REC.ctx) return; const fr = arreter(), morceaux = REC.morceaux; REC.morceaux = [];
+    if (!envoyer) { $('msg3').textContent = 'Annulé.'; return; }
+    const duree = morceaux.reduce((n, m) => n + m.length, 0) / fr; if (duree < 0.6) { $('msg3').textContent = 'Trop court : parle un peu plus longtemps avant de toucher « Envoyer ».'; return; }
+    $('msg3').classList.remove('erreur'); $('msg3').textContent = 'Envoi…';
+    try { const r = await fetch('/api/invite/vocal', {method: 'POST', headers: {authorization: 'Bearer ' + cle, 'content-type': 'audio/wav'}, body: versWav(morceaux, fr)});
+      $('msg3').textContent = await r.text(); $('msg3').classList.toggle('erreur', !r.ok); if (r.ok) charger();
+    } catch (e) { $('msg3').textContent = 'Le serveur ne répond pas : réessaie dans un moment.'; $('msg3').classList.add('erreur'); }
+  }
+  $('enr').addEventListener('click', async () => {
+    if (REC.ctx) { finir(true); return; }
+    $('msg3').classList.remove('erreur'); $('msg3').textContent = '';
+    try {
+      REC.flux = await navigator.mediaDevices.getUserMedia({audio: {echoCancellation: true, noiseSuppression: true, autoGainControl: true}});
+      const AC = window.AudioContext || window.webkitAudioContext; REC.ctx = new AC(); if (REC.ctx.state === 'suspended') await REC.ctx.resume();
+      REC.src = REC.ctx.createMediaStreamSource(REC.flux); REC.proc = REC.ctx.createScriptProcessor(4096, 1, 1); REC.morceaux = [];
+      REC.proc.onaudioprocess = (e) => { REC.morceaux.push(new Float32Array(e.inputBuffer.getChannelData(0))); };
+      REC.src.connect(REC.proc); REC.proc.connect(REC.ctx.destination);
+      REC.t0 = Date.now(); chrono(true); $('enr').textContent = '■ Envoyer'; $('enr').classList.add('enr'); $('annuler').hidden = false;
+    } catch (e) { arreter(); $('msg3').textContent = 'Micro refusé : autorise-le pour cette page (Réglages de l’iPhone, Safari, Micro), puis réessaie.'; $('msg3').classList.add('erreur'); }
+  });
+  $('annuler').addEventListener('click', () => finir(false));
   charger();
 })();
 </script>

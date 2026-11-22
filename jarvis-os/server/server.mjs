@@ -26,9 +26,10 @@ import {createFlux, SECOURS} from './flux.mjs';
 import {createActivite, outilNom} from './activite.mjs';
 import {createRadar} from './radar.mjs';
 import {pique, PERSO_ORAL} from './humour.mjs';   /* 21/11/2026 : sa personnalité à l'oral (« sarcastique assumé ») */
+import {createAudio} from './audio.mjs';   /* 0.64.0 : le message vocal d'un proche, mis au format de l'écoute */
 const ACT = createActivite();   /* 0.33.0 : ce que fait Claude à l'instant */
 
-const VERSION = '0.64.0';
+const VERSION = '0.65.0';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PORT = +(process.env.PORT || 8787);
 const HOST = process.env.HOST || '127.0.0.1';
@@ -140,12 +141,67 @@ async function ecrireTacheInvitee(tc) {   /* dans Pilotage, onglet Tâches : la 
   } catch (e) { console.log('invité : tâche pas encore écrite (' + String(e.message || e).slice(0, 120) + ')'); return false; }
 }
 let tachesCache = {at: 0, rows: null};
+const TACHES_CACHE_MS = Number(process.env.JARVIS_TACHES_CACHE_MS ?? 30000);   /* 0 au banc : un « Fait » écrit dans Pilotage est vu au rappel suivant */
 async function tachesPilotage() {
-  if (tachesCache.rows && now() - tachesCache.at < 30000) return tachesCache.rows;
+  if (tachesCache.rows && now() - tachesCache.at < TACHES_CACHE_MS) return tachesCache.rows;
   const r = await GG.tool('Google Sheets', 'get_values', {spreadsheetId: PILOTAGE, range: 'Tâches!A1:E500'}); tachesCache = {at: now(), rows: (r && r.values) || []}; return tachesCache.rows;
 }
-/* une tâche pas encore écrite (Google pas relié, panne) : réessayée toutes les 5 minutes pendant 7 jours */
-setInterval(() => { for (const tc of (S.invTaches || []).filter((x) => x.row === null && now() - x.at < 7 * 864e5)) ecrireTacheInvitee(tc).catch(() => {}); }, 300000).unref();
+/* une tâche pas encore écrite (Google pas relié, panne) : réessayée toutes les 5 minutes pendant 7 jours ; un message vocal est effacé au bout de 7 jours */
+const VOCAUX = path.join(DATA, 'invites');
+setInterval(() => {
+  for (const tc of (S.invTaches || []).filter((x) => x.row === null && now() - x.at < 7 * 864e5)) ecrireTacheInvitee(tc).catch(() => {});
+  let chg = false; for (const tc of (S.invTaches || []).filter((x) => x.vocal && now() - x.at > 7 * 864e5)) { fs.rm(path.join(VOCAUX, tc.id + '.wav'), {force: true}, () => {}); delete tc.vocal; tc.vocalEfface = true; chg = true; }
+  if (chg) save();
+}, 300000).unref();
+
+/* ---------- 0.64.0 (ses choix du 22/11/2026) : le message vocal de sa femme (« sa propre voix »), lu à voix haute quand JARVIS est ouvert,
+   et les rappels : « les tâches pour moi sont plus urgentes, c'est à faire dans la minute ou dans les 5-10 minutes ». Une tâche sans date
+   (ou pour aujourd'hui) est rappelée toutes les 5 minutes, 6 fois au plus (30 minutes), la nuit aussi (son choix), jusqu'à « C'est fait » :
+   dans JARVIS, ou « Fait » dans Pilotage (relu avant chaque rappel). « Dans 5 min », « Dans 15 min » : le rappel suivant attend, puis reprend. ---------- */
+const RAPPEL_MS = Number(process.env.JARVIS_RAPPEL_MS) || 300000, RAPPEL_FOIS = 6;
+const estFait = (st) => /^fait/i.test(String(st || '').trim());
+/* la ligne de Pilotage de cette tâche (le numéro noté à l'écriture, vérifié par le texte ; sinon cherchée par texte et « De <prénom> ») */
+function ligneDe(tc, rows, inv) {
+  const r = tc.row ? rows[tc.row - 1] : null; if (r && String(r[1] || '').trim() === tc.texte) return tc.row;
+  const i = rows.findIndex((x) => String(x[1] || '').trim() === tc.texte && String(x[4] || '') === 'De ' + (inv ? inv.nom : '')); return i >= 0 ? i + 1 : 0;
+}
+function statutDe(tc, rows, inv) {
+  if (tc.fait) return 'Fait';
+  const l = ligneDe(tc, rows, inv); if (l) return String(rows[l - 1][3] || 'À faire');
+  return tc.row === null ? 'Pas encore arrivée' : 'À faire';
+}
+const urgente = (pour) => !pour || pour <= paris(new Date(now())).ymd;
+function nouvelleTacheInvitee(inv, texte, pour, extra = {}) {
+  const tc = {id: crypto.randomBytes(6).toString('hex'), inv: inv.id, texte, ...(pour ? {pour} : {}), at: now(), row: null, ...extra};
+  if (urgente(pour) && S.invRappels !== false) tc.rappel = {restants: RAPPEL_FOIS, prochain: now() + RAPPEL_MS, n: 0};
+  S.invTaches = [...(S.invTaches || []), tc].slice(-300); save();
+  return tc;
+}
+/* la notification : à l'arrivée, puis à chaque rappel (une étiquette par envoi : l'iPhone sonne à chaque fois) ; elle ouvre la tâche dans JARVIS */
+function pousserInvitee(tc, inv) {
+  if (!(S.push && S.push.subs.length)) return;
+  const n = tc.rappel ? tc.rappel.n : 0, min = Math.max(1, Math.round((now() - tc.at) / 60000)), pour = tc.pour ? ' (' + pourQuand(tc.pour) + ')' : '';
+  PUSH.send({title: (n ? 'Rappel : ' + (tc.vocal ? 'message vocal de ' : 'tâche de ') : tc.vocal ? 'Message vocal de ' : 'Tâche de ') + inv.nom, body: tc.texte + pour + (n ? ' — envoyée il y a ' + min + ' min' : ''), url: '/#recue=' + tc.id, tag: 'invite-' + tc.id + (n ? '-' + n : '')}, {urgency: 'high'}).catch(() => {});
+}
+let rappelsEnCours = false;   /* une relecture lente de Pilotage ne doit pas faire partir deux fois le même rappel */
+async function rappelsInvites() {
+  if (rappelsEnCours) return; rappelsEnCours = true;
+  try { await rappelsDus(); } finally { rappelsEnCours = false; }
+}
+async function rappelsDus() {
+  const dus = (S.invTaches || []).filter((x) => x.rappel && !x.fait && x.rappel.restants > 0 && x.rappel.prochain <= now());
+  if (!dus.length) return;
+  let rows = null; try { if (GG.status('').linked) rows = await tachesPilotage(); } catch { rows = null; }
+  for (const tc of dus) {
+    const inv = (S.invites || []).find((x) => x.id === tc.inv); if (!inv || S.invRappels === false) { delete tc.rappel; continue; }
+    if (rows && estFait(statutDe(tc, rows, inv))) { tc.fait = now(); delete tc.rappel; continue; }
+    tc.rappel.restants--; tc.rappel.n++; tc.rappel.prochain = now() + RAPPEL_MS;
+    pousserInvitee(tc, inv);
+    if (tc.rappel.restants <= 0) tc.rappel.fini = now();
+  }
+  save();
+}
+setInterval(() => { rappelsInvites().catch(() => {}); }, Number(process.env.JARVIS_RAPPEL_TICK_MS) || 30000).unref();
 
 /* ---------- Claude Code ---------- */
 const childEnv = () => { const e = {...process.env}; for (const k of PAID_ENV) delete e[k]; return e; };
@@ -1075,6 +1131,7 @@ const rangeTick = setInterval(() => {
 /* ---------- 0.22.0 : la voix refaite (voix.mjs) — écoute Whisper, réponses instantanées, Haiku pour le reste ---------- */
 const WHISPER_DIR = process.env.JARVIS_WHISPER_DIR || path.join(os.homedir(), 'whisper');
 const ECOUTE = createEcoute({dir: WHISPER_DIR, py: path.join(WHISPER_DIR, 'venv', 'bin', 'python'), helper: path.join(HERE, 'stt', 'whisper_helper.py'), parakeetHelper: path.join(HERE, 'stt', 'parakeet_helper.py'), model: process.env.JARVIS_WHISPER_MODEL || 'small', fakeHelper: process.env.JARVIS_STT_HELPER || '', log: (t) => { S.ecouteErr = {at: now(), t: String(t).slice(0, 300)}; }});
+const AUDIO = createAudio({py: process.env.JARVIS_AUDIO_PY || path.join(WHISPER_DIR, 'venv', 'bin', 'python'), helper: process.env.JARVIS_AUDIO_HELPER || path.join(HERE, 'stt', 'audio_helper.py'), ffmpeg: process.env.JARVIS_FFMPEG ?? 'ffmpeg', tmp: path.join(DATA, 'stt')});   /* 0.64.0 : le message vocal d'un proche */
 let ECOUTE_INSTALL = {state: 'idle', at: 0, tail: ''};
 /* 0.36.0 : la fin de phrase reconnue à la voix (Smart Turn), installée avec l'écoute */
 const TOUR = createTour({dir: WHISPER_DIR, py: path.join(WHISPER_DIR, 'venv', 'bin', 'python'), helper: path.join(HERE, 'stt', 'tour_helper.py'), fakeHelper: process.env.JARVIS_TOUR_HELPER || '', log: (t) => { S.tourErr = {at: now(), t: String(t).slice(0, 300)}; }});
@@ -1399,6 +1456,15 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/health') return json(res, 200, {ok: true, version: VERSION, commit, paired: S.tokens.length > 0});
     if (p === '/api/pair' && req.method === 'POST') { const b = await readBody(req); const r = pair(b.code, b.device); return json(res, r.status, r.body); }
     /* retour de Google après « Connecter Google » : protégé par l'état à usage unique, pas par le jeton de l'appareil */
+    /* 0.64.0 : son automatisation de l'iPhone (« quand je reçois un message de … contenant 🔔 ») joue le dernier message vocal reçu (moins de 15 minutes),
+       avec la clé de son Raccourci : « Obtenir le contenu de l'URL », puis « Lire le son » ; JARVIS fermé, il entend sa voix */
+    if (p === '/api/raccourci/vocal' && req.method === 'GET') {
+      if (!racOk(req) && !authed(req)) { res.writeHead(401, {'content-type': 'text/plain; charset=utf-8'}); res.end('Clé du Raccourci refusée : recrée-la dans JARVIS, Réglages, Siri et bouton Action.'); return; }
+      const tc = (S.invTaches || []).filter((x) => x.vocal && now() - x.at < 15 * 60000).pop(), f = tc && path.join(VOCAUX, tc.id + '.wav');
+      if (!f || !fs.existsSync(f)) { res.writeHead(404, {'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store'}); res.end('Aucun message vocal depuis 15 minutes.'); return; }
+      tc.ecoute = tc.ecoute || now(); save();
+      res.writeHead(200, {'content-type': 'audio/wav', 'content-length': fs.statSync(f).size, 'content-disposition': 'inline; filename="message-vocal.wav"', 'cache-control': 'no-store'}); fs.createReadStream(f).pipe(res); return;
+    }
     /* Raccourcis de l'iPhone : leur propre clé (POST /api/raccourci/cle depuis Réglages), qui n'ouvre que cette adresse ; réponse en texte, à lire à voix haute */
     if (p === '/api/raccourci' && req.method === 'POST') {
       const say = (st, t) => { res.writeHead(st, {'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store'}); res.end(t); };
@@ -1428,26 +1494,44 @@ const server = http.createServer(async (req, res) => {
       return say(r.ok ? 200 : 502, r.ok ? relancesDuTexte(r.text, 'siri').text : r.error);   /* « rappelle-moi… » : la relance est notée, la ligne technique n'est pas lue */
     }
     /* 0.62.0 : les adresses de l'invitée, avec sa propre clé ; la réponse d'un ajout est une phrase, lue par Siri */
-    if (p === '/api/invite/tache' && req.method === 'POST') {
+    if ((p === '/api/invite/tache' || p === '/api/invite/vocal') && req.method === 'POST') {
       const say = (st, x) => { res.writeHead(st, {'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store'}); res.end(x); };
-      const inv = inviteDe(req); if (!inv) return say(401, 'Clé refusée : demande une nouvelle invitation.');
-      const b = await readBody(req).catch(() => ({})), texte = String((b && (b.texte || b.text)) || '').replace(/[\u0000-\u001f\u007f]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 200);
-      if (texte.length < 2) return say(400, "Je n'ai rien entendu : redis ta tâche.");
-      inv.recents = (inv.recents || []).filter((x) => now() - x < 3600000); if (inv.recents.length >= 30) return say(429, 'Trop de tâches en une heure : réessaie plus tard.');
+      const inv = inviteDe(req); if (!inv) { req.resume(); return say(401, 'Clé refusée : demande une nouvelle invitation.'); }
+      inv.recents = (inv.recents || []).filter((x) => now() - x < 3600000); if (inv.recents.length >= 30) { req.resume(); return say(429, 'Trop de tâches en une heure : réessaie plus tard.'); }
+      let texte = '', pour = null, extra = {}, son = null;
+      if (p === '/api/invite/vocal') {
+        /* 0.64.0 : sa voix (le fichier du raccourci « Enregistrer de l'audio », ou de sa page) → WAV 16 kHz gardé ici, puis transcrit pour le texte */
+        const raw = await readRaw(req, 25e6); if (!raw || raw.length < 64) return say(raw ? 400 : 413, raw ? "Je n'ai rien reçu : réessaie." : 'Message trop long : 90 secondes au plus.');
+        const a = await AUDIO.versWav16k(raw);
+        if (!a) return say(415, (await AUDIO.m4a()) ? 'Son illisible : réenregistre ton message.' : 'Le serveur ne lit pas ce format : dans ton raccourci, ajoute « Encoder le média » (audio seulement, AIFF) juste avant l’envoi.');
+        if (a.duree < 0.4) return say(400, 'Message trop court : réessaie.');
+        son = a.wav; extra = {vocal: true, duree: Math.round(a.duree * 10) / 10};
+        if (ECOUTE.ready()) { const t = await Promise.race([ECOUTE.transcribe(a.wav, path.join(DATA, 'stt')), new Promise((z) => setTimeout(() => z({ok: false}), 25000))]); if (t.ok) { texte = String(t.text || '').replace(/[\u0000-\u001f\u007f]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 200); S.usage.stt = (S.usage.stt || 0) + 1; } }
+        if (texte.length < 2) texte = 'Message vocal de ' + inv.nom + ' (' + Math.max(1, Math.round(a.duree)) + ' s)'; else extra.transcrit = true;
+        pour = datePour(extra.transcrit ? texte : '');
+      } else {
+        const b = await readBody(req).catch(() => ({})); texte = String((b && (b.texte || b.text)) || '').replace(/[\u0000-\u001f\u007f]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 200);
+        if (texte.length < 2) return say(400, "Je n'ai rien entendu : redis ta tâche.");
+        pour = /^\d{4}-\d{2}-\d{2}$/.test(String(b.pour || '')) ? String(b.pour) : datePour(texte);
+      }
       inv.recents.push(now()); inv.uses = (inv.uses || 0) + 1; inv.last = now();
-      const pour = /^\d{4}-\d{2}-\d{2}$/.test(String(b.pour || '')) ? String(b.pour) : datePour(texte);
-      const tc = {id: crypto.randomBytes(6).toString('hex'), inv: inv.id, texte, ...(pour ? {pour} : {}), at: now(), row: null};
-      S.invTaches = [...(S.invTaches || []), tc].slice(-300); save();
+      const tc = nouvelleTacheInvitee(inv, texte, pour, extra);
+      if (son) {
+        fs.mkdirSync(VOCAUX, {recursive: true, mode: 0o700}); fs.writeFileSync(path.join(VOCAUX, tc.id + '.wav'), son, {mode: 0o600});
+        /* 50 messages vocaux gardés au plus (3 Mo chacun au plus) : une clé perdue ne remplit pas le disque */
+        const vs = (S.invTaches || []).filter((x) => x.vocal); for (const old of vs.slice(0, Math.max(0, vs.length - 50))) { fs.rm(path.join(VOCAUX, old.id + '.wav'), {force: true}, () => {}); delete old.vocal; old.vocalEfface = true; }
+        save();
+      }
       await ecrireTacheInvitee(tc); tachesCache.at = 0;
-      if (S.push && S.push.subs.length) PUSH.send({title: 'Tâche de ' + inv.nom, body: texte + (pour ? ' (' + pourQuand(pour) + ')' : ''), url: '/#taches', tag: 'invite-' + tc.id}).catch(() => {});
-      return say(200, 'C’est noté : « ' + texte + ' »' + (pour ? ', ' + pourQuand(pour) : '') + '.');
+      pousserInvitee(tc, inv);
+      const quand = pour ? ', ' + pourQuand(pour) : '';
+      /* la même phrase sert à Siri (lue à elle) et au message qu'elle lui envoie ensuite (« 🔔 » + cette phrase) */
+      return say(200, extra.vocal ? (extra.transcrit ? 'Message vocal envoyé : « ' + texte + ' »' + quand + '.' : 'Message vocal envoyé.') : 'C’est noté : « ' + texte + ' »' + quand + '.');
     }
     if (p === '/api/invite/taches' && req.method === 'GET') {
       const inv = inviteDe(req); if (!inv) return json(res, 401, {error: 'Clé refusée : demande une nouvelle invitation.'});
       let rows = []; try { if (GG.status('').linked) rows = await tachesPilotage(); } catch { rows = []; }
-      const statut = (tc) => { const r = tc.row ? rows[tc.row - 1] : null; if (r && String(r[1] || '').trim() === tc.texte) return String(r[3] || 'À faire');
-        const f = rows.find((x) => String(x[1] || '').trim() === tc.texte && String(x[4] || '') === 'De ' + inv.nom); return f ? String(f[3] || 'À faire') : tc.row === null ? 'Pas encore arrivée' : 'À faire'; };
-      return json(res, 200, {nom: inv.nom, taches: (S.invTaches || []).filter((x) => x.inv === inv.id).slice(-30).reverse().map((x) => ({texte: x.texte, pour: x.pour || '', at: x.at, statut: statut(x)}))});
+      return json(res, 200, {nom: inv.nom, m4a: await AUDIO.m4a(), taches: (S.invTaches || []).filter((x) => x.inv === inv.id).slice(-30).reverse().map((x) => ({texte: x.texte, pour: x.pour || '', at: x.at, statut: statutDe(x, rows, inv), ...(x.vocal || x.vocalEfface ? {vocal: true} : {})}))});
     }
     if (p === '/api/google/callback') { const r = await GG.callback(url.searchParams); if (r.ok) { S.googleVu = true; save(); } res.writeHead(r.ok ? 200 : 400, {'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'referrer-policy': 'no-referrer'}); res.end(googlePage(r)); return; }
     if (await JMCP.traiter(req, res, p, url)) return;   /* 0.39.0 : /mcp, /oauth/…, /.well-known/… (leur propre accès) */
@@ -1568,14 +1652,37 @@ const server = http.createServer(async (req, res) => {
       if (p === '/api/raccourci/cle' && req.method === 'POST') { const k = crypto.randomBytes(24).toString('base64url'); S.raccourci = {hash: sha(k), at: now(), uses: 0}; save(); return json(res, 200, {cle: k, url: publicBase(req) + '/api/raccourci'}); }
       if (p === '/api/raccourci/retirer' && req.method === 'POST') { S.raccourci = null; save(); return json(res, 200, {ok: true}); }
       /* 0.62.0 : ses invitations : créer (la clé n'est montrée qu'une fois, dans le lien), lister, retirer */
-      if (p === '/api/invites' && req.method === 'GET') return json(res, 200, {invites: (S.invites || []).map((x) => ({id: x.id, nom: x.nom, at: x.at, uses: x.uses || 0, last: x.last || 0, taches: (S.invTaches || []).filter((y) => y.inv === x.id).length}))});
+      if (p === '/api/invites' && req.method === 'GET') return json(res, 200, {rappels: S.invRappels !== false, m4a: await AUDIO.m4a(), invites: (S.invites || []).map((x) => ({id: x.id, nom: x.nom, at: x.at, uses: x.uses || 0, last: x.last || 0, taches: (S.invTaches || []).filter((y) => y.inv === x.id).length}))});
+      if (p === '/api/invites/reglages' && req.method === 'POST') { const b = await readBody(req); if (typeof b.rappels === 'boolean') { S.invRappels = b.rappels; if (!b.rappels) for (const tc of S.invTaches || []) delete tc.rappel; save(); } return json(res, 200, {rappels: S.invRappels !== false}); }
+      /* 0.64.0 : ce qu'elle a envoyé depuis 48 heures (la page le lit toutes les 15 secondes quand elle est ouverte : rien n'est lu dans Pilotage ici) */
+      if (p === '/api/invites/recues' && req.method === 'GET') {
+        const nomDe = (id) => ((S.invites || []).find((y) => y.id === id) || {}).nom || '';
+        return json(res, 200, {rappels: S.invRappels !== false, recues: (S.invTaches || []).filter((x) => now() - x.at < 48 * 3600e3).slice(-30).reverse().map((x) => ({id: x.id, nom: nomDe(x.inv), texte: x.texte, pour: x.pour || '', at: x.at, vocal: !!x.vocal, duree: x.duree || 0, fait: !!x.fait, ecoute: x.ecoute || 0,
+          rappel: x.rappel && !x.fait && x.rappel.restants > 0 ? {prochain: x.rappel.prochain, restants: x.rappel.restants} : null}))});
+      }
+      { const ma = p.match(/^\/api\/invites\/audio\/([a-f0-9]{12})$/); if (ma && req.method === 'GET') {
+        const f = path.join(VOCAUX, ma[1] + '.wav'); if (!fs.existsSync(f)) return json(res, 404, {error: 'Message vocal effacé (gardé 7 jours).'});
+        res.writeHead(200, {'content-type': 'audio/wav', 'content-length': fs.statSync(f).size, 'cache-control': 'private, max-age=604800'}); fs.createReadStream(f).pipe(res); return; } }
+      { const mr = p.match(/^\/api\/invites\/recues\/([a-f0-9]{12})$/); if (mr && req.method === 'POST') {
+        const tc = (S.invTaches || []).find((x) => x.id === mr[1]); if (!tc) return json(res, 404, {error: 'Tâche introuvable.'});
+        const b = await readBody(req).catch(() => ({})), inv = (S.invites || []).find((x) => x.id === tc.inv);
+        if (b.action === 'ecoute') { tc.ecoute = tc.ecoute || now(); save(); return json(res, 200, {ok: true}); }
+        if (b.action === 'plustard') { const m = [5, 10, 15, 30, 60].includes(+b.minutes) ? +b.minutes : 5; tc.rappel = {restants: RAPPEL_FOIS, prochain: now() + m * 60000, n: (tc.rappel && tc.rappel.n) || 0}; delete tc.fait; save(); return json(res, 200, {ok: true, prochain: tc.rappel.prochain}); }
+        if (b.action === 'fait') {
+          tc.fait = now(); delete tc.rappel; save();
+          /* le statut « Fait » dans Pilotage : elle voit « Faite ✓ » sur sa page ; la ligne est revérifiée par son texte avant d'écrire */
+          let ecrit = false; if (GG.status('').linked) { try { tachesCache.at = 0; const l = ligneDe(tc, await tachesPilotage(), inv); if (l > 1) { await GG.tool('Google Sheets', 'update_values', {spreadsheetId: PILOTAGE, range: 'Tâches!D' + l, values: [['Fait']]}); ecrit = true; tachesCache.at = 0; } } catch { ecrit = false; } }
+          return json(res, 200, {ok: true, pilotage: ecrit});
+        }
+        return json(res, 400, {error: 'Action inconnue.'});
+      } }
       if (p === '/api/invites' && req.method === 'POST') {
         const b = await readBody(req), nom = String(b.nom || '').replace(/[<>"\u0000-\u001f]/g, '').trim().slice(0, 30); if (!nom) return json(res, 400, {error: 'Son prénom manque.'});
         if ((S.invites || []).length >= 10) return json(res, 400, {error: 'Dix invitations au plus : retires-en une.'});
         const k = crypto.randomBytes(24).toString('base64url'), x = {id: crypto.randomBytes(5).toString('hex'), nom, hash: sha(k), at: now(), uses: 0}; S.invites = [...(S.invites || []), x]; save();
         return json(res, 200, {id: x.id, nom, cle: k, url: publicBase(req) + '/api/invite/tache', lien: publicBase(req) + '/invite/#cle=' + k});
       }
-      { const mi = p.match(/^\/api\/invites\/([a-f0-9]{6,20})$/); if (mi && req.method === 'DELETE') { S.invites = (S.invites || []).filter((x) => x.id !== mi[1]); save(); return json(res, 200, {ok: true}); } }
+      { const mi = p.match(/^\/api\/invites\/([a-f0-9]{6,20})$/); if (mi && req.method === 'DELETE') { S.invites = (S.invites || []).filter((x) => x.id !== mi[1]); for (const tc of (S.invTaches || []).filter((x) => x.inv === mi[1])) { delete tc.rappel; if (tc.vocal) { fs.rm(path.join(VOCAUX, tc.id + '.wav'), {force: true}, () => {}); delete tc.vocal; tc.vocalEfface = true; } } save(); return json(res, 200, {ok: true}); } }   /* 0.64.0 : ses messages vocaux sont effacés avec l'accès */
       if (p === '/api/raccourci/etat') return json(res, 200, {active: !!S.raccourci, at: S.raccourci && S.raccourci.at, uses: (S.raccourci && S.raccourci.uses) || 0, last: S.raccourci && S.raccourci.last, url: publicBase(req) + '/api/raccourci'});
       if (p === '/api/push/subscribe' && req.method === 'POST') { const b = await readBody(req); const r = PUSH.subscribe(b.subscription, deviceOf(req), 'https://' + String(req.headers.host || 'jarvis.invalid').split(':')[0]);   /* sujet VAPID : toujours une adresse https (Apple refuse un sujet http) */ if (r.ok) NOTIFY.tick({only: 'canal', force: true}).catch(() => {}); return json(res, r.ok ? 200 : 400, r); }
       if (p === '/api/push/unsubscribe' && req.method === 'POST') { const b = await readBody(req); return json(res, 200, PUSH.unsubscribe(String(b.endpoint || ''))); }
