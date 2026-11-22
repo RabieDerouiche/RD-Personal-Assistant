@@ -71,6 +71,24 @@ srv.listen(0, async () => {
       ok('glisser depuis le bord gauche : retour à Espaces', await p.evaluate(() => location.hash === '#espaces'));
       await p.tap('.esp-tile[data-go="achats"]'); await p.waitForTimeout(500); await p.tap('.tab[data-tab="espaces"]'); await p.waitForTimeout(500);
       ok('onglet Espaces touché depuis un domaine : retour à Espaces', await p.evaluate(() => location.hash === '#espaces')); }
+    /* l'app fluide (22/11/2026) : l'ancienne page part dans le sens du geste pendant que la nouvelle arrive ; le titre suit ; rien n'en reste ; les chiffres comptent sans valeur fausse */
+    { await p.goto(base + '#espaces'); await p.waitForTimeout(2500);
+      const probe = () => p.evaluate(() => { const g = document.querySelector('.ux-ghost'); return {g: g ? g.className.replace('ux-ghost ', '') : '', ids: g ? g.querySelectorAll('[id]').length : 0, inn: [...document.querySelector('#view .view-in').classList].filter((c) => /^ux-in-/.test(c)).join(''), t: [...document.getElementById('view-title').classList].filter((c) => /^ux-in-/.test(c)).join('')}; });
+      const seq = [];
+      for (const [act, want] of [[() => p.evaluate(() => document.querySelector('.esp-tile[data-go="achats"]').click()), 'push'], [() => p.evaluate(() => document.getElementById('nav-back').click()), 'pop'], [() => p.evaluate(() => document.querySelector('.tab[data-tab="demandes"]').click()), 'left'], [() => p.evaluate(() => document.querySelector('.ux-seg [data-f="decider"]').click()), 'fade']]) {
+        await act(); await p.waitForTimeout(40); const a = await probe(); await p.waitForTimeout(700); const z = await p.evaluate(() => document.querySelectorAll('.ux-ghost').length); seq.push(want + ':' + a.g + '/' + a.inn + '/' + a.ids + '/' + z); }
+      ok('fluidité : entrer, revenir, changer d’onglet, changer de filtre : l’ancienne page part dans le bon sens pendant que la nouvelle arrive, sans identifiant en double, et rien n’en reste', seq.join(' ') === 'push:ux-out-push/ux-in-push/0/0 pop:ux-out-pop/ux-in-pop/0/0 left:ux-out-left/ux-in-left/0/0 fade:ux-out-fade/ux-in-fade/0/0', seq.join(' '));
+      await p.evaluate(() => document.querySelector('.tab[data-tab="espaces"]').click()); await p.waitForTimeout(40);
+      ok('fluidité : le titre de la page glisse avec elle', /^ux-in-right$/.test((await probe()).t), JSON.stringify(await probe()));
+      await p.waitForTimeout(700); await p.evaluate(() => document.querySelector('.tab[data-tab="accueil"]').click());
+      const vals = []; for (let i = 0; i < 12; i++) { vals.push(await p.evaluate(() => (document.querySelector('.hud-ro.q-bl b') || {}).textContent || '')); await p.waitForTimeout(80); }
+      ok('fluidité : « Pour toi » compte jusqu’à sa valeur, jamais négatif, puis s’arrête sur la vraie valeur', vals.every((x) => !/^-/.test(x)) && vals[vals.length - 1] === vals[vals.length - 2] && /^\d+ décisions?$/.test(vals[vals.length - 1]), vals.join(' | '));
+      await p.evaluate(() => document.querySelector('.talk-slot .jv-btn').click()); await p.waitForTimeout(700); await p.evaluate(() => document.querySelector('#chat .chat-head button').click()); await p.waitForTimeout(40);
+      const sink = await p.evaluate(() => document.querySelectorAll('.ux-ov-out').length); await p.waitForTimeout(500);
+      ok('fluidité : la discussion redescend en s’effaçant, puis disparaît ; le ciel vit derrière', sink === 1 && await p.evaluate(() => !document.querySelector('.ux-ov-out') && document.getElementById('chat').hidden && !!document.querySelector('.ux-sky i'))); }
+    { const ctxR = await b.newContext({...devices['iPhone 15 Pro Max'], reducedMotion: 'reduce'}); const q = await ctxR.newPage(); await q.goto(base + '#espaces'); await q.waitForTimeout(2500);
+      await q.evaluate(() => document.querySelector('.esp-tile[data-go="achats"]').click()); await q.waitForTimeout(40);
+      ok('fluidité : « réduire les animations » de l’iPhone respecté (aucun calque, aucun glissé)', await q.evaluate(() => !document.querySelector('.ux-ghost') && !document.querySelector('#view .view-in.ux-in'))); await ctxR.close(); }
     await p.goto(base + '#suivi'); await p.waitForTimeout(2500);
     ok('#suivi (liens des notifications) : Équipe, filtre Demandes, avec les panneaux de Suivi ; l’adresse reste #suivi', await p.evaluate(() => location.hash === '#suivi' && document.getElementById('view-title').textContent === 'Les bots' && document.querySelector('.ux-seg [aria-pressed="true"]').dataset.f === 'dem' && !!document.querySelector('.pend-x') && [...document.querySelectorAll('#view h2')].some((x) => /Tes ordres/.test(x.textContent))));
     await p.goto(base + '#automatisations'); await p.waitForTimeout(2500);

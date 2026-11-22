@@ -9645,6 +9645,122 @@ void main(){
     };
   }
 
+  /* ================= refonte UX (22/11/2026) : l'app vivante et fluide (« on dirait que c'est le même écran tellement la transition est fluide »)
+     Un seul système de mouvement : l'en-tête et la barre ne bougent jamais ; seul le contenu glisse, dans le sens du geste (entrer : depuis la droite ;
+     revenir : vers la droite, en suivant le doigt du bord gauche ; changer d'onglet : du côté de l'onglet) ; l'ancienne page part PENDANT que la nouvelle
+     arrive (ses éléments sont déplacés dans un calque qui s'efface, sans copie : les dessins des personnages restent) ; les filtres se fondent ;
+     la discussion et les rubriques par-dessus montent et redescendent ; les chiffres s'animent ; un ciel discret vit derrière tout. ================= */
+  {
+    const UXM = {next: null, t: 0, prev: null, dragX: 0, shown: {}};
+    const EASE = 'cubic-bezier(.32,.72,0,1)';
+    document.head.append(h('style', {text: ''
+      + '.ux-ghost{position:fixed;left:0;right:0;overflow:hidden;pointer-events:none;z-index:39}.ux-ghost>.view-in{position:absolute;margin:0;box-sizing:border-box}'
+      + '.ux-out-push>.view-in{animation:uxOutL .36s ' + EASE + ' both}.ux-out-pop>.view-in{animation:uxOutR .36s ' + EASE + ' both}'
+      + '.ux-out-right>.view-in{animation:uxOutTabL .3s ' + EASE + ' both}.ux-out-left>.view-in{animation:uxOutTabR .3s ' + EASE + ' both}.ux-out-fade>.view-in{animation:uxOutF .22s ease both}'
+      + '.view-in.ux-in-push{animation:uxInR .4s ' + EASE + ' both}.view-in.ux-in-pop{animation:uxInL .4s ' + EASE + ' both}'
+      + '.view-in.ux-in-right{animation:uxInTabR .34s ' + EASE + ' both}.view-in.ux-in-left{animation:uxInTabL .34s ' + EASE + ' both}.view-in.ux-in-fade{animation:uxInF .3s ' + EASE + ' both}'
+      + '.view-in.ux-in>*{animation:uxRise .5s ' + EASE + ' both}'
+      + '.ux-tin.ux-in-push{animation:uxInR .4s ' + EASE + ' both}.ux-tin.ux-in-pop{animation:uxInL .4s ' + EASE + ' both}.ux-tin.ux-in-right{animation:uxInTabR .34s ' + EASE + ' both}.ux-tin.ux-in-left{animation:uxInTabL .34s ' + EASE + ' both}.ux-tin.ux-in-fade{animation:uxInF .3s ' + EASE + ' both}'
+      + [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => '.view-in.ux-in>*:nth-child(' + n + '){animation-delay:' + (n - 1) * 32 + 'ms}').join('')
+      + '@keyframes uxInR{from{transform:translateX(38%);opacity:0}}@keyframes uxInL{from{transform:translateX(-26%);opacity:0}}'
+      + '@keyframes uxOutL{45%{opacity:.08}to{transform:translateX(-24%);opacity:0}}@keyframes uxOutR{from{transform:translateX(var(--ux-from,0px))}55%{opacity:.25}to{transform:translateX(100%);opacity:0}}'
+      + '@keyframes uxInTabR{from{transform:translateX(14%);opacity:0}}@keyframes uxInTabL{from{transform:translateX(-14%);opacity:0}}'
+      + '@keyframes uxOutTabL{40%{opacity:.05}to{transform:translateX(-10%);opacity:0}}@keyframes uxOutTabR{40%{opacity:.05}to{transform:translateX(10%);opacity:0}}'   /* l'ancienne page s'efface vite : pas de double exposition */
+      + '@keyframes uxInF{from{opacity:0;transform:translateY(6px)}}@keyframes uxOutF{to{opacity:0}}@keyframes uxRise{from{opacity:0;transform:translateY(12px)}}'
+      /* la discussion et les rubriques par-dessus : elles montent, et redescendent en s'effaçant */
+      + '#chat:not([hidden]),#app:not([hidden]){animation:uxSheetIn .44s ' + EASE + ' both}'
+      + '.ux-ov-out{position:fixed!important;inset:0;pointer-events:none;animation:uxSheetOut .3s ' + EASE + ' both}'
+      + '@keyframes uxSheetIn{from{transform:translateY(7%);opacity:0}}@keyframes uxSheetOut{to{transform:translateY(9%);opacity:0}}'
+      + '.sheet{transition:transform .44s ' + EASE + '!important}.sheet-back{transition:opacity .3s ease!important}'
+      /* au toucher : tout ce qui s'appuie répond */
+      + '.card,.hm-row,.esp-tile,.esp-row,.hud-ro,.canal-row,.mate,.sor-in,.fam,.btn,.chip,.mchip,.tl-chip,.agw-d{transition:transform .16s ease,box-shadow .2s ease}'
+      + '.card:active,.hm-row:active,.esp-tile:active,.esp-row:active,.hud-ro:active,.canal-row:active,.mate:active,.btn:active,.tl-chip:active,.agw-d:active{transform:scale(.975)}'
+      /* ce qui attend ta réponse respire doucement */
+      + '.esp-tile.amb,.hud-ro.amb,.mate[data-mode="demande"]{animation:uxBreathe 3.2s ease-in-out infinite}'
+      + '@keyframes uxBreathe{50%{box-shadow:0 0 22px rgba(var(--warn),.28),inset 0 0 0 1px rgba(var(--warn),.35)}}'
+      /* le ciel : poussière d'étoiles qui scintille et lueurs qui dérivent, derrière tout */
+      + '.ux-sky{position:fixed;inset:0;pointer-events:none;overflow:hidden}.ux-sky i{position:absolute;inset:-20%;background:radial-gradient(42% 30% at 30% 20%,rgba(var(--c4),.16),transparent 70%),radial-gradient(36% 26% at 75% 65%,rgba(var(--c3),.11),transparent 70%);animation:uxAur 26s ease-in-out infinite alternate}'
+      + '.ux-sky b{position:absolute;inset:0;opacity:.55;background-image:radial-gradient(1px 1px at 12% 18%,#cfefff,transparent),radial-gradient(1px 1px at 72% 9%,#e9d5ff,transparent),radial-gradient(1.5px 1.5px at 88% 34%,#a5f3fc,transparent),radial-gradient(1px 1px at 33% 41%,#cfefff,transparent),radial-gradient(1px 1px at 55% 23%,#fff,transparent),radial-gradient(1.5px 1.5px at 20% 62%,#c4b5fd,transparent),radial-gradient(1px 1px at 64% 55%,#cfefff,transparent),radial-gradient(1px 1px at 92% 71%,#fff,transparent),radial-gradient(1px 1px at 6% 83%,#a5f3fc,transparent),radial-gradient(1px 1px at 44% 77%,#e9d5ff,transparent);animation:uxTw 5s ease-in-out infinite alternate}'
+      + '.ux-sky b+b{background-position:37% 51%;animation-duration:7s;animation-delay:-3s;opacity:.4}'
+      + '@keyframes uxAur{to{transform:translate(6%,4%) rotate(8deg)}}@keyframes uxTw{to{opacity:.15}}'
+      + '@media (prefers-reduced-motion: reduce){.ux-sky i,.ux-sky b,.esp-tile.amb,.hud-ro.amb,.mate[data-mode="demande"],#chat:not([hidden]),#app:not([hidden]),.view-in.ux-in>*{animation:none!important}}'}));
+    if (document.documentElement.classList.contains('theme-holo')) document.body.prepend(h('div', {class: 'ux-sky', 'aria-hidden': 'true'}, h('i'), h('b'), h('b')));
+    const SNAPS = () => ({tab: TAB, agent: AGENT, ach: SEL.achats, voy: SEL.voyages});
+    const ROOTS = ['accueil', 'demandes', 'agenda', 'espaces'];
+    const depth = (x) => (x.tab === rootOf(x.tab) ? 0 : 1) + (x.agent || x.ach || x.voy ? 1 : 0);
+    function kindOf(a, b) {
+      if (!a || navKey(a) === navKey(b)) return null;
+      const ia = ROOTS.indexOf(rootOf(a.tab)), ib = ROOTS.indexOf(rootOf(b.tab));
+      if (ia !== ib) return ib > ia ? 'right' : 'left';
+      return depth(b) > depth(a) ? 'push' : depth(b) < depth(a) ? 'pop' : 'fade';
+    }
+    /* l'ancienne page part dans un calque : une copie (les dessins des personnages et du globe y sont recopiés), sans identifiants, inerte, puis effacée.
+       Copie et pas déplacement : certaines rubriques gardent leurs éléments pour les réafficher (Réglages), ils doivent rester intacts. */
+    function cloneVisual(node) {
+      const c = node.cloneNode(true), a = node.querySelectorAll('canvas'), b = c.querySelectorAll('canvas');
+      a.forEach((cv, i) => { const d = b[i]; if (!d || !cv.width) return; try { d.width = cv.width; d.height = cv.height; d.getContext('2d').drawImage(cv, 0, 0); } catch (e) { /* rien */ } });
+      c.querySelectorAll('[id]').forEach((x) => x.removeAttribute('id')); c.removeAttribute('id');
+      return c;
+    }
+    function ghostOut(old0, rect, topB, botT, kind, title) {
+      const old = cloneVisual(old0);
+      const g = h('div', {class: 'ux-ghost ux-out-' + kind, 'aria-hidden': 'true', inert: ''});
+      g.style.top = topB + 'px'; g.style.height = Math.max(0, botT - topB) + 'px';
+      old.classList.remove('is-enter', 'ux-in'); old.style.left = rect.left + 'px'; old.style.top = (rect.top - topB) + 'px'; old.style.width = rect.width + 'px';
+      if (kind === 'pop' && UXM.dragX) old.style.setProperty('--ux-from', UXM.dragX + 'px');
+      g.append(old);
+      if (title) { const c = title.node; c.removeAttribute('id'); c.classList.add('view-in'); c.style.left = title.r.left + 'px'; c.style.top = (title.r.top - topB) + 'px'; c.style.width = title.r.width + 'px'; c.style.margin = '0'; g.append(c); }   /* le titre part avec sa page */
+      document.body.append(g);
+      setTimeout(() => g.remove(), kind === 'fade' ? 260 : 400);
+    }
+    /* les chiffres comptent jusqu'à leur valeur, une fois par valeur */
+    function countUp(root) {
+      root.querySelectorAll('.hud-ro b, .esp-v, .kpi-n').forEach((el) => {
+        const tx = el.textContent, m = tx.match(/^(\d{1,3}(?:[  ]\d{3})+|\d+)(,\d+)?/); if (!m) return;   /* « 1 à décider » : seulement « 1 » ; « 1 234,50 € » : tout le nombre */
+        const key = (el.className || '') + '|' + (el.closest('[data-go]') ? el.closest('[data-go]').dataset.go : el.closest('.hud-ro') ? el.closest('.hud-ro').className : '');
+        if (UXM.shown[key] === tx) return; UXM.shown[key] = tx;
+        const dec = m[2] ? m[2].length - 1 : 0, val = parseFloat(m[1].replace(/[\s  ]/g, '') + (m[2] ? '.' + m[2].slice(1) : '')), rest = tx.slice(m[0].length);
+        if (!(val > 0) || val > 1e7) return;
+        const t0 = performance.now(), D = 700, fmtN = (v) => v.toFixed(dec).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+        const step = () => { if (!el.isConnected) return; const k = Math.max(0, Math.min(1, (performance.now() - t0) / D)), e = 1 - Math.pow(1 - k, 3); el.textContent = fmtN(val * e) + rest; if (k < 1) requestAnimationFrame(step); else el.textContent = tx; };
+        requestAnimationFrame(step);
+      });
+    }
+    const RV1 = renderView;
+    renderView = function (keep) {
+      const now = SNAPS();
+      let kind = null;
+      if (!reduced && UXM.prev) kind = keep ? (UXM.next && performance.now() - UXM.t < 700 ? UXM.next : null) : kindOf(UXM.prev, now);
+      UXM.next = null;
+      const v = $('view'), old = v && v.firstElementChild;
+      let rect = null, topB = 0, botT = innerHeight;
+      let title = null; const vt = $('view-title');
+      if (kind && old) { rect = v.getBoundingClientRect(); const hd = document.querySelector('.top'), bar = $('tabs'); topB = hd ? Math.max(0, hd.getBoundingClientRect().bottom) : 0; botT = bar ? bar.getBoundingClientRect().top : innerHeight;
+        if (vt && getComputedStyle(vt).display !== 'none') title = {node: vt.cloneNode(true), r: vt.getBoundingClientRect(), t: vt.textContent}; }
+      const r = RV1.apply(this, arguments);
+      UXM.prev = SNAPS();
+      const nw = v && v.firstElementChild;
+      if (kind && old && nw && old !== nw) {
+        const tNew = vt && getComputedStyle(vt).display !== 'none';
+        ghostOut(old, rect, topB, botT, kind, title && (title.t !== (vt && vt.textContent) || !tNew) ? title : null); UXM.dragX = 0;
+        if (vt && tNew && (!title || title.t !== vt.textContent)) { vt.classList.remove('ux-in-push', 'ux-in-pop', 'ux-in-left', 'ux-in-right', 'ux-in-fade'); void vt.offsetWidth; vt.classList.add('ux-tin', 'ux-in-' + kind); setTimeout(() => vt.classList.remove('ux-tin', 'ux-in-' + kind), 900); }
+        nw.classList.remove('is-enter'); nw.classList.add('ux-in', 'ux-in-' + kind);
+        setTimeout(() => nw.classList.remove('ux-in', 'ux-in-' + kind), 900);
+      }
+      if (nw && (!keep || kind)) countUp(nw);
+      return r;
+    };
+    /* un filtre (puces, segments, onglets d'une page) touché : le contenu se fond au lieu de sauter */
+    document.addEventListener('click', (e) => { const t = e.target.closest && e.target.closest('#view .seg button, #view .ux-seg button, #view [role="tab"], #view .mchip[aria-pressed], #view .chip[aria-pressed], #view .chips button'); if (t) { UXM.next = 'fade'; UXM.t = performance.now(); } }, true);
+    /* le retour par le bord gauche : l'ancienne page repart de là où le doigt l'a laissée */
+    document.addEventListener('touchstart', () => { UXM.dragX = 0; }, {passive: true, capture: true});
+    document.addEventListener('touchmove', (e) => { const v = $('view'), m = v && /translateX\((-?\d+(?:\.\d+)?)px\)/.exec(v.style.transform || ''); if (m) UXM.dragX = parseFloat(m[1]); }, {passive: true});
+    /* la discussion et les rubriques par-dessus redescendent en s'effaçant (leurs éléments partent dans un calque) */
+    const sinkOut = (ov) => { if (!ov || ov.hidden || reduced) return; const g = cloneVisual(ov); g.className = ov.className + ' ux-ov-out'; g.setAttribute('aria-hidden', 'true'); g.setAttribute('inert', ''); g.hidden = false; g.style.cssText = ov.style.cssText; document.body.append(g); setTimeout(() => g.remove(), 320); };
+    const CC1 = closeChat; closeChat = function () { sinkOut($('chat')); return CC1.apply(this, arguments); };
+    const CA1 = closeApp; closeApp = function () { sinkOut($('app')); return CA1.apply(this, arguments); };
+  }
+
   boot();
 })();
 </script>
