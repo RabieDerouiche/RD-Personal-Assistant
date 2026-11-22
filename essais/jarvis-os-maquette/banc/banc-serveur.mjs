@@ -96,7 +96,7 @@ try {
   await p.evaluate(() => [...document.querySelectorAll('#chat .msg.proposal .btn.main')].pop().click()); await p.waitForTimeout(1500);
   { const tk = await p.evaluate(() => JSON.parse(localStorage.getItem('jarvis.settings')).serverToken); const rl = await fetch(BASE + '/api/relances', {headers: {authorization: 'Bearer ' + tk}}).then((x) => x.json());
     ok('discussion : la relance confirmée est programmée sur le serveur', rl.prevues.some((x) => x.source === 'conversation' && x.ligne === 2 && /Iris a répondu au syndic/.test(x.quoi)), JSON.stringify(rl.prevues)); }
-  /* 0.61.0 (son choix du 22/11/2026) : un proche reçoit un lien d'invitation, ouvre sa page sur son iPhone, envoie une tâche et voit son statut (prénoms inventés) */
+  /* 0.62.0 (son choix du 22/11/2026) : un proche reçoit un lien d'invitation, ouvre sa page sur son iPhone, envoie une tâche et voit son statut (prénoms inventés) */
   { const tk = await p.evaluate(() => JSON.parse(localStorage.getItem('jarvis.settings')).serverToken);
     const iv = await fetch(BASE + '/api/invites', {method: 'POST', headers: {authorization: 'Bearer ' + tk, 'content-type': 'application/json'}, body: JSON.stringify({nom: 'Lina'})}).then((x) => x.json());
     const ci = await b.newContext({...devices['iPhone 15 Pro Max']}), qi = await ci.newPage(); qi.on('pageerror', (e) => errs.push('invité : ' + e.message));
@@ -495,7 +495,16 @@ try {
       ok('voix : un ordre à un bot attend son « oui » dit à voix haute ; le « oui » l’envoie sans repasser par Claude et JARVIS le dit', e2.cartes.some((c) => /Ordre proposé à Kairos/i.test(c) && /Envoyer à Kairos/.test(c)) && hits.sample === nOui && e3.cartes.some((c) => /Ordre proposé à Kairos/i.test(c) && /Envoyé/.test(c)) && e3.eux.some((x) => /C’est parti : ordre envoyé à Kairos/.test(x)), JSON.stringify([e2.cartes.slice(-1), e3]));
       await dire('Envoie un ordre vocal pour Kairos'); const nNon = hits.sample; await dire('Non, laisse tomber', 2500); const e4 = await etat();
       const nSeul = hits.sample; await dire('Oui', 3500);
-      ok('voix : « non » l’annule (rien ne part) ; un « oui » sans proposition en cours part à Claude', nSeul === nNon && e4.cartes.slice(-1).some((c) => /Abandonné/.test(c)) && e4.eux.some((x) => /j’annule/.test(x)) && hits.sample === nSeul + 1, JSON.stringify([e4, nNon, nSeul, hits.sample])); }
+      ok('voix : « non » l’annule (rien ne part) ; un « oui » sans proposition en cours part à Claude', nSeul === nNon && e4.cartes.slice(-1).some((c) => /Abandonné/.test(c)) && e4.eux.some((x) => /j’annule/.test(x)) && hits.sample === nSeul + 1, JSON.stringify([e4, nNon, nSeul, hits.sample]));
+      /* 0.61.0 : plus rapide (une action ne passe plus par les réponses instantanées, pas de ligne « Suite ») et les tâches entières à la voix */
+      const r0 = hits.rapide; vreq.length = 0;
+      const capt = []; v.on('request', (r) => { if (/\/api\/sample$/.test(r.url())) { try { const j = JSON.parse(r.postData() || '{}'); capt.push(/ajoute toujours une dernière ligne qui commence par « Suite/.test(JSON.stringify(j.input || ''))); } catch (e) { /* rien */ } } });
+      await dire('Coche la tâche vocale, j’ai appelé le plombier'); const e5 = await etat();
+      ok('voix (0.61.0) : une action part directement à Claude (pas de détour par les réponses instantanées), sans ligne « Suite » à écrire ; « j’ai appelé le plombier » coche la tâche aussitôt', hits.rapide === r0 && capt.length >= 1 && !capt.some(Boolean) && e5.cartes.some((c) => /Tâche à cocher/i.test(c) && /Appeler le plombier/.test(c) && /C'est parti/.test(c)), JSON.stringify([hits.rapide, r0, capt, e5.cartes.slice(-1)]));
+      await dire('Ajoute une tâche vocale : appeler le plombier jeudi'); await dire('Reporte la tâche vocale à demain'); const e6 = await etat();
+      await dire('Supprime la tâche vocale'); const e7 = await etat(); await dire('Oui vas-y merci', 2500); const e8 = await etat();
+      await dire('Coche la tâche fantôme'); const e9 = await etat();
+      ok('voix : reporter une tâche se fait aussitôt ; la supprimer attend un « oui vas-y merci » ; une tâche introuvable est dite, rien n’est coché', e6.cartes.some((c) => /Tâche à reporter/i.test(c) && /C'est parti/.test(c)) && e7.cartes.some((c) => /Tâche à supprimer/i.test(c) && /Supprimer/.test(c)) && e8.cartes.some((c) => /Tâche à supprimer/i.test(c) && /C'est parti/.test(c)) && e8.eux.some((x) => /tâche supprimée/.test(x)) && e9.eux.some((x) => /Je ne trouve pas la tâche « Repeindre la lune »/.test(x)), JSON.stringify([e6.cartes.slice(-1), e7.cartes.slice(-1), e8, e9.eux])); }
     await v.tap('#chat .mains-fin').catch(() => {});
     await v.close(); }
   /* 0.33.0 : l'activité en direct — une mission lancée apparaît sur l'accueil (« En ce moment ») avec son plan et ce qu'elle fait, et sur l'orbe (pastille) ;

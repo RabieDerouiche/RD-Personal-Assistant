@@ -3266,7 +3266,7 @@ void main(){
   function propRun(m) {
     if (!m || m.state !== 'open') return;
     if (m.kind === 'proposal') { m.state = 'sent'; finish({title: 'Ordre à ' + BOT[m.bot].name, effect: 'Une ligne pour ' + BOT[m.bot].name + ' dans le Canal : « ' + m.text + ' », puis la sonnette.', bot: m.bot, order: m.text, say: "Bien reçu, j'y vais.", reply: "C'est fait : le détail est dans mon chat (réponse simulée)."}); return; }
-    if (m.kind === 'act') { m.state = 'done'; finish(m.fin()); }
+    if (m.kind === 'act') { m.state = 'done'; finish(m.fin(), m.ctx); }   /* 0.61.0 : m.ctx (tâche cochée, reportée, supprimée) pour l'écrire dans Pilotage */
   }
   const msgEl = (m) => {
     if (m.kind === 'carte' && typeof carteEl === 'function') return carteEl(m);   /* 0.34.0 : réponses illustrées */
@@ -3382,11 +3382,13 @@ void main(){
   }
   /* 0.60.0 : la conversation à la voix (mains libres) : Claude agit et fait valider de vive voix, sans bouton */
   const voixOn = () => typeof MAINS === 'object' && !!MAINS.on;
+  /* une phrase qui demande d'agir part directement à Claude (pas de détour par les réponses instantanées) */
+  const voixAction = (x) => /\b(ajoute[rz]?|note[rz]?|rappelle[rz]?|programme[rz]?|envoie[rz]?|dis a|demande a|previens|relance[rz]?|cree[rz]?|confie[rz]?|retiens|reporte[rz]?|decale[rz]?|deplace[rz]?|supprime[rz]?|annule[rz]?|coche[rz]?|termine[rz]?|j ai (fini|fait|appele|envoye|paye|regle)|c est fait|marque[rz]?|prepare[rz]?|organise[rz]?)\b/.test(lvLow(x).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' '));   /* 0.61.0 : au niveau de sendChat (déclarée plus bas, elle restait invisible pour lui) */
   const VOIX_AGIR = "EN CONVERSATION À LA VOIX (Rabie te parle, mains libres) : il ne touche aucun bouton. Sois précis et efficace : comprends l'intention exacte, reformule l'objet précis (qui, quoi, quand), et agis. "
     + "Une tâche, un souvenir, une relance : fais-le aussitôt avec l'outil et dis-le en une phrase. Un ordre à un bot, une échéance, une routine, la tâche Claude, la mise à jour d'un dossier : dis exactement ce qui partira, puis demande « Je l'envoie ? » (ou « Je la programme ? ») ; son oui l'exécute. "
     + "S'il manque une information indispensable, pose une seule question courte. Plusieurs demandes d'un coup : traite-les toutes. Réponses courtes : elles sont lues à voix haute. ";
   function voixRules(ctx) {
-    return ctx.replace("ces outils ne font que proposer, Rabie confirme d'un bouton. ", 'à la voix, comme dit plus bas. ').replace('Rabie le confirmera d\'un bouton. ', 'il le confirme de vive voix. ').replace(/(Tu es Claude, le chef[^]*?tu répartis le travail\. )/, '$1' + VOIX_AGIR);
+    return ctx.replace(/Après la réponse, ajoute toujours une dernière ligne qui commence par « Suite : »[^\n]*\n/, '').replace("ces outils ne font que proposer, Rabie confirme d'un bouton. ", 'à la voix, comme dit plus bas. ').replace('Rabie le confirmera d\'un bouton. ', 'il le confirme de vive voix. ').replace(/(Tu es Claude, le chef[^]*?tu répartis le travail\. )/, '$1' + VOIX_AGIR);
   }
   /* à l'ouverture de la discussion avec Claude (et quand il change de profondeur) : le serveur lance Claude et lui donne déjà les données
      et l'historique de la discussion (gardé dans le téléphone) : la question suivante n'envoie que la question */
@@ -3422,7 +3424,7 @@ void main(){
     }
     /* 0.36.0 (« Voix plus vive ») : en mains libres, l'heure, la météo, l'agenda… sont répondus par le serveur sans IA (moins d'une
        seconde) ; Claude garde l'échange dans sa discussion (il le reçoit avec la question suivante) */
-    if (MAINS.on && window.JarvisServeur && window.JarvisServeur.rapide && window.JarvisServeur.linked && window.JarvisServeur.linked()) {
+    if (MAINS.on && window.JarvisServeur && window.JarvisServeur.rapide && window.JarvisServeur.linked && window.JarvisServeur.linked() && !(typeof voixAction === 'function' && voixAction(text))) {
       CHAT.busy = true; mainsBusy('thinking');
       const rq = await Promise.race([window.JarvisServeur.rapide(text, typeof metPos === 'function' ? metPos() : null), new Promise((z) => setTimeout(() => z(null), 2500))]);
       CHAT.busy = false;
@@ -5744,7 +5746,7 @@ void main(){
     const pap = rows('pap');
     if (pap) S.papiers = pap.filter((r) => r['Document']).map((r) => { const where = r['Où il est (lien Drive, ou « papier »)'] || ''; const url = (where.match(/https?:\/\/\S+/) || [])[0]; const q = P(r['Document'], r['Personne'], lvFrIso(r['Valable jusqu\'au']), where, r['Sert pour'], r['Remarque'], url); q.id = 'q:' + r._row; return q; });
     const tach = rows('tach');
-    if (tach) S.taches = tach.filter((r) => r['Tâche'] && !/^(fait|annul)/.test(lvLow(r['Statut']))).map((r) => ({id: 't:' + r._row, _row: r._row, title: r['Tâche'], n: lvFrIso(r['Pour le']) ? N(lvFrIso(r['Pour le'])) : null, de: /^De /.test(String(r['Remarque'] || '')) ? String(r['Remarque']).slice(3).trim() : ''}));   /* 0.61.0 : « de » un proche */
+    if (tach) S.taches = tach.filter((r) => r['Tâche'] && !/^(fait|annul)/.test(lvLow(r['Statut']))).map((r) => ({id: 't:' + r._row, _row: r._row, title: r['Tâche'], n: lvFrIso(r['Pour le']) ? N(lvFrIso(r['Pour le'])) : null, de: /^De /.test(String(r['Remarque'] || '')) ? String(r['Remarque']).slice(3).trim() : ''}));   /* 0.62.0 : « de » un proche */
     const jour = rows('jour');
     if (jour) S.activite = jour.slice(-40).map((r, i) => ({r, i, s: lvStamp(r['Date et heure'])})).sort((a, b) => (b.s && a.s ? b.s - a.s : 0) || b.i - a.i).slice(0, 15).map(({r, s}) => { return {bot: lvBot(r['Bot']), when: s ? fmt(s, {day: '2-digit', month: '2-digit'}) + ' · ' + pad2(s.getHours()) + 'h' + pad2(s.getMinutes()) : r['Date et heure'], text: (r['Sujet'] ? r['Sujet'] + ' : ' : '') + r['Détail'], fresh: !!(s && now - s < 86400000), s: s ? s.getTime() : null}; }); /* JARVIS OS : s = heure exacte */
     /* achats : une famille par marque, ses modèles, leur dernier prix (onglet Prix, sinon onglet Relevés) */
@@ -9351,7 +9353,7 @@ void main(){
         h('button', {type: 'button', class: 'btn ghost danger', onclick: async () => { await JS.raccourci.retirer(); VIEWS_RELOAD_SIRI(); }}, 'Retirer')), out);
     return card;
   }
-  /* JARVIS OS 0.61.0 (son choix du 22/11/2026) : un proche (sa femme) lui envoie des tâches depuis son iPhone, avec Siri. Sa clé, dans le lien
+  /* JARVIS OS 0.62.0 (son choix du 22/11/2026) : un proche (sa femme) lui envoie des tâches depuis son iPhone, avec Siri. Sa clé, dans le lien
      d'invitation, n'ouvre que deux adresses : ajouter une tâche, voir le statut des siennes. Il crée et retire l'accès ici. */
   async function inviteCard(JS) {
     const card = h('section', {class: 'card set-card invite-card'}, h('b', {text: 'Tâches envoyées par un proche'}));
@@ -9616,7 +9618,7 @@ void main(){
       /* JARVIS OS 0.12.0 : notifications envoyées par le serveur (un bot a répondu, rappels du matin, Grok reparti) */
       if (JS.push) parts.push(await notifCard(JS, msg, () => draw()));
       if (JS.raccourci) parts.push(await siriCard(JS));
-      if (JS.invites) parts.push(await inviteCard(JS));   /* 0.61.0 : un proche lui envoie des tâches */ /* JARVIS OS 0.13.0 : Siri et bouton Action */
+      if (JS.invites) parts.push(await inviteCard(JS));   /* 0.62.0 : un proche lui envoie des tâches */ /* JARVIS OS 0.13.0 : Siri et bouton Action */
       if (JS.tour) parts.push(await tourCard(JS)); /* JARVIS OS 0.15.0 : tour de Claude */
       if (JS.sauvegarde) parts.push(await savCard(JS)); /* JARVIS OS 0.14.0 : sauvegarde de Pilotage */
       if (JS.mcp) { const mc = await mcpCard(JS); if (mc.dataset.urgent) parts.unshift(mc); else parts.push(mc); } /* JARVIS OS 0.39.0 : assistants reliés (en tête si une demande attend) */
@@ -9995,13 +9997,40 @@ void main(){
        En conversation à la voix : une tâche, un souvenir, une relance sont faits aussitôt ; un ordre à un bot, une échéance, une routine,
        la tâche Claude, un dossier attendent son « oui » dit à voix haute (ou tapé), qui les exécute sans repasser par Claude ; « non » les annule.
        Seules comptent les propositions de la dernière réponse (un « oui » à une autre question n'exécute rien de plus ancien). */
-    const VOIX_DIRECT = {ajouter_tache: 1, retenir: 1, programmer_relance: 1};
+    const VOIX_DIRECT = {ajouter_tache: 1, retenir: 1, programmer_relance: 1, terminer_tache: 1, reporter_tache: 1};
     const VOIX_FAIT = {preparer_ordre: (m) => 'ordre envoyé à ' + BOT[m.bot].name, ajouter_echeance: () => 'échéance ajoutée', confier_tache_claude: () => 'tâche Claude lancée', programmer_routine: () => 'routine programmée',
-      mettre_a_jour_dossier: () => 'dossier mis à jour', ajouter_tache: () => 'tâche ajoutée', retenir: () => 'c’est retenu', programmer_relance: () => 'relance programmée'};
+      mettre_a_jour_dossier: () => 'dossier mis à jour', ajouter_tache: () => 'tâche ajoutée', retenir: () => 'c’est retenu', programmer_relance: () => 'relance programmée',
+      terminer_tache: () => 'tâche cochée', reporter_tache: () => 'tâche reportée', supprimer_tache: () => 'tâche supprimée'};
+    /* 0.61.0 (« optimise au maximum la conversation vocale et la gestion des tâches ») : les tâches se gèrent entièrement à la voix
+       (« j'ai appelé le plombier », « reporte la crèche à lundi », « supprime la tâche du garage »), retrouvées par leur titre */
+    const nrmT = (s) => lvLow(s).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+    function tacheTrouve(q) {
+      const all = (S.taches || []).filter((t) => !/^(fait|annul)/i.test(t.status || '')), k = nrmT(q); if (!k) return null;
+      let hit = all.filter((t) => nrmT(t.title) === k); if (hit.length === 1) return hit[0];
+      hit = all.filter((t) => nrmT(t.title).includes(k) || k.includes(nrmT(t.title))); if (hit.length === 1) return hit[0];
+      const w = new Set(k.split(' ').filter((x) => x.length > 2)); let best = null, bs = 0, tie = false;
+      all.forEach((t) => { const tw = nrmT(t.title).split(' ').filter((x) => x.length > 2), sc = tw.filter((x) => w.has(x)).length / Math.max(1, Math.min(w.size, tw.length)); if (sc > bs) { bs = sc; best = t; tie = false; } else if (sc === bs && sc > 0) tie = true; });
+      return bs >= 0.5 && !tie ? best : null;
+    }
+    function tacheChatTools(T, out) {
+      const manque = (q) => { T.msgs.splice(Math.max(0, T.msgs.indexOf(out)), 0, {who: 'claude', text: 'Je ne trouve pas la tâche « ' + q + ' » dans tes tâches en cours.', local: true}); renderChat(); return 'Introuvable : « ' + q + ' ».'; };
+      const prop = (label, t, ok, fin, extra) => { T.msgs.splice(T.msgs.indexOf(out), 0, Object.assign({kind: 'act', label, text: t.title + (extra || ''), ok, state: 'open', ctx: {type: 'tache', item: t}, fin}, {})); renderChat(); return 'Proposée à Rabie.'; };
+      const titre = {type: 'string', description: 'Le titre de la tâche, tel qu’il est dans ses tâches (mes_taches)'};
+      return [
+        {name: 'terminer_tache', description: "Coche une tâche de Rabie (statut « Fait » dans l'onglet Tâches) quand il dit qu'il l'a faite.", inputSchema: {type: 'object', properties: {titre}, required: ['titre']},
+          execute: (input) => { const q = String(input.titre || '').trim(), t = tacheTrouve(q); if (!t) return manque(q);
+            return prop('Tâche à cocher', t, "C'est fait", () => ({title: 'Tâche faite', effect: 'Le statut de « ' + t.title + " » passe à « Fait » dans l'onglet Tâches.", mutate: () => drop('taches', t.id), bot: 'hydra', say: 'Une de moins !', work: false})); }},
+        {name: 'reporter_tache', description: "Change la date d'une tâche de Rabie (colonne « Pour le » de l'onglet Tâches).", inputSchema: {type: 'object', properties: {titre, date: {type: 'string', description: 'AAAA-MM-JJ'}}, required: ['titre', 'date']},
+          execute: (input) => { const q = String(input.titre || '').trim(), iso = String(input.date || ''), t = tacheTrouve(q); if (!t) return manque(q); if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) throw new Error('Date invalide'); const n = dayDiff(iso);
+            return prop('Tâche à reporter', t, 'Reporter', () => ({title: 'Tâche reportée', effect: 'La date de « ' + t.title + ' » passe à ' + longDay(n) + " dans l'onglet Tâches.", mutate: () => { t.n = n; }, bot: 'hydra', say: 'Je te la rappelle ' + longDay(n) + '.', work: false}), ' · ' + longDay(n)); }},
+        {name: 'supprimer_tache', description: "Supprime une tâche de Rabie (statut « Annulé » dans l'onglet Tâches) quand il ne veut plus la faire.", inputSchema: {type: 'object', properties: {titre}, required: ['titre']},
+          execute: (input) => { const q = String(input.titre || '').trim(), t = tacheTrouve(q); if (!t) return manque(q);
+            return prop('Tâche à supprimer', t, 'Supprimer', () => ({title: 'Tâche supprimée', effect: '« ' + t.title + " » passe à « Annulé » dans l'onglet Tâches.", mutate: () => drop('taches', t.id), work: false})); }}];
+    }
     const CT1 = chatTools;
     chatTools = function (T, out) {
       const voix = voixOn();
-      return CT1(T, out).map((t) => {
+      return CT1(T, out).concat(tacheChatTools(T, out)).map((t) => {
         if (!t || typeof t.execute !== 'function' || t.name === 'montrer') return t;
         const desc = voix ? String(t.description || '').replace(/\s*Rien (?:n'|ne )[^.]*?touché[^.]*\./g, '').trim() + (VOIX_DIRECT[t.name] ? ' À la voix : fait aussitôt, sans lui redemander.' : ' À la voix : dis ce qui partira et demande son accord ; son « oui » l’exécute.') : t.description;
         return Object.assign({}, t, {description: desc, execute: async (input) => {
@@ -10018,8 +10047,12 @@ void main(){
         }});
       });
     };
-    const OUI = /^(oui|ouais|ouai|yes|ok|okay|d'?accord|vas[- ]y|go|valide|je valide|confirme|je confirme|c'?est bon|parfait|fais[- ]le|envoie(?:[- ]l[ea])?|programme(?:[- ]l[ea])?|ajoute(?:[- ]l[ea])?|lance(?:[- ]l[ea])?|bien s[uû]r|exactement|carr[ée]ment|allez(?:[- ]y)?|banco|c'?est parti|tout bon|oui vas[- ]y|oui c'?est bon|oui envoie(?:[- ]l[ea])?|oui parfait|oui merci)$/;
-    const NON = /^(non|nan|non merci|annule|annule tout|annule [çc]a|laisse tomber|non laisse tomber|laisse|stop|pas maintenant|attends|oublie|oublie [çc]a|surtout pas|non pas maintenant)$/;
+    const MOTS = (t, voc, coeur) => { const w = nrmT(t).replace(/\b(s il te plait|stp|jarvis|claude)\b/g, ' ').split(' ').filter(Boolean); return w.length > 0 && w.length <= 7 && w.every((x) => voc.has(x)) && w.some((x) => coeur.has(x)); };
+    const V_OUI = new Set('oui ouais ouaip yes yep ok okay d accord dacc acc vas y go valide valider je confirme confirmer confirme c est bon parfait fais le la envoie envoies programme ajoute lance bien sur exactement carrement allez banco parti tout nickel top super impeccable ca marche merci absolument evidemment volontiers'.split(' '));
+    const C_OUI = new Set('oui ouais ouaip yes yep ok okay accord dacc vas go valide confirme bon parfait fais envoie programme ajoute lance sur exactement carrement banco parti nickel top super impeccable marche absolument evidemment volontiers'.split(' '));
+    const V_NON = new Set('non nan annule annuler tout ca laisse tomber stop pas maintenant attends oublie surtout merci finalement plutot rien'.split(' '));
+    const C_NON = new Set('non nan annule annuler laisse stop attends oublie rien'.split(' '));
+    const OUI = {test: (t) => MOTS(t, V_OUI, C_OUI) && !/\b(non|pas)\b/.test(nrmT(t))}, NON = {test: (t) => MOTS(t, V_NON, C_NON)};
     const voixPending = (T) => { let i = T.msgs.length - 2; while (i >= 0 && T.msgs[i].who !== 'toi') i--; return T.msgs.filter((m, k) => k > i && (m.kind === 'act' || m.kind === 'proposal') && m.state === 'open' && Date.now() - (m.at || 0) < 10 * 60000); };
     const LC1 = localCmd;
     localCmd = function (raw, T) {

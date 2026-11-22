@@ -54,9 +54,9 @@ const results = []; let fails = 0;
   const bad = cas.filter(([t, k]) => R(t) !== k);
   results.push((bad.length ? 'ÉCHEC ' : 'OK    ') + 'routeur : Haiku pour lire une donnée, Sonnet pour analyser ou rédiger, Opus quand il le demande' + (bad.length ? ' :: ' + JSON.stringify(bad.map(([t, k]) => [t.slice(0, 30), k, R(t)])) : '')); if (bad.length) fails++; }
 /* 0.60.0 : le routeur de la conversation à la voix : jamais Haiku ; Opus pour une action (ajouter, rappeler, envoyer, un bot nommé…) ou une réflexion */
-{ const cas = [['Ajoute une tâche : appeler le plombier jeudi', 'deep'], ['Dis à Iris de relancer le syndic', 'deep'], ['Rappelle-moi de payer la crèche vendredi', 'deep'], ['Programme le brief à 7 h', 'deep'], ['Raconte-moi une blague', 'default'], ['Quel temps fait-il', 'default'], ['Est-ce que je devrais changer de banque, ton avis ?', 'deep']];
+{ const cas = [['Ajoute une tâche : appeler le plombier jeudi', 'default'], ['Rappelle-moi de payer la crèche vendredi', 'default'], ["J'ai appelé le plombier, coche-la", 'default'], ['Dis à Iris de relancer le syndic', 'deep'], ['Ajoute le garage et reporte la crèche à lundi', 'deep'], ['Organise ma semaine', 'deep'], ['Raconte-moi une blague', 'default'], ['Quel temps fait-il', 'default'], ['Est-ce que je devrais changer de banque, ton avis ?', 'deep']];
   const bad = cas.filter(([t, k]) => routeurVoix(t) !== k);
-  results.push((bad.length ? 'ÉCHEC ' : 'OK    ') + 'routeur de la voix : jamais Haiku ; Opus pour ce qu’il faut faire ou décider, Sonnet pour le reste' + (bad.length ? ' :: ' + JSON.stringify(bad.map(([t, k]) => [t.slice(0, 30), k, routeurVoix(t)])) : '')); if (bad.length) fails++; }
+  results.push((bad.length ? 'ÉCHEC ' : 'OK    ') + 'routeur de la voix : jamais Haiku ; Sonnet pour une action simple, Opus pour un ordre à un bot, plusieurs actions ou une réflexion' + (bad.length ? ' :: ' + JSON.stringify(bad.map(([t, k]) => [t.slice(0, 30), k, routeurVoix(t)])) : '')); if (bad.length) fails++; }
 /* 0.32.0 : le moteur d'écoute — Parakeet une fois installé (marque et variante), sinon Whisper ; JARVIS_ECOUTE_MOTEUR=whisper ; marque douteuse = Whisper */
 { const d = fs.mkdtempSync(path.join(os.tmpdir(), 'ecoute-')), P = path.join(d, 'parakeet'), v0 = choixEcoute(d, {});
   fs.mkdirSync(P); fs.writeFileSync(path.join(P, 'variante.json'), JSON.stringify({engine: 'sherpa', variante: 'int8'})); const v1 = choixEcoute(d, {});
@@ -173,7 +173,7 @@ try {
     r = await T('Google Sheets', 'append_values', {spreadsheetId: 'PIL', range: 'Canal!A1', values: [['16/11/2026', 'Rabie', 'Iris', 'Info', 'Test', 'À faire', '', '']]}); let c = FG.calls.filter((x) => /:append$/.test(x.path)).pop();
     ok('Sheets append_values : ligne ajoutée, saisie comme dans Sheets', r.status === 200 && c.q.valueInputOption === 'USER_ENTERED' && c.q.insertDataOption === 'INSERT_ROWS' && c.body.values[0][4] === 'Test', JSON.stringify(c.q));
     r = await T('Google Sheets', 'update_values', {spreadsheetId: 'PIL', range: 'Échéances!F12', values: [['Fait']]}); c = FG.calls.filter((x) => x.method === 'PUT').pop(); ok('Sheets update_values', r.status === 200 && c.path.endsWith('Échéances!F12') && c.body.values[0][0] === 'Fait');
-    /* 0.61.0 (son choix du 22/11/2026) : un proche envoie une tâche avec Siri ; sa clé n'ouvre que deux adresses (prénoms inventés) */
+    /* 0.62.0 (son choix du 22/11/2026) : un proche envoie une tâche avec Siri ; sa clé n'ouvre que deux adresses (prénoms inventés) */
     { const cr = await G('/api/invites', {nom: 'Lina'}), k = cr.body.cle, IH = {authorization: 'Bearer ' + k, 'content-type': 'application/json'};
       ok('invité : invitation créée (clé montrée une fois, lien vers /invite/)', cr.status === 200 && /^[A-Za-z0-9_-]{30,}$/.test(k || '') && /\/invite\/#cle=/.test(cr.body.lien) && /\/api\/invite\/tache$/.test(cr.body.url), JSON.stringify(cr.body).slice(0, 160));
       const n0 = FG.calls.filter((x) => /:append$/.test(x.path)).length;

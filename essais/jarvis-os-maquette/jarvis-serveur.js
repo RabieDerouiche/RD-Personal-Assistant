@@ -62,8 +62,8 @@
      les petites choses sont faites aussitôt, le reste se valide de vive voix ; jamais de bouton */
   const toolsSysVoix = (tools) => "Outils. EN CONVERSATION À LA VOIX, Rabie ne touche aucun bouton : tout se fait à la voix. Pour agir, termine ta réponse par une ligne par action, exactement de cette forme, avec un JSON valide sur une seule ligne :\n"
     + '⟦outil ajouter_tache {"titre":"…"}⟧\n'
-    + "Deux sortes d'actions. (1) Faites aussitôt, sans lui redemander : ajouter_tache, retenir, programmer_relance, montrer. Dis-le simplement, au présent (« C'est noté : appeler le plombier jeudi. »). "
-    + "(2) À valider de vive voix : preparer_ordre, ajouter_echeance, confier_tache_claude, programmer_routine, mettre_a_jour_dossier. Dis exactement ce qui partira (le texte de l'ordre, la date, la routine), puis termine par une question courte (« Je l'envoie ? », « Je la programme ? ») : son « oui » l'exécute aussitôt, son « non » l'annule, sans repasser par toi. "
+    + "Deux sortes d'actions. (1) Faites aussitôt, sans lui redemander : ajouter_tache, terminer_tache, reporter_tache, retenir, programmer_relance, montrer. Dis-le simplement, au présent (« C'est noté : appeler le plombier jeudi. »). "
+    + "(2) À valider de vive voix : preparer_ordre, ajouter_echeance, supprimer_tache, confier_tache_claude, programmer_routine, mettre_a_jour_dossier. Dis exactement ce qui partira (le texte de l'ordre, la date, la routine), puis termine par une question courte (« Je l'envoie ? », « Je la programme ? ») : son « oui » l'exécute aussitôt, son « non » l'annule, sans repasser par toi. "
     + "Ne parle jamais de bouton ni d'appui. S'il manque une information indispensable (la date, le bot, l'objet exact), demande-la d'abord, une seule question à la fois, sans outil. Plusieurs choses demandées d'un coup : une ligne d'outil chacune. N'utilise un outil que si c'est utile.\nOutils disponibles :\n"
     + tools.map((t) => { const sc = t.inputSchema || t.input_schema || {}, req = sc.required || [], pr = sc.properties || {};
       return '- ' + t.name + ' : ' + String(t.description || '') + (Object.keys(pr).length ? ' Champs : ' + Object.keys(pr).map((k) => k + (req.includes(k) ? '' : ' (facultatif)') + (pr[k].description ? ' = ' + pr[k].description : '')).join(' ; ') + '.' : ''); }).join('\n');
@@ -242,7 +242,7 @@
     radarSet: (cle, valeur) => req('/api/radar/set', {cle, valeur}).then((r) => { if (r.status !== 200) throw new Error((r.j && r.j.error) || 'Refusé'); return r.j; }),
     radarProposition: (id, oui, modif) => req('/api/radar/proposition', {id, oui, modif: modif || null}).then((r) => (r.status === 200 ? r.j : null)).catch(() => null),
     radarLire: () => req('/api/radar/lire', {}).then((r) => r.j || null).catch(() => null),
-    /* 0.61.0 : ses invitations (un proche qui lui envoie des tâches) */
+    /* 0.62.0 : ses invitations (un proche qui lui envoie des tâches) */
     invites: {liste: () => req('/api/invites').then((r) => (r.status === 200 ? r.j.invites : null)).catch(() => null), creer: (nom) => req('/api/invites', {nom}).then((r) => r.j).catch(() => null),
       retirer: (id) => req('/api/invites/' + id, null, 'DELETE').then((r) => r.status === 200).catch(() => false)},
     radarAlerte: (id, action) => req('/api/radar/alerte', {id, action}).then((r) => (r.status === 200 ? r.j : null)).catch(() => null),   /* 0.56.0 : Retirer / Garder une dépense qui finit */

@@ -28,7 +28,7 @@ import {createRadar} from './radar.mjs';
 import {pique, PERSO_ORAL} from './humour.mjs';   /* 21/11/2026 : sa personnalité à l'oral (« sarcastique assumé ») */
 const ACT = createActivite();   /* 0.33.0 : ce que fait Claude à l'instant */
 
-const VERSION = '0.61.0';
+const VERSION = '0.62.0';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PORT = +(process.env.PORT || 8787);
 const HOST = process.env.HOST || '127.0.0.1';
@@ -106,7 +106,7 @@ function pair(code, device) {
 const authed = (req) => { const m = /^Bearer (.+)$/.exec(req.headers.authorization || ''); if (!m) return false; const h = sha(m[1]); return S.tokens.some((t) => t.hash === h); };
 const deviceOf = (req) => { const m = /^Bearer (.+)$/.exec(req.headers.authorization || ''); const t = m && S.tokens.find((x) => x.hash === sha(m[1])); return t ? t.hash.slice(0, 12) : ''; };
 
-/* ---------- 0.61.0 (son choix du 22/11/2026) : un proche (sa femme) envoie une tâche à JARVIS depuis son iPhone, « Dis Siri, tâche pour… » ----------
+/* ---------- 0.62.0 (son choix du 22/11/2026) : un proche (sa femme) envoie une tâche à JARVIS depuis son iPhone, « Dis Siri, tâche pour… » ----------
    Sa clé n'ouvre que deux adresses : ajouter une tâche, voir le statut des siennes. Rien d'autre de JARVIS (mails, agenda, Radar, mémoire) ne lui est
    lisible. La tâche va dans l'onglet Tâches de Pilotage, marquée « De <prénom> », et une notification part sur les appareils reliés. */
 const inviteDe = (req) => { const m = /^Bearer (.+)$/.exec(req.headers.authorization || ''); if (!m) return null; const h = sha(m[1]); return (S.invites || []).find((x) => x.hash === h) || null; };
@@ -1427,7 +1427,7 @@ const server = http.createServer(async (req, res) => {
       S.usage.raccourcis = (S.usage.raccourcis || 0) + 1; if (S.raccourci) { S.raccourci.uses = (S.raccourci.uses || 0) + 1; S.raccourci.last = now(); } save();
       return say(r.ok ? 200 : 502, r.ok ? relancesDuTexte(r.text, 'siri').text : r.error);   /* « rappelle-moi… » : la relance est notée, la ligne technique n'est pas lue */
     }
-    /* 0.61.0 : les adresses de l'invitée, avec sa propre clé ; la réponse d'un ajout est une phrase, lue par Siri */
+    /* 0.62.0 : les adresses de l'invitée, avec sa propre clé ; la réponse d'un ajout est une phrase, lue par Siri */
     if (p === '/api/invite/tache' && req.method === 'POST') {
       const say = (st, x) => { res.writeHead(st, {'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store'}); res.end(x); };
       const inv = inviteDe(req); if (!inv) return say(401, 'Clé refusée : demande une nouvelle invitation.');
@@ -1567,7 +1567,7 @@ const server = http.createServer(async (req, res) => {
       /* clé des Raccourcis : créée ici depuis l'app reliée, montrée une seule fois, jamais stockée en clair ; recréer retire l'ancienne */
       if (p === '/api/raccourci/cle' && req.method === 'POST') { const k = crypto.randomBytes(24).toString('base64url'); S.raccourci = {hash: sha(k), at: now(), uses: 0}; save(); return json(res, 200, {cle: k, url: publicBase(req) + '/api/raccourci'}); }
       if (p === '/api/raccourci/retirer' && req.method === 'POST') { S.raccourci = null; save(); return json(res, 200, {ok: true}); }
-      /* 0.61.0 : ses invitations : créer (la clé n'est montrée qu'une fois, dans le lien), lister, retirer */
+      /* 0.62.0 : ses invitations : créer (la clé n'est montrée qu'une fois, dans le lien), lister, retirer */
       if (p === '/api/invites' && req.method === 'GET') return json(res, 200, {invites: (S.invites || []).map((x) => ({id: x.id, nom: x.nom, at: x.at, uses: x.uses || 0, last: x.last || 0, taches: (S.invTaches || []).filter((y) => y.inv === x.id).length}))});
       if (p === '/api/invites' && req.method === 'POST') {
         const b = await readBody(req), nom = String(b.nom || '').replace(/[<>"\u0000-\u001f]/g, '').trim().slice(0, 30); if (!nom) return json(res, 400, {error: 'Son prénom manque.'});
