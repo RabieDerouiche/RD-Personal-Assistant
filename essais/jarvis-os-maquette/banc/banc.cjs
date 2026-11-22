@@ -43,8 +43,10 @@ srv.listen(0, async () => {
     ok('mode maquette sur un serveur local', await p.evaluate(() => window.__JARVIS_MODE === 'maquette'));
     ok('thème Hologramme par défaut', await p.evaluate(() => document.documentElement.classList.contains('theme-holo')));
     ok('nom : J.A.R.V.I.S OS (titre de la page, nom à l\'installation, manifeste) ; plus de « Jarvis v17 copie » à l\'écran', await p.evaluate(async () => document.title === 'J.A.R.V.I.S OS' && (document.querySelector('meta[name="apple-mobile-web-app-title"]') || {}).content === 'J.A.R.V.I.S OS' && (await fetch('manifest.webmanifest').then((r) => r.json())).name === 'J.A.R.V.I.S OS' && !/v17 copie/i.test(document.body.innerText)));
-    ok('accueil en tableau de bord : « Demander » en haut, 3 chiffres (pour toi, mails, bons prix), à faire, aujourd\'hui, 14 prochains jours, à surveiller (plus de « Bientôt »)', await p.evaluate(() => ['En un coup d’œil', 'À faire maintenant', "Aujourd'hui", 'Les 14 prochains jours', 'À surveiller'].every((t) => [...document.querySelectorAll('.hm-h h2')].some((x) => x.textContent === t)) && ![...document.querySelectorAll('.hm-h h2')].some((x) => x.textContent === 'Bientôt') && document.querySelectorAll('.kpi-t').length === 3 && !!document.querySelector('#view .intent') && document.querySelector('#view .intent').getBoundingClientRect().top < document.querySelector('.kpi-grid').getBoundingClientRect().top));
-    ok('accueil : le résumé du jour donne la météo, et chaque chiffre ouvre sa rubrique', await p.evaluate(() => /(\d+° · \S+ · \d+ à \d+°|Demain : [^,]+, \d+ à \d+°)/.test((document.querySelector('.hm-hello small') || {}).textContent || '')));
+    /* refonte UX (22/11/2026) : l'accueil s'ouvre sur l'écran de JARVIS (heure, globe et ses anneaux, 4 relevés reliés, phrase du jour) ; « pour toi » y est ; mails et bons prix restent en chiffres */
+    ok('accueil : écran de JARVIS (heure, globe, 4 relevés reliés au globe, phrase du jour, « Parler à JARVIS »), puis en un coup d’œil (mails, bons prix), à faire, aujourd\'hui, 14 prochains jours, à surveiller', await p.evaluate(() => !!document.querySelector('.hud .holo-stage canvas') && document.querySelectorAll('.hud .hud-ro').length === 4 && document.querySelectorAll('.hud-lines path').length === 4 && /^\d\d:\d\d\d\d$/.test(document.getElementById('hud-clock').textContent) && /Rabie\./.test(document.querySelector('.hud-say').textContent) && /Parler à JARVIS/.test(document.querySelector('.hud-act').textContent) && ['En un coup d’œil', 'À faire maintenant', "Aujourd'hui", 'Les 14 prochains jours', 'À surveiller'].every((t) => [...document.querySelectorAll('.hm-h h2')].some((x) => x.textContent === t)) && document.querySelectorAll('.kpi-t').length === 2 && !document.querySelector('#view .intent') && !document.querySelector('.hm-hello')));
+    ok('accueil : la météo dans son relevé ; « Pour toi » compte comme l\'en-tête et ouvre Pour moi', await p.evaluate(() => /\d+°/.test(document.querySelector('.hud-ro.q-tr').textContent) && document.querySelector('.hud-ro.q-bl b').textContent.startsWith(String(document.querySelector('#status .st.is-demande b') ? document.querySelector('#status .st.is-demande b').textContent : document.querySelector('.tab[data-tab="demandes"] .badge').textContent))));
+    { await p.evaluate(() => document.querySelector('.hud-ro.q-bl').click()); await p.waitForTimeout(500); const tab = await p.evaluate(() => location.hash); await p.goto(base + '#accueil'); await p.waitForTimeout(1500); ok('accueil : le relevé « Pour toi » ouvre Pour moi', tab === '#demandes', tab); }
     { await p.evaluate(() => [...document.querySelectorAll('.kpi-t')].find((x) => /bons? prix/.test(x.textContent)).click()); await p.waitForTimeout(500); const tab = await p.evaluate(() => location.hash); await p.goto(base + '#accueil'); await p.waitForTimeout(1500); ok('accueil : la tuile « bon prix » ouvre Achats', tab === '#achats', tab); }
     /* 0.25.0 : en-tête sur une ligne, la pause dite une fois (la pastille de l'en-tête, qui ouvre le détail) */
     ok('en-tête sur une ligne : JARVIS, l\'état, la loupe et la mise à jour à la même hauteur ; plus d\'horloge ni de « 0 au travail », « en veille »', await p.evaluate(() => { const y = (e) => { const r = e.getBoundingClientRect(); return r.top + r.height / 2; }, a = y(document.querySelector('.brand b')), b = y(document.getElementById('status')), c = y(document.getElementById('gs-btn')), d = y(document.querySelector('.refresh-btn'));
@@ -56,40 +58,34 @@ srv.listen(0, async () => {
     await p.evaluate(() => [...document.querySelectorAll('#sheet button')].find((x) => /^Fermer$/.test(x.textContent.trim())).click()); await p.waitForTimeout(400);
     ok('accueil : un rendez-vous écrit dans l\'agenda et dans Échéances n\'apparaît qu\'une fois dans « Les 14 prochains jours »', await p.evaluate(() => { const h2 = [...document.querySelectorAll('.hm-h h2')].find((x) => /14 prochains/.test(x.textContent)); return [...h2.closest('section').querySelectorAll('.hm-row')].filter((r) => /notaire/i.test(r.textContent)).length === 1; }));
     await p.screenshot({path: path.join(SH, 'accueil.png')});
-    /* barre du bas et toutes les rubriques */
+    /* refonte UX (22/11/2026, maquette validée) : 5 portes fixes ; plus de favoris ni de « Tout » ; Espaces mène aux domaines, « ‹ Espaces » et le bord gauche en reviennent */
     const bar = await p.evaluate(() => [...document.querySelectorAll('.fav-row .tab')].map((t) => t.dataset.tab));
-    ok('Accueil et « Pour moi » dans les favoris par défaut', bar[0] === 'accueil' && bar[1] === 'demandes' && await p.evaluate(() => document.querySelector('.fav-row .tab[data-tab="demandes"]').textContent.includes('Pour moi')));
-    ok('barre : 4 favoris et l\'orbe au centre', bar.length === 4 && await p.evaluate(() => !!document.querySelector('.talk-slot .jv-btn')), bar.join(','));
-    await p.tap('.fav-handle'); await p.waitForTimeout(500);
-    ok('« Tout » : toutes les rubriques', await p.evaluate(() => document.querySelectorAll('.all-grid .tab').length >= 11));
-    await p.screenshot({path: path.join(SH, 'tout.png')});
-    await p.tap('.all-grid .tab[data-tab="papiers"]'); await p.waitForTimeout(600);
-    ok('rubrique ouverte depuis « Tout »', await p.evaluate(() => document.querySelector('.all-sheet').hidden && /papiers/i.test(document.getElementById('view-title').textContent)));
-    /* 0.49.1 (« l'ouverture du menu bugge des fois ») : vrais gestes tactiles, une page neuve par geste */
-    { const fresh = async () => { const q = await page(''); return {q, cdp: await q.context().newCDPSession(q)}; };
-      const st = (q) => q.evaluate(() => { const s = document.querySelector('.all-sheet'); return s.hidden ? 'fermé' : s.classList.contains('is-open') ? 'ouvert' : 'transition'; });
-      const tt = (cdp, type, x, y) => cdp.send('Input.dispatchTouchEvent', {type, touchPoints: /End|Cancel/.test(type) ? [] : [{x, y}]});
-      const drag = async (q, cdp, x0, y0, x1, y1) => { await tt(cdp, 'touchStart', x0, y0); for (let i = 1; i <= 6; i++) { await tt(cdp, 'touchMove', x0 + (x1 - x0) * i / 6, y0 + (y1 - y0) * i / 6); await q.waitForTimeout(16); } await tt(cdp, 'touchEnd'); await q.waitForTimeout(600); };
-      const hd = (q) => q.evaluate(() => { const r = document.querySelector('.fav-handle').getBoundingClientRect(); return {x: r.left + r.width / 2, y: r.top + r.height / 2, top: r.top}; });
-      const tab = (q) => q.evaluate(() => { const r = document.querySelector('.fav-row .tab').getBoundingClientRect(); return {x: r.left + r.width / 2, y: r.top + r.height / 2}; });
-      const orb = (q) => q.evaluate(() => { const r = document.querySelector('.talk-slot').getBoundingClientRect(); return {x: r.left + r.width / 2, y: r.top + r.height / 2}; });
-      let {q, cdp} = await fresh(); let H = await hd(q); await q.touchscreen.tap(H.x, H.y); await q.waitForTimeout(150); await q.touchscreen.tap(H.x, H.y); await q.waitForTimeout(600);
-      ok('« Tout » : un second appui impatient ne referme pas le menu (« Fermer » monte à la place de « Tout »)', await st(q) === 'ouvert');
-      await q.context().close(); ({q, cdp} = await fresh()); H = await hd(q); await q.touchscreen.tap(H.x, H.top - 8); await q.waitForTimeout(600);
-      ok('« Tout » : un appui un peu au-dessus de la poignée ouvre le menu, pas la carte derrière', await st(q) === 'ouvert' && await q.evaluate(() => document.getElementById('sheet').hidden));
-      await q.context().close(); ({q, cdp} = await fresh()); let O = await orb(q); await drag(q, cdp, O.x, O.y + 10, O.x, O.y - 45);
-      const deOrbe = await st(q); await q.context().close(); ({q, cdp} = await fresh()); let A = await tab(q); await drag(q, cdp, A.x, A.y, A.x + 120, A.y - 45);
-      const biais = await st(q); await q.context().close(); ({q, cdp} = await fresh()); A = await tab(q); await drag(q, cdp, A.x, A.y, A.x, A.y - 50);
-      ok('glissé vers le haut sur la barre : ouvre depuis un favori, jamais depuis l\'orbe ni en biais', deOrbe === 'fermé' && biais === 'fermé' && await st(q) === 'ouvert', deOrbe + ' / ' + biais);
-      const t = await q.evaluate(() => document.querySelector('.all-panel').getBoundingClientRect().top + 30);
-      await tt(cdp, 'touchStart', 215, t); await tt(cdp, 'touchMove', 215, t + 40); await tt(cdp, 'touchCancel'); await q.waitForTimeout(500);
-      ok('menu : un glissé interrompu par iOS (touchcancel) remet le panneau en place', await st(q) === 'ouvert' && await q.evaluate(() => { const e = document.querySelector('.all-panel'); return !e.style.transform && !e.style.transition; }));
-      await Promise.all([tt(cdp, 'touchStart', 215, t), tt(cdp, 'touchMove', 215, t + 25), tt(cdp, 'touchMove', 215, t + 50), tt(cdp, 'touchMove', 215, t + 70), tt(cdp, 'touchEnd')]); await q.waitForTimeout(600);
-      ok('menu : un lancer vif vers le bas le ferme (même s\'il fait moins de 90 px)', await st(q) === 'fermé');
-      H = await hd(q); await q.touchscreen.tap(H.x, H.y); await q.waitForTimeout(500);
-      await q.evaluate(() => document.querySelector('.all-h .link').click()); await q.evaluate(() => document.querySelector('.fav-pick.is-fav').click()); await q.evaluate(() => document.querySelector('.all-h .link').click()); await q.waitForTimeout(200);
-      ok('favoris laissés à 3 puis « Terminé » : les 4 d\'avant sont gardés, avec un avis', await q.evaluate(() => { const s = document.querySelector('.all-sheet'); s.querySelector('.all-h .link').click(); return document.querySelectorAll('.fav-pick.is-fav').length === 4 && document.querySelectorAll('.fav-row .tab').length === 4 && /Favoris inchangés/.test(document.getElementById('toasts').textContent); }));
-      await q.context().close(); }
+    ok('barre : Aujourd’hui, Pour moi, l’orbe, Agenda, Espaces ; plus de poignée « Tout » ni de favoris', bar.join(',') === 'accueil,demandes,agenda,espaces' && await p.evaluate(() => !!document.querySelector('.fav-row > .talk-slot .jv-btn') && document.querySelector('.fav-row').children[3].classList.contains('talk-slot') && !document.querySelector('.fav-handle, .all-sheet') && /Aujourd’hui/.test(document.querySelector('.tab[data-tab="accueil"]').textContent)), bar.join(','));
+    await p.tap('.tab[data-tab="espaces"]'); await p.waitForTimeout(600);
+    ok('Espaces : une tuile vivante par domaine (Argent, Achats, Voyages, Sorties, Papiers, Équipe) et Réglages', await p.evaluate(() => location.hash === '#espaces' && ['argent', 'achats', 'voyages', 'sorties', 'papiers', 'equipe'].every((k) => document.querySelector('.esp-tile[data-go="' + k + '"] .esp-v')) && !!document.querySelector('.esp-row[data-go="reglages"]') && /\d/.test(document.querySelector('.esp-tile[data-go="argent"] .esp-v').textContent)));
+    await p.screenshot({path: path.join(SH, 'espaces.png')});
+    await p.tap('.esp-tile[data-go="papiers"]'); await p.waitForTimeout(600);
+    ok('domaine ouvert depuis Espaces : Espaces reste allumé, « ‹ Espaces » dans l’en-tête', await p.evaluate(() => /papiers/i.test(document.getElementById('view-title').textContent) && document.querySelector('.tab[data-tab="espaces"]').getAttribute('aria-current') === 'page' && !document.getElementById('nav-back').hidden && /Espaces/.test(document.getElementById('nav-back').textContent)));
+    { const cdp = await p.context().newCDPSession(p); const tt = (type, x, y) => cdp.send('Input.dispatchTouchEvent', {type, touchPoints: /End|Cancel/.test(type) ? [] : [{x, y}]});
+      await tt('touchStart', 4, 400); for (let i = 1; i <= 8; i++) { await tt('touchMove', 4 + i * 28, 404); await p.waitForTimeout(16); } await tt('touchEnd'); await p.waitForTimeout(600);
+      ok('glisser depuis le bord gauche : retour à Espaces', await p.evaluate(() => location.hash === '#espaces'));
+      await p.tap('.esp-tile[data-go="achats"]'); await p.waitForTimeout(500); await p.tap('.tab[data-tab="espaces"]'); await p.waitForTimeout(500);
+      ok('onglet Espaces touché depuis un domaine : retour à Espaces', await p.evaluate(() => location.hash === '#espaces')); }
+    await p.goto(base + '#suivi'); await p.waitForTimeout(2500);
+    ok('#suivi (liens des notifications) : Équipe, filtre Demandes, avec les panneaux de Suivi ; l’adresse reste #suivi', await p.evaluate(() => location.hash === '#suivi' && document.getElementById('view-title').textContent === 'Les bots' && document.querySelector('.ux-seg [aria-pressed="true"]').dataset.f === 'dem' && !!document.querySelector('.pend-x') && [...document.querySelectorAll('#view h2')].some((x) => /Tes ordres/.test(x.textContent))));
+    await p.goto(base + '#automatisations'); await p.waitForTimeout(2500);
+    ok('#automatisations : Équipe, filtre Routines (frises de suivi de livraison)', await p.evaluate(() => location.hash === '#automatisations' && document.querySelector('.ux-seg [aria-pressed="true"]').dataset.f === 'rout' && document.querySelectorAll('.auto.card').length > 0));
+    await p.evaluate(() => document.querySelector('.ux-seg [data-f="cout"]').click()); await p.waitForTimeout(400);
+    ok('Équipe, filtre Coût : coût de la semaine et file d’attente', await p.evaluate(() => [...document.querySelectorAll('#view h2')].some((x) => /Coût de la semaine/.test(x.textContent)) && ![...document.querySelectorAll('#view h2')].some((x) => /En cours chez tes bots/.test(x.textContent))));
+    await p.goto(base + '#reglages'); await p.waitForTimeout(2500);
+    ok('Réglages : l’état des systèmes (venu de Suivi) en bas', await p.evaluate(() => [...document.querySelectorAll('#view h2')].some((x) => /État des systèmes/.test(x.textContent))));
+    await p.goto(base + '#demandes'); await p.waitForTimeout(2500);
+    { const segs = await p.evaluate(() => [...document.querySelectorAll('.ux-seg button')].map((b) => b.dataset.f).join(','));
+      await p.evaluate(() => document.querySelector('.ux-seg [data-f="decider"]').click()); await p.waitForTimeout(400);
+      ok('Pour moi : filtres Tout, Décider, À faire, Infos ; « Décider » ne garde que « À décider »', segs === 'tout,decider,faire,infos' && await p.evaluate(() => !document.getElementById('pm-dec').hidden && [...document.querySelectorAll('.pm-sec')].filter((x) => !x.hidden).length === 1 && !document.querySelector('.pm-sum:not([hidden])')), segs);
+      await p.tap('.tab[data-tab="accueil"]'); await p.waitForTimeout(400); await p.tap('.tab[data-tab="demandes"]'); await p.waitForTimeout(500);
+      ok('Pour moi rouvert : de nouveau sur « Tout »', await p.evaluate(() => document.querySelector('.ux-seg [aria-pressed="true"]').dataset.f === 'tout' && [...document.querySelectorAll('.pm-sec')].every((x) => !x.hidden))); }
+    await p.goto(base); await p.waitForTimeout(2500);
     /* 0.25.0, un seul Claude : l'orbe ouvre la discussion avec Claude (celle qui a ses données) ; plus de page vocale ni de « Conversation » en continu */
     await p.tap('.talk-slot .jv-btn'); await p.waitForTimeout(1000);
     ok('orbe : ouvre la discussion avec Claude, sans page vocale ni mode « Conversation »', await p.evaluate(() => !document.getElementById('chat').hidden && !document.querySelector('.jv') && !!document.querySelector('#chat .lire-toggle') && ![...document.querySelectorAll('#chat .chat-head button')].some((x) => /Conversation|Fil/.test(x.textContent)) && /Claude/.test(document.querySelector('#chat .chat-id b').textContent)));
@@ -328,9 +324,11 @@ srv.listen(0, async () => {
     ok('équipe : texte en Exo 2, plus de police machine à écrire', await p.evaluate(() => /Exo 2/.test(getComputedStyle(document.querySelector('.mate-log')).fontFamily) && /Oxanium/.test(getComputedStyle(document.querySelector('.mate b')).fontFamily)));
     ok('équipe : l\'ambre ne remplit plus les cartes', await p.evaluate(() => { const d = document.querySelector('.mate[data-mode="demande"]'); return !!d && !/251, 191, 36, 0\.12/.test(getComputedStyle(d).backgroundImage); }));
     ok('équipe : « Te demande » une seule fois par carte', await p.evaluate(() => [...document.querySelectorAll('.mate[data-mode="demande"]')].every((x) => !/^Te demande/.test(x.querySelector('.mate-log span').textContent))));
-    ok('équipe : tes ordres en lignes, pastilles de chiffres sans débordement', await p.evaluate(() => { const st = document.querySelector('.stats'); const t = [...document.querySelectorAll('.panel')].find((x) => /Tes ordres/.test(x.textContent)); return !!t && t.querySelectorAll('.canal-row').length > 0 && !/\[object/.test(t.textContent) && !!st && st.scrollWidth <= st.clientWidth + 1; }));
     await p.screenshot({path: path.join(SH, 'equipe.png')});
-    await p.evaluate(() => [...document.querySelectorAll('.panel')].find((x) => /Tes ordres/.test(x.textContent)).querySelector('.canal-row').click()); await p.waitForTimeout(700);
+    await p.evaluate(() => document.querySelector('.ux-seg [data-f="dem"]').click()); await p.waitForTimeout(500);   /* refonte UX : tes ordres sont dans Équipe, filtre Demandes */
+    ok('équipe : tes ordres en lignes, pastilles de chiffres sans débordement', await p.evaluate(() => { const st = document.querySelector('.stats') || document.createElement('div'); const t = [...document.querySelectorAll('.panel')].find((x) => x.querySelector('h2') && /^Tes ordres/.test(x.querySelector('h2').textContent)); return !!t && t.querySelectorAll('.canal-row').length > 0 && !/\[object/.test(t.textContent) && !!st && st.scrollWidth <= st.clientWidth + 1; }));
+
+    await p.evaluate(() => [...document.querySelectorAll('.panel')].find((x) => x.querySelector('h2') && /^Tes ordres/.test(x.querySelector('h2').textContent)).querySelector('.canal-row').click()); await p.waitForTimeout(700);
     ok('équipe : un ordre s\'ouvre avec ses gestes', await p.evaluate(() => { const s = document.getElementById('sheet'); return !!s && !s.hidden && /Relancer|Merci/.test(s.textContent); }));
     /* papiers lus dans le Drive (16/11/2026) */
     p = await page('#papiers');
@@ -404,8 +402,8 @@ srv.listen(0, async () => {
     p = await page('#voyages');
     await p.evaluate(() => document.querySelector('.voy .fam-hit').click()); await p.waitForTimeout(800);
     ok('doublon 15 : « Valider ces dates » une seule fois, le conseil renvoie aux dates proposées', await p.evaluate(() => [...document.querySelectorAll('#view button')].filter((x) => /Valider ces dates/.test(x.innerText)).length === 1 && !!document.querySelector('.verdict .verdict-go') && !!document.getElementById('plan-dates')));
-    p = await page('#suivi');
-    ok('doublon 16 : Suivi garde une ligne vers Papiers ; Équipe sans dépôt ; Papiers avec le dépôt', await p.evaluate(() => /papiers? suivis?/.test((document.querySelector('.pap-go') || {}).textContent || '') && ![...document.querySelectorAll('#view .pap-search, #view input[type="search"]')].some((x) => !x.closest('.hist-panel'))) && await (async () => { const q = await page('#equipe'); const e = await q.evaluate(() => ![...document.querySelectorAll('#view .panel h2')].some((x) => /Déposer un document/.test(x.textContent))); const r = await page('#papiers'); return e && await r.evaluate(() => [...document.querySelectorAll('#view .panel h2')].some((x) => /Déposer un document/.test(x.textContent))); })());
+    p = await page('#espaces');   /* refonte UX : plus de Suivi ; Papiers est une tuile d'Espaces */
+    ok('doublon 16 : Papiers est une tuile d’Espaces (plus de ligne dans Suivi) ; Équipe sans dépôt ; Papiers avec le dépôt', await p.evaluate(() => /suivis?/.test((document.querySelector('.esp-tile[data-go="papiers"]') || {}).textContent || '') && !document.querySelector('#view .pap-search')) && await (async () => { const q = await page('#suivi'); const e = await q.evaluate(() => ![...document.querySelectorAll('#view .panel h2')].some((x) => /Déposer un document/.test(x.textContent))); const r = await page('#papiers'); return e && await r.evaluate(() => [...document.querySelectorAll('#view .panel h2')].some((x) => /Déposer un document/.test(x.textContent))); })());
     /* marges d'un vrai iPhone (capture du 17/11/2026) : barre d'état 59 px, barre d'accueil 34 px. L'en-tête ne cache plus le haut de la page. */
     { const ctx = await b.newContext({...devices['iPhone 15 Pro Max']}); const q = await ctx.newPage(); q.on('pageerror', (e) => errs.push('marges : ' + e.message));
       const c = await ctx.newCDPSession(q); await c.send('Emulation.setSafeAreaInsetsOverride', {insets: {top: 59, bottom: 34, left: 0, right: 0}});
@@ -422,7 +420,8 @@ srv.listen(0, async () => {
       const st = await p.evaluate(() => { const b = document.createElement('button'); b.className = 'btn danger-fill'; b.textContent = 'Oui : supprimer'; document.body.append(b); const cs = getComputedStyle(b); const r = {fg: cs.color, bg: cs.backgroundImage !== 'none' ? (cs.backgroundImage.match(/rgba?\([^)]+\)/) || [cs.backgroundColor])[0] : cs.backgroundColor}; b.remove(); return r; });
       const L1 = lum(st.fg), L2 = lum(st.bg), ratio = (Math.max(L1, L2) + 0.05) / (Math.min(L1, L2) + 0.05);
       ok('Hologramme : « Oui : supprimer » lisible (contraste ≥ 3)', ratio >= 3, JSON.stringify(st) + ' ' + ratio.toFixed(2));
-      await p.evaluate(() => [...document.querySelectorAll('.panel')].find((x) => /Tes ordres/.test(x.textContent)).querySelector('.canal-row').click()); await p.waitForTimeout(700);
+      await p.evaluate(() => { const b = document.querySelector('.ux-seg [data-f="dem"]'); if (b) b.click(); }); await p.waitForTimeout(500);   /* refonte UX : tes ordres sont sous « Demandes » */
+      await p.evaluate(() => [...document.querySelectorAll('.panel')].find((x) => x.querySelector('h2') && /^Tes ordres/.test(x.querySelector('h2').textContent)).querySelector('.canal-row').click()); await p.waitForTimeout(700);
       for (let k = 0; k < 3 && !(await p.$('#toasts .toast')); k++) { await p.evaluate(() => { const b = document.querySelector('#sheet:not([hidden]) .sa-main .btn, #sheet:not([hidden]) .btn.main'); if (b) b.click(); }); await p.waitForTimeout(900); }
       const had = !!(await p.$('#toasts .toast'));
       if (had) { await p.click('#toasts .toast .toast-x'); await p.waitForTimeout(450); }
@@ -444,7 +443,7 @@ srv.listen(0, async () => {
         const m = await q.evaluate(() => [...document.querySelectorAll('#sheet .sheet-actions .btn')].map((x) => { const r = x.getBoundingClientRect(), cs = getComputedStyle(x), c = x.querySelector('.cost'); return {rad: cs.borderRadius, pl: cs.paddingLeft, gap: c ? r.right - c.getBoundingClientRect().right : 0}; }));
         ok('feuille : boutons de même forme et même marge, coût calé à droite', m.length >= 5 && new Set(m.map((x) => x.rad + x.pl)).size === 1 && m.every((x) => x.gap <= 40), JSON.stringify(m)); }
       ok('glisser : la feuille du bas se ferme (pas sur un petit glissé ni un glissé de côté)', shortOk && sideOk && await p.evaluate(() => document.getElementById('sheet').hidden), shortOk + ' ' + sideOk + ' ' + box.tag);
-      p = await page(''); await p.fill('.intent-input', 'Bonjour'); await p.press('.intent-input', 'Enter'); await p.waitForTimeout(900);
+      p = await page(''); await p.evaluate(() => [...document.querySelectorAll('.hud-act button')].find((x) => /Parler à JARVIS/.test(x.textContent)).click()); await p.waitForTimeout(900);   /* refonte UX : « Parler à JARVIS » sur l'écran de JARVIS */
       const opened = await p.evaluate(() => !document.getElementById('chat').hidden);
       await drag(p, 215, 40, 0, 260, 350);
       ok('glisser : la discussion se ferme d\'un glissé vers le bas', opened && await p.evaluate(() => document.getElementById('chat').hidden));
@@ -468,7 +467,7 @@ srv.listen(0, async () => {
     /* 18/11/2026, passe globale : notifications (lien profond, bandeau qui se ferme, « Voir »), compteurs, Équipe, champs date */
     { p = await page('#accueil');
       const row = await p.evaluate(() => { let k = -1; window.__G['Canal'].forEach((x, i) => { if (i && x[1] === 'Rabie' && x[6]) k = i; }); return k + 1; });
-      const nums = await p.evaluate(() => { const k = [...document.querySelectorAll('.kpi-t')].find((x) => /pour toi/.test(x.textContent)); return [(document.querySelector('#status .st.is-demande') || {}).textContent, (document.querySelector('.tab[data-tab="demandes"] .badge') || {}).textContent, k ? k.querySelector('.kpi-n').textContent : '', document.getElementById('view').innerText]; });
+      const nums = await p.evaluate(() => { const k = document.querySelector('.hud-ro.q-bl b'); return [(document.querySelector('#status .st.is-demande') || {}).textContent, (document.querySelector('.tab[data-tab="demandes"] .badge') || {}).textContent, k ? (k.textContent.match(/^\d+/) || [''])[0] : '', document.getElementById('view').innerText];   /* refonte UX : « pour toi » est le relevé de l'écran de JARVIS */ });
       const n0 = (nums[0].match(/^(\d+) pour toi$/) || [])[1];
       ok('compteurs : un seul « pour toi », le même dans l\'en-tête, la pastille et l\'accueil', n0 != null && nums[1] === n0 && nums[2] === n0, nums.slice(0, 3).join(' / '));
       ok('accueil : jamais « J-- » (voyage en cours ou passé)', !/J--/.test(nums[3]));
@@ -495,7 +494,7 @@ srv.listen(0, async () => {
       ok('Pour moi : « En attente, plus tard, en rappel » ouvert par défaut', wait === true, String(wait));
       p = await page('#equipe');
       const eq = await p.evaluate(() => [[...document.querySelectorAll('#view .panel h2')].map((x) => x.textContent).join(' | '), (document.querySelector('#view .stats') || {}).innerText || '']);
-      ok('Équipe : plus de doublon « Échanges récents », des chiffres d\'équipe (ordres en cours, réponses)', !/Échanges récents/.test(eq[0]) && /Tes ordres/.test(eq[0]) && /en cours/.test(eq[1]) && /répons/.test(eq[1]) && !/prix suivis|papiers/.test(eq[1]), eq.join(' :: ').replace(/\s+/g, ' ').slice(0, 160));
+      ok('Équipe : plus de doublon « Échanges récents », des chiffres d\'équipe (ordres en cours, réponses)', !/Échanges récents/.test(eq[0]) && !/Tes ordres/.test(eq[0]) /* refonte UX : sous « Demandes » */ && /en cours/.test(eq[1]) && /répons/.test(eq[1]) && !/prix suivis|papiers/.test(eq[1]), eq.join(' :: ').replace(/\s+/g, ' ').slice(0, 160));
       p = await page('#agenda');
       const di = await p.evaluate(() => { const x = document.querySelector('input.inp[type="date"]'); if (!x) return null; const c = getComputedStyle(x); return c.minWidth + ' ' + c.appearance; });
       ok('Agenda : le champ date ne peut plus sortir de sa carte sur iPhone (largeur min. 0, sans apparence native)', di === '0px none', String(di)); }
@@ -528,8 +527,8 @@ srv.listen(0, async () => {
       await p.evaluate(() => { try { localStorage.setItem('jarvis.theme', 'neon'); } catch (e) { /* rien */ } }); await p.reload(); await p.waitForTimeout(2000);
       const th = await p.evaluate(() => ({cls: document.documentElement.className, th: document.documentElement.getAttribute('data-th'), c1: getComputedStyle(document.documentElement).getPropertyValue('--c1').trim(), jv: getComputedStyle(document.documentElement).getPropertyValue('--jv1').trim()}));
       ok('thème : Hologramme seul, un ancien choix (classique, Ambre, Néon) retombe sur Hologramme', th.cls === 'theme-holo' && th.th === 'holo' && th.c1 === '56, 189, 248' && th.jv === '', JSON.stringify(th));
-      await p.click('.fav-handle'); await p.waitForTimeout(600);
-      ok('thème : plus de ligne « Thème » dans Toutes les rubriques (un seul thème)', await p.evaluate(() => !document.querySelector('.theme-row, .th-pick') && !!document.querySelector('.all-panel')));
+      await p.click('.tab[data-tab="espaces"]'); await p.waitForTimeout(600);
+      ok('thème : plus de ligne « Thème » (un seul thème)', await p.evaluate(() => !document.querySelector('.theme-row, .th-pick') && !!document.querySelector('.esp-grid')));
     }
     /* 0.24.0 : chercher un produit à partir d'une idée (ici, la recherche d'exemple et une recherche simulée) */
     { p = await page('#achats');
@@ -610,8 +609,8 @@ srv.listen(0, async () => {
       await p.evaluate(() => [...document.querySelectorAll('.rad-due')][1].querySelectorAll('.row-actions button')[1].click()); await p.waitForTimeout(800);
       ok('Radar : « Comparer avec Claude » ouvre la discussion avec la question déjà écrite (rien n\'est envoyé)', await p.evaluate(() => { const ta = document.getElementById('chat-in'); return !!ta && /Compare pour moi « Assistant IA » \(21,60 €, mensuel\)/.test(ta.value); }));
       p = await page('');
-      await p.tap('.fav-handle'); await p.waitForTimeout(600);
-      ok('Radar : la rubrique Argent est dans « Toutes les rubriques » (maquette)', await p.evaluate(() => !!document.querySelector('.all-grid .tab[data-tab="argent"]')));
+      await p.tap('.tab[data-tab="espaces"]'); await p.waitForTimeout(600);
+      ok('Radar : la rubrique Argent est une tuile d’Espaces (maquette)', await p.evaluate(() => !!document.querySelector('.esp-tile[data-go="argent"]')));
       p = await page('#argent'); await p.screenshot({path: path.join(SH, 'radar.png')}); }
     /* Reste à payer (21/11/2026 ; ses choix : dans JARVIS, ses dépenses seulement, notification la veille + la page Radar). Date fixée au lundi
        23/11/2026 : paie le 28 (un samedi : avancée au vendredi 27) ; prélèvements du week-end et des jours fériés décalés au jour ouvré suivant. */

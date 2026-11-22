@@ -3938,11 +3938,14 @@ void main(){
   ];
   const TITLES = {accueil: "Vue d'ensemble", demandes: 'Ce qui attend ta réponse', agenda: 'Agenda et dates clés', equipe: 'Les bots', suivi: 'Dossiers, papiers, tâches', achats: 'Achats et prix suivis', voyages: 'Projets de voyage'};
   let TAB = 'accueil';
+  /* refonte UX (22/11/2026) : la porte de la barre à laquelle appartient chaque page */
+  function rootOf(id) { return id === 'accueil' || id === 'demandes' || id === 'agenda' ? id : 'espaces'; }
+  const NAVLBL = {accueil: 'Aujourd’hui', demandes: 'Pour moi', agenda: 'Agenda', espaces: 'Espaces', equipe: 'Équipe', suivi: 'Équipe', automatisations: 'Équipe', reglages: 'Réglages', argent: 'Argent', papiers: 'Papiers', sorties: 'Sorties', achats: 'Achats', voyages: 'Voyages'};
   /* le retour en arrière : chaque écran quitté est gardé, avec sa position ; « up » = remonter d'un niveau sans empiler */
   const NAV = {stack: [], cur: null, up: false, y: null};
   const navState = () => ({tab: TAB, agent: AGENT, ach: SEL.achats, voy: SEL.voyages});
   const navKey = (x) => [x.tab, x.agent, x.ach, x.voy].join('|');
-  const navLabel = (x) => x.ach ? ((S.ach.find((f) => f.id === x.ach) || {}).title || 'Achats') : x.voy ? ((S.voyages.find((v) => v.id === x.voy) || {}).title || 'Voyages') : x.agent && BOT[x.agent] ? BOT[x.agent].name : ((TABS.find((t) => t.id === x.tab) || {}).label || (x.tab === 'equipe' ? 'Équipe' : 'Accueil'));
+  const navLabel = (x) => x.ach ? ((S.ach.find((f) => f.id === x.ach) || {}).title || 'Achats') : x.voy ? ((S.voyages.find((v) => v.id === x.voy) || {}).title || 'Voyages') : x.agent && BOT[x.agent] ? BOT[x.agent].name : (NAVLBL[x.tab] || (TABS.find((t) => t.id === x.tab) || {}).label || 'Aujourd’hui');
   function navTrack(y) {
     const cur = navState();
     if (NAV.cur && navKey(NAV.cur) !== navKey(cur)) {
@@ -3951,12 +3954,14 @@ void main(){
       else { NAV.stack.push(Object.assign({}, NAV.cur, {y})); if (NAV.stack.length > 40) NAV.stack.shift(); }
     }
     NAV.up = false; NAV.cur = cur;
-    const b = $('nav-back'), top = NAV.stack[NAV.stack.length - 1];
-    const deep = !!(AGENT || SEL.achats || SEL.voyages); const br = document.querySelector('.brand'); if (br) br.classList.toggle('is-deep', deep && !!top);
+    const b = $('nav-back'), espDeep = rootOf(TAB) === 'espaces' && TAB !== 'espaces' && !AGENT && !SEL.achats && !SEL.voyages;
+    const top = NAV.stack[NAV.stack.length - 1] || (espDeep ? {tab: 'espaces'} : null);   /* une page de domaine ouverte directement remonte à Espaces */
+    const deep = !!(AGENT || SEL.achats || SEL.voyages) || espDeep; const br = document.querySelector('.brand'); if (br) br.classList.toggle('is-deep', deep && !!top);
     if (b) { b.hidden = !top || !deep; if (top) { b.replaceChildren(h('span', {class: 'ic', html: icon('back', 16)}), h('span', {class: 'nb-l', text: navLabel(top)})); b.setAttribute('aria-label', 'Retour : ' + navLabel(top)); } }
   }
   function navBack() {
-    const x = NAV.stack.pop(); if (!x) return;
+    const x = NAV.stack.pop();
+    if (!x) { if (rootOf(TAB) === 'espaces' && TAB !== 'espaces') { NAV.up = true; go('espaces'); } return; }
     closeSheet(true); closeApp(); if (CHAT.open) closeChat();
     TAB = VIEWS[x.tab] ? x.tab : 'accueil'; AGENT = x.agent; SEL.achats = x.ach; SEL.voyages = x.voy;
     NAV.cur = navState(); NAV.y = x.y;
@@ -3972,7 +3977,7 @@ void main(){
     $('view-title').textContent = VIEWTITLE[TAB] ? VIEWTITLE[TAB]() : TAB === 'equipe' && AGENT ? BOT[AGENT].name + ' · ' + BOT[AGENT].title : TITLES[TAB];
     VIEWS[TAB](body);
     v.replaceChildren(body);
-    document.querySelectorAll('.tab').forEach((t) => { const on = t.dataset.tab === TAB; t.setAttribute('aria-current', on ? 'page' : 'false'); if (on) try { t.scrollIntoView({inline: 'center', block: 'nearest'}); } catch (e) { /* rien */ } });
+    document.querySelectorAll('.tab').forEach((t) => { const on = t.dataset.tab === rootOf(TAB); t.setAttribute('aria-current', on ? 'page' : 'false'); });
     header();
     const to = keep ? y : NAV.y != null ? NAV.y : 0; NAV.y = null;
     if (sc) sc.scrollTop = to; else window.scrollTo(0, to);
@@ -4618,69 +4623,85 @@ void main(){
     el.append(h('p', {class: 'muted rad-foot', text: SRV_OS ? 'Lu dans tes mails par ton serveur, chaque matin à 6 h 50. Les montants restent sur le serveur : jamais dans Pilotage, ni chez les bots.' : 'Maquette : données d’exemple. Sur ton serveur, le Radar lira tes mails chaque matin à 6 h 50, sans Claude, et gardera tes dépenses fixes et ta paie ; les montants resteront sur le serveur, jamais dans Pilotage ni chez les bots.'}));
   };
 
+  /* ================= refonte UX (22/11/2026) : Espaces, la porte de tous les domaines ; chaque tuile dit déjà l'essentiel ================= */
+  TITLES.espaces = 'Espaces';
+  ICONS.team = '<circle cx="9" cy="9" r="3.2"/><circle cx="17" cy="10" r="2.4"/><path d="M3.5 19.5c.6-3.3 2.8-5 5.5-5s4.9 1.7 5.5 5M14.5 15c2.6-.4 4.8.9 5.5 4.5"/>';
+  document.head.append(h('style', {text: ''
+    + '.esp-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0 0 6px}'
+    + '.esp-tile{position:relative;overflow:hidden;display:grid;align-content:start;gap:3px;min-height:140px;padding:14px;text-align:left;border-radius:20px;color:var(--fg);font:inherit;cursor:pointer;border:1px solid rgba(var(--c1),.28);background:linear-gradient(180deg,rgba(var(--k7),.42),rgba(var(--k1),.82));box-shadow:inset 0 1px 0 rgba(var(--c6),.12),0 10px 26px rgba(0,0,0,.35);transition:transform .12s}'
+    + '.esp-tile:active{transform:scale(.97)}.esp-tile.amb{border-color:rgba(var(--warn),.6)}.esp-tile.amb .esp-s b{color:#fde68a;font-weight:600}'
+    + '.esp-ic{width:34px;height:34px;border-radius:11px;display:grid;place-items:center;margin-bottom:6px;color:rgb(var(--c2));background:rgba(var(--c1),.12);border:1px solid rgba(var(--c1),.3)}'
+    + '.esp-n{font:600 12.5px var(--display);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}.esp-v{font:700 21px/1.15 var(--display)}.esp-s{color:var(--muted);font-size:13px;line-height:1.3}'
+    + '.esp-tile.pic{align-content:end;min-height:160px}.esp-tile.pic img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0}'
+    + '.esp-tile.pic::after{content:"";position:absolute;inset:0;z-index:0;background:linear-gradient(180deg,rgba(2,6,20,.12),rgba(2,6,20,.9) 70%)}'
+    + '.esp-tile.pic>span,.esp-tile.pic>b{position:relative;z-index:1}.esp-tile.pic .esp-n{color:rgb(var(--c2))}.esp-tile.pic .esp-s{color:#d6e9ff}.esp-tile.pic .esp-ic{position:absolute;top:12px;left:12px;background:rgba(2,6,20,.6)}'
+    + '.esp-rows{display:grid;gap:8px}.esp-row{display:flex;align-items:center;gap:12px;width:100%;min-height:60px;padding:10px 14px;text-align:left;font:inherit;color:var(--fg);border-radius:18px;border:1px solid rgba(var(--c1),.22);background:linear-gradient(180deg,rgba(var(--k7),.34),rgba(var(--k1),.78));cursor:pointer}'
+    + '.esp-row .esp-ic{margin:0;flex:0 0 auto}.esp-row b{display:block;font-weight:600;font-size:15px}.esp-row small{display:block;color:var(--muted);font-size:13px}.esp-row>span:nth-child(2){flex:1;min-width:0}'
+    + '.esp-lead{color:var(--muted);margin:0 0 12px}'}));
+  const escH = (x) => String(x == null ? '' : x).replace(/[&<>"]/g, (c) => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
+  VIEWS.espaces = (el) => {
+    const tile = (id, ic, name, v, sub, o) => { o = o || {}; const b = h('button', {type: 'button', class: 'esp-tile' + (o.amb ? ' amb' : ''), 'data-go': id, onclick: () => go(id)}, h('span', {class: 'esp-ic', html: icon(ic, 18)}), h('span', {class: 'esp-n', text: name}), h('b', {class: 'esp-v', text: v}), h('span', {class: 'esp-s', html: sub}));
+      if (o.photo) o.photo((url) => { if (!url || b.querySelector('img')) return; b.classList.add('pic'); b.prepend(h('img', {src: url, alt: '', decoding: 'async'})); });
+      return b; };
+    const T = [];
+    /* Argent (le Radar) */
+    if (radOn()) {
+      radLoad(); const d = RAD.data, R = d ? radReste(d) : null, nv = d ? (d.propositions || []).length : 0;
+      T.push(tile('argent', 'euro', 'Argent', R ? radEur(R.tReste) : 'Radar', R ? (R.mois ? 'd’ici la fin du mois' : 'd’ici ta paie') + (nv ? ', <b>' + nv + ' à valider</b>' : '') : 'lecture de tes mails…', {amb: nv > 0}));
+    }
+    /* Achats */
+    const live = S.ach.filter((f) => !['achete', 'retire'].includes(famState(f))), hot = live.filter((f) => ACH_HOT.includes(famState(f)));
+    T.push(tile('achats', 'tag', 'Achats', hot.length ? hot.length + ' à décider' : live.length + ' suivis', hot.length ? escH(hot[0].title) : 'Kairos surveille les prix', {amb: hot.length > 0}));
+    /* Voyages : le prochain départ, avec sa photo */
+    const trips = S.voyages.filter((v) => !v.gone), nx = trips.filter((v) => !v.demo && v.depart != null && v.depart >= 0).sort((a, b) => a.depart - b.depart)[0];
+    T.push(tile('voyages', 'plane', 'Voyages', nx ? 'J-' + nx.depart : trips.length + ' projet' + (trips.length > 1 ? 's' : ''), nx ? escH(nx.title) : 'tes envies de voyage', {photo: nx ? (cb) => { try { voyPhoto(voyDests(nx).photo, cb); } catch (e) { /* rien */ } } : null}));
+    /* Sorties */
+    const open = S.sorties.filter((x) => x.status === 'proposee' && !sorExpired(x)), wk = open.filter(sorInWeekend);
+    T.push(tile('sorties', 'map', 'Sorties', wk.length ? wk.length + (wk.length > 1 ? ' idées' : ' idée') : open.length + (open.length > 1 ? ' idées' : ' idée'), wk.length ? 'ce week-end' : 'pour les prochains week-ends'));
+    /* Papiers */
+    T.push(tile('papiers', 'doc', 'Papiers', (S.papiers || []).length + ' suivis', 'rangés par Iris dans ton Drive'));
+    /* Équipe : l'état de Grok */
+    const asking = new Set((S.demandes || []).map((x) => x.bot).filter(Boolean)).size;
+    T.push(tile('equipe', 'team', 'Équipe', GP.on ? 'Grok en pause' : asking ? asking + (asking > 1 ? ' bots t’attendent' : ' bot t’attend') : 'Tout roule', GP.on ? (GP.until ? 'reprise ' + escH(fmt(GP.until, {weekday: 'short'}).replace('.', '') + ' ' + hmFr(GP.until)) : 'les sonnettes attendent la reprise') : 'tes bots, leurs routines, le coût', {amb: GP.on || asking > 0}));
+    const row = (id, ic, t, sub) => h('button', {type: 'button', class: 'esp-row', 'data-go': id, onclick: () => go(id)}, h('span', {class: 'esp-ic', html: icon(ic, 18)}), h('span', {}, h('b', {text: t}), h('small', {text: sub})), h('span', {class: 'ic', html: icon('next', 16)}));
+    el.append(h('p', {class: 'esp-lead', text: 'Chaque domaine montre déjà l’essentiel : un appui pour le détail.'}), h('div', {class: 'esp-grid'}, T),
+      panel('Coulisses', null, h('div', {class: 'esp-rows'}, row('equipe', 'team', 'Équipe, routines et dossiers', 'Les bots, ce que tu leur as demandé, leurs passages, le coût'), row('reglages', 'gear', 'Réglages', 'Serveur, voix, notifications, Google, mémoire'))));
+  };
+
   function boot() {
     const nav = $('tabs');
-    /* JARVIS OS : barre à tes 4 favoris, l'orbe au centre ; la poignée (ou un geste vers le haut) montre toutes les rubriques */
-    /* ordre du 16/11/2026 : le quotidien d'abord (accueil, ce qui attend sa réponse, agenda, ce qui est en cours), puis les domaines, puis l'équipe et les réglages */
+    /* JARVIS OS, refonte UX (22/11/2026, maquette validée par le propriétaire) : 5 portes fixes, l'orbe au centre ; plus de favoris ni de menu « Tout ».
+       Les autres rubriques sont dans Espaces ; l'onglet allumé est celui de la racine de la page (Espaces pour Achats, Équipe, Réglages…). */
     ICONS.home = '<path d="M4 11.5 12 5l8 6.5"/><path d="M6.5 10v9.5h11V10"/><path d="M10 19.5v-5h4v5"/>';
-    const ALL = [['accueil', 'Accueil', 'home'], ['demandes', 'Pour moi', 'chat'], ['agenda', 'Agenda', 'cal'], ['suivi', 'Suivi', 'folder'], ['achats', 'Achats', 'tag'], ['voyages', 'Voyages', 'plane'], ['sorties', 'Sorties', 'map'], ['papiers', 'Papiers', 'doc'], ['equipe', 'Équipe', 'pulse'], ['automatisations', 'Automatisations', 'clock'], ['reglages', 'Réglages', 'gear']];
-    if (radOn()) ALL.splice(ALL.findIndex((a) => a[0] === 'equipe'), 0, ['argent', 'Argent', 'euro']); /* Radar (maquette du 21/11/2026) */
-    const FAV0 =['accueil', 'demandes', 'agenda', 'achats'];
-    let FAV = null; try { FAV = JSON.parse(localStorage.getItem('jarvis.fav')); if (localStorage.getItem('jarvis.fav.v') !== '2') { FAV = null; localStorage.setItem('jarvis.fav.v', '2'); } } catch (e) { /* rien */ }
-    if (!Array.isArray(FAV) || FAV.length !== 4 || FAV.some((f) => !ALL.find((a) => a[0] === f))) FAV = FAV0.slice();
-    const sheet = h('div', {class: 'all-sheet', hidden: true, role: 'dialog', 'aria-label': 'Toutes les rubriques'});
-    let editFav = false;
-    const navBtn = ([id, label, ic], extra) => h('button', {type: 'button', class: 'tab', 'data-tab': id, onclick: () => { closeAll(); go(id); }, ...(extra || {})}, h('span', {class: 'ic', html: icon(ic, 20)}), h('span', {class: 'lbl', text: label}), id === 'demandes' ? h('span', {class: 'badge', hidden: true}) : null);
-    /* ouverture et fermeture animées ; la feuille suit le doigt quand on la tire vers le bas */
-    /* 0.49.1 (« l'ouverture du menu bugge des fois ») : un second appui impatient tombait sur « Fermer », qui monte à la place de « Tout », et refermait le menu ;
-       un glissé interrompu par iOS (touchcancel) laissait le panneau à mi-course ; un lancer vif vers le bas ne fermait pas ;
-       des favoris laissés à 3 n'étaient ni gardés ni annulés */
-    let closeT = 0, openedAt = 0, FAV_OK = FAV.slice();
-    const openAll = () => { if (!sheet.hidden && sheet.classList.contains('is-open')) return; clearTimeout(closeT); drawSheet(); sheet.hidden = false; openedAt = performance.now(); document.body.classList.add('all-open'); requestAnimationFrame(() => requestAnimationFrame(() => sheet.classList.add('is-open'))); };
-    const favDone = () => { if (FAV.length === 4) return; FAV = FAV_OK.slice(); toast('Favoris inchangés', 'Il en faut 4 : choisis-en un autre avant « Terminé ».'); };
-    function closeAll() { if (sheet.hidden) return; if (editFav) favDone(); sheet.classList.remove('is-open'); const pn = sheet.querySelector('.all-panel'); if (pn) { pn.style.transition = ''; pn.style.transform = ''; } dy0 = null; editFav = false; document.body.classList.remove('all-open'); closeT = setTimeout(() => { sheet.hidden = true; }, 300); }
-    let dy0 = null, dyN = 0, dt0 = 0;
-    sheet.addEventListener('touchstart', (e) => { dy0 = null; const pn = e.target.closest && e.target.closest('.all-panel'); if (pn && pn.scrollTop <= 0 && e.touches.length === 1) { dy0 = e.touches[0].clientY; dyN = 0; dt0 = performance.now(); pn.style.transition = 'none'; } }, {passive: true});
-    sheet.addEventListener('touchmove', (e) => { if (dy0 == null) return; dyN = Math.max(0, e.touches[0].clientY - dy0); const pn = sheet.querySelector('.all-panel'); if (pn) pn.style.transform = 'translateY(' + dyN + 'px)'; }, {passive: true});
-    const dragEnd = (cancel) => { if (dy0 == null) return; dy0 = null; const pn = sheet.querySelector('.all-panel'); if (!pn) return; pn.style.transition = ''; const fast = dyN > 50 && dyN / Math.max(1, performance.now() - dt0) > 0.6; if (!cancel && (dyN > 90 || fast)) closeAll(); else pn.style.transform = ''; };
-    sheet.addEventListener('touchend', () => dragEnd(false), {passive: true});
-    sheet.addEventListener('touchcancel', () => dragEnd(true), {passive: true});
-    function drawSheet() {
-      sheet.replaceChildren(h('div', {class: 'all-panel'},
-        h('div', {class: 'all-h'}, h('b', {text: editFav ? 'Choisis 4 favoris' : 'Toutes les rubriques'}), h('button', {type: 'button', class: 'link', onclick: () => { if (editFav) favDone(); editFav = !editFav; drawSheet(); }}, editFav ? 'Terminé' : 'Modifier mes favoris')),
-        h('div', {class: 'all-grid'}, ALL.map((a) => editFav
-          ? h('button', {type: 'button', class: 'tab fav-pick' + (FAV.includes(a[0]) ? ' is-fav' : ''), onclick: () => { if (FAV.includes(a[0])) FAV = FAV.filter((f) => f !== a[0]); else if (FAV.length < 4) FAV.push(a[0]); if (FAV.length === 4) { FAV_OK = FAV.slice(); try { localStorage.setItem('jarvis.fav', JSON.stringify(FAV)); } catch (e) { /* rien */ } drawBar(); } drawSheet(); }}, h('span', {class: 'ic', html: icon(a[2], 20)}), h('span', {class: 'lbl', text: a[1]}), h('span', {class: 'star', text: FAV.includes(a[0]) ? '★' : '☆'}))
-          : navBtn(a))),
-        h('button', {type: 'button', class: 'all-close', onclick: closeAll}, 'Fermer')));
-    }
-    /* 0.49.1 : pendant l'ouverture (450 ms), un second appui sur « Tout » tombait sur « Fermer », qui monte à sa place : ignoré */
-    sheet.addEventListener('click', (e) => { if (performance.now() - openedAt < 450) { e.stopPropagation(); e.preventDefault(); } }, true);
-    sheet.addEventListener('click', (e) => { if (e.target === sheet) closeAll(); });
+    ICONS.sun = '<circle cx="12" cy="12" r="4"/><path d="M12 2.8v2.4M12 18.8v2.4M2.8 12h2.4M18.8 12h2.4M5.5 5.5l1.7 1.7M16.8 16.8l1.7 1.7M5.5 18.5l1.7-1.7M16.8 7.2l1.7-1.7"/>';
+    ICONS.grid = '<rect x="4" y="4" width="6.5" height="6.5" rx="2"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="2"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="2"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="2"/>';
+    const PORTES = [['accueil', 'Aujourd’hui', 'sun'], ['demandes', 'Pour moi', 'chat'], ['agenda', 'Agenda', 'cal'], ['espaces', 'Espaces', 'grid']];
+    /* un appui sur l'onglet de la page ouverte remonte en haut ; sur l'onglet d'une page plus profonde (Achats sous Espaces), il revient à sa racine */
+    const navBtn = ([id, label, ic]) => h('button', {type: 'button', class: 'tab', 'data-tab': id, onclick: () => { if (TAB === id && !AGENT && !SEL.achats && !SEL.voyages) { const sc = $('scroller'); if (sc) try { sc.scrollTo({top: 0, behavior: 'smooth'}); } catch (e) { sc.scrollTop = 0; } return; } go(id); }},
+      h('span', {class: 'ic', html: icon(ic, 20)}), h('span', {class: 'lbl', text: label}), id === 'demandes' ? h('span', {class: 'badge', hidden: true}) : null);
     function drawBar() {
-      const fav = FAV.map((f) => ALL.find((a) => a[0] === f));
-      nav.replaceChildren(h('button', {type: 'button', class: 'fav-handle', 'aria-label': 'Toutes les rubriques', onclick: openAll}, h('span', {class: 'grip'}), h('span', {text: 'Tout'})),
-        h('div', {class: 'fav-row'}, h('span', {class: 'fav-ind', 'aria-hidden': 'true'}), navBtn(fav[0]), navBtn(fav[1]), h('div', {class: 'talk-slot'}), navBtn(fav[2]), navBtn(fav[3])));
+      nav.replaceChildren(h('div', {class: 'fav-row'}, h('span', {class: 'fav-ind', 'aria-hidden': 'true'}), navBtn(PORTES[0]), navBtn(PORTES[1]), h('div', {class: 'talk-slot'}), navBtn(PORTES[2]), navBtn(PORTES[3])));
       if (window.JarvisVoice) try { window.JarvisVoice.mountButton(nav.querySelector('.talk-slot')); } catch (e) { /* rien */ }
       try { renderView(true); } catch (e) { /* rien */ }
       placeInd();
     }
-    /* l'indicateur lumineux glisse jusqu'à la rubrique ouverte ; hors de la barre, c'est « Tout » qui s'allume */
+    /* l'indicateur lumineux glisse jusqu'à l'onglet allumé */
     function placeInd() {
       const ind = nav.querySelector('.fav-ind'), row = nav.querySelector('.fav-row'); if (!ind || !row) return;
       const t = row.querySelector('.tab[aria-current="page"]');
-      nav.classList.toggle('is-elsewhere', !t);
       if (!t) { ind.style.opacity = '0'; return; }
       const r = row.getBoundingClientRect(), b = t.getBoundingClientRect();
       ind.style.opacity = '1'; ind.style.transform = 'translateX(' + (b.left - r.left + b.width / 2 - 28) + 'px)';
     }
     new MutationObserver(() => requestAnimationFrame(placeInd)).observe(nav, {subtree: true, attributes: true, attributeFilter: ['aria-current']});
     window.addEventListener('resize', placeInd);
-    /* 0.49.1 : le glissé vers le haut n'ouvre plus le menu depuis l'orbe, ni depuis le bas de l'écran (geste d'accueil d'iOS), ni sur un glissé lent ou en biais */
-    let y0 = null, x0 = 0, yt0 = 0;
-    nav.addEventListener('touchstart', (e) => { y0 = null; if (e.touches.length !== 1 || (e.target.closest && e.target.closest('.talk-slot'))) return; const y = e.touches[0].clientY, pb = parseFloat(getComputedStyle(nav).paddingBottom) || 0; if (y > innerHeight - pb) return; y0 = y; x0 = e.touches[0].clientX; yt0 = performance.now(); }, {passive: true});
-    nav.addEventListener('touchend', (e) => { if (y0 == null) return; const dy = y0 - e.changedTouches[0].clientY, dx = Math.abs(e.changedTouches[0].clientX - x0); y0 = null; if (dy > 40 && dx < dy / 2 && performance.now() - yt0 < 700) openAll(); }, {passive: true});
-    nav.addEventListener('touchcancel', () => { y0 = null; }, {passive: true});
-    document.body.append(sheet);
+    /* glisser depuis le bord gauche de l'écran : retour, comme dans une app iPhone (seulement quand « ‹ Retour » est affiché, rien d'ouvert par-dessus) */
+    let E = null;
+    document.addEventListener('touchstart', (e) => { E = null; const b = $('nav-back'); if (e.touches.length !== 1 || e.touches[0].clientX > 24 || !b || b.hidden || !$('sheet').hidden || CHAT.open || APP.id) return; E = {x0: e.touches[0].clientX, y0: e.touches[0].clientY, t0: performance.now(), on: false}; }, {passive: true});
+    document.addEventListener('touchmove', (e) => { if (!E) return; const dx = e.touches[0].clientX - E.x0, dy = e.touches[0].clientY - E.y0; if (!E.on) { if (Math.abs(dy) > Math.abs(dx)) { E = null; return; } if (dx < 10) return; E.on = true; } const v = $('view'); v.style.transition = 'none'; v.style.transform = 'translateX(' + Math.max(0, dx) + 'px)'; v.style.opacity = String(1 - Math.min(0.5, dx / innerWidth)); }, {passive: true});
+    const eEnd = (e, cancel) => { const g = E; E = null; if (!g || !g.on) return; const v = $('view'); v.style.transition = ''; v.style.transform = ''; v.style.opacity = ''; if (cancel) return; const dx = e.changedTouches[0].clientX - g.x0, fast = dx / Math.max(1, performance.now() - g.t0) > 0.5; if (dx > 100 || (dx > 40 && fast)) navBack(); };
+    document.addEventListener('touchend', (e) => eEnd(e, false), {passive: true});
+    document.addEventListener('touchcancel', (e) => eEnd(e, true), {passive: true});
     drawBar();
     const brand = document.querySelector('.brand b'); if (brand) { brand.style.cursor = 'pointer'; brand.addEventListener('click', () => go('accueil')); }
     $('sheet-back').addEventListener('click', () => closeSheet());
@@ -8156,16 +8177,89 @@ void main(){
         h('ol', {class: 'trip-steps'}, STEPS.map((x, i) => h('li', {class: i < v.step ? 'is-done' : i === v.step ? 'is-now' : '', text: x}))),
         mine.length ? h('p', {class: 'trip-todo'}, h('b', {text: 'Pour toi : '}), mine.map((c) => cap1(String(c.t).replace(/^Rabie\s+/i, ''))).join(' ; ')) : h('p', {class: 'trip-todo muted', text: lvName(v.bot) + ' s’en occupe'})));
   }
+  /* ---------- l'écran de JARVIS : l'heure qui défile, le globe et ses anneaux, 4 relevés reliés au globe, la phrase du jour dite à l'ouverture ---------- */
+  const HUD = {g: null, done: false, timer: null, i: 0};
+  document.head.append(h('style', {text: ''
+    + '.hud{position:relative;margin:0 0 6px}.hud-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}'
+    + '.hud-clock{font:700 46px/1 Orbitron,var(--display);letter-spacing:.04em;color:#eaf8ff;text-shadow:0 0 22px rgba(var(--c1),.65),0 0 2px #fff}.hud-clock small{font-size:18px;color:rgb(var(--c2));margin-left:3px}'
+    + '.hud-date{margin-top:8px;font:600 12px var(--display);letter-spacing:.2em;text-transform:uppercase;color:var(--muted)}'
+    + '.hud-on{text-align:right;font:700 12px Orbitron,var(--display);letter-spacing:.18em;color:rgb(var(--c2));padding-top:4px}.hud-on i{display:inline-block;width:8px;height:8px;border-radius:50%;background:#34d399;box-shadow:0 0 10px #34d399;margin-right:7px;animation:hudblink 1.6s ease-in-out infinite}'
+    + '.hud-on small{display:block;margin-top:5px;font:500 12px var(--sans);letter-spacing:.02em;color:var(--muted);white-space:nowrap}'
+    + '.hud-core{position:relative;height:340px;margin:2px -8px 0}.hud-core .holo-stage{position:absolute;inset:0;width:auto;height:auto}.hud-core .holo-stage canvas{width:100%;height:100%;display:block}'
+    + '.hud-lines{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible}.hud-lines path{fill:none;stroke:rgb(var(--c2));stroke-opacity:.85;stroke-width:1.5;stroke-dasharray:4 3;animation:hudflow 1.2s linear infinite;filter:drop-shadow(0 0 3px rgba(var(--c1),.9))}.hud-lines circle{fill:#e0faff;filter:drop-shadow(0 0 5px rgb(var(--c1)))}'
+    + '.hud-ro{position:absolute;z-index:1;width:128px;text-align:left;padding:8px 10px 9px;border-radius:4px 14px 4px 14px;color:var(--fg);font:inherit;cursor:pointer;background:rgba(3,10,28,.74);border:1px solid rgba(var(--c1),.45);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);box-shadow:0 0 18px rgba(14,165,233,.18),inset 0 0 14px rgba(var(--c1),.08);animation:hudhover 5s ease-in-out infinite}'
+    + '.hud-ro::before,.hud-ro::after{content:"";position:absolute;width:10px;height:10px;border:2px solid rgb(var(--c2))}.hud-ro::before{left:-2px;top:-2px;border-right:0;border-bottom:0;border-radius:4px 0 0 0}.hud-ro::after{right:-2px;bottom:-2px;border-left:0;border-top:0;border-radius:0 0 4px 0}'
+    + '.hud-ro small{display:block;font:700 11px var(--display);letter-spacing:.16em;color:rgb(var(--c2))}.hud-ro b{display:block;font:700 18px/1.15 var(--display);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.hud-ro span{display:block;font-size:12px;color:var(--muted);margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}'
+    + '.hud-ro.amb{border-color:rgba(var(--warn),.65);box-shadow:0 0 18px rgba(var(--warn),.2)}.hud-ro.amb::before,.hud-ro.amb::after{border-color:rgb(var(--warn))}.hud-ro.amb small{color:#fde68a}.hud-ro.amb b{color:#fde68a;text-shadow:0 0 12px rgba(var(--warn),.55)}'
+    + '.hud-ro.q-tl{left:8px;top:4px}.hud-ro.q-tr{right:8px;top:4px;animation-delay:-1.2s}.hud-ro.q-bl{left:8px;bottom:4px;animation-delay:-2.5s}.hud-ro.q-br{right:8px;bottom:4px;animation-delay:-3.7s}'
+    + '.hud-say{min-height:72px;margin:10px 6px 0;font:500 16px/1.5 var(--sans);color:#dbeafe;text-align:center}.hud-hi{font:700 19px var(--display);color:rgb(var(--c2))}'
+    + '.hud-caret{display:inline-block;width:2px;height:1.05em;vertical-align:-3px;background:rgb(var(--c2));margin-left:3px;box-shadow:0 0 6px rgb(var(--c1));animation:hudblink 1s steps(2) infinite}'
+    + '.hud-act{display:flex;justify-content:center;gap:8px;flex-wrap:wrap;margin:12px 0 4px}'
+    + '@keyframes hudblink{50%{opacity:.15}}@keyframes hudflow{to{stroke-dashoffset:-12}}@keyframes hudhover{50%{transform:translateY(-3px)}}'
+    + '.hud .hud-ro,.hud .hud-ro:hover,.hud .hud-ro:focus{background:rgba(3,10,28,.74);background-image:none}.hud .hud-ro b{font-size:16.5px}.hud .hud-ro{width:142px}'
+    + '#dir:has(.hud) #view-title{display:none}'
+    + '@media (prefers-reduced-motion: reduce){.hud-ro,.hud-lines path{animation:none}}'}));
+  const p2h = (n) => String(n).padStart(2, '0');
+  const hudClock = () => { const d = new Date(); return p2h(d.getHours()) + ':' + p2h(d.getMinutes()) + '<small>' + p2h(d.getSeconds()) + '</small>'; };
+  setInterval(() => { const c = $('hud-clock'); if (c) c.innerHTML = hudClock(); }, 1000);
+  function hudLines() {
+    const core = document.querySelector('.hud-core'), svg = core && core.querySelector('.hud-lines'); if (!svg || !core.isConnected) return;
+    const W = core.clientWidth, H = core.clientHeight, cx = W / 2, cy = H / 2, R = Math.min(W, H) * 0.235 * 1.08, cr = core.getBoundingClientRect();
+    svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+    svg.innerHTML = [...core.querySelectorAll('.hud-ro')].map((ro) => {
+      const r = ro.getBoundingClientRect(), left = r.left - cr.left < W / 2, top = r.top - cr.top < H / 2;
+      const x0 = left ? r.right - cr.left : r.left - cr.left, y0 = top ? r.bottom - cr.top - 14 : r.top - cr.top + 14, x1 = x0 + (left ? 12 : -12);
+      const an = Math.atan2(y0 - cy, x1 - cx), tx = cx + Math.cos(an) * R, ty = cy + Math.sin(an) * R, f = (v) => v.toFixed(1);
+      return '<path d="M' + f(x0) + ' ' + f(y0) + ' H' + f(x1) + ' L' + f(tx) + ' ' + f(ty) + '"/><circle cx="' + f(tx) + '" cy="' + f(ty) + '" r="2.6"/><circle cx="' + f(x0) + '" cy="' + f(y0) + '" r="1.8"/>';
+    }).join('');
+  }
+  window.addEventListener('resize', () => { if (document.querySelector('.hud-core')) hudLines(); });
+  function hudScreen(D, pr, ml) {
+    const holoOk = document.documentElement.classList.contains('theme-holo') && window.JarvisVoice && window.JarvisVoice.holo;
+    if (!HUD.g && holoOk) HUD.g = window.JarvisVoice.holo({hud: true, nodes: 150});
+    const today = D.ag.filter((a) => a.n === 0), nowH = new Date().getHours() + new Date().getMinutes() / 60;
+    const tOf = (a) => { const m = String(a.time || '').match(/(\d{1,2})h(\d{2})?/); return m ? +m[1] + (+m[2] || 0) / 60 : null; };
+    const next = today.filter((a) => tOf(a) != null && tOf(a) > nowH).sort((a, b) => tOf(a) - tOf(b))[0];
+    const pm = pourMoiN(), urg = D.dem.filter((d) => d.due != null && d.due <= 2).length;
+    const ro = (pos, act, k, b, sub, amb) => h('button', {type: 'button', class: 'hud-ro q-' + pos + (amb ? ' amb' : ''), onclick: act}, h('small', {text: k}), h('b', {text: b}), h('span', {text: sub}));
+    const metB = ml ? (ml.match(/-?\d+°/) || [''])[0] || ml.split(' · ')[0] : '', metS = ml ? ml.replace(/^-?\d+° · /, '') : 'Afficher la météo';
+    let argB = null, argS = '';
+    if (typeof radOn === 'function' && radOn()) { radLoad(); const R = RAD.data ? radReste(RAD.data) : null; if (R) { argB = radEur(R.tReste); argS = R.mois ? 'd’ici la fin du mois' : 'd’ici ta paie'; } }
+    const deals = (S.ach || []).filter((f) => ['achat', 'bon'].includes(famState(f)));
+    const core = h('div', {class: 'hud-core'}, HUD.g ? HUD.g.el : C('claude', 150).el, h('svg', {class: 'hud-lines', 'aria-hidden': 'true'}),
+      ro('tl', () => go('agenda'), 'AGENDA', today.length + (today.length > 1 ? ' rendez-vous' : today.length ? ' rendez-vous' : ' rendez-vous'), next ? next.time + ' ' + next.title : today.length ? 'fini pour aujourd’hui' : 'journée libre'),
+      ro('tr', () => metLoad(true), 'MÉTÉO', metB || '—', metS),
+      ro('bl', () => go('demandes'), 'POUR TOI', pm + (pm > 1 ? ' décisions' : pm ? ' décision' : ''), urg ? urg + (urg > 1 ? ' urgentes' : ' urgente') : pm ? 'à décider ou à faire' : 'rien ne t’attend', pm > 0),
+      argB ? ro('br', () => go('argent'), 'ARGENT', argB, argS) : ro('br', () => go('achats'), 'BONS PRIX', String(deals.length), deals.length ? deals[0].title : 'rien sous tes seuils'));
+    const hi = h('span', {class: 'hud-hi'}), say = h('span'), A = hello() + ', Rabie.';
+    const B = (pm ? pm + (pm > 1 ? ' décisions t’attendent' : ' décision t’attend') + (urg ? ', dont ' + urg + (urg > 1 ? ' urgentes' : ' urgente') : '') + '. ' : 'Rien ne t’attend. ')
+      + (today.length ? today.length + (today.length > 1 ? ' rendez-vous' : ' rendez-vous') + ' aujourd’hui' + (next ? ', le prochain à ' + next.time.replace('h', ' h ') : '') + '. ' : 'Journée libre dans ton agenda. ')
+      + (GP.on ? 'Grok est en pause' + (GP.until ? ' jusqu’à ' + fmt(GP.until, {weekday: 'long'}) + ' ' + hmFr(GP.until) : '') + '.' : 'Tes bots sont au travail.');
+    const scr = h('section', {class: 'hud', 'aria-label': 'JARVIS'},
+      h('div', {class: 'hud-top'}, h('div', {}, h('div', {class: 'hud-clock', id: 'hud-clock', html: hudClock()}), h('div', {class: 'hud-date', html: escH(cap1(fmt(TODAY, {weekday: 'long', day: 'numeric', month: 'long'}))) + (pr ? '<br>' + escH(CODE[pr]) : '')})),
+        h('div', {class: 'hud-on'}, h('i'), 'J.A.R.V.I.S', h('small', {text: 'en ligne · ' + (BOTS.length + 1) + ' agents'}))),
+      core, h('p', {class: 'hud-say'}, hi, ' ', say, h('i', {class: 'hud-caret'})),
+      h('div', {class: 'hud-act'}, h('button', {type: 'button', class: 'btn main', onclick: () => (window.JarvisAsk || (() => openChat('claude')))()}, 'Parler à JARVIS'), typeof briefCard === 'function' ? null : null));
+    requestAnimationFrame(() => requestAnimationFrame(hudLines));
+    /* la phrase du jour : dite une fois par ouverture de l'app, pendant que le globe parle ; elle continue si la page est redessinée (données qui arrivent) */
+    HUD.hi = hi; HUD.say = say; HUD.A = A; HUD.txt = A + ' ' + B;
+    const put = (n) => { const x = HUD.txt.slice(0, n); HUD.hi.textContent = x.slice(0, HUD.A.length); HUD.say.textContent = x.length > HUD.A.length ? x.slice(HUD.A.length + 1) : ''; };
+    if (HUD.done || reduced) put(HUD.txt.length);
+    else if (HUD.timer) put(HUD.i);
+    else {
+      HUD.i = 0; if (HUD.g) HUD.g.set('speaking');
+      HUD.timer = setInterval(() => { HUD.i += 2; put(HUD.i); if (HUD.i >= HUD.txt.length) { clearInterval(HUD.timer); HUD.timer = null; HUD.done = true; setTimeout(() => HUD.g && HUD.g.set('idle'), 500); } }, 34);
+    }
+    return scr;
+  }
   function homeDash(el, D, bar) {
     metLoad(false);
     const pr = S.presence && S.presence[isoOf(TODAY)], ml = metLine();
-    el.append(h('header', {class: 'hm-hello'}, h('span', {class: 'hm-glb'}, globe({nodes: 60, size: 52, ring: false})),
-      h('div', {}, h('b', {text: hello() + ', Rabie'}), h('small', {text: cap1(fmt(TODAY, {weekday: 'long', day: 'numeric', month: 'long'})) + (pr ? ' · ' + CODE[pr] : '') + (ml ? ' · ' + ml : '')}),
-        !ml && !window.__METEO ? h('button', {type: 'button', class: 'link hm-met', onclick: () => metLoad(true)}, 'Afficher la météo') : null)));
-    el.append(bar);   /* 19/11/2026 : « Demander » repasse en haut (en bas, il ne servait à rien) */
+    /* refonte UX (22/11/2026, maquette validée : « le bloc bleu est trop banal ; impressionnant, futuriste, vivant ») : l'écran de JARVIS */
+    void bar; el.append(hudScreen(D, pr, ml));
     if (typeof briefCard === 'function') { const bc = briefCard(); if (bc) el.append(bc); }   /* 0.41.0 : le brief du jour */
     if (typeof actCard === 'function') el.append(actCard());   /* 0.33.0 : ce que font Claude et tes bots, en direct */
-    el.append(hsec('En un coup d’œil', null, homeKpis(D)));
+    { const k = homeKpis(D); [...k.querySelectorAll('.kpi-t')].filter((x) => /pour toi/.test(x.textContent)).forEach((x) => x.remove()); el.append(hsec('En un coup d’œil', null, k)); }   /* « pour toi » est dans l'écran de JARVIS ; mails et bons prix restent (son choix du 19/11) */
     if (D.now.length) el.append(hsec('À faire maintenant', more('Tout voir', 'demandes'), nowRows(D)));
     const today = D.ag.filter((a) => a.n === 0), H0 = 7, H1 = 23, nowH = new Date().getHours() + new Date().getMinutes() / 60, pos = (x) => Math.max(0, Math.min(100, (x - H0) / (H1 - H0) * 100));
     const axis = h('div', {class: 'tl-axis'}, h('span', {class: 'tl-now', style: 'left:' + pos(nowH) + '%'}, h('small', {text: hm(new Date())})));
@@ -9452,6 +9546,104 @@ void main(){
     };
     draw(/[?&#]google=ok/.test(location.href) ? msg('Google est relié.') : null);
   };
+
+  /* ================= refonte UX (22/11/2026, maquette validée) : Équipe absorbe Suivi et Automatisations ; Pour moi en filtres =================
+     Rien n'est réécrit : les panneaux d'origine (mêmes boutons, mêmes données) sont rangés sous un filtre. Suivi et Automatisations restent des
+     adresses valides (#suivi, #automatisations : liens des notifications du serveur), qui ouvrent Équipe sur le bon filtre. */
+  {
+    const V_EQ = VIEWS.equipe, V_SUIVI = VIEWS.suivi, V_AUTO = VIEWS.automatisations, V_DEM = VIEWS.demandes, V_REG = VIEWS.reglages;
+    const EQF = {f: 'bots'}, PMF = {f: 'tout'};
+    const segBar = (cur, opts, on) => h('div', {class: 'seg ux-seg', role: 'group', 'aria-label': 'Filtre'}, opts.map(([k, l, n]) => h('button', {type: 'button', 'aria-pressed': String(cur === k), 'data-f': k, onclick: () => on(k)}, l, n ? h('b', {text: String(n)}) : null)));
+    const harvest = (fn) => { const box = h('div'); try { fn(box); } catch (e) { console.warn('refonte UX', e); } return [...box.children]; };
+    const h2Of = (n) => { const x = n.querySelector && n.querySelector('h2'); return x ? x.textContent.trim() : ''; };
+    const COUT = /^(Coût de la semaine|File d'attente des bots|Claude cette semaine)/, SYS = /^État des systèmes/, TACHES = /^Mes tâches/, PAPL = /^Papiers$/, ORD = /^Tes ordres/;
+    document.head.append(h('style', {text: '.ux-seg{position:sticky;top:calc(var(--top-h, 64px) + 4px);z-index:5;display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:4px;padding:4px;margin:0 0 14px;border-radius:14px;background:rgba(4,10,28,.92);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);border:1px solid rgba(var(--c1),.25)}'
+      + '.ux-seg button{min-height:38px;border:0;border-radius:10px;background:none;color:var(--muted);font:600 13.5px var(--sans);white-space:nowrap;cursor:pointer}'
+      + '.ux-seg button[aria-pressed="true"]{color:#031022;background:linear-gradient(90deg,rgb(var(--c2)),rgb(var(--c1)))}.ux-seg b{font:600 12px var(--display);margin-left:4px;opacity:.85}'}));
+    /* Équipe : Bots, Demandes, Routines, Coût */
+    VIEWS.equipe = (el) => {
+      if (AGENT) { V_EQ(el); return; }
+      const f = EQF.f;
+      el.append(segBar(f, [['bots', 'Bots'], ['dem', 'Demandes'], ['rout', 'Routines'], ['cout', 'Coût']], (k) => { EQF.f = k; const sc = $('scroller'); renderView(true); if (sc) sc.scrollTop = 0; eqHash(); }));
+      if (f === 'bots') { harvest(V_EQ).filter((n) => !ORD.test(h2Of(n))).forEach((n) => el.append(n)); return; }
+      if (f === 'rout') { V_AUTO(el); return; }
+      const parts = harvest(V_SUIVI).filter((n) => !SYS.test(h2Of(n)) && !TACHES.test(h2Of(n)) && !PAPL.test(h2Of(n)));
+      if (f === 'cout') { parts.filter((n) => COUT.test(h2Of(n))).forEach((n) => el.append(n)); return; }
+      parts.filter((n) => !COUT.test(h2Of(n))).forEach((n) => el.append(n));
+      harvest(V_EQ).filter((n) => ORD.test(h2Of(n))).forEach((n) => el.append(n));   /* tes ordres : ce que tu as demandé */
+    };
+    TITLES.suivi = TITLES.equipe; TITLES.automatisations = TITLES.equipe;
+    /* chaque filtre garde son adresse d'avant (#suivi, #automatisations) : un rechargement ou un lien de notification rouvre le bon filtre */
+    const EQHASH = {bots: 'equipe', dem: 'suivi', rout: 'automatisations', cout: 'equipe'};
+    function eqHash() { try { if (TAB === 'equipe' && !AGENT && location.hash.slice(1) !== EQHASH[EQF.f]) history.replaceState(null, '', '#' + EQHASH[EQF.f]); } catch (e) { /* rien */ } }
+    const alias = (k) => (el) => { EQF.f = k; TAB = 'equipe'; VIEWS.equipe(el); };
+    VIEWS.suivi = alias('dem'); VIEWS.automatisations = alias('rout');
+    const GO_UX = go;
+    go = function (id, keep) { if (id === 'suivi' || id === 'automatisations') { EQF.f = id === 'suivi' ? 'dem' : 'rout'; id = 'equipe'; } if (id === 'demandes') PMF.f = 'tout'; const r = GO_UX(id, keep); if (id === 'equipe') eqHash(); return r; };   /* Pour moi s'ouvre toujours sur « Tout » (les liens #voir-… y mènent à une section) */
+    /* Réglages : l'état des systèmes (venu de Suivi) en bas */
+    VIEWS.reglages = (el) => { V_REG(el); harvest(V_SUIVI).filter((n) => SYS.test(h2Of(n))).forEach((n) => el.append(n)); };
+    /* Pour moi : Tout, Décider, À faire, Infos ; « Mes tâches » (venues de Suivi) dans À faire */
+    const PM = {decider: ['pm-dec'], faire: ['pm-todo', 'pm-proj', 'pm-mail', 'pm-taches', 'pm-wait'], infos: ['pm-rep']};
+    VIEWS.demandes = (el) => {
+      V_DEM(el);
+      if (typeof FOCUS === 'object' && FOCUS && FOCUS.on) return;
+      if ((S.taches || []).some((t) => t.status !== 'Fait')) { const tt = h('div', {class: 'stack'}); try { SCREEN.taches(tt); el.append(h('section', {class: 'panel pm-sec', id: 'pm-taches'}, h('header', {class: 'panel-h'}, h('h2', {text: 'Mes tâches'})), tt)); } catch (e) { /* rien */ } }
+      const n = (ids) => ids.reduce((s, id) => { const x = el.querySelector('#' + id + ' .pm-list'); return s + (x ? x.children.length : 0); }, 0);
+      const f = PMF.f, bar = segBar(f, [['tout', 'Tout'], ['decider', 'Décider', n(PM.decider)], ['faire', 'À faire', n(['pm-todo', 'pm-proj'])], ['infos', 'Infos', n(PM.infos)]], (k) => { PMF.f = k; renderView(true); });
+      const start = el.querySelector('#fc-start'); if (start && start.parentNode === el) start.after(bar); else el.prepend(bar);
+      el.querySelectorAll('.pm-sum').forEach((x) => { x.hidden = true; });   /* les filtres donnent les mêmes nombres */
+      if (f !== 'tout') el.querySelectorAll('.pm-sec, #pm-mail').forEach((x) => { if (!PM[f].includes(x.id)) x.hidden = true; });
+    };
+  }
+
+  /* ================= refonte UX (22/11/2026) : le globe vit avec Claude ; il réfléchit pendant l'attente, répond pendant que le texte arrive (ou que la voix lit),
+     écoute en mains libres ; le même état dans la barre et en grand en haut de la discussion ================= */
+  {
+    let G_CL = null, last = '';
+    document.head.append(h('style', {text: '.chat-globe{position:relative;height:170px;margin:0 0 8px;flex:0 0 auto}.chat-globe .holo-stage{position:absolute;inset:0;width:auto;height:auto}.chat-globe .holo-stage canvas{width:100%;height:100%;display:block}'
+      + '.cl-state{position:absolute;left:0;right:0;bottom:2px;text-align:center;font:600 12px var(--display);letter-spacing:.2em;text-transform:uppercase;color:rgb(var(--c2))}.cl-state[data-s="thinking"]{color:#d8b4fe}.cl-state[data-s="speaking"]{color:#93c5fd}'}));
+    const LBL = {idle: 'Prêt', listening: 'À l’écoute', thinking: 'Réfléchit…', speaking: 'Répond'};
+    function uxState() {
+      if (!CHAT.open) { const b0 = window.JarvisVoice && window.JarvisVoice.bar && window.JarvisVoice.bar(); if (b0 && last !== 'idle') { b0.set('idle'); last = 'idle'; } return; }
+      const T = THREADS[CHAT.key], m = T && T.msgs[T.msgs.length - 1];
+      let st = CHAT.busy ? (m && m.wait ? 'thinking' : 'speaking') : 'idle';
+      if (typeof MAINS === 'object' && MAINS.on) st = MAINS.state === 'thinking' ? 'thinking' : MAINS.state === 'speaking' ? 'speaking' : st === 'idle' ? 'listening' : st;
+      const b = window.JarvisVoice && window.JarvisVoice.bar && window.JarvisVoice.bar();
+      if (st !== last || (G_CL && G_CL.el.dataset.s !== st)) { if (G_CL) G_CL.set(st); if (b) b.set(st); }
+      const l = document.querySelector('#chat .cl-state'); if (l) { l.dataset.s = st; l.textContent = LBL[st] || ''; }
+      last = st;
+    }
+    const RC = renderChat;
+    renderChat = function () {
+      RC.apply(this, arguments);
+      if (!CHAT.open || CHAT.mode !== 'claude') return;
+      const log = $('chat').querySelector('.chat-log'), hv = window.JarvisVoice && window.JarvisVoice.holo;
+      if (log && hv && document.documentElement.classList.contains('theme-holo')) {
+        if (!G_CL) G_CL = hv({ring: true, nodes: 140});
+        if (!log.querySelector('.chat-globe')) log.prepend(h('div', {class: 'chat-globe'}, G_CL.el, h('div', {class: 'cl-state'})));
+      }
+      uxState();
+    };
+    const MB = mainsBusy;
+    mainsBusy = function (b) { MB(b); uxState(); };
+    setInterval(() => { if (CHAT.open || last !== 'idle') uxState(); }, 150);   /* la réponse s'écrit sans redessiner toute la discussion : l'état est relu en continu, discussion ouverte */
+    const CC = closeChat;
+    closeChat = function () { CC.apply(this, arguments); uxState(); };
+  }
+
+  /* ================= refonte UX (22/11/2026) : un grand titre par page ; des photos dans Sorties (Wikipédia, comme les voyages) ================= */
+  {
+    document.head.append(h('style', {text: 'html.theme-holo .view-title{font:700 29px/1.15 var(--display);letter-spacing:.01em;text-transform:none;color:var(--fg);margin:4px 0 14px;text-shadow:0 0 18px rgba(var(--c1),.25)}'
+      + 'html.theme-holo .view-title::after{width:64px;margin-top:10px}'
+      + '.sor-ph{display:block;height:132px;border-radius:14px;overflow:hidden;margin:0 0 10px;background:linear-gradient(135deg,rgba(var(--c4),.5),rgba(var(--c3),.4))}.sor-ph img{width:100%;height:100%;object-fit:cover;display:block}'}));
+    const SC = sorCard;
+    sorCard = function (s) {
+      const card = SC(s), inner = card.querySelector('.sor-in'); if (!inner) return card;
+      const names = [s.where, String(s.title || '').replace(/^[^:]{0,24}:\s*/, ''), s.title].map((x) => String(x || '').replace(/\s*\(.*$/, '').trim()).filter((x) => x && x.length > 2);
+      if (names.length) try { voyPhoto([...new Set(names)], (u) => { if (!u || inner.querySelector('.sor-ph')) return; inner.prepend(h('span', {class: 'sor-ph'}, h('img', {src: u, alt: '', loading: 'lazy', decoding: 'async'}))); }); } catch (e) { /* rien */ }
+      return card;
+    };
+  }
 
   boot();
 })();
