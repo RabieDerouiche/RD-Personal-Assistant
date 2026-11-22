@@ -93,6 +93,11 @@ function answer(raw) {
   /* discussion de la page sur le serveur : propositions en fin de réponse (⟦outil …⟧), seulement si la consigne décrit les outils */
   const lastQ = input.split('Lui : ').pop(), sys = (opt('--append-system-prompt') || '') + '\n' + (opt('--system-prompt') || '') + '\n' + FIRST;
   /* 0.60.0 : la voix qui agit — avec la consigne de la voix, une tâche faite aussitôt, un ordre à valider de vive voix */
+  /* 0.61.0 : les tâches gérées à la voix (avant la règle d'ajout, qui reconnaît aussi « tâche vocale ») */
+  if (/coche la tâche vocale/i.test(lastQ)) return {text: 'Une de moins.\n⟦outil terminer_tache {"titre":"appeler le plombier"}⟧'};
+  if (/reporte la tâche vocale/i.test(lastQ)) return {text: 'Je la décale.\n⟦outil reporter_tache {"titre":"Appeler le plombier","date":"' + demain + '"}⟧'};
+  if (/supprime la tâche vocale/i.test(lastQ)) return {text: 'Je supprime « Appeler le plombier ». Je la supprime ?\n⟦outil supprimer_tache {"titre":"Appeler le plombier"}⟧'};
+  if (/tâche fantôme/i.test(lastQ)) return {text: 'Je la coche.\n⟦outil terminer_tache {"titre":"Repeindre la lune"}⟧'};
   if (/tâche vocale/i.test(lastQ)) return {text: /EN CONVERSATION À LA VOIX/.test(sys) ? 'C’est noté : appeler le plombier jeudi.\n⟦outil ajouter_tache {"titre":"Appeler le plombier","date":"' + demain + '"}⟧' : 'Pas de consigne de la voix.'};
   if (/ordre vocal pour Kairos/i.test(lastQ)) return {text: /EN CONVERSATION À LA VOIX/.test(sys) ? 'J’envoie à Kairos : relève le prix du robot cuiseur. Je l’envoie ?\n⟦outil preparer_ordre {"bot":"Kairos","message":"Relève le prix du robot cuiseur."}⟧' : 'Pas de consigne de la voix.'};
   /* 0.37.0 : la mémoire durable — ce qu'il reçoit dans sa consigne, et la proposition de retenir (si l'outil est décrit) */
