@@ -4654,7 +4654,7 @@ void main(){
     T.push(tile('achats', 'tag', 'Achats', hot.length ? hot.length + ' à décider' : live.length + ' suivis', hot.length ? escH(hot[0].title) : 'Kairos surveille les prix', {amb: hot.length > 0}));
     /* Voyages : le prochain départ, avec sa photo */
     const trips = S.voyages.filter((v) => !v.gone), nx = trips.filter((v) => !v.demo && v.depart != null && v.depart >= 0).sort((a, b) => a.depart - b.depart)[0];
-    T.push(tile('voyages', 'plane', 'Voyages', nx ? 'J-' + nx.depart : trips.length + ' projet' + (trips.length > 1 ? 's' : ''), nx ? escH(nx.title) : 'tes envies de voyage', {photo: nx ? (cb) => { try { voyPhoto(voyDests(nx), cb); } catch (e) { /* rien */ } } : null}));
+    T.push(tile('voyages', 'plane', 'Voyages', nx ? 'J-' + nx.depart : trips.length + ' projet' + (trips.length > 1 ? 's' : ''), nx ? escH(nx.title) : 'tes envies de voyage', {photo: nx ? (cb) => { try { voyPhoto(voyDests(nx).photo, cb); } catch (e) { /* rien */ } } : null}));
     /* Sorties */
     const open = S.sorties.filter((x) => x.status === 'proposee' && !sorExpired(x)), wk = open.filter(sorInWeekend);
     T.push(tile('sorties', 'map', 'Sorties', wk.length ? wk.length + (wk.length > 1 ? ' idées' : ' idée') : open.length + (open.length > 1 ? ' idées' : ' idée'), wk.length ? 'ce week-end' : 'pour les prochains week-ends'));
@@ -9626,6 +9626,20 @@ void main(){
     setInterval(() => { if (CHAT.open || last !== 'idle') uxState(); }, 150);   /* la réponse s'écrit sans redessiner toute la discussion : l'état est relu en continu, discussion ouverte */
     const CC = closeChat;
     closeChat = function () { CC.apply(this, arguments); uxState(); };
+  }
+
+  /* ================= refonte UX (22/11/2026) : un grand titre par page ; des photos dans Sorties (Wikipédia, comme les voyages) ================= */
+  {
+    document.head.append(h('style', {text: 'html.theme-holo .view-title{font:700 29px/1.15 var(--display);letter-spacing:.01em;text-transform:none;color:var(--fg);margin:4px 0 14px;text-shadow:0 0 18px rgba(var(--c1),.25)}'
+      + 'html.theme-holo .view-title::after{width:64px;margin-top:10px}'
+      + '.sor-ph{display:block;height:132px;border-radius:14px;overflow:hidden;margin:0 0 10px;background:linear-gradient(135deg,rgba(var(--c4),.5),rgba(var(--c3),.4))}.sor-ph img{width:100%;height:100%;object-fit:cover;display:block}'}));
+    const SC = sorCard;
+    sorCard = function (s) {
+      const card = SC(s), inner = card.querySelector('.sor-in'); if (!inner) return card;
+      const names = [s.where, String(s.title || '').replace(/^[^:]{0,24}:\s*/, ''), s.title].map((x) => String(x || '').replace(/\s*\(.*$/, '').trim()).filter((x) => x && x.length > 2);
+      if (names.length) try { voyPhoto([...new Set(names)], (u) => { if (!u || inner.querySelector('.sor-ph')) return; inner.prepend(h('span', {class: 'sor-ph'}, h('img', {src: u, alt: '', loading: 'lazy', decoding: 'async'}))); }); } catch (e) { /* rien */ }
+      return card;
+    };
   }
 
   boot();
