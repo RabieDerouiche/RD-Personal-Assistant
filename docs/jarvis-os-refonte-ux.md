@@ -63,4 +63,6 @@ Conséquence retenue : le travail se fait sur une branche, poussée régulièrem
 
 ## État
 
-- 22/11/2026 : décisions prises, plan écrit ; cartographie du code en cours.
+- 22/11/2026 : décisions prises, plan écrit, code cartographié.
+- 22/11/2026 : **appliquée en 0.54.0** (une seule fusion). Fait : étapes 1 (coquille, Espaces, retour par le bord), 2 (Équipe absorbe Suivi et Automatisations par récolte des panneaux d'origine ; Pour moi en filtres), 3 (globe vivant dans `holo.ts`, écran de JARVIS sur l'accueil, états du globe pendant la discussion), une partie de 4 (grands titres, photos des sorties, photo du prochain voyage dans Espaces) et 8 (bancs maquette, bout en bout, check-up adaptés). Reste, à proposer au propriétaire : 7 (discussion et rubriques par-dessus en feuille du bas) et le reste de 6 (Achats, Voyages, Argent, Papiers sur le modèle de la maquette : carte phare, un filtre, lignes illustrées), le nettoyage du CSS du menu « Tout ».
+- Où est quoi dans le code (couches ajoutées en fin de script, repérées « refonte UX ») : `rootOf()` et `NAVLBL` près de `TAB` ; `navTrack`/`navBack` (retour vers Espaces) ; `boot()` (barre, bord gauche) ; `VIEWS.espaces` avant `boot()` ; `hudScreen()`/`hudLines()` avant `homeDash()` ; en fin de script : Équipe et Pour moi (`EQF`, `PMF`, `EQHASH`), états du globe (`uxState`, enveloppes de `renderChat`, `mainsBusy`, `closeChat`), grands titres et `sorCard` avec photo.

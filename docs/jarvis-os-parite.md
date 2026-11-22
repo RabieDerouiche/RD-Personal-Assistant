@@ -10,6 +10,8 @@ Règle (16/11/2026) : **aucune régression**. Chaque fonction de la page (copie 
 
 ## Écrans et panneaux
 
+Refonte UX (0.54.0, 22/11/2026) : navigation à 5 portes ; Suivi et Automatisations sont dans Équipe (filtres Demandes, Routines, Coût ; adresses `#suivi` et `#automatisations` gardées), « État des systèmes » dans Réglages, « Mes tâches » dans Pour moi ; correspondance complète bloc par bloc dans `docs/jarvis-os-refonte-ux.md`.
+
 **Accueil (« Vue d'ensemble »)**
 - [ ] Claude chef d'équipe (grande sphère) : appui = discussion avec Claude ; « Bonjour / Bon après-midi / Bonsoir, <prénom> »
 - [ ] Carte de briefing (chiffres clés), barre Claude, pastilles de statistiques
