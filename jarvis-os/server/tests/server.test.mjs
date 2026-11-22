@@ -734,6 +734,15 @@ try {
     os1 = await fetch(BASE + '/ancienne/'); ok('ancienne app à /ancienne/', os1.status === 200 && /assets\/index-/.test(await os1.text()));
     os1 = await fetch(BASE + '/sw.js'); ok('service worker de la nouvelle app à la racine', os1.status === 200 && /jarvis-os-app/.test(await os1.text()));
     { const pc = await fetch(BASE + '/confidentialite.html'); ok('règles de confidentialité publiques (déclarées à Google)', pc.status === 200 && /règles de confidentialité/.test(await pc.text())); }
+    /* 0.53.0 : les maquettes (données inventées) servies par le serveur, le dépôt passant en privé */
+    { const l = await fetch(BASE + '/maquettes/'), lt = await l.text(), rd = await fetch(BASE + '/maquettes/ux', {redirect: 'manual'});
+      const ux = await fetch(BASE + '/maquettes/ux/'), uxt = await ux.text(), js = await fetch(BASE + '/maquettes/ux/globe.js'), ph = fs.readdirSync(path.join(HERE, '..', '..', '..', 'essais', 'jarvis-os-ux', 'photos')).find((f) => /\.jpg$/.test(f));
+      const img = await fetch(BASE + '/maquettes/ux/photos/' + ph), banc = await fetch(BASE + '/maquettes/ux/banc.cjs'), fuite = await fetch(BASE + '/maquettes/ux/..%2F..%2Fjarvis-os%2Fserver%2Fserver.mjs'), inc = await fetch(BASE + '/maquettes/inconnue/');
+      ok('maquettes : la liste, puis la refonte UX à /maquettes/ux/ (page, script, photo), non indexée ; le banc, un chemin qui remonte et une maquette inconnue sont refusés',
+        l.status === 200 && /Refonte UX de JARVIS/.test(lt) && /href="\/maquettes\/ux\/"/.test(lt) && rd.status === 301 && rd.headers.get('location') === '/maquettes/ux/'
+        && ux.status === 200 && /<html/i.test(uxt) && ux.headers.get('x-robots-tag') === 'noindex' && js.status === 200 && /javascript/.test(js.headers.get('content-type') || '')
+        && img.status === 200 && img.headers.get('content-type') === 'image/jpeg' && banc.status === 404 && fuite.status === 404 && inc.status === 404,
+        JSON.stringify([l.status, rd.status, rd.headers.get('location'), ux.status, js.status, img.status, banc.status, fuite.status, inc.status])); }
     os1 = await fetch(BASE + '/os/jarvis-serveur.js'); ok('pont vers le serveur servi', os1.status === 200 && /api\/tool/.test(await os1.text())); }
   const pre = await fetch(BASE + '/api/chat', {method: 'OPTIONS', headers: {origin: 'https://rabiederouiche.github.io', 'access-control-request-method': 'POST'}});
   ok('CORS : app GitHub Pages acceptée', pre.headers.get('access-control-allow-origin') === 'https://rabiederouiche.github.io');
