@@ -2880,7 +2880,7 @@ void main(){
     taches(el) {
       el.append(newTaskForm());
       const list = S.taches.slice().sort((a, b) => (a.n == null ? 999 : a.n) - (b.n == null ? 999 : b.n));
-      el.append(sec('En cours', list.length ? list.map((t) => simpleCard('tache', t, t.title, null, t.n == null ? 'sans date' : (t.n < 0 ? 'en retard, prévue ' : 'pour ') + short(t.n), 'hydra', 2)) : emptyState('Aucune tâche en cours.')));
+      el.append(sec('En cours', list.length ? list.map((t) => simpleCard('tache', t, t.title, null, (t.n == null ? 'sans date' : (t.n < 0 ? 'en retard, prévue ' : 'pour ') + short(t.n)) + (t.de ? ' · de ' + t.de : ''), 'hydra', 2)) : emptyState('Aucune tâche en cours.')));
     },
     dossiers(el) { el.append(S.dossiers.length ? S.dossiers.map((k) => simpleCard('dossier', k, k.title, k.step, BOT[k.bot].name + ' · en attente ' + deQui(k.who) + ' depuis ' + (-k.since) + ' jours', k.bot, 2)) : emptyState('Aucun dossier ouvert.')); },
     prix(el) {
@@ -5746,7 +5746,7 @@ void main(){
     const pap = rows('pap');
     if (pap) S.papiers = pap.filter((r) => r['Document']).map((r) => { const where = r['Où il est (lien Drive, ou « papier »)'] || ''; const url = (where.match(/https?:\/\/\S+/) || [])[0]; const q = P(r['Document'], r['Personne'], lvFrIso(r['Valable jusqu\'au']), where, r['Sert pour'], r['Remarque'], url); q.id = 'q:' + r._row; return q; });
     const tach = rows('tach');
-    if (tach) S.taches = tach.filter((r) => r['Tâche'] && !/^(fait|annul)/.test(lvLow(r['Statut']))).map((r) => ({id: 't:' + r._row, _row: r._row, title: r['Tâche'], n: lvFrIso(r['Pour le']) ? N(lvFrIso(r['Pour le'])) : null}));
+    if (tach) S.taches = tach.filter((r) => r['Tâche'] && !/^(fait|annul)/.test(lvLow(r['Statut']))).map((r) => ({id: 't:' + r._row, _row: r._row, title: r['Tâche'], n: lvFrIso(r['Pour le']) ? N(lvFrIso(r['Pour le'])) : null, de: /^De /.test(String(r['Remarque'] || '')) ? String(r['Remarque']).slice(3).trim() : ''}));   /* 0.62.0 : « de » un proche */
     const jour = rows('jour');
     if (jour) S.activite = jour.slice(-40).map((r, i) => ({r, i, s: lvStamp(r['Date et heure'])})).sort((a, b) => (b.s && a.s ? b.s - a.s : 0) || b.i - a.i).slice(0, 15).map(({r, s}) => { return {bot: lvBot(r['Bot']), when: s ? fmt(s, {day: '2-digit', month: '2-digit'}) + ' · ' + pad2(s.getHours()) + 'h' + pad2(s.getMinutes()) : r['Date et heure'], text: (r['Sujet'] ? r['Sujet'] + ' : ' : '') + r['Détail'], fresh: !!(s && now - s < 86400000), s: s ? s.getTime() : null}; }); /* JARVIS OS : s = heure exacte */
     /* achats : une famille par marque, ses modèles, leur dernier prix (onglet Prix, sinon onglet Relevés) */
@@ -9353,6 +9353,33 @@ void main(){
         h('button', {type: 'button', class: 'btn ghost danger', onclick: async () => { await JS.raccourci.retirer(); VIEWS_RELOAD_SIRI(); }}, 'Retirer')), out);
     return card;
   }
+  /* JARVIS OS 0.62.0 (son choix du 22/11/2026) : un proche (sa femme) lui envoie des tâches depuis son iPhone, avec Siri. Sa clé, dans le lien
+     d'invitation, n'ouvre que deux adresses : ajouter une tâche, voir le statut des siennes. Il crée et retire l'accès ici. */
+  async function inviteCard(JS) {
+    const card = h('section', {class: 'card set-card invite-card'}, h('b', {text: 'Tâches envoyées par un proche'}));
+    const out = h('p', {class: 'set-msg'}), say = (x, bad) => { out.textContent = x; out.classList.toggle('is-bad', !!bad); };
+    const l = await JS.invites.liste();
+    if (l === null) { card.append(h('p', {class: 'muted', text: 'Ton serveur ne le connaît pas encore : touche « Mettre à jour le serveur » plus bas.'})); return card; }
+    card.append(h('p', {class: 'muted', text: 'Elle dit « Dis Siri, tâche pour toi » et dicte : la tâche arrive dans tes tâches, marquée « de » son prénom, avec une notification. Elle voit si ses tâches sont faites, rien d’autre de JARVIS.'}));
+    if (l.length) card.append(h('ul', {class: 'mem-list'}, l.map((x) => h('li', {class: 'mem-it'},
+      h('span', {}, h('b', {text: x.nom}), h('small', {class: 'muted', text: ' · depuis le ' + fmt(new Date(x.at), {day: 'numeric', month: 'long'}) + ' · ' + x.taches + ' tâche' + (x.taches > 1 ? 's' : '') + (x.last ? ', dernière le ' + fmt(new Date(x.last), {day: 'numeric', month: 'short'}) : '')})),
+      h('button', {type: 'button', class: 'btn ghost sm danger', onclick: () => confirmSheet({bot: 'claude', title: 'Retirer l’accès de ' + x.nom + ' ?', ok: 'Oui, retirer', cost: 'free', say: 'Son raccourci et sa page ne marcheront plus ; ses tâches déjà envoyées restent.', run: async () => { await JS.invites.retirer(x.id); VIEWS_RELOAD_SIRI(); }})}, 'Retirer l’accès')))));
+    const id1 = 'iv-' + (++SEQ), id2 = 'iv-' + (++SEQ), garde = (() => { try { return localStorage.getItem('jarvis.invite.moi') || ''; } catch (e) { return ''; } })();
+    const nom = h('input', {class: 'inp', id: id1, type: 'text', maxlength: '30', placeholder: 'ex. Lina', autocomplete: 'off'}), moi = h('input', {class: 'inp', id: id2, type: 'text', maxlength: '30', placeholder: 'ex. Sami', value: garde});
+    card.append(h('form', {class: 'pick-form invite-form', onsubmit: async (ev) => {
+      ev.preventDefault(); const n = nom.value.trim(), m = moi.value.trim(); if (!n) { nom.focus(); return; }
+      try { localStorage.setItem('jarvis.invite.moi', m); } catch (e) { /* rien */ }
+      say('Création…'); const r = await JS.invites.creer(n); if (!r || !r.cle) { say((r && r.error) || 'Le serveur n’a pas créé l’invitation.', true); return; }
+      const lien = r.lien + (m ? '&pour=' + encodeURIComponent(m) : '');
+      card.replaceChildren(h('b', {text: 'Invitation de ' + r.nom}), h('p', {class: 'muted', text: 'Envoie-lui ce lien, à elle seulement : il contient sa clé, montrée une seule fois. Elle l’ouvre sur son iPhone ; la page lui permet d’envoyer une tâche et lui montre comment créer le raccourci Siri.'}),
+        h('code', {class: 'siri-key invite-lien', text: lien}),
+        h('div', {class: 'row-actions'}, navigator.share ? h('button', {type: 'button', class: 'btn main', onclick: async () => { try { await navigator.share({title: 'Tâches', text: 'Pour m’envoyer une tâche, avec Siri aussi :', url: lien}); } catch (e) { /* annulé */ } }}, 'Envoyer le lien…') : null,
+          h('button', {type: 'button', class: 'btn', onclick: async () => { try { await navigator.clipboard.writeText(lien); say('Lien copié.'); } catch (e) { say('Copie impossible : sélectionne le lien.', true); } }}, 'Copier le lien'),
+          h('button', {type: 'button', class: 'btn ghost', onclick: () => VIEWS_RELOAD_SIRI()}, 'Terminé')), out);
+    }}, h('label', {for: id1, class: 'pick-label', text: 'Son prénom'}), nom, h('label', {for: id2, class: 'pick-label', text: 'Ton prénom (ce qu’elle dira à Siri : « tâche pour … »)'}), moi,
+      h('button', {type: 'submit', class: 'btn main'}, 'Créer l’invitation')), out);
+    return card;
+  }
   const SETV = {box: null, at: 0, html: '', force: false};   /* dernier rendu de Réglages (voir VIEWS.reglages) */
   const VIEWS_RELOAD_SIRI = () => { SETV.force = true; if (TAB === 'reglages') renderView(true); };
   /* JARVIS OS 0.14.0 : carte « Sauvegarde de Pilotage » : la copie de la nuit, et ce qui a changé d'une copie à l'autre (valeurs avant et après) */
@@ -9590,7 +9617,8 @@ void main(){
       parts.push(gcard);
       /* JARVIS OS 0.12.0 : notifications envoyées par le serveur (un bot a répondu, rappels du matin, Grok reparti) */
       if (JS.push) parts.push(await notifCard(JS, msg, () => draw()));
-      if (JS.raccourci) parts.push(await siriCard(JS)); /* JARVIS OS 0.13.0 : Siri et bouton Action */
+      if (JS.raccourci) parts.push(await siriCard(JS));
+      if (JS.invites) parts.push(await inviteCard(JS));   /* 0.62.0 : un proche lui envoie des tâches */ /* JARVIS OS 0.13.0 : Siri et bouton Action */
       if (JS.tour) parts.push(await tourCard(JS)); /* JARVIS OS 0.15.0 : tour de Claude */
       if (JS.sauvegarde) parts.push(await savCard(JS)); /* JARVIS OS 0.14.0 : sauvegarde de Pilotage */
       if (JS.mcp) { const mc = await mcpCard(JS); if (mc.dataset.urgent) parts.unshift(mc); else parts.push(mc); } /* JARVIS OS 0.39.0 : assistants reliés (en tête si une demande attend) */
