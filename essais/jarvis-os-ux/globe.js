@@ -5,7 +5,9 @@
    - « réfléchit » : des paquets de lumière courent le long du réseau, le globe tourne plus vite, en violet ;
    - « parle » : le cœur bat au rythme d'une voix et une couronne d'ondes tourne autour du globe ;
    - « écoute » : des ondes partent du globe ; au repos, il respire.
-   UXGlobe.create({pedestal, ring, nodes, voice}) → {el, set(état)} ; états : idle, listening, thinking, speaking. */
+   - « hud » (accueil, retour du 22/11 : « pas assez impressionnant, futuriste, vivant ») : anneaux gradués qui tournent en sens
+     contraires, arcs de données, balayage radar, poussière de lumière en orbite ; tout suit l'état du globe.
+   UXGlobe.create({pedestal, ring, nodes, voice, hud}) → {el, set(état)} ; états : idle, listening, thinking, speaking. */
 (function () {
   'use strict';
   const COL = {
@@ -17,7 +19,8 @@
   const reduced = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
   function create(o) {
     o = o || {};
-    const N = o.nodes || 130, ped = !!o.pedestal, ring = o.ring !== false, voiceRing = o.voice !== false;
+    const N = o.nodes || 130, ped = !!o.pedestal, ring = o.ring !== false, voiceRing = o.voice !== false, hud = !!o.hud;
+    const DUST = hud ? Array.from({length: 46}, (_, i) => ({r: 1.25 + ((i * 37) % 100) / 100 * 0.9, a: i * 2.39, s: 0.05 + ((i * 53) % 100) / 1000, z: ((i * 71) % 100) / 100})) : [];
     const el = document.createElement('div'); el.className = 'globe';
     const cv = document.createElement('canvas'); el.append(cv);
     const g = cv.getContext('2d');
@@ -59,7 +62,7 @@
       t += dt * (reduced ? 0.15 : cur.spd);
       const W = cv.width, H = cv.height, A = cur.a, B = cur.b;
       const breathe = state === 'idle' ? 0.012 * Math.sin(t * 1.4) : 0;
-      const R = Math.min(W, H * (ped ? 0.78 : 1)) * (ped ? 0.3 : ring ? 0.3 : 0.34) * (1 + breathe + live * 0.035 * Math.sin(t * 9));
+      const R = Math.min(W, H * (ped ? 0.78 : 1)) * (hud ? 0.235 : ped ? 0.3 : ring ? 0.3 : 0.34) * (1 + breathe + live * 0.035 * Math.sin(t * 9));
       const cx = W / 2, cy = ped ? H * 0.42 : H / 2;
       g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, W, H); g.globalCompositeOperation = 'lighter';
       /* halo */
@@ -67,6 +70,37 @@
       let gr = g.createRadialGradient(cx, cy, R * 0.6, cx, cy, Math.max(R * 0.7, halo));
       gr.addColorStop(0, rgba(A, 0.24 + live * 0.14 + 0.04 * Math.sin(t * 1.4))); gr.addColorStop(1, rgba(B, 0));
       g.fillStyle = gr; g.beginPath(); g.arc(cx, cy, Math.max(R * 0.7, halo), 0, Math.PI * 2); g.fill();
+      /* écran de JARVIS : anneaux gradués, arcs, balayage, poussière */
+      if (hud) {
+        const ring0 = (rad, a) => { g.lineWidth = 1 * dpr; g.strokeStyle = rgba(A, a); g.beginPath(); g.arc(cx, cy, rad, 0, Math.PI * 2); g.stroke(); };
+        ring0(R * 1.38, 0.28); ring0(R * 1.98, 0.14);
+        /* graduations : 120 traits, un sur cinq plus long, qui tournent lentement */
+        const rt = R * 1.62, rot = t * 0.12;
+        g.lineWidth = 1.1 * dpr;
+        for (let i = 0; i < 120; i++) {
+          const an = rot + (i / 120) * Math.PI * 2, long = i % 5 === 0, l = long ? R * 0.1 : R * 0.045;
+          g.strokeStyle = rgba(long ? A : B, long ? 0.75 : 0.4);
+          g.beginPath(); g.moveTo(cx + Math.cos(an) * rt, cy + Math.sin(an) * rt); g.lineTo(cx + Math.cos(an) * (rt + l), cy + Math.sin(an) * (rt + l)); g.stroke();
+        }
+        /* arcs de données, en sens contraires, plus vifs quand JARVIS réfléchit ou parle */
+        const arcs = [[1.84, 0.9, -0.35, 3 * dpr, A], [1.84, 0.45, -0.35, 3 * dpr, B], [1.48, 1.4, 0.5, 2 * dpr, A], [2.1, 0.6, 0.22, 1.6 * dpr, B]];
+        arcs.forEach(([rf, len, sp, lw, c], n) => {
+          const st = t * sp * (1 + think * 1.5) + n * 2.1; g.lineWidth = lw; g.strokeStyle = rgba(c, 0.55 + 0.35 * Math.max(think, talk)); g.lineCap = 'round';
+          g.beginPath(); g.arc(cx, cy, R * rf, st, st + len); g.stroke();
+          g.beginPath(); g.arc(cx, cy, R * rf, st + Math.PI, st + Math.PI + len * 0.5); g.stroke();
+        });
+        g.lineCap = 'butt';
+        /* balayage radar */
+        if (g.createConicGradient) {
+          const sw = t * 0.9, cg = g.createConicGradient(sw, cx, cy);
+          cg.addColorStop(0, rgba(A, 0.22 + 0.15 * talk)); cg.addColorStop(0.08, rgba(A, 0)); cg.addColorStop(1, rgba(A, 0));
+          g.fillStyle = cg; g.beginPath(); g.arc(cx, cy, R * 1.98, 0, Math.PI * 2); g.arc(cx, cy, R * 1.05, 0, Math.PI * 2, true); g.fill();
+        }
+        /* repères cardinaux */
+        [0, 1, 2, 3].forEach((q) => { const an = q * Math.PI / 2 + Math.PI / 4; const x = cx + Math.cos(an) * R * 1.98, y = cy + Math.sin(an) * R * 1.98; g.fillStyle = rgba(A, 0.9); g.beginPath(); g.arc(x, y, 2.6 * dpr, 0, Math.PI * 2); g.fill(); g.fillStyle = rgba(A, 0.2); g.beginPath(); g.arc(x, y, 7 * dpr, 0, Math.PI * 2); g.fill(); });
+        /* poussière de lumière en orbite */
+        DUST.forEach((d) => { const an = d.a + t * d.s * (1 + think); const rr = R * d.r * (1 + 0.02 * Math.sin(t + d.a)); const x = cx + Math.cos(an) * rr, y = cy + Math.sin(an) * rr * 0.92; const tw = 0.35 + 0.65 * (0.5 + 0.5 * Math.sin(t * 2.2 + d.a * 3)); g.fillStyle = rgba(d.z > 0.5 ? A : B, tw * 0.8); g.beginPath(); g.arc(x, y, (0.8 + d.z * 1.4) * dpr, 0, Math.PI * 2); g.fill(); });
+      }
       /* socle */
       if (ped) {
         const py = cy + R * 1.42, pr = R * 1.55;

@@ -127,11 +127,40 @@ body::after { content: ""; position: fixed; z-index: -1; inset: 0; pointer-event
 .facts-row span { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; padding: 5px 10px; border-radius: 999px; background: rgba(var(--c1), .07); border: 1px solid var(--line); color: #d6e9ff; }
 /* globe de l'accueil et de Claude */
 .globe { position: relative; } .globe canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
-.home-globe { height: 172px; margin: -10px -8px -4px; }
-.hero-home { text-align: center; padding-top: 10px; }
-.hero-home h3 { font: 700 24px var(--display); margin: 0; }
-.hero-home p { margin: 6px auto 0; max-width: 340px; }
-.hero-home .chips { justify-content: center; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+/* accueil : l'écran de JARVIS (retour du 22/11 : « le bloc bleu est trop banal ; impressionnant, futuriste, vivant ») */
+.hud { position: relative; margin: 2px 0 4px; }
+.hud-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+.hud-clock { font: 700 46px/1 var(--logo); letter-spacing: .04em; color: #eaf8ff; text-shadow: 0 0 22px rgba(var(--c1), .65), 0 0 2px #fff; }
+.hud-clock small { font-size: 18px; color: rgb(var(--c2)); margin-left: 3px; letter-spacing: .06em; }
+.hud-date { margin-top: 8px; font: 600 12px var(--display); letter-spacing: .2em; text-transform: uppercase; color: var(--muted); }
+.hud-on { text-align: right; font: 700 12px var(--logo); letter-spacing: .18em; color: rgb(var(--c2)); padding-top: 4px; }
+.hud-on i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #34d399; box-shadow: 0 0 10px #34d399; margin-right: 7px; animation: blink 1.6s ease-in-out infinite; }
+.hud-on small { display: block; margin-top: 5px; font: 500 12px var(--sans); letter-spacing: .02em; color: var(--muted); white-space: nowrap; }
+.hud-core { position: relative; height: 340px; margin: 2px -8px 0; }
+.hud-core .globe { position: absolute; inset: 0; }
+.hud-lines { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
+.hud-lines path { fill: none; stroke: rgb(var(--c2)); stroke-opacity: .85; stroke-width: 1.5; stroke-dasharray: 4 3; animation: flow 1.2s linear infinite; filter: drop-shadow(0 0 3px rgba(var(--c1), .9)); }
+.hud-lines circle { fill: #e0faff; filter: drop-shadow(0 0 5px rgb(var(--c1))); }
+@keyframes flow { to { stroke-dashoffset: -12; } }
+.ro { position: absolute; z-index: 1; width: 126px; text-align: left; padding: 8px 10px 9px; border-radius: 4px 14px 4px 14px; background: rgba(3, 10, 28, .74); border: 1px solid rgba(var(--c1), .45); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); box-shadow: 0 0 18px rgba(14, 165, 233, .18), inset 0 0 14px rgba(var(--c1), .08); animation: hover 5s ease-in-out infinite; }
+.ro:nth-of-type(2) { animation-delay: -1.2s; } .ro:nth-of-type(3) { animation-delay: -2.5s; } .ro:nth-of-type(4) { animation-delay: -3.7s; }
+@keyframes hover { 50% { transform: translateY(-3px); } }
+.ro::before, .ro::after { content: ""; position: absolute; width: 10px; height: 10px; border: 2px solid rgb(var(--c2)); }
+.ro::before { left: -2px; top: -2px; border-right: 0; border-bottom: 0; border-radius: 4px 0 0 0; }
+.ro::after { right: -2px; bottom: -2px; border-left: 0; border-top: 0; border-radius: 0 0 4px 0; }
+.ro small { display: block; font: 700 11px var(--display); letter-spacing: .16em; color: rgb(var(--c2)); }
+.ro b { display: block; font: 700 18px/1.15 var(--display); margin-top: 3px; white-space: nowrap; }
+.ro span { display: block; font-size: 12px; color: var(--muted); margin-top: 1px; }
+.ro.amb { border-color: rgba(var(--warn), .65); box-shadow: 0 0 18px rgba(var(--warn), .2); } .ro.amb::before, .ro.amb::after { border-color: rgb(var(--warn)); }
+.ro.amb small { color: #fde68a; } .ro.amb b { color: #fde68a; text-shadow: 0 0 12px rgba(var(--warn), .55); }
+.ro-tl { left: 8px; top: 4px; } .ro-tr { right: 8px; top: 4px; } .ro-bl { left: 8px; bottom: 4px; } .ro-br { right: 8px; bottom: 4px; }
+.hud-say { min-height: 72px; margin: 10px 6px 0; font: 500 16px/1.5 var(--sans); color: #dbeafe; text-align: center; }
+.hud-say #hud-hi { font: 700 19px var(--display); color: rgb(var(--c2)); letter-spacing: .02em; }
+.caret { display: inline-block; width: 2px; height: 1.05em; vertical-align: -3px; background: rgb(var(--c2)); margin-left: 3px; box-shadow: 0 0 6px rgb(var(--c1)); animation: blink 1s steps(2) infinite; }
+.hud .row-btn { justify-content: center; margin-top: 12px; }
+@keyframes blink { 50% { opacity: .15; } }
+@media (prefers-reduced-motion: reduce) { .ro, .hud-lines path { animation: none; } }
 .claude-globe { height: 190px; margin: -6px 0 0; }
 .cl-state { text-align: center; font: 600 12px var(--display); letter-spacing: .2em; text-transform: uppercase; color: rgb(var(--c2)); margin: -6px 0 12px; min-height: 16px; }
 .cl-state[data-s="thinking"] { color: #d8b4fe; } .cl-state[data-s="speaking"] { color: #93c5fd; }
@@ -443,10 +472,17 @@ body::after { content: ""; position: fixed; z-index: -1; inset: 0; pointer-event
       let tl = '', put = false;
       today.forEach((e) => { const eh = parseInt(e.h, 10); if (!put && eh > h) { tl += '<div class="tl-now">MAINTENANT · ' + F(now, {hour: '2-digit', minute: '2-digit'}) + '</div>'; put = true; } tl += '<div class="tl-it' + (eh < h ? ' past' : '') + '"><span class="h">' + e.h + '</span><span class="w">' + esc(e.t) + '<small>' + esc(e.w) + '</small></span></div>'; });
       if (!put) tl += '<div class="tl-now">MAINTENANT · ' + F(now, {hour: '2-digit', minute: '2-digit'}) + '</div>';
-      return head('Aujourd’hui', F(TODAY, {weekday: 'long', day: 'numeric', month: 'long'}))
-        + '<div class="card hero hero-home"><div class="gslot" data-g="home"></div><h3>' + hello + '</h3><p>5 décisions pour toi, dont 2 urgentes. 2 rendez-vous aujourd’hui. Grok reprend mardi à 12 h 47.</p>'
-        + '<div class="chips"><span class="chip">' + ic('sun', 14) + ' Télétravail</span><span class="chip">' + ic('rain', 14) + ' Demain : pluie, 2 à 7°</span><span class="chip">161,63 € d’ici ta paie</span></div>'
-        + '<div class="row-btn" style="justify-content:center"><button type="button" class="btn primary" data-act="claude">Demander à JARVIS</button><button type="button" class="btn" data-act="ask-brief">Mon brief</button></div></div>'
+      const next = today.find((e) => parseInt(e.h, 10) > h);
+      return '<h1 class="sr">Aujourd’hui</h1><section class="hud" aria-label="JARVIS">'
+        + '<div class="hud-top"><div><div class="hud-clock" id="hud-clock">' + clockHtml() + '</div><div class="hud-date">' + F(TODAY, {weekday: 'long', day: 'numeric', month: 'long'}) + '<br>télétravail</div></div>'
+        + '<div class="hud-on"><i></i>J.A.R.V.I.S<small>en ligne · 8 agents</small></div></div>'
+        + '<div class="hud-core"><div class="gslot" data-g="home"></div><svg class="hud-lines" aria-hidden="true"></svg>'
+        + '<button type="button" class="ro ro-tl" data-act="tab:agenda"><small>AGENDA</small><b>' + today.length + ' rendez-vous</b><span>' + (next ? next.h + ' ' + esc(next.t) : 'fini pour aujourd’hui') + '</span></button>'
+        + '<button type="button" class="ro ro-tr" data-act="day:1"><small>MÉTÉO</small><b>2 à 7°</b><span>demain, pluie le matin</span></button>'
+        + '<button type="button" class="ro ro-bl amb" data-act="tab:moi"><small>DÉCISIONS</small><b>5 pour toi</b><span>dont 2 urgentes</span></button>'
+        + '<button type="button" class="ro ro-br" data-act="go:argent"><small>ARGENT</small><b>161,63 €</b><span>d’ici ta paie</span></button></div>'
+        + '<p class="hud-say"><span id="hud-hi"></span> <span id="hud-say"></span><i class="caret"></i></p>'
+        + '<div class="row-btn"><button type="button" class="btn primary" data-act="claude">Parler à JARVIS</button><button type="button" class="btn" data-act="ask-brief">Mon brief</button></div></section>'
         + sec('Maintenant', ['Tout voir (' + ITEMS.length + ')', 'tab:moi']) + '<div class="list">' + urg.map(itemRow).join('') + '</div>'
         + sec('Ta journée', ['Agenda', 'tab:agenda']) + '<div class="card"><div class="tl">' + tl + '</div></div>'
         + sec('Cette semaine') + week()
@@ -552,6 +588,31 @@ body::after { content: ""; position: fixed; z-index: -1; inset: 0; pointer-event
       + '<p>Une matinée calme, juste à côté d’un parc pour pique-niquer après. Réservation conseillée le week-end.</p>'
       + '<div class="row-btn"><button type="button" class="btn primary" data-act="done:On y va">On y va <span class="cost">tu réserves</span></button><button type="button" class="btn" data-act="done:Autre idée">Autre idée <span class="cost">1 passage</span></button></div></div>';
   }
+  /* l'écran de JARVIS : l'heure qui défile, les relevés reliés au globe, la phrase qu'il dit à l'ouverture */
+  const p2 = (n) => String(n).padStart(2, '0');
+  function clockHtml() { const d = new Date(); return p2(d.getHours()) + ':' + p2(d.getMinutes()) + '<small>' + p2(d.getSeconds()) + '</small>'; }
+  setInterval(() => { const c = $('hud-clock'); if (c) c.innerHTML = clockHtml(); }, 1000);
+  function hudLines() {
+    const core = document.querySelector('.hud-core'), svg = core && core.querySelector('.hud-lines'); if (!svg) return;
+    const W = core.clientWidth, H = core.clientHeight, cx = W / 2, cy = H / 2, R = Math.min(W, H) * 0.235 * 1.08;   /* jusqu’au bord du globe */
+    svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+    const cr = core.getBoundingClientRect();
+    svg.innerHTML = [...core.querySelectorAll('.ro')].map((ro) => {
+      const r = ro.getBoundingClientRect(), left = r.left - cr.left < W / 2, top = r.top - cr.top < H / 2;
+      const x0 = left ? r.right - cr.left : r.left - cr.left, y0 = (top ? r.bottom - cr.top - 14 : r.top - cr.top + 14), x1 = x0 + (left ? 12 : -12);
+      const an = Math.atan2(y0 - cy, x1 - cx), tx = cx + Math.cos(an) * R, ty = cy + Math.sin(an) * R;
+      return '<path d="M' + x0.toFixed(1) + ' ' + y0.toFixed(1) + ' H' + x1.toFixed(1) + ' L' + tx.toFixed(1) + ' ' + ty.toFixed(1) + '"/><circle cx="' + tx.toFixed(1) + '" cy="' + ty.toFixed(1) + '" r="2.6"/><circle cx="' + x0.toFixed(1) + '" cy="' + y0.toFixed(1) + '" r="1.8"/>';
+    }).join('');
+  }
+  addEventListener('resize', () => { if (document.querySelector('.hud')) hudLines(); });
+  let SAID = false;
+  function hudSay() {
+    const hi = $('hud-hi'), say = $('hud-say'), A = hello + '.', B = 'Cinq décisions t’attendent, dont deux urgentes. Deux rendez-vous aujourd’hui. Grok reprend mardi à 12 h 47.';
+    if (SAID) { hi.textContent = A; say.textContent = B; return; }
+    SAID = true; const txt = A + ' ' + B; let i = 0;
+    if (G_HOME) G_HOME.set('speaking');
+    const t = setInterval(() => { i += 2; const s = txt.slice(0, i); if (!hi.isConnected) { clearInterval(t); if (G_HOME) G_HOME.set('idle'); return; } hi.textContent = s.slice(0, A.length); say.textContent = s.length > A.length ? s.slice(A.length + 1) : ''; if (i >= txt.length) { clearInterval(t); setTimeout(() => G_HOME && G_HOME.set('idle'), 500); } }, 34);
+  }
   function week() {
     return '<div class="week">' + [0, 1, 2, 3, 4, 5, 6].map((d) => { const D = day(d), we = D.getDay() === 0 || D.getDay() === 6, L = AG.filter((e) => e.d === d); return '<button type="button" class="wd' + (d === 0 ? ' is-today' : '') + (we ? ' is-we' : '') + '" data-act="day:' + d + '"><small>' + F(D, {weekday: 'short'}).replace('.', '') + '</small><b>' + D.getDate() + '</b><span class="dots">' + L.slice(0, 3).map((e) => '<i style="background:' + e.c + '"></i>').join('') + '</span></button>'; }).join('') + '</div>';
   }
@@ -560,7 +621,8 @@ body::after { content: ""; position: fixed; z-index: -1; inset: 0; pointer-event
   function render(how) {
     const id = cur(), deep = S.stack[S.tab].length > 1;
     const v = $('view'); v.className = 'view'; RI = 0; v.innerHTML = SCREENS[id]();
-    v.querySelectorAll('.gslot[data-g="home"]').forEach((sl) => { if (!G_HOME && window.UXGlobe) { G_HOME = UXGlobe.create({pedestal: true, nodes: 150}); G_HOME.el.classList.add('home-globe'); } if (G_HOME) sl.replaceWith(G_HOME.el); });
+    v.querySelectorAll('.gslot[data-g="home"]').forEach((sl) => { if (!G_HOME && window.UXGlobe) { G_HOME = UXGlobe.create({hud: true, nodes: 150}); G_HOME.el.classList.add('home-globe'); } if (G_HOME) sl.replaceWith(G_HOME.el); });
+    if (v.querySelector('.hud')) { hudLines(); hudSay(); }
     mountAv(v);
     if (how) { void v.offsetWidth; v.classList.add('enter-' + how); }
     $('mini').textContent = NAMES[id] || (DOM[id] && DOM[id].n) || '';
@@ -712,7 +774,7 @@ body::after { content: ""; position: fixed; z-index: -1; inset: 0; pointer-event
   addEventListener('touchcancel', () => eEnd(true), {passive: true});
   addEventListener('keydown', (e) => { if (e.key === 'Escape') { if ($('search').classList.contains('on')) closeFind(); else if (S.sheet) closeSheet(); else back(); } });
 
-  window.__UX = {S, ITEMS, go, tab, back, closeSheet};
+  window.__UX = {S, ITEMS, go, tab, back, closeSheet, replay: () => { SAID = false; render(); }};
   render();
 })();
 </script>
