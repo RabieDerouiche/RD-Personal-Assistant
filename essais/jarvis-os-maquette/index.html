@@ -3262,6 +3262,12 @@ void main(){
     if (!APP.id && $('sheet').hidden) document.body.classList.remove('noscroll');
     if (CHAT.prev && CHAT.prev.isConnected) try { CHAT.prev.focus({preventScroll: true}); } catch (e) { /* rien */ }
   }
+  /* 0.60.0 : exécuter une proposition de la discussion, d'un bouton ou d'un « oui » dit à voix haute */
+  function propRun(m) {
+    if (!m || m.state !== 'open') return;
+    if (m.kind === 'proposal') { m.state = 'sent'; finish({title: 'Ordre à ' + BOT[m.bot].name, effect: 'Une ligne pour ' + BOT[m.bot].name + ' dans le Canal : « ' + m.text + ' », puis la sonnette.', bot: m.bot, order: m.text, say: "Bien reçu, j'y vais.", reply: "C'est fait : le détail est dans mon chat (réponse simulée)."}); return; }
+    if (m.kind === 'act') { m.state = 'done'; finish(m.fin()); }
+  }
   const msgEl = (m) => {
     if (m.kind === 'carte' && typeof carteEl === 'function') return carteEl(m);   /* 0.34.0 : réponses illustrées */
     if (m.kind === 'proposal') {
@@ -3269,14 +3275,14 @@ void main(){
       return h('div', {class: 'msg proposal', style: botVars(m.bot)},
         h('span', {class: 'pick-label', text: 'Ordre proposé à ' + BOT[m.bot].name}), h('p', {text: '« ' + m.text + ' »'}),
         sent ? h('p', {class: 'muted', text: LINK.on ? 'Envoyé : ligne écrite dans le Canal.' : 'Envoyé dans le Canal, sonnette partie (simulé).'}) : gone ? h('p', {class: 'muted', text: 'Abandonné.'}) :
-          h('div', {class: 'row-actions'}, h('button', {type: 'button', class: 'btn main sm', onclick: () => { m.state = 'sent'; finish({title: 'Ordre à ' + BOT[m.bot].name, effect: 'Une ligne pour ' + BOT[m.bot].name + ' dans le Canal : « ' + m.text + ' », puis la sonnette.', bot: m.bot, order: m.text, say: "Bien reçu, j'y vais.", reply: "C'est fait : le détail est dans mon chat (réponse simulée)."}); renderChat(); }}, 'Envoyer à ' + BOT[m.bot].name), h('button', {type: 'button', class: 'btn ghost sm', onclick: () => { m.state = 'dropped'; renderChat(); }}, 'Non')));
+          h('div', {class: 'row-actions'}, h('button', {type: 'button', class: 'btn main sm', onclick: () => { propRun(m); renderChat(); }}, 'Envoyer à ' + BOT[m.bot].name), h('button', {type: 'button', class: 'btn ghost sm', onclick: () => { m.state = 'dropped'; renderChat(); }}, 'Non')));
     }
     if (m.kind === 'act') {
       const done = m.state === 'done', gone = m.state === 'dropped';
       return h('div', {class: 'msg proposal is-act'},
         h('span', {class: 'pick-label', text: m.label}), h('p', {text: m.text}),
         done ? h('p', {class: 'muted', text: LINK.on ? 'C\'est parti.' : 'Ajouté (simulé).'}) : gone ? h('p', {class: 'muted', text: 'Abandonné.'}) :
-          h('div', {class: 'row-actions'}, h('button', {type: 'button', class: 'btn main sm', onclick: () => { m.state = 'done'; finish(m.fin()); renderChat(); }}, m.ok), h('button', {type: 'button', class: 'btn ghost sm', onclick: () => { m.state = 'dropped'; renderChat(); }}, 'Non')));
+          h('div', {class: 'row-actions'}, h('button', {type: 'button', class: 'btn main sm', onclick: () => { propRun(m); renderChat(); }}, m.ok), h('button', {type: 'button', class: 'btn ghost sm', onclick: () => { m.state = 'dropped'; renderChat(); }}, 'Non')));
     }
     const who = m.who, isMe = who === 'toi';
     const head = isMe ? null : h('div', {class: 'msg-h'}, h('b', {text: who === 'claude' ? 'Claude' : BOT[who] ? BOT[who].name : who}), m.modele ? h('em', {class: 'msg-mod', text: ({haiku: 'Haiku', sonnet: 'Sonnet', opus: 'Opus', instant: 'Instantané'}[m.modele] || m.modele) + (m.secours ? ' · secours' : '')}) : null, m.date ? h('time', {text: m.date}) : null, m.sim ? h('em', {text: 'simulé'}) : null);
@@ -3370,16 +3376,24 @@ void main(){
      vérifié au banc du serveur. Changer de mode change la consigne : la discussion repart sur un nouveau Claude. */
   const VOIX_PERSO = "À L'ORAL : cette réponse sera lue à voix haute. Personnalité de JARVIS (son choix du 21/11/2026 : « sarcastique assumé ») : un majordome brillant, pince-sans-rire et franchement sarcastique, toujours bienveillant. Chaque réponse porte une pique : tu le taquines, lui, ses habitudes, la situation ou toi-même, jamais pour le rabaisser. L'information d'abord, exacte et complète ; la pique ensuite, en une phrase au plus, jamais à la place d'une réponse ni d'une action à faire. Aucun humour, ton sobre et chaleureux, quand il s'agit de santé, d'argent difficile (dette, découvert, impayé, crédit), d'un deuil, de sécurité, d'un papier ou d'une échéance urgente, ou de sa famille (sa femme, ses enfants). Jamais de moquerie sur une autre personne, jamais vulgaire. Parle comme à l'oral : phrases courtes, sans liste, sans markdown, sans emoji, sans lien ; dis « c'est sûr », « sûrement » ou « je suppose » au lieu des marques (certain), (Likely), (guessing).";
   function chatCtx(T) {
-    const oral = !!((typeof MAINS === 'object' && MAINS.on) || (typeof LIRE === 'object' && LIRE.on));
-    if (!T.ctx || T.ctxOral !== oral || Date.now() - (T.ctxAt || 0) > 10 * 60000) { T.ctx = rulesFor(oral); T.ctxAt = Date.now(); T.ctxOral = oral; }
+    const oral = !!((typeof MAINS === 'object' && MAINS.on) || (typeof LIRE === 'object' && LIRE.on)), voix = voixOn();
+    if (!T.ctx || T.ctxOral !== oral || T.ctxVoix !== voix || Date.now() - (T.ctxAt || 0) > 10 * 60000) { T.ctx = rulesFor(oral); if (voix) T.ctx = voixRules(T.ctx); T.ctxAt = Date.now(); T.ctxOral = oral; T.ctxVoix = voix; }
     return T.ctx;
+  }
+  /* 0.60.0 : la conversation à la voix (mains libres) : Claude agit et fait valider de vive voix, sans bouton */
+  const voixOn = () => typeof MAINS === 'object' && !!MAINS.on;
+  const VOIX_AGIR = "EN CONVERSATION À LA VOIX (Rabie te parle, mains libres) : il ne touche aucun bouton. Sois précis et efficace : comprends l'intention exacte, reformule l'objet précis (qui, quoi, quand), et agis. "
+    + "Une tâche, un souvenir, une relance : fais-le aussitôt avec l'outil et dis-le en une phrase. Un ordre à un bot, une échéance, une routine, la tâche Claude, la mise à jour d'un dossier : dis exactement ce qui partira, puis demande « Je l'envoie ? » (ou « Je la programme ? ») ; son oui l'exécute. "
+    + "S'il manque une information indispensable, pose une seule question courte. Plusieurs demandes d'un coup : traite-les toutes. Réponses courtes : elles sont lues à voix haute. ";
+  function voixRules(ctx) {
+    return ctx.replace("ces outils ne font que proposer, Rabie confirme d'un bouton. ", 'à la voix, comme dit plus bas. ').replace('Rabie le confirmera d\'un bouton. ', 'il le confirme de vive voix. ').replace(/(Tu es Claude, le chef[^]*?tu répartis le travail\. )/, '$1' + VOIX_AGIR);
   }
   /* à l'ouverture de la discussion avec Claude (et quand il change de profondeur) : le serveur lance Claude et lui donne déjà les données
      et l'historique de la discussion (gardé dans le téléphone) : la question suivante n'envoie que la question */
   function chatPrepare() {
     if (!CHAT.open || CHAT.mode !== 'claude' || !SAMPLE || typeof SAMPLE.prepare !== 'function') return;
     const T = THREADS[CHAT.key]; if (!T || CHAT.busy) return;
-    try { SAMPLE.prepare([{role: 'user', content: chatCtx(T)}].concat(T.turns), {modelTier: CHAT.tier, tools: chatTools(T, null)}); } catch (e) { /* rien : la question partira avec les données */ }
+    try { SAMPLE.prepare([{role: 'user', content: chatCtx(T)}].concat(T.turns), {modelTier: voixOn() && CHAT.tier === 'auto' && SRV_OS ? 'voix' : CHAT.tier, voix: voixOn(), tools: chatTools(T, null)}); } catch (e) { /* rien : la question partira avec les données */ }
   }
   async function sendChat() {
     const ta = $('chat-in'); if (!ta) return;
@@ -3446,7 +3460,7 @@ void main(){
         const r = MSG_EL.get(out);
         if (r && r.pe.isConnected && CHAT.open) { r.pe.replaceChildren(...mdNodes(out.text, true)); r.el.classList.toggle('is-wait', !!out.wait); const lg = $('chat') && $('chat').querySelector('.chat-log'); if (lg && CHAT.stick !== false) lg.scrollTop = lg.scrollHeight; }
         else renderChat(); }); };
-      const opts = {modelTier: CHAT.tier, signal: CHAT.ctl.signal, onText: ({text: t}) => { const bd = splitNext(t).body; if (bd) { out.text = bd; out.wait = false; } frame(); lire(false); if (CHAT.av) CHAT.av.talk(0.8); if (CHAT.talk && typeof voxFeed === 'function') voxFeed(out, false); }};
+      const opts = {modelTier: voixOn() && CHAT.tier === 'auto' && SRV_OS ? 'voix' : CHAT.tier, voix: voixOn(), signal: CHAT.ctl.signal, onText: ({text: t}) => { const bd = splitNext(t).body; if (bd) { out.text = bd; out.wait = false; } frame(); lire(false); if (CHAT.av) CHAT.av.talk(0.8); if (CHAT.talk && typeof voxFeed === 'function') voxFeed(out, false); }};
       if (canTools) opts.tools = tools; else opts.cache = false;
       opts.conversation = true;   /* 0.30.0 : le serveur garde le Claude de cette discussion ouvert */
       const res = await SAMPLE([{role: 'user', content: chatCtx(T)}].concat(T.turns), opts);
@@ -7655,6 +7669,7 @@ void main(){
     dictCancel(); voxStop();
     MAINS.on = true; MAINS.state = 'listening'; MAINS.busy = false; MAINS.next = ''; DICT.note = '';
     if (CHAT.open) renderChat();
+    if (typeof chatPrepare === 'function') try { chatPrepare(); } catch (e) { /* rien */ }   /* 0.60.0 : Claude préparé avec la consigne de la voix (Sonnet, et Opus) */
     v.converse({
       onState: (st, why) => {
         if (!MAINS.on) return;
@@ -9947,6 +9962,55 @@ void main(){
     { const sc = $('scroller'), sky = document.querySelector('.ux-sky'); let raf = 0; if (sc && sky) sc.addEventListener('scroll', () => { if (raf) return; raf = requestAnimationFrame(() => { raf = 0; sky.style.setProperty('--sy', String(sc.scrollTop)); }); }, {passive: true}); }
     /* au premier affichage aussi */
     setTimeout(() => { const v = $('view') && $('view').firstElementChild; if (v) { decorate(v, true); reveal(v); } }, 0);
+    /* ================= 0.60.0 : la voix qui agit (sa demande du 22/11/2026 : « améliore la gestion des tâches par les conversations vocales,
+       pas besoin d'appui de bouton, il demande la validation oralement si besoin ; il doit être plus sharp, pas grave si ça consomme plus »).
+       En conversation à la voix : une tâche, un souvenir, une relance sont faits aussitôt ; un ordre à un bot, une échéance, une routine,
+       la tâche Claude, un dossier attendent son « oui » dit à voix haute (ou tapé), qui les exécute sans repasser par Claude ; « non » les annule.
+       Seules comptent les propositions de la dernière réponse (un « oui » à une autre question n'exécute rien de plus ancien). */
+    const VOIX_DIRECT = {ajouter_tache: 1, retenir: 1, programmer_relance: 1};
+    const VOIX_FAIT = {preparer_ordre: (m) => 'ordre envoyé à ' + BOT[m.bot].name, ajouter_echeance: () => 'échéance ajoutée', confier_tache_claude: () => 'tâche Claude lancée', programmer_routine: () => 'routine programmée',
+      mettre_a_jour_dossier: () => 'dossier mis à jour', ajouter_tache: () => 'tâche ajoutée', retenir: () => 'c’est retenu', programmer_relance: () => 'relance programmée'};
+    const CT1 = chatTools;
+    chatTools = function (T, out) {
+      const voix = voixOn();
+      return CT1(T, out).map((t) => {
+        if (!t || typeof t.execute !== 'function' || t.name === 'montrer') return t;
+        const desc = voix ? String(t.description || '').replace(/\s*Rien (?:n'|ne )[^.]*?touché[^.]*\./g, '').trim() + (VOIX_DIRECT[t.name] ? ' À la voix : fait aussitôt, sans lui redemander.' : ' À la voix : dis ce qui partira et demande son accord ; son « oui » l’exécute.') : t.description;
+        return Object.assign({}, t, {description: desc, execute: async (input) => {
+          const avant = new Set(T.msgs), r = await t.execute(input);
+          const neu = T.msgs.filter((m) => !avant.has(m) && (m.kind === 'act' || m.kind === 'proposal') && m.state === 'open');
+          if (!neu.length) return r;
+          /* une version corrigée (réponse suivante) remplace la précédente du même genre (même bot pour un ordre) */
+          T.msgs.forEach((m) => { if (!neu.includes(m) && m.state === 'open' && m.tool === t.name && m.out !== out && (m.kind !== 'proposal' || neu.some((x) => x.bot === m.bot))) m.state = 'dropped'; });
+          neu.forEach((m) => { m.tool = t.name; m.at = Date.now(); m.out = out; });
+          if (!voixOn()) return r;
+          if (VOIX_DIRECT[t.name]) { neu.forEach(propRun); renderChat(); return 'Fait aussitôt (conversation à la voix) : ' + neu.map((m) => m.text).join(' ; ') + '.'; }
+          neu.forEach((m) => { m.oral = true; }); renderChat();
+          return 'En attente de son accord de vive voix : ' + neu.map((m) => m.text).join(' ; ') + '. Lis-lui ce qui partira et demande « Je l’envoie ? » ; son « oui » l’exécute.';
+        }});
+      });
+    };
+    const OUI = /^(oui|ouais|ouai|yes|ok|okay|d'?accord|vas[- ]y|go|valide|je valide|confirme|je confirme|c'?est bon|parfait|fais[- ]le|envoie(?:[- ]l[ea])?|programme(?:[- ]l[ea])?|ajoute(?:[- ]l[ea])?|lance(?:[- ]l[ea])?|bien s[uû]r|exactement|carr[ée]ment|allez(?:[- ]y)?|banco|c'?est parti|tout bon|oui vas[- ]y|oui c'?est bon|oui envoie(?:[- ]l[ea])?|oui parfait|oui merci)$/;
+    const NON = /^(non|nan|non merci|annule|annule tout|annule [çc]a|laisse tomber|non laisse tomber|laisse|stop|pas maintenant|attends|oublie|oublie [çc]a|surtout pas|non pas maintenant)$/;
+    const voixPending = (T) => { let i = T.msgs.length - 2; while (i >= 0 && T.msgs[i].who !== 'toi') i--; return T.msgs.filter((m, k) => k > i && (m.kind === 'act' || m.kind === 'proposal') && m.state === 'open' && Date.now() - (m.at || 0) < 10 * 60000); };
+    const LC1 = localCmd;
+    localCmd = function (raw, T) {
+      if (CHAT.mode === 'claude' && T && T.msgs) {
+        const t = lvLow(raw).replace(/[’]/g, "'").replace(/[.!?…,;:]+/g, ' ').replace(/\s+/g, ' ').trim().replace(/^(jarvis|claude) /, '').replace(/ (s'il te pla[iî]t|stp|merci|jarvis)$/, '').trim();
+        const oui = OUI.test(t), pend = oui || NON.test(t) ? voixPending(T) : [];
+        if (pend.length) {
+          let txt;
+          if (oui) { pend.forEach(propRun); txt = 'C’est parti : ' + pend.map((m) => (VOIX_FAIT[m.tool] || (() => 'c’est fait'))(m)).join(', ') + '.'; }
+          else { pend.forEach((m) => { m.state = 'dropped'; }); txt = 'D’accord, j’annule' + (pend.length > 1 ? ' les ' + pend.length + ' propositions' : '') + '. Rien n’est parti.'; }
+          const m = {who: 'claude', text: txt, local: true, modele: 'instant'};
+          T.msgs.push(m); T.turns.push({role: 'user', content: raw}, {role: 'assistant', content: txt});
+          renderChat();
+          if (!voixOn() && CHAT.talk && typeof voxSpeak === 'function') voxSpeak(m);
+          return true;
+        }
+      }
+      return LC1(raw, T);
+    };
     /* ================= 0.58.0 : fini les blocs bleus (son choix au QCM du 22/11/2026 : « verre noir, une couleur par rubrique, bord irisé sur les cartes phares »).
        Les surfaces bleu marine deviennent du verre presque noir ; chaque carte prend la couleur de sa rubrique (ou de son bot) en lueur dans le coin et sur le bord ;
        les cartes phares ont un bord irisé ; l'ambre reste réservé à « attend ta réponse ». Couleurs fixes : rien ne se redessine en continu. */

@@ -6,7 +6,7 @@ import {startFakeGoogle} from './fake-google.mjs';
 import http from 'node:http'; import crypto from 'node:crypto';
 import {paris, pauseDepuisFaits, paliers} from '../notify.mjs';
 import {choixEcoute} from '../voix.mjs';
-import {routeur} from '../flux.mjs';
+import {routeur, routeurVoix} from '../flux.mjs';
 const FG = await startFakeGoogle();
 const DATA = fs.mkdtempSync(path.join(os.tmpdir(), 'jarvis-'));
 /* 0.22.0 : faux Open-Meteo (prévisions de 8 jours à partir d'aujourd'hui, heure de Paris) */
@@ -53,6 +53,10 @@ const results = []; let fails = 0;
 { const R = (t) => routeur(t), cas = [["Qu'est-ce que j'ai demain ?", 'quick'], ['Où en est Iris ?', 'quick'], ['Quelle heure est-il', 'quick'], ['Explique-moi pourquoi Kairos attend', 'default'], ['Rédige une réponse au syndic', 'default'], ['Compare les deux offres de prêt', 'default'], ['Réfléchis bien à ma stratégie pour le rachat', 'deep'], ['Analyse approfondie de mes abonnements', 'deep'], ['x'.repeat(300), 'default']];
   const bad = cas.filter(([t, k]) => R(t) !== k);
   results.push((bad.length ? 'ÉCHEC ' : 'OK    ') + 'routeur : Haiku pour lire une donnée, Sonnet pour analyser ou rédiger, Opus quand il le demande' + (bad.length ? ' :: ' + JSON.stringify(bad.map(([t, k]) => [t.slice(0, 30), k, R(t)])) : '')); if (bad.length) fails++; }
+/* 0.60.0 : le routeur de la conversation à la voix : jamais Haiku ; Opus pour une action (ajouter, rappeler, envoyer, un bot nommé…) ou une réflexion */
+{ const cas = [['Ajoute une tâche : appeler le plombier jeudi', 'deep'], ['Dis à Iris de relancer le syndic', 'deep'], ['Rappelle-moi de payer la crèche vendredi', 'deep'], ['Programme le brief à 7 h', 'deep'], ['Raconte-moi une blague', 'default'], ['Quel temps fait-il', 'default'], ['Est-ce que je devrais changer de banque, ton avis ?', 'deep']];
+  const bad = cas.filter(([t, k]) => routeurVoix(t) !== k);
+  results.push((bad.length ? 'ÉCHEC ' : 'OK    ') + 'routeur de la voix : jamais Haiku ; Opus pour ce qu’il faut faire ou décider, Sonnet pour le reste' + (bad.length ? ' :: ' + JSON.stringify(bad.map(([t, k]) => [t.slice(0, 30), k, routeurVoix(t)])) : '')); if (bad.length) fails++; }
 /* 0.32.0 : le moteur d'écoute — Parakeet une fois installé (marque et variante), sinon Whisper ; JARVIS_ECOUTE_MOTEUR=whisper ; marque douteuse = Whisper */
 { const d = fs.mkdtempSync(path.join(os.tmpdir(), 'ecoute-')), P = path.join(d, 'parakeet'), v0 = choixEcoute(d, {});
   fs.mkdirSync(P); fs.writeFileSync(path.join(P, 'variante.json'), JSON.stringify({engine: 'sherpa', variante: 'int8'})); const v1 = choixEcoute(d, {});
