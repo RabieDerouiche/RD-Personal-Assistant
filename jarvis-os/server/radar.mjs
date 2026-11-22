@@ -41,6 +41,8 @@ export function occurrences(f, a, b) {
     let brut = J(Y, M, Math.min(j, dim(Y, M))), le = decale(brut, 1), ff = f;
     if (f.debut && ymd(le) < f.debut) continue;   /* 0.51.0 : une dépense qui commence plus tard (taxe foncière mensualisée en janvier) */
     if (f.fin && ymd(le) > f.fin) continue;   /* 0.54.0 : une dépense qui s'arrête (résiliée, échéancier terminé) */
+    /* 0.66.0 : un contrat dont le montant change selon le mois (assurance de prêt) : le montant de ce mois-là */
+    if (f.paliers && f.paliers.length) { const v = montantPalier(f.paliers, ymd(le).slice(0, 7)); if (v == null) continue; ff = {...f, montant: v, estime: false, exact: true}; }
     /* 0.51.0 : la facture du mois est arrivée (« 160,00 € prélevés le 28 ») : son montant et son jour, à la place de l'habituel */
     if (f.prochain && f.prochain.date && f.prochain.date.slice(0, 7) === ymd(le).slice(0, 7)) { brut = le = depuisYmd(f.prochain.date); ff = {...f, montant: f.prochain.montant, estime: false, exact: true}; }
     if (le >= a && le <= b) out.push({f: ff, brut, le});
@@ -146,6 +148,8 @@ export function genre(objet, texte) {
   if (/vous avez recu (un |une |des )?(paiement|virement|remboursement|versement)|you('ve| have)? received (a |an )?(payment|transfer|refund)|remboursement (a ete )?(effectue|emis|recu|de votre commande)|refund (has been )?(issued|processed)/.test(s)) return 'autre';
   /* 0.56.0 : un montant « en votre faveur », crédité ou remboursé (régularisation, remboursement) n'est pas une dépense */
   if (/en votre faveur|sera credite(e)? sur votre compte|a votre credit\b|vous sera rembourse|sera rembourse(e)? (sur|par)/.test(s)) return 'autre';
+  /* 0.66.0 : un relevé annuel de charges dont le solde « sera reporté sur votre appel de fonds » : il part avec l'appel suivant, pas à part */
+  if (/(sera|seront|est|sont) (reporte|reportee|reportes|impute|imputee|integre|integree)s? (sur|dans|a) (votre|le|ton|la) (prochain(e)? )?(appel|echeance|facture)/.test(s)) return 'autre';
   /* 0.56.0 : une mensualité qui change (« votre mensualité s'élèvera désormais à … ») */
   if (/(vos|votre) mensualites? (evoluent|evolue|change|changent|va changer|vont changer|augmente|baisse)|(votre )?(nouvelle )?mensualite (s'elevera|sera|passe|passera|est desormais)/.test(s)) return 'mensualite';
   /* 0.51.0 : un reçu fiscal (dons) n'est pas une facture */
@@ -179,6 +183,43 @@ export function montantPdf(texte) {
   }
   return trouverMontant(s);
 }
+/* 0.66.0 (sa remarque du 22/11/2026 : « dans l'historique des prélèvements, tu n'as pas les bonnes valeurs », exemple : son syndic) : le prélèvement
+   écrit dans un appel ou un avis (« ÉCHÉANCIER DES PRÉLÈVEMENTS … PAR PRÉLÈVEMENT 10/01/2027 431.93 », exemple inventé) est ce qui part vraiment : l'appel
+   de fonds plus le fonds de travaux, plus une régularisation. Il l'emporte sur « Montant de l'appel de fonds ». Plusieurs dates : plusieurs prélèvements. */
+const ANCRE_PREL = /[ée]ch[ée]ancier des pr[ée]l[èe]vements|par pr[ée]l[èe]vements?|pr[ée]l[èe]vements? (?:pr[ée]vus?|programm[ée]s?|[àa] venir)|dates? (?:du |de |des )?pr[ée]l[èe]vements?\s*:?/gi;
+const PAIRE_PREL = /^[\s:|]*(?:le\s+)?(\d{2})\/(\d{2})\/(\d{4})\s*:?\s*(\d{1,3}(?:[ .]\d{3})*[.,]\d{2}|\d+[.,]\d{2})(?!\d)\s*(?:€|EUR\b|euros?\b)?/i;
+export function prelevementsPdf(texte) {
+  const s = String(texte || '').replace(/[\u00a0\u202f]/g, ' '), out = [], vus = new Set();
+  for (const a of s.matchAll(ANCRE_PREL)) {
+    let i = a.index + a[0].length;
+    for (let k = 0; k < 12; k++) {
+      const m = PAIRE_PREL.exec(s.slice(i, i + 90)); if (!m) break;
+      const d = +m[1], mo = +m[2], v = montantDe(m[4]), date = m[3] + '-' + m[2] + '-' + m[1];
+      if (d >= 1 && d <= 31 && mo >= 1 && mo <= 12 && v > 0 && !vus.has(date)) { vus.add(date); out.push({date, montant: v}); }
+      i += m[0].length;
+    }
+  }
+  return out.sort((a, b) => (a.date < b.date ? -1 : 1));
+}
+/* 0.66.0 (sa demande du 22/11/2026 : « mon assurance emprunteur n'est pas fixe, le contrat d'adhésion a toutes les infos ») : le tableau des
+   cotisations d'un contrat (« période du … au … | mois du paiement | total ») donne le montant de chaque mois, pour toute sa durée (une assurance
+   de prêt calculée sur le capital restant dû baisse chaque année ; une cotisation d'association s'ajoute un mois par an). Au moins 12 mois qui se
+   suivent ; gardés en paliers (un palier à chaque changement de montant). */
+export function calendrierPdf(texte) {
+  const s = String(texte || '').replace(/[\u00a0\u202f]/g, ' '), D = '(\\d{2})/(\\d{2})/(\\d{4})', mois = new Map();
+  const re = new RegExp(D + '\\s+' + D + '\\s+(?:(?:(\\d{2})/)?(\\d{2})/(\\d{4})\\s+)?' + NB + '\\s?(?:€|EUR\\b|euros?\\b)', 'gi');
+  for (const m of s.matchAll(re)) {
+    const k = m[9] ? m[9] + '-' + m[8] : m[3] + '-' + m[2], v = montantDe(m[10]);
+    if (v != null && v >= 0 && +k.slice(5, 7) >= 1 && +k.slice(5, 7) <= 12 && !mois.has(k)) mois.set(k, v);
+  }
+  const l = [...mois].sort((a, b) => (a[0] < b[0] ? -1 : 1)), rang = (k) => +k.slice(0, 4) * 12 + +k.slice(5, 7);
+  if (l.length < 12 || l.slice(1).filter((x, i) => rang(x[0]) - rang(l[i][0]) === 1).length < (l.length - 1) * 0.9) return null;
+  const paliers = [];
+  for (const [du, montant] of l) if (!paliers.length || paliers[paliers.length - 1].montant !== montant) paliers.push({du, montant});
+  return {paliers, debut: l[0][0], fin: l[l.length - 1][0], mois: l.length, total: Math.round(l.reduce((t, x) => t + x[1] * 100, 0)) / 100};
+}
+/* le montant d'un mois (« AAAA-MM ») selon ses paliers ; null avant le premier */
+export function montantPalier(paliers, mo) { let v = null; for (const p of paliers || []) { if (p.du <= mo) v = p.montant; else break; } return v; }
 /* 0.56.0 : une phrase publicitaire ou une estimation ne donne pas de prix (« 12,39 € par mois, c'est notre estimation ») */
 const PUB = /a titre indicatif|sans valeur contractuelle|estimation|\bestime(e|s)?\b|impact estime|et si vous|parrain|code promo|offre speciale|jusqu'a -?\d+ ?%|economisez|reduction de \d|offert|gratuit pendant|en moyenne|recevez|gagnez|regroupez|cashback|au capital|capital (social )?de|\brcs\b|siren|siret|tva intracom|orias/;   /* et les mentions légales (« SAS au capital de 56 800 € ») */
 export const sansPub = (texte) => String(texte || '').split(/\n|(?<=[.!?])\s+|\s\|\s/).filter((l) => !PUB.test(plat(l))).join('\n');
@@ -281,11 +322,11 @@ export function regrouper(releves, auj, joursCle = {}) {
   const out = [];
   for (const [dom, l] of par) {
     const parMois = new Map(), nMois = new Map();
-    for (const r of l.slice().sort((a, b) => ((a.datePrel || a.date) < (b.datePrel || b.date) ? -1 : 1))) { const m = (r.datePrel || r.date).slice(0, 7), d = parMois.get(m);
+    for (const r of l.slice().sort((a, b) => ((a.datePrel || a.date) + a.date < (b.datePrel || b.date) + b.date ? -1 : 1))) { const m = (r.datePrel || r.date).slice(0, 7), d = parMois.get(m);   /* 0.66.0 : même jour : le mail le plus récent (« annule et remplace ») */
       /* 0.56.0 : plusieurs mails le même mois (facture, rappel, commande) : le plus récent, complété par le montant et le jour des autres */
       parMois.set(m, d ? {...(r.montant || !d.montant ? r : d), montant: r.montant || d.montant, datePrel: r.datePrel || d.datePrel} : r); nMois.set(m, (nMois.get(m) || 0) + 1); }
     /* 0.51.0 : le montant habituel d'un mois = sa facture moins sa part ponctuelle, lue dans le mail qui l'explique (même mois, même total) */
-    const pts = [...parMois].map(([m, r]) => { const h = l.find((y) => y.hors && (y.datePrel || y.date).slice(0, 7) === m && Math.abs((y.montant || 0) - (r.montant || 0)) < 0.01); return h && r.montant > h.hors ? {...r, montant: Math.round((r.montant - h.hors) * 100) / 100} : r; });
+    const pts = [...parMois].map(([m, r]) => { const h = l.find((y) => y.hors && (y.datePrel || y.date).slice(0, 7) === m && Math.abs((y.montant || 0) - (r.montant || 0)) < 0.01); return h && r.montant > h.hors ? {...r, montant: Math.round((r.montant - h.hors) * 100) / 100, reel: r.montant, partHors: h.hors} : r; });
     if (pts.length < 2) continue;
     /* 0.49.0 : des paiements plusieurs fois par mois (achats dans un jeu, livraisons de repas) ne font pas une dépense fixe */
     if (l.length / parMois.size > 1.5 || Math.max(...nMois.values()) > 2) continue;
@@ -307,7 +348,7 @@ export function regrouper(releves, auj, joursCle = {}) {
     const ecrit = joursCle[dom] || joursCle[der.cle] || null, annonces = pts.filter((r) => r.datePrel);
     const jour = annonces.length ? plusFrequent(annonces.map((r) => +r.datePrel.slice(8, 10))) : ecrit || plusFrequent(pts.map((r) => +ymd(plus(depuisYmd(r.date), lag)).slice(8, 10)));
     out.push({id: 'p' + hash(dom), cle: dom, dom: der.dom || dom, service: der.service, cat: categorie(der.dom || dom, der.service), montant: !derC ? null : variable ? mediane(mts.slice(-6)) : conn.length <= 2 || Math.abs(derC.montant - med2) <= med2 * tol ? derC.montant : med2, jour,
-      ...(annonces.length || ecrit ? {} : {jourApprox: true, ...(lag ? {decalage: lag} : {})}), rythme, historique: pts.slice(-6).reverse().map((r) => ({date: r.date, ...(r.datePrel ? {datePrel: r.datePrel} : {}), montant: r.montant})), ...(rythme === 'mensuel' ? {} : {mois: derJ.getUTCMonth() + 1}), ...(varie > 0.05 || variable ? {estime: true} : {}), ...(variable ? {variable: true} : {}), source: 'mail', preuves: pts.length, dernier: ymd(derJ),
+      ...(annonces.length || ecrit ? {} : {jourApprox: true, ...(lag ? {decalage: lag} : {})}), rythme, historique: pts.filter((r) => (r.datePrel || r.date) <= ymd(auj)).slice(-6).reverse().map((r) => ({date: r.date, ...(r.datePrel ? {datePrel: r.datePrel} : {}), montant: r.reel || r.montant, ...(r.partHors ? {hors: r.partHors} : {})})),   /* 0.66.0 : ce qui est vraiment parti, sa part ponctuelle à côté */ ...(rythme === 'mensuel' ? {} : {mois: derJ.getUTCMonth() + 1}), ...(varie > 0.05 || variable ? {estime: true} : {}), ...(variable ? {variable: true} : {}), source: 'mail', preuves: pts.length, dernier: ymd(derJ),
       depuis: pts[0].date.slice(5, 7) + '/' + pts[0].date.slice(0, 4), ...(der.objet || der.fil ? {exemple: {objet: der.objet || '', date: der.date, ...(der.fil ? {url: 'https://mail.google.com/mail/u/0/#all/' + der.fil} : {})}} : {})});
   }
   return out.sort((a, b) => (b.montant || 0) - (a.montant || 0));
@@ -319,6 +360,8 @@ export function regrouper(releves, auj, joursCle = {}) {
 const REQUETE = 'subject:(facture OR échéance OR échéancier OR prélèvement OR prelevement OR mensualité OR cotisation OR reçu OR receipt OR invoice OR renouvellement OR renouveler OR abonnement OR subscription OR "votre paiement" OR "confirmation de paiement" OR "paiement refusé" OR "échec de paiement" OR "payment failed" OR "payment declined" OR "essai gratuit" OR "free trial" OR résiliation OR resiliation OR résilié OR mensualisation OR souscription OR adhésion OR "votre contrat" OR mensualités OR "appel de charges" OR "appel de fonds" OR copropriété OR "Paiement en 4X" OR "plan de paiements" OR "paiement réussi" OR "police d\'assurance" OR renews OR renew OR membership) -in:spam -in:trash -in:sent -category:promotions -category:social -category:forums';
 /* 0.54.0 : des factures dont l'objet ne dit rien (« Votre espace client », « Information importante ») : cherchées par les phrases d'un prélèvement */
 const FILTRE = ' -in:spam -in:trash -in:sent -category:promotions -category:social -category:forums';
+/* 0.66.0 : les contrats avec leur tableau de cotisations (assurance de prêt), en pièce jointe */
+const REQUETE_CONTRATS = 'has:attachment filename:pdf subject:(contrat OR adhésion OR adhesion OR certificat OR avenant OR échéancier OR echeancier OR "conditions particulières" OR cotisations)' + ' -in:spam -in:trash -in:sent -category:promotions -category:social -category:forums';
 const REQUETE_CORPS = '("sera prélevé" OR "sera prélevée" OR "seront prélevés" OR "date de prélèvement" OR "prélèvement aura lieu" OR "montant prélevé" OR "will be charged" OR "mensualité de" OR "avis d\'échéance")' + FILTRE;
 /* les adresses de messagerie personnelles ne sont jamais lues comme des fournisseurs */
 const PERSO = /^(gmail|googlemail|yahoo|hotmail|outlook|live|icloud|me|laposte|wanadoo|orange|free|sfr|neuf|aol|protonmail|proton)\.(com|fr|net|me)$/;
@@ -346,6 +389,9 @@ export function createRadar({file, gmail, claude = async () => ({ok: false, erro
   if (R.version < 4) { Object.assign(R, {releves: [], fils: {}, vus: [], scan: null, propositions: [], alertes: [], avenir: [], ponctuels: [], mandats: [], version: 4}); }
   /* 0.54.0 : détection revue (contrats d'un seul mail, mensualisations, résiliations, recherche élargie) : lecture de départ refaite */
   if (R.version < 5) { Object.assign(R, {releves: [], fils: {}, vus: [], scan: null, propositions: [], alertes: [], avenir: [], ponctuels: [], mandats: [], finis: [], version: 5}); }
+  /* 0.66.0 : prélèvements lus dans l'échéancier des appels (syndic), relevés reportés écartés, échéancier des contrats (assurance de prêt) :
+     lecture de départ refaite ; ses dépenses fixes, sa paie et ce qu'il a écarté restent */
+  if (R.version < 6) { Object.assign(R, {releves: [], fils: {}, vus: [], scan: null, propositions: [], alertes: [], avenir: [], ponctuels: [], mandats: [], finis: [], version: 6, revise: true}); }
   if (!R.finis) R.finis = []; if (!R.gardes) R.gardes = {};
   const sauver = () => { const tmp = file + '.tmp'; fs.writeFileSync(tmp, JSON.stringify(R), {mode: 0o600}); fs.renameSync(tmp, file); };
   let occupe = null;   /* une lecture des mails à la fois */
@@ -368,6 +414,12 @@ export function createRadar({file, gmail, claude = async () => ({ok: false, erro
     if (f.dom) o.dom = TXT(f.dom, 80);
     if (f.cle) o.cle = TXT(f.cle, 120);
     if (f.depuis) o.depuis = TXT(f.depuis, 12);
+    /* 0.66.0 : le montant de chaque mois selon son contrat (paliers « AAAA-MM »), et le document qui les donne */
+    if (Array.isArray(f.paliers) && f.paliers.length && f.paliers.length <= 400) {
+      const pl = f.paliers.filter((x) => x && /^\d{4}-(0[1-9]|1[0-2])$/.test(String(x.du || '')) && +x.montant >= 0 && +x.montant < 100000).map((x) => ({du: x.du, montant: Math.round(+x.montant * 100) / 100})).sort((a, b) => (a.du < b.du ? -1 : 1));
+      if (pl.length) { o.paliers = pl; delete o.estime; }
+    }
+    if (o.paliers && f.contrat && typeof f.contrat === 'object') o.contrat = {objet: TXT(f.contrat.objet, 140), date: TXT(f.contrat.date, 10), ...(/^https:\/\/mail\.google\.com\//.test(String(f.contrat.url || '')) ? {url: TXT(f.contrat.url, 200)} : {})};
     return o;
   };
   function regler(cle, v) {
@@ -408,8 +460,18 @@ export function createRadar({file, gmail, claude = async () => ({ok: false, erro
      Retirer (la dépense s'arrête à la date annoncée, ou sort tout de suite, et n'est plus proposée) ou Garder (plus d'alerte pour ce silence) */
   function alerte(id, action) {
     const a = R.alertes.find((x) => x.id === id); if (!a || !a.fixe) return {ok: false, error: 'Alerte introuvable.'};
-    if (action !== 'retirer' && action !== 'garder') return {ok: false, error: 'Action inconnue.'};
+    if (action !== 'retirer' && action !== 'garder' && !(action === 'appliquer' && a.type === 'calendrier')) return {ok: false, error: 'Action inconnue.'};
     const f = R.fixes.find((x) => x.id === a.fixe), t0 = ymd(auj());
+    /* 0.66.0 : les montants de son contrat (un par mois) remplacent son montant fixe ; « Garder » : son montant reste, plus de question */
+    if (a.type === 'calendrier') {
+      const c = a.calendrier || {};
+      if (f && action === 'appliquer' && Array.isArray(c.paliers) && c.paliers.length) {
+        Object.assign(f, {paliers: c.paliers, rythme: 'mensuel', ...(c.jour ? {jour: c.jour} : {}), ...(c.debut ? {debut: c.debut} : {}), ...(c.fin ? {fin: c.fin} : {}), ...(c.contrat ? {contrat: c.contrat} : {})});
+        delete f.mois; delete f.estime; delete f.variable; f.montant = montantPalier(f.paliers, t0.slice(0, 7)) ?? f.montant;
+      }
+      if (f && action !== 'appliquer') R.gardes = {...R.gardes, ['c' + f.id]: c.fin || true};
+      R.alertes = R.alertes.filter((x) => x !== a); sauver(); return {ok: true};
+    }
     if (f && action === 'retirer') { if (a.fin && a.fin >= t0) f.fin = a.fin; else { R.fixes = R.fixes.filter((x) => x !== f); if (cleDe(f)) R.refus = [...new Set([...R.refus, cleDe(f)])].slice(-300); } }
     if (f && action === 'garder') R.gardes = {...R.gardes, [(a.type === 'resiliation' ? 'r' : '') + f.id]: a.type === 'silence' ? a.dernier : true};
     R.alertes = R.alertes.filter((x) => x !== a); sauver(); return {ok: true};
@@ -450,9 +512,11 @@ export function createRadar({file, gmail, claude = async () => ({ok: false, erro
       for (const m of (x && x.messages) || []) {
         if (dejaVus.has(m.id) || (m.labelIds || []).includes('SENT')) continue;
         dejaVus.add(m.id); R.vus.push(m.id);
-        const pdf = (m.attachments || []).find((a) => (/pdf/i.test(a.mimeType) || /\.pdf$/i.test(a.filename)) && (a.attachmentId || a.data) && !(a.size > 5e6));
+        /* 0.66.0 : plusieurs PDF : le certificat, la facture ou l'appel avant les conditions générales et les notices */
+        const note = (a) => (/conditions? g[ée]n[ée]rales|^cg[-_ ]|notice|\bcgv\b|\bcgu\b|brochure|plaquette|document d'information/i.test(a.filename || '') ? 0 : /certificat|adh[ée]sion|[ée]ch[ée]ancier|facture|appel|avis|contrat|conditions particuli/i.test(a.filename || '') ? 2 : 1);
+        const pdf = (m.attachments || []).filter((a) => (/pdf/i.test(a.mimeType) || /\.pdf$/i.test(a.filename)) && (a.attachmentId || a.data) && !(a.size > 5e6)).sort((a, b) => note(b) - note(a))[0];
         lus.push({lu: lireMail({id: m.id, fil: m.threadId, sender: m.sender, nom: ((m.addressDisplayNames || [])[0] || {}).displayName, objet: m.subject, texte: m.plaintextBody, date: m.date}),
-          extrait: TXT(String(m.plaintextBody || '').replace(/\s+/g, ' '), 1500), objet: TXT(m.subject, 200), sender: m.sender, ...(pdf ? {pdf: {mid: m.id, aid: pdf.attachmentId || '', data: pdf.data || ''}} : {})});
+          extrait: TXT(String(m.plaintextBody || '').replace(/\s+/g, ' '), 1500), objet: TXT(m.subject, 200), sender: m.sender, ...(pdf ? {pdf: {mid: m.id, aid: pdf.attachmentId || '', data: pdf.data || '', nom: TXT(pdf.filename, 120)}} : {})});
       }
     }
     R.vus = R.vus.slice(-6000);
@@ -485,6 +549,28 @@ export function createRadar({file, gmail, claude = async () => ({ok: false, erro
   function retenir(lu, {depart}) {
     const t = auj(), age = lu.date ? Math.round((t - depuisYmd(lu.date)) / 864e5) : 0, fx = lu.cle ? R.fixes.find((f) => cleDe(f) === lu.cle) : null;
     /* un renouvellement chiffré compte aussi comme un paiement du service (pour repérer sa régularité) */
+    /* 0.66.0 : le tableau des cotisations d'un contrat : une dépense fixe dont le montant suit le mois ; s'il en a déjà une qui lui ressemble
+       (même service, ou une assurance de prêt saisie à la main), une alerte lui propose d'y appliquer ces montants (« Appliquer » ou « Garder ») */
+    if (lu.genre === 'calendrier') {
+      const c = lu.calendrier, mo = ymd(t).slice(0, 7); if (!lu.cle || !c || c.fin < mo) return;
+      const nom = c.creancier ? c.creancier.toLowerCase().replace(/(^|[\s-])\p{L}/gu, (z) => z.toUpperCase()) : lu.service, assur = c.assurance && (c.pret || /pret|emprunt|credit/.test(plat(lu.objet + ' ' + (lu.service || ''))));
+      const service = assur ? 'Assurance de prêt (' + nom + ')' : nom, jour = c.jour || +lu.date.slice(8, 10), montant = montantPalier(c.paliers, mo) ?? c.paliers[0].montant;
+      const lmo = (k) => MOIS_L[+k.slice(5, 7) - 1] + ' ' + k.slice(0, 4), suivant = c.paliers.find((p) => p.du > mo);
+      const dit = eur(montant) + ' ce mois-ci' + (suivant ? ', puis ' + eur(suivant.montant) + ' en ' + lmo(suivant.du) + (c.paliers.filter((p) => p.du > mo).length > 1 ? ' (il change encore ensuite)' : '') : '') + ', jusqu’en ' + lmo(c.fin);
+      const cal = {paliers: c.paliers, jour, debut: c.debut + '-' + String(Math.min(jour, 28)).padStart(2, '0'), fin: c.fin + '-' + String(Math.min(jour, 28)).padStart(2, '0'), contrat: {objet: lu.objet || '', date: lu.date, ...(lu.fil ? {url: 'https://mail.google.com/mail/u/0/#all/' + lu.fil} : {})}};
+      const mots = [nom, lu.service, c.creancier].filter(Boolean).map(nomPlat).filter((w) => w.length >= 4);
+      const f = R.fixes.find((x) => !(x.fin && x.fin < ymd(t)) && ((cleDe(x) && cleDe(x) === lu.cle) || mots.some((w) => nomPlat(x.service).includes(w)) || (assur && /assurance.*(pret|emprunt|credit)|emprunteur/.test(plat(x.service)))));
+      if (f) {
+        const deja = f.paliers && f.paliers.length === c.paliers.length && f.fin === cal.fin;
+        if (!deja && R.gardes['c' + f.id] !== cal.fin && !R.alertes.some((a) => a.type === 'calendrier' && a.fixe === f.id))
+          R.alertes.push({id: 'c' + lu.id, date: ymd(t), type: 'calendrier', titre: 'Montants de ton contrat', service: f.service, montant, avant: f.montant, fixe: f.id, calendrier: cal, fil: lu.fil,
+            texte: 'Le tableau de ton contrat donne le montant de chaque mois : ' + dit + '. Appliquer ces montants ?'});
+        return;
+      }
+      annonce(lu, {service, cat: assur || c.assurance ? 'Assurances' : categorie(lu.dom, lu.service), montant, jour, ...(c.jour ? {} : {jourApprox: true}), rythme: 'mensuel', paliers: c.paliers, debut: cal.debut, fin: cal.fin, contrat: cal.contrat,
+        aide: 'le montant de chaque mois vient du tableau de ton contrat'});
+      return;
+    }
     if (lu.genre === 'mensualisation') { if (lu.cle) R.joursCle = {...(R.joursCle || {}), [lu.cle]: +lu.debut.slice(8, 10)}; if (lu.cle && lu.fin && lu.fin >= ymd(t)) annonce(lu, {montant: lu.montant, jour: +lu.debut.slice(8, 10), debut: lu.debut, fin: lu.fin}); return; }
     if (lu.genre === 'contrat') { if (lu.cle && lu.montant) { const j0 = lu.datePrel || lu.date, ry = lu.rythme || 'mensuel'; annonce(lu, {montant: lu.montant, jour: +j0.slice(8, 10), ...(lu.datePrel ? {} : {jourApprox: true}), rythme: ry, ...(ry !== 'mensuel' ? {mois: +j0.slice(5, 7)} : {}), ...(lu.datePrel && lu.datePrel > ymd(t) ? {debut: lu.datePrel} : {})}); } return; }
     if (lu.genre === 'resiliation') {
@@ -533,6 +619,8 @@ export function createRadar({file, gmail, claude = async () => ({ok: false, erro
       if (!lu.cle) return;   /* un reçu d'intermédiaire sans marchand reconnu ne sert pas */
       /* 0.49.0 : une facture dont le montant n'est que dans la pièce jointe (crèche, transports…) compte aussi : sa régularité suffit, le montant sera à compléter */
       R.releves.push({id: lu.id, fil: lu.fil || '', objet: lu.objet || '', dom: lu.dom, cle: lu.cle, service: lu.service, montant: lu.montant || null, date: lu.date, datePrel: lu.datePrel || null, genre: 'facture', ...(lu.hors ? {hors: lu.hors} : {})});
+      /* 0.66.0 : un appel prélevé en plusieurs fois (échéancier du PDF) : chaque prélèvement compte, à son jour */
+      (lu.suite || []).forEach((e, i) => R.releves.push({id: lu.id + '-' + (i + 1), fil: lu.fil || '', objet: lu.objet || '', dom: lu.dom, cle: lu.cle, service: lu.service, montant: e.montant, date: lu.date, datePrel: e.date, genre: 'facture'}));
       /* 0.51.0 : la facture du mois d'une dépense fixe, prélevée plus tard : le reste à payer prend son vrai montant */
       if (fx && lu.montant && lu.datePrel && lu.datePrel >= ymd(t) && !lu.hors) fx.prochain = {date: lu.datePrel, montant: lu.montant};
       if (fx && lu.montant && !depart && !fx.estime) {
@@ -563,6 +651,7 @@ export function createRadar({file, gmail, claude = async () => ({ok: false, erro
     R.ponctuels = unique(uniq(R.ponctuels).filter((v) => v.date >= ymd(t))).slice(-60);
     R.avenir = R.avenir.filter((v) => v.type !== 'echeance').concat(unique(R.avenir.filter((v) => v.type === 'echeance'))).sort((a, b) => (a.date < b.date ? -1 : 1));
     for (const f of R.fixes) if (f.prochain && f.prochain.date < ymd(t)) delete f.prochain;
+    for (const f of R.fixes) if (f.paliers && f.paliers.length) { const v = montantPalier(f.paliers, ymd(t).slice(0, 7)); if (v != null) f.montant = v; }   /* 0.66.0 */
     const mois0 = ymd(J(t.getUTCFullYear(), t.getUTCMonth() - 1, 1)), adh = new Set(R.mandats.filter((m) => m.debut && m.montant == null && m.debut >= mois0).map((m) => m.cle));
     const rg = regrouper(R.releves, t, R.joursCle || {}).filter((p) => !(adh.has(p.cle || p.dom) && p.rythme === 'annuel')), rgCles = new Set(rg.map((p) => p.cle || p.dom));   /* 0.56.0 : la mensualisation remplace le paiement annuel */   /* une dépense déjà vue dans les factures prime sur son annonce */
     /* une annonce reste proposée tant qu'elle vaut : un échéancier jusqu'à sa fin, une adhésion jusqu'au mois de son début, un contrat 2 mois (un an s'il est annuel) */
@@ -582,17 +671,39 @@ export function createRadar({file, gmail, claude = async () => ({ok: false, erro
   }
   /* 0.52.0 (son choix : « Oui, sur le serveur ») : une facture dont le montant n'est que dans le PDF joint est lue ici, sans IA ; le PDF
      n'est pas gardé, seuls le montant et la date retrouvés le sont */
+  /* 0.66.0 : un mail de contrat (certificat d'adhésion, avenant, échéancier) : son PDF est lu pour le tableau des cotisations, quel que soit son genre */
+  const CONTRAT_PJ = /contrat|adh[ée]sion|certificat|[ée]ch[ée]ancier|avenant|conditions particuli|tableau d'amortissement|cotisations/i;
+  const estContrat = (x) => !!x.pdf && x.lu.genre !== 'echeance' && (CONTRAT_PJ.test(x.objet || '') || CONTRAT_PJ.test(x.pdf.nom || ''));
   async function parPdf(lus, o) {
     let reste = o.depart ? Math.max(0, maxPdf - ((R.scan && R.scan.pdf) || 0)) : 20;
     for (const x of lus) {
+      const contrat = estContrat(x);
       /* 0.54.0 : le PDF est lu aussi quand le mail a le montant mais pas le jour du prélèvement */
-      if (!x.pdf || !['facture', 'renouvellement'].includes(x.lu.genre) || (x.lu.montant && x.lu.datePrel) || reste <= 0 || (!x.pdf.data && !gmail.pj)) continue;
+      if (!x.pdf || reste <= 0 || (!x.pdf.data && !gmail.pj)) continue;
+      if (!contrat && (!['facture', 'renouvellement'].includes(x.lu.genre) || (x.lu.montant && x.lu.datePrel))) continue;
       reste--; if (R.scan && o.depart) R.scan.pdf = (R.scan.pdf || 0) + 1;
       let d = x.pdf.data;
       if (!d) { try { d = ((await gm(() => gmail.pj(x.pdf.mid, x.pdf.aid), 10)) || {}).data || ''; } catch (e) { if (estQuota(e)) throw e; log('radar : pièce jointe illisible (' + TXT(e.message || e, 120) + ')'); continue; } }
-      const texte = texteDePdf(Buffer.from(String(d).replace(/-/g, '+').replace(/_/g, '/'), 'base64')), v = texte ? montantPdf(texte) : null, dp = texte ? trouverDate(texte, x.lu.date ? depuisYmd(x.lu.date) : null) : null;
+      const texte = texteDePdf(Buffer.from(String(d).replace(/-/g, '+').replace(/_/g, '/'), 'base64'));
+      if (!texte) continue;
+      /* 0.66.0 : le tableau des cotisations d'un contrat : le montant de chaque mois (assurance de prêt) */
+      if (contrat) {
+        const c = calendrierPdf(texte);
+        if (c) {
+          const dp = trouverDate(texte, null), cr = (texte.match(/nom du cr[ée]ancier\s*:?\s*([A-Za-zÀ-ÿ0-9][^\n]{1,40})/i) || [])[1];
+          x.lu = {...x.lu, genre: 'calendrier', calendrier: {...c, jour: dp && dp.slice(0, 7) === c.debut ? +dp.slice(8, 10) : null, ...(cr ? {creancier: cr.trim()} : {}), assurance: /assurance|assur[ée]|cotisation/i.test(texte.slice(0, 20000)), pret: /pr[êe]ts?\b|emprunt|cr[ée]dit immobilier/i.test(texte.slice(0, 20000))}, pdf: true, sur: true};
+          continue;
+        }
+        if (!['facture', 'renouvellement'].includes(x.lu.genre)) continue;
+      }
+      /* 0.66.0 : le prélèvement écrit (date et montant) : ce qui part vraiment */
+      const pr = prelevementsPdf(texte), prm = pr.map((e) => e.montant);
+      /* un échéancier de 5 prélèvements égaux ou plus (énergie, impôts) reste une mensualisation, avec son début et sa fin */
+      if (pr.length >= 5 && Math.max(...prm) <= Math.min(...prm) * 1.1 + 0.05) { x.lu = {...x.lu, genre: 'mensualisation', montant: mediane(prm), debut: pr[0].date, fin: pr[pr.length - 1].date, pdf: true, sur: true}; continue; }
+      if (pr.length) { x.lu = {...x.lu, montant: pr[0].montant, datePrel: pr[0].date, pdf: true, sur: true, ...(pr.length > 1 ? {suite: pr.slice(1)} : {})}; continue; }
+      const v = montantPdf(texte), dp = trouverDate(texte, x.lu.date ? depuisYmd(x.lu.date) : null);
       /* 0.56.0 : un échéancier en PDF (5 mensualités égales ou plus) : une mensualisation, avec son début et sa fin */
-      const ech = texte ? echeancier(texte, x.lu.date ? depuisYmd(x.lu.date) : null) : [], mt = ech.map((e) => e.montant);
+      const ech = echeancier(texte, x.lu.date ? depuisYmd(x.lu.date) : null), mt = ech.map((e) => e.montant);
       if (ech.length >= 5 && Math.max(...mt) <= Math.min(...mt) * 1.1 + 0.05) { x.lu = {...x.lu, genre: 'mensualisation', montant: mediane(mt), debut: ech[0].date, fin: ech[ech.length - 1].date, pdf: true, sur: true}; continue; }
       if (!v && !dp) continue;
       x.lu = {...x.lu, montant: x.lu.montant || v, datePrel: x.lu.datePrel || dp, pdf: true, sur: !!(x.lu.montant || v)};
@@ -625,7 +736,21 @@ export function createRadar({file, gmail, claude = async () => ({ok: false, erro
         R.scan.mois += 1; ranger(); sauver();
       }
       const fq = fournisseurs(); if (fq) R.scan.lus += await lire(fq + ' newer_than:' + moisDepart + 'm', 150, {depart: true});
+      /* 0.66.0 : ses contrats en cours (certificat d'adhésion, avenant, échéancier) peuvent dater de plusieurs années : cherchés sur 4 ans */
+      R.scan.lus += await lire(REQUETE_CONTRATS + ' newer_than:4y', 40, {depart: true});
       R.scan.fini = now();
+      /* 0.66.0 : relue avec de nouvelles règles, une dépense lue dans ses mails prend le montant de ses derniers prélèvements (alerte « Montant
+         corrigé ») ; ce qu'il a saisi à la main n'est jamais touché */
+      if (R.revise) {
+        const t = auj(), rg = regrouper(R.releves, t, R.joursCle || {});
+        for (const f of R.fixes) {
+          if (f.source !== 'mail' || !cleDe(f) || (f.paliers && f.paliers.length) || (f.fin && f.fin < ymd(t))) continue;
+          const g = rg.find((x) => x.cle === cleDe(f)); if (!g || g.montant == null || Math.abs(g.montant - f.montant) <= Math.max(0.5, f.montant * 0.01)) continue;
+          R.alertes.push({id: 'k' + f.id + ymd(t).replace(/-/g, ''), date: ymd(t), type: 'corrige', titre: 'Montant corrigé', service: f.service, montant: g.montant, avant: f.montant, texte: 'D’après tes derniers prélèvements, relus avec les nouvelles règles.'});
+          f.montant = g.montant; if (g.estime) f.estime = true;
+        }
+        delete R.revise;
+      }
     } catch (e) {
       R.scan.erreur = estQuota(e) ? 'Google a limité la lecture de tes mails : elle reprendra où elle s’est arrêtée à ta prochaine ouverture du Radar (dans 10 minutes au plus tôt).' : 'Lecture de tes mails interrompue : ' + TXT(e.message || e, 140);
       log('radar : lecture de départ interrompue (' + TXT(e.message || e, 200) + ')');
@@ -667,14 +792,23 @@ export function createRadar({file, gmail, claude = async () => ({ok: false, erro
     return {libelle: MOIS_L[t.getUTCMonth()] + ' ' + t.getUTCFullYear(), precedentLibelle: MOIS_L[p0.getUTCMonth()] + ' ' + p0.getUTCFullYear(), total: som(ce), precedent: som(occ(p0, p1)), fixes: true,
       postes: cats.map((c) => { const l = ce.filter((o) => (o.f.cat || 'Autres') === c); return {id: plat(c), label: c, montant: som(l), n: l.length}; }).sort((a, b) => b.montant - a.montant)};
   }
+  /* 0.66.0 : l'historique d'une dépense : un prélèvement par mois (le mail le plus récent du mois, complété par les autres), le plus récent d'abord */
+  function histoDe(l) {
+    const parM = new Map();
+    for (const r of l.slice().sort((a, b) => ((a.datePrel || a.date) + a.date < (b.datePrel || b.date) + b.date ? -1 : 1))) {
+      const m = (r.datePrel || r.date).slice(0, 7), d = parM.get(m);
+      parM.set(m, d ? {...(r.montant || !d.montant ? r : d), montant: r.montant || d.montant, datePrel: r.datePrel || d.datePrel, hors: r.hors || d.hors} : r);
+    }
+    const t0 = ymd(auj());   /* un prélèvement annoncé, pas encore passé, n'est pas de l'historique */
+    return [...parM.values()].filter((r) => (r.datePrel || r.date) <= t0).reverse().slice(0, 6).map((r) => ({date: r.date, ...(r.datePrel ? {datePrel: r.datePrel} : {}), montant: r.montant, ...(r.hors && r.montant > r.hors ? {hors: r.hors} : {})}));
+  }
   function etat() {
     const t = auj();
     return {maj: R.maj, google: !!gmail.lie(), fixes: R.fixes, revenus: rev(), notif: R.notif, propositions: R.propositions, ponctuels: R.ponctuels.filter((v) => v.date >= ymd(t)).sort((a, b) => (a.date < b.date ? -1 : 1)),
       scan: R.scan ? {enCours: !!R.scan.enCours, mois: R.scan.mois, total: R.scan.total, lus: R.scan.lus, fini: R.scan.fini, erreur: R.scan.erreur, pause: R.scan.pause || ''} : null,
       avenir: R.avenir.filter((v) => v.date >= ymd(t)).sort((a, b) => (a.date < b.date ? -1 : 1)), alertes: R.alertes.slice().sort((a, b) => (a.date < b.date ? 1 : -1)).map((a) => (a.fil ? {...a, url: 'https://mail.google.com/mail/u/0/#all/' + a.fil} : a)),
       /* 0.56.0 : les dernières factures lues de chaque dépense fixe (montant, jour), pour qu'il vérifie d'un coup d'œil */
-      historiques: Object.fromEntries(R.fixes.filter((f) => f.source === 'mail').map((f) => [f.id, R.releves.filter((r) => (cleDe(f) && (r.cle || r.dom) === cleDe(f)) || nomPlat(r.service) === nomPlat(f.service))
-        .sort((a, b) => ((a.datePrel || a.date) < (b.datePrel || b.date) ? 1 : -1)).slice(0, 6).map((r) => ({date: r.date, ...(r.datePrel ? {datePrel: r.datePrel} : {}), montant: r.montant}))]).filter(([, l]) => l.length)),
+      historiques: Object.fromEntries(R.fixes.filter((f) => f.source === 'mail').map((f) => [f.id, histoDe(R.releves.filter((r) => (cleDe(f) && (r.cle || r.dom) === cleDe(f)) || nomPlat(r.service) === nomPlat(f.service)))]).filter(([, l]) => l.length)),
       abonnements: R.fixes.filter((f) => f.cat === 'Abonnements' && !(f.fin && f.fin < ymd(t))).map((f) => ({service: f.service, cat: sousCategorie(f), prix: f.montant, rythme: f.rythme, depuis: f.depuis || ''})),
       mois: moisDe(t), navigo: null};
   }
