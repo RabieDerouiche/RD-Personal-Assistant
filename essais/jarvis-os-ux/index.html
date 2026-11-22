@@ -11,6 +11,8 @@
      Principes : 5 portes au lieu de 12, un seul modèle d'écran, une seule couche (feuille du bas), aucun geste caché sur la barre. -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<script src="globe.js"></script>
+<script src="personnages.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700&family=Oxanium:wght@500;600;700&family=Exo+2:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 :root {
@@ -27,6 +29,10 @@ html { background: var(--bg); }
 body { margin: 0; min-height: 100vh; background: radial-gradient(120% 60% at 50% -10%, rgba(var(--c4), .22), transparent 60%), radial-gradient(90% 50% at 100% 30%, rgba(var(--c3), .10), transparent 60%), var(--bg); background-attachment: fixed; color: var(--fg); font: 400 15px/1.45 var(--sans); -webkit-font-smoothing: antialiased; overflow-x: hidden; }
 button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
 .wrap { max-width: 520px; margin: 0 auto; padding: calc(var(--top) + 6px) 16px calc(var(--bar) + 28px); }
+
+/* ---------- profondeur : sol en grille et poussière d'étoiles derrière tout ---------- */
+body::before { content: ""; position: fixed; z-index: -1; left: -60%; right: -60%; bottom: -2vh; height: 46vh; pointer-events: none; background-image: linear-gradient(rgba(var(--c1), .16) 1px, transparent 1px), linear-gradient(90deg, rgba(var(--c1), .16) 1px, transparent 1px); background-size: 46px 46px; transform: perspective(260px) rotateX(62deg); transform-origin: 50% 100%; -webkit-mask-image: linear-gradient(to top, rgba(0, 0, 0, .9), transparent 85%); mask-image: linear-gradient(to top, rgba(0, 0, 0, .9), transparent 85%); }
+body::after { content: ""; position: fixed; z-index: -1; inset: 0; pointer-events: none; opacity: .55; background-image: radial-gradient(1px 1px at 12% 18%, #cfefff, transparent), radial-gradient(1px 1px at 72% 9%, #e9d5ff, transparent), radial-gradient(1.5px 1.5px at 88% 34%, #a5f3fc, transparent), radial-gradient(1px 1px at 33% 41%, #cfefff, transparent), radial-gradient(1px 1px at 55% 23%, #fff, transparent), radial-gradient(1.5px 1.5px at 20% 62%, #c4b5fd, transparent), radial-gradient(1px 1px at 64% 55%, #cfefff, transparent), radial-gradient(1px 1px at 92% 71%, #fff, transparent), radial-gradient(1px 1px at 6% 83%, #a5f3fc, transparent), radial-gradient(1px 1px at 44% 77%, #e9d5ff, transparent); }
 
 /* ---------- en-tête : logo ou retour, petit titre au défilement, Grok, recherche ---------- */
 .top { position: fixed; z-index: 30; left: 0; right: 0; top: 0; height: var(--top); padding: env(safe-area-inset-top, 0px) 12px 0; display: flex; align-items: center; gap: 8px; background: rgba(2, 6, 20, .72); -webkit-backdrop-filter: blur(18px) saturate(140%); backdrop-filter: blur(18px) saturate(140%); border-bottom: 1px solid transparent; transition: border-color .2s; }
@@ -48,7 +54,7 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 .lt-sub { margin: 0 0 16px; color: var(--muted); font-size: 14px; }
 
 /* ---------- cartes ---------- */
-.card { position: relative; border-radius: 20px; background: var(--card); border: 1px solid var(--line); padding: 14px 16px; }
+.card { position: relative; border-radius: 20px; background: var(--card); border: 1px solid var(--line); padding: 14px 16px; box-shadow: inset 0 1px 0 rgba(150, 220, 255, .12), 0 12px 30px rgba(0, 0, 0, .35), 0 0 24px rgba(14, 165, 233, .05); }
 .hero { border: 1px solid transparent; background: linear-gradient(180deg, rgba(14, 44, 104, .55), rgba(4, 12, 34, .9)) padding-box, linear-gradient(135deg, rgba(var(--c1), .9), rgba(var(--c3), .8)) border-box; box-shadow: 0 0 28px rgba(var(--c1), .12); padding: 16px; margin-bottom: 18px; }
 .hero .k { color: var(--muted); font-size: 13px; }
 .hero .big { font: 700 34px/1.1 var(--display); margin: 4px 0; }
@@ -75,7 +81,67 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 
 /* ---------- lignes : le même modèle partout ---------- */
 .list { display: grid; gap: 8px; }
-.row { width: 100%; display: flex; align-items: center; gap: 12px; text-align: left; padding: 12px 14px; border-radius: 18px; background: var(--card); border: 1px solid var(--line); min-height: 64px; transition: transform .12s; }
+.row { width: 100%; display: flex; align-items: center; gap: 12px; text-align: left; padding: 12px 14px; border-radius: 18px; background: var(--card); border: 1px solid var(--line); min-height: 64px; transition: transform .12s; box-shadow: inset 0 1px 0 rgba(150, 220, 255, .1), 0 8px 22px rgba(0, 0, 0, .28); }
+.list > * { animation: rise .38s cubic-bezier(.2, .9, .25, 1) both; animation-delay: calc(var(--i, 0) * 45ms); }
+@keyframes rise { from { opacity: 0; transform: translateY(10px); } }
+/* personnages des bots (sphère, silhouette, emblème) */
+.ava { position: relative; flex: 0 0 auto; width: 46px; height: 46px; display: block; }
+.ava canvas, .avc { width: 100%; height: 100%; display: block; }
+.ava.l { width: 56px; height: 56px; } .ava.xl { width: 112px; height: 112px; } .ava.m { width: 40px; height: 40px; }
+/* photos */
+.ph { position: relative; flex: 0 0 auto; width: 64px; height: 64px; border-radius: 14px; overflow: hidden; background: linear-gradient(135deg, rgba(var(--c4), .6), rgba(var(--c3), .45)); border: 1px solid rgba(var(--c1), .35); box-shadow: 0 6px 16px rgba(0, 0, 0, .4); }
+.ph img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.ph .dt { position: absolute; left: 4px; bottom: 4px; padding: 1px 6px; border-radius: 8px; background: rgba(2, 6, 20, .78); font: 700 11px var(--display); letter-spacing: .04em; text-transform: uppercase; color: rgb(var(--c2)); }
+.photo { position: relative; margin: -16px -16px 14px; height: 190px; border-radius: 19px 19px 0 0; overflow: hidden; background: linear-gradient(135deg, rgba(var(--c4), .6), rgba(var(--c3), .45)); }
+.photo img { width: 100%; height: 100%; object-fit: cover; display: block; transform: scale(1.04); animation: kb 18s ease-in-out infinite alternate; }
+@keyframes kb { to { transform: scale(1.12) translate(-2%, -1%); } }
+.photo::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(2, 6, 20, .05) 30%, rgba(2, 6, 20, .88)); }
+.photo .on-ph { position: absolute; z-index: 1; left: 16px; right: 16px; bottom: 12px; }
+.photo .kick { font: 600 12px var(--display); letter-spacing: .18em; text-transform: uppercase; color: rgb(var(--c2)); text-shadow: 0 1px 6px #000; }
+.photo .ttl { font: 700 30px/1.1 var(--display); text-shadow: 0 2px 12px rgba(0, 0, 0, .7); }
+.photo .meta { color: #dbeafe; font-size: 13.5px; text-shadow: 0 1px 6px #000; }
+.photo .stamp { position: absolute; z-index: 1; top: 12px; right: 12px; padding: 4px 10px; border-radius: 999px; background: rgba(2, 6, 20, .72); border: 1px solid rgba(var(--c1), .5); font: 700 13px var(--display); color: rgb(var(--c2)); }
+.photo .dtile { position: absolute; z-index: 1; top: 12px; left: 12px; width: 54px; padding: 6px 0; border-radius: 14px; text-align: center; background: linear-gradient(160deg, rgb(var(--c1)), rgb(var(--c4))); color: #031022; box-shadow: 0 6px 18px rgba(0, 0, 0, .5); }
+.dtile small { display: block; font: 700 11px var(--sans); text-transform: uppercase; } .dtile b { display: block; font: 700 22px/1 var(--display); }
+.pcards { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.pcard { position: relative; text-align: left; border-radius: 18px; overflow: hidden; min-height: 168px; border: 1px solid var(--line); background: #071530; box-shadow: 0 10px 24px rgba(0, 0, 0, .4); transition: transform .12s; }
+.pcard img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.pcard::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(2, 6, 20, 0) 25%, rgba(2, 6, 20, .92)); }
+.pcard span { position: absolute; z-index: 1; left: 12px; right: 12px; bottom: 10px; }
+.pcard b { display: block; font: 600 15px/1.25 var(--display); }
+.pcard small { display: block; color: #cfe3ff; font-size: 12.5px; margin-top: 2px; }
+.pcard .pill { position: absolute; z-index: 1; top: 10px; left: 10px; padding: 3px 9px; border-radius: 999px; font: 700 11.5px var(--display); background: rgba(2, 6, 20, .75); border: 1px solid rgba(var(--c1), .5); color: rgb(var(--c2)); }
+.pcard.wide { grid-column: span 2; min-height: 150px; }
+.trend { display: inline-block; padding: 1px 7px; border-radius: 999px; font: 700 11.5px var(--display); }
+.trend.down { color: #6ee7b7; background: rgba(var(--ok), .12); border: 1px solid rgba(var(--ok), .4); }
+.trend.up { color: #fda4af; background: rgba(var(--bad), .1); border: 1px solid rgba(var(--bad), .4); }
+.trend.flat { color: var(--muted); border: 1px solid var(--line); }
+.vend { display: grid; gap: 1px; border-radius: 14px; overflow: hidden; border: 1px solid var(--line); margin: 12px 0 0; }
+.vend div { display: grid; grid-template-columns: 1fr auto auto; gap: 10px; align-items: center; padding: 9px 12px; background: rgba(var(--c1), .05); font-size: 13.5px; }
+.vend b { font: 600 14px var(--display); } .vend i { font-style: normal; font-size: 12px; color: var(--muted); } .vend .ok { color: #6ee7b7; } .vend .no { color: #fda4af; }
+.chart { position: relative; margin: 10px 0 2px; }
+.chart svg { width: 100%; height: 120px; display: block; overflow: visible; }
+.board { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 10px; margin: 2px 0 12px; padding: 10px 12px; border-radius: 14px; border: 1px dashed rgba(var(--c1), .45); background: rgba(var(--c1), .05); }
+.board b { font: 700 22px var(--display); } .board small { display: block; color: var(--muted); font-size: 11.5px; } .board .arc { height: 26px; }
+.facts-row { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 0; }
+.facts-row span { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; padding: 5px 10px; border-radius: 999px; background: rgba(var(--c1), .07); border: 1px solid var(--line); color: #d6e9ff; }
+/* globe de l'accueil et de Claude */
+.globe { position: relative; } .globe canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.home-globe { height: 172px; margin: -10px -8px -4px; }
+.hero-home { text-align: center; padding-top: 10px; }
+.hero-home h3 { font: 700 24px var(--display); margin: 0; }
+.hero-home p { margin: 6px auto 0; max-width: 340px; }
+.hero-home .chips { justify-content: center; }
+.claude-globe { height: 190px; margin: -6px 0 0; }
+.cl-state { text-align: center; font: 600 12px var(--display); letter-spacing: .2em; text-transform: uppercase; color: rgb(var(--c2)); margin: -6px 0 12px; min-height: 16px; }
+.cl-state[data-s="thinking"] { color: #d8b4fe; } .cl-state[data-s="speaking"] { color: #93c5fd; }
+/* équipe : la constellation */
+.crew { display: grid; justify-items: center; gap: 2px; margin: 4px 0 6px; }
+.crew-row { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; width: 100%; margin-top: 8px; }
+.crew-row button { display: grid; justify-items: center; gap: 2px; font-size: 11px; color: var(--muted); }
+.crew-row .ava { width: 44px; height: 44px; }
+.crew-row i { width: 7px; height: 7px; border-radius: 50%; background: var(--dim); }
+.crew-row i.amb { background: rgb(var(--warn)); box-shadow: 0 0 8px rgb(var(--warn)); } .crew-row i.live { background: #34d399; box-shadow: 0 0 8px #34d399; }
 .row .av { flex: 0 0 auto; width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center; font: 700 15px var(--display); color: #fff; }
 .row .tx { flex: 1; min-width: 0; }
 .row .t { display: block; font-weight: 600; font-size: 15.5px; line-height: 1.3; }
@@ -128,6 +194,11 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 .tile .ts { color: var(--muted); font-size: 13px; line-height: 1.3; }
 .tile.amb { border-color: rgba(var(--warn), .5); }
 .tile.amb .ts b { color: #fde68a; font-weight: 600; }
+.tile.pic { justify-content: end; align-content: end; min-height: 168px; }
+.tile.pic img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 0; }
+.tile.pic::after { content: ""; position: absolute; inset: 0; z-index: 0; background: linear-gradient(180deg, rgba(2, 6, 20, .15), rgba(2, 6, 20, .9) 70%); }
+.tile.pic > span { position: relative; z-index: 1; } .tile.pic .tn { color: rgb(var(--c2)); } .tile.pic .ts { color: #d6e9ff; }
+.tile.pic .ti { position: absolute; top: 12px; left: 12px; background: rgba(2, 6, 20, .6); }
 .tile svg.spark { position: absolute; right: 14px; top: 18px; width: 64px; height: 24px; opacity: .9; }
 
 /* ---------- Équipe ---------- */
@@ -154,7 +225,11 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 .tab[aria-current="page"] svg { filter: drop-shadow(0 0 6px rgba(var(--c2), .85)); }
 .tab[aria-current="page"]::after { content: ""; position: absolute; bottom: 1px; width: 22px; height: 3px; border-radius: 2px; background: rgb(var(--c2)); box-shadow: 0 0 10px rgb(var(--c2)); }
 .badge { position: absolute; top: 4px; left: calc(50% + 6px); min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: rgb(var(--warn)); color: #1d1200; font: 700 11px/18px var(--display); text-align: center; }
-.orb-tab { justify-self: center; width: 64px; height: 64px; margin-top: -18px; border-radius: 50%; display: grid; place-items: center; }
+.orb-tab { justify-self: center; width: 76px; height: 76px; margin-top: -26px; border-radius: 50%; display: grid; place-items: center; background: radial-gradient(circle, rgba(2, 8, 24, .95) 52%, rgba(2, 8, 24, 0) 70%); }
+.orb-tab .globe { width: 76px; height: 76px; }
+.orb-tab::after { content: ""; position: absolute; width: 58px; height: 58px; border-radius: 50%; box-shadow: 0 0 0 1px rgba(56, 189, 248, .45), 0 0 22px rgba(56, 189, 248, .4); animation: jvholo 2.6s ease-in-out infinite; pointer-events: none; }
+.orb-tab { position: relative; }
+@keyframes jvholo { 50% { box-shadow: 0 0 0 1px rgba(103, 232, 249, .75), 0 0 36px rgba(56, 189, 248, .7); } }
 .orb { display: block; position: relative; width: 58px; height: 58px; border-radius: 50%; background: radial-gradient(circle at 34% 28%, #e0faff 0, #7dd3fc 14%, rgb(var(--c1)) 30%, rgb(var(--c4)) 62%, #1e1b4b 86%); box-shadow: 0 0 22px rgba(var(--c1), .65), 0 0 2px #fff inset; }
 .orb::before, .orb::after { content: ""; position: absolute; inset: -5px; border-radius: 50%; border: 1.5px dashed rgba(var(--c2), .7); animation: spin 9s linear infinite; }
 .orb::after { inset: -10px; border: 1px solid rgba(var(--c3), .45); border-left-color: transparent; border-right-color: transparent; animation-duration: 5s; animation-direction: reverse; }
@@ -277,6 +352,8 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
     team: '<circle cx="9" cy="9" r="3.2"/><circle cx="17" cy="10" r="2.4"/><path d="M3.5 19.5c.6-3.3 2.8-5 5.5-5s4.9 1.7 5.5 5M14.5 15c2.6-.4 4.8.9 5.5 4.5"/>',
     gear: '<circle cx="12" cy="12" r="3"/><path d="M12 2.8v2.4M12 18.8v2.4M2.8 12h2.4M18.8 12h2.4M5.5 5.5l1.7 1.7M16.8 16.8l1.7 1.7M5.5 18.5l1.7-1.7M16.8 7.2l1.7-1.7"/>',
     chev: '<path d="m9 5 7 7-7 7"/>', back: '<path d="m15 5-7 7 7 7"/>', x: '<path d="M6 6l12 12M18 6 6 18"/>',
+    sun: '<circle cx="12" cy="12" r="4"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M5.6 18.4 7 17M17 7l1.4-1.4"/>', rain: '<path d="M7 15.5a4.5 4.5 0 1 1 1.2-8.8A5.5 5.5 0 0 1 18.5 9a3.5 3.5 0 0 1-.5 7H7z"/><path d="M9 19l-1 2M13 19l-1 2M17 19l-1 2"/>',
+    clock: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>', kid: '<circle cx="12" cy="6.5" r="2.5"/><path d="M8 21v-6l-2-3 3-3h6l3 3-2 3v6"/>', check: '<path d="m5 12.5 4.5 4.5L19 7.5"/>', star: '<path d="m12 3.5 2.6 5.4 5.9.8-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8L3.5 9.7l5.9-.8z"/>',
     mic: '<rect x="9" y="3.5" width="6" height="11" rx="3"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v2.5"/>', send: '<path d="M4 12 20 4l-6 16-2.5-6.5z"/>'
   };
   const ic = (k, s) => '<svg viewBox="0 0 24 24" width="' + (s || 22) + '" height="' + (s || 22) + '" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + P[k] + '</svg>';
@@ -289,7 +366,13 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
     athena: {n: 'Athéna', c: '#f59e0b', r: 'Veille IA et .NET'}, argus: {n: 'Argus', c: '#ef4444', r: 'Supervision'},
     plutus: {n: 'Plutus', c: '#22c55e', r: 'Pistes de revenus'}, claude: {n: 'Claude', c: '#ea7a52', r: "Chef d'équipe"}, radar: {n: 'Radar', c: '#0ea5e9', r: 'Argent, lu dans tes mails'}
   };
-  const av = (b) => '<span class="av" style="background:linear-gradient(135deg,' + BOT[b].c + ',' + BOT[b].c + '99)">' + esc(BOT[b].n[0]) + '</span>';
+  /* personnages des bots (personnages.js) : posés après chaque rendu */
+  const av = (b, o) => '<span class="ava' + (o && o.cls ? ' ' + o.cls : '') + '" data-bot="' + b + '"' + (o && o.ask ? ' data-ask="1"' : '') + (o && o.work ? ' data-work="1"' : '') + '></span>';
+  const mountAv = (root) => { if (!window.UXAvatars) return; (root || document).querySelectorAll('.ava[data-bot]:not(.on)').forEach((e) => { e.classList.add('on'); UXAvatars.mount(e, e.dataset.bot, {ask: !!e.dataset.ask, work: !!e.dataset.work}); }); };
+  /* photos : Wikimedia Commons, licences libres (crédits : « Crédits photos » au bas d'Espaces) */
+  const PHOTOS = {"lisbonne":{"auteur":"Dale Cruse - 10M views from San Francisco, CA, USA","licence":"CC BY 4.0","page":"https://commons.wikimedia.org/wiki/File%3AAlfama_Rooftops_and_Tagus_River_View%2C_Lisbon_%2854733828355%29.jpg"},"lille":{"auteur":"Velvet","licence":"CC BY-SA 3.0","page":"https://commons.wikimedia.org/wiki/File%3ALille_gd_place_colonne.jpg"},"laponie":{"auteur":"YosemiteYamper","licence":"CC BY-SA 4.0","page":"https://commons.wikimedia.org/wiki/File%3AAurora_borealis_over_grillkota%2C_Naamijoki%2C_Pello.jpg"},"basque":{"auteur":"Eusebius","licence":"CC BY 3.0","page":"https://commons.wikimedia.org/wiki/File%3ABiarritz_-_pano_plage.jpg"},"rome":{"auteur":"Diliff","licence":"CC BY-SA 2.5","page":"https://commons.wikimedia.org/wiki/File%3AColosseum_in_Rome-April_2007-1-_copie_2B.jpg"},"spectacle":{"auteur":"Sister72","licence":"CC BY 2.0","page":"https://www.flickr.com/photos/79874304@N00/196867770"},"ferme":{"auteur":"San José Public Library","licence":"CC BY-SA 2.0","page":"https://www.flickr.com/photos/26204872@N08/9867545575"},"noel":{"auteur":"Michael Cavén","licence":"CC BY 2.0","page":"https://www.flickr.com/photos/29241649@N02/5285604343"},"aquarium":{"auteur":"Follow Your Nose","licence":"CC BY 2.0","page":"https://www.flickr.com/photos/31816015@N02/4881676285"},"robot":{"auteur":"dvanzuijlekom","licence":"CC BY-SA 2.0","page":"https://www.flickr.com/photos/52365139@N05/8499549941"},"casque":{"auteur":"GuitarChalk","licence":"CC BY 2.0","page":"https://www.flickr.com/photos/161844010@N02/46173306114"},"poussette":{"auteur":"corsi photo","licence":"CC BY 2.0","page":"https://www.flickr.com/photos/11211909@N00/16232411324"},"liseuse":{"auteur":"jblyberg","licence":"CC BY 2.0","page":"https://www.flickr.com/photos/36813960@N00/4505413539"},"cafetiere":{"auteur":"Lars Plougmann","licence":"CC BY-SA 2.0","page":"https://www.flickr.com/photos/75062596@N00/2569906181"},"poupee":{"auteur":"Gail Frederick","licence":"CC BY 2.0","page":"https://www.flickr.com/photos/71365354@N00/5274490147"}};
+  const pic = (k) => PHOTOS[k] ? '<img src="photos/' + k + '.jpg" alt="" decoding="async">' : '';
+  const ph = (k, dt) => '<span class="ph">' + pic(k) + (dt ? '<span class="dt">' + esc(dt) + '</span>' : '') + '</span>';
   const ITEMS = [
     {id: 'i1', k: 'decider', b: 'chronos', t: 'Valider le CRA de la semaine', s: 'Chronos le soumet dès ton oui. La session du portail est à reconnecter.', due: 'Avant vendredi 17 h', urgent: true, a: [['Oui, soumets-le', '1 passage', 'primary'], ['Explique-moi', 'Claude']], since: 'attend ton oui depuis 2 h', track: [['Écrit dans le Canal', 'jeu. 9 h 12', 'on'], ['Sonnette envoyée', 'jeu. 9 h 12', 'on'], ['Chronos a préparé le CRA', 'jeu. 10 h 40', 'on'], ['Attend ton oui', 'maintenant', 'wait']]},
     {id: 'i2', k: 'decider', b: 'kairos', t: 'Robot Alpha X7 à 389 €', s: 'Sous ton seuil de 400 €, −12 % en 3 semaines, vendeur agréé, livré.', due: 'Prix valable jusqu’à dimanche', urgent: true, a: [['Je l’achète (lien du vendeur)', 'gratuit', 'primary'], ['Attendre encore', 'gratuit']], since: 'relevé ce matin', facts: [['Prix total TTC livré', '389 €'], ['Ton seuil', '400 €'], ['Plus bas en 2 mois', '389 €'], ['Vendeur', 'Boutique agréée']]},
@@ -321,19 +404,18 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
         ['f', 'Fixes', [['le 5', 'Loyer de parking', '85,00 €'], ['le 9', 'Transports', '86,40 €'], ['le 12', 'Musique en ligne', '11,99 €'], ['le 26', 'Téléphone mobile', '19,99 €']]],
         ['al', 'Alertes', [['hier', 'Hausse annoncée : box internet', '+3 €/mois']]]],
       tile: {v: '161,63 €', s: 'd’ici ta paie, <b>3 à valider</b>', amb: true}},
-    achats: {n: 'Achats', icon: 'tag', sub: 'Kairos suit 5 produits. Prix total TTC livré, vendeurs fiables.',
-      hero: {k: 'À décider', big: '389 €', p: 'Robot Alpha X7 : sous ton seuil de 400 €, −12 % en 3 semaines.', spark: [442, 440, 431, 431, 418, 405, 405, 389], a: [['Décider', 'item:i2'], ['+ Suivre un produit', 'toast']]},
-      seg: [['s', 'Suivis', [['−12 %', 'Robot Alpha X7', '389 €', [442, 431, 418, 405, 389]], ['stable', 'Casque Nova 2', '149 €', [149, 152, 149, 149, 149]], ['+3 %', 'Poussette Urban', '329 €', [319, 319, 325, 329, 329]], ['−5 %', 'Liseuse Folio', '119 €', [125, 125, 122, 119, 119]], ['stable', 'Cafetière Duo', '89 €', [89, 89, 91, 89, 89]]]],
-        ['i', 'Idées', [['6 idées', 'Maison de poupée, 30 à 60 €', 'Pour Léa']]], ['b', 'Achetés', [['oct.', 'Siège auto Kid+', '179 €'], ['sept.', 'Tablette S9', '229 €']]]],
-      tile: {v: '1 à décider', s: 'Robot −12 % · <b>389 €</b>', amb: true, spark: [442, 431, 418, 405, 389]}},
+    achats: {n: 'Achats', icon: 'tag', sub: 'Kairos suit 5 produits. Prix total TTC livré, vendeurs fiables.', hero: () => heroAchats(),
+      seg: [['s', 'Suivis', [{ph: 'robot', t: 'Robot Alpha X7', s: 'Seuil 400 € · 3 vendeurs agréés', p: '389 €', tr: ['down', '−12 %'], sp: [442, 431, 418, 405, 389]}, {ph: 'casque', t: 'Casque Nova 2', s: 'Seuil 130 € · prix public 179 €', p: '149 €', tr: ['flat', 'stable'], sp: [149, 152, 149, 149, 149]}, {ph: 'poussette', t: 'Poussette Urban', s: 'Seuil 300 € · Black Friday attendu', p: '329 €', tr: ['up', '+3 %'], sp: [319, 319, 325, 329, 329]}, {ph: 'liseuse', t: 'Liseuse Folio', s: 'Seuil 110 € · plus bas 115 € en mars', p: '119 €', tr: ['down', '−5 %'], sp: [125, 125, 122, 119, 119]}, {ph: 'cafetiere', t: 'Cafetière Duo', s: 'Seuil 75 €', p: '89 €', tr: ['flat', 'stable'], sp: [89, 89, 91, 89, 89]}]],
+        ['i', 'Idées', [{ph: 'poupee', t: 'Maison de poupée', s: '6 idées de 30 à 60 €, pour Léa · photos et avis', p: '6 idées'}]], ['b', 'Achetés', [['oct.', 'Siège auto Kid+', '179 €'], ['sept.', 'Tablette S9', '229 €']]]],
+      tile: {v: '1 à décider', s: 'Robot −12 % · <b>389 €</b>', amb: true, ph: 'robot'}},
     voyages: {n: 'Voyages', icon: 'plane', sub: 'Ulysse prépare, tu choisis. Tu paies toujours toi-même.',
-      hero: {k: 'Prochain départ · J-104', big: 'Lisbonne', p: 'Avril, à trois. 3 périodes proposées, budget 2 500 € TTC au plus.', a: [['Choisir les dates', 'item:i4'], ['Carnet par Claude', 'toast']]},
-      seg: [['p', 'Projets', [['J-104', 'Lisbonne, avril', 'Dates à choisir'], ['J-19', 'Week-end à Lille', 'Réservé']]], ['e', 'Envies', [['', 'Laponie en hiver', 'Idée'], ['', 'Côte basque', 'Idée'], ['', 'Rome', 'Idée']]]],
-      tile: {v: 'J-104', s: 'Lisbonne · dates à choisir'}},
+      hero: () => heroVoyage(),
+      seg: [['p', 'Projets', [{ph: 'lisbonne', dt: 'J-104', t: 'Lisbonne, en avril', s: 'À trois · 3 périodes à choisir · 2 500 € au plus'}, {ph: 'lille', dt: 'J-19', t: 'Week-end à Lille', s: 'Réservé · train 9 h 46 · hôtel près de la Grand-Place'}]], ['e', 'Envies', [{ph: 'laponie', t: 'Laponie en hiver', s: 'Aurores boréales, chiens de traîneau · février'}, {ph: 'basque', t: 'Côte basque', s: 'Plages et villages · été'}, {ph: 'rome', t: 'Rome', s: 'Week-end long · printemps'}]]],
+      tile: {v: 'J-104', s: 'Lisbonne · dates à choisir', ph: 'lisbonne'}},
     sorties: {n: 'Sorties', icon: 'map', sub: 'Les idées d’Ulysse pour le week-end en famille.',
-      hero: {k: 'Ce week-end', big: '2 idées', p: 'Spectacle Boucle d’or samedi, ferme pédagogique dimanche.', a: [['Voir le week-end', 'filt:w']]},
-      seg: [['w', 'À faire', [['sam.', 'Spectacle : Boucle d’or', 'dès 2 ans · 12 €'], ['dim.', 'Ferme pédagogique', '25 min en voiture · 24 € TTC'], ['3 déc.', 'Marché de Noël', 'gratuit']]], ['d', 'Faites', [['8 nov.', 'Aquarium', 'aimé']]]],
-      tile: {v: '2 idées', s: 'ce week-end'}},
+      hero: () => heroSortie(),
+      seg: [['w', 'À faire', [{ph: 'spectacle', dt: 'sam.', t: 'Spectacle : Boucle d’or', s: 'Marionnettes · dès 2 ans · 12 € TTC'}, {ph: 'ferme', dt: 'dim.', t: 'Ferme pédagogique', s: 'Chèvres et poneys · 25 min en voiture · 24 € TTC'}, {ph: 'noel', dt: '3 déc.', t: 'Marché de Noël', s: 'Le soir, illuminations · gratuit'}]], ['d', 'Faites', [{ph: 'aquarium', dt: '8 nov.', t: 'Aquarium', s: 'Tu as aimé · tunnel des requins'}]]],
+      tile: {v: '2 idées', s: 'ce week-end', ph: 'spectacle'}},
     papiers: {n: 'Papiers', icon: 'doc', sub: '51 documents rangés par Iris dans ton Drive.', search: true,
       seg: [['p', 'Personnes', [['15', 'Moi', 'Identité, santé, travail'], ['6', 'Léa', 'Santé, crèche'], ['7', 'Famille et proches', '']]], ['t', 'Thèmes', [['11', 'Logement', 'Achat, factures'], ['3', 'Voiture', ''], ['4', 'Voyages', ''], ['5', 'À trier', '']]], ['v', 'Validité', [['40 j', 'Passeport', 'Expire le 31/12'], ['ok', 'Titre de séjour', '2029'], ['ok', 'Permis', '2033']]]],
       tile: {v: '51', s: 'documents · <b>1 expire</b>', amb: true}}
@@ -346,8 +428,9 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
   const cur = () => { const s = S.stack[S.tab]; return s[s.length - 1]; };
 
   /* ---------------- lignes et cartes ---------------- */
-  const row = (o) => '<button type="button" class="row' + (o.urgent ? ' is-urgent' : '') + '" data-act="' + esc(o.act || '') + '">' + (o.av || '') + '<span class="tx"><span class="t">' + esc(o.t) + '</span>' + (o.s ? '<span class="s">' + esc(o.s) + '</span>' : '') + (o.due ? '<span class="due' + (o.calm ? ' calm' : '') + '">' + esc(o.due) + '</span>' : '') + '</span>' + (o.r ? '<span class="r">' + o.r + '</span>' : '') + ic('chev', 16).replace('<svg', '<svg class="chev"') + '</button>';
-  const itemRow = (it) => row({av: av(it.b), t: it.t, s: it.s, due: it.due, urgent: it.urgent, act: 'item:' + it.id});
+  let RI = 0;
+  const row = (o) => '<button type="button" class="row' + (o.urgent ? ' is-urgent' : '') + '" style="--i:' + (RI++ % 14) + '" data-act="' + esc(o.act || '') + '">' + (o.av || '') + '<span class="tx"><span class="t">' + esc(o.t) + '</span>' + (o.s ? '<span class="s">' + esc(o.s) + '</span>' : '') + (o.due ? '<span class="due' + (o.calm ? ' calm' : '') + '">' + esc(o.due) + '</span>' : '') + '</span>' + (o.r ? '<span class="r">' + o.r + '</span>' : '') + ic('chev', 16).replace('<svg', '<svg class="chev"') + '</button>';
+  const itemRow = (it) => row({av: av(it.b, {ask: it.k === 'decider'}), t: it.t, s: it.s, due: it.due, urgent: it.urgent, act: 'item:' + it.id});
   const sec = (t, link) => '<div class="sec"><h2>' + esc(t) + '</h2>' + (link ? '<button type="button" data-act="' + link[1] + '">' + esc(link[0]) + '</button>' : '') + '</div>';
   const seg = (key, opts) => '<div class="seg" role="group">' + opts.map(([k, l, n]) => '<button type="button" data-act="filt:' + k + '" aria-pressed="' + (S.f[key] === k) + '">' + esc(l) + (n != null ? '<b>' + n + '</b>' : '') + '</button>').join('') + '</div>';
   const head = (t, sub) => '<h1 class="lt">' + esc(t) + '</h1>' + (sub ? '<p class="lt-sub">' + sub + '</p>' : '');
@@ -361,14 +444,16 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
       today.forEach((e) => { const eh = parseInt(e.h, 10); if (!put && eh > h) { tl += '<div class="tl-now">MAINTENANT · ' + F(now, {hour: '2-digit', minute: '2-digit'}) + '</div>'; put = true; } tl += '<div class="tl-it' + (eh < h ? ' past' : '') + '"><span class="h">' + e.h + '</span><span class="w">' + esc(e.t) + '<small>' + esc(e.w) + '</small></span></div>'; });
       if (!put) tl += '<div class="tl-now">MAINTENANT · ' + F(now, {hour: '2-digit', minute: '2-digit'}) + '</div>';
       return head('Aujourd’hui', F(TODAY, {weekday: 'long', day: 'numeric', month: 'long'}))
-        + '<div class="card hero"><div class="brief"><span class="orb-s"><span class="orb"></span></span><div><h3>' + hello + '</h3><p>5 décisions pour toi, dont 2 urgentes. 2 rendez-vous aujourd’hui. Grok reprend mardi à 12 h 47.</p></div></div>'
-        + '<div class="chips"><span class="chip">Télétravail</span><span class="chip">Demain : pluie, 2 à 7°</span><span class="chip">161,63 € d’ici ta paie</span></div></div>'
+        + '<div class="card hero hero-home"><div class="gslot" data-g="home"></div><h3>' + hello + '</h3><p>5 décisions pour toi, dont 2 urgentes. 2 rendez-vous aujourd’hui. Grok reprend mardi à 12 h 47.</p>'
+        + '<div class="chips"><span class="chip">' + ic('sun', 14) + ' Télétravail</span><span class="chip">' + ic('rain', 14) + ' Demain : pluie, 2 à 7°</span><span class="chip">161,63 € d’ici ta paie</span></div>'
+        + '<div class="row-btn" style="justify-content:center"><button type="button" class="btn primary" data-act="claude">Demander à JARVIS</button><button type="button" class="btn" data-act="ask-brief">Mon brief</button></div></div>'
         + sec('Maintenant', ['Tout voir (' + ITEMS.length + ')', 'tab:moi']) + '<div class="list">' + urg.map(itemRow).join('') + '</div>'
         + sec('Ta journée', ['Agenda', 'tab:agenda']) + '<div class="card"><div class="tl">' + tl + '</div></div>'
         + sec('Cette semaine') + week()
-        + sec('À surveiller', ['Espaces', 'tab:espaces']) + '<div class="list">'
-        + row({av: '<span class="av" style="background:linear-gradient(135deg,#ec4899,#a855f7)">' + ic('tag', 19) + '</span>', t: 'Robot Alpha X7 : 389 €', s: 'Sous ton seuil, prix valable jusqu’à dimanche', act: 'go:achats'})
-        + row({av: '<span class="av" style="background:linear-gradient(135deg,#3b82f6,#38bdf8)">' + ic('plane', 19) + '</span>', t: 'Lisbonne · J-104', s: 'Dates à choisir avant le 30/11', act: 'go:voyages'}) + '</div>';
+        + sec('À surveiller', ['Espaces', 'tab:espaces']) + '<div class="pcards">'
+        + pcard('robot', '−12 %', 'Robot Alpha X7 : 389 €', 'Sous ton seuil, jusqu’à dimanche', 'go:achats')
+        + pcard('lisbonne', 'J-104', 'Lisbonne', 'Dates à choisir avant le 30/11', 'go:voyages')
+        + pcard('spectacle', 'Ce week-end', 'Spectacle : Boucle d’or', 'Samedi 10 h 30 · dès 2 ans · 12 € TTC', 'go:sorties', true) + '</div>';
     },
     moi() {
       const n = (k) => ITEMS.filter((i) => k === 'tout' || i.k === k).length;
@@ -389,14 +474,14 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
       return head('Agenda', 'Ton agenda, tes échéances et ta présence.') + head1 + sec('Les 7 prochains jours') + week() + '<div style="height:14px"></div>' + seg('agenda', [['liste', 'Liste'], ['mois', 'Mois'], ['ech', 'Échéances', 3]]) + (S.f.agenda === 'ech' ? '<div class="list">' + row({t: 'Attestation d’assurance', s: 'Iris · à envoyer', due: 'Avant le 28/11', act: 'item:i8'}) + row({t: 'Passeport : renouvellement', s: 'Expire le 31/12', due: 'Dans 40 jours', calm: true, act: 'go:papiers'}) + row({t: 'Résiliation salle de sport', s: 'Iris suit', due: 'Avant le 15/12', calm: true, act: 'toast'}) + '</div>' : body);
     },
     espaces() {
-      const t = (k) => { const d = DOM[k], tl = d.tile; return '<button type="button" class="tile' + (tl.amb ? ' amb' : '') + '" data-act="go:' + k + '"><span class="ti">' + ic(d.icon, 19) + '</span><span class="tn">' + d.n + '</span><span class="tv">' + esc(tl.v) + '</span><span class="ts">' + tl.s + '</span>' + (tl.spark ? spark(tl.spark, '#f9a8d4') : '') + '</button>'; };
+      const t = (k) => { const d = DOM[k], tl = d.tile, P = tl.ph && PHOTOS[tl.ph]; return '<button type="button" class="tile' + (tl.amb ? ' amb' : '') + (P ? ' pic' : '') + '" data-act="go:' + k + '">' + (P ? pic(tl.ph) : '') + '<span class="ti">' + ic(d.icon, 19) + '</span><span class="tn">' + d.n + '</span><span class="tv">' + esc(tl.v) + '</span><span class="ts">' + tl.s + '</span>' + (tl.spark ? spark(tl.spark, '#f9a8d4') : '') + '</button>'; };
       return head('Espaces', 'Chaque domaine montre déjà l’essentiel : un appui pour le détail.')
         + '<div class="tiles">' + ['argent', 'achats', 'voyages', 'sorties', 'papiers'].map(t).join('')
         + '<button type="button" class="tile amb" data-act="go:equipe"><span class="ti">' + ic('team', 19) + '</span><span class="tn">Équipe</span><span class="tv">Grok en pause</span><span class="ts">reprise mar. 12 h 47 · <b>4 en file</b></span></button></div>'
         + sec('Coulisses') + '<div class="list">'
         + row({av: '<span class="av" style="background:rgba(56,189,248,.15);color:rgb(103,232,249)">' + ic('team', 19) + '</span>', t: 'Équipe, routines et dossiers', s: 'Les bots, leurs passages, ce que tu leur as demandé, le coût', act: 'go:equipe'})
         + row({av: '<span class="av" style="background:rgba(56,189,248,.15);color:rgb(103,232,249)">' + ic('gear', 19) + '</span>', t: 'Réglages', s: 'Serveur, voix, notifications, Google, mémoire', act: 'go:reglages'}) + '</div>'
-        + '<p class="note">Maquette de refonte (données inventées). <a href="#" data-act="help">Ce qui change</a> · comparer avec <a href="../jarvis-os-maquette/">l’app actuelle</a>.</p>';
+        + '<p class="note">Maquette de refonte (données inventées). <a href="#" data-act="help">Ce qui change</a> · comparer avec <a href="../jarvis-os-maquette/">l’app actuelle</a> · <a href="#" data-act="credits">Crédits photos</a>.</p>';
     },
     equipe() {
       const B = [['claude', 'En direct', 'live', 'répond tout de suite'], ['iris', 'Te demande · 5', 'amb', 'prochain : lun. 7 h 30'], ['chronos', 'Te demande · 1', 'amb', 'prochain : ven. 12 h'], ['kairos', 'En pause', 'off', 'reprise mar. 12 h 47'], ['ulysse', 'En pause', 'off', 'reprise mar. 12 h 47'], ['athena', 'Au repos', 'off', 'prochain : lun. 7 h'], ['argus', 'Au repos', 'off', 'bilan : lun. 8 h'], ['plutus', 'À préciser', 'off', 'aucune routine']];
@@ -404,12 +489,14 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
       const R = [['iris', 'Veille du matin', 'lun.-ven. 7 h 30', 'lun. 7 h 30'], ['iris', 'Courrier prioritaire', 'à l’arrivée', 'au prochain mail'], ['chronos', 'CRA de la semaine', 'ven. 12 h', 'ven. 12 h'], ['kairos', 'Relevé des prix', 'chaque jour 9 h', 'mar. 13 h'], ['athena', 'Veille IA et .NET', 'lun. 7 h', 'lun. 7 h'], ['argus', 'Supervision', 'lun. 8 h', 'lun. 8 h']];
       const f = S.f.equipe;
       let body = '';
-      if (f === 'bots') body = '<div class="list">' + B.map(([b, st, cl, nx]) => row({av: av(b), t: BOT[b].n, s: BOT[b].r + ' · ' + nx, r: '<span class="st ' + cl + '">' + esc(st) + '</span>', act: 'bot:' + b})).join('') + '</div>';
-      if (f === 'dem') body = '<div class="list">' + DEM.map(([b, t, s, n]) => '<button type="button" class="row" data-act="dem:' + esc(t) + '">' + av(b) + '<span class="tx"><span class="t">' + esc(t) + '</span><span class="s">' + esc(s) + '</span><span class="steps">' + [1, 2, 3, 4].map((i) => '<i class="' + (i <= n ? 'on' : '') + '"></i>').join('') + '</span></span>' + ic('chev', 16).replace('<svg', '<svg class="chev"') + '</button>').join('') + '</div>';
+      if (f === 'bots') body = '<div class="list">' + B.map(([b, st, cl, nx]) => row({av: av(b, {cls: 'l', ask: cl === 'amb', work: cl === 'live'}), t: BOT[b].n, s: BOT[b].r + ' · ' + nx, r: '<span class="st ' + cl + '">' + esc(st) + '</span>', act: 'bot:' + b})).join('') + '</div>';
+      if (f === 'dem') body = '<div class="list">' + DEM.map(([b, t, s, n], i) => '<button type="button" class="row" style="--i:' + i + '" data-act="dem:' + esc(t) + '">' + av(b) + '<span class="tx"><span class="t">' + esc(t) + '</span><span class="s">' + esc(s) + '</span><span class="steps">' + [1, 2, 3, 4].map((i) => '<i class="' + (i <= n ? 'on' : '') + '"></i>').join('') + '</span></span>' + ic('chev', 16).replace('<svg', '<svg class="chev"') + '</button>').join('') + '</div>';
       if (f === 'rout') body = '<div class="list">' + R.map(([b, t, w, nx]) => row({av: av(b), t: t, s: BOT[b].n + ' · ' + w, r: '<small>prochain</small><b>' + esc(nx) + '</b>', act: 'toast'})).join('') + '</div>';
       if (f === 'cout') body = '<div class="card"><div class="k" style="color:var(--muted);font-size:13px">Cette semaine (remise à zéro mar. 12 h 47)</div><div style="font:700 28px var(--display);margin:4px 0 14px">31 passages · 4 chats</div><div class="bars">' + [['iris', 12], ['argus', 7], ['kairos', 5], ['chronos', 4], ['ulysse', 2], ['athena', 1]].map(([b, n]) => '<div class="bar-l"><span>' + BOT[b].n + '</span><span class="tr"><i style="width:' + (n / 12 * 100) + '%;background:' + BOT[b].c + '"></i></span><b>' + n + '</b></div>').join('') + '</div></div>';
       return head('Équipe', 'Tes bots, leurs routines, ce que tu leur as demandé et ce que ça coûte.')
-        + '<div class="card hero"><div class="k">Grok est en pause</div><div class="big" style="font-size:26px">Reprise mardi 12 h 47</div><p>4 demandes attendent la reprise. Les sonnettes partiront seules à ce moment-là.</p><div class="row-btn"><button type="button" class="btn" data-act="filt:dem">Voir la file</button><button type="button" class="btn" data-act="toast">Grok est reparti</button></div></div>'
+        + '<div class="card hero"><div class="crew">' + av('claude', {cls: 'xl', work: true}) + '<b style="font:600 17px var(--display)">Claude · chef d’équipe</b><small style="color:#6ee7b7">en direct</small></div>'
+        + '<div class="crew-row">' + B.slice(1).map(([b, st, cl]) => '<button type="button" data-act="bot:' + b + '">' + av(b, {ask: cl === 'amb'}) + '<span>' + BOT[b].n + '</span><i class="' + cl + '"></i></button>').join('') + '</div>'
+        + '<div style="height:1px;background:var(--line);margin:14px -16px 12px"></div><div class="k">Grok est en pause</div><div class="big" style="font-size:24px">Reprise mardi 12 h 47</div><p>4 demandes attendent la reprise. Les sonnettes partiront seules à ce moment-là.</p><div class="row-btn"><button type="button" class="btn" data-act="filt:dem">Voir la file</button><button type="button" class="btn" data-act="toast">Grok est reparti</button></div></div>'
         + seg('equipe', [['bots', 'Bots', 8], ['dem', 'Demandes', 4], ['rout', 'Routines', 6], ['cout', 'Coût']]) + body;
     },
     reglages() {
@@ -422,9 +509,10 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
       const d = DOM[k], H = d.hero; if (S.f[k] == null) S.f[k] = d.seg[0][0];
       const L = (d.seg.find((s) => s[0] === S.f[k]) || d.seg[0])[2];
       let hero = '';
-      if (H) hero = '<div class="card hero"><div class="k">' + esc(H.k) + '</div><div class="big">' + esc(H.big) + '</div>' + (H.bar ? '<div style="height:8px;border-radius:99px;background:rgba(56,189,248,.12);overflow:hidden;margin:8px 0 2px"><i style="display:block;height:100%;width:' + H.bar + '%;border-radius:99px;background:linear-gradient(90deg,rgb(var(--c1)),rgb(var(--c3)))"></i></div><small style="color:var(--muted);font-size:12.5px">' + H.bar + ' % du mois déjà prélevé</small>' : '') + (H.spark ? '<div style="position:relative;height:46px;margin:6px 0 0">' + spark(H.spark, '#f9a8d4').replace('class="spark"', 'style="width:100%;height:46px"') + '</div>' : '') + '<p>' + esc(H.p) + '</p><div class="row-btn">' + H.a.map(([l, a], i) => '<button type="button" class="btn' + (i ? '' : ' primary') + '" data-act="' + a + '">' + esc(l) + '</button>').join('') + '</div></div>';
+      if (typeof H === 'function') hero = H();
+      else if (H) hero = '<div class="card hero"><div class="k">' + esc(H.k) + '</div><div class="big">' + esc(H.big) + '</div>' + (H.bar ? '<div style="height:8px;border-radius:99px;background:rgba(56,189,248,.12);overflow:hidden;margin:8px 0 2px"><i style="display:block;height:100%;width:' + H.bar + '%;border-radius:99px;background:linear-gradient(90deg,rgb(var(--c1)),rgb(var(--c3)))"></i></div><small style="color:var(--muted);font-size:12.5px">' + H.bar + ' % du mois déjà prélevé</small>' : '') + (H.spark ? '<div style="position:relative;height:46px;margin:6px 0 0">' + spark(H.spark, '#f9a8d4').replace('class="spark"', 'style="width:100%;height:46px"') + '</div>' : '') + '<p>' + esc(H.p) + '</p><div class="row-btn">' + H.a.map(([l, a], i) => '<button type="button" class="btn' + (i ? '' : ' primary') + '" data-act="' + a + '">' + esc(l) + '</button>').join('') + '</div></div>';
       if (d.search) hero = '<div class="card hero"><div class="k">Chercher un papier</div><button type="button" class="btn full" data-act="find" style="justify-content:flex-start;margin-top:8px;color:var(--muted)">' + ic('doc', 18) + ' passeport, quittance, carte Vitale…</button><div class="chips">' + ['Passeport', 'Titre de séjour', 'Carte Vitale', 'Permis', 'Quittance'].map((c) => '<button type="button" class="chip" data-act="find:' + c + '">' + c + '</button>').join('') + '</div></div>';
-      const r = (x) => { const money = !x[3] && /^[+−-]?[\d\s.,]+ ?€/.test(x[2]);
+      const r = (x) => { if (!Array.isArray(x)) return row({av: x.ph ? ph(x.ph, x.dt) : '', t: x.t, s: x.s, r: (x.p ? '<b>' + esc(x.p) + '</b>' : '') + (x.tr ? '<span class="trend ' + x.tr[0] + '">' + esc(x.tr[1]) + '</span>' : ''), act: 'dom:' + k + ':' + x.t}); const money = !x[3] && /^[+−-]?[\d\s.,]+ ?€/.test(x[2]);
         const lead = x[3] ? '<span class="av" style="background:rgba(236,72,153,.14);width:56px">' + spark(x[3], '#f9a8d4').replace('class="spark"', 'style="width:44px;height:22px"') + '</span>'
           : x[0] ? '<span class="av" style="background:rgba(56,189,248,.14);color:rgb(103,232,249);font-size:12px;width:54px">' + esc(x[0]) + '</span>'
           : '<span class="av" style="background:rgba(56,189,248,.14);color:rgb(103,232,249);width:54px">' + ic(d.icon, 19) + '</span>';
@@ -432,6 +520,38 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
       return head(d.n, d.sub) + hero + seg(k, d.seg.map(([key, l, rows]) => [key, l, rows.length])) + '<div class="list">' + L.map(r).join('') + '</div>';
     };
   });
+  const pcard = (k, pill, t, s, act, wide) => '<button type="button" class="pcard' + (wide ? ' wide' : '') + '" data-act="' + act + '">' + pic(k) + '<em class="pill">' + esc(pill) + '</em><span><b>' + esc(t) + '</b><small>' + esc(s) + '</small></span></button>';
+  /* courbe des prix : escalier, seuil et prix public en repères */
+  function chart(pts, seuil, pub) {
+    const W = 340, H = 120, mn = Math.min(...pts, seuil) - 15, mx = Math.max(...pts, pub) + 10, X = (i) => 8 + i * (W - 70) / (pts.length - 1), Y = (v) => 8 + (mx - v) / (mx - mn) * (H - 24);
+    let d = 'M' + X(0) + ' ' + Y(pts[0]); pts.forEach((v, i) => { if (i) d += ' H' + X(i).toFixed(1) + ' V' + Y(v).toFixed(1); });
+    const area = d + ' V' + (H - 16) + ' H' + X(0) + ' Z', L = (v, c, txt) => '<line x1="8" x2="' + (W - 62) + '" y1="' + Y(v) + '" y2="' + Y(v) + '" stroke="' + c + '" stroke-dasharray="4 4" stroke-width="1.2"/><text x="' + (W - 58) + '" y="' + (Y(v) + 4) + '" fill="' + c + '" font-size="11" font-family="Exo 2, sans-serif">' + txt + '</text>';
+    return '<div class="chart"><svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Courbe des prix"><defs><linearGradient id="cg" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#f472b6" stop-opacity=".35"/><stop offset="1" stop-color="#f472b6" stop-opacity="0"/></linearGradient></defs>'
+      + L(pub, '#8aa9d1', 'Public ' + pub + ' €') + L(seuil, '#6ee7b7', 'Seuil ' + seuil + ' €') + '<path d="' + area + '" fill="url(#cg)"/><path d="' + d + '" fill="none" stroke="#f472b6" stroke-width="2.4" stroke-linejoin="round"/>'
+      + '<circle cx="' + X(pts.length - 1) + '" cy="' + Y(pts[pts.length - 1]) + '" r="5" fill="#fff" stroke="#f472b6" stroke-width="3"/><text x="8" y="' + (H - 2) + '" fill="#8aa9d1" font-size="11" font-family="Exo 2, sans-serif">il y a 8 semaines</text><text x="' + (W - 92) + '" y="' + (H - 2) + '" fill="#8aa9d1" font-size="11" font-family="Exo 2, sans-serif" text-anchor="end">aujourd’hui</text></svg></div>';
+  }
+  function heroAchats() {
+    return '<div class="card hero"><div class="photo" style="height:170px">' + pic('robot') + '<span class="stamp">À décider</span><div class="on-ph"><div class="kick">Kairos · relevé ce matin</div><div class="ttl" style="font-size:25px">Robot Alpha X7</div></div></div>'
+      + '<div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap"><span class="big">389 €</span><span class="trend down">−12 % en 3 semaines</span></div>'
+      + '<p>Sous ton seuil de 400 €, plus bas prix des 2 derniers mois. Total TTC livré.</p>' + chart([442, 440, 431, 431, 418, 405, 405, 389], 400, 449)
+      + '<div class="vend"><div><span>Boutique agréée</span><b>389 €</b><i class="ok">livré · agréé</i></div><div><span>Grande enseigne</span><b>412 €</b><i class="ok">agréé</i></div><div><span>Place de marché</span><b>399 €</b><i class="no">non agréé</i></div></div>'
+      + '<div class="row-btn"><button type="button" class="btn primary" data-act="item:i2">Décider</button><button type="button" class="btn" data-act="toast">+ Suivre un produit</button></div></div>';
+  }
+  function heroVoyage() {
+    return '<div class="card hero"><div class="photo">' + pic('lisbonne') + '<span class="stamp">J-104</span><div class="on-ph"><div class="kick">Portugal · avril</div><div class="ttl">Lisbonne</div><div class="meta">À trois · suivi par Ulysse</div></div></div>'
+      + '<div class="board"><div><b>PAR</b><small>Paris</small></div><svg class="arc" viewBox="0 0 160 26" preserveAspectRatio="none"><path d="M4 22 Q80 -6 156 22" fill="none" stroke="rgba(103,232,249,.7)" stroke-dasharray="3 4" stroke-width="1.6"/><path d="M76 4.5l8 3.5-8 3.5 1.5-3.5z" fill="rgb(103,232,249)"/></svg><div style="text-align:right"><b>LIS</b><small>Lisbonne</small></div></div>'
+      + '<div class="facts-row"><span>' + ic('sun', 15) + ' 19° le jour, 12° la nuit</span><span>' + ic('rain', 15) + ' 6 jours de pluie (probable)</span><span>' + ic('clock', 15) + ' 2 h 25 de vol</span></div>'
+      + '<div style="margin:14px 0 4px;display:flex;justify-content:space-between;font-size:13.5px"><span style="color:var(--muted)">Budget 2 500 € TTC au plus</span><b style="font-family:var(--display)">1 830 € d’options</b></div><div style="height:8px;border-radius:99px;background:rgba(56,189,248,.12);overflow:hidden"><i style="display:block;height:100%;width:73%;border-radius:99px;background:linear-gradient(90deg,rgb(var(--c1)),rgb(var(--c3)))"></i></div>'
+      + '<div class="sec" style="margin:16px 2px 8px"><h2>Temps forts</h2></div><div class="chips" style="margin-top:0">' + ['Alfama et ses miradouros', 'Tram 28', 'Belém', 'Océanarium', 'Pastéis de nata'].map((x) => '<span class="chip">' + x + '</span>').join('') + '</div>'
+      + '<div class="row-btn"><button type="button" class="btn primary" data-act="item:i4">Choisir les dates</button><button type="button" class="btn" data-act="toast">Carnet par Claude</button></div></div>';
+  }
+  function heroSortie() {
+    const sat = day((6 - TODAY.getDay() + 7) % 7);
+    return '<div class="card hero"><div class="photo">' + pic('spectacle') + '<div class="dtile"><small>' + F(sat, {weekday: 'short'}).replace('.', '') + '</small><b>' + sat.getDate() + '</b></div><span class="stamp">Ce week-end</span><div class="on-ph"><div class="kick">Proposé par Ulysse</div><div class="ttl" style="font-size:25px">Spectacle : Boucle d’or</div><div class="meta">Marionnettes · 10 h 30 · 45 min</div></div></div>'
+      + '<div class="facts-row"><span>' + ic('kid', 15) + ' dès 2 ans</span><span>12 € TTC par personne</span><span>' + ic('clock', 15) + ' 20 min en métro</span><span>' + ic('star', 15) + ' 4,7 sur 5</span></div>'
+      + '<p>Une matinée calme, juste à côté d’un parc pour pique-niquer après. Réservation conseillée le week-end.</p>'
+      + '<div class="row-btn"><button type="button" class="btn primary" data-act="done:On y va">On y va <span class="cost">tu réserves</span></button><button type="button" class="btn" data-act="done:Autre idée">Autre idée <span class="cost">1 passage</span></button></div></div>';
+  }
   function week() {
     return '<div class="week">' + [0, 1, 2, 3, 4, 5, 6].map((d) => { const D = day(d), we = D.getDay() === 0 || D.getDay() === 6, L = AG.filter((e) => e.d === d); return '<button type="button" class="wd' + (d === 0 ? ' is-today' : '') + (we ? ' is-we' : '') + '" data-act="day:' + d + '"><small>' + F(D, {weekday: 'short'}).replace('.', '') + '</small><b>' + D.getDate() + '</b><span class="dots">' + L.slice(0, 3).map((e) => '<i style="background:' + e.c + '"></i>').join('') + '</span></button>'; }).join('') + '</div>';
   }
@@ -439,14 +559,19 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
   /* ---------------- rendu ---------------- */
   function render(how) {
     const id = cur(), deep = S.stack[S.tab].length > 1;
-    const v = $('view'); v.className = 'view'; v.innerHTML = SCREENS[id]();
+    const v = $('view'); v.className = 'view'; RI = 0; v.innerHTML = SCREENS[id]();
+    v.querySelectorAll('.gslot[data-g="home"]').forEach((sl) => { if (!G_HOME && window.UXGlobe) { G_HOME = UXGlobe.create({pedestal: true, nodes: 150}); G_HOME.el.classList.add('home-globe'); } if (G_HOME) sl.replaceWith(G_HOME.el); });
+    mountAv(v);
     if (how) { void v.offsetWidth; v.classList.add('enter-' + how); }
     $('mini').textContent = NAMES[id] || (DOM[id] && DOM[id].n) || '';
     $('lead').innerHTML = deep ? '<button type="button" class="back" data-act="back">' + ic('back', 22) + esc(NAMES[S.stack[S.tab][S.stack[S.tab].length - 2]]) + '</button>' : '<span class="logo">JARVIS</span>';
-    if (!$('bar').children.length) $('bar').innerHTML = TABS.map((t) => t[0] === 'orb' ? '<button type="button" class="orb-tab" data-act="claude" aria-label="Parler à Claude"><span class="orb"></span></button>' : '<button type="button" class="tab" data-tab="' + t[0] + '" data-act="tab:' + t[0] + '">' + ic(t[2], 23) + '<span>' + t[1] + '</span>' + (t[0] === 'moi' ? '<span class="badge">' + ITEMS.filter((i) => i.k !== 'info').length + '</span>' : '') + '</button>').join('');
+    if (!$('bar').children.length) { $('bar').innerHTML = TABS.map((t) => t[0] === 'orb' ? '<button type="button" class="orb-tab" data-act="claude" aria-label="Parler à Claude"></button>' : '<button type="button" class="tab" data-tab="' + t[0] + '" data-act="tab:' + t[0] + '">' + ic(t[2], 23) + '<span>' + t[1] + '</span>' + (t[0] === 'moi' ? '<span class="badge">' + ITEMS.filter((i) => i.k !== 'info').length + '</span>' : '') + '</button>').join('');
+      if (window.UXGlobe) { G_BAR = UXGlobe.create({ring: true, nodes: 90, voice: false}); $('bar').querySelector('.orb-tab').append(G_BAR.el); } }
     $('bar').querySelectorAll('.tab').forEach((b) => { if (b.dataset.tab === S.tab) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
     onScroll();
   }
+  let G_HOME = null, G_BAR = null, G_CL = null;
+  const gset = (st) => { [G_BAR, G_CL].forEach((x) => x && x.set(st)); const l = $('cl-state'); if (l) { l.dataset.s = st; l.textContent = {idle: 'Prêt', listening: 'À l’écoute', thinking: 'Réfléchit…', speaking: 'Répond'}[st]; } };
   function go(id) { S.y[cur()] = scrollY; S.stack[S.tab].push(id); scrollTo(0, 0); render('push'); }
   function back() { const s = S.stack[S.tab]; if (s.length < 2) return; s.pop(); render('pop'); scrollTo(0, S.y[cur()] || 0); }
   function tab(t) {
@@ -464,9 +589,9 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
     sheet.style.transition = ''; sheet.style.transform = '';
     scrim.classList.add('on'); openedAt = performance.now();
     requestAnimationFrame(() => { sheet.classList.remove('half', 'full'); sheet.classList.add(full ? 'full' : 'half'); });
-    S.sheet = full ? 'full' : 'half'; document.body.style.overflow = 'hidden';
+    S.sheet = full ? 'full' : 'half'; document.body.style.overflow = 'hidden'; mountAv(sheet);
   }
-  function closeSheet() { if (!S.sheet) return; sheet.style.transition = ''; sheet.style.transform = ''; sheet.classList.remove('half', 'full'); scrim.classList.remove('on'); S.sheet = null; document.body.style.overflow = ''; }
+  function closeSheet() { if (!S.sheet) return; clearTimeout(ASK.t); clearInterval(ASK.i); gset('idle'); sheet.style.transition = ''; sheet.style.transform = ''; sheet.classList.remove('half', 'full'); scrim.classList.remove('on'); S.sheet = null; document.body.style.overflow = ''; }
   scrim.addEventListener('click', () => { if (performance.now() - openedAt > 400) closeSheet(); });
   /* tirer la poignée ou l'en-tête : vers le haut = plein écran, vers le bas = moitié puis fermer ; un lancer vif compte ; un glissé interrompu revient en place */
   let G = null;
@@ -481,8 +606,9 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
   const btns = (a) => a.map(([l, c, kind, act]) => '<button type="button" class="btn' + (kind ? ' ' + kind : '') + '" data-act="' + (act || 'done:' + l) + '"><span>' + esc(l) + '</span><span class="cost">' + esc(c) + '</span></button>').join('');
   function itemSheet(it) {
     const extra = [['Mettre de côté', 'gratuit'], ['En discuter avec Claude', 'Claude', '', 'claude'], ['Confier à un autre bot', '1 passage']];
-    openSheet(sheetHead(av(it.b).replace('class="av"', 'class="av" style="width:40px;height:40px"'), it.t, BOT[it.b].n + ' · ' + it.since)
-      + '<div class="sh-body"><p>' + esc(it.s) + '</p>' + (it.due ? '<p><span class="tag amb">' + esc(it.due) + '</span></p>' : '')
+    const P = {i2: 'robot', i4: 'lisbonne'}[it.id];
+    openSheet(sheetHead(av(it.b, {cls: 'l', ask: it.k === 'decider'}), it.t, BOT[it.b].n + ' · ' + it.since)
+      + '<div class="sh-body">' + (P && PHOTOS[P] ? '<div class="card" style="padding:16px 16px 0;margin-bottom:12px"><div class="photo" style="height:150px;margin-bottom:0">' + pic(P) + '</div></div>' : '') + '<p>' + esc(it.s) + '</p>' + (it.due ? '<p><span class="tag amb">' + esc(it.due) + '</span></p>' : '')
       + (it.facts ? '<div class="facts">' + it.facts.map(([a, b]) => '<div><span>' + esc(a) + '</span><b>' + esc(b) + '</b></div>').join('') + '</div>' : '')
       + '<div class="acts">' + btns(it.a) + '</div>'
       + (it.track ? '<div class="sec" style="margin-top:6px"><h2>Où ça en est</h2></div><ol class="track">' + it.track.map(([t, w, c]) => '<li class="' + c + '">' + esc(t) + '<small>' + esc(w) + '</small></li>').join('') + '</ol>' : '')
@@ -497,20 +623,36 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
       ['Des gestes d’iPhone', 'Appui seulement sur la barre, glisser du bord gauche pour revenir, second appui sur l’onglet : retour en haut.']];
     openSheet(sheetHead('', 'Ce qui change', 'Maquette du 21/11/2026, à valider') + '<div class="sh-body"><div class="list">' + L.map(([t, s], i) => '<div class="row" style="align-items:flex-start"><span class="av" style="background:linear-gradient(135deg,rgb(var(--c1)),rgb(var(--c4)));color:#031022">' + (i + 1) + '</span><span class="tx"><span class="t">' + esc(t) + '</span><span class="s" style="-webkit-line-clamp:4">' + esc(s) + '</span></span></div>').join('') + '</div></div>', true);
   }
+  function creditsSheet() {
+    openSheet(sheetHead('', 'Crédits', 'Photos de Wikimedia Commons, sous licence libre') + '<div class="sh-body"><div class="list">' + Object.keys(PHOTOS).map((k) => '<a class="row" href="' + esc(PHOTOS[k].page) + '" target="_blank" rel="noopener">' + ph(k) + '<span class="tx"><span class="t">' + esc(PHOTOS[k].auteur || 'Auteur inconnu') + '</span><span class="s">' + esc(PHOTOS[k].licence) + ' · Wikimedia Commons</span></span></a>').join('') + '</div><p class="note">Personnages des bots : silhouettes de game-icons.net (Lorc, Delapouite et contributeurs), licence CC BY 3.0.</p></div>', true);
+  }
   function genericSheet(t, sub, facts, acts) { openSheet(sheetHead('', t, sub) + '<div class="sh-body">' + (facts ? '<div class="facts">' + facts.map(([a, b]) => '<div><span>' + esc(a) + '</span><b>' + esc(b) + '</b></div>').join('') + '</div>' : '') + '<div class="acts">' + btns(acts || [['Ouvrir', 'gratuit', 'primary']]) + '</div></div>'); }
   function claudeSheet() {
     const where = NAMES[cur()] || (DOM[cur()] && DOM[cur()].n);
     const sug = {auj: ['Qu’est-ce que je fais en premier ?', 'Prépare ma semaine'], moi: ['Explique-moi le CRA en attente', 'Réponds au syndic pour moi'], achats: ['Le robot va-t-il encore baisser ?', 'Trouve une idée de cadeau à 50 €'], argent: ['Pourquoi 161 € d’ici ma paie ?', 'Quelles dépenses ont augmenté ?']}[cur()] || ['Qu’est-ce que je fais en premier ?', 'Résume cette page'];
-    openSheet(sheetHead('<span class="orb-s"><span class="orb" style="width:38px;height:38px"></span></span>', 'Claude', 'Chef d’équipe · réponse mot par mot')
-      + '<div class="sh-body" id="chat"><span class="ctx">Tu regardes : ' + esc(where) + '</span><div class="sugs">' + sug.map((s) => '<button type="button" data-act="ask:' + esc(s) + '">' + esc(s) + '</button>').join('') + '</div><div class="msgs" id="msgs"></div></div>'
+    openSheet(sheetHead(av('claude', {cls: 'm', work: true}), 'JARVIS', 'Claude, chef d’équipe · réponse mot par mot')
+      + '<div class="sh-body" id="chat"><div class="gslot" data-g="claude"></div><div class="cl-state" id="cl-state"></div><span class="ctx">Tu regardes : ' + esc(where) + '</span><div class="sugs">' + sug.map((s) => '<button type="button" data-act="ask:' + esc(s) + '">' + esc(s) + '</button>').join('') + '</div><div class="msgs" id="msgs"></div></div>'
       + '<form class="compose" id="compose"><button type="button" class="ic-btn" data-act="toast:mic" aria-label="Dicter">' + ic('mic', 21) + '</button><input id="ask" placeholder="Demande à Claude…" autocomplete="off"><button type="submit" class="ic-btn send" aria-label="Envoyer">' + ic('send', 20) + '</button></form>', true);
+    if (!G_CL && window.UXGlobe) { G_CL = UXGlobe.create({ring: true, nodes: 140}); G_CL.el.classList.add('claude-globe'); }
+    const sl = sheet.querySelector('.gslot[data-g="claude"]'); if (sl && G_CL) sl.replaceWith(G_CL.el);
+    gset('listening'); ASK.t = setTimeout(() => gset('idle'), 2600);
     $('compose').addEventListener('submit', (e) => { e.preventDefault(); const v = $('ask').value.trim(); if (v) { ask(v); $('ask').value = ''; } });
+    $('ask').addEventListener('focus', () => { clearTimeout(ASK.t); gset('listening'); });
+    $('ask').addEventListener('blur', () => { if (G_CL && G_CL.state === 'listening') gset('idle'); });
   }
+  const ASK = {t: 0, i: 0};
+  const ANS = {
+    'Qu’est-ce que je fais en premier ?': ['Commence par le CRA : Chronos attend ton oui avant vendredi 17 h, c’est un seul passage. Ensuite le robot à 389 € : le prix tient jusqu’à dimanche. Le reste peut attendre lundi.', 'i1'],
+    'Prépare ma semaine': ['Lundi : veille d’Iris et bilan d’Argus. Mardi : l’expert du syndic le matin, puis Grok repart à 12 h 47. Jeudi : l’attestation d’assurance à envoyer. Vendredi : le CRA, si tu ne l’as pas validé avant.', 'i8'],
+    'Le robot va-t-il encore baisser ?': ['Probablement pas avant le Black Friday : il a perdu 12 % en trois semaines et touche le plus bas des deux derniers mois. À 389 €, il est sous ton seuil : c’est un bon moment.', 'i2']
+  };
   function ask(q) {
     const m = $('msgs'); if (!m) return; const s = document.querySelector('.sugs'); if (s) s.remove();
-    m.insertAdjacentHTML('beforeend', '<div class="msg me">' + esc(q) + '</div><div class="msg ai"></div>');
-    const a = m.lastElementChild, txt = 'Maquette : ici, la vraie réponse de Claude s’écrit mot par mot, avec ses cartes (rendez-vous, achat, demande) et ses propositions à valider d’un bouton.'.split(' ');
-    let i = 0; const t = setInterval(() => { a.textContent += (i ? ' ' : '') + txt[i++]; $('chat').scrollTop = 1e6; if (i >= txt.length) clearInterval(t); }, 45);
+    clearTimeout(ASK.t); clearInterval(ASK.i);
+    m.insertAdjacentHTML('beforeend', '<div class="msg me">' + esc(q) + '</div><div class="msg ai"><span class="tx"></span></div>');
+    const a = m.lastElementChild, ans = ANS[q] || ['Maquette : ici, la vraie réponse de Claude s’écrit mot par mot, avec ses cartes (rendez-vous, achat, demande) et ses propositions à valider d’un bouton.'], txt = ans[0].split(' ');
+    gset('thinking'); $('chat').scrollTop = 1e6;
+    ASK.t = setTimeout(() => { gset('speaking'); let i = 0; ASK.i = setInterval(() => { a.firstChild.textContent += (i ? ' ' : '') + txt[i++]; $('chat').scrollTop = 1e6; if (i >= txt.length) { clearInterval(ASK.i); const it = ans[1] && ITEMS.find((x) => x.id === ans[1]); if (it) { a.insertAdjacentHTML('beforeend', '<div class="list" style="margin-top:10px">' + itemRow(it) + '</div>'); mountAv(a); } ASK.t = setTimeout(() => gset('idle'), 700); } }, 70); }, 1300);
   }
 
   /* ---------------- recherche partout ---------------- */
@@ -548,6 +690,8 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
     else if (k === 'one') { const it = ITEMS.find((i) => i.k === 'decider'); itemSheet(it); toast('Une par une : la suivante arrive dès ta réponse.'); }
     else if (k === 'find') openFind(v || '');
     else if (k === 'help') helpSheet();
+    else if (k === 'credits') creditsSheet();
+    else if (k === 'ask-brief') { claudeSheet(); setTimeout(() => ask('Prépare ma semaine'), 350); }
     else if (k === 'q') { $('q').value = v; search(v); }
     else if (k === 'sr') { closeFind(); el.dataset.act = a.slice(3); el.click(); }
     else if (k === 'ev') genericSheet(a.slice(3), 'Agenda', [['Quand', 'voir l’agenda'], ['Agenda', 'Principal']], [['Modifier', 'gratuit', 'primary'], ['Ajouter un rappel', 'gratuit']]);

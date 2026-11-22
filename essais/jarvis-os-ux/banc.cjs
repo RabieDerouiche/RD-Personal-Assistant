@@ -3,7 +3,7 @@
    Captures dans le dossier temporaire du système (jarvis-os-ux). Sortie : une ligne OK/ÉCHEC par vérification. */
 const {chromium, devices} = require('playwright'); const http = require('http'), fs = require('fs'), path = require('path'), os = require('os');
 const ROOT = path.join(__dirname, '..'), SH = path.join(os.tmpdir(), 'jarvis-os-ux'); fs.mkdirSync(SH, {recursive: true});
-const TYPES = {'.js': 'text/javascript', '.html': 'text/html; charset=utf-8', '.png': 'image/png'};
+const TYPES = {'.js': 'text/javascript', '.html': 'text/html; charset=utf-8', '.png': 'image/png', '.jpg': 'image/jpeg'};
 const srv = http.createServer((q, r) => { let f = path.join(ROOT, decodeURIComponent(q.url.split('?')[0])); if (f.endsWith('/')) f += 'index.html'; fs.readFile(f, (e, d) => { if (e) { r.writeHead(404); r.end(); return; } r.writeHead(200, {'content-type': TYPES[path.extname(f)] || 'application/octet-stream'}); r.end(d); }); });
 const out = []; let fails = 0; const ok = (n, c, i) => { out.push((c ? 'OK    ' : 'ÉCHEC ') + n + (i ? ' :: ' + i : '')); if (!c) fails++; };
 srv.listen(0, async () => {
@@ -28,6 +28,11 @@ srv.listen(0, async () => {
     const tabs = await p.evaluate(() => [...document.querySelectorAll('.bar .tab')].map((t) => [t.textContent.replace(/\d+$/, '').trim(), Math.round(t.getBoundingClientRect().height), Math.round(t.getBoundingClientRect().width)]));
     ok('barre : 4 onglets (Aujourd’hui, Pour moi, Agenda, Espaces) et l’orbe au centre, cibles de 44 px au moins', tabs.map((t) => t[0]).join(',') === 'Aujourd’hui,Pour moi,Agenda,Espaces' && tabs.every((t) => t[1] >= 44 && t[2] >= 44) && await p.evaluate(() => document.querySelector('.bar-in').children[2].classList.contains('orb-tab')), JSON.stringify(tabs));
     ok('plus de menu « Tout » ni de poignée', await p.evaluate(() => !document.querySelector('.all-sheet, .fav-handle')));
+    /* retouches du 21/11 : orbe vivante, personnages, photos */
+    const globe = (sel) => p.evaluate((s) => { const c = document.querySelector(s + ' canvas'); if (!c) return null; const g = c.getContext('2d'), d = g.getImageData(0, 0, c.width, c.height).data; let lit = 0; for (let i = 3; i < d.length; i += 16) if (d[i] > 40) lit++; return {w: c.width, cw: c.clientWidth, lit, url: c.toDataURL().length}; }, sel);
+    const g1 = await globe('.orb-tab'), h1 = await globe('.home-globe'); await p.waitForTimeout(400); const g2 = await globe('.orb-tab');
+    ok('orbe de la barre : le globe réseau, dessiné en haute résolution (2 à 3 pixels par point) et animé', g1 && g1.w >= g1.cw * 2 && g1.lit > 50 && g2.url !== g1.url, JSON.stringify([g1, g2 && g2.url]));
+    ok('accueil : le globe sur son socle', h1 && h1.lit > 200, JSON.stringify(h1));
     await p.screenshot({path: path.join(SH, '1-aujourdhui.png')});
     const screens = [['auj', 'tab:auj'], ['moi', 'tab:moi'], ['agenda', 'tab:agenda'], ['espaces', 'tab:espaces']];
     for (const [id] of screens) {
@@ -36,13 +41,17 @@ srv.listen(0, async () => {
       ok('écran ' + id + ' : ouvert, sans débordement ni défilement de côté, texte de 11 px au moins', await cur() === id && o.scroll && !o.bad.length && f >= 11, JSON.stringify({o, f}));
     }
     await p.screenshot({path: path.join(SH, '4-espaces.png')});
+    ok('Espaces : tuiles Achats, Voyages et Sorties en photo', await p.evaluate(() => ['achats', 'voyages', 'sorties'].every((k) => { const i = document.querySelector('.tile[data-act="go:' + k + '"] img'); return i && i.complete && i.naturalWidth > 300; })));
     /* Espaces : tuiles vivantes, chaque domaine sur le même modèle */
     for (const k of ['argent', 'achats', 'voyages', 'sorties', 'papiers', 'equipe']) {
       await tapSel('.tile[data-act="go:' + k + '"]');
       const o = await noOverflow(), f = await minFont();
       const model = await p.evaluate(() => ({h1: !!document.querySelector('#view h1.lt'), hero: !!document.querySelector('#view .hero'), seg: document.querySelectorAll('#view .seg').length, rows: document.querySelectorAll('#view .row').length, back: !!document.querySelector('#lead .back')}));
       ok('Espaces → ' + k + ' : même modèle (titre, carte phare, un filtre, lignes), retour « ‹ Espaces », sans débordement', await cur() === k && model.h1 && model.hero && model.seg === 1 && model.rows >= 1 && model.back && o.scroll && !o.bad.length && f >= 11, JSON.stringify({model, o, f}));
-      if (k === 'achats') await p.screenshot({path: path.join(SH, '5-achats.png')});
+      if (['achats', 'voyages', 'sorties'].includes(k)) { await p.waitForTimeout(300); ok(k + ' : grande photo, chargée, et des lignes illustrées', await p.evaluate(() => { const i = document.querySelector('#view .hero .photo img'); return i && i.complete && i.naturalWidth >= 600 && [...document.querySelectorAll('#view .list .ph img')].filter((x) => x.naturalWidth > 100).length >= 2; })); }
+      if (k === 'achats') { ok('Achats : courbe des prix avec seuil et prix public, et les vendeurs', await p.evaluate(() => /Seuil 400/.test(document.querySelector('.chart').textContent) && /Public 449/.test(document.querySelector('.chart').textContent) && document.querySelectorAll('.vend > div').length === 3)); await p.screenshot({path: path.join(SH, '5-achats.png')}); }
+      if (k === 'voyages') ok('Voyages : carte d’embarquement, météo probable, budget et temps forts', await p.evaluate(() => { const t = document.querySelector('#view .hero').textContent; return /PAR/.test(t) && /LIS/.test(t) && /pluie/.test(t) && /Budget/.test(t) && /Temps forts/i.test(t); }));
+      if (k === 'equipe') { await p.waitForTimeout(400); ok('Équipe : les personnages des bots (sphère, silhouette) dans la constellation et la liste', await p.evaluate(() => { const c = [...document.querySelectorAll('#view .ava canvas')]; const drawn = c.filter((x) => { const d = x.getContext('2d').getImageData(x.width / 2 - 2, x.height / 2 - 2, 4, 4).data; return d[3] > 0; }); return c.length >= 15 && drawn.length >= 8 && drawn.includes(document.querySelector('.crew .ava.xl canvas')); }));   /* les personnages hors de l'écran ne sont dessinés qu'en y arrivant */ }
       if (k === 'equipe') await p.screenshot({path: path.join(SH, '6-equipe.png')});
       if (k === 'argent') { await drag(4, 400, 240, 410, 10); ok('glisser depuis le bord gauche : retour à Espaces', await cur() === 'espaces'); }
       else { await tapSel('#lead .back'); ok('« ‹ Espaces » : retour', await cur() === 'espaces'); }
@@ -82,7 +91,9 @@ srv.listen(0, async () => {
     /* Claude : la même feuille, en plein écran, avec le contexte */
     await tapSel('.orb-tab');
     ok('orbe : Claude dans la même feuille, plein écran, « Tu regardes : Pour moi »', await sheetState() === 'full' && await p.evaluate(() => /Tu regardes : Pour moi/.test(document.getElementById('sheet').textContent)));
-    await tapSel('.sugs button'); await p.waitForTimeout(3500);
+    const st = () => p.evaluate(() => [document.querySelector('#sheet .globe').dataset.s, document.querySelector('.orb-tab .globe').dataset.s, document.getElementById('cl-state').textContent]);
+    const s0 = await st(); await p.evaluate(() => document.querySelector('.sugs button').click()); await p.waitForTimeout(500); const s1 = await st(); await p.waitForTimeout(1400); const s2 = await st(); await p.waitForTimeout(2500); const s3 = await st();
+    ok('le globe de Claude vit : à l’écoute à l’ouverture, réfléchit, puis répond pendant que le texte s’écrit (la barre aussi), puis revient au repos', s0[0] === 'listening' && s1[0] === 'thinking' && s1[1] === 'thinking' && /Réfléchit/.test(s1[2]) && s2[0] === 'speaking' && /Répond/.test(s2[2]) && s3[0] === 'idle', JSON.stringify([s0, s1, s2, s3]));
     ok('Claude : une suggestion envoie la question et la réponse s’écrit', await p.evaluate(() => document.querySelectorAll('.msg.me').length === 1 && document.querySelector('.msg.ai').textContent.length > 40));
     await p.screenshot({path: path.join(SH, '7-claude.png')});
     await tapSel('#sheet .x'); ok('Claude : ✕ ferme', await sheetState() === 'fermée');
@@ -96,6 +107,8 @@ srv.listen(0, async () => {
     await tapSel('#grok'); ok('pastille « Grok » : ouvre Équipe (sous Espaces)', await cur() === 'equipe' && await p.evaluate(() => __UX.S.tab === 'espaces'));
     await tapSel('.seg button[data-act="filt:cout"]'); ok('Équipe : « Coût » montre les passages de la semaine par bot', await p.evaluate(() => document.querySelectorAll('.bar-l').length === 6));
     await tapSel('button[data-act="help"]'); ok('« ? » : ce qui change, en 6 points', await p.evaluate(() => document.querySelectorAll('#sheet .row').length === 6));
+    await tapSel('#sheet .x'); await tapSel('#lead .back'); await tapSel('a[data-act="credits"]');
+    ok('crédits : 15 photos avec auteur, licence libre et lien, et les silhouettes', await p.evaluate(() => { const r = [...document.querySelectorAll('#sheet a.row')]; return r.length === 15 && r.every((a) => /^https:/.test(a.href) && /CC|Domaine/.test(a.textContent)) && /game-icons/.test(document.getElementById('sheet').textContent); }));
     await p.screenshot({path: path.join(SH, '8-ce-qui-change.png')});
     ok('aucune erreur de page', !errs.length, errs.join(' | '));
   } catch (e) { ok('déroulé du banc', false, e.message); }
