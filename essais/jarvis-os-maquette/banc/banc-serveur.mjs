@@ -96,6 +96,18 @@ try {
   await p.evaluate(() => [...document.querySelectorAll('#chat .msg.proposal .btn.main')].pop().click()); await p.waitForTimeout(1500);
   { const tk = await p.evaluate(() => JSON.parse(localStorage.getItem('jarvis.settings')).serverToken); const rl = await fetch(BASE + '/api/relances', {headers: {authorization: 'Bearer ' + tk}}).then((x) => x.json());
     ok('discussion : la relance confirmée est programmée sur le serveur', rl.prevues.some((x) => x.source === 'conversation' && x.ligne === 2 && /Iris a répondu au syndic/.test(x.quoi)), JSON.stringify(rl.prevues)); }
+  /* 0.62.0 (son choix du 22/11/2026) : un proche reçoit un lien d'invitation, ouvre sa page sur son iPhone, envoie une tâche et voit son statut (prénoms inventés) */
+  { const tk = await p.evaluate(() => JSON.parse(localStorage.getItem('jarvis.settings')).serverToken);
+    const iv = await fetch(BASE + '/api/invites', {method: 'POST', headers: {authorization: 'Bearer ' + tk, 'content-type': 'application/json'}, body: JSON.stringify({nom: 'Lina'})}).then((x) => x.json());
+    const ci = await b.newContext({...devices['iPhone 15 Pro Max']}), qi = await ci.newPage(); qi.on('pageerror', (e) => errs.push('invité : ' + e.message));
+    await qi.goto(iv.lien + '&pour=Sami'); await qi.waitForTimeout(1500);
+    const a0 = await qi.evaluate(() => ({titre: document.getElementById('titre').textContent, adresse: location.href, gardee: !!localStorage.getItem('jarvis.invite.cle'), siri: document.getElementById('nomrac').textContent, url: document.getElementById('url').textContent, large: document.documentElement.scrollWidth <= innerWidth + 1}));
+    await qi.fill('#texte', 'Acheter des couches pour demain'); await qi.click('#form button[type=submit]'); await qi.waitForTimeout(1500);
+    const a1 = await qi.evaluate(() => ({msg: document.getElementById('msg').textContent, liste: [...document.querySelectorAll('#liste li')].map((x) => x.innerText.replace(/\s+/g, ' ').trim())}));
+    ok('invité : sa page s’ouvre par le lien (clé gardée dans son téléphone, retirée de l’adresse), dit « Une tâche pour Sami » et le raccourci « Tâche pour Sami » ; une tâche envoyée revient « C’est noté … pour demain » et s’affiche « À faire »',
+      a0.titre === 'Une tâche pour Sami' && !/cle=/.test(a0.adresse) && a0.gardee && a0.siri === 'Tâche pour Sami' && /\/api\/invite\/tache$/.test(a0.url) && a0.large
+      && a1.msg === 'C’est noté : « Acheter des couches pour demain », pour demain.' && a1.liste.length === 1 && /Acheter des couches pour demain/.test(a1.liste[0]) && /À faire/.test(a1.liste[0]), JSON.stringify([a0, a1]));
+    await qi.screenshot({path: SH + 'invite.png'}); await ci.close(); }
   /* 0.37.0 : la mémoire durable — Claude propose de retenir (carte « À retenir ») ; gardé sur le serveur seulement sur son bouton */
   await p.fill('#chat-in', 'Retiens que je préfère le train pour Lyon'); await p.press('#chat-in', 'Enter').catch(() => {}); await p.waitForTimeout(2500);
   if (!(await p.evaluate(() => /À retenir/.test(document.getElementById('chat').textContent)))) { await p.evaluate(() => { const f = document.querySelector('#chat form'); if (f) f.requestSubmit(); }); await p.waitForTimeout(2500); }
@@ -234,7 +246,7 @@ try {
     const derniere = () => q.evaluate(() => { const m = [...document.querySelectorAll('#chat .msg.them p')]; return m.length ? m[m.length - 1].textContent : ''; });
     await q.fill('#chat-in', 'Bonjour Claude'); await q.press('#chat-in', 'Enter'); await q.waitForTimeout(1500);
     const r1 = await derniere(), mod1 = await q.evaluate(() => { const m = [...document.querySelectorAll('#chat .msg.them .msg-mod')]; return m.length ? m[m.length - 1].textContent : ''; });
-    ok('Claude instantané : Claude préparé à l\'ouverture de la discussion (avec son historique gardé dans le téléphone) ; la première question part seule, sans les données ; « Réfléchi » (par défaut, 0.62.0) l\'a confiée à Opus qui réfléchit, dit sous la réponse', vus.prep >= 1 && vus.conv >= 1 && /^Tu as dit : Bonjour Claude\. Session : reprise/.test(r1) && mod1 === 'Opus' && /effort : high, pensée : oui/.test(r1), JSON.stringify([vus, mod1, r1.slice(-120)]));
+    ok('Claude instantané : Claude préparé à l\'ouverture de la discussion (avec son historique gardé dans le téléphone) ; la première question part seule, sans les données ; « Réfléchi » (par défaut, 0.63.0) l\'a confiée à Opus qui réfléchit, dit sous la réponse', vus.prep >= 1 && vus.conv >= 1 && /^Tu as dit : Bonjour Claude\. Session : reprise/.test(r1) && mod1 === 'Opus' && /effort : high, pensée : oui/.test(r1), JSON.stringify([vus, mod1, r1.slice(-120)]));
     await q.fill('#chat-in', 'Raconte lentement'); await q.press('#chat-in', 'Enter'); await q.waitForTimeout(1300);
     const enCours = await derniere(), arret = await q.evaluate(() => !!document.querySelector('#chat .chat-row .btn[aria-label="Arrêter"]'));
     const globeFlux = await q.evaluate(() => [(document.querySelector('#chat .chat-globe .holo-stage') || {dataset: {}}).dataset.s, (document.querySelector('.talk-slot .holo-stage') || {dataset: {}}).dataset.s, (document.querySelector('#chat .cl-state') || {}).textContent]);

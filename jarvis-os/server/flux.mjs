@@ -38,7 +38,7 @@ export function routeur(texte) {
 /* 0.60.0 (sa demande : « la gestion des tâches par la voix doit être plus sharp, pas grave si ça consomme plus de jetons ») : en conversation
    à la voix, jamais Haiku. Une action à faire (ajouter, noter, rappeler, programmer, envoyer, prévenir un bot…), une réflexion ou une
    question longue → Opus, le plus sûr pour comprendre et agir ; le reste → Sonnet. L'heure, la météo, l'agenda restent instantanés (sans IA). */
-/* 0.61.0 : une action simple → Sonnet, le reste → Opus. 0.62.0 (son choix : « je préfère une réflexion solide et juste qu'une réponse
+/* 0.61.0 : une action simple → Sonnet, le reste → Opus. 0.63.0 (son choix : « je préfère une réflexion solide et juste qu'une réponse
    rapide, travaille sur la qualité ») : la conversation à la voix n'utilise plus ce routeur, elle a toujours Opus qui réfléchit (voir PENSE) ;
    il reste pour mémoire et pour ses tests */
 const ACTIONS_VOIX = /\b(ajoute[rz]?|note[rz]?|rappelle[rz]?|programme[rz]?|planifie[rz]?|envoie[rz]?|cree[rz]?|organise[rz]?|prepare[rz]?|confie[rz]?|retiens|reporte[rz]?|decale[rz]?|deplace[rz]?|supprime[rz]?|annule[rz]?|coche[rz]?|termine[rz]?|relance[rz]?|change[rz]?|modifie[rz]?)\b/g;
@@ -50,7 +50,7 @@ export function routeurVoix(texte) {
   return 'default';
 }
 
-/* 0.62.0 : la discussion avec Claude (à la voix « voix », à l'écrit « juste ») : Opus, effort élevé, réflexion permise ; « Rapide » et les
+/* 0.63.0 : la discussion avec Claude (à la voix « voix », à l'écrit « juste ») : Opus, effort élevé, réflexion permise ; « Rapide » et les
    petites lectures de la page gardent l'effort réduit, sans réflexion */
 export const PENSE = {effort: 'high'};
 
@@ -68,7 +68,7 @@ export function createFlux({bin, env, settings, cwd, conso, models, friendly, da
     if (SECOURS[model] && process.env.JARVIS_SECOURS !== '0') args.push('--fallback-model', SECOURS[model]);
     try { fs.mkdirSync(cwd, {recursive: true}); } catch { /* rien */ }
     let child;
-    const e0 = {...env()}; if (pense) delete e0.MAX_THINKING_TOKENS; else e0.MAX_THINKING_TOKENS = '0';   /* 0.62.0 : la voix réfléchit */
+    const e0 = {...env()}; if (pense) delete e0.MAX_THINKING_TOKENS; else e0.MAX_THINKING_TOKENS = '0';   /* 0.63.0 : la voix réfléchit */
     try { child = spawn(bin, args, {cwd, env: e0, stdio: ['pipe', 'pipe', 'pipe']}); } catch { return null; }
     const p = {child, model, ne: now(), vu: now(), buf: '', err: '', mort: false, t: null, chaine: Promise.resolve()};
     child.on('error', () => { p.mort = true; finTour(p, {ok: false, error: 'Claude Code introuvable sur le serveur.'}); });
@@ -134,7 +134,7 @@ export function createFlux({bin, env, settings, cwd, conso, models, friendly, da
   async function demander({tier, system, input, conv, onDelta, coupe}) {
     const msgs = lire(input);
     if (!msgs.length) return {ok: false, error: 'Demande vide.'};
-    const pense = tier === 'voix' || tier === 'juste', prof = tier === 'auto' ? routeur(msgs[msgs.length - 1].text) : pense ? 'deep' : tier, model = models[prof] || models.default, mk = model + (pense ? '+pense' : '');   /* 0.33.0 : « Auto » ; 0.62.0 : « voix » = Opus qui réfléchit */
+    const pense = tier === 'voix' || tier === 'juste', prof = tier === 'auto' ? routeur(msgs[msgs.length - 1].text) : pense ? 'deep' : tier, model = models[prof] || models.default, mk = model + (pense ? '+pense' : '');   /* 0.33.0 : « Auto » ; 0.63.0 : « voix » = Opus qui réfléchit */
     const act = activite ? activite.debut({genre: 'page', titre: msgs[msgs.length - 1].text, modele: model}) : null;
     let p, blocs, ponctuel = false, reprise = false;
     if (conv && msgs.length >= 2 && msgs[msgs.length - 1].role === 'user') {
@@ -176,7 +176,7 @@ export function createFlux({bin, env, settings, cwd, conso, models, friendly, da
   function preparer({tier, system, input}) {
     const msgs = lire(input);
     if (!msgs.length) return {ok: false, error: 'Rien à préparer.'};
-    if (tier === 'voix' || tier === 'juste') return prep1(models.deep || models.default, system, msgs, true);   /* « juste » : la discussion écrite, même Claude */   /* 0.62.0 : la voix : Opus qui réfléchit, prêt dès l'ouverture des mains libres */
+    if (tier === 'voix' || tier === 'juste') return prep1(models.deep || models.default, system, msgs, true);   /* « juste » : la discussion écrite, même Claude */   /* 0.63.0 : la voix : Opus qui réfléchit, prêt dès l'ouverture des mains libres */
     if (tier !== 'auto') return prep1(models[tier] || models.default, system, msgs);
     const r = prep1(models.quick || models.default, system, msgs);
     if (r.ok && models.default && models.default !== models.quick) {
