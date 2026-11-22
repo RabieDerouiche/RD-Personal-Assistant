@@ -717,6 +717,24 @@ srv.listen(0, async () => {
       ok('Radar 0.52 : paie « entre le 5 et le 10 » : « Reste à payer d’ici ta paie (au plus tard le jeu. 10/12) », « Ma paie : entre le 5 et le 10 », la fiche propose « Ils peuvent arriver plus tôt » (dès le 5)',
         r.k === 'Reste à payer d’ici ta paie (au plus tard le jeu. 10/12)' && /entre le 5 et le 10/.test(r.paie) && f.labels.includes('Ils peuvent arriver plus tôt') && f.des === '5', JSON.stringify([r, f]));
       await ctx.close(); }
+    /* 0.56.0 : une dépense dont les factures ont cessé : l'alerte « Plus de facture » propose Retirer ou Garder ; Retirer la sort du reste à payer
+       (lundi 23/11/2026, paie du 28 avancée au 27 ; dépense et alerte d'exemple) */
+    { const ctx = await b.newContext({...devices['iPhone 15 Pro Max']}); await ctx.addInitScript(PAUSE_INIT);
+      await ctx.addInitScript(() => { try { localStorage.setItem('jarvis.radar.reste', JSON.stringify({jusqua: 'paie', fx: [{id: 'fs', service: 'Salle (exemple)', cat: 'Autres', montant: 29.9, jour: 26, rythme: 'mensuel', source: 'mail'}]})); } catch (e) { /* rien */ } });
+      const q = await ctx.newPage(); q.on('pageerror', (e) => errs.push('radar 0.56 : ' + e.message));
+      await q.clock.setFixedTime(new Date('2026-11-23T10:00:00')); await q.goto(base + '#argent'); await q.waitForTimeout(3000);
+      await q.evaluate(() => { window.__RADAR.alertes.push({id: 'zfs', date: '2026-11-23', type: 'silence', titre: 'Plus de facture', service: 'Salle (exemple)', montant: 29.9, fixe: 'fs', dernier: '2026-08-05', texte: 'Dernière facture le 05/08. Toujours d’actualité ?'}); });
+      const av = await q.evaluate(() => ({big: document.querySelector('.rad-big').textContent, rows: [...document.querySelectorAll('.rad-fixes > .panel:first-child .rad-fx')].map((x) => x.innerText.replace(/\s+/g, ' ').trim())}));
+      await q.evaluate(() => [...document.querySelectorAll('.rad-seg button')].find((x) => /^Alertes/.test(x.textContent)).click()); await q.waitForTimeout(600);
+      const al = await q.evaluate(() => { const a = document.querySelector('.rad-alert.is-silence'); return a ? {t: a.innerText.replace(/\s+/g, ' '), b: [...a.querySelectorAll('.row-actions button')].map((x) => x.textContent.trim())} : null; });
+      await q.evaluate(() => [...document.querySelectorAll('.rad-alert.is-silence .row-actions button')].find((x) => /Retirer/.test(x.textContent)).click()); await q.waitForTimeout(700);
+      const toast1 = await q.evaluate(() => (document.querySelector('.toast') || {}).textContent || '');
+      await q.evaluate(() => [...document.querySelectorAll('.rad-seg button')].find((x) => /^Fixes/.test(x.textContent)).click()); await q.waitForTimeout(600);
+      const ap = await q.evaluate(() => ({big: document.querySelector('.rad-big').textContent, rules: [...document.querySelectorAll('.rad-rule')].map((x) => x.innerText.replace(/\s+/g, ' ').trim()), alerte: !!document.querySelector('.rad-alert.is-silence')}));
+      ok('Radar 0.56 : « Plus de facture » propose Retirer ou Garder ; « Retirer » sort la dépense du reste à payer (29,90 € de moins) et de la liste, et l’alerte disparaît',
+        av.rows.some((x) => /Salle \(exemple\)/.test(x)) && !!al && /Toujours d’actualité/.test(al.t) && al.b.some((x) => /Retirer/.test(x)) && al.b.some((x) => /Garder/.test(x)) && /Retirée/.test(toast1)
+        && !ap.rules.some((x) => /Salle \(exemple\)/.test(x)) && !ap.alerte && av.big !== ap.big, JSON.stringify([av, al, toast1, ap]));
+      await ctx.close(); }
     /* aucune rubrique n'affiche de texte cassé */
     const broken = [];
     for (const t of ['accueil', 'demandes', 'agenda', 'suivi', 'achats', 'voyages', 'sorties', 'papiers', 'argent', 'equipe', 'automatisations', 'reglages']) {
