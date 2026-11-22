@@ -28,7 +28,7 @@ import {createRadar} from './radar.mjs';
 import {pique, PERSO_ORAL} from './humour.mjs';   /* 21/11/2026 : sa personnalité à l'oral (« sarcastique assumé ») */
 const ACT = createActivite();   /* 0.33.0 : ce que fait Claude à l'instant */
 
-const VERSION = '0.52.0';
+const VERSION = '0.53.0';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PORT = +(process.env.PORT || 8787);
 const HOST = process.env.HOST || '127.0.0.1';
@@ -37,6 +37,11 @@ const CLAUDE = process.env.CLAUDE_BIN || 'claude';
 const WEB = process.env.JARVIS_WEB || path.join(HERE, '..', 'web');
 const REPO = process.env.JARVIS_REPO || path.join(HERE, '..', '..');
 const OS_DIR = process.env.JARVIS_OS_DIR || path.join(REPO, 'essais', 'jarvis-os-maquette');   /* la nouvelle app (page Jarvis refondue), servie à /os/ en essai */
+/* 0.53.0 (son choix du 22/11/2026 : « Sur ton serveur ») : les maquettes, faites de données inventées, sont servies ici, le dépôt passant en
+   privé (GitHub Pages ne les publierait plus). /maquettes/ : la liste ; /maquettes/<nom>/ : le dossier essais/<dossier>/ du dépôt, à jour
+   après chaque « Mettre à jour ». Une nouvelle maquette = une entrée ici (son dossier entre dans MAJ_CHEMINS). */
+const MAQUETTES = {ux: {dossier: 'jarvis-os-ux', titre: 'Refonte UX de JARVIS'}};
+const ESSAIS = process.env.JARVIS_ESSAIS || path.dirname(OS_DIR);   /* le dossier essais/ du dépôt (celui de la nouvelle app) */
 const ORIGINS = (process.env.JARVIS_ORIGINS || 'https://rabiederouiche.github.io').split(',').map((s) => s.trim()).filter(Boolean);
 const AGENTS = ['claude', 'jarvis', ...BOT_IDS];
 const BOT_NAME = {jarvis: 'Iris', ...BOT_NOMS};   /* « Jarvis » (Grok) passe par Iris, point d'entrée */
@@ -1152,7 +1157,7 @@ let commit = ''; try { commit = execFileSync('git', ['-C', REPO, 'rev-parse', '-
 /* 0.27.0 (20/11/2026, « on a mis en place une mise à jour automatique sur Panier, fais pareil sur JARVIS ») : y a-t-il une version plus récente
    dans le dépôt ? Demandé par l'app à son lancement ; le serveur n'interroge le dépôt qu'une fois toutes les dix minutes. Seuls comptent les
    fichiers de l'app et du serveur : une fusion qui ne touche que la documentation ou les instructions ne propose rien. JARVIS_MAJ=0 coupe tout. */
-const MAJ = process.env.JARVIS_MAJ !== '0', MAJ_DELAI = +(process.env.JARVIS_MAJ_DELAI_MS || 600000), MAJ_CHEMINS = ['jarvis-os/server', 'jarvis-os/web', 'essais/jarvis-os-maquette'];
+const MAJ = process.env.JARVIS_MAJ !== '0', MAJ_DELAI = +(process.env.JARVIS_MAJ_DELAI_MS || 600000), MAJ_CHEMINS = ['jarvis-os/server', 'jarvis-os/web', 'essais/jarvis-os-maquette', ...Object.values(MAQUETTES).map((m) => 'essais/' + m.dossier)];
 let distant = {le: 0, dispo: false, version: '', nouveautes: 0}, majVerif = null, majEnCours = false;
 function majVerifie(force) {
   if (!MAJ) return Promise.resolve({dispo: false, actuelle: VERSION, commit});
@@ -1331,7 +1336,8 @@ async function tts(text) {
 }
 
 /* ---------- HTTP ---------- */
-const TYPES = {'.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.json': 'application/json', '.webmanifest': 'application/manifest+json'};
+const TYPES = {'.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.json': 'application/json', '.webmanifest': 'application/manifest+json',
+  '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.svg': 'image/svg+xml', '.webp': 'image/webp', '.woff2': 'font/woff2', '.md': 'text/plain; charset=utf-8'};
 function cors(req, res) {
   const o = req.headers.origin;
   if (o && ORIGINS.includes(o)) { res.setHeader('Access-Control-Allow-Origin', o); res.setHeader('Vary', 'Origin'); res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type'); res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS'); res.setHeader('Access-Control-Max-Age', '600'); }
@@ -1624,6 +1630,21 @@ const server = http.createServer(async (req, res) => {
     }
     /* les apps (16/11/2026) : la nouvelle (page Jarvis refondue) à la racine ; l'ancienne PWA à /ancienne/ (ses réglages avancés) ;
        /os/ (adresse d'essai) renvoie à la racine ; un fichier absent de la nouvelle app est cherché dans l'ancienne (ex. /confidentialite.html) */
+    const mq = p.match(/^\/maquettes(?:\/([a-z0-9-]+))?(\/.*)?$/);
+    if (mq) {
+      const ent = {'x-robots-tag': 'noindex', 'cache-control': 'no-cache'};
+      if (!mq[1]) { res.writeHead(200, {...ent, 'content-type': TYPES['.html']}); res.end('<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Maquettes de JARVIS</title>'
+        + '<body style="font-family:system-ui;margin:24px;background:#0b1020;color:#e8eefc"><h1 style="font-size:22px">Maquettes de JARVIS</h1><p style="color:#9fb0d0">Données inventées.</p><ul>'
+        + Object.entries(MAQUETTES).map(([k, m]) => '<li style="margin:10px 0"><a style="color:#7cc4ff" href="/maquettes/' + k + '/">' + m.titre + '</a></li>').join('') + '</ul></body>'); return; }
+      const m = MAQUETTES[mq[1]], r = mq[2] ? decodeURIComponent(mq[2]) : '';
+      if (!m || r.split('/').includes('..') || /(^|\/)(banc|tests?)(\.|\/|$)/.test(r)) { res.writeHead(404); res.end(); return; }
+      if (!r) { res.writeHead(301, {location: '/maquettes/' + mq[1] + '/' + url.search}); res.end(); return; }
+      const racine = path.join(ESSAIS, m.dossier); let f = path.normalize(path.join(racine, r));
+      if (!f.startsWith(racine + path.sep)) { res.writeHead(404); res.end(); return; }
+      if (r.endsWith('/')) f = path.join(f, 'index.html');
+      fs.readFile(f, (e, d) => { if (e) { res.writeHead(404); res.end(); return; } res.writeHead(200, {...ent, 'content-type': TYPES[path.extname(f).toLowerCase()] || 'application/octet-stream'}); res.end(d); });
+      return;
+    }
     if (p === '/os' || p.startsWith('/os/')) { res.writeHead(301, {location: '/' + p.slice(4) + url.search}); res.end(); return; }
     if (p === '/ancienne') { res.writeHead(302, {location: '/ancienne/'}); res.end(); return; }
     const old = p.startsWith('/ancienne/'), rel = decodeURIComponent(old ? p.slice('/ancienne'.length) : p);
