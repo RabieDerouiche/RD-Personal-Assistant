@@ -173,7 +173,7 @@ try {
     r = await T('Google Sheets', 'append_values', {spreadsheetId: 'PIL', range: 'Canal!A1', values: [['16/11/2026', 'Rabie', 'Iris', 'Info', 'Test', 'À faire', '', '']]}); let c = FG.calls.filter((x) => /:append$/.test(x.path)).pop();
     ok('Sheets append_values : ligne ajoutée, saisie comme dans Sheets', r.status === 200 && c.q.valueInputOption === 'USER_ENTERED' && c.q.insertDataOption === 'INSERT_ROWS' && c.body.values[0][4] === 'Test', JSON.stringify(c.q));
     r = await T('Google Sheets', 'update_values', {spreadsheetId: 'PIL', range: 'Échéances!F12', values: [['Fait']]}); c = FG.calls.filter((x) => x.method === 'PUT').pop(); ok('Sheets update_values', r.status === 200 && c.path.endsWith('Échéances!F12') && c.body.values[0][0] === 'Fait');
-    /* 0.57.0 (son choix du 22/11/2026) : un proche envoie une tâche avec Siri ; sa clé n'ouvre que deux adresses (prénoms inventés) */
+    /* 0.61.0 (son choix du 22/11/2026) : un proche envoie une tâche avec Siri ; sa clé n'ouvre que deux adresses (prénoms inventés) */
     { const cr = await G('/api/invites', {nom: 'Lina'}), k = cr.body.cle, IH = {authorization: 'Bearer ' + k, 'content-type': 'application/json'};
       ok('invité : invitation créée (clé montrée une fois, lien vers /invite/)', cr.status === 200 && /^[A-Za-z0-9_-]{30,}$/.test(k || '') && /\/invite\/#cle=/.test(cr.body.lien) && /\/api\/invite\/tache$/.test(cr.body.url), JSON.stringify(cr.body).slice(0, 160));
       const n0 = FG.calls.filter((x) => /:append$/.test(x.path)).length;

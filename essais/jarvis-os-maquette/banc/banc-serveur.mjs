@@ -96,7 +96,7 @@ try {
   await p.evaluate(() => [...document.querySelectorAll('#chat .msg.proposal .btn.main')].pop().click()); await p.waitForTimeout(1500);
   { const tk = await p.evaluate(() => JSON.parse(localStorage.getItem('jarvis.settings')).serverToken); const rl = await fetch(BASE + '/api/relances', {headers: {authorization: 'Bearer ' + tk}}).then((x) => x.json());
     ok('discussion : la relance confirmée est programmée sur le serveur', rl.prevues.some((x) => x.source === 'conversation' && x.ligne === 2 && /Iris a répondu au syndic/.test(x.quoi)), JSON.stringify(rl.prevues)); }
-  /* 0.57.0 (son choix du 22/11/2026) : un proche reçoit un lien d'invitation, ouvre sa page sur son iPhone, envoie une tâche et voit son statut (prénoms inventés) */
+  /* 0.61.0 (son choix du 22/11/2026) : un proche reçoit un lien d'invitation, ouvre sa page sur son iPhone, envoie une tâche et voit son statut (prénoms inventés) */
   { const tk = await p.evaluate(() => JSON.parse(localStorage.getItem('jarvis.settings')).serverToken);
     const iv = await fetch(BASE + '/api/invites', {method: 'POST', headers: {authorization: 'Bearer ' + tk, 'content-type': 'application/json'}, body: JSON.stringify({nom: 'Lina'})}).then((x) => x.json());
     const ci = await b.newContext({...devices['iPhone 15 Pro Max']}), qi = await ci.newPage(); qi.on('pageerror', (e) => errs.push('invité : ' + e.message));

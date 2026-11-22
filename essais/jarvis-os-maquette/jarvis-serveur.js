@@ -242,7 +242,7 @@
     radarSet: (cle, valeur) => req('/api/radar/set', {cle, valeur}).then((r) => { if (r.status !== 200) throw new Error((r.j && r.j.error) || 'Refusé'); return r.j; }),
     radarProposition: (id, oui, modif) => req('/api/radar/proposition', {id, oui, modif: modif || null}).then((r) => (r.status === 200 ? r.j : null)).catch(() => null),
     radarLire: () => req('/api/radar/lire', {}).then((r) => r.j || null).catch(() => null),
-    /* 0.57.0 : ses invitations (un proche qui lui envoie des tâches) */
+    /* 0.61.0 : ses invitations (un proche qui lui envoie des tâches) */
     invites: {liste: () => req('/api/invites').then((r) => (r.status === 200 ? r.j.invites : null)).catch(() => null), creer: (nom) => req('/api/invites', {nom}).then((r) => r.j).catch(() => null),
       retirer: (id) => req('/api/invites/' + id, null, 'DELETE').then((r) => r.status === 200).catch(() => false)},
     radarAlerte: (id, action) => req('/api/radar/alerte', {id, action}).then((r) => (r.status === 200 ? r.j : null)).catch(() => null),   /* 0.56.0 : Retirer / Garder une dépense qui finit */

@@ -5744,7 +5744,7 @@ void main(){
     const pap = rows('pap');
     if (pap) S.papiers = pap.filter((r) => r['Document']).map((r) => { const where = r['Où il est (lien Drive, ou « papier »)'] || ''; const url = (where.match(/https?:\/\/\S+/) || [])[0]; const q = P(r['Document'], r['Personne'], lvFrIso(r['Valable jusqu\'au']), where, r['Sert pour'], r['Remarque'], url); q.id = 'q:' + r._row; return q; });
     const tach = rows('tach');
-    if (tach) S.taches = tach.filter((r) => r['Tâche'] && !/^(fait|annul)/.test(lvLow(r['Statut']))).map((r) => ({id: 't:' + r._row, _row: r._row, title: r['Tâche'], n: lvFrIso(r['Pour le']) ? N(lvFrIso(r['Pour le'])) : null, de: /^De /.test(String(r['Remarque'] || '')) ? String(r['Remarque']).slice(3).trim() : ''}));   /* 0.57.0 : « de » un proche */
+    if (tach) S.taches = tach.filter((r) => r['Tâche'] && !/^(fait|annul)/.test(lvLow(r['Statut']))).map((r) => ({id: 't:' + r._row, _row: r._row, title: r['Tâche'], n: lvFrIso(r['Pour le']) ? N(lvFrIso(r['Pour le'])) : null, de: /^De /.test(String(r['Remarque'] || '')) ? String(r['Remarque']).slice(3).trim() : ''}));   /* 0.61.0 : « de » un proche */
     const jour = rows('jour');
     if (jour) S.activite = jour.slice(-40).map((r, i) => ({r, i, s: lvStamp(r['Date et heure'])})).sort((a, b) => (b.s && a.s ? b.s - a.s : 0) || b.i - a.i).slice(0, 15).map(({r, s}) => { return {bot: lvBot(r['Bot']), when: s ? fmt(s, {day: '2-digit', month: '2-digit'}) + ' · ' + pad2(s.getHours()) + 'h' + pad2(s.getMinutes()) : r['Date et heure'], text: (r['Sujet'] ? r['Sujet'] + ' : ' : '') + r['Détail'], fresh: !!(s && now - s < 86400000), s: s ? s.getTime() : null}; }); /* JARVIS OS : s = heure exacte */
     /* achats : une famille par marque, ses modèles, leur dernier prix (onglet Prix, sinon onglet Relevés) */
@@ -9351,7 +9351,7 @@ void main(){
         h('button', {type: 'button', class: 'btn ghost danger', onclick: async () => { await JS.raccourci.retirer(); VIEWS_RELOAD_SIRI(); }}, 'Retirer')), out);
     return card;
   }
-  /* JARVIS OS 0.57.0 (son choix du 22/11/2026) : un proche (sa femme) lui envoie des tâches depuis son iPhone, avec Siri. Sa clé, dans le lien
+  /* JARVIS OS 0.61.0 (son choix du 22/11/2026) : un proche (sa femme) lui envoie des tâches depuis son iPhone, avec Siri. Sa clé, dans le lien
      d'invitation, n'ouvre que deux adresses : ajouter une tâche, voir le statut des siennes. Il crée et retire l'accès ici. */
   async function inviteCard(JS) {
     const card = h('section', {class: 'card set-card invite-card'}, h('b', {text: 'Tâches envoyées par un proche'}));
@@ -9616,7 +9616,7 @@ void main(){
       /* JARVIS OS 0.12.0 : notifications envoyées par le serveur (un bot a répondu, rappels du matin, Grok reparti) */
       if (JS.push) parts.push(await notifCard(JS, msg, () => draw()));
       if (JS.raccourci) parts.push(await siriCard(JS));
-      if (JS.invites) parts.push(await inviteCard(JS));   /* 0.57.0 : un proche lui envoie des tâches */ /* JARVIS OS 0.13.0 : Siri et bouton Action */
+      if (JS.invites) parts.push(await inviteCard(JS));   /* 0.61.0 : un proche lui envoie des tâches */ /* JARVIS OS 0.13.0 : Siri et bouton Action */
       if (JS.tour) parts.push(await tourCard(JS)); /* JARVIS OS 0.15.0 : tour de Claude */
       if (JS.sauvegarde) parts.push(await savCard(JS)); /* JARVIS OS 0.14.0 : sauvegarde de Pilotage */
       if (JS.mcp) { const mc = await mcpCard(JS); if (mc.dataset.urgent) parts.unshift(mc); else parts.push(mc); } /* JARVIS OS 0.39.0 : assistants reliés (en tête si une demande attend) */
