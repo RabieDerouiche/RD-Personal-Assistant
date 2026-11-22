@@ -22,17 +22,21 @@ srv.listen(0, async () => {
   const noOverflow = () => p.evaluate(() => { const w = document.documentElement.clientWidth; const bad = [...document.querySelectorAll('#view *, .bar *, .top *')].filter((e) => { const r = e.getBoundingClientRect(); return r.width && (r.right > w + 1 || r.left < -1); }).map((e) => e.className || e.tagName); return {scroll: document.documentElement.scrollWidth <= w, bad: bad.slice(0, 4)}; });
   const minFont = () => p.evaluate(() => Math.min(...[...document.querySelectorAll('#view *')].filter((e) => e.childNodes.length && [...e.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim())).map((e) => parseFloat(getComputedStyle(e).fontSize))));
   try {
-    await p.goto(base); await p.waitForTimeout(1200);
+    await p.goto(base); await p.waitForTimeout(500);
+    const parle = await p.evaluate(() => { const g = document.querySelector('.home-globe'); return g && g.dataset.s; }); await p.waitForTimeout(3600);
     W = await p.evaluate(() => innerWidth);   /* après le chargement : sur une page vide, l'émulation mobile donne 980 px */
     /* navigation : 5 portes, appui seulement */
     const tabs = await p.evaluate(() => [...document.querySelectorAll('.bar .tab')].map((t) => [t.textContent.replace(/\d+$/, '').trim(), Math.round(t.getBoundingClientRect().height), Math.round(t.getBoundingClientRect().width)]));
     ok('barre : 4 onglets (Aujourd’hui, Pour moi, Agenda, Espaces) et l’orbe au centre, cibles de 44 px au moins', tabs.map((t) => t[0]).join(',') === 'Aujourd’hui,Pour moi,Agenda,Espaces' && tabs.every((t) => t[1] >= 44 && t[2] >= 44) && await p.evaluate(() => document.querySelector('.bar-in').children[2].classList.contains('orb-tab')), JSON.stringify(tabs));
+    ok('accueil : le globe parle pendant que la phrase s’écrit', parle === 'speaking', parle);
     ok('plus de menu « Tout » ni de poignée', await p.evaluate(() => !document.querySelector('.all-sheet, .fav-handle')));
     /* retouches du 21/11 : orbe vivante, personnages, photos */
     const globe = (sel) => p.evaluate((s) => { const c = document.querySelector(s + ' canvas'); if (!c) return null; const g = c.getContext('2d'), d = g.getImageData(0, 0, c.width, c.height).data; let lit = 0; for (let i = 3; i < d.length; i += 16) if (d[i] > 40) lit++; return {w: c.width, cw: c.clientWidth, lit, url: c.toDataURL().length}; }, sel);
     const g1 = await globe('.orb-tab'), h1 = await globe('.home-globe'); await p.waitForTimeout(400); const g2 = await globe('.orb-tab');
     ok('orbe de la barre : le globe réseau, dessiné en haute résolution (2 à 3 pixels par point) et animé', g1 && g1.w >= g1.cw * 2 && g1.lit > 50 && g2.url !== g1.url, JSON.stringify([g1, g2 && g2.url]));
-    ok('accueil : le globe sur son socle', h1 && h1.lit > 200, JSON.stringify(h1));
+    ok('accueil : l’écran de JARVIS (globe et ses anneaux, l’heure qui défile, 4 relevés reliés au globe), sans le bloc bleu', h1 && h1.lit > 400 && await p.evaluate(() => !document.querySelector('#view .card.hero') && document.querySelectorAll('.hud .ro').length === 4 && document.querySelectorAll('.hud-lines path').length === 4 && /^\d\d:\d\d\d\d$/.test(document.getElementById('hud-clock').textContent)), JSON.stringify(h1));
+    { const c1 = await p.evaluate(() => document.getElementById('hud-clock').textContent); await p.waitForTimeout(1100); const c2 = await p.evaluate(() => document.getElementById('hud-clock').textContent);
+      ok('accueil : JARVIS dit le point du jour à l’ouverture (texte qui s’écrit, globe qui parle), puis se tait ; les secondes défilent', c1 !== c2 && await p.evaluate(() => /Cinq décisions/.test(document.getElementById('hud-say').textContent) && document.querySelector('.home-globe').dataset.s === 'idle'), c1 + ' → ' + c2); }
     await p.screenshot({path: path.join(SH, '1-aujourdhui.png')});
     const screens = [['auj', 'tab:auj'], ['moi', 'tab:moi'], ['agenda', 'tab:agenda'], ['espaces', 'tab:espaces']];
     for (const [id] of screens) {
