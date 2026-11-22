@@ -665,7 +665,30 @@ srv.listen(0, async () => {
         pr0.length === 3 && pr0.some((x) => /Stockage en ligne/.test(x) && /le 14 de chaque mois · vue 12 fois, depuis 11\/2025/.test(x)) && pr1.props === 1 && pr1.rules === 18 && pr1.deja.some((x) => /^lun\. 16\/11 Stockage en ligne Abonnements · décalé du sam\. 14\/11 1,99 €$/.test(x)), JSON.stringify([pr0, pr1]));
       ok('Reste à payer : une dépense « montant à compléter » (vers le 5 de chaque mois) s\'ajoute en saisissant son montant (310 €)', pr0.some((x) => /Garde d’enfant/.test(x) && /vers le 5 de chaque mois/.test(x) && /montant à compléter/.test(x)) && vide === '' && pr2.props === 0 && pr2.rules.length === 19
         && pr2.rules.some((x) => /Garde d’enfant \(exemple\) .*310,00 €/.test(x)), JSON.stringify([vide, pr2]));
+      /* 0.50.0 : la preuve de chaque proposition (dernier mail) ; les raccourcis pour ce qu'aucun mail n'annonce */
+      ok('Reste à payer : chaque dépense proposée montre son dernier mail (objet et date)', pr0.every((x) => /Dernier mail : « .+ », le \d\d\/\d\d/.test(x)), JSON.stringify(pr0));
+      const rac0 = await q.evaluate(() => [...document.querySelectorAll('.rad-raccourci')].map((x) => x.textContent));
+      await q.evaluate(() => [...document.querySelectorAll('.rad-raccourci')].find((x) => /Mutuelle/.test(x.textContent)).click()); await q.waitForTimeout(700);
+      const nomPre = await q.evaluate(() => document.querySelector('.rad-form input[type="text"]').value);
+      await q.fill('.rad-form input[inputmode="decimal"]', '24'); await q.fill('.rad-form input[type="number"]', '3'); await q.evaluate(() => document.querySelector('.rad-form button[type="submit"]').click()); await q.waitForTimeout(700);
+      const rac1 = await q.evaluate(() => ({chips: [...document.querySelectorAll('.rad-raccourci')].map((x) => x.textContent), rules: [...document.querySelectorAll('.rad-rule')].map((x) => x.innerText.replace(/\s+/g, ' '))}));
+      ok('Reste à payer : raccourcis « sans mail » (crédit déjà là : pas proposé ; « + Mutuelle » ouvre la feuille au nom écrit, et disparaît une fois ajoutée)', !rac0.some((x) => /Crédit immobilier/.test(x)) && rac0.some((x) => /Mutuelle/.test(x)) && nomPre === 'Mutuelle'
+        && !rac1.chips.some((x) => /Mutuelle/.test(x)) && rac1.rules.some((x) => /^Mutuelle le 3 de chaque mois · ajouté par toi 24,00 €$/.test(x)), JSON.stringify([rac0, nomPre, rac1.chips]));
       await q.screenshot({path: path.join(SH, 'radar-reste.png')}); await ctx.close(); }
+    /* 0.51.0 : la facture du mois annoncée remplace l'habituel ; une dépense qui commence plus tard (impôts mensualisés) ne compte pas avant
+       (lundi 23/11/2026, paie du 28 avancée au 27 ; dépenses d'exemple posées dans le téléphone) */
+    { const ctx = await b.newContext({...devices['iPhone 15 Pro Max']}); await ctx.addInitScript(PAUSE_INIT);
+      await ctx.addInitScript(() => { try { localStorage.setItem('jarvis.radar.reste', JSON.stringify({jusqua: 'paie', fx: [
+        {id: 'td', service: 'Impôts (exemple)', cat: 'Impôts', montant: 90, jour: 25, rythme: 'mensuel', source: 'mail', debut: '2027-01-15'},
+        {id: 'tp', service: 'Téléphone (exemple)', cat: 'Télécoms', montant: 16, jour: 25, rythme: 'mensuel', source: 'mail', estime: true, variable: true, prochain: {date: '2026-11-26', montant: 87.5}}]})); } catch (e) { /* rien */ } });
+      const q = await ctx.newPage(); q.on('pageerror', (e) => errs.push('radar 0.51 : ' + e.message));
+      await q.clock.setFixedTime(new Date('2026-11-23T10:00:00')); await q.goto(base + '#argent'); await q.waitForTimeout(3000);
+      const r = await q.evaluate(() => ({big: document.querySelector('.rad-big').textContent, rows: [...document.querySelectorAll('.rad-fixes > .panel:first-child .rad-fx')].map((x) => x.innerText.replace(/\s+/g, ' ').trim()),
+        rules: [...document.querySelectorAll('.rad-rule')].map((x) => x.innerText.replace(/\s+/g, ' ').trim()), large: document.documentElement.scrollWidth <= innerWidth + 1}));
+      ok('Radar 0.51 : la facture du mois annoncée (87,50 € le 26/11) remplace l\'habituel (16 €, estimé) ; une dépense qui commence en janvier ne compte pas en novembre et le dit (« à partir du 15/01/2027 »)',
+        r.big === '117,05 €' && r.rows.some((x) => /Téléphone \(exemple\)/.test(x) && /87,50 €/.test(x) && !/≈/.test(x)) && !r.rows.some((x) => /Impôts/.test(x)) && r.rules.some((x) => /Impôts \(exemple\)/.test(x) && /à partir du 15\/01\/2027/.test(x))
+        && r.rules.some((x) => /Téléphone \(exemple\)/.test(x) && /facture du mois : 87,50 €/.test(x)) && r.large, JSON.stringify(r));
+      await q.screenshot({path: path.join(SH, 'radar-051.png')}); await ctx.close(); }
     /* aucune rubrique n'affiche de texte cassé */
     const broken = [];
     for (const t of ['accueil', 'demandes', 'agenda', 'suivi', 'achats', 'voyages', 'sorties', 'papiers', 'argent', 'equipe', 'automatisations', 'reglages']) {
