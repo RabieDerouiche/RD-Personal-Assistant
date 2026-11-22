@@ -106,6 +106,47 @@ function pair(code, device) {
 const authed = (req) => { const m = /^Bearer (.+)$/.exec(req.headers.authorization || ''); if (!m) return false; const h = sha(m[1]); return S.tokens.some((t) => t.hash === h); };
 const deviceOf = (req) => { const m = /^Bearer (.+)$/.exec(req.headers.authorization || ''); const t = m && S.tokens.find((x) => x.hash === sha(m[1])); return t ? t.hash.slice(0, 12) : ''; };
 
+/* ---------- 0.57.0 (son choix du 22/11/2026) : un proche (sa femme) envoie une tâche à JARVIS depuis son iPhone, « Dis Siri, tâche pour… » ----------
+   Sa clé n'ouvre que deux adresses : ajouter une tâche, voir le statut des siennes. Rien d'autre de JARVIS (mails, agenda, Radar, mémoire) ne lui est
+   lisible. La tâche va dans l'onglet Tâches de Pilotage, marquée « De <prénom> », et une notification part sur les appareils reliés. */
+const inviteDe = (req) => { const m = /^Bearer (.+)$/.exec(req.headers.authorization || ''); if (!m) return null; const h = sha(m[1]); return (S.invites || []).find((x) => x.hash === h) || null; };
+function datePour(texte, ref) {   /* « demain », « vendredi », « le 12 décembre », « dans 3 jours » → AAAA-MM-JJ (heure de Paris) */
+  const s = String(texte || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[’‘]/g, "'").toLowerCase(), p = ref || paris(new Date(now())), t0 = Date.UTC(p.y, p.m - 1, p.d), J = 864e5, iso = (ms) => new Date(ms).toISOString().slice(0, 10);
+  const MOIS = ['janvier', 'fevrier', 'mars', 'avril', 'mai', 'juin', 'juillet', 'aout', 'septembre', 'octobre', 'novembre', 'decembre'], JOURS = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
+  if (/\bapres[- ]demain\b/.test(s)) return iso(t0 + 2 * J);
+  if (/\bdemain\b/.test(s)) return iso(t0 + J);
+  if (/\b(aujourd'hui|ce soir|ce midi|cet apres-midi)\b/.test(s)) return iso(t0);
+  const dm = s.match(new RegExp('\\b(\\d{1,2})(?:er)? (' + MOIS.join('|') + ')\\b'));
+  if (dm && +dm[1] >= 1 && +dm[1] <= 31) { let ms = Date.UTC(p.y, MOIS.indexOf(dm[2]), +dm[1]); if (ms < t0) ms = Date.UTC(p.y + 1, MOIS.indexOf(dm[2]), +dm[1]); return iso(ms); }
+  const dn = s.match(/\ble (\d{1,2})(?:er)?\b(?! ?(h\b|heures?|€|euros?|%|ans?\b))/);
+  if (dn && +dn[1] >= 1 && +dn[1] <= 31) { let ms = Date.UTC(p.y, p.m - 1, +dn[1]); if (ms < t0) ms = Date.UTC(p.y, p.m, +dn[1]); return iso(ms); }
+  const dans = s.match(/\bdans (\d{1,2}) jours?\b/); if (dans) return iso(t0 + (+dans[1]) * J);
+  const wj = s.match(/\b(dimanche|lundi|mardi|mercredi|jeudi|vendredi|samedi)\b/);
+  if (wj) { let k = (JOURS.indexOf(wj[1]) - new Date(t0).getUTCDay() + 7) % 7; if (k === 0) k = 7; return iso(t0 + k * J); }
+  if (/\bla semaine prochaine\b/.test(s)) { const k = (8 - new Date(t0).getUTCDay()) % 7 || 7; return iso(t0 + k * J); }
+  return null;
+}
+const frJour = (iso) => String(iso).slice(0, 10).split('-').reverse().join('/');
+function pourQuand(iso) {   /* « pour demain », « pour vendredi 28 novembre » */
+  const p = paris(new Date(now())), t0 = Date.UTC(p.y, p.m - 1, p.d), [y, m, d] = iso.split('-').map(Number), k = Math.round((Date.UTC(y, m - 1, d) - t0) / 864e5);
+  if (k === 0) return "pour aujourd'hui"; if (k === 1) return 'pour demain'; if (k === 2) return 'pour après-demain';
+  return 'pour ' + new Intl.DateTimeFormat('fr-FR', {timeZone: 'UTC', weekday: 'long', day: 'numeric', month: 'long'}).format(new Date(Date.UTC(y, m - 1, d)));
+}
+async function ecrireTacheInvitee(tc) {   /* dans Pilotage, onglet Tâches : la ligne de la page (« Ajoutée le », « Tâche », « Pour le », « Statut », « Remarque ») */
+  const inv = (S.invites || []).find((x) => x.id === tc.inv); if (!inv || !GG.status('').linked) return false;
+  try {
+    const p = paris(new Date(tc.at)), r = await GG.tool('Google Sheets', 'append_values', {spreadsheetId: PILOTAGE, range: 'Tâches!A1', values: [[frJour(p.ymd), tc.texte, tc.pour ? frJour(tc.pour) : '', 'À faire', 'De ' + inv.nom]]});
+    const m = /![A-Z]+(\d+)/.exec(String((r && r.updates && r.updates.updatedRange) || '')); tc.row = m ? +m[1] : 0; save(); return true;
+  } catch (e) { console.log('invité : tâche pas encore écrite (' + String(e.message || e).slice(0, 120) + ')'); return false; }
+}
+let tachesCache = {at: 0, rows: null};
+async function tachesPilotage() {
+  if (tachesCache.rows && now() - tachesCache.at < 30000) return tachesCache.rows;
+  const r = await GG.tool('Google Sheets', 'get_values', {spreadsheetId: PILOTAGE, range: 'Tâches!A1:E500'}); tachesCache = {at: now(), rows: (r && r.values) || []}; return tachesCache.rows;
+}
+/* une tâche pas encore écrite (Google pas relié, panne) : réessayée toutes les 5 minutes pendant 7 jours */
+setInterval(() => { for (const tc of (S.invTaches || []).filter((x) => x.row === null && now() - x.at < 7 * 864e5)) ecrireTacheInvitee(tc).catch(() => {}); }, 300000).unref();
+
 /* ---------- Claude Code ---------- */
 const childEnv = () => { const e = {...process.env}; for (const k of PAID_ENV) delete e[k]; return e; };
 const SYSTEM = `Tu es JARVIS, l'assistant vocal personnel du propriétaire, dans son app JARVIS OS sur iPhone. Tu parles français et tu le tutoies.
@@ -1386,6 +1427,28 @@ const server = http.createServer(async (req, res) => {
       S.usage.raccourcis = (S.usage.raccourcis || 0) + 1; if (S.raccourci) { S.raccourci.uses = (S.raccourci.uses || 0) + 1; S.raccourci.last = now(); } save();
       return say(r.ok ? 200 : 502, r.ok ? relancesDuTexte(r.text, 'siri').text : r.error);   /* « rappelle-moi… » : la relance est notée, la ligne technique n'est pas lue */
     }
+    /* 0.57.0 : les adresses de l'invitée, avec sa propre clé ; la réponse d'un ajout est une phrase, lue par Siri */
+    if (p === '/api/invite/tache' && req.method === 'POST') {
+      const say = (st, x) => { res.writeHead(st, {'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store'}); res.end(x); };
+      const inv = inviteDe(req); if (!inv) return say(401, 'Clé refusée : demande une nouvelle invitation.');
+      const b = await readBody(req).catch(() => ({})), texte = String((b && (b.texte || b.text)) || '').replace(/[\u0000-\u001f\u007f]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 200);
+      if (texte.length < 2) return say(400, "Je n'ai rien entendu : redis ta tâche.");
+      inv.recents = (inv.recents || []).filter((x) => now() - x < 3600000); if (inv.recents.length >= 30) return say(429, 'Trop de tâches en une heure : réessaie plus tard.');
+      inv.recents.push(now()); inv.uses = (inv.uses || 0) + 1; inv.last = now();
+      const pour = /^\d{4}-\d{2}-\d{2}$/.test(String(b.pour || '')) ? String(b.pour) : datePour(texte);
+      const tc = {id: crypto.randomBytes(6).toString('hex'), inv: inv.id, texte, ...(pour ? {pour} : {}), at: now(), row: null};
+      S.invTaches = [...(S.invTaches || []), tc].slice(-300); save();
+      await ecrireTacheInvitee(tc); tachesCache.at = 0;
+      if (S.push && S.push.subs.length) PUSH.send({title: 'Tâche de ' + inv.nom, body: texte + (pour ? ' (' + pourQuand(pour) + ')' : ''), url: '/#taches', tag: 'invite-' + tc.id}).catch(() => {});
+      return say(200, 'C’est noté : « ' + texte + ' »' + (pour ? ', ' + pourQuand(pour) : '') + '.');
+    }
+    if (p === '/api/invite/taches' && req.method === 'GET') {
+      const inv = inviteDe(req); if (!inv) return json(res, 401, {error: 'Clé refusée : demande une nouvelle invitation.'});
+      let rows = []; try { if (GG.status('').linked) rows = await tachesPilotage(); } catch { rows = []; }
+      const statut = (tc) => { const r = tc.row ? rows[tc.row - 1] : null; if (r && String(r[1] || '').trim() === tc.texte) return String(r[3] || 'À faire');
+        const f = rows.find((x) => String(x[1] || '').trim() === tc.texte && String(x[4] || '') === 'De ' + inv.nom); return f ? String(f[3] || 'À faire') : tc.row === null ? 'Pas encore arrivée' : 'À faire'; };
+      return json(res, 200, {nom: inv.nom, taches: (S.invTaches || []).filter((x) => x.inv === inv.id).slice(-30).reverse().map((x) => ({texte: x.texte, pour: x.pour || '', at: x.at, statut: statut(x)}))});
+    }
     if (p === '/api/google/callback') { const r = await GG.callback(url.searchParams); if (r.ok) { S.googleVu = true; save(); } res.writeHead(r.ok ? 200 : 400, {'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'referrer-policy': 'no-referrer'}); res.end(googlePage(r)); return; }
     if (await JMCP.traiter(req, res, p, url)) return;   /* 0.39.0 : /mcp, /oauth/…, /.well-known/… (leur propre accès) */
     if (p.startsWith('/api/')) {
@@ -1504,6 +1567,15 @@ const server = http.createServer(async (req, res) => {
       /* clé des Raccourcis : créée ici depuis l'app reliée, montrée une seule fois, jamais stockée en clair ; recréer retire l'ancienne */
       if (p === '/api/raccourci/cle' && req.method === 'POST') { const k = crypto.randomBytes(24).toString('base64url'); S.raccourci = {hash: sha(k), at: now(), uses: 0}; save(); return json(res, 200, {cle: k, url: publicBase(req) + '/api/raccourci'}); }
       if (p === '/api/raccourci/retirer' && req.method === 'POST') { S.raccourci = null; save(); return json(res, 200, {ok: true}); }
+      /* 0.57.0 : ses invitations : créer (la clé n'est montrée qu'une fois, dans le lien), lister, retirer */
+      if (p === '/api/invites' && req.method === 'GET') return json(res, 200, {invites: (S.invites || []).map((x) => ({id: x.id, nom: x.nom, at: x.at, uses: x.uses || 0, last: x.last || 0, taches: (S.invTaches || []).filter((y) => y.inv === x.id).length}))});
+      if (p === '/api/invites' && req.method === 'POST') {
+        const b = await readBody(req), nom = String(b.nom || '').replace(/[<>"\u0000-\u001f]/g, '').trim().slice(0, 30); if (!nom) return json(res, 400, {error: 'Son prénom manque.'});
+        if ((S.invites || []).length >= 10) return json(res, 400, {error: 'Dix invitations au plus : retires-en une.'});
+        const k = crypto.randomBytes(24).toString('base64url'), x = {id: crypto.randomBytes(5).toString('hex'), nom, hash: sha(k), at: now(), uses: 0}; S.invites = [...(S.invites || []), x]; save();
+        return json(res, 200, {id: x.id, nom, cle: k, url: publicBase(req) + '/api/invite/tache', lien: publicBase(req) + '/invite/#cle=' + k});
+      }
+      { const mi = p.match(/^\/api\/invites\/([a-f0-9]{6,20})$/); if (mi && req.method === 'DELETE') { S.invites = (S.invites || []).filter((x) => x.id !== mi[1]); save(); return json(res, 200, {ok: true}); } }
       if (p === '/api/raccourci/etat') return json(res, 200, {active: !!S.raccourci, at: S.raccourci && S.raccourci.at, uses: (S.raccourci && S.raccourci.uses) || 0, last: S.raccourci && S.raccourci.last, url: publicBase(req) + '/api/raccourci'});
       if (p === '/api/push/subscribe' && req.method === 'POST') { const b = await readBody(req); const r = PUSH.subscribe(b.subscription, deviceOf(req), 'https://' + String(req.headers.host || 'jarvis.invalid').split(':')[0]);   /* sujet VAPID : toujours une adresse https (Apple refuse un sujet http) */ if (r.ok) NOTIFY.tick({only: 'canal', force: true}).catch(() => {}); return json(res, r.ok ? 200 : 400, r); }
       if (p === '/api/push/unsubscribe' && req.method === 'POST') { const b = await readBody(req); return json(res, 200, PUSH.unsubscribe(String(b.endpoint || ''))); }

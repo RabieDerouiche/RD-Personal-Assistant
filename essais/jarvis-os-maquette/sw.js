@@ -10,7 +10,7 @@ self.addEventListener('message', (e) => { if (e.data && e.data.type === 'active'
 self.addEventListener('activate', (e) => { e.waitUntil(caches.keys().then((ks) => Promise.all(ks.filter((k) => k !== CACHE).map((k) => caches.delete(k)))).then(() => self.clients.claim())); });
 self.addEventListener('fetch', (e) => {
   const u = new URL(e.request.url);
-  if (e.request.method !== 'GET' || u.origin !== location.origin || u.pathname.startsWith('/api/') || u.pathname.startsWith('/ancienne/') || u.pathname.startsWith('/courses') || u.pathname.startsWith('/maquettes')) return;   /* /maquettes : les maquettes servies par le serveur (0.53.0) ; /courses : l'app Panier, qui a son propre service */
+  if (e.request.method !== 'GET' || u.origin !== location.origin || u.pathname.startsWith('/api/') || u.pathname.startsWith('/ancienne/') || u.pathname.startsWith('/courses') || u.pathname.startsWith('/maquettes') || u.pathname.startsWith('/invite')) return;   /* /maquettes : les maquettes servies par le serveur (0.53.0) ; /invite : la page d'un proche (0.57.0) ; /courses : l'app Panier, qui a son propre service */
   const garde = () => caches.match(e.request).then((m) => m || (e.request.mode === 'navigate' ? caches.match('./index.html') : null));
   e.respondWith(fetch(e.request).then((r) => { if (r.ok) { const copy = r.clone(); caches.open(CACHE).then((c) => c.put(e.request, copy)).catch(() => {}); return r; } return r.status >= 500 ? garde().then((m) => m || r) : r; })
     .catch(() => garde().then((m) => m || caches.match('./index.html'))));
