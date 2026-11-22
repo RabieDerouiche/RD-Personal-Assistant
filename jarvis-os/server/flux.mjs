@@ -38,8 +38,9 @@ export function routeur(texte) {
 /* 0.60.0 (sa demande : « la gestion des tâches par la voix doit être plus sharp, pas grave si ça consomme plus de jetons ») : en conversation
    à la voix, jamais Haiku. Une action à faire (ajouter, noter, rappeler, programmer, envoyer, prévenir un bot…), une réflexion ou une
    question longue → Opus, le plus sûr pour comprendre et agir ; le reste → Sonnet. L'heure, la météo, l'agenda restent instantanés (sans IA). */
-/* 0.61.0 (« rapidité, fluidité ») : une action simple (ajouter, cocher, reporter une tâche, un rappel) → Sonnet, plus rapide et sûr pour cela ;
-   un ordre à un bot, plusieurs actions d'un coup, une réflexion, une demande longue → Opus */
+/* 0.61.0 : une action simple → Sonnet, le reste → Opus. 0.63.0 (son choix : « je préfère une réflexion solide et juste qu'une réponse
+   rapide, travaille sur la qualité ») : la conversation à la voix n'utilise plus ce routeur, elle a toujours Opus qui réfléchit (voir PENSE) ;
+   il reste pour mémoire et pour ses tests */
 const ACTIONS_VOIX = /\b(ajoute[rz]?|note[rz]?|rappelle[rz]?|programme[rz]?|planifie[rz]?|envoie[rz]?|cree[rz]?|organise[rz]?|prepare[rz]?|confie[rz]?|retiens|reporte[rz]?|decale[rz]?|deplace[rz]?|supprime[rz]?|annule[rz]?|coche[rz]?|termine[rz]?|relance[rz]?|change[rz]?|modifie[rz]?)\b/g;
 export function routeurVoix(texte) {
   const t = String(texte || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[’']/g, ' ');
@@ -49,6 +50,10 @@ export function routeurVoix(texte) {
   return 'default';
 }
 
+/* 0.63.0 : la discussion avec Claude (à la voix « voix », à l'écrit « juste ») : Opus, effort élevé, réflexion permise ; « Rapide » et les
+   petites lectures de la page gardent l'effort réduit, sans réflexion */
+export const PENSE = {effort: 'high'};
+
 export function createFlux({bin, env, settings, cwd, conso, models, friendly, dateLigne, activite, maxActifs = 2, inactifMs = 15 * 60000, ageMaxMs = 2 * 3600000, timeoutMs = 120000, memLibre = () => os.freemem(), prepMem = +process.env.JARVIS_PREP_MEM || 900e6}) {
   const now = () => Date.now();
   const CONV = {};   /* par modèle : la conversation de la discussion {p, cle, qs (empreintes de ses questions)} */
@@ -57,13 +62,14 @@ export function createFlux({bin, env, settings, cwd, conso, models, friendly, da
   const prendre = () => new Promise((ok) => { if (actifs < maxActifs) { actifs++; ok(); } else attente.push(ok); });
   const rendre = () => { const n = attente.shift(); if (n) n(); else actifs--; };
 
-  function lancer(model) {
+  function lancer(model, pense) {
     const args = ['-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose', '--include-partial-messages',
-      '--model', model, '--effort', 'low', '--system-prompt', FIXE, '--tools', '', '--strict-mcp-config', '--settings', settings()];
+      '--model', model, '--effort', pense ? PENSE.effort : 'low', '--system-prompt', FIXE, '--tools', '', '--strict-mcp-config', '--settings', settings()];
     if (SECOURS[model] && process.env.JARVIS_SECOURS !== '0') args.push('--fallback-model', SECOURS[model]);
     try { fs.mkdirSync(cwd, {recursive: true}); } catch { /* rien */ }
     let child;
-    try { child = spawn(bin, args, {cwd, env: {...env(), MAX_THINKING_TOKENS: '0'}, stdio: ['pipe', 'pipe', 'pipe']}); } catch { return null; }
+    const e0 = {...env()}; if (pense) delete e0.MAX_THINKING_TOKENS; else e0.MAX_THINKING_TOKENS = '0';   /* 0.63.0 : la voix réfléchit */
+    try { child = spawn(bin, args, {cwd, env: e0, stdio: ['pipe', 'pipe', 'pipe']}); } catch { return null; }
     const p = {child, model, ne: now(), vu: now(), buf: '', err: '', mort: false, t: null, chaine: Promise.resolve()};
     child.on('error', () => { p.mort = true; finTour(p, {ok: false, error: 'Claude Code introuvable sur le serveur.'}); });
     child.on('close', () => { p.mort = true; finTour(p, {ok: false, error: friendly(p.err || "Claude s'est arrêté.")}); });
@@ -128,11 +134,11 @@ export function createFlux({bin, env, settings, cwd, conso, models, friendly, da
   async function demander({tier, system, input, conv, onDelta, coupe}) {
     const msgs = lire(input);
     if (!msgs.length) return {ok: false, error: 'Demande vide.'};
-    const prof = tier === 'auto' ? routeur(msgs[msgs.length - 1].text) : tier === 'voix' ? routeurVoix(msgs[msgs.length - 1].text) : tier, model = models[prof] || models.default;   /* 0.33.0 : « Auto » ; 0.60.0 : « voix » */
+    const pense = tier === 'voix' || tier === 'juste', prof = tier === 'auto' ? routeur(msgs[msgs.length - 1].text) : pense ? 'deep' : tier, model = models[prof] || models.default, mk = model + (pense ? '+pense' : '');   /* 0.33.0 : « Auto » ; 0.63.0 : « voix » = Opus qui réfléchit */
     const act = activite ? activite.debut({genre: 'page', titre: msgs[msgs.length - 1].text, modele: model}) : null;
     let p, blocs, ponctuel = false, reprise = false;
     if (conv && msgs.length >= 2 && msgs[msgs.length - 1].role === 'user') {
-      const cle = cleDe(model, system, msgs[0].text), qs = msgs.slice(1).filter((m) => m.role === 'user').map((m) => empreinte(m.text)), c = CONV[model];
+      const cle = cleDe(mk, system, msgs[0].text), qs = msgs.slice(1).filter((m) => m.role === 'user').map((m) => empreinte(m.text)), c = CONV[mk];
       /* 0.36.0 : des échanges ont pu se glisser entre deux questions sans passer par lui (réponses instantanées des mains libres :
          l'heure, la météo…) : il les reçoit avec la question, sans relancer la discussion */
       if (c && !c.p.mort && c.cle === cle && qs.length > c.qs.length && c.qs.every((x, i) => x === qs[i]) && now() - c.p.ne < ageMaxMs) {
@@ -142,26 +148,26 @@ export function createFlux({bin, env, settings, cwd, conso, models, friendly, da
         p = c.p; c.qs = qs; reprise = true;
         blocs = [dateLigne() + (entre.length ? '[Entre-temps, JARVIS a répondu seul, sans toi]\n' + aplatir(entre) + '\n\n' : '') + '[Question]\n' + msgs[msgs.length - 1].text];
       } else {
-        fermer(model);
-        p = lancer(model); if (!p) return {ok: false, error: 'Claude Code introuvable sur le serveur.'};
-        CONV[model] = {p, cle, qs};
+        fermer(mk);
+        p = lancer(model, pense); if (!p) return {ok: false, error: 'Claude Code introuvable sur le serveur.'};
+        CONV[mk] = {p, cle, qs};
         blocs = [consigneDe(system) + '\n\n[Données de la page]\n' + msgs[0].text, dateLigne() + '[Question]\n' + aplatir(msgs.slice(1))];
       }
     } else {
       await prendre(); ponctuel = true;
-      p = lancer(model); if (!p) { rendre(); return {ok: false, error: 'Claude Code introuvable sur le serveur.'}; }
+      p = lancer(model, pense); if (!p) { rendre(); return {ok: false, error: 'Claude Code introuvable sur le serveur.'}; }
       blocs = [consigneDe(system), dateLigne() + '[Question]\n' + aplatir(msgs)];
     }
     const {reponse, libre} = envoyer(p, blocs, {onDelta, kind: 'page'});
     let coupee = false;
-    if (coupe) coupe(() => { coupee = true; tuer(p, true); if (CONV[model] && CONV[model].p === p) delete CONV[model]; });
+    if (coupe) coupe(() => { coupee = true; tuer(p, true); if (CONV[mk] && CONV[mk].p === p) delete CONV[mk]; });
     const r = await reponse;
     if (ponctuel) { rendre(); libre.then(() => tuer(p)); }
-    else if (!r.ok && CONV[model] && CONV[model].p === p) fermer(model);
+    else if (!r.ok && CONV[mk] && CONV[mk].p === p) fermer(mk);
     stats.questions++; if (reprise) stats.reprises++; if (r.secours) stats.secours++;
     if (!coupee) stats.dernier = {at: now(), premier: r.premier, total: r.total, model, chaud: reprise, conv: !!conv, ok: r.ok, secours: !!r.secours};
     if (act) act.fin(r.ok);
-    return {...r, modele: model, profondeur: prof};
+    return {...r, modele: model, profondeur: prof, reflexion: pense};
   }
   /* la discussion s'ouvre : Claude est lancé et lit tout de suite les données (le premier message) et l'historique de la discussion
      s'il y en a un (gardé dans le téléphone) ; la question suivante n'envoie que la question */
@@ -170,11 +176,7 @@ export function createFlux({bin, env, settings, cwd, conso, models, friendly, da
   function preparer({tier, system, input}) {
     const msgs = lire(input);
     if (!msgs.length) return {ok: false, error: 'Rien à préparer.'};
-    if (tier === 'voix') {   /* 0.60.0 : la conversation à la voix : Sonnet prêt, et Opus aussi s'il reste de la mémoire */
-      const r = prep1(models.default, system, msgs);
-      if (r.ok && models.deep && models.deep !== models.default) r.aussi = memLibre() > prepMem ? prep1(models.deep, system, msgs) : {ok: false, error: 'mémoire'};
-      return r;
-    }
+    if (tier === 'voix' || tier === 'juste') return prep1(models.deep || models.default, system, msgs, true);   /* « juste » : la discussion écrite, même Claude */   /* 0.63.0 : la voix : Opus qui réfléchit, prêt dès l'ouverture des mains libres */
     if (tier !== 'auto') return prep1(models[tier] || models.default, system, msgs);
     const r = prep1(models.quick || models.default, system, msgs);
     if (r.ok && models.default && models.default !== models.quick) {
@@ -183,12 +185,12 @@ export function createFlux({bin, env, settings, cwd, conso, models, friendly, da
     }
     return r;
   }
-  function prep1(model, system, msgs) {
-    const cle = cleDe(model, system, msgs[0].text), hist = msgs.slice(1), qs = hist.filter((m) => m.role === 'user').map((m) => empreinte(m.text)), c = CONV[model];
+  function prep1(model, system, msgs, pense) {
+    const mk = model + (pense ? '+pense' : ''), cle = cleDe(mk, system, msgs[0].text), hist = msgs.slice(1), qs = hist.filter((m) => m.role === 'user').map((m) => empreinte(m.text)), c = CONV[mk];
     if (c && !c.p.mort && c.cle === cle && c.qs.length === qs.length && c.qs.every((x, i) => x === qs[i])) return {ok: true, deja: true};
-    fermer(model);
-    const p = lancer(model); if (!p) return {ok: false, error: 'Claude Code introuvable sur le serveur.'};
-    CONV[model] = {p, cle, qs}; stats.preparees++;
+    fermer(mk);
+    const p = lancer(model, pense); if (!p) return {ok: false, error: 'Claude Code introuvable sur le serveur.'};
+    CONV[mk] = {p, cle, qs}; stats.preparees++;
     const lis = hist.length ? 'Voici la discussion jusqu\'ici :\n' + aplatir(hist) + '\n\nLa discussion reprend : lis tout cela, puis réponds seulement « prêt ». Sa prochaine question suit.'
       : 'La discussion s\'ouvre : lis ces données, puis réponds seulement « prêt ». Ses questions suivent.';
     envoyer(p, [consigneDe(system) + '\n\n[Données de la page]\n' + msgs[0].text, dateLigne() + '[Question]\n' + lis], {kind: 'preparation'});
