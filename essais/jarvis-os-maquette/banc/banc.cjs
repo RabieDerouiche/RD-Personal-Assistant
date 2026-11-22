@@ -773,18 +773,18 @@ srv.listen(0, async () => {
         av.rows.some((x) => /Salle \(exemple\)/.test(x)) && !!al && /Toujours d’actualité/.test(al.t) && al.b.some((x) => /Retirer/.test(x)) && al.b.some((x) => /Garder/.test(x)) && /Retirée/.test(toast1)
         && !ap.rules.some((x) => /Salle \(exemple\)/.test(x)) && !ap.alerte && av.big !== ap.big, JSON.stringify([av, al, toast1, ap]));
       await ctx.close(); }
-    /* 0.65.0 (sa demande : « mon assurance emprunteur n'est pas fixe, le contrat d'adhésion a toutes les infos ») : l'alerte « Montants de ton contrat »
+    /* 0.66.0 (sa demande : « mon assurance emprunteur n'est pas fixe, le contrat d'adhésion a toutes les infos ») : l'alerte « Montants de ton contrat »
        propose Appliquer ; la dépense suit alors le tableau (montant du mois, prochains changements, dernier prélèvement) ; données d'exemple */
     { const ctx = await b.newContext({...devices['iPhone 15 Pro Max']}); await ctx.addInitScript(PAUSE_INIT);
       await ctx.addInitScript(() => { try { localStorage.setItem('jarvis.radar.reste', JSON.stringify({jusqua: 'mois', fx: [{id: 'fa', service: 'Assurance de prêt (exemple)', cat: 'Assurances', montant: 31.2, jour: 5, rythme: 'mensuel', source: 'toi'}]})); } catch (e) { /* rien */ } });
-      const q = await ctx.newPage(); q.on('pageerror', (e) => errs.push('radar 0.65 : ' + e.message));
+      const q = await ctx.newPage(); q.on('pageerror', (e) => errs.push('radar 0.66 : ' + e.message));
       await q.clock.setFixedTime(new Date('2026-11-23T10:00:00')); await q.goto(base + '#argent'); await q.waitForTimeout(3000);
       await q.evaluate(() => { window.__RADAR.alertes.push({id: 'cfa', date: '2026-11-23', type: 'calendrier', titre: 'Montants de ton contrat', service: 'Assurance de prêt (exemple)', montant: 30.9, avant: 31.2, fixe: 'fa',
         calendrier: {paliers: [{du: '2025-09', montant: 61.2}, {du: '2025-10', montant: 31.2}, {du: '2026-08', montant: 32.5}, {du: '2026-09', montant: 35.9}, {du: '2026-10', montant: 30.9}, {du: '2027-08', montant: 32.1}, {du: '2027-09', montant: 36.4}],
           jour: 5, debut: '2025-09-05', fin: '2047-12-05', contrat: {objet: 'Votre contrat (exemple)', date: '2025-07-30'}}, texte: 'Le tableau de ton contrat donne le montant de chaque mois : 30,90 € ce mois-ci, puis 32,10 € en août 2027 (il change encore ensuite), jusqu’en décembre 2047. Appliquer ces montants ?'}); });
       await q.evaluate(() => [...document.querySelectorAll('.rad-seg button')].find((x) => /^Alertes/.test(x.textContent)).click()); await q.waitForTimeout(600);
       const al = await q.evaluate(() => { const a = document.querySelector('.rad-alert.is-calendrier'); return a ? {t: a.innerText.replace(/\s+/g, ' '), b: [...a.querySelectorAll('.row-actions button')].map((x) => x.textContent.trim())} : null; });
-      await q.screenshot({path: path.join(SH, 'radar-065-alerte.png')});
+      await q.screenshot({path: path.join(SH, 'radar-066-alerte.png')});
       await q.evaluate(() => [...document.querySelectorAll('.rad-alert.is-calendrier .row-actions button')].find((x) => /Appliquer/.test(x.textContent)).click()); await q.waitForTimeout(700);
       const toast1 = await q.evaluate(() => (document.querySelector('.toast') || {}).textContent || '');
       await q.evaluate(() => [...document.querySelectorAll('.rad-seg button')].find((x) => /^Fixes/.test(x.textContent)).click()); await q.waitForTimeout(600);
@@ -792,10 +792,10 @@ srv.listen(0, async () => {
       await q.evaluate(() => [...document.querySelectorAll('.rad-rule')].find((x) => /Assurance de prêt/.test(x.textContent)).click()); await q.waitForTimeout(900);
       const fiche = await q.evaluate(() => { const s = document.getElementById('sheet'), pal = s.querySelector('.rad-pal'), mt = [...s.querySelectorAll('.rad-form input.inp')][1];
         return {pal: pal ? [...pal.querySelectorAll('li')].map((x) => x.textContent) : [], lu: pal ? (pal.querySelector('.muted') || {}).textContent : '', ro: !!(mt && mt.readOnly), v: mt ? mt.value : '', suit: pal ? !!pal.querySelector('input[type=checkbox]:checked') : false}; });
-      await q.screenshot({path: path.join(SH, 'radar-065-fiche.png')});
+      await q.screenshot({path: path.join(SH, 'radar-066-fiche.png')});
       await q.evaluate(() => { const f = document.querySelector('#sheet .rad-form'); f.requestSubmit(); }); await q.waitForTimeout(600);
       const garde = await q.evaluate(() => { try { const fx = JSON.parse(localStorage.getItem('jarvis.radar.reste') || '{}').fx || []; const a = fx.find((x) => x.id === 'fa'); return a ? {n: (a.paliers || []).length, fin: a.fin, m: a.montant} : null; } catch (e) { return null; } });
-      ok('Radar 0.65 : « Montants de ton contrat » propose Appliquer ou Garder mon montant ; Appliquer : la dépense suit le tableau (30,90 € ce mois-ci, « selon ton contrat »), sa fiche montre les prochains changements et le dernier prélèvement, montant non modifiable tant qu’elle le suit, et l’enregistrer garde le tableau',
+      ok('Radar 0.66 : « Montants de ton contrat » propose Appliquer ou Garder mon montant ; Appliquer : la dépense suit le tableau (30,90 € ce mois-ci, « selon ton contrat »), sa fiche montre les prochains changements et le dernier prélèvement, montant non modifiable tant qu’elle le suit, et l’enregistrer garde le tableau',
         !!al && /30,90 € ce mois-ci/.test(al.t) && al.b.includes('Appliquer') && al.b.includes('Garder mon montant') && /Montants appliqués/.test(toast1) && /selon ton contrat/.test(rule) && /30,90/.test(rule)
         && fiche.pal[0] === 'Ce mois-ci : 30,90 €' && fiche.pal.includes('Dès août 2027 : 32,10 €') && fiche.pal.includes('Dès septembre 2027 : 36,40 €') && fiche.pal.includes('Dernier prélèvement : décembre 2047') && /Votre contrat \(exemple\)/.test(fiche.lu)
         && fiche.ro && fiche.v === '30,90' && fiche.suit && !!garde && garde.n === 7 && garde.fin === '2047-12-05' && garde.m === 30.9, JSON.stringify([al, toast1, rule, fiche, garde]));

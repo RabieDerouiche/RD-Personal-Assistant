@@ -4417,7 +4417,7 @@ void main(){
       /* 0.56.0 (son choix : « il me demande ») : une résiliation ou des factures qui ont cessé : Retirer ou Garder, rien ne change sans lui */
       x.fixe && (x.type === 'resiliation' || x.type === 'silence') ? h('div', {class: 'row-actions'}, btn('Retirer', () => radAlerteDo(x, 'retirer'), 'sm main', 'x'), btn('Garder', () => radAlerteDo(x, 'garder'), 'sm', 'check'),
         x.url ? btn('Ouvrir le mail', () => window.open(x.url, '_blank', 'noopener'), 'sm', 'inbox') : null) :
-      /* 0.65.0 (sa demande : « mon assurance emprunteur n'est pas fixe, le contrat a toutes les infos ») : les montants de son contrat, mois par mois */
+      /* 0.66.0 (sa demande : « mon assurance emprunteur n'est pas fixe, le contrat a toutes les infos ») : les montants de son contrat, mois par mois */
       x.fixe && x.type === 'calendrier' ? h('div', {class: 'row-actions'}, btn('Appliquer', () => radAlerteDo(x, 'appliquer'), 'sm main', 'check'), btn('Garder mon montant', () => radAlerteDo(x, 'garder'), 'sm'),
         x.url ? btn('Voir le contrat', () => window.open(x.url, '_blank', 'noopener'), 'sm', 'inbox') : null) :
       h('div', {class: 'row-actions'}, btn('Vu', () => { RAD.vu.add(x.k); radSave(); renderView(true); }, 'sm', 'check'),
@@ -4509,7 +4509,7 @@ void main(){
       let raw = radD(Y, M, Math.min(j, radDim(Y, M))), due = radShift(raw, 1), xx = x;
       if (x.debut && radYmd(due) < x.debut) continue;   /* 0.51.0 : une dépense qui commence plus tard (impôts mensualisés) */
       if (x.fin && radYmd(due) > x.fin) continue;   /* 0.56.0 : une dépense qui s'arrête (résiliée, échéancier terminé) */
-      if (x.paliers && x.paliers.length) { const v = radPalier(x.paliers, radYmd(due).slice(0, 7)); if (v == null) continue; xx = Object.assign({}, x, {montant: v, estime: false, exact: true}); }   /* 0.65.0 */
+      if (x.paliers && x.paliers.length) { const v = radPalier(x.paliers, radYmd(due).slice(0, 7)); if (v == null) continue; xx = Object.assign({}, x, {montant: v, estime: false, exact: true}); }   /* 0.66.0 */
       /* 0.51.0 : la facture du mois est arrivée : son vrai montant et son jour, à la place de l'habituel */
       if (x.prochain && x.prochain.date && String(x.prochain.date).slice(0, 7) === radYmd(due).slice(0, 7)) { const [py, pm, pd] = String(x.prochain.date).split('-').map(Number); raw = due = radD(py, pm - 1, pd); xx = Object.assign({}, x, {montant: x.prochain.montant, estime: false, exact: true}); }
       if (due >= a && due <= b) out.push({x: xx, raw, date: due});
@@ -4541,7 +4541,7 @@ void main(){
   const radRegleP = (rev) => (rev.des ? 'entre le ' + radLe(rev.des) + ' et ' : '') + (rev.jour === 'dernier' ? 'le dernier jour du mois' : 'le ' + radLe(parseInt(rev.jour, 10) || 28)) + (rev.avance === false ? '' : ', avancée si week-end ou férié');
   /* 0.52.0 : une paie qui arrive « entre le 5 et le 10 » : le reste court jusqu'au plus tard, et le dit */
   const radPaieFin = (R) => (R.rev && R.rev.des ? '(au plus tard le ' + radJour(R.fin) + ')' : 'du ' + radJour(R.fin));
-  /* 0.65.0 : une dépense dont le montant suit le tableau de son contrat (assurance de prêt) : le montant du mois */
+  /* 0.66.0 : une dépense dont le montant suit le tableau de son contrat (assurance de prêt) : le montant du mois */
   const radPalier = (pl, mo) => { let v = null; for (const p of pl || []) { if (p.du <= mo) v = p.montant; else break; } return v; };
   const radMoisDe = (d) => radYmd(d).slice(0, 7), radMontantMois = (x, d) => (x.paliers && x.paliers.length ? radPalier(x.paliers, radMoisDe(d || radAuj())) ?? x.montant : x.montant);
   const radParMois = (x) => radC(radMontantMois(x)) * (x.rythme === 'annuel' ? 1 : x.rythme === 'trimestriel' ? 4 : 12) / 12 / 100;
@@ -4634,7 +4634,7 @@ void main(){
     const jr = h('input', {class: 'inp', id: ids[3], type: 'number', inputmode: 'numeric', min: '1', max: '31', step: '1', value: x ? String(x.jour) : '', placeholder: '1 à 31'});
     const mo = h('select', {class: 'inp', id: ids[4]}, RAD_MOIS.map((l, i) => h('option', {value: String(i + 1), selected: (x ? parseInt(x.mois, 10) || 1 : radAuj().getMonth() + 1) === i + 1}, l)));
     const est = h('input', {type: 'checkbox', checked: !!(x && x.estime)});
-    /* 0.65.0 : le montant de chaque mois vient du tableau de son contrat : coché, il le suit ; décoché, le montant saisi devient fixe */
+    /* 0.66.0 : le montant de chaque mois vient du tableau de son contrat : coché, il le suit ; décoché, le montant saisi devient fixe */
     const pal = x && x.paliers && x.paliers.length ? x.paliers : null, suit = h('input', {type: 'checkbox', checked: !!pal});
     if (pal) { const deux = () => Number(radMontantMois(x)).toFixed(2).replace('.', ','); mt.value = deux(); mt.readOnly = true; suit.addEventListener('change', () => { mt.readOnly = suit.checked; if (suit.checked) mt.value = deux(); }); }
     const palBloc = () => { if (!pal) return null; const mo = radMoisDe(radAuj()), lmo = (k) => RAD_MOIS[+k.slice(5, 7) - 1] + ' ' + k.slice(0, 4), apres = pal.filter((p) => p.du > mo).slice(0, 4);
@@ -4655,7 +4655,7 @@ void main(){
       if (est.checked) it.estime = true;
       /* 0.51.0 : son début et la facture du mois déjà annoncée restent (ils viennent de ses mails) */
       if (x && x.debut) it.debut = x.debut; if (x && x.fin) it.fin = x.fin; if (x && x.variable && est.checked) it.variable = true; if (x && x.prochain && !prop) it.prochain = x.prochain;
-      /* 0.65.0 : ce qui vient de ses mails reste attaché (avant, une modification le perdait) ; le tableau du contrat, s'il le suit */
+      /* 0.66.0 : ce qui vient de ses mails reste attaché (avant, une modification le perdait) ; le tableau du contrat, s'il le suit */
       if (x && x.dom) it.dom = x.dom; if (x && x.cle) it.cle = x.cle; if (x && x.depuis) it.depuis = x.depuis;
       if (pal && suit.checked) { it.paliers = pal; it.rythme = 'mensuel'; delete it.mois; delete it.estime; if (x.contrat) it.contrat = x.contrat; it.montant = radMontantMois(x); }
       if (prop) { closeSheet(); radPropDo(prop, true, {service: it.service, montant: it.montant, jour: it.jour, rythme: it.rythme, mois: it.mois, estime: !!it.estime, ...(pal && !suit.checked ? {paliers: []} : {})}); return; }
