@@ -244,7 +244,13 @@
     radarLire: () => req('/api/radar/lire', {}).then((r) => r.j || null).catch(() => null),
     /* 0.62.0 : ses invitations (un proche qui lui envoie des tâches) */
     invites: {liste: () => req('/api/invites').then((r) => (r.status === 200 ? r.j.invites : null)).catch(() => null), creer: (nom) => req('/api/invites', {nom}).then((r) => r.j).catch(() => null),
-      retirer: (id) => req('/api/invites/' + id, null, 'DELETE').then((r) => r.status === 200).catch(() => false)},
+      retirer: (id) => req('/api/invites/' + id, null, 'DELETE').then((r) => r.status === 200).catch(() => false),
+      /* 0.64.0 : son message vocal, les rappels toutes les 5 minutes, « C'est fait » / « Dans 5 min » */
+      etat: () => req('/api/invites').then((r) => (r.status === 200 ? r.j : null)).catch(() => null),
+      reglages: (o) => req('/api/invites/reglages', o).then((r) => (r.status === 200 ? r.j : null)).catch(() => null),
+      recues: () => req('/api/invites/recues').then((r) => (r.status === 200 ? r.j : null)).catch(() => null),
+      agir: (id, action, minutes) => req('/api/invites/recues/' + id, {action, ...(minutes ? {minutes} : {})}).then((r) => (r.status === 200 ? r.j : null)).catch(() => null),
+      audio: (id) => fetch(BASE + '/api/invites/audio/' + encodeURIComponent(id), {headers: {authorization: 'Bearer ' + token()}}).then((r) => (r.ok ? r.blob() : null)).then((b) => (b ? URL.createObjectURL(b) : null)).catch(() => null)},
     radarAlerte: (id, action) => req('/api/radar/alerte', {id, action}).then((r) => (r.status === 200 ? r.j : null)).catch(() => null),   /* 0.56.0 : Retirer / Garder une dépense qui finit */
     memoire: {
       liste: () => req('/api/memoire').then((r) => (r.status === 200 ? r.j : null)).catch(() => null),
