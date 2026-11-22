@@ -10,6 +10,7 @@
 import fs from 'node:fs';
 import crypto from 'node:crypto';
 import {paris} from './notify.mjs';
+import {texteDePdf} from './pdf.mjs';
 
 /* ---------- calendrier : une date de Paris = un jour UTC à midi (aucun fuseau en jeu) ---------- */
 export const J = (y, m, d) => new Date(Date.UTC(y, m, d, 12));
@@ -135,6 +136,16 @@ export function genre(objet, texte) {
   if (/(facture|avis d'echeance|echeancier|\brecu\b|receipt|invoice|votre paiement|payment received|confirmation de paiement|prelevement|mensualite|cotisation)/.test(s)) return 'facture';   /* « abonnement » seul : trop de lettres d'information */
   return 'autre';
 }
+/* 0.52.0 : le montant d'une facture lue dans son PDF : d'abord « à régler », « net à payer », « total à payer » (le bas de la facture),
+   puis « total TTC », sinon la règle des mails */
+export function montantPdf(texte) {
+  const s = String(texte || '').replace(/[\u00a0\u202f]/g, ' ');
+  for (const re of [new RegExp('(?:net|montant|total|reste|solde|somme)\\s+(?:[àa]\\s+)?(?:payer|r[ée]gler|pr[ée]lever|acquitter)[^\\n\\d€]{0,25}' + NB + EURO, 'gi'),
+    new RegExp('(?:[àa]\\s+(?:payer|r[ée]gler))\\s*:?[^\\n\\d€]{0,10}' + NB + EURO, 'gi'), new RegExp('total\\s+(?:ttc|g[ée]n[ée]ral|de la facture)[^\\n\\d€]{0,25}' + NB + EURO, 'gi')]) {
+    const l = [...s.matchAll(re)].map((m) => montantDe(m[1])).filter(Boolean); if (l.length) return l[l.length - 1];
+  }
+  return trouverMontant(s);
+}
 /* « passera de 59,99 € à 69,99 € » : l'ancien et le nouveau prix */
 export function avantApres(texte) {
   const s = String(texte || '').replace(/[  ]/g, ' ');
@@ -258,7 +269,7 @@ const SYS_CLAUDE = "Tu lis des mails de facturation pour le tableau des dépense
    au plus `budget` unités par minute (4 000 ; la limite de Google est 15 000 pour tout JARVIS), et une limite atteinte fait attendre une
    minute puis reprendre (5 fois au plus), au lieu d'abandonner. Une lecture interrompue reprend au mois où elle s'était arrêtée. */
 const estQuota = (e) => /quota|rate ?limit|\b429\b|too many requests|userRateLimitExceeded|resource has been exhausted/i.test(String((e && e.message) || e));
-export function createRadar({file, gmail, claude = async () => ({ok: false, error: 'Claude absent.'}), push = async () => [], now = Date.now, log = () => {}, matin = '06:50', soir = '19:00', moisDepart = 13, maxClaude = 60, parLot = 8,
+export function createRadar({file, gmail, claude = async () => ({ok: false, error: 'Claude absent.'}), push = async () => [], now = Date.now, log = () => {}, matin = '06:50', soir = '19:00', moisDepart = 13, maxClaude = 60, parLot = 8, maxPdf = 40,
   budget = 4000, horloge = Date.now, attente = (ms) => new Promise((z) => setTimeout(z, ms)), pauseQuota = 65000}) {
   const lireFichier = () => { try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return {}; } };
   const R = Object.assign({fixes: [], revenus: null, notif: {veille: true, seuil: 20, echec: true}, propositions: [], refus: [], releves: [], alertes: [], avenir: [], ponctuels: [], mandats: [], vus: [], fils: {}, scan: null, jours: {}, maj: null}, lireFichier());
@@ -269,6 +280,8 @@ export function createRadar({file, gmail, claude = async () => ({ok: false, erro
   /* 0.51.0 : règles revues sur une vraie boîte (faux « paiement échoué », paiements en 4 fois, factures variables, impôts) : lecture refaite ;
      ses dépenses fixes, sa paie et ce qu'il a écarté restent */
   if (R.version < 3) { Object.assign(R, {releves: [], fils: {}, vus: [], scan: null, propositions: [], alertes: [], avenir: [], ponctuels: [], mandats: [], version: 3}); }
+  /* 0.52.0 : les factures dont le montant est dans le PDF joint sont relues (lecture de départ refaite, le reste gardé) */
+  if (R.version < 4) { Object.assign(R, {releves: [], fils: {}, vus: [], scan: null, propositions: [], alertes: [], avenir: [], ponctuels: [], mandats: [], version: 4}); }
   const sauver = () => { const tmp = file + '.tmp'; fs.writeFileSync(tmp, JSON.stringify(R), {mode: 0o600}); fs.renameSync(tmp, file); };
   let occupe = null;   /* une lecture des mails à la fois */
   const auj = () => parisJour(now());
@@ -293,7 +306,12 @@ export function createRadar({file, gmail, claude = async () => ({ok: false, erro
   };
   function regler(cle, v) {
     if (cle === 'fixes') { if (!Array.isArray(v) || v.length > 200) return {ok: false, error: 'Liste illisible.'}; const l = v.map(propre); if (l.some((x) => !x)) return {ok: false, error: 'Une dépense est incomplète (nom, montant, jour de 1 à 31).'}; R.fixes = l; }
-    else if (cle === 'revenus') { if (!v || !(v.jour === 'dernier' || (parseInt(v.jour, 10) >= 1 && parseInt(v.jour, 10) <= 31))) return {ok: false, error: 'Jour de paie illisible.'}; R.revenus = {jour: v.jour === 'dernier' ? 'dernier' : parseInt(v.jour, 10), avance: v.avance !== false}; }
+    else if (cle === 'revenus') {
+      if (!v || !(v.jour === 'dernier' || (parseInt(v.jour, 10) >= 1 && parseInt(v.jour, 10) <= 31))) return {ok: false, error: 'Jour de paie illisible.'};
+      const jour = v.jour === 'dernier' ? 'dernier' : parseInt(v.jour, 10), des = parseInt(v.des, 10);
+      /* 0.52.0 : une paie qui arrive « entre le 5 et le 10 » : le reste à payer court jusqu'au plus tard (le 10) */
+      R.revenus = {jour, avance: v.avance !== false, ...(des >= 1 && des <= 31 && (jour === 'dernier' || des < jour) ? {des} : {})};
+    }
     else if (cle === 'notif') { if (!v || typeof v !== 'object') return {ok: false, error: 'Réglage illisible.'}; const s = +v.seuil; R.notif = {veille: v.veille !== false, seuil: s >= 0 && s <= 100000 ? s : 20, echec: v.echec !== false}; }
     else return {ok: false, error: 'Réglage inconnu.'};
     R.propositions = R.propositions.filter((p) => !connue(p)); sauver(); return {ok: true};
@@ -350,8 +368,9 @@ export function createRadar({file, gmail, claude = async () => ({ok: false, erro
       for (const m of (x && x.messages) || []) {
         if (dejaVus.has(m.id) || (m.labelIds || []).includes('SENT')) continue;
         dejaVus.add(m.id); R.vus.push(m.id);
+        const pdf = (m.attachments || []).find((a) => (/pdf/i.test(a.mimeType) || /\.pdf$/i.test(a.filename)) && (a.attachmentId || a.data) && !(a.size > 5e6));
         lus.push({lu: lireMail({id: m.id, fil: m.threadId, sender: m.sender, nom: ((m.addressDisplayNames || [])[0] || {}).displayName, objet: m.subject, texte: m.plaintextBody, date: m.date}),
-          extrait: TXT(String(m.plaintextBody || '').replace(/\s+/g, ' '), 1500), objet: TXT(m.subject, 200), sender: m.sender});
+          extrait: TXT(String(m.plaintextBody || '').replace(/\s+/g, ' '), 1500), objet: TXT(m.subject, 200), sender: m.sender, ...(pdf ? {pdf: {mid: m.id, aid: pdf.attachmentId || '', data: pdf.data || ''}} : {})});
       }
     }
     R.vus = R.vus.slice(-6000);
@@ -441,8 +460,23 @@ export function createRadar({file, gmail, claude = async () => ({ok: false, erro
     R.propositions = rg.concat(R.mandats.filter((m) => !rgCles.has(m.cle) && (!m.debut || m.debut >= ymd(J(t.getUTCFullYear(), t.getUTCMonth() - 1, 1))))).map((p) => ({...p, cle: p.cle || p.dom})).filter((p) => !R.refus.includes(cleDe(p)) && !connue(p));
     R.maj = new Date(now()).toISOString();
   }
+  /* 0.52.0 (son choix : « Oui, sur le serveur ») : une facture dont le montant n'est que dans le PDF joint est lue ici, sans IA ; le PDF
+     n'est pas gardé, seuls le montant et la date retrouvés le sont */
+  async function parPdf(lus, o) {
+    let reste = o.depart ? Math.max(0, maxPdf - ((R.scan && R.scan.pdf) || 0)) : 10;
+    for (const x of lus) {
+      if (!x.pdf || x.lu.genre !== 'facture' || x.lu.montant || reste <= 0 || (!x.pdf.data && !gmail.pj)) continue;
+      reste--; if (R.scan && o.depart) R.scan.pdf = (R.scan.pdf || 0) + 1;
+      let d = x.pdf.data;
+      if (!d) { try { d = ((await gm(() => gmail.pj(x.pdf.mid, x.pdf.aid), 10)) || {}).data || ''; } catch (e) { if (estQuota(e)) throw e; log('radar : pièce jointe illisible (' + TXT(e.message || e, 120) + ')'); continue; } }
+      const texte = texteDePdf(Buffer.from(String(d).replace(/-/g, '+').replace(/_/g, '/'), 'base64')), v = texte ? montantPdf(texte) : null;
+      if (!v) continue;
+      x.lu = {...x.lu, montant: v, datePrel: x.lu.datePrel || trouverDate(texte, x.lu.date ? depuisYmd(x.lu.date) : null), pdf: true, sur: true};
+    }
+  }
   async function lire(q, n, o) {
-    const lus = await lireRequete(q, n), surs = lus.filter((x) => x.lu.sur), aClaude = lus.filter((x) => !x.lu.sur && x.lu.genre === 'facture');
+    const lus0 = await lireRequete(q, n); await parPdf(lus0, o);
+    const lus = lus0, surs = lus.filter((x) => x.lu.sur), aClaude = lus.filter((x) => !x.lu.sur && x.lu.genre === 'facture');
     const envoyes = aClaude.slice(0, o.depart ? Math.max(0, maxClaude - ((R.scan && R.scan.claude) || 0)) : 16);   /* au départ 60 mails au plus pour Claude, ensuite 16 par jour */
     const compris = envoyes.length ? await parClaude(envoyes) : [], lus2 = new Set(compris.map((x) => x.lu.id));
     if (R.scan && o.depart) R.scan.claude = (R.scan.claude || 0) + envoyes.length;
@@ -453,7 +487,7 @@ export function createRadar({file, gmail, claude = async () => ({ok: false, erro
   /* au départ : ses 13 derniers mois, un mois à la fois (du plus ancien au plus récent), puis les propositions */
   async function depart() {
     const reprise = R.scan && !R.scan.fini ? Math.min(R.scan.mois || 0, moisDepart) : 0;   /* une lecture interrompue reprend au mois suivant */
-    R.scan = {enCours: true, debut: now(), mois: reprise, total: moisDepart, lus: (reprise && R.scan.lus) || 0, claude: (reprise && R.scan.claude) || 0, fini: null, erreur: '', pause: ''}; sauver();
+    R.scan = {enCours: true, debut: now(), mois: reprise, total: moisDepart, lus: (reprise && R.scan.lus) || 0, claude: (reprise && R.scan.claude) || 0, pdf: (reprise && R.scan.pdf) || 0, fini: null, erreur: '', pause: ''}; sauver();
     try {
       const t = auj();
       for (let k = moisDepart - 1 - reprise; k >= 0; k--) {
@@ -482,7 +516,7 @@ export function createRadar({file, gmail, claude = async () => ({ok: false, erro
     if (!l.length) return null;
     const r = resteA(R.fixes, rev(), dem, 'paie', R.ponctuels);
     const msg = {title: 'Demain : ' + (l.length === 1 ? l[0].f.service : l.length + ' prélèvements'), url: '/#argent', tag: 'radar-veille-' + ymd(dem),
-      body: l.map((o) => o.f.service + ' : ' + (o.f.estime ? 'environ ' : '') + eur(o.f.montant)).join('\n') + '\nReste à payer d’ici ta paie du ' + jourCourt(r.fin) + ' : ' + eur(r.total) + '.'};
+      body: l.map((o) => o.f.service + ' : ' + (o.f.estime ? 'environ ' : '') + eur(o.f.montant)).join('\n') + '\nReste à payer d’ici ta paie ' + (rev().des ? '(au plus tard le ' : 'du ') + jourCourt(r.fin) + (rev().des ? ')' : '') + ' : ' + eur(r.total) + '.'};
     await push(msg).catch(() => {});
     return msg;
   }

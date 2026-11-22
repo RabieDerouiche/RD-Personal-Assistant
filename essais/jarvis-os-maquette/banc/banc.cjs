@@ -256,7 +256,7 @@ srv.listen(0, async () => {
     ok('demandes : réponses reçues dans « À décider », courrier arrivé replié dans « Courrier à trier »', await p.evaluate(() => /Réponse reçue/.test((document.getElementById('pm-dec') || {}).textContent || '') && [...document.querySelectorAll('details.pm-sec')].some((x) => /Courrier à trier/.test(x.querySelector('summary').textContent) && /Arrivés depuis/.test(x.textContent))));
     /* 18/11/2026 (retour du propriétaire : « cet onglet est très mal fait ») : résumé, sections, cartes illustrées, historique parti dans Suivi */
     ok('Pour moi : résumé, « À décider » et « À faire », plus d\'historique du Canal ni de paragraphe d\'explication', await p.evaluate(() => !!document.querySelector('.pm-sum') && !!document.getElementById('pm-dec') && !!document.getElementById('pm-todo') && !document.querySelector('#dir .hist-panel') && !document.querySelector('#dir p.lead')));
-    ok('CRA (oui attendu, texte vide dans À toi) : la demande lue dans le Canal, « Oui depuis JARVIS » (Charte, section 7), sa semaine', await p.evaluate(() => { const c = [...document.querySelectorAll('.pm-card')].find((x) => x.querySelector('.pm-title').textContent === 'CRA Allegis'); return !!c && /Soumettre le CRA Allegis/.test(c.textContent) && !!c.querySelector('.week') && [...c.querySelectorAll('.pm-row .btn')].some((b) => /^Oui depuis JARVIS/.test(b.textContent)); }));
+    ok('CRA (oui attendu, texte vide dans À toi) : la demande lue dans le Canal, « Oui depuis JARVIS » (Charte, section 7), sa semaine', await p.evaluate(() => { const c = [...document.querySelectorAll('.pm-card')].find((x) => x.querySelector('.pm-title').textContent === 'CRA client'); return !!c && /Soumettre le CRA client/.test(c.textContent) && !!c.querySelector('.week') && [...c.querySelectorAll('.pm-row .btn')].some((b) => /^Oui depuis JARVIS/.test(b.textContent)); }));
     ok('Pour moi : chaque demande a son image (mail, semaine, oui/non, choix, étapes ou échéancier)', await p.evaluate(() => { const c = [...document.querySelectorAll('.pm-card')]; const kinds = new Set(c.flatMap((x) => [...x.querySelectorAll('.pm-viz > *')].map((v) => v.classList[0] || v.className))); return c.length >= 8 && ['pm-mail', 'pm-yn', 'pm-opts', 'pm-tl'].every((k) => kinds.has(k)) && c.filter((x) => x.querySelector('.pm-viz')).length >= c.length * 0.7; }), await p.evaluate(() => [...document.querySelectorAll('.pm-card')].map((x) => x.querySelector('.pm-title').textContent + ':' + [...x.querySelectorAll('.pm-viz > *')].map((v) => v.classList[0] || v.className).join('+')).join(' | ')));
     /* 18/11/2026 (retour du propriétaire, choix QCM « Court, selon la demande ») : feuille d'une demande raccourcie, « Revérifie » selon le sujet */
     { await p.evaluate(() => document.querySelectorAll('#toasts .toast').forEach((t) => t.remove()));
@@ -689,6 +689,17 @@ srv.listen(0, async () => {
         r.big === '117,05 €' && r.rows.some((x) => /Téléphone \(exemple\)/.test(x) && /87,50 €/.test(x) && !/≈/.test(x)) && !r.rows.some((x) => /Impôts/.test(x)) && r.rules.some((x) => /Impôts \(exemple\)/.test(x) && /à partir du 15\/01\/2027/.test(x))
         && r.rules.some((x) => /Téléphone \(exemple\)/.test(x) && /facture du mois : 87,50 €/.test(x)) && r.large, JSON.stringify(r));
       await q.screenshot({path: path.join(SH, 'radar-051.png')}); await ctx.close(); }
+    /* 0.52.0 : une paie qui arrive « entre le 5 et le 10 » (jeudi 03/12/2026) : le reste à payer court jusqu'au 10 et le dit */
+    { const ctx = await b.newContext({...devices['iPhone 15 Pro Max']}); await ctx.addInitScript(PAUSE_INIT);
+      await ctx.addInitScript(() => { try { localStorage.setItem('jarvis.radar.reste', JSON.stringify({jusqua: 'paie', rev: {jour: 10, des: 5, avance: true}})); } catch (e) { /* rien */ } });
+      const q = await ctx.newPage(); q.on('pageerror', (e) => errs.push('radar 0.52 : ' + e.message));
+      await q.clock.setFixedTime(new Date('2026-12-03T10:00:00')); await q.goto(base + '#argent'); await q.waitForTimeout(3000);
+      const r = await q.evaluate(() => ({k: document.querySelector('.rad-k').textContent, paie: [...document.querySelectorAll('.rad-act button')].map((x) => x.textContent).find((x) => /Ma paie/.test(x)) || ''}));
+      await q.evaluate(() => [...document.querySelectorAll('.rad-act button')].find((x) => /Ma paie/.test(x.textContent)).click()); await q.waitForTimeout(600);
+      const f = await q.evaluate(() => ({labels: [...document.querySelectorAll('.rad-form .pick-label')].map((x) => x.textContent), des: (document.querySelectorAll('.rad-form select')[1] || {}).value}));
+      ok('Radar 0.52 : paie « entre le 5 et le 10 » : « Reste à payer d’ici ta paie (au plus tard le jeu. 10/12) », « Ma paie : entre le 5 et le 10 », la fiche propose « Ils peuvent arriver plus tôt » (dès le 5)',
+        r.k === 'Reste à payer d’ici ta paie (au plus tard le jeu. 10/12)' && /entre le 5 et le 10/.test(r.paie) && f.labels.includes('Ils peuvent arriver plus tôt') && f.des === '5', JSON.stringify([r, f]));
+      await ctx.close(); }
     /* aucune rubrique n'affiche de texte cassé */
     const broken = [];
     for (const t of ['accueil', 'demandes', 'agenda', 'suivi', 'achats', 'voyages', 'sorties', 'papiers', 'argent', 'equipe', 'automatisations', 'reglages']) {

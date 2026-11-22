@@ -28,7 +28,7 @@ import {createRadar} from './radar.mjs';
 import {pique, PERSO_ORAL} from './humour.mjs';   /* 21/11/2026 : sa personnalité à l'oral (« sarcastique assumé ») */
 const ACT = createActivite();   /* 0.33.0 : ce que fait Claude à l'instant */
 
-const VERSION = '0.51.0';
+const VERSION = '0.52.0';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PORT = +(process.env.PORT || 8787);
 const HOST = process.env.HOST || '127.0.0.1';
@@ -1035,7 +1035,8 @@ const ideeFinie = (x) => { if (S.push && S.push.subs.length) PUSH.send(x.statut 
 /* Radar (21/11/2026, radar.mjs) : ses dépenses fixes, sa paie, le reste à payer et ce que ses mails annoncent. Gardé à part, dans radar.json :
    aucun outil MCP, aucune réponse de Siri, aucun brief ni aucune consigne de Claude ne le lit (sa mensualité de crédit y est : jamais chez les bots). */
 const RADAR = createRadar({file: path.join(DATA, 'radar.json'), now, log: (t) => console.log(t),
-  gmail: {lie: () => GG.status('').linked, chercher: (q, n) => GG.tool('Gmail', 'search_threads', {query: q, pageSize: n, idsOnly: true}), fil: (id) => GG.tool('Gmail', 'get_thread', {threadId: id})},
+  gmail: {lie: () => GG.status('').linked, chercher: (q, n) => GG.tool('Gmail', 'search_threads', {query: q, pageSize: n, idsOnly: true}), fil: (id) => GG.tool('Gmail', 'get_thread', {threadId: id}),
+    pj: (messageId, attachmentId) => GG.tool('Gmail', 'get_attachment', {messageId, attachmentId})},   /* 0.52.0 : le PDF d'une facture sans montant, lu sur le serveur (pdf.mjs) */
   claude: (prompt, system) => { const box = path.join(DATA, 'radar'); fs.mkdirSync(box, {recursive: true, mode: 0o700});
     return runClaude({kind: 'radar', titre: 'Radar : lecture de factures', prompt, system, model: MODELS.rapide, cwd: box, timeoutMs: 180000,
       tools: {allow: [], deny: ['Bash', 'Read', 'Edit', 'Write', 'Glob', 'Grep', 'NotebookEdit', 'WebFetch', 'WebSearch', 'Task']}}); },

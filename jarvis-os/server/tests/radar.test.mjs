@@ -1,7 +1,9 @@
 /* Banc du Radar : node tests/radar.test.mjs (aucun vrai Google, aucun vrai Claude, aucun coût). Mails et montants inventés. */
 import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path';
-import {J, ymd, feries, occurrences, paies, resteA, trouverMontant, trouverDate, genre, avantApres, lireMail, regrouper, nomService, categorie, montantDe, createRadar, domaine} from '../radar.mjs';
+import {J, ymd, feries, occurrences, paies, resteA, trouverMontant, trouverDate, genre, avantApres, lireMail, regrouper, nomService, categorie, montantDe, createRadar, domaine, montantPdf} from '../radar.mjs';
 import {textOf} from '../google.mjs';
+import {texteDePdf} from '../pdf.mjs';
+import zlib from 'node:zlib';
 import {interdit} from '../memoire.mjs';
 const results = []; let fails = 0;
 const ok = (name, cond, info) => { results.push((cond ? 'OK   ' : 'ÉCHEC') + ' ' + name + (info ? ' :: ' + info : '')); if (!cond) fails++; };
@@ -124,7 +126,7 @@ try {
     const n0 = appelsT.length; await RQ.lireMaintenant();
     ok('Radar : un fil déjà lu et inchangé n’est pas relu (seule la liste du jour est demandée)', appelsT.length - n0 === 1, (appelsT.length - n0) + ' appels');
     /* une lecture interrompue reprend au mois où elle s'était arrêtée ; un ancien message anglais de Google est montré en français */
-    fs.writeFileSync(path.join(DIR, 'radar3.json'), JSON.stringify({version: 3, scan: {enCours: false, debut: 0, mois: 2, total: 4, lus: 5, fini: null, erreur: "Quota exceeded for quota metric 'Total Query Cost'"}}));
+    fs.writeFileSync(path.join(DIR, 'radar3.json'), JSON.stringify({version: 4, scan: {enCours: false, debut: 0, mois: 2, total: 4, lus: 5, fini: null, erreur: "Quota exceeded for quota metric 'Total Query Cost'"}}));
     const qs = [], RR = createRadar({file: path.join(DIR, 'radar3.json'), gmail: {lie: () => true, chercher: async (q) => { qs.push(q); return {threads: []}; }, fil: async () => ({messages: []})}, now: () => Date.parse('2026-11-23T09:00:00Z'), moisDepart: 4});
     const msg = RR.etat().scan.erreur; await RR.traiter('GET', '/api/radar', null); await RR.attendre();
     ok('Radar : la lecture interrompue reprend au mois suivant (2 mois restants sur 4) ; l’ancien message de Google est traduit', qs.length === 2 && /after:2026\/10\/01/.test(qs[0]) && RR.etat().scan.fini && /Google a limité la lecture de tes mails/.test(msg), JSON.stringify([qs, msg])); }
@@ -151,7 +153,7 @@ try {
     /* la lecture d'avant 0.49.0 est oubliée (relevés, propositions), ses dépenses validées, sa paie et ses refus restent */
     fs.writeFileSync(path.join(DIR, 'radar5.json'), JSON.stringify({fixes: [{id: 'f1', service: 'Crédit', montant: 900, jour: 5, rythme: 'mensuel', source: 'toi'}], revenus: {jour: 27, avance: true}, refus: ['x.fr'], releves: [{id: 'r', dom: 'x.fr', montant: 1, date: '2026-11-01', genre: 'facture'}], propositions: [{id: 'p1', service: 'Bruit'}], scan: {fini: 1}}));
     const RV = createRadar({file: path.join(DIR, 'radar5.json'), gmail: {lie: () => false}, now: () => Date.parse('2026-11-23T09:00:00Z')}), bv = RV.brut();
-    ok('Radar : la lecture faite avec les anciennes règles est refaite (relevés et propositions oubliés) ; dépenses, paie et refus gardés', !bv.releves.length && !bv.propositions.length && !bv.scan && bv.fixes.length === 1 && bv.revenus.jour === 27 && bv.refus.includes('x.fr') && bv.version === 3); }
+    ok('Radar : la lecture faite avec les anciennes règles est refaite (relevés et propositions oubliés) ; dépenses, paie et refus gardés', !bv.releves.length && !bv.propositions.length && !bv.scan && bv.fixes.length === 1 && bv.revenus.jour === 27 && bv.refus.includes('x.fr') && bv.version === 4); }
   /* 0.50.0 : catégories enfants et impôts ; la proposition montre son dernier mail */
   ok('Radar : catégories « Enfants » (crèche, couches) et « Impôts » (DGFiP)', categorie('creche-exemple.fr', 'Crèche Les Lutins') === 'Enfants' && categorie('couches-exemple.fr', 'Couches Exemple') === 'Enfants' && categorie('dgfip.finances.gouv.fr', '') === 'Impôts');
   { const px = regrouper(['2026-09', '2026-10', '2026-11'].map((m) => ({id: 'x' + m, fil: 'f' + m, objet: 'Votre facture de ' + m, dom: 'tel3-exemple.fr', cle: 'tel3-exemple.fr', service: 'Tel Trois', montant: 9.99, date: m + '-05', datePrel: null, genre: 'facture'})), lundi)[0];
@@ -211,6 +213,42 @@ try {
     ok('Mails 0.51 : une partie texte qui renvoie au HTML est remplacée par le HTML lu (sans styles, entités traduites, cases séparées)', /Montant \| 4,50 € \|/.test(tx) && /Merci & à bientôt/.test(tx) && !/color/.test(tx), JSON.stringify(tx));
     const tx2 = textOf({mimeType: 'multipart/alternative', parts: [{mimeType: 'text/plain', body: {data: b('Bonjour, votre facture de 12,00 € est disponible. Version HTML : voir en ligne.')}}, {mimeType: 'text/html', body: {data: b('<p>autre</p>')}}]});
     ok('Mails 0.51 : une vraie partie texte reste la partie texte', /12,00 €/.test(tx2), tx2); }
+  /* 0.52.0 : les PDF des factures lus sur le serveur, sans IA (factures inventées : l'une produite par Chromium, l'autre écrite lettre par lettre
+     comme le logiciel d'une crèche, en Courier et en Helvetica sans largeurs) ; la paie « entre le 5 et le 10 » */
+  { const chrome = texteDePdf(fs.readFileSync(new URL('./fixtures/facture-exemple.pdf', import.meta.url)));
+    ok('PDF 0.52 : une facture produite par Chromium (police composée, table ToUnicode) se lit, lignes et montants intacts', /Total à payer : 412,50 €/.test(chrome) && /Facture n° 2026-11 du 05\/11\/2026/.test(chrome) && /Prélèvement le 10\/11\/2026/.test(chrome), JSON.stringify(chrome));
+    ok('PDF 0.52 : le montant retenu est celui « à payer » (pas une ligne de la facture), la date celle du prélèvement', montantPdf(chrome) === 412.5 && trouverDate(chrome, J(2026, 10, 5)) === '2026-11-10');
+    const HV = {M: 833, o: 556, n: 556, t: 278, a: 556, ' ': 278, '\xe0': 556, r: 333, '\xe9': 556, g: 556, l: 222, e: 556, ':': 278, '2': 556, '6': 556, '8': 556, ',': 278, '4': 556, '0': 556, '\x80': 556};
+    const pdfMain = (lignes) => {   /* lignes : [police, taille, texte (octets WinAnsi)] ; chaque lettre placée par « (x)' avance 0 Td » */
+      let c = 'BT /F1 12 Tf ET\n', y = 700;
+      for (const [f, z, tx] of lignes) { c += 'BT /' + f + ' ' + z + ' Tf ET\nBT 60 ' + y + ' Td '; for (const ch of tx) c += '(' + (ch === '(' || ch === ')' || ch === '\\' ? '\\' + ch : ch) + ")' " + ((f === 'F1' ? 600 : HV[ch] || 556) * z / 1000).toFixed(2) + ' 0 Td '; c += 'ET\n'; y -= 20; }
+      const flux = zlib.deflateSync(Buffer.from(c, 'latin1')), o = [];
+      o.push('1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj', '2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj',
+        '3 0 obj << /Type /Page /Parent 2 0 R /Resources << /Font << /F1 5 0 R /F2 6 0 R >> >> /Contents 4 0 R >> endobj');
+      const debut = '%PDF-1.4\n' + o.join('\n') + '\n4 0 obj << /Length ' + flux.length + ' /Filter /FlateDecode >>\nstream\n';
+      const fin = '\nendstream\nendobj\n5 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Courier /Encoding /WinAnsiEncoding >> endobj\n6 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >> endobj\ntrailer << /Root 1 0 R >>\n%%EOF\n';
+      return Buffer.concat([Buffer.from(debut, 'latin1'), flux, Buffer.from(fin, 'latin1')]);
+    };
+    const main = texteDePdf(pdfMain([['F1', 12, 'Facture de novembre'], ['F2', 12, 'Montant \xe0 r\xe9gler : 268,40 \x80'], ['F1', 10, 'Ech\xe9ance : 15/12/2026']]));
+    ok('PDF 0.52 : une facture écrite lettre par lettre (polices standard sans largeurs) se lit sans blancs inventés (« Montant », pas « M ontant »)', /Montant à régler : 268,40 €/.test(main) && /Echéance : 15\/12\/2026/.test(main) && montantPdf(main) === 268.4, JSON.stringify(main));
+    ok('PDF 0.52 : un fichier qui n’est pas un PDF, ou un PDF chiffré, ne donne rien (pas d’erreur)', texteDePdf(Buffer.from('bonjour')) === '' && texteDePdf(Buffer.from('%PDF-1.4\n1 0 obj << >> endobj\ntrailer << /Encrypt 9 0 R >>\n%%EOF')) === '');
+    /* de bout en bout : 3 factures mensuelles de crèche, montant seulement dans le PDF → proposées avec leur montant et leur jour, sans Claude */
+    const F6 = {}, pjs = {};
+    ['09', '10', '11'].forEach((mm, i) => { const id = 'pf' + i; pjs[id] = pdfMain([['F2', 12, 'Montant \xe0 r\xe9gler : 268,40 \x80'], ['F1', 10, 'Ech\xe9ance : 05/' + mm + '/2026']]).toString('base64').replace(/\+/g, '-').replace(/\//g, '_');
+      F6['t' + id] = {id: 't' + id, messages: [{id, threadId: 't' + id, sender: 'noreply@creche-exemple.fr', addressDisplayNames: [{displayName: 'Crèche Exemple', emailAddress: 'noreply@creche-exemple.fr'}], subject: 'Votre facture', plaintextBody: 'Veuillez trouver ci-joint votre facture.', date: '2026-' + mm + '-01T08:00:00Z', labelIds: [], attachments: [{filename: 'facture.pdf', mimeType: 'application/pdf', size: 900, attachmentId: 'a' + id}]}]}; });
+    let appelsClaude = 0; const appelsPj = [];
+    const R6 = createRadar({file: path.join(DIR, 'radar8.json'), gmail: {lie: () => true, chercher: async () => ({threads: Object.values(F6).map((x) => ({id: x.id}))}), fil: async (id) => F6[id], pj: async (mid, aid) => { appelsPj.push(mid + '/' + aid); return {data: pjs[mid]}; }},
+      claude: async () => { appelsClaude++; return {ok: false, error: 'non'}; }, now: () => Date.parse('2026-11-23T09:00:00Z'), moisDepart: 1});
+    await R6.traiter('GET', '/api/radar', null); await R6.attendre();
+    const p6 = R6.etat().propositions.find((x) => x.cle === 'creche-exemple.fr');
+    ok('Radar 0.52 (serveur) : 3 factures dont le montant n’est que dans le PDF → proposée à 268,40 € le 5, lue dans les PDF, sans Claude', !!p6 && p6.montant === 268.4 && p6.jour === 5 && !p6.jourApprox && appelsPj.length === 3 && appelsClaude === 0 && R6.brut().scan.pdf === 3, JSON.stringify([p6, appelsPj.length, appelsClaude]));
+    /* la paie « entre le 5 et le 10 » : le reste à payer court jusqu'au 10 ; la notification de la veille le dit */
+    const R7 = createRadar({file: path.join(DIR, 'radar9.json'), gmail: {lie: () => false}, now: () => Date.parse('2026-12-03T18:00:00Z'), push: async (m) => { R7m.push(m); return []; }}), R7m = [];
+    const ok1 = R7.regler('revenus', {jour: 10, des: 5, avance: true}).ok, ok2 = R7.regler('fixes', [{service: 'Loyer exemple', montant: 50, jour: 4, rythme: 'mensuel'}]).ok;
+    const msg7 = await R7.veille();
+    ok('Radar 0.52 : la paie « entre le 5 et le 10 » est gardée ; la veille dit « d’ici ta paie (au plus tard le jeu. 10/12) »', ok1 && ok2 && R7.brut().revenus.des === 5 && R7.brut().revenus.jour === 10 && !!msg7 && /au plus tard le jeu\. 10\/12/.test(msg7.body), JSON.stringify([R7.brut().revenus, msg7]));
+    R7.regler('revenus', {jour: 10, des: 12});
+    ok('Radar 0.52 : une fenêtre à l’envers (dès le 12, au plus tard le 10) est ignorée', R7.brut().revenus.des === undefined, JSON.stringify(R7.brut().revenus)); }
   /* la mémoire de JARVIS (lue par le serveur MCP, que Grok Bot peut joindre) refuse les chiffres d'un crédit */
   ok('Mémoire : refuse les chiffres d’un crédit (règle du 12/11/2026), garde le reste', interdit('Ma mensualité de crédit immobilier est de 1150 €') && interdit('Il reste 180 000 € à rembourser sur le prêt immobilier') && !interdit("J'ai un crédit immobilier à la banque") && !interdit('Je suis prêt à 8h'));
 } catch (e) { ok('exception', false, e.stack); }
