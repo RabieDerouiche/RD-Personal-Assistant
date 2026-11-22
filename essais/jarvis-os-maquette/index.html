@@ -460,6 +460,10 @@
   .aj:active { transform: scale(.95); }
   .aj { transition: box-shadow .25s ease, transform .14s ease; } .aj.is-on { box-shadow: 0 0 0 2px var(--bc, rgb(var(--c1))), 0 0 18px color-mix(in srgb, var(--bc, rgb(var(--c1))) 45%, transparent); }
   [id^="auto-"] { scroll-margin-top: calc(var(--toph, 96px) + 64px); }
+  /* 0.59.0 : au démarrage, une lueur qui respire (avant : « Maquette » et « Vue d'ensemble » sur une page vide) ; l'orbe de la barre esquissée avant d'être montée */
+  #view:empty { min-height: 62vh; background: radial-gradient(closest-side at 50% 40%, rgba(34, 211, 238, .2), rgba(168, 85, 247, .07) 60%, transparent 80%); animation: bootPulse 1.6s ease-in-out infinite; }
+  .talk-slot:not(:has(.jv-btn))::before { content: ""; width: 54px; height: 54px; border-radius: 50%; background: radial-gradient(circle at 50% 42%, rgba(207, 250, 254, .9), rgba(34, 211, 238, .4) 34%, rgba(10, 20, 40, .3) 72%); box-shadow: 0 0 22px rgba(34, 211, 238, .35); animation: bootPulse 1.6s ease-in-out infinite; }
+  @keyframes bootPulse { 50% { opacity: .45; } }
 </style><title>J.A.R.V.I.S OS</title></head><body>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sora:wght@400;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
@@ -1628,14 +1632,14 @@
 <div class="scroller" id="scroller">
 <header class="top">
   <div class="top-in">
-    <div class="brand"><button type="button" class="nav-back" id="nav-back" hidden></button><b>JARVIS</b><p class="demo" id="demo">Maquette</p></div>
+    <div class="brand"><button type="button" class="nav-back" id="nav-back" hidden></button><b>JARVIS</b><p class="demo" id="demo"></p></div>
     <div class="top-meta"><span id="today"></span><span class="clock" id="clock">--:--</span><span class="top-tools" id="top-tools"></span></div>
     <div class="status" id="status" aria-live="polite"></div>
   </div>
 </header>
 <nav class="tabs fav-bar" id="tabs" aria-label="Rubriques"></nav>
 <main id="dir" class="dir">
-  <h1 class="view-title" id="view-title">Vue d'ensemble</h1>
+  <h1 class="view-title" id="view-title"></h1>
   <div id="view"></div>
 </main>
 </div>
@@ -4085,9 +4089,44 @@ void main(){
     const JS = window.JarvisServeur; if (!SRV_OS || !JS || !JS.brief || !JS.linked()) return null;
     const card = h('section', {class: 'hm-sec brief-card', id: 'brief-card', hidden: ''});
     JS.brief.lire().then((b) => { if (!b || !b.texte || new Date(b.at).toDateString() !== new Date().toDateString()) return; card.hidden = false;
-      card.replaceChildren(h('header', {class: 'hm-h'}, h('h2', {text: 'Brief du matin'}), h('span', {class: 'aside', text: fmt(new Date(b.at), {hour: '2-digit', minute: '2-digit'})})), h('p', {class: 'brief-tx', text: b.texte}),
-        h('div', {class: 'row-actions'}, h('button', {type: 'button', class: 'btn sm', onclick: () => { const v = JVX(); if (v && v.say) try { v.say(b.texte); } catch (e) { /* rien */ } }}, 'Lire'))); });
+      card.classList.add('bf-in');
+      card.replaceChildren(h('header', {class: 'hm-h bf-h'}, h('h2', {text: 'Brief du matin'}), h('span', {class: 'aside', text: fmt(new Date(b.at), {hour: '2-digit', minute: '2-digit'})}),
+        h('button', {type: 'button', class: 'btn sm bf-lire', onclick: () => { const v = JVX(); if (v && v.say) try { v.say(b.texte); } catch (e) { /* rien */ } }}, '▶ Lire')), briefBody(b)); });
     return card;
+  }
+  /* 0.59.0 : le brief en rubriques (météo, agenda, pour toi, échéances, missions, relances), une ligne par chose ; le serveur les donne (parts),
+     sinon elles sont retrouvées dans le texte (brief fait par un serveur plus ancien) */
+  const BF = {meteo: ['Météo', '#38bdf8'], agenda: ['Agenda', '#60a5fa'], pourmoi: ['Pour toi', '#fbbf24'], echeances: ['Échéances', '#fb7185'], missions: ['Missions de Claude', '#a78bfa'], relances: ['Relances', '#34d399'], autre: ['', '#94a3b8']};
+  function briefParts(b) {
+    if (Array.isArray(b.parts) && b.parts.length) return b.parts.filter((x) => x && BF[x.k] && x.t);
+    const tx = String(b.texte || '').replace(/^Bonjour\.\s*Nous sommes [^.]+\.\s*/, '');
+    const kind = (x) => /^Échéances\s*:/i.test(x) ? 'echeances' : /^Relances du jour/i.test(x) ? 'relances' : /missions? terminées?/i.test(x) ? 'missions'
+      : /pour toi|Le détail est dans Pour moi|Rien ne t.attend/i.test(x) ? 'pourmoi' : /degr|pluie|ressenti|parapluie|soleil|nuag|vent\b|neige|bruine|orage|couvert|éclaircie|brouillard|averse/i.test(x) ? 'meteo'
+      : /agenda|rendez-vous|^Aujourd.hui|^Demain|^Ce soir|^Cet après-midi/i.test(x) ? 'agenda' : 'autre';
+    const out = []; (tx.match(/[^.]+(?:\.(?!\d)|$)/g) || []).map((x) => x.trim()).filter(Boolean).forEach((x) => { const k = kind(x), last = out[out.length - 1]; if (last && (last.k === k || k === 'autre')) last.t += ' ' + x; else out.push({k, t: x}); });
+    return out;
+  }
+  function briefBody(b) {
+    const list = h('div', {class: 'bf'});
+    briefParts(b).forEach((p) => {
+      const [lbl, col] = BF[p.k]; let t = p.t.replace(/\s*Le détail est dans Pour moi\.?/i, '').trim();
+      const row = h('div', {class: 'bf-row', style: '--bf:' + col}, h('span', {class: 'bf-dot'}));
+      const box = h('div', {class: 'bf-b'}); row.append(box);
+      const m = t.match(/^([^:]{2,60}?)\s:\s([\s\S]+)$/);
+      if (p.k === 'meteo') {
+        const ss = t.split(/(?<=\.)\s+/), tip = ss.filter((x) => /^Prends|^Pense|^Sors/i.test(x));
+        box.append(h('small', {class: 'bf-k', text: lbl}), h('b', {text: ss[0].replace(/^En ce moment,?\s*/i, '').replace(/(\d+) degrés/g, '$1°').replace(/ressenti (-?\d+)(?!°)/, 'ressenti $1°').replace(/\.$/, '')}));
+        const rest = ss.slice(1).filter((x) => !tip.includes(x)).join(' ').replace(/(\d+) degrés/g, '$1°'); if (rest) box.append(h('span', {class: 'bf-t', text: rest}));
+        tip.forEach((x) => box.append(h('span', {class: 'bf-tip', text: x.replace(/\.$/, '')})));
+      } else if (m && /;|pour toi|Échéances|Relances|terminée/i.test(m[1] + m[2])) {
+        box.append(h('small', {class: 'bf-k', text: p.k === 'autre' ? m[1] : p.k === 'pourmoi' ? m[1].replace(/^(\d+|Une) chose/i, (z) => z) : lbl}));
+        const items = m[2].replace(/\.$/, '').split(/\s;\s/).map((x) => x.trim()).filter(Boolean);
+        box.append(h('ul', {class: 'bf-l'}, items.map((x) => { const d = x.match(/^(aujourd.hui|demain),\s*/i); return h('li', {}, d ? h('em', {text: cap1(d[1])}) : null, d ? x.slice(d[0].length) : x); })));
+        if (p.k === 'pourmoi') box.append(h('button', {type: 'button', class: 'bf-go', onclick: () => go('demandes')}, 'Voir dans Pour moi ›'));
+      } else box.append(h('small', {class: 'bf-k', text: lbl || 'Aussi'}), h('span', {class: 'bf-t', text: t}));
+      list.append(row);
+    });
+    return list;
   }
   VIEWS.automatisations = (el) => {
     { const rp = routinesPanel(); if (rp) el.append(rp); }   /* 0.41.0 */
@@ -4311,7 +4350,7 @@ void main(){
     if (!JS) { if (!RAD.data) RAD.data = window.__RADAR || null; return; }
     if (RAD.loading || (!force && RAD.data && Date.now() - (RAD.at || 0) < 30000)) return;
     RAD.loading = true;
-    JS.radar().then((r) => { RAD.loading = false; RAD.at = Date.now(); if (r) { RAD.data = r; if (TAB === 'argent') renderView(true); } }).catch(() => { RAD.loading = false; RAD.at = Date.now(); });
+    JS.radar().then((r) => { RAD.loading = false; RAD.at = Date.now(); if (r) { RAD.data = r; if (TAB === 'argent' || TAB === 'accueil' || TAB === 'espaces') renderView(true); } }).catch(() => { RAD.loading = false; RAD.at = Date.now(); });
   }
   const radEur = (n) => (n == null || isNaN(n) ? '' : Number(n).toLocaleString('fr-FR', {minimumFractionDigits: 2, maximumFractionDigits: 2}).replace(/\u202f/g, '\u00a0') + ' €');   /* espace insécable visible : la fine (U+202F) ne s'affichait pas */
   const radDay = (iso) => { const d = new Date(iso + 'T12:00:00'), t = new Date(); t.setHours(12, 0, 0, 0); return Math.round((d - t) / 864e5); };
@@ -8244,13 +8283,14 @@ void main(){
     const ro = (pos, act, k, b, sub, amb) => h('button', {type: 'button', class: 'hud-ro q-' + pos + (amb ? ' amb' : ''), 'data-k': k, onclick: act}, h('small', {text: k}), h('b', {text: b}), h('span', {text: sub}));
     const metB = ml ? (ml.match(/-?\d+°/) || [''])[0] || ml.split(' · ')[0] : '', metS = ml ? ml.replace(/^-?\d+° · /, '') : 'Afficher la météo';
     let argB = null, argS = '';
-    if (typeof radOn === 'function' && radOn()) { radLoad(); const R = RAD.data ? radReste(RAD.data) : null; if (R) { argB = radEur(R.tReste); argS = R.mois ? 'd’ici la fin du mois' : 'd’ici ta paie'; } }
+    const argOn = typeof radOn === 'function' && radOn(), wait = SRV_OS && !SNAP;   /* 0.59.0 : données pas encore lues */
+    if (argOn) { radLoad(); const R = RAD.data ? radReste(RAD.data) : null; if (R) { argB = radEur(R.tReste); argS = R.mois ? 'd’ici la fin du mois' : 'd’ici ta paie'; } }
     const deals = (S.ach || []).filter((f) => ['achat', 'bon'].includes(famState(f)));
     const core = h('div', {class: 'hud-core'}, HUD.g ? HUD.g.el : C('claude', 150).el, h('svg', {class: 'hud-lines', 'aria-hidden': 'true'}),
-      ro('tl', () => go('agenda'), 'AGENDA', today.length + (today.length > 1 ? ' rendez-vous' : today.length ? ' rendez-vous' : ' rendez-vous'), next ? next.time + ' ' + next.title : today.length ? 'fini pour aujourd’hui' : 'journée libre'),
+      wait ? ro('tl', () => go('agenda'), 'AGENDA', '…', 'lecture de l’agenda') : ro('tl', () => go('agenda'), 'AGENDA', today.length + ' rendez-vous', next ? next.time + ' ' + next.title : today.length ? 'fini pour aujourd’hui' : 'journée libre'),
       ro('tr', () => metLoad(true), 'MÉTÉO', metB || '—', metS),
-      ro('bl', () => go('demandes'), 'POUR TOI', pm + (pm > 1 ? ' décisions' : pm ? ' décision' : ''), urg ? urg + (urg > 1 ? ' urgentes' : ' urgente') : pm ? 'à décider ou à faire' : 'rien ne t’attend', pm > 0),
-      argB ? ro('br', () => go('argent'), 'ARGENT', argB, argS) : ro('br', () => go('achats'), 'BONS PRIX', String(deals.length), deals.length ? deals[0].title : 'rien sous tes seuils'));
+      wait ? ro('bl', () => go('demandes'), 'POUR TOI', '…', 'lecture de Pilotage') : ro('bl', () => go('demandes'), 'POUR TOI', pm + (pm > 1 ? ' décisions' : pm ? ' décision' : ''), urg ? urg + (urg > 1 ? ' urgentes' : ' urgente') : pm ? 'à décider ou à faire' : 'rien ne t’attend', pm > 0),
+      argB || argOn ? ro('br', () => go('argent'), 'ARGENT', argB || (RAD.at ? '—' : '…'), argB ? argS : RAD.at ? 'Radar à régler' : 'lecture du Radar') : ro('br', () => go('achats'), 'BONS PRIX', String(deals.length), deals.length ? deals[0].title : 'rien sous tes seuils'));
     const hi = h('span', {class: 'hud-hi'}), say = h('span'), A = hello() + ', Rabie.';
     const B = (pm ? pm + (pm > 1 ? ' décisions t’attendent' : ' décision t’attend') + (urg ? ', dont ' + urg + (urg > 1 ? ' urgentes' : ' urgente') : '') + '. ' : 'Rien ne t’attend. ')
       + (today.length ? today.length + (today.length > 1 ? ' rendez-vous' : ' rendez-vous') + ' aujourd’hui' + (next ? ', le prochain à ' + next.time.replace('h', ' h ') : '') + '. ' : 'Journée libre dans ton agenda. ')
@@ -8262,13 +8302,13 @@ void main(){
       h('div', {class: 'hud-act'}, h('button', {type: 'button', class: 'btn main', onclick: () => (window.JarvisAsk || (() => openChat('claude')))()}, 'Parler à JARVIS'), typeof briefCard === 'function' ? null : null));
     requestAnimationFrame(() => requestAnimationFrame(hudLines));
     /* la phrase du jour : dite une fois par ouverture de l'app, pendant que le globe parle ; elle continue si la page est redessinée (données qui arrivent) */
-    HUD.hi = hi; HUD.say = say; HUD.A = A; HUD.txt = A + ' ' + B;
+    HUD.hi = hi; HUD.say = say; HUD.A = A; HUD.txt = wait ? A : A + ' ' + B;
     const put = (n) => { const x = HUD.txt.slice(0, n); HUD.hi.textContent = x.slice(0, HUD.A.length); HUD.say.textContent = x.length > HUD.A.length ? x.slice(HUD.A.length + 1) : ''; };
     if (HUD.done || reduced) put(HUD.txt.length);
     else if (HUD.timer) put(HUD.i);
     else {
       HUD.i = 0; if (HUD.g) HUD.g.set('speaking');
-      HUD.timer = setInterval(() => { HUD.i += 2; put(HUD.i); if (HUD.i >= HUD.txt.length) { clearInterval(HUD.timer); HUD.timer = null; HUD.done = true; setTimeout(() => HUD.g && HUD.g.set('idle'), 500); } }, 34);
+      HUD.timer = setInterval(() => { HUD.i += 2; put(HUD.i); if (HUD.i >= HUD.txt.length && !(SRV_OS && !SNAP)) { clearInterval(HUD.timer); HUD.timer = null; HUD.done = true; setTimeout(() => HUD.g && HUD.g.set('idle'), 500); } }, 34);
     }
     return scr;
   }
@@ -9760,7 +9800,12 @@ void main(){
         if (vt && getComputedStyle(vt).display !== 'none') title = {node: vt.cloneNode(true), r: vt.getBoundingClientRect(), t: vt.textContent}; }
       const r = RV1.apply(this, arguments);
       UXM.prev = SNAPS();
-      const nw = v && v.firstElementChild;
+      let nw = v && v.firstElementChild;
+      const raw = nw && nw !== old ? nw.innerHTML : null;
+      /* 0.59.0 : une page redessinée parce que des données arrivent (Pilotage, Radar, photos), sans rien de changé, n'est plus remplacée :
+         avant, elle clignotait (cartes, reflets, photos rechargées) à chaque lecture. Si elle a changé, ses photos déjà chargées sont gardées. */
+      if (keep && !kind && old && nw && old !== nw && old.__raw === raw && old.__dec === uxNorm(old)) { v.replaceChild(old, nw); return r; }   /* __dec : la page affichée n'a pas été modifiée sur place depuis (bouton « … », élément déplacé) */
+      if (keep && !kind && old && nw && old !== nw) keepImgs(old, nw);
       if (kind && old && nw && old !== nw) {
         const tNew = vt && getComputedStyle(vt).display !== 'none';
         ghostOut(old, rect, topB, botT, kind, title && (title.t !== (vt && vt.textContent) || !tNew) ? title : null); UXM.dragX = 0;
@@ -9770,9 +9815,14 @@ void main(){
         setTimeout(() => nw.classList.remove('ux-in', 'ux-in-' + kind), 900);
       }
       if (nw && (!keep || kind)) countUp(nw);
-      if (nw) { decorate(nw); if (!keep || kind) reveal(nw); }
+      if (nw) { decorate(nw, !keep || kind); if (!keep || kind) reveal(nw); if (kind) UXM.navAt = performance.now(); if (raw != null) { nw.__raw = raw; nw.__dec = uxNorm(nw); } }
       return r;
     };
+    const uxNorm = (x) => x.innerHTML.replace(/ ux-rv(?:-on)?\b| ux-tilt\b/g, '');
+    function keepImgs(old, nw) {
+      const have = new Map(); old.querySelectorAll('img').forEach((i) => { if (i.complete && i.naturalWidth && i.getAttribute('src')) have.set(i.getAttribute('src'), i); });
+      if (have.size) nw.querySelectorAll('img').forEach((i) => { const o = have.get(i.getAttribute('src')); if (o) { have.delete(i.getAttribute('src')); o.className = i.className; o.alt = i.alt; i.replaceWith(o); } });
+    }
     /* un filtre (puces, segments, onglets d'une page) touché : le contenu se fond au lieu de sauter */
     document.addEventListener('click', (e) => { const t = e.target.closest && e.target.closest('#view .seg button, #view .ux-seg button, #view [role="tab"], #view .mchip[aria-pressed], #view .chip[aria-pressed], #view .chips button'); if (t) { UXM.next = 'fade'; UXM.t = performance.now(); } }, true);
     /* le retour par le bord gauche : l'ancienne page repart de là où le doigt l'a laissée */
@@ -9805,7 +9855,7 @@ void main(){
       + '.ux-shine::before{content:"";position:absolute;top:-60%;bottom:-60%;width:38%;left:-60%;background:linear-gradient(100deg,transparent,rgba(190,240,255,.16) 45%,rgba(255,255,255,.28) 50%,rgba(190,240,255,.16) 55%,transparent);transform:translateX(0) rotate(12deg);animation:uxSweep var(--sw,7s) ease-in-out var(--sd,0s) infinite}'
       + '@keyframes uxSweep{0%,62%{transform:translateX(0) rotate(12deg)}100%{transform:translateX(560%) rotate(12deg)}}'
       + '.ux-neon{inset:-1.5px;padding:2px;overflow:hidden;-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask:linear-gradient(#000 0 0) content-box exclude,linear-gradient(#000 0 0)}'
-      + '.ux-neon::before{content:"";position:absolute;left:50%;top:50%;width:160%;aspect-ratio:1;background:conic-gradient(from 0deg,transparent 0 42%,rgba(var(--c2),.15) 50%,#e8fbff 66%,rgb(var(--c2)) 72%,rgb(var(--c3)) 84%,transparent 96%);animation:uxSpin 4.2s linear infinite}'
+      + '.ux-neon::before{content:"";position:absolute;left:50%;top:50%;width:160%;aspect-ratio:1;background:conic-gradient(from 0deg,transparent 0 42%,rgba(var(--c2),.15) 50%,#e8fbff 66%,rgb(var(--c2)) 72%,rgb(var(--c3)) 84%,transparent 96%);animation:uxSpin 4.2s linear var(--nd,0s) infinite}'
       /* liseré de lumière en haut des cartes : éclairées par-dessus, même à l'arrêt */
       + '.ux-shine::after{content:"";position:absolute;left:12%;right:12%;top:0;height:1px;background:linear-gradient(90deg,transparent,rgba(220,250,255,.75),transparent);box-shadow:0 0 10px rgba(var(--c2),.6)}'
       + '@keyframes uxSpin{from{transform:translate(-50%,-50%) rotate(0)}to{transform:translate(-50%,-50%) rotate(360deg)}}'
@@ -9833,16 +9883,27 @@ void main(){
     const SHINES = '.esp-tile, .hud-ro, .kpi-t, .mate, .voy, .fam, .shop-hero, .rad-hero, .trip-hero, .brief-card, .hero, .pm-card, .card.item, .sor';
     const NEONS = '.hero, .shop-hero, .rad-hero, .trip-hero, .brief-card, .esp-tile.amb, .hud-ro.amb';
     const HALOS = '.esp-tile.amb, .hud-ro.amb, .mate[data-mode="demande"]';
-    const posRel = (x) => { if (getComputedStyle(x).position === 'static') x.style.position = 'relative'; };
-    const deco = (x, cls) => { if (x.querySelector(':scope > .' + cls)) return null; posRel(x); const d = h('i', {class: 'ux-deco ' + cls, 'aria-hidden': 'true'}); x.append(d); return d; };
-    function decorate(root) {
+    /* 0.59.0 : toutes les lectures d'abord, puis les écritures (avant : un recalcul de style par carte, 35 ms au téléphone ralenti) ;
+       les reflets et le néon reprennent où ils en étaient quand la page est redessinée (données qui arrivent), au lieu de repartir tous ensemble */
+    function decorate(root, nav) {
       if (reduced) return;
-      let n = 0;
-      root.querySelectorAll(SHINES).forEach((x) => { const d = deco(x, 'ux-shine'); if (d) { d.style.setProperty('--sd', ((n++ * 1.37) % 6).toFixed(2) + 's'); d.style.setProperty('--sw', (6.5 + (n % 3)) + 's'); } });
-      [...root.querySelectorAll(NEONS)].slice(0, 3).forEach((x) => deco(x, 'ux-neon'));
-      root.querySelectorAll(HALOS).forEach((x) => { x.style.animation = 'none'; deco(x, 'ux-halo'); });
-      root.querySelectorAll(TILTS).forEach((x) => { if (!x.classList.contains('ux-tiltable')) { x.classList.add('ux-tiltable'); deco(x, 'ux-lit'); } });
-      const vt = $('view-title'); if (vt && !vt.classList.contains('ux-holo')) { vt.classList.add('ux-holo'); setTimeout(() => vt.classList.remove('ux-holo'), 1900); }
+      const jobs = [], has = (x, c) => !!x.querySelector(':scope > .' + c);
+      root.querySelectorAll(SHINES).forEach((x) => jobs.push([x, 'ux-shine']));
+      [...root.querySelectorAll(NEONS)].slice(0, 3).forEach((x) => jobs.push([x, 'ux-neon']));
+      root.querySelectorAll(HALOS).forEach((x) => jobs.push([x, 'ux-halo']));
+      const tilts = [...root.querySelectorAll(TILTS)].filter((x) => !x.classList.contains('ux-tiltable')); tilts.forEach((x) => jobs.push([x, 'ux-lit']));
+      const todo = jobs.filter(([x, c]) => !has(x, c)), stat = todo.map(([x]) => getComputedStyle(x).position === 'static');
+      const t = performance.now() / 1000; let n = 0;
+      todo.forEach(([x, c], i) => {
+        if (stat[i]) x.style.position = 'relative';
+        const d = h('i', {class: 'ux-deco ' + c, 'aria-hidden': 'true'});
+        if (c === 'ux-shine') { const sw = 6.5 + (n % 3), off = (n++ * 1.37) % 6; d.style.setProperty('--sw', sw + 's'); d.style.setProperty('--sd', (-(((t - off) % sw) + sw) % sw).toFixed(2) + 's'); }
+        if (c === 'ux-neon') d.style.setProperty('--nd', (-(t % 4.2)).toFixed(2) + 's');
+        if (c === 'ux-halo') x.style.animation = 'none';
+        x.append(d);
+      });
+      tilts.forEach((x) => x.classList.add('ux-tiltable'));
+      const vt = $('view-title'); if (nav && vt && !vt.classList.contains('ux-holo')) { vt.classList.add('ux-holo'); setTimeout(() => vt.classList.remove('ux-holo'), 1900); }
     }
     /* apparition en 3D : ce qui est sous le bas de l'écran apparaît en montant quand on y arrive */
     let IO = null;
@@ -9877,10 +9938,15 @@ void main(){
     openChat = function () { const wasOpen = CHAT.open, r = OC1.apply(this, arguments); const ov = $('chat'); if (!reduced && ov && !wasOpen && !ov.hidden) { const [x, y] = orbXY(); ov.style.setProperty('--ox', x); ov.style.setProperty('--oy', y); ov.classList.remove('ux-circ', 'ux-circd'); void ov.offsetWidth; ov.classList.add('ux-circ'); setTimeout(() => { if (CHAT.open) ov.classList.add('ux-circd'); ov.classList.remove('ux-circ'); }, 700); }   /* ux-circd : sans lui, l'animation de feuille repartait à la fin du cercle (la discussion remontait une seconde fois) */ return r; };
     const CC2 = closeChat;
     closeChat = function () { const ov = $('chat'), vis = ov && !ov.hidden; const r = CC2.apply(this, arguments); if (ov) ov.classList.remove('ux-circ', 'ux-circd'); if (vis && !reduced) { const g = document.querySelector('body > .ux-ov-out:last-of-type'); if (g) { const [x, y] = orbXY(); g.style.setProperty('--ox', x); g.style.setProperty('--oy', y); g.classList.add('ux-circ-out'); } } return r; };
+    /* 0.59.0 (« l'appui sur les boutons du menu, Espaces surtout, bugge ») : l'onglet s'allume dès que le doigt le touche (avant : rien jusqu'à la fin du calcul de la page),
+       et un second appui pendant la transition est ignoré (avant : il relançait la page ou la remontait pendant qu'elle arrivait) */
+    document.addEventListener('pointerdown', (e) => { const t = e.target.closest && e.target.closest('.tab'); if (!t) return; t.classList.add('is-press'); setTimeout(() => t.classList.remove('is-press'), 380); }, {passive: true, capture: true});
+    document.addEventListener('click', (e) => { const t = e.target.closest && e.target.closest('.tab'); if (!t) return; if (UXM.navAt && performance.now() - UXM.navAt < 450) { e.stopImmediatePropagation(); e.preventDefault(); } }, true);
+    document.head.append(h('style', {text: '.fav-bar{touch-action:manipulation;-webkit-tap-highlight-color:transparent}.fav-row{align-items:stretch!important}.fav-bar .tab{justify-content:flex-end;min-height:62px!important}.fav-row .tab{transition:transform .18s ' + EASE + ',color .18s}.fav-row .tab.is-press{transform:scale(.9);color:var(--fg)}.fav-row .tab.is-press .ic{filter:drop-shadow(0 0 8px var(--pg,#22d3ee))}'}));
     /* parallaxe : le ciel glisse plus lentement que la page */
     { const sc = $('scroller'), sky = document.querySelector('.ux-sky'); let raf = 0; if (sc && sky) sc.addEventListener('scroll', () => { if (raf) return; raf = requestAnimationFrame(() => { raf = 0; sky.style.setProperty('--sy', String(sc.scrollTop)); }); }, {passive: true}); }
     /* au premier affichage aussi */
-    setTimeout(() => { const v = $('view') && $('view').firstElementChild; if (v) { decorate(v); reveal(v); } }, 0);
+    setTimeout(() => { const v = $('view') && $('view').firstElementChild; if (v) { decorate(v, true); reveal(v); } }, 0);
     /* ================= 0.58.0 : fini les blocs bleus (son choix au QCM du 22/11/2026 : « verre noir, une couleur par rubrique, bord irisé sur les cartes phares »).
        Les surfaces bleu marine deviennent du verre presque noir ; chaque carte prend la couleur de sa rubrique (ou de son bot) en lueur dans le coin et sur le bord ;
        les cartes phares ont un bord irisé ; l'ambre reste réservé à « attend ta réponse ». Couleurs fixes : rien ne se redessine en continu. */
@@ -9888,6 +9954,14 @@ void main(){
     const setPg = () => document.documentElement.style.setProperty('--pg', PGC[TAB] || '#22d3ee');
     const RV4 = renderView; renderView = function () { const r = RV4.apply(this, arguments); setPg(); return r; };
     setPg();
+    document.head.append(h('style', {id: 'ux-brief', text: '.brief-card.bf-in{animation:uxInF .5s ' + EASE + ' both}.bf-h{align-items:center;gap:8px}.bf-h .aside{margin-left:auto}.bf-lire{padding:6px 12px!important}'
+      + '.bf{display:grid;gap:12px;margin-top:4px}.bf-row{display:grid;grid-template-columns:10px 1fr;gap:10px;align-items:start}'
+      + '.bf-dot{width:8px;height:8px;margin-top:6px;border-radius:50%;background:var(--bf);box-shadow:0 0 10px var(--bf)}'
+      + '.bf-b{display:grid;gap:4px;min-width:0}.bf-k{font:600 11px var(--tech,inherit);letter-spacing:.14em;text-transform:uppercase;color:var(--bf)}.bf-b>b{font-size:17px;font-weight:650;color:var(--fg)}'
+      + '.bf-t{font-size:14.5px;line-height:1.45;color:var(--muted)}.bf-tip{justify-self:start;font-size:13px;padding:4px 10px;border-radius:999px;color:#e0f2fe;background:color-mix(in srgb,var(--bf) 18%,transparent);border:1px solid color-mix(in srgb,var(--bf) 45%,transparent)}'
+      + '.bf-l{list-style:none;margin:2px 0 0;padding:0;display:grid;gap:6px}.bf-l li{font-size:14.5px;line-height:1.4;color:var(--fg);padding:8px 10px;border-radius:12px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06)}'
+      + '.bf-l em{font-style:normal;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;margin-right:8px;padding:2px 7px;border-radius:6px;color:#111;background:var(--bf)}'
+      + '.bf-go{justify-self:start;background:none;border:0;padding:2px 0;color:var(--bf);font:600 13.5px inherit;cursor:pointer}'}));
     document.head.append(h('style', {id: 'ux-cartes', text: 'html.theme-holo{--k1:10,11,16;--k2:24,26,36;--k3:17,19,27;--k5:6,7,11;--k6:14,15,22;--k7:26,28,40;--k8:19,21,30;--k9:11,12,18;--k10:40,43,58;--k11:6,7,11;--k12:3,3,6;--bg:#05060a;--bg-2:#0a0b11;--sheet:rgba(12,13,19,.97);--glass:rgba(255,255,255,.045);--glass-2:rgba(255,255,255,.07);--glass-3:rgba(255,255,255,.12);--line:rgba(255,255,255,.09);--line-2:rgba(255,255,255,.18);--fg:#eef1f7;--muted:#a3acbf;--dim:#6e778b}html.theme-holo body::after{background:radial-gradient(1px 1px at 8% 14%,rgba(255,255,255,.5),transparent 60%),radial-gradient(1px 1px at 34% 6%,rgba(255,255,255,.35),transparent 60%),radial-gradient(1.5px 1.5px at 72% 22%,rgba(255,255,255,.45),transparent 60%),radial-gradient(1px 1px at 91% 9%,rgba(255,255,255,.4),transparent 60%),radial-gradient(1px 1px at 18% 48%,rgba(255,255,255,.3),transparent 60%),radial-gradient(1px 1px at 46% 72%,rgba(255,255,255,.3),transparent 60%),radial-gradient(860px 520px at 50% -12%,color-mix(in srgb,var(--pg) 22%,transparent),transparent 62%),radial-gradient(640px 520px at 112% 84%,rgba(168,85,247,.16),transparent 62%),radial-gradient(560px 480px at -12% 62%,rgba(236,72,153,.08),transparent 62%),#05060a}.ux-sky i{background:radial-gradient(42% 30% at 30% 20%,color-mix(in srgb,var(--pg) 13%,transparent),transparent 70%),radial-gradient(36% 26% at 75% 65%,rgba(168,85,247,.10),transparent 70%)}html.theme-holo .top{border-bottom-color:color-mix(in srgb,var(--pg) 28%,transparent);box-shadow:0 1px 0 color-mix(in srgb,var(--pg) 10%,transparent)}.ux-seg{background:rgba(12,13,19,.92)!important;border-color:rgba(255,255,255,.08)!important}html.theme-holo :is(.glass,.card,.unit,.kpi,.key,.mate,.hero,.feed,.canal-row,.tl,.routines,.intent-row,.brief-card,.auto,.pap,.menu-tile,.esp-tile,.esp-row,.hud-ro,.tf,.rad-hero,.shop-hero,.trip-hero){--tint:var(--bc,var(--pg));--cbg:radial-gradient(130% 90% at 0% 0%,color-mix(in srgb,var(--tint) 30%,transparent),transparent 60%) padding-box,radial-gradient(90% 70% at 100% 100%,color-mix(in srgb,var(--tint) 9%,transparent),transparent 60%) padding-box,linear-gradient(180deg,#15171f,#0b0c12) padding-box;background:var(--cbg),linear-gradient(160deg,color-mix(in srgb,var(--tint) 68%,transparent),rgba(255,255,255,.08) 44%,rgba(255,255,255,.03)) border-box!important;border:1px solid transparent!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.07),0 14px 34px rgba(0,0,0,.5),0 0 28px color-mix(in srgb,var(--tint) 13%,transparent)!important}html.theme-holo :is(.esp-tile,.esp-row)[data-go="achats"]{--tint:#fb7185}html.theme-holo :is(.esp-tile,.esp-row)[data-go="voyages"]{--tint:#2dd4bf}html.theme-holo :is(.esp-tile,.esp-row)[data-go="sorties"]{--tint:#f472b6}html.theme-holo :is(.esp-tile,.esp-row)[data-go="argent"]{--tint:#34d399}html.theme-holo :is(.esp-tile,.esp-row)[data-go="papiers"]{--tint:#c084fc}html.theme-holo :is(.esp-tile,.esp-row)[data-go="equipe"]{--tint:#818cf8}html.theme-holo :is(.esp-tile,.esp-row)[data-go="reglages"]{--tint:#94a3b8}html.theme-holo :is(.esp-tile,.esp-row)[data-go="agenda"]{--tint:#60a5fa}html.theme-holo .hud-ro.q-tl{--tint:#60a5fa}html.theme-holo .hud-ro.q-tr{--tint:#38bdf8}html.theme-holo .hud-ro.q-bl{--tint:#a78bfa}html.theme-holo .hud-ro.q-br{--tint:#34d399}html.theme-holo .hud-ro[data-k="BONS PRIX"]{--tint:#fb7185}html.theme-holo :is(.glass,.card,.unit,.kpi,.key,.mate,.hero,.feed,.canal-row,.tl,.routines,.intent-row,.brief-card,.auto,.pap,.menu-tile,.esp-tile,.esp-row,.hud-ro,.tf,.rad-hero,.shop-hero,.trip-hero):is(.amb,.is-amber,.is-today,[data-mode="demande"]){--tint:#fbbf24}html.theme-holo :is(.hero,.shop-hero,.rad-hero,.trip-hero,.brief-card){background:var(--cbg),conic-gradient(from 210deg,#22d3ee,#a855f7,#f472b6,#fbbf24,#34d399,#22d3ee) border-box!important;border:1.5px solid transparent!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 16px 40px rgba(0,0,0,.55),0 0 30px rgba(168,85,247,.18),0 0 18px rgba(34,211,238,.12)!important}.ux-neon::before{background:conic-gradient(from 0deg,transparent 0 38%,rgba(34,211,238,.2) 46%,#67e8f9 56%,#c084fc 66%,#f472b6 75%,#fde68a 84%,transparent 95%)!important}:is(.amb,.is-amber,.is-today,[data-mode="demande"])>.ux-neon::before{background:conic-gradient(from 0deg,transparent 0 45%,rgba(251,191,36,.2) 55%,#fde68a 70%,#fbbf24 80%,transparent 95%)!important}.ux-shine::after{background:linear-gradient(90deg,transparent,rgba(255,255,255,.72),transparent)!important;box-shadow:0 0 10px color-mix(in srgb,var(--tint,var(--pg)) 70%,transparent)!important}.ux-lit{background:radial-gradient(160px circle at var(--lx,50%) var(--ly,50%),rgba(255,255,255,.22),color-mix(in srgb,var(--tint,var(--pg)) 14%,transparent) 40%,transparent 70%)!important}html.theme-holo .panel-h h2::before{background:linear-gradient(var(--pg),color-mix(in srgb,var(--pg) 45%,#a855f7));box-shadow:0 0 10px color-mix(in srgb,var(--pg) 70%,transparent)}.ux-floor i{background-image:linear-gradient(color-mix(in srgb,var(--pg) 28%,transparent) 1px,transparent 1px),linear-gradient(90deg,color-mix(in srgb,var(--pg) 28%,transparent) 1px,transparent 1px)!important}.fav-row .tab[aria-current="page"]::before{background:radial-gradient(circle,color-mix(in srgb,var(--pg) 30%,transparent),transparent 65%)!important}'}));
   }
 

@@ -28,7 +28,7 @@ import {createRadar} from './radar.mjs';
 import {pique, PERSO_ORAL} from './humour.mjs';   /* 21/11/2026 : sa personnalité à l'oral (« sarcastique assumé ») */
 const ACT = createActivite();   /* 0.33.0 : ce que fait Claude à l'instant */
 
-const VERSION = '0.58.0';
+const VERSION = '0.59.0';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PORT = +(process.env.PORT || 8787);
 const HOST = process.env.HOST || '127.0.0.1';
@@ -875,30 +875,33 @@ function memoireBloc() {
 }
 /* ---------- 0.41.0 : les routines planifiées et le brief du matin (routines.mjs) ---------- */
 /* le brief du matin, sans IA : date, météo à sa position, agenda du jour, ce qui l'attend, échéances d'aujourd'hui et demain, missions finies, relances du jour */
-async function briefTexte() {
-  const t = paris(new Date(now())), out = ['Bonjour. Nous sommes ' + new Intl.DateTimeFormat('fr-FR', {timeZone: 'Europe/Paris', weekday: 'long', day: 'numeric', month: 'long'}).format(new Date(now())) + '.'];
+/* 0.59.0 (« le brief du matin n'est pas bien représenté, tout est dans un paragraphe ») : le texte (lu à voix haute) et ses rubriques (affichées) */
+async function briefTexte() { return (await briefData()).texte; }
+async function briefData() {
+  const t = paris(new Date(now())), out = ['Bonjour. Nous sommes ' + new Intl.DateTimeFormat('fr-FR', {timeZone: 'Europe/Paris', weekday: 'long', day: 'numeric', month: 'long'}).format(new Date(now())) + '.'], parts = [];
+  const add = (k, x) => { out.push(x); parts.push({k, t: x}); };
   const essai = async (f) => { try { return await f(); } catch { return null; } };
-  if (S.pos) { const m = await essai(() => instantReply({kind: 'meteo', court: true}, "météo aujourd'hui")); if (m) out.push(m); }
+  if (S.pos) { const m = await essai(() => instantReply({kind: 'meteo', court: true}, "météo aujourd'hui")); if (m) add('meteo', m); }
   if (GG.status('').linked) {
-    const ag = await essai(() => instantReply({kind: 'agenda'}, "mon agenda aujourd'hui")); if (ag) out.push(ag);
-    const pm = await essai(() => instantReply({kind: 'pourmoi'}, "ce qui m'attend")); if (pm) out.push(pm);
+    const ag = await essai(() => instantReply({kind: 'agenda'}, "mon agenda aujourd'hui")); if (ag) add('agenda', ag);
+    const pm = await essai(() => instantReply({kind: 'pourmoi'}, "ce qui m'attend")); if (pm) add('pourmoi', pm);
     const ec = await essai(async () => {
       const e = await sheetRead("'Échéances'!A1:H1000"), hd = (e[0] || []).map(low), iD = hd.indexOf('date'), iS = hd.indexOf('sujet'), iSt = hd.indexOf('statut');
       const soon = e.slice(1).map((r) => ({n: daysTo(r[iD], t), s: String(r[iS] || '')})).filter((x, k) => x.n != null && x.n >= 0 && x.n <= 1 && !['fait', 'annule', 'annulee'].includes(low(e[k + 1][iSt]))).slice(0, 5);
       return soon.length ? 'Échéances : ' + soon.map((x) => (x.n === 0 ? "aujourd'hui, " : 'demain, ') + clip(x.s, 70)).join(' ; ') + '.' : null;
-    }); if (ec) out.push(ec);
+    }); if (ec) add('echeances', ec);
   }
   const finies = S.missions.filter((x) => x.status === 'terminee' && x.done && now() - x.done < 864e5);
-  if (finies.length) out.push((finies.length > 1 ? finies.length + ' missions terminées' : 'Une mission terminée') + ' depuis hier : ' + finies.slice(-3).map((x) => clip(x.titre || x.text, 60)).join(' ; ') + '.');
+  if (finies.length) add('missions', (finies.length > 1 ? finies.length + ' missions terminées' : 'Une mission terminée') + ' depuis hier : ' + finies.slice(-3).map((x) => clip(x.titre || x.text, 60)).join(' ; ') + '.');
   const fin = new Date(Date.UTC(t.y, t.m - 1, t.d + 1)).getTime() + 3 * 3600e3;   /* jusqu'à minuit (heure de Paris, à une heure près) */
   const rl = (S.relances || []).filter((x) => x.statut === 'prevue' && x.quand < fin);
-  if (rl.length) out.push('Relances du jour : ' + rl.slice(0, 3).map((x) => clip(x.quoi, 70)).join(' ; ') + '.');
-  return out.join(' ');
+  if (rl.length) add('relances', 'Relances du jour : ' + rl.slice(0, 3).map((x) => clip(x.quoi, 70)).join(' ; ') + '.');
+  return {texte: out.join(' '), parts};
 }
 const ROUT = createRoutines({S, save, now, paris, log: (t) => { S.routinesErr = {at: now(), t: String(t).slice(0, 300)}; },
   lancer: async (r) => {
     if (r.genre === 'brief') {
-      const texte = await briefTexte(); S.brief = {at: now(), texte}; save();
+      const {texte, parts} = await briefData(); S.brief = {at: now(), texte, parts}; save();
       if (S.push && S.push.subs.length) await PUSH.send({title: 'Brief du matin', body: texte.replace(/^Bonjour\. Nous sommes [^.]+\. /, '').slice(0, 230), url: '/#accueil', tag: 'brief'}, {urgency: 'normal'}).catch(() => {});
       return;
     }
@@ -1442,7 +1445,7 @@ const server = http.createServer(async (req, res) => {
           const r = ROUT.modifier(mr[1], await readBody(req)); return json(res, r ? 200 : 404, {routines: ROUT.liste()});
         } }
       if (p === '/api/brief' && req.method === 'GET') return json(res, 200, {brief: S.brief || null});
-      if (p === '/api/brief/maintenant' && req.method === 'POST') { const texte = await briefTexte(); S.brief = {at: now(), texte}; save(); return json(res, 200, {brief: S.brief}); }
+      if (p === '/api/brief/maintenant' && req.method === 'POST') { const {texte, parts} = await briefData(); S.brief = {at: now(), texte, parts}; save(); return json(res, 200, {brief: S.brief}); }
       if (p === '/api/skills' && req.method === 'GET') return json(res, 200, {skills: skillsListe()});   /* 0.38.0 : les skills des missions */
       if (p === '/api/memoire' && req.method === 'POST') { const b = await readBody(req), r = MEM.ajouter(b.texte, b.source); return json(res, r.ok ? 200 : 400, {...r, ...memoireEtat()}); }
       if (p === '/api/memoire/efface' && req.method === 'POST') { const b = await readBody(req); return json(res, MEM.effacer(b.id) ? 200 : 404, memoireEtat()); }

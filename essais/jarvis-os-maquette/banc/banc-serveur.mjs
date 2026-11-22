@@ -201,8 +201,16 @@ try {
     await q.screenshot({path: SH + 'routines.png'});
     ok('brief du matin : activé (tous les jours à 7 h 30 par défaut) et fait sans IA à la demande', /Brief du matin · tous les jours à 7 h 30/.test(br.b) && /^Bonjour\. Nous sommes /.test(br.out), JSON.stringify(br).slice(0, 300));
     await q.goto(BASE + '/?serveur#accueil'); await q.waitForTimeout(2500);
-    const bc = await q.evaluate(() => { const c = document.getElementById('brief-card'); return c && !c.hidden ? c.textContent : ''; });
-    ok('brief du matin : le brief du jour est sur l\'accueil, avec « Lire »', /Brief du matin/.test(bc) && /Bonjour\. Nous sommes/.test(bc) && /Lire/.test(bc), bc.slice(0, 160));
+    const bc = await q.evaluate(() => { const c = document.getElementById('brief-card'); return c && !c.hidden ? {t: c.textContent, rows: [...c.querySelectorAll('.bf-row')].map((r) => r.innerText.replace(/\s+/g, ' ').trim())} : {t: '', rows: []}; });
+    /* 0.59.0 (« tout est dans un paragraphe, pas top à lire ») : une rubrique par ligne (le serveur les donne), la liste de ce qui t'attend, « Lire » */
+    ok('brief du matin : sur l\'accueil en rubriques (Agenda, Pour toi en liste avec « Voir dans Pour moi »), avec « Lire », sans le paragraphe d\'avant', /Brief du matin/.test(bc.t) && /Lire/.test(bc.t) && !/Bonjour\. Nous sommes/.test(bc.t) && bc.rows.some((r) => /^AGENDA/i.test(r)) && bc.rows.some((r) => /pour toi/i.test(r) && /Voir dans Pour moi/.test(r)), JSON.stringify(bc.rows).slice(0, 300));
+    /* un brief fait par un serveur plus ancien (texte seul) : ses rubriques retrouvées dans le texte (exemple inventé) */
+    { const TX = "Bonjour. Nous sommes lundi 23 novembre. En ce moment 8 degrés, ressenti 5, bruine. Aujourd'hui : entre 7 et 10 degrés, pluie faible. Prends un parapluie. Rien dans ton agenda pour le reste de la journée. 3 choses pour toi : Garde du chat pendant les vacances ; Relance du syndic (02/01/2027) ; Révision de la voiture. Le détail est dans Pour moi. Échéances : demain, Contrôle technique.";
+      await q.route('**/api/brief', (r) => r.fulfill({contentType: 'application/json', body: JSON.stringify({brief: {at: Date.now(), texte: TX}})}));
+      await q.reload(); await q.waitForTimeout(2500);
+      const fb = await q.evaluate(() => ({k: [...document.querySelectorAll('#brief-card .bf-k')].map((x) => x.textContent), b: (document.querySelector('#brief-card .bf-b > b') || {}).textContent, tip: (document.querySelector('#brief-card .bf-tip') || {}).textContent, li: [...document.querySelectorAll('#brief-card .bf-l li')].map((x) => x.textContent), em: (document.querySelector('#brief-card .bf-l em') || {}).textContent}));
+      ok('brief du matin (texte seul, serveur plus ancien) : Météo « 8°, ressenti 5°, bruine » et « Prends un parapluie » à part, Agenda, 3 choses pour toi en liste, Échéances avec « Demain »', fb.k.join('|') === 'Météo|Agenda|3 choses pour toi|Échéances' && fb.b === '8°, ressenti 5°, bruine' && fb.tip === 'Prends un parapluie' && fb.li.length === 4 && fb.li[1] === 'Relance du syndic (02/01/2027)' && fb.em === 'Demain', JSON.stringify(fb));
+      await q.unroute('**/api/brief'); }
     { const tk2 = await q.evaluate(() => JSON.parse(localStorage.getItem('jarvis.settings')).serverToken); for (const x of (await fetch(BASE + '/api/routines', {headers: {authorization: 'Bearer ' + tk2}}).then((y) => y.json())).routines) await fetch(BASE + '/api/routines/' + x.id, {method: 'DELETE', headers: {authorization: 'Bearer ' + tk2}}); }
     await q.close(); }
   { const q = await ctx.newPage();
