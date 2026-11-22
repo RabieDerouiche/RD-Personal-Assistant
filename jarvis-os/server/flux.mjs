@@ -38,10 +38,14 @@ export function routeur(texte) {
 /* 0.60.0 (sa demande : « la gestion des tâches par la voix doit être plus sharp, pas grave si ça consomme plus de jetons ») : en conversation
    à la voix, jamais Haiku. Une action à faire (ajouter, noter, rappeler, programmer, envoyer, prévenir un bot…), une réflexion ou une
    question longue → Opus, le plus sûr pour comprendre et agir ; le reste → Sonnet. L'heure, la météo, l'agenda restent instantanés (sans IA). */
+/* 0.61.0 (« rapidité, fluidité ») : une action simple (ajouter, cocher, reporter une tâche, un rappel) → Sonnet, plus rapide et sûr pour cela ;
+   un ordre à un bot, plusieurs actions d'un coup, une réflexion, une demande longue → Opus */
+const ACTIONS_VOIX = /\b(ajoute[rz]?|note[rz]?|rappelle[rz]?|programme[rz]?|planifie[rz]?|envoie[rz]?|cree[rz]?|organise[rz]?|prepare[rz]?|confie[rz]?|retiens|reporte[rz]?|decale[rz]?|deplace[rz]?|supprime[rz]?|annule[rz]?|coche[rz]?|termine[rz]?|relance[rz]?|change[rz]?|modifie[rz]?)\b/g;
 export function routeurVoix(texte) {
   const t = String(texte || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[’']/g, ' ');
-  if (routeur(texte) === 'deep') return 'deep';
-  if (t.length > 160 || /\b(ajoute[rz]?|note[rz]?|rappelle[rz]?|programme[rz]?|planifie[rz]?|envoie[rz]?|envoyer|dis a|demande a|previens|prevenir|relance[rz]?|cree[rz]?|organise[rz]?|prepare[rz]?|confie[rz]?|retiens|souviens|echeance|taches?|ordre|routine|change[rz]?|modifie[rz]?|annule[rz]?|deplace[rz]?|reporte[rz]?|iris|chronos|kairos|ulysse|athena|argus|plutus|pourquoi|compare[rz]?|conseille|avis|decide[rz]?|choisi[rs]?|strategie|plan)\b/.test(t)) return 'deep';
+  if (routeur(texte) === 'deep' || t.length > 160) return 'deep';
+  if (/\b(dis a|demande a|previens|prevenir|ordre|iris|chronos|kairos|ulysse|athena|argus|plutus|pourquoi|compare[rz]?|conseille[rz]?|avis|decide[rz]?|choisi[rs]?|strategie|plan|analyse[rz]?|organise[rz]? (ma|la|mon)|prepare[rz]? (ma|la|mon))\b/.test(t)) return 'deep';
+  if ((t.match(ACTIONS_VOIX) || []).length >= 2) return 'deep';
   return 'default';
 }
 
