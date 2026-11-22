@@ -57,6 +57,13 @@ function partOf(part, type) {
   for (const p of part.parts || []) { const t = partOf(p, type); if (t) return t; }
   return '';
 }
+/* 0.52.0 : les pièces jointes d'un mail (nom, type, taille, identifiant pour les lire) ; le Radar lit les PDF des factures sans montant */
+function piecesDe(part, out = []) {
+  if (!part || out.length >= 10) return out;
+  if (part.filename && part.body && (part.body.attachmentId || part.body.data)) out.push({filename: String(part.filename).slice(0, 200), mimeType: part.mimeType || '', size: +part.body.size || 0, ...(part.body.attachmentId ? {attachmentId: part.body.attachmentId} : {data: part.body.data})});
+  for (const p of part.parts || []) piecesDe(p, out);
+  return out;
+}
 export function textOf(part) {
   const t = partOf(part, 'text/plain');
   const bouchon = t.trim().length < 400 && /ne (prend|supporte) pas (en charge )?(le format |les messages |les e-?mails |l.affichage )?html|n.affiche pas (le format|les messages) html|(does not|doesn.t|cannot|can.t) (support|display) html|(view|voir|afficher|consulter|lire) (this|ce|le|cet) (e-?mail|message|courriel|mail) (in|dans) (your|votre|un) (web )?(browser|navigateur)/i.test(t);
@@ -69,7 +76,7 @@ function mailMsg(m, withBody) {
   const at = +m.internalDate || Date.parse(hdr(m, 'Date')) || 0;
   const o = {id: m.id, threadId: m.threadId, sender: from.emailAddress, addressDisplayNames: [from], toRecipients: addrs(hdr(m, 'To')).map((a) => a.emailAddress),
     subject: hdr(m, 'Subject'), snippet: m.snippet || '', date: new Date(at).toISOString(), internalDate: String(at), labelIds: m.labelIds || [], viewUrl: 'https://mail.google.com/mail/#all/' + m.threadId};
-  if (withBody) o.plaintextBody = textOf(m.payload);
+  if (withBody) { o.plaintextBody = textOf(m.payload); o.attachments = piecesDe(m.payload); }
   return o;
 }
 const encWord = (s) => /^[\x20-\x7e]*$/.test(s) ? s : '=?UTF-8?B?' + Buffer.from(s, 'utf8').toString('base64') + '?=';
@@ -215,6 +222,7 @@ export function createGoogle({S, save, log = () => {}}) {
         const threads = await pool(j.threads, 8, async (t) => { const x = await api('GET', `${URLS.gmail}/users/me/threads/${enc(t.id)}?format=metadata&${meta}`); const ms = (x.messages || []).map((m) => mailMsg(m, false)); return {id: x.id, messageCount: ms.length, messages: ms, viewUrl: 'https://mail.google.com/mail/#all/' + x.id}; });
         return {threads};
       },
+      get_attachment: async (i) => { const x = await api('GET', `${URLS.gmail}/users/me/messages/${enc(i.messageId)}/attachments/${enc(i.attachmentId)}`); return {size: x.size || 0, data: x.data || ''}; },
       get_thread: async (i) => { const x = await api('GET', `${URLS.gmail}/users/me/threads/${enc(i.threadId)}?format=full`); return {id: x.id, messages: (x.messages || []).map((m) => mailMsg(m, true))}; },
       list_drafts: async (i) => {
         const q = new URLSearchParams({maxResults: String(Math.min(+i.pageSize || 20, 100))}); if (i.query) q.set('q', i.query);
