@@ -4444,13 +4444,15 @@ void main(){
       : x.rythme === 'trimestriel' ? le + j + ', tous les 3 mois (' + [0, 3, 6, 9].map((k) => RAD_MOIS[(m + k) % 12]).join(', ') + ')' : le + j + ' de chaque mois'; };
   /* 0.51.0 : une dépense qui commence plus tard le dit */
   const radDes = (x) => (x.debut && x.debut > radYmd(radAuj()) ? ', à partir du ' + radDate(x.debut) + (x.debut.slice(0, 4) !== String(radAuj().getFullYear()) ? '/' + x.debut.slice(0, 4) : '') : '');
-  const radRegleP = (rev) => (rev.jour === 'dernier' ? 'le dernier jour du mois' : 'le ' + radLe(parseInt(rev.jour, 10) || 28)) + (rev.avance === false ? '' : ', avancée si week-end ou férié');
+  const radRegleP = (rev) => (rev.des ? 'entre le ' + radLe(rev.des) + ' et ' : '') + (rev.jour === 'dernier' ? 'le dernier jour du mois' : 'le ' + radLe(parseInt(rev.jour, 10) || 28)) + (rev.avance === false ? '' : ', avancée si week-end ou férié');
+  /* 0.52.0 : une paie qui arrive « entre le 5 et le 10 » : le reste court jusqu'au plus tard, et le dit */
+  const radPaieFin = (R) => (R.rev && R.rev.des ? '(au plus tard le ' + radJour(R.fin) + ')' : 'du ' + radJour(R.fin));
   const radParMois = (x) => radC(x.montant) * (x.rythme === 'annuel' ? 1 : x.rythme === 'trimestriel' ? 4 : 12) / 12 / 100;
   function radHero(R, d, al, soon) {
     const tot = R.tReste + R.tDeja, pc = tot ? Math.round(R.tDeja / tot * 100) : 0, nx = R.reste[0];
     return h('section', {class: 'card shop-hero rad-hero'}, h('span', {class: 'rad-coin', html: icon('euro', 24)}),
       h('div', {class: 'rad-hero-tx'},
-        h('small', {class: 'rad-k', text: R.mois ? 'Reste à payer d’ici la fin du mois (' + radJour(R.fin) + ')' : 'Reste à payer d’ici ta paie du ' + radJour(R.fin)}),
+        h('small', {class: 'rad-k', text: R.mois ? 'Reste à payer d’ici la fin du mois (' + radJour(R.fin) + ')' : 'Reste à payer d’ici ta paie ' + radPaieFin(R)}),
         h('b', {class: 'rad-big', text: radEur(R.tReste)}),
         h('p', {class: R.fx.length ? '' : 'rad-vide', text: !R.fx.length ? 'Rien de validé pour l’instant : ce total ne compte que tes dépenses fixes validées. ' + ((d.propositions || []).length ? 'Valide plus bas celles trouvées dans tes mails, et ajoute les autres (crédit, mutuelle…).' : 'Ajoute-les plus bas (crédit, mutuelle, abonnements…).')
           : nx ? R.reste.length + (R.reste.length > 1 ? ' prélèvements' : ' prélèvement') + ' · prochain : ' + nx.x.service + ', ' + radQuand(nx.date, R.t) + ', ' + (nx.x.estime ? 'environ ' : '') + radEur(nx.x.montant) : 'Plus aucun prélèvement fixe d’ici là.'}),
@@ -4474,7 +4476,7 @@ void main(){
       sc && sc.enCours ? h('p', {class: 'card rad-scan', role: 'status', text: 'Je lis tes ' + (sc.total || 13) + ' derniers mois de mails (' + (sc.mois || 0) + '/' + (sc.total || 13) + ') : les dépenses récurrentes trouvées arrivent ici, à valider une par une.' + (sc.pause ? ' ' + sc.pause : '')}) : null,
       SRV_OS && d.google === false ? h('p', {class: 'card rad-scan', text: 'Google n’est pas relié à JARVIS : le Radar ne lit pas tes mails. Relie-le dans Réglages ; tes dépenses fixes saisies à la main comptent déjà.'}) : null,
       sc && !sc.enCours && sc.erreur ? h('p', {class: 'muted', text: sc.erreur}) : null,
-      panel(R.mois ? 'D’ici la fin du mois' : 'D’ici ta paie du ' + radJour(R.fin), h('span', {class: 'aside', text: radEur(R.tReste)}),
+      panel(R.mois ? 'D’ici la fin du mois' : 'D’ici ta paie ' + radPaieFin(R), h('span', {class: 'aside', text: radEur(R.tReste)}),
         R.reste.length ? R.reste.map((o) => row(o, false)) : h('p', {class: 'muted', text: 'Rien d’ici là.'})),
       props.length ? panel('À valider (' + props.length + ')', h('span', {class: 'aside', text: 'trouvées dans tes mails'}), props.map((x) => h('article', {class: 'card item rad-prop'},
         h('div', {class: 'rad-al-h'}, h('span', {class: 'hm-ic', html: icon('inbox', 17)}), h('div', {class: 'hm-tx'}, h('b', {text: x.service}), h('small', {text: radRegle(x) + radDes(x) + (x.preuves > 1 ? ' · vue ' + x.preuves + ' fois' : '') + (x.depuis && !x.debut ? ', depuis ' + x.depuis : '')}))),
@@ -4517,7 +4519,7 @@ void main(){
     if (!l.length) { toast('Notification', 'Aucun prélèvement à annoncer d’ici la fin du mois prochain.'); return; }
     const jour = l[0].date, du = l.filter((p) => radYmd(p.date) === radYmd(jour)), R2 = radReste(d, jour, 'paie'), m = (p) => p.x.service + ', ' + (p.x.estime ? 'environ ' : '') + radEur(p.x.montant);
     toast('Exemple de notification', radJour(radD(jour.getFullYear(), jour.getMonth(), jour.getDate() - 1)) + ' à 19 h : « Demain : ' + (du.length === 1 ? m(du[0]) : du.length + ' prélèvements (' + du.map(m).join(' ; ') + ')')
-      + '. Reste à payer d’ici ta paie du ' + radJour(R2.fin) + ' : ' + radEur(R2.tReste) + '. »');
+      + '. Reste à payer d’ici ta paie ' + radPaieFin(R2) + ' : ' + radEur(R2.tReste) + '. »');
   }
   /* une dépense trouvée dans ses mails : « Ajouter » (telle quelle ou corrigée) ou « Pas une dépense fixe » */
   function radPropDo(p, oui, modif) {
@@ -4567,15 +4569,19 @@ void main(){
     const rev = radGet(RAD.data, 'rev', {jour: 28, avance: true}), id = 'rp-' + (++SEQ);
     const sel = h('select', {class: 'inp', id}, Array.from({length: 31}, (_, i) => [String(i + 1), 'le ' + radLe(i + 1) + ' de chaque mois']).concat([['dernier', 'le dernier jour du mois']])
       .map(([v, l]) => h('option', {value: v, selected: String(rev.jour) === v}, l)));
-    const av = h('input', {type: 'checkbox', checked: rev.avance !== false});
+    const av = h('input', {type: 'checkbox', checked: rev.avance !== false}), id2 = 'rp-' + (++SEQ);
+    const des = h('select', {class: 'inp', id: id2}, [['', 'à jour fixe']].concat(Array.from({length: 30}, (_, i) => [String(i + 1), 'dès le ' + radLe(i + 1)]))
+      .map(([v, l]) => h('option', {value: v, selected: String(rev.des || '') === v}, l)));
     const save = (ev) => {
       ev.preventDefault();
-      const it = {jour: sel.value === 'dernier' ? 'dernier' : +sel.value, avance: av.checked};
+      const it = {jour: sel.value === 'dernier' ? 'dernier' : +sel.value, avance: av.checked}, d = +des.value;
+      if (d && (it.jour === 'dernier' || d < it.jour)) it.des = d;
       radPut('rev', it); closeSheet(); toast('Paie notée', 'Prochaine paie : ' + radJour(radPaies(it, radAuj()).next) + '.'); renderView(true);
     };
     openSheet({kicker: 'Radar · tes revenus', title: 'Ta paie', actions: [], say: 'Le jour où tes revenus arrivent : le reste à payer s’arrête à cette date.',
       extra: () => h('form', {class: 'pick-form rad-form', onsubmit: save},
-        h('label', {for: id, class: 'pick-label', text: 'Tes revenus arrivent'}), sel,
+        h('label', {for: id, class: 'pick-label', text: 'Tes revenus arrivent (au plus tard)'}), sel,
+        h('label', {for: id2, class: 'pick-label', text: 'Ils peuvent arriver plus tôt'}), des,
         h('div', {class: 'checks'}, h('label', {class: 'check'}, av, ' Avancée au jour ouvré d’avant si elle tombe un week-end ou un jour férié')),
         h('button', {type: 'submit', class: 'btn main'}, 'Enregistrer'))});
   }
@@ -6724,12 +6730,12 @@ void main(){
      (Charte, section 7) : pour ces demandes, une ligne « Réponse » dans le Canal et la sonnette remplacent la phrase à coller dans le chat */
   function isRoutineDem(d) { return d.kind === 'oui' && /routine/i.test([d.title, d.ask, d.f && d.f.phrase].join(' ')); }
   /* JARVIS OS (18/11/2026, question du propriétaire « pourquoi dois-je encore donner mon oui dans Grok pour le CRA ? ») : depuis le 13/11 (Charte, section 7),
-     son « Oui » depuis JARVIS vaut confirmation du CRA Allegis de la semaine ; la page le proposait seulement pour les routines */
-  function isCraDem(d) { return d.kind === 'oui' && /\bcra\b|allegis/i.test([d.title, d.ask].join(' ')); }
+     son « Oui » depuis JARVIS vaut confirmation du CRA client de la semaine ; la page le proposait seulement pour les routines */
+  function isCraDem(d) { return d.kind === 'oui' && /\bcra\b|feuille de temps|timesheet/i.test([d.title, d.ask].join(' ')); }
   const yesOk = (d) => isRoutineDem(d) || isCraDem(d);
   function yesFromJarvis(list) {
     const one = (d) => '« ' + d.title + ' »' + (d.f && d.f.phrase ? ' (' + String(d.f.phrase).replace(/^\s*Oui[,.]?\s*/i, '').replace(/[.\s]+$/, '') + ')' : '');
-    return ('Oui pour ' + (list.length === 1 ? one(list[0]) : 'ces ' + list.length + ' demandes : ' + list.map((d, i) => (i + 1) + ') ' + one(d)).join(' ; ')) + '. Oui donné depuis JARVIS : ' + (list.every(isCraDem) ? 'il vaut confirmation du CRA Allegis de la semaine, tel que listé' : list.some(isCraDem) ? 'il vaut confirmation du CRA Allegis et pour une routine strictement conforme à ta fiche ou à la Charte' : 'il vaut pour une routine strictement conforme à ta fiche ou à la Charte') + ' (Charte, section 7).').slice(0, 900);
+    return ('Oui pour ' + (list.length === 1 ? one(list[0]) : 'ces ' + list.length + ' demandes : ' + list.map((d, i) => (i + 1) + ') ' + one(d)).join(' ; ')) + '. Oui donné depuis JARVIS : ' + (list.every(isCraDem) ? 'il vaut confirmation du CRA client de la semaine, tel que listé' : list.some(isCraDem) ? 'il vaut confirmation du CRA client et pour une routine strictement conforme à ta fiche ou à la Charte' : 'il vaut pour une routine strictement conforme à ta fiche ou à la Charte') + ' (Charte, section 7).').slice(0, 900);
   }
   function yesGroups() { const g = {}; (S.demandes || []).filter((d) => d.kind === 'oui').forEach((d) => { (g[d.bot] = g[d.bot] || []).push(d); }); return Object.keys(g).map((b) => ({bot: b, list: g[b]})); }
   const yesPhrase = (list) => list.length === 1 ? (list[0].f.phrase || ('Oui pour « ' + list[0].title + ' » : ' + list[0].ask)).slice(0, 600)
@@ -6777,7 +6783,7 @@ void main(){
     if (!d.live) return cfg;
     const prev = cfg.extra;
     const dr = draftOf(d), tm = d.kind === 'brouillon' && !dr ? textMail(d) : null;
-    const cra = /\bcra\b|allegis|feuille de temps|timesheet/i.test(d.title + ' ' + d.ask);
+    const cra = /\bcra\b|feuille de temps|timesheet/i.test(d.title + ' ' + d.ask);
     if (dr && d.kind !== 'brouillon') cfg.say = 'Le brouillon est prêt : relis-le, il part tel quel de ta boîte.';
     if (cra) cfg.extraTop = () => craWeek(d);
     cfg.extra = () => h('div', {class: 'stack'}, dr ? mailBox(dr.to, dr.cc, dr.subject, dr.body, dr.dup) : tm ? mailBox(tm.to, [], tm.subject, tm.body, 0) : null, prev ? prev() : null, demHistory(d, dr));
@@ -7112,7 +7118,7 @@ void main(){
       act("J'ai fait…", {tone: 'main2', cost: 'next', pick: {kind: 'text', label: 'Ce que tu as fait', placeholder: 'Sans montant ni taux : ils restent dans le chat du bot'}, go: (v) => ({title: 'Échéance faite', bot: e.bot, canalType: 'Réponse', noRing: true, say: 'Noté, merci.',
         order: "Pour l'échéance " + q + ' du ' + short(e.n) + ", voici ce que j'ai fait : " + v.txt, effect: q + ' passe à « Fait » dans Pilotage, et une ligne « Réponse » pour ' + who + ' dans le Canal, lue à son prochain passage (sans sonnette).', mutate: () => drop('echeances', e.id)})})];
   };
-  /* JARVIS OS (18/11/2026, retour du propriétaire : « l'événement CRA Allegis s'affiche comme à faire alors que Chronos l'a déjà fait ») :
+  /* JARVIS OS (18/11/2026, retour du propriétaire : « l'événement CRA client s'affiche comme à faire alors que Chronos l'a déjà fait ») :
      une échéance « Un bot s'en occupe / suit » que le bot a faite sans passer sa ligne à « Fait » est reconnue d'après son Journal
      ou sa ligne du Canal (mêmes mots, même date dans le titre, mot d'achèvement, à quelques jours de la date). Gratuit : rien n'est relu. */
   const ECH_FAIT = /\b(soumise?s?|faite?s?|envoyee?s?|payee?s?|terminee?s?|reglee?s?|validee?s?|approuvee?s?|deposee?s?|saisie?s?|transmise?s?|signee?s?|confirmee?s?)\b/;
@@ -8237,7 +8243,7 @@ void main(){
     const f = d.f || {}, A = () => ACTIONS.demande(d), run = (a) => (ev) => { ev.stopPropagation(); if (!a) return; if (a.pick || a.confirm) openItem('demande', d, a); else finish(a.go(), {type: 'demande', item: d}); };
     const dr = draftOf(d), out = [];
     if (dr) out.push(h('div', {class: 'pm-mail'}, h('span', {class: 'ic', html: icon('send', 15)}), h('div', {}, h('b', {text: 'À ' + (dr.to.join(', ') || 'personne')}), h('span', {text: '« ' + (dr.subject || 'sans objet') + ' »'}), full ? null : h('small', {text: String(dr.body || '').replace(/\s+/g, ' ').slice(0, 110) + '…'}))));
-    if (!full && /\bcra\b|allegis|feuille de temps|timesheet/i.test(d.title + ' ' + d.ask)) out.push(craWeek(d));
+    if (!full && /\bcra\b|feuille de temps|timesheet/i.test(d.title + ' ' + d.ask)) out.push(craWeek(d));
     const xm = pmExpM(d); if (xm && !expAcked(d)) out.push(h('p', {class: 'pm-expired'}, h('s', {text: xm[1].trim()}), h('span', {text: ' · expirée'})));
     const found = pmFound(d); if (found) out.push(found);
     if ((d.kind === 'ouinon' || d.kind === 'question' || isCraDem(d)) && (f.si_oui || f.si_non)) {
@@ -8248,7 +8254,7 @@ void main(){
     if (d.kind === 'choix' && d.options.length) { const acts = A(); out.push(h('div', {class: 'pm-opts'}, d.options.map((o, i) => h('button', {type: 'button', class: 'pm-tile', onclick: run(acts.find((a) => a.label === o))}, h('b', {text: String.fromCharCode(65 + i)}), h('span', {text: o.replace(/^[A-C]\s+/, '')}))))); }
     const steps = d.kind === 'afaire' || d.kind === 'question' ? pmSteps(d) : [];
     if (steps.length) out.push(h('ol', {class: 'pm-steps'}, steps.map((x, i) => h('li', {}, h('i', {text: String(i + 1)}), h('span', {text: x})))));
-    const cra = /\bcra\b|allegis|feuille de temps|timesheet/i.test(d.title + ' ' + d.ask), tl = full || !cra ? pmTimeline(d, full ? 6 : 4) : null; if (tl) out.push(tl);
+    const cra = /\bcra\b|feuille de temps|timesheet/i.test(d.title + ' ' + d.ask), tl = full || !cra ? pmTimeline(d, full ? 6 : 4) : null; if (tl) out.push(tl);
     return out.length ? h('div', {class: 'pm-viz'}, out) : null;
   }
   function pmCard(d) {

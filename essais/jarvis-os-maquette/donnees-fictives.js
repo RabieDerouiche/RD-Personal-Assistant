@@ -14,7 +14,7 @@
     ['Ce qui attend ta réponse', '8 en attente'], ['Calculé : ne rien saisir ici.'],
     ['Depuis le', 'Bot', 'Sujet', "Ce qu'on attend de toi"],
     [fr(D(-4)), 'Iris', 'Passeport', 'À faire : Prendre rendez-vous au consulat | Pourquoi : il expire dans 7 mois | Si non : pas de voyage en mars | Temps : 10 min | Avant le : ' + fr(D(16)) + ' | Lien : https://example.org/rdv'],
-    [fr(D(-2)), 'Chronos', 'CRA Allegis semaine du ' + fr(D(-5)).slice(0, 5), 'Oui/Non : Je soumets le CRA de la semaine du ' + fr(D(-5)).slice(0, 5) + ' (4 jours) ? | Pourquoi : il part vendredi à midi | Si oui : il est envoyé au portail | Si non : je te redemande lundi | Conseil : Oui | Temps : 1 min'],
+    [fr(D(-2)), 'Chronos', 'CRA client semaine du ' + fr(D(-5)).slice(0, 5), 'Oui/Non : Je soumets le CRA de la semaine du ' + fr(D(-5)).slice(0, 5) + ' (4 jours) ? | Pourquoi : il part vendredi à midi | Si oui : il est envoyé au portail | Si non : je te redemande lundi | Conseil : Oui | Temps : 1 min'],
     [fr(D(-2)), 'Kairos', 'Robot cuiseur', 'Choix : Quel vendeur pour le robot cuiseur ? | Options : Vendeur officiel / Grande enseigne / Attendre | Pourquoi : même prix chez deux vendeurs'],
     [fr(D(-1)), 'Iris', 'Relance syndic', 'Brouillon : La relance au syndic est prête | Lien : https://mail.google.com/mail/#drafts?compose=DRAFT1 | Pourquoi : sans réponse depuis 10 jours'],
     [fr(D(-1)), 'Iris', 'Attestation', "Brouillon : Demande d'attestation prête | À : agence@example.org | Objet : Demande d'attestation | Texte : Bonjour, pouvez-vous m'envoyer l'attestation ? Merci."],
@@ -27,7 +27,7 @@
     [fr(D(0)), 'Iris', 'Résiliation StreamPlus', 'Envoyer la relance préparée dans tes brouillons Gmail (fil StreamPlus)'],
     [fr(D(-6)), 'Iris', 'Offre de bienvenue', "À faire : Activer l'offre de bienvenue | Avant le : " + fr(D(-2))],
     [fr(D(-5)), 'Iris', 'Formulaire de la mutuelle', 'À faire : Renvoyer le formulaire signé | Avant le : ' + fr(D(-1))],
-    [fr(D(0)), 'Chronos', 'CRA Allegis', 'Ton oui dans le chat de Chronos : '],
+    [fr(D(0)), 'Chronos', 'CRA client', 'Ton oui dans le chat de Chronos : '],
     [fr(D(-1)), 'Iris', "Rachat de l'abonnement", "À faire : Offre Alpha terminée le " + fr(D(-3)) + " (simulation non connue). Simuler chez Beta (offre jusqu'au " + fr(D(12)) + ')'],
     [fr(D(0)), 'Iris', 'Garde pendant la fermeture de la crèche le ' + fr(D(60)), "Choix : Qui garde l'enfant ? | Options : Toi / Ton épouse / Partage | Avant le : " + fr(D(45))]
   ];
@@ -38,7 +38,7 @@
     [fr(D(-2)), "Envoyer l'attestation à l'école", 'Famille', '', 'À venir', 'Iris', 'Demandée par la directrice', 'À faire par moi'],
     [fr(D(6)), 'Rendez-vous notaire (14h30)', 'Famille', '', 'À venir', 'Iris', 'Événement important ajouté depuis la page', 'Date à retenir'],
     [fr(D(0)), 'Rendez-vous médecin', 'Famille', '', 'À venir', 'Iris', 'Cabinet du centre', 'Date à retenir'],
-    [fr(D(2)), 'CRA Allegis de la semaine', 'Travail', '', 'À venir', 'Chronos', 'Saisie sur le portail', "Un bot s'en occupe"],
+    [fr(D(2)), 'CRA client de la semaine', 'Travail', '', 'À venir', 'Chronos', 'Saisie sur le portail', "Un bot s'en occupe"],
     [fr(D(3)), 'Relancer la résiliation', 'Contrats', '', 'À venir', 'Iris', 'Si rien reçu', 'Un bot suit'],
     [fr(D(13)), 'Black Friday', 'Achats', '', 'À venir', 'Kairos', 'Offres à surveiller', 'Offre'],
     [fr(D(13)), 'Robot Alpha : offre de lancement', 'Achats', '', 'À venir', 'Kairos', 'cadeau officiel', 'Offre'],
@@ -120,7 +120,7 @@
     ['Bot', 'Routine', 'Déclencheur', 'Moment', 'But', 'Message à Rabie', 'État'],
     ['Iris', 'Veille du matin', 'Horaire', 'Lun-ven 7h30', 'x', 'x', 'En place'],
     ['Iris', 'Sonnette Jarvis', 'Mail', "À l'arrivée", 'x', 'x', 'En place'],
-    ['Chronos', 'CRA Allegis', 'Horaire', 'Ven 12h', 'x', 'x', 'En place'],
+    ['Chronos', 'CRA client', 'Horaire', 'Ven 12h', 'x', 'x', 'En place'],
     ['Kairos', 'Prix suivis', 'Horaire', 'Dim 17h', 'x', 'x', 'En place'],
     ['Ulysse', 'Sorties du week-end', 'Horaire', 'Jeu 19h', 'x', 'x', 'À créer'],
     ['Athéna', 'Digest IA du lundi', 'Horaire', 'Lun 9h', 'x', 'x', 'En place'],
@@ -131,7 +131,7 @@
   G['État'] = SCEN.active ? [
     ['Bot', 'Dernier passage', "Ce que j'ai fait", 'Prochain passage', 'Dernier tour de Gmail'],
     ['Iris', stamp(lastSign), 'Veille faite', nextP(2, 7, 30, 'Veille du matin'), stamp(lastSign)],
-    ['Chronos', stamp(at(-1, 12, 0)), 'CRA préparé', nextP(6, 12, 0, 'CRA Allegis')],
+    ['Chronos', stamp(at(-1, 12, 0)), 'CRA préparé', nextP(6, 12, 0, 'CRA client')],
     ['Kairos', stamp(at(-1, 17, 0)), 'Prix relevés', nextP(1, 17, 0, 'Prix suivis')],
     ['Ulysse', stamp(at(-2, 19, 0)), 'Idées', nextP(5, 19, 0, 'Sorties')],
     ['Athéna', stamp(at(-5, 9, 0)), 'Digest', nextP(2, 9, 0, 'Digest')],
@@ -139,7 +139,7 @@
   ] : [
     ['Bot', 'Dernier passage', "Ce que j'ai fait", 'Prochain passage', 'Dernier tour de Gmail'],
     ['Iris', stamp(at(-1, 0, 15)), 'Doublon repéré', nextP(-1, 7, 30, 'Veille du matin')],
-    ['Chronos', fr(D(-2)) + ' 18:53', 'Renommage', fr(D(-1)) + ' 11:43 (CRA Allegis)'],
+    ['Chronos', fr(D(-2)) + ' 18:53', 'Renommage', fr(D(-1)) + ' 11:43 (CRA client)'],
     ['Kairos', fr(D(-1)) + ' 00:15', 'Relevé Jeu Gamma', fr(D(1)) + ' 16:57 (Prix suivis)'],
     ['Ulysse', fr(D(-2)) + ' 19:45', 'Bloc Voyages', fr(D(5)) + ' 19:13 (Sorties du week-end)'],
     ['Athéna', fr(D(-2)) + ' 18:52', 'Renommée', fr(D(2)) + ' 08:54 (Digest IA du lundi)'],
@@ -414,7 +414,7 @@
       stop: async () => { window.__ear.push('dict:stop'); live = false; clearInterval(poll); st('idle', 'stopped'); }};
   }
   window.claude = {use: async (name) => { await delay(null, 10); if (SCEN.offline) return null; return name === 'mcp' ? mcp : name === 'sample' ? (SCEN.noSample ? null : sample) : name === 'tts' ? tts : name === 'dictation' ? dict : null; }};
-  G['Canal'].push([fr(D(0)), 'Chronos', 'Rabie', 'CRA Allegis', 'Oui/Non : Soumettre le CRA Allegis de la semaine du ' + fr(D(-2)).slice(0, 5) + ' | Jours : télétravail et congés selon Présence | Pourquoi : congés confirmés dans Présence ; aucun férié | Avant le : ' + fr(D(2)), 'Attend ton oui', '', '']);
+  G['Canal'].push([fr(D(0)), 'Chronos', 'Rabie', 'CRA client', 'Oui/Non : Soumettre le CRA client de la semaine du ' + fr(D(-2)).slice(0, 5) + ' | Jours : télétravail et congés selon Présence | Pourquoi : congés confirmés dans Présence ; aucun férié | Avant le : ' + fr(D(2)), 'Attend ton oui', '', '']);
   /* scénario pending : n ordres du propriétaire encore « À faire », datés d'aujourd'hui */
   if (SCEN.pending) for (let i = 1; i <= SCEN.pending; i++) G['Canal'].push([fr(D(0)), 'Rabie', 'Iris', 'Ordre', 'Ordre numéro ' + i, 'À faire', '', '']);
   /* 0.23.0 : un comparatif déjà préparé par Claude (en vrai : sur le serveur, avec le web) pour le produit à deux variantes */

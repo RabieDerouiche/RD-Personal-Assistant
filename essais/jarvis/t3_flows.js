@@ -33,7 +33,7 @@ const fill = async (h, sel, val) => { await h.page.fill(sel, val); };
   await scen('A pause auto', {}, async (h, step) => {
     await step('en-tête après chargement', async () => (await L.text(h, '#status')).replace(/\n/g, ' · '), 0);
     await L.tab(h, 'demandes');
-    await step('demande Oui/Non : Oui, vas-y', async () => card(h, 'CRA Allegis', 'Oui, vas-y'));
+    await step('demande Oui/Non : Oui, vas-y', async () => card(h, 'CRA client', 'Oui, vas-y'));
     await step('demande Choix puis Annuler', async () => { const r = await card(h, 'Robot cuiseur', 'Grande enseigne'); await L.tick(h, 800); const c = await L.click(h, 'Annuler', '#toasts, #sheet'); return r + ' / annuler ' + c; });
     await step('double appui sur la même réponse', async () => { const a = await card(h, 'Dates du voyage', 'Cherche toi-même'); await L.tick(h, 400); await h.page.evaluate(() => { const s = document.getElementById('sheet'); if (!s.hidden) Array.from(s.querySelectorAll('button')).find((b) => /Terminé|Fermer/.test(b.innerText)).click(); }); await L.tick(h, 300); return a; });
     await step('brouillon Gmail : relire, envoyer', async () => { const a = await card(h, 'Bonjour, Je me permets', 'Relire et envoyer'); await L.tick(h, 500); const s1 = await sheetTxt(h); const b = await L.click(h, 'Envoyer ce mail', '#sheet'); const s2 = await sheetTxt(h); const c = await L.click(h, 'Oui : envoyer ce mail', '#sheet'); return [a, b, c, 'FEUILLE: ' + s1.slice(0, 200), 'CONFIRME: ' + s2.slice(0, 260)].join(' / '); });
@@ -117,7 +117,7 @@ const fill = async (h, sel, val) => { await h.page.fill(sel, val); };
     await step('5 s après', async () => '', 7000);
     await step('ensuite', async () => (await ban(h)) + ' // ' + (await h.page.evaluate(() => JSON.stringify([localStorage.getItem('jarvis.pause.rung'), !!localStorage.getItem('jarvis.pause.off')]))), 0);
     await L.tab(h, 'demandes');
-    await step('un ordre sonne de nouveau normalement', async () => card(h, 'CRA Allegis', 'Oui, vas-y'), 17500);
+    await step('un ordre sonne de nouveau normalement', async () => card(h, 'CRA client', 'Oui, vas-y'), 17500);
   });
   await scen('H3 remise à zéro passée, annulée par Rabie', {time: '2026-11-17T12:30:00+01:00'}, async (h, step) => {
     await step('annuler dans les 5 s', async () => { await L.tick(h, 1000); return L.click(h, 'Annuler', '#toasts'); }, 7000);
