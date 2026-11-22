@@ -472,6 +472,18 @@ try {
     await v.tap('#chat .chat-head .btn.ghost'); await v.waitForTimeout(600); await v.tap('.talk-slot .jv-btn'); await v.waitForTimeout(1200); const s6 = await st();
     ok('mains libres : pas de bouton qui les coupe dans l\'en-tête ; le micro du champ dicte une question ; l\'orbe reprend la conversation continue', !s4.toggle && s4.dictBtn && dicte && s6.conv && /écoute/.test(s6.strip), JSON.stringify([s4.toggle, s4.dictBtn, dicte, s6.conv, s6.strip]));
     ok('mains libres : la question lue à voix haute part avec la personnalité de JARVIS (« sarcastique assumé »), placée avant les données', oral.length >= 1 && oral.every(Boolean), JSON.stringify(oral));
+    /* 0.60.0 (sa demande : « la gestion des tâches par la voix, pas besoin d'appui de bouton, il demande la validation oralement ; plus sharp ») */
+    { const vreq = []; v.on('request', (r) => { if (/\/api\/sample$/.test(r.url())) { try { const j = JSON.parse(r.postData() || '{}'); vreq.push({tier: j.tier, voix: /EN CONVERSATION À LA VOIX/.test(j.system || ''), bouton: /attend son bouton|en attente de son bouton|touché « /.test(j.system || '')}); } catch (e) { /* rien */ } } });
+      const dire = async (t, ms) => { await v.evaluate((x) => { const ta = document.getElementById('chat-in'); ta.value = x; document.querySelector('#chat .chat-row .btn.main').click(); }, t); await v.waitForTimeout(ms || 3500); };
+      const etat = () => v.evaluate(() => ({cartes: [...document.querySelectorAll('#chat .msg.proposal')].map((x) => x.innerText.replace(/\s+/g, ' ').trim()), eux: [...document.querySelectorAll('#chat .msg.them p')].map((x) => x.textContent).slice(-3)}));
+      await dire('Ajoute une tâche vocale : appeler le plombier jeudi'); const e1 = await etat(), q1 = vreq[vreq.length - 1] || {};
+      ok('voix : une tâche dite à voix haute est faite aussitôt, sans bouton ; la question part en « voix » (Sonnet ou Opus, jamais Haiku) avec la consigne de la voix, sans « bouton »', e1.cartes.some((c) => /Tâche proposée/i.test(c) && /C'est parti/.test(c)) && q1.tier === 'voix' && q1.voix && !q1.bouton, JSON.stringify([e1.cartes, q1]));
+      await dire('Envoie un ordre vocal pour Kairos'); const e2 = await etat(), nOui = hits.sample;
+      await dire('Oui', 2500); const e3 = await etat();
+      ok('voix : un ordre à un bot attend son « oui » dit à voix haute ; le « oui » l’envoie sans repasser par Claude et JARVIS le dit', e2.cartes.some((c) => /Ordre proposé à Kairos/i.test(c) && /Envoyer à Kairos/.test(c)) && hits.sample === nOui && e3.cartes.some((c) => /Ordre proposé à Kairos/i.test(c) && /Envoyé/.test(c)) && e3.eux.some((x) => /C’est parti : ordre envoyé à Kairos/.test(x)), JSON.stringify([e2.cartes.slice(-1), e3]));
+      await dire('Envoie un ordre vocal pour Kairos'); const nNon = hits.sample; await dire('Non, laisse tomber', 2500); const e4 = await etat();
+      const nSeul = hits.sample; await dire('Oui', 3500);
+      ok('voix : « non » l’annule (rien ne part) ; un « oui » sans proposition en cours part à Claude', nSeul === nNon && e4.cartes.slice(-1).some((c) => /Abandonné/.test(c)) && e4.eux.some((x) => /j’annule/.test(x)) && hits.sample === nSeul + 1, JSON.stringify([e4, nNon, nSeul, hits.sample])); }
     await v.tap('#chat .mains-fin').catch(() => {});
     await v.close(); }
   /* 0.33.0 : l'activité en direct — une mission lancée apparaît sur l'accueil (« En ce moment ») avec son plan et ce qu'elle fait, et sur l'orbe (pastille) ;

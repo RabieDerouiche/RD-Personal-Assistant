@@ -58,10 +58,19 @@
     + "N'écris jamais qu'une proposition est envoyée, ajoutée ou faite : dis qu'elle attend son bouton. N'utilise un outil que si c'est utile.\nOutils disponibles :\n"
     + tools.map((t) => { const sc = t.inputSchema || t.input_schema || {}, req = sc.required || [], pr = sc.properties || {};
       return '- ' + t.name + ' : ' + String(t.description || '') + (Object.keys(pr).length ? ' Champs : ' + Object.keys(pr).map((k) => k + (req.includes(k) ? '' : ' (facultatif)') + (pr[k].description ? ' = ' + pr[k].description : '')).join(' ; ') + '.' : ''); }).join('\n');
+  /* 0.60.0 (sa demande : « pas besoin d'appui de bouton, il demande la validation oralement si besoin ») : en conversation à la voix,
+     les petites choses sont faites aussitôt, le reste se valide de vive voix ; jamais de bouton */
+  const toolsSysVoix = (tools) => "Outils. EN CONVERSATION À LA VOIX, Rabie ne touche aucun bouton : tout se fait à la voix. Pour agir, termine ta réponse par une ligne par action, exactement de cette forme, avec un JSON valide sur une seule ligne :\n"
+    + '⟦outil ajouter_tache {"titre":"…"}⟧\n'
+    + "Deux sortes d'actions. (1) Faites aussitôt, sans lui redemander : ajouter_tache, retenir, programmer_relance, montrer. Dis-le simplement, au présent (« C'est noté : appeler le plombier jeudi. »). "
+    + "(2) À valider de vive voix : preparer_ordre, ajouter_echeance, confier_tache_claude, programmer_routine, mettre_a_jour_dossier. Dis exactement ce qui partira (le texte de l'ordre, la date, la routine), puis termine par une question courte (« Je l'envoie ? », « Je la programme ? ») : son « oui » l'exécute aussitôt, son « non » l'annule, sans repasser par toi. "
+    + "Ne parle jamais de bouton ni d'appui. S'il manque une information indispensable (la date, le bot, l'objet exact), demande-la d'abord, une seule question à la fois, sans outil. Plusieurs choses demandées d'un coup : une ligne d'outil chacune. N'utilise un outil que si c'est utile.\nOutils disponibles :\n"
+    + tools.map((t) => { const sc = t.inputSchema || t.input_schema || {}, req = sc.required || [], pr = sc.properties || {};
+      return '- ' + t.name + ' : ' + String(t.description || '') + (Object.keys(pr).length ? ' Champs : ' + Object.keys(pr).map((k) => k + (req.includes(k) ? '' : ' (facultatif)') + (pr[k].description ? ' = ' + pr[k].description : '')).join(' ; ') + '.' : ''); }).join('\n');
   const sansOutils = (t) => t.replace(OUTIL, '').replace(/```\s*```/g, '').replace(/\n{3,}/g, '\n\n').trim();
   /* pendant le flux : les propositions complètes sont retirées, et une proposition encore en cours d'écriture (« ⟦… ») ne s'affiche pas */
   const enCours = (t) => { const s = t.replace(OUTIL, ''), i = s.indexOf('⟦'); return (i >= 0 ? s.slice(0, i) : s).replace(/```\s*$/, '').replace(/\n{3,}/g, '\n\n').trim(); };
-  const sysDe = (opts, tools) => (opts.system || BASE_SYS) + (tools.length ? '\n\n' + toolsSys(tools) : '');
+  const sysDe = (opts, tools) => (opts.system || BASE_SYS) + (tools.length ? '\n\n' + (opts.voix ? toolsSysVoix(tools) : toolsSys(tools)) : '');
   const outilsDe = (opts) => (Array.isArray(opts.tools) ? opts.tools.filter((t) => t && t.name && typeof t.execute === 'function') : []);
   /* 0.30.0 (Claude instantané) : la réponse arrive mot par mot (SSE) ; conversation = la discussion, dont le serveur garde le Claude ouvert ;
      « Arrêter » (opts.signal) coupe la réponse et Claude avec elle */
