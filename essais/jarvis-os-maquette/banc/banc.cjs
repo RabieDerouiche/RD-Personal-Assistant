@@ -120,10 +120,24 @@ srv.listen(0, async () => {
       await p.goto(base + '#agenda'); await p.waitForTimeout(1500);
       const hit = await p.evaluate(() => { const t = document.querySelector('.tab[data-tab="espaces"]'), row = document.querySelector('.fav-row').getBoundingClientRect(), r = t.getBoundingClientRect(); const e = document.elementFromPoint(r.left + r.width / 2, row.top + 3); return {ok: !!(e && e.closest('.tab[data-tab="espaces"]')), h: Math.round(r.height)}; });
       ok('barre : un appui tout en haut de l’onglet compte (avant : 12 px morts au-dessus de chaque onglet)', hit.ok && hit.h >= 60, JSON.stringify(hit));
-      await p.evaluate(() => { document.querySelector('.tab[data-tab="espaces"]').click(); setTimeout(() => document.querySelector('.tab[data-tab="accueil"]').click(), 90); }); await p.waitForTimeout(1000);
-      const cur = await p.evaluate(() => (document.querySelector('.tab[aria-current="page"]') || {dataset: {}}).dataset.tab);
-      await p.evaluate(() => document.querySelector('.tab[data-tab="accueil"]').click()); await p.waitForTimeout(900);
-      ok('barre : un second appui pendant la transition est ignoré (la page ne repart pas), un appui après passe', cur === 'espaces' && await p.evaluate(() => (document.querySelector('.tab[aria-current="page"]') || {dataset: {}}).dataset.tab === 'accueil'), cur); }
+      /* 0.64.0 : seul un second appui sur le MÊME onglet pendant sa transition est ignoré ; un autre onglet répond tout de suite */
+      await p.evaluate(() => { window.__g = 0; new MutationObserver((ms) => ms.forEach((m) => m.addedNodes.forEach((n) => { if (n.classList && n.classList.contains('ux-ghost')) window.__g++; }))).observe(document.body, {childList: true});
+        document.querySelector('.tab[data-tab="espaces"]').click(); setTimeout(() => document.querySelector('.tab[data-tab="espaces"]').click(), 90); }); await p.waitForTimeout(1000);
+      const deux = await p.evaluate(() => ({cur: (document.querySelector('.tab[aria-current="page"]') || {dataset: {}}).dataset.tab, g: window.__g}));
+      await p.evaluate(() => { document.querySelector('.tab[data-tab="accueil"]').click(); setTimeout(() => document.querySelector('.tab[data-tab="agenda"]').click(), 120); }); await p.waitForTimeout(1000);
+      ok('barre : un second appui sur le même onglet pendant sa transition est ignoré ; un autre onglet touché aussitôt répond tout de suite (0.64.0)', deux.cur === 'espaces' && deux.g === 1 && await p.evaluate(() => (document.querySelector('.tab[aria-current="page"]') || {dataset: {}}).dataset.tab === 'agenda'), JSON.stringify(deux)); }
+    /* 0.64.0 (son retour : « au chargement, toujours du clignotement sur l'accueil ; les menus, Espaces, pas réactifs des fois ») */
+    { await p.goto(base + '#espaces'); await p.waitForTimeout(2000);
+      ok('barre : hors de la zone qui défile (sur iPhone, un appui pendant que la page glisse ne sert plus seulement à l’arrêter)', await p.evaluate(() => document.getElementById('tabs').parentElement === document.body && !document.getElementById('scroller').contains(document.getElementById('tabs'))));
+      /* doigt posé sur une tuile pendant que des données arrivent : la page n'est pas remplacée sous le doigt ; l'appui ouvre la tuile ; un seul rafraîchissement ensuite */
+      const c = await p.context().newCDPSession(p); const r = await p.evaluate(() => { const b = document.querySelector('.esp-tile[data-go="sorties"]').getBoundingClientRect(); window.__t0 = document.querySelector('.esp-tile[data-go="sorties"]'); return [b.left + b.width / 2, b.top + b.height / 2]; });
+      await c.send('Input.dispatchTouchEvent', {type: 'touchStart', touchPoints: [{x: r[0], y: r[1]}]}); await p.waitForTimeout(60);
+      const pendant = await p.evaluate(() => { window.__uxRerender(); window.__uxRerender(); return document.querySelector('.esp-tile[data-go="sorties"]') === window.__t0; });
+      await c.send('Input.dispatchTouchEvent', {type: 'touchEnd', touchPoints: []}); await p.waitForTimeout(1400);
+      ok('données qui arrivent pendant un appui : la page n’est pas remplacée sous le doigt, l’appui ouvre la tuile (Sorties), le rafraîchissement suit', pendant && await p.evaluate(() => /sorties/.test(location.hash) || /Sorties/.test(document.getElementById('view-title').textContent)), String(pendant));
+      await p.goto(base); await p.waitForTimeout(2500);
+      const cal = await p.evaluate(() => { const v = document.getElementById('view'); window.__uxRerender(); const lignes = document.querySelectorAll('.hud-lines path').length; const an = v.getAnimations({subtree: true}).filter((a) => a.effect.getTiming().iterations === Infinity && a instanceof CSSAnimation); return {lignes, n: an.length, cales: an.filter((a) => a.startTime === 0).length}; });
+      ok('accueil rafraîchi : les lignes de l’écran de JARVIS là tout de suite, les animations en boucle reprennent où elles en étaient (calées sur l’horloge de la page)', cal.lignes >= 3 && cal.n > 0 && cal.cales === cal.n, JSON.stringify(cal)); }
     { const ctxR = await b.newContext({...devices['iPhone 15 Pro Max'], reducedMotion: 'reduce'}); const q = await ctxR.newPage(); await q.goto(base + '#espaces'); await q.waitForTimeout(2500);
       await q.evaluate(() => document.querySelector('.esp-tile[data-go="achats"]').click()); await q.waitForTimeout(40);
       ok('fluidité : « réduire les animations » de l’iPhone respecté (aucun calque, aucun glissé)', await q.evaluate(() => !document.querySelector('.ux-ghost') && !document.querySelector('#view .view-in.ux-in'))); await ctxR.close(); }
