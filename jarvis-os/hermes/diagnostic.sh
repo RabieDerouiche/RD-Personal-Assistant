@@ -59,7 +59,7 @@ if id hermes >/dev/null 2>&1; then
   seuil=$(sed -n 's/^HERMES_SEUIL_FORFAIT=//p' /etc/hermes/garde.conf 2>/dev/null)
   [ "$(sed -n 's/^HERMES_GARDE_CINQ_HEURES=//p' /etc/hermes/garde.conf 2>/dev/null)" = 1 ] && fenetres="semaine et fenêtre de 5 heures" || fenetres="semaine seulement"
   echo "  garde du forfait : $(systemctl is-active hermes-garde.timer 2>/dev/null || echo absent) (seuil ${seuil:-?} %, $fenetres)$([ -f /var/lib/hermes-garde/arret ] && echo ' ; HERMES EN PAUSE : forfait au-dessus du seuil')"
-  journalctl -u hermes-garde -n 1 --no-pager -o cat 2>/dev/null | sed 's/^/    dernier contrôle : /'
+  journalctl -u hermes-garde -n 30 --utc --no-pager -o short-iso 2>/dev/null | grep -E ': (Forfait|Hermes|Usage) ' | tail -1 | sed -E 's/^([0-9T:-]+)[^ ]* [^ ]+ [^ ]+: /\1 UTC : /; s/T/ /; s/^/    dernier contrôle : /'
   echo "  dernières lignes utiles du journal :"
   grep -E "telegram connected|Connected to Telegram|ERROR|Traceback|plan limit|extra usage|denied" /home/hermes/.hermes/logs/gateway.log 2>/dev/null | tail -5 | cut -c1-160 | sed -E 's/[0-9]{6,}/<n>/g; s/^/    /'
 fi
