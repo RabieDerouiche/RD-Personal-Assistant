@@ -17,6 +17,7 @@ nouveau n'était noté dans Pilotage ; c'est sa décision de faire l'essai quand
 | Serveur | Mesurer d'abord : vérifier sur le VPS-1 actuel si la mémoire pose un vrai problème ; VPS-2 seulement si c'est sûr que JARVIS serait bridé |
 | Modèle | Son abonnement Claude, par le plugin (« déjà accepté ») ; par défaut **Claude Opus 5.5** (second QCM : le plus capable, pour juger honnêtement ; il use le forfait environ deux fois plus vite que Sonnet) ; `/model` dans le chat pour changer |
 | Bot Telegram | **Un nouveau bot** (le jeton de l'ancien bot d'octobre est resté sur l'ancien serveur ; à supprimer chez @BotFather) |
+| Connexion Claude (QCM après le rappel de la zone grise : plugin officiel d'Hermes mais pas approuvé par Anthropic, qui préfère une clé d'API) | **Garder le plugin** ; la clé d'API des crédits inclus dans Max reste le plan B |
 | Pouvoirs | Aucun pour le moment ; à ouvrir progressivement après l'étude de faisabilité et du déroulé idéal |
 
 ## L'abonnement Claude dans Hermes : ce qui est permis (vérifié le 23/11/2026)
@@ -214,3 +215,6 @@ retirer : `sudo bash /opt/rd/jarvis-os/hermes/desinstaller.sh` (`--tout` efface 
 - 23/11/2026 : `install.sh` passé sur le vrai serveur (code 0 : Hermes installé, non démarré ; règles réseau et
   garde actifs). Garde corrigé ensuite : plus aucune lecture d'usage tant qu'Hermes est arrêté (relancer
   `install.sh` pour l'appliquer).
+- 23/11/2026, par la session « Serveur JARVIS » (tâche confiée par `send_message`, résultat lu par `list_events`, sans
+  recopie par lui) : dépôt à jour (`012837f`), `install.sh` code 0, garde corrigé en place, diagnostic « Confortable »
+  (2,75 Go disponibles, 2,15 Go avec Hermes en train de répondre, aucune retenue de JARVIS, échange 0,9 Go). Reste : `connexion-claude.sh` et `telegram.sh` (Termius).
