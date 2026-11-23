@@ -20,6 +20,7 @@ import {BOT_IDS, BOT_NOMS, BOT_LISTE} from './bots.mjs';
 import {createEcoute, createTour, wavOk, intention, quand, meteoPhrase, meteoUrl, heurePhrase, datePhrase, nrm, diction} from './voix.mjs';
 import {createMemoire, profilTexte, createJournal, interdit} from './memoire.mjs';
 import {createMcp} from './mcp.mjs';
+import {createGardeMemoire} from './garde-memoire.mjs';
 import {createVoixGoogle, VOIX_DEFAUT, nomOk} from './voix-google.mjs';
 import {createRoutines, lirePhrase, quandDit} from './routines.mjs';
 import {createFlux, SECOURS} from './flux.mjs';
@@ -29,7 +30,7 @@ import {pique, PERSO_ORAL} from './humour.mjs';   /* 21/11/2026 : sa personnalit
 import {createAudio, typeSon, silence} from './audio.mjs';   /* 0.64.0 : le message vocal d'un proche, mis au format de l'écoute */
 const ACT = createActivite();   /* 0.33.0 : ce que fait Claude à l'instant */
 
-const VERSION = '0.70.0';
+const VERSION = '0.70.1';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PORT = +(process.env.PORT || 8787);
 const HOST = process.env.HOST || '127.0.0.1';
@@ -385,13 +386,21 @@ const serial = (fn) => { const p = busy.then(fn, fn); busy = p.catch(() => {}); 
 /* 0.36.0 (« Voix plus vive ») : Siri a sa propre file : une question à Siri n'attend plus derrière un tour, un ordre aux bots ou la
    tâche Claude ; s'il reste moins de 400 Mo de mémoire libre, elle reprend la file commune (deux Claude à la fois ne tiendraient pas) */
 let busySiri = Promise.resolve();
-const serialSiri = (fn) => { if (os.freemem() < (+process.env.JARVIS_SIRI_MEM || 400e6)) return serial(fn); const p = busySiri.then(fn, fn); busySiri = p.catch(() => {}); return p; };
+/* 0.70.1 : chaque retenue faute de mémoire est notée dans le journal (garde-memoire.mjs ; diagnostic.sh d'Hermes les compte) */
+const GARDE_MEM = createGardeMemoire({now});
+const SIRI_MEM = +process.env.JARVIS_SIRI_MEM || 400e6, MISSIONS_MEM = +process.env.JARVIS_MISSIONS_MEM || 600e6;
+const serialSiri = (fn) => { if (os.freemem() < SIRI_MEM) { GARDE_MEM.noter('Siri passe par la file commune', SIRI_MEM); return serial(fn); } const p = busySiri.then(fn, fn); busySiri = p.catch(() => {}); return p; };
 /* missions longues (0.15.0) : leur propre file, pour ne bloquer ni la conversation, ni Siri, ni l'app ; une mission à la fois */
 /* 0.33.0 (choix du 21/11/2026, « Missions en parallèle ») : deux missions à la fois (JARVIS_MISSIONS), la suivante attend ; une seconde
    ne démarre que s'il reste 600 Mo de mémoire libre (le VPS-1 a 4 Go, l'écoute en prend 1 à 1,5) */
 const MISSIONS_MAX = Math.max(1, +process.env.JARVIS_MISSIONS || 2);
 let missionsActives = 0; const missionsFile = [];
-const missionPlace = () => missionsActives === 0 || (missionsActives < MISSIONS_MAX && os.freemem() > (+process.env.JARVIS_MISSIONS_MEM || 600e6));
+const missionPlace = () => {
+  if (missionsActives === 0) return true;
+  if (missionsActives >= MISSIONS_MAX) return false;
+  if (os.freemem() > MISSIONS_MEM) return true;
+  GARDE_MEM.noter('seconde mission retardée', MISSIONS_MEM); return false;
+};
 function missionSuivante() { while (missionsFile.length && missionPlace()) missionsFile.shift()(); }
 const serialMission = (fn) => new Promise((resolve, reject) => {
   const go = () => { missionsActives++; Promise.resolve().then(fn).then(resolve, reject).finally(() => { missionsActives--; missionSuivante(); }); };
@@ -484,7 +493,7 @@ function prechauffe() {
   });
 }
 /* 0.30.0 : Claude pour la page, instantané (flux.mjs) : discussion gardée ouverte, réponse mot par mot, file à part, secours */
-const FLUX = createFlux({bin: CLAUDE, env: childEnv, settings: () => guardSettings('chat'), cwd: path.join(DATA, 'sample'), conso: consoAdd, friendly, dateLigne: () => dateLigne() + etatJarvisLigne(), activite: ACT,
+const FLUX = createFlux({auBord: (genre, seuil) => GARDE_MEM.noter(genre, seuil), bin: CLAUDE, env: childEnv, settings: () => guardSettings('chat'), cwd: path.join(DATA, 'sample'), conso: consoAdd, friendly, dateLigne: () => dateLigne() + etatJarvisLigne(), activite: ACT,
   models: {quick: MODELS.rapide, default: MODELS.equilibre, deep: MODELS.profond, smart: MODELS.profond}});
 const PAGE_SYS = "Tu réponds au propriétaire dans sa page Jarvis (JARVIS OS), en français, en le tutoyant. Réponds exactement au format demandé.";
 function chatFin(r, t0, warm, model, send) {

@@ -39,10 +39,12 @@ StandardOutput=journal
 StandardError=journal
 
 # ---- JARVIS d'abord : Hermes est le premier sacrifié si la mémoire manque
-# Mesuré au banc (23/11/2026) : environ 340 Mo au repos, plus environ 250 Mo par Claude Code lancé
-# pour une réponse (un seul à la fois, politique.yaml). Hermes règle son propre cache sur MemoryMax.
-MemoryHigh=700M
-MemoryMax=900M
+# Mesuré au banc (23/11/2026) : 325 à 360 Mo au repos, plus environ 250 Mo par Claude Code lancé pour une
+# réponse (un seul à la fois, politique.yaml). Serveur mesuré le même jour : 1,86 Go disponibles sur 3,8 Go,
+# JARVIS près de son pic. Au-delà de MemoryHigh, Hermes est ralenti et poussé vers l'échange (2 Go) avant JARVIS.
+# Hermes règle son propre cache sur MemoryMax.
+MemoryHigh=650M
+MemoryMax=800M
 OOMScoreAdjust=600
 CPUWeight=20
 IOWeight=20

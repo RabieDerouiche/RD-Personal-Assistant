@@ -60,6 +60,10 @@ if id hermes >/dev/null 2>&1; then
   grep -E "telegram connected|Connected to Telegram|ERROR|Traceback|plan limit|extra usage|denied" /home/hermes/.hermes/logs/gateway.log 2>/dev/null | tail -5 | cut -c1-160 | sed -E 's/[0-9]{6,}/<n>/g; s/^/    /'
 fi
 
+t "JARVIS s'est-il retenu faute de mémoire ? (7 derniers jours ; noté depuis JARVIS 0.70.1, une ligne par genre et par 10 min au plus)"
+retenues=$(journalctl -u jarvis --since "7 days ago" --no-pager -o cat 2>/dev/null | grep -o "mémoire basse : [^(]*" | sed 's/ *$//' || true)
+if [ -n "$retenues" ]; then printf '%s\n' "$retenues" | sort | uniq -c | sed 's/^ */  /'; else echo "  aucune retenue notée"; fi
+
 t "Verdict mémoire (Likely : pics additionnés, comme s'ils arrivaient en même temps)"
 total=$(mo MemTotal); dispo=$(mo MemAvailable)
 hermes_pic=600; [ "$(systemctl is-active hermes-gateway 2>/dev/null)" = active ] && hermes_pic=0   # déjà compté dans les pics
@@ -70,3 +74,4 @@ if [ "$pire" -ge 900 ]; then echo "  → VPS actuel suffisant : JARVIS ne devrai
 elif [ "$((dispo - hermes_pic))" -ge 900 ]; then echo "  → Juste : JARVIS peut se brider aux pics (voix + mission + réponse d'Hermes). Essai possible, à surveiller."
 else echo "  → Insuffisant : passer au VPS-2 (8 Go) avant de démarrer Hermes."
 fi
+[ -n "$retenues" ] && echo "  → JARVIS s'est déjà retenu (ci-dessus) : si c'est depuis le démarrage d'Hermes, Hermes le gêne ; passer au VPS-2 ou arrêter Hermes."
