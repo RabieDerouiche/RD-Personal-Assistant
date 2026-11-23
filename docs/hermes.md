@@ -256,3 +256,6 @@ retirer : `sudo bash /opt/rd/jarvis-os/hermes/desinstaller.sh` (`--tout` efface 
   faux JARVIS (liaison par un faux terminal, jeton en en-tête, outil hors liste invisible, routine posée,
   recréée, retirée et lancée, skill chargée, 500 Mo au plus). Non vérifiable au banc : le vrai JARVIS derrière
   Caddy depuis l'utilisateur `hermes`, le vrai Claude dans une routine, « /skills approve » dans Telegram.
+- 23/11/2026, 19h30 : sur le serveur (session « Serveur JARVIS »), dépôt `3c4d4a8`, JARVIS 0.71.0, `install.sh`
+  code 0 avec la politique des étapes 3 et 4 (pas encore relié). Ses choix par QCM et la suite : `docs/hermes-deroule.md`.
+
