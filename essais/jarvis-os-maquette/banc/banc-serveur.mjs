@@ -64,6 +64,15 @@ try {
     { let n = 0; const compte = (r) => { try { if (new URL(r.url()).pathname === '/api/radar') n++; } catch { /* rien */ } };
       p.on('request', compte); await p.waitForTimeout(8000); p.off('request', compte);
       ok('Radar (serveur) : la page ne relit pas le serveur en boucle (au plus une lecture en 8 s, lecture des mails finie)', n <= 1, n + ' lectures'); }
+    /* 0.68.0 (ses retours du 23/11/2026) : le paiement en 4 fois inventé est un achat de « En plusieurs fois » ; « Tout relire » relit tout en le disant, puis donne son bilan */
+    const pl = await p.evaluate(() => ({row: (document.querySelector('.rad-plans .rad-plan') || {}).innerText || '', h: (document.querySelector('.rad-plans .panel-h') || {}).innerText || ''}));
+    ok('Radar 0.68 (serveur) : le paiement en 4 fois lu dans les mails est un achat de « En plusieurs fois » (PayPal, 1 sur 4 payée, 60 € restent)', /BOUTIQUE EXEMPLE/.test(pl.row) && /PayPal · 4 fois · 80,00 €/.test(pl.row) && /1 sur 4 payée/.test(pl.row) && /60,00 € restent/.test(pl.h), JSON.stringify(pl));
+    await p.evaluate(() => document.querySelector('.rad-relire').click()); await p.waitForTimeout(500);
+    const rl1 = await p.evaluate(() => ({scan: (document.querySelector('.rad-scan') || {}).innerText || '', toast: [...document.querySelectorAll('.toast')].map((x) => x.innerText.replace(/\s+/g, ' ')).join(' | ')}));
+    await p.waitForTimeout(9000);
+    const rl2 = await p.evaluate(() => ({scan: (document.querySelector('.rad-scan') || {}).innerText || '', btn: (document.querySelector('.rad-relire') || {}).textContent || '', rules: document.querySelectorAll('.rad-rule').length, plans: document.querySelectorAll('.rad-plans .rad-plan').length}));
+    ok('Radar 0.68 (serveur) : « Tout relire » relit les 13 mois en le disant, puis donne son bilan ; la dépense ajoutée et le paiement en 4 fois restent', (/Je relis tes 13 derniers mois/.test(rl1.scan) || /Relecture finie/.test(rl1.scan)) && /Je relis tes 13 derniers mois de mails/.test(rl1.toast)
+      && /Relecture finie : \d+ mails lus/.test(rl2.scan) && /1 en plusieurs fois/.test(rl2.scan) && /Tout relire \(13 mois\)/.test(rl2.btn) && rl2.rules === 1 && rl2.plans >= 1, JSON.stringify([rl1, rl2]));
     await p.screenshot({path: SH + 'radar-serveur.png'}); }
   await p.goto(BASE + '/?serveur#agenda'); await p.waitForTimeout(4000);
   ok('agenda en direct : carte Aujourd\'hui, 7 prochains jours, grille', await p.evaluate(() => !!document.querySelector('.agt .agt-date') && document.querySelectorAll('.agw-d').length === 7 && !!document.querySelector('.mgrid .mg-d.is-today')));

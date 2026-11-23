@@ -27,6 +27,11 @@ export function startFakeGoogle() {
   { const n = new Date(); for (const k of [2, 1, 0]) { const d = new Date(Date.UTC(n.getUTCFullYear(), n.getUTCMonth() - k, 1, 8)), mm = String(d.getUTCMonth() + 1).padStart(2, '0'), id = 'rd' + k;
       F.radar['t' + id] = {id: 't' + id, threadId: 't' + id, labelIds: ['INBOX', 'CATEGORY_UPDATES'], snippet: 'Votre facture', internalDate: String(d.getTime()), text: 'Bonjour,\nVotre facture est disponible.\nMontant TTC : 48,20 €\nIl sera prélevé le 12/' + mm + '/' + d.getUTCFullYear() + '.',
         payload: {headers: [{name: 'From', value: '"Énergie Exemple" <facturation@energie-exemple.fr>'}, {name: 'To', value: 'moi@example.org'}, {name: 'Subject', value: 'Votre facture du mois'}, {name: 'Date', value: d.toUTCString()}]}}; } }
+  /* 0.68.0 : un paiement en 4 fois inventé (4 × 20 € : il y a 10 jours, puis tous les 30 jours), pour le panneau « En plusieurs fois » */
+  { const j = (k) => new Date(Date.now() + k * 864e5), fr = (x) => String(x.getUTCDate()).padStart(2, '0') + '/' + String(x.getUTCMonth() + 1).padStart(2, '0') + '/' + x.getUTCFullYear(), d0 = j(-10);
+    F.radar.tpl4 = {id: 'tpl4', threadId: 'tpl4', labelIds: ['INBOX', 'CATEGORY_UPDATES'], snippet: 'Votre plan de paiements', internalDate: String(d0.getTime()),
+      text: 'Voici votre nouveau plan de paiements Paiement en 4X.\nVotre achat de 80,00 € EUR auprès de BOUTIQUE EXEMPLE a été divisé en 4 paiements plus petits.\n' + [-10, 20, 50, 80].map((k) => '* 20,00 € EUR le ' + fr(j(k))).join(' ') + '\n',
+      payload: {headers: [{name: 'From', value: '"PayPal" <service@paypal.fr>'}, {name: 'To', value: 'moi@example.org'}, {name: 'Subject', value: 'Votre plan de paiements Paiement en 4X est prêt'}, {name: 'Date', value: d0.toUTCString()}]}}; }
   const send = (res, st, body) => { res.writeHead(st, {'content-type': 'application/json'}); res.end(st === 204 ? '' : JSON.stringify(body)); };
   const server = http.createServer((req, res) => {
     let raw = ''; req.on('data', (d) => { raw += d; }); req.on('end', () => {

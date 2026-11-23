@@ -127,7 +127,7 @@ try {
     const n0 = appelsT.length; await RQ.lireMaintenant();
     ok('Radar : un fil déjà lu et inchangé n’est pas relu (seules les listes du jour sont demandées : objet, phrases de prélèvement, fournisseurs connus)', appelsT.length - n0 === 3, (appelsT.length - n0) + ' appels');
     /* une lecture interrompue reprend au mois où elle s'était arrêtée ; un ancien message anglais de Google est montré en français */
-    fs.writeFileSync(path.join(DIR, 'radar3.json'), JSON.stringify({version: 6, scan: {enCours: false, debut: 0, mois: 2, total: 4, lus: 5, fini: null, erreur: "Quota exceeded for quota metric 'Total Query Cost'"}}));
+    fs.writeFileSync(path.join(DIR, 'radar3.json'), JSON.stringify({version: 7, scan: {enCours: false, debut: 0, mois: 2, total: 4, lus: 5, fini: null, erreur: "Quota exceeded for quota metric 'Total Query Cost'"}}));
     const qs = [], RR = createRadar({file: path.join(DIR, 'radar3.json'), gmail: {lie: () => true, chercher: async (q) => { qs.push(q); return {threads: []}; }, fil: async () => ({messages: []})}, now: () => Date.parse('2026-11-23T09:00:00Z'), moisDepart: 4});
     const msg = RR.etat().scan.erreur; await RR.traiter('GET', '/api/radar', null); await RR.attendre();
     ok('Radar : la lecture interrompue reprend au mois suivant (2 mois restants sur 4), puis cherche ses contrats (0.66.0) ; l’ancien message de Google est traduit', qs.length === 5 && /after:2026\/10\/01/.test(qs[0]) && /^has:attachment filename:pdf .*newer_than:4y$/.test(qs[4]) && RR.etat().scan.fini && /Google a limité la lecture de tes mails/.test(msg), JSON.stringify([qs, msg])); }
@@ -156,7 +156,7 @@ try {
     /* la lecture d'avant 0.49.0 est oubliée (relevés, propositions), ses dépenses validées, sa paie et ses refus restent */
     fs.writeFileSync(path.join(DIR, 'radar5.json'), JSON.stringify({fixes: [{id: 'f1', service: 'Crédit', montant: 900, jour: 5, rythme: 'mensuel', source: 'toi'}], revenus: {jour: 27, avance: true}, refus: ['x.fr'], releves: [{id: 'r', dom: 'x.fr', montant: 1, date: '2026-11-01', genre: 'facture'}], propositions: [{id: 'p1', service: 'Bruit'}], scan: {fini: 1}}));
     const RV = createRadar({file: path.join(DIR, 'radar5.json'), gmail: {lie: () => false}, now: () => Date.parse('2026-11-23T09:00:00Z')}), bv = RV.brut();
-    ok('Radar : la lecture faite avec les anciennes règles est refaite (relevés et propositions oubliés) ; dépenses, paie et refus gardés', !bv.releves.length && !bv.propositions.length && !bv.scan && bv.fixes.length === 1 && bv.revenus.jour === 27 && bv.refus.includes('x.fr') && bv.version === 6); }
+    ok('Radar : la lecture faite avec les anciennes règles est refaite (relevés et propositions oubliés) ; dépenses, paie et refus gardés', !bv.releves.length && !bv.propositions.length && !bv.scan && bv.fixes.length === 1 && bv.revenus.jour === 27 && bv.refus.includes('x.fr') && bv.version === 7); }
   /* 0.50.0 : catégories enfants et impôts ; la proposition montre son dernier mail */
   ok('Radar : catégories « Enfants » (crèche, couches) et « Impôts » (DGFiP)', categorie('creche-exemple.fr', 'Crèche Les Lutins') === 'Enfants' && categorie('couches-exemple.fr', 'Couches Exemple') === 'Enfants' && categorie('dgfip.finances.gouv.fr', '') === 'Impôts');
   { const px = regrouper(['2026-09', '2026-10', '2026-11'].map((m) => ({id: 'x' + m, fil: 'f' + m, objet: 'Votre facture de ' + m, dom: 'tel3-exemple.fr', cle: 'tel3-exemple.fr', service: 'Tel Trois', montant: 9.99, date: m + '-05', datePrel: null, genre: 'facture'})), lundi)[0];
@@ -400,6 +400,116 @@ try {
       Buffer.from('\nendstream\nendobj\n6 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >> endobj\n9 0 obj ' + page.length + ' endobj\ntrailer << /Root 1 0 R >>\n%%EOF\n', 'latin1')]);
     const tp = texteDePdf(pdf);
     ok('PDF 0.56 : ASCII85 + compression, texte dans un formulaire interne, longueur indirecte : lu ; « Total » puis « 412,50 € » donne 412,50 €', /Total\n412,50 €/.test(tp) && montantPdf(tp) === 412.5, JSON.stringify(tp)); }
+  /* ---------- 0.68.0 (ses retours du 23/11/2026, exemples inventés) : la relecture qui se relance, des alertes sans doublon et récupérables,
+     les paiements en plusieurs fois suivis par achat ---------- */
+  { const th = (id, sender, nom, objet, texte, date) => ({id, messages: [{id: 'm' + id, threadId: id, sender, addressDisplayNames: [{displayName: nom, emailAddress: sender}], subject: objet, plaintextBody: texte, date, labelIds: ['INBOX']}]});
+    const lien = (pid) => '\n| Se connecter[](https://www.paypal.com/myaccount/paylater/planDetails?cpi=PAY_LATER_FR&plan_id=' + pid + '&paylater_source=email) |';
+    const PID = '11111111-2222-3333-4444-555555555555';
+    const planB = th('pb', 'service@paypal.fr', 'PayPal', 'Votre plan de paiements Paiement en 4X est prêt', '| Voici votre nouveau plan de paiements Paiement en 4X. |\n| Votre achat de 80,00 € EUR auprès de BOUTIQUE EXEMPLE a été divisé en 4 paiements plus petits. |\n| Mensualité |\n| 20,00 € EUR/mois |\n| Montant de la transaction |\n| 80,00 € EUR |\n| * 20,00 € EUR à régler aujourd\'hui * 20,00 € EUR le 3 novembre 2026 * 20,00 € EUR le 3 décembre 2026 * 20,00 € EUR le 2 janvier 2027 * 20,00 € EUR le 1 février 2027 |' + lien(PID), '2026-11-02T23:40:00Z');
+    const confB = th('cb', 'service@paypal.fr', 'PayPal', 'Confirmation de votre Paiement en 4X', '| Le remboursement de votre échéance Paiement en 4X a été reçu. |\n| Vous avez effectué un paiement de 20,00 € EUR pour votre Paiement en 4X auprès de BOUTIQUE EXEMPLE. Le paiement a été débité de votre carte le 3 novembre 2026. |\n| Montant du paiement |\n| 20,00 € EUR |\n| Marchand |\n| BOUTIQUE EXEMPLE |\n| Montant restant |\n| 60,00 € EUR |' + lien(PID), '2026-11-03T08:10:00Z');
+    const retB = th('rb', 'service@paypal.fr', 'PayPal', 'Paiement en 4X : Concernant votre droit de rétractation', '| Votre délai de rétractation a commencé |\n| Le 3 novembre 2026, vous avez accepté un prêt de 80,00 € EUR pour votre achat chez BOUTIQUE EXEMPLE en utilisant Paiement en 4X. Vous pouvez vous rétracter jusqu\'au 1 décembre 2026. |', '2026-11-20T08:00:00Z');
+    const planM = th('pm', 'conseiller@cofidis.fr', 'Conseiller', 'Consultez l’échéancier de vos achats financés', 'Suite à votre achat en 4 fois par carte bancaire sur le site MAGASIN EXEMPLE réalisé le 02/11/2026 d\'un montant de 80,00 €, nous vous informons du prélèvement de votre 1ère échéance :\n| MONTANT | DATE DE PRÉLÈVEMENT |\n| 20,00 € | 03/11/2026 |\n| 20,00 € | 03/12/2026 |\n| 20,00 € | 03/01/2027 |\n| 20,00 € | 03/02/2027 |\n| TOTAL À PAYER : 80,00 € |', '2026-11-03T09:00:00Z');
+    const dix = ['10/12/2026', '10/01/2027', '10/02/2027', '10/03/2027', '10/04/2027', '10/05/2027', '10/06/2027', '10/07/2027', '10/08/2027', '10/09/2027'].map((d) => '| 30,00 € | ' + d + ' |').join('\n');
+    const plan10 = th('p10', 'service@oney.fr', 'Oney', 'Votre paiement en 10 fois est accepté', 'Votre achat de 300,00 € auprès de MEUBLE EXEMPLE en 10 fois :\n' + dix, '2026-11-05T09:00:00Z');
+    const rapL = th('rl', 'service@paypal.fr', 'PayPal', 'L\'échéance de votre Paiement en 4X approche', '| Votre prochaine échéance de 15,00 € EUR sera due le 28 novembre 2026. |\n| Marchand |\n| LIBRAIRIE EXEMPLE |', '2026-11-21T08:00:00Z');
+    const facts = ['2026-08', '2026-09', '2026-10', '2026-11'].flatMap((m, i) => [th('fe' + i, 'factures@eau-exemple.fr', 'Eau Exemple', 'Votre facture', 'Montant TTC : 21,30 €. Il sera prélevé le 6/' + m.slice(5) + '/' + m.slice(0, 4) + '.', m + '-01T08:00:00Z'),
+      th('fc' + i, 'factures@club-exemple.fr', 'Club Exemple', 'Votre facture', 'Montant : 29,90 €. Prélèvement le 10/' + m.slice(5) + '/' + m.slice(0, 4) + '.', m + '-02T08:00:00Z')]).filter((t) => !/^fc[23]$/.test(t.id));   /* le club : plus de facture depuis septembre */
+    const echecs = ['2026-11-10', '2026-11-14', '2026-11-18'].map((d, i) => th('ev' + i, 'info@video-exemple.com', 'Video Exemple', 'Payment failed', 'We couldn\'t process your payment of €9.99. Please update your payment method.', d + 'T08:00:00Z'));
+    const obscur = th('fo', 'factures@obscur-exemple.fr', 'Obscur Exemple', 'Votre facture', 'Votre facture est disponible dans votre espace client.', '2026-10-05T08:00:00Z');   /* illisible par les règles : pour Claude */
+    const F = Object.fromEntries([planB, confB, retB, planM, plan10, rapL, ...facts, ...echecs, obscur].map((t) => [t.id, t]));
+    let porte = null; const fichier = path.join(DIR, 'radar68.json'), appelsC = [];
+    const gmail68 = {lie: () => true, chercher: async (q) => { if (porte) await porte.p; const m = q.match(/after:(\d{4})\/(\d{2})/); if (!m) return {threads: []};
+      return {threads: Object.values(F).filter((t) => t.messages[0].date.startsWith(m[1] + '-' + m[2])).map((t) => ({id: t.id}))}; }, fil: async (id) => F[id]};
+    const claude68 = async (prompt) => { appelsC.push(prompt); const ids = [...prompt.matchAll(/\[mail (\w+)\]/g)].map((x) => x[1]); return {ok: true, text: JSON.stringify(ids.map((id) => ({id, genre: 'facture', service: 'Obscur', montant: 12.5, date_prelevement: null})))}; };
+    /* le club et l'eau sont déjà des dépenses fixes lues dans ses mails (avant la relecture) */
+    fs.writeFileSync(fichier, JSON.stringify({version: 7, fixes: [{id: 'fclub', service: 'Club Exemple', cat: 'Autres', montant: 29.9, jour: 10, rythme: 'mensuel', source: 'mail', dom: 'club-exemple.fr', cle: 'club-exemple.fr'}], revenus: {jour: 5, avance: true}}));
+    let maintenant68 = Date.parse('2026-11-23T09:00:00Z');
+    const R68 = createRadar({file: fichier, gmail: gmail68, claude: claude68, now: () => maintenant68, moisDepart: 4});
+    await R68.traiter('GET', '/api/radar', null); await R68.attendre();
+    let e = R68.etat();
+    const pB = e.plans.find((p) => p.service === 'BOUTIQUE EXEMPLE'), pM = e.plans.find((p) => p.service === 'MAGASIN EXEMPLE'), p10 = e.plans.find((p) => p.service === 'MEUBLE EXEMPLE'), pL = e.plans.find((p) => p.service === 'LIBRAIRIE EXEMPLE');
+    ok('Radar 0.68 : un plan par achat : 4 échéances (« aujourd’hui » écrit deux fois par un mail de 0 h 40 ne fait pas une cinquième), la première payée d’après sa confirmation, 60 € restants comme écrit dans le mail',
+      !!pB && pB.via === 'PayPal' && pB.fois === 4 && pB.total === 80 && pB.echeances.length === 4 && pB.payees === 1 && pB.reste === 60 && pB.restant === 60 && pB.prochaine.date === '2026-12-03' && !pB.partiel, JSON.stringify(pB));
+    ok('Radar 0.68 : l’avis de rétractation (« un prêt de 80,00 € … jusqu’au 1 décembre ») ne compte pas l’achat entier comme un prélèvement ; ni comme une échéance', !e.ponctuels.some((x) => x.montant === 80) && e.plans.filter((p) => p.service === 'BOUTIQUE EXEMPLE').length === 1, JSON.stringify(e.ponctuels));
+    ok('Radar 0.68 : deux achats différents avec une échéance de 20 € le même jour comptent tous les deux (avant : la seconde était effacée)', !!pM && pM.via === 'Cofidis' && e.ponctuels.filter((x) => x.date === '2026-12-03' && x.montant === 20).length === 2
+      && resteA([], {jour: 5, avance: true}, J(2026, 10, 23), 'paie', e.ponctuels).total === 55, JSON.stringify(e.ponctuels.filter((x) => x.date <= '2026-12-04')));
+    ok('Radar 0.68 : un paiement en 10 fois reste un paiement en plusieurs fois (ses 10 échéances), pas une « dépense fixe » à valider', !!p10 && p10.fois === 10 && p10.reste === 300 && p10.echeances.length === 10 && !e.propositions.some((x) => /meuble/i.test(x.service)), JSON.stringify(p10));
+    ok('Radar 0.68 : un rappel seul (sans le mail du plan) donne un plan partiel avec son échéance', !!pL && pL.partiel && pL.reste === 15 && pL.prochaine.date === '2026-11-28', JSON.stringify(pL));
+    ok('Radar 0.68 : « À venir » range les échéances par plan (« Échéance 2 sur 4 »)', e.avenir.some((v) => v.type === 'echeance' && v.plan === pB.id && v.date === '2026-12-03' && /Échéance 2 sur 4/.test(v.note)), JSON.stringify(e.avenir.filter((v) => v.type === 'echeance').slice(0, 3)));
+    /* « Plus de facture » : une seule alerte, après la lecture (avant : une par mois relu et par dépense, toutes fausses) */
+    const sil = e.alertes.filter((a) => a.type === 'silence');
+    ok('Radar 0.68 : « Plus de facture » : une seule alerte pour le club (plus de facture depuis septembre), aucune pour ce qui est facturé chaque mois', sil.length === 1 && sil[0].fixe === 'fclub' && sil[0].dernier === '2026-09-10', JSON.stringify(e.alertes.map((a) => [a.type, a.service, a.dernier])));
+    const ech = e.alertes.filter((a) => a.type === 'echec');
+    ok('Radar 0.68 : trois mails pour le même paiement échoué font une seule alerte, la plus récente, « 3 mails »', ech.length === 1 && ech[0].n === 3 && ech[0].date === '2026-11-18', JSON.stringify(ech));
+    /* « Vu » gardé sur le serveur, et « Remettre » */
+    let r = await R68.traiter('POST', '/api/radar/alerte', async () => ({id: ech[0].id, action: 'vu'}));
+    const vuOk = r.status === 200 && !!r.body.alertes.find((a) => a.id === ech[0].id).vu;
+    r = await R68.traiter('POST', '/api/radar/alerte', async () => ({id: ech[0].id, action: 'revoir'}));
+    ok('Radar 0.68 : « Vu » est gardé sur le serveur (plus seulement dans un iPhone) ; « Remettre » le défait', vuOk && !r.body.alertes.find((a) => a.id === ech[0].id).vu);
+    await R68.traiter('POST', '/api/radar/alerte', async () => ({id: ech[0].id, action: 'vu'}));
+    /* « Retirer » par erreur, puis « Annuler » : la dépense revient, elle n'est plus écartée */
+    r = await R68.traiter('POST', '/api/radar/alerte', async () => ({id: sil[0].id, action: 'retirer'}));
+    const apres = r.body, ecOk = apres.ecartees.some((x) => x.cle === 'club-exemple.fr' && x.service === 'Club Exemple') && apres.traitees.some((x) => x.id === sil[0].id && x.action === 'retirer') && !apres.fixes.some((f) => f.id === 'fclub');
+    r = await R68.traiter('POST', '/api/radar/alerte', async () => ({id: sil[0].id, action: 'annuler'}));
+    ok('Radar 0.68 : « Retirer » est noté (« Écartées », réponse gardée) ; « Annuler » remet la dépense, la retire des écartées et l’alerte revient', ecOk && r.status === 200 && r.body.fixes.some((f) => f.id === 'fclub' && f.montant === 29.9) && !r.body.ecartees.length && !r.body.traitees.length && r.body.alertes.some((a) => a.id === sil[0].id), JSON.stringify(apres.ecartees));
+    /* « Pas une dépense fixe » par erreur, puis « Reproposer » */
+    const eau = r.body.propositions.find((p) => p.service === 'Eau Exemple');
+    r = await R68.traiter('POST', '/api/radar/proposition', async () => ({id: eau.id, oui: false}));
+    const ecarteeEau = r.body.ecartees.find((x) => x.service === 'Eau Exemple');
+    r = await R68.traiter('POST', '/api/radar/reproposer', async () => ({cle: ecarteeEau.cle}));
+    ok('Radar 0.68 : une dépense écartée garde son nom et revient dans « À valider » avec « Reproposer »', !!ecarteeEau && r.status === 200 && r.body.revenue === true && r.body.propositions.some((p) => p.service === 'Eau Exemple') && !r.body.ecartees.length);
+    /* un plan « plus à payer » (achat annulé, remboursé) et « Remettre » */
+    r = await R68.traiter('POST', '/api/radar/plan', async () => ({id: p10.id, action: 'retirer'}));
+    const sans10 = r.body.ponctuels.length, retireOk = r.body.plans.find((p) => p.id === p10.id).retire;
+    r = await R68.traiter('POST', '/api/radar/plan', async () => ({id: p10.id, action: 'remettre'}));
+    ok('Radar 0.68 : « Plus à payer » sort les échéances d’un plan du reste à payer ; « Remettre » les rend', retireOk && sans10 === r.body.ponctuels.length - 10 && !r.body.plans.find((p) => p.id === p10.id).retire, sans10 + ' / ' + r.body.ponctuels.length);
+    /* un rappel qui décale une échéance : la date change, rien n'est compté deux fois */
+    F.rb2 = th('rb2', 'service@paypal.fr', 'PayPal', 'L\'échéance de votre Paiement en 4X approche', '| Votre prochaine échéance de 20,00 € EUR sera due le 5 décembre 2026. |\n| Marchand |\n| BOUTIQUE EXEMPLE |' + lien(PID), '2026-11-28T08:00:00Z');
+    gmail68.chercher = async (q) => (/newer_than:3d/.test(q) && /subject:/.test(q) ? {threads: [{id: 'rb2'}]} : {threads: []});
+    maintenant68 = Date.parse('2026-11-28T09:00:00Z'); await R68.traiter('POST', '/api/radar/lire', async () => ({tout: false})); await R68.attendre();
+    e = R68.etat(); const pB2 = e.plans.find((p) => p.id === pB.id);
+    ok('Radar 0.68 : un rappel qui décale une échéance (3 → 5 décembre) la déplace, sans la compter deux fois', pB2.prochaine.date === '2026-12-05' && e.ponctuels.filter((x) => x.plan === pB.id).length === 3 && !e.ponctuels.some((x) => x.plan === pB.id && x.date === '2026-12-03'), JSON.stringify(pB2.echeances));
+    /* « Tout relire » : relit ses mois avec les règles du jour, montre ce qu'il voyait pendant ce temps, garde ses réponses ; Claude ne relit pas les mêmes mails */
+    gmail68.chercher = async (q) => { if (porte) await porte.p; const m = q.match(/after:(\d{4})\/(\d{2})/); if (!m) return {threads: []}; return {threads: Object.values(F).filter((t) => t.id !== 'rb2' && t.messages[0].date.startsWith(m[1] + '-' + m[2])).map((t) => ({id: t.id}))}; };
+    maintenant68 = Date.parse('2026-11-23T09:00:00Z');
+    const nAlertes = R68.etat().alertes.length, nC = appelsC.length; let ouvrir; porte = {p: new Promise((z) => { ouvrir = z; })};
+    r = await R68.traiter('POST', '/api/radar/lire', async () => ({}));
+    const pendant = R68.etat();
+    ok('Radar 0.68 : « Tout relire » démarre aussitôt (202), lecture complète en cours ; ce qu’il voyait reste affiché pendant ce temps', r.status === 202 && pendant.scan.enCours && pendant.scan.complet && pendant.relecture && pendant.alertes.length === nAlertes && pendant.plans.length === 4, JSON.stringify(pendant.scan));
+    const debut0 = R68.brut().scan.debut, deux = await R68.traiter('POST', '/api/radar/lire', async () => ({}));
+    ok('Radar 0.68 : un second appui pendant la lecture ne la relance pas (la même lecture continue)', deux.status === 202 && R68.brut().scan.enCours && R68.brut().scan.debut === debut0);
+    porte = null; ouvrir(); await R68.attendre();
+    e = R68.etat();
+    ok('Radar 0.68 : relu jusqu’au bout : la nouvelle lecture remplace l’ancienne, un bilan est donné ; ses dépenses, sa paie, ses refus et son « Vu » restent ; Claude ne relit pas les mêmes mails',
+      !e.relecture && !R68.brut().avant && e.scan.fini && e.scan.bilan && e.scan.bilan.plans === 4 && e.fixes.some((f) => f.id === 'fclub') && e.revenus.jour === 5 && !!e.alertes.find((a) => a.type === 'echec').vu && nC >= 1 && appelsC.length === nC, JSON.stringify([e.scan.bilan, nC, appelsC.length - nC]));
+    /* le même paiement échoué, deux mails le même matin : une seule notification */
+    const pushs = []; F.ex1 = th('ex1', 'billing@jeu-exemple.com', 'Jeu Exemple', 'Payment declined', 'Your payment of €4.99 was declined. Update your payment method.', '2026-11-29T05:00:00Z'); F.ex2 = th('ex2', 'billing@jeu-exemple.com', 'Jeu Exemple', 'Payment failed', 'We could not process your payment of €4.99.', '2026-11-29T05:30:00Z');
+    const Rn = createRadar({file: path.join(DIR, 'radar68n.json'), gmail: {lie: () => true, chercher: async (q) => (/newer_than:3d/.test(q) && /subject:/.test(q) ? {threads: [{id: 'ex1'}, {id: 'ex2'}]} : {threads: []}), fil: async (id) => F[id]}, push: async (m) => { pushs.push(m); return []; }, now: () => Date.parse('2026-11-29T06:00:00Z')});
+    Rn.brut().scan = {fini: 1}; await Rn.lireMaintenant();
+    ok('Radar 0.68 : deux mails le même matin pour le même paiement échoué : une alerte, une seule notification', pushs.filter((m) => /Paiement échoué/.test(m.title)).length === 1 && Rn.etat().alertes.filter((a) => a.type === 'echec').length === 1, JSON.stringify(pushs.map((m) => m.title))); }
+  /* 0.68.0 : une lecture qui ne répond plus ne bloque plus rien ; une version d'avant (6) est relue sans perdre ce qu'il voyait */
+  { const lents = [], F2 = {ok1: {id: 'ok1', messages: [{id: 'mo1', threadId: 'ok1', sender: 'factures@eau-exemple.fr', addressDisplayNames: [{displayName: 'Eau Exemple'}], subject: 'Votre facture', plaintextBody: 'Montant TTC : 21,30 €.', date: '2026-11-02T08:00:00Z'}]}};
+    const Rb = createRadar({file: path.join(DIR, 'radar68b.json'), gmail: {lie: () => true, chercher: async (q) => (/after:2026\/11/.test(q) && /subject:/.test(q) ? {threads: [{id: 'bloque'}, {id: 'ok1'}]} : {threads: []}), fil: (id) => (id === 'bloque' ? (lents.push(id), new Promise(() => {})) : Promise.resolve(F2[id]))},
+      now: () => Date.parse('2026-11-23T09:00:00Z'), moisDepart: 1, delaiGmail: 40});
+    await Rb.lireMaintenant();
+    ok('Radar 0.68 : un fil que Gmail ne rend jamais est abandonné au bout du délai (90 s en service) : la lecture continue et finit', lents.length === 1 && !!Rb.etat().scan.fini && !Rb.etat().scan.erreur && Rb.brut().releves.length === 1, JSON.stringify(Rb.etat().scan));
+    let horloge = Date.parse('2026-11-23T09:00:00Z'), bloquer = true; const qs = [];
+    const Rf = createRadar({file: path.join(DIR, 'radar68f.json'), gmail: {lie: () => true, chercher: (q) => { qs.push(q); return bloquer ? new Promise(() => {}) : Promise.resolve({threads: []}); }, fil: async () => ({messages: []})},
+      now: () => horloge, moisDepart: 2, delaiGmail: 3600e3, bloquee: 15 * 60e3});
+    Rf.traiter('GET', '/api/radar', null); await new Promise((z) => setTimeout(z, 20));
+    const avantFig = Rf.etat().scan.enCours; horloge += 20 * 60e3; bloquer = false;
+    const rf = await Rf.traiter('POST', '/api/radar/lire', async () => ({})); await Rf.attendre();
+    ok('Radar 0.68 : une lecture figée (rien de Gmail depuis 20 min) est abandonnée et « Relire » en lance une nouvelle, qui finit (avant : le bouton renvoyait la lecture bloquée)', avantFig && rf.status === 202 && !!Rf.etat().scan.fini && !Rf.etat().scan.erreur && qs.length > 1, JSON.stringify([Rf.etat().scan, qs.length]));
+    /* version 6 (0.66.0/0.67.0) : relue avec les règles de 0.68.0 ; ce qu'il voyait reste affiché, sans les « Plus de facture » répétées (fausses) */
+    const f6 = path.join(DIR, 'radar68v6.json'), sil6 = [1, 2, 3].map((i) => ({id: 'zf1202608' + i, date: '2026-11-22', type: 'silence', titre: 'Plus de facture', service: 'Club Exemple', fixe: 'f1', dernier: '2026-0' + (5 + i) + '-10'}));
+    fs.writeFileSync(f6, JSON.stringify({version: 6, fixes: [{id: 'f1', service: 'Club Exemple', montant: 29.9, jour: 10, rythme: 'mensuel', source: 'mail', cle: 'club-exemple.fr'}], scan: {fini: 1, mois: 13, total: 13},
+      alertes: sil6.concat([{id: 'ax', date: '2026-11-20', type: 'echec', titre: 'Paiement échoué', service: 'Video Exemple'}]), propositions: [{id: 'pz', service: 'Eau Exemple', montant: 21.3, jour: 6, rythme: 'mensuel', cle: 'eau-exemple.fr'}], ponctuels: [{id: 'e1', date: '2026-12-03', service: 'Paiement en 4 fois : BOUTIQUE EXEMPLE', montant: 20}]}));
+    let ouvre6; const porte6 = new Promise((z) => { ouvre6 = z; });
+    const R6b = createRadar({file: f6, gmail: {lie: () => true, chercher: async () => { await porte6; return {threads: []}; }, fil: async () => ({messages: []})}, now: () => Date.parse('2026-11-23T09:00:00Z'), moisDepart: 2});
+    const v0 = R6b.etat();
+    R6b.traiter('GET', '/api/radar', null); await new Promise((z) => setTimeout(z, 10)); const v1 = R6b.etat(); ouvre6(); await R6b.attendre(); const v2 = R6b.etat();
+    ok('Radar 0.68 : une lecture de 0.66/0.67 est refaite avec les nouvelles règles ; pendant ce temps, ses propositions et ses échéances restent affichées, sans les 3 « Plus de facture » fausses', R6b.brut().version === 7 && v0.relecture && v0.propositions.length === 1 && v0.ponctuels.length === 1
+      && v0.alertes.length === 1 && v0.alertes[0].type === 'echec' && v1.scan.enCours && v1.scan.complet && !v2.relecture && v2.scan.fini && v2.fixes.length === 1, JSON.stringify([v0.alertes, v1.scan, v2.scan])); }
   /* la mémoire de JARVIS (lue par le serveur MCP, que Grok Bot peut joindre) refuse les chiffres d'un crédit */
   ok('Mémoire : refuse les chiffres d’un crédit (règle du 12/11/2026), garde le reste', interdit('Ma mensualité de crédit immobilier est de 1150 €') && interdit('Il reste 180 000 € à rembourser sur le prêt immobilier') && !interdit("J'ai un crédit immobilier à la banque") && !interdit('Je suis prêt à 8h'));
 } catch (e) { ok('exception', false, e.stack); }
