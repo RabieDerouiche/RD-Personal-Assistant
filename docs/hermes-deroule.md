@@ -14,7 +14,7 @@ Rien de personnel ici.
 
 | Question | Son choix |
 |---|---|
-| Routines à mettre en double d'abord | Supervision (Argus) et Semaine à venir (Iris), **puis la Veille du matin d'Iris** (à préparer : écriture bornée dans Dossiers et Échéances) |
+| Routines à mettre en double d'abord | Supervision (Argus) et Semaine à venir (Iris), puis la Veille du matin d'Iris. **Corrigé par lui le 24/11/2026** : la Supervision « ne sert à rien sur Hermes » (elle surveille les bots de Grok Bot : la refaire n'allège rien et n'apprend rien) : retirée. Veille du matin : oui. Il veut « du lourd » : un vrai scénario automatisable de A à Z (voir « Scénario des couches ») |
 | Routines qui demandent le web | **Essai du web chez Hermes**, sur le Digest d'Athéna seulement, en double, avec un jeton à part qui ne voit pas ses mails |
 | Chronos (portails) | **Reste chez Grok Bot** : pas de remplacement complet pour l'instant |
 | Durée du double | **2 semaines** avant la comparaison et sa décision de bascule |
@@ -60,7 +60,7 @@ Ouvrir un accès direct plus tard reste possible : c'est sa décision, par QCM.
 
 | Routines | Destination | Quand, à quelle condition |
 |---|---|---|
-| Argus : Supervision (lun, mer, ven) | **Hermes, en double** | Phase 1, maintenant. Hermes voit en plus un Grok Bot en pause, qu'Argus ne peut pas signaler. |
+| Argus : Supervision (lun, mer, ven) | Reste chez Grok Bot | Essayée en double le 23/11/2026, retirée le 24/11 à sa demande : surveiller les bots de Grok Bot n'a de sens que chez Grok Bot (et JARVIS repère déjà seul une pause de Grok). |
 | Iris : Semaine à venir (dim) | **Hermes, en double** | Phase 1, maintenant. |
 | Iris : Veille du matin (lun-ven) | **Hermes, en double** (7h40) | Depuis le 24/11/2026. En double il n'écrit rien dans Dossiers ni Échéances : il note au Journal ce qu'il aurait écrit. Pour la bascule : outils de JARVIS à ajouter, bornés à ces colonnes. |
 | Athéna : Digest IA et .NET ; Ulysse : Sorties du week-end ; Kairos : Liste du mois, Prix suivis | Hermes avec le web, ou routines de JARVIS | Phase 3, son choix (QCM). Le web d'Hermes marche sans clé (services gratuits, limités) ; il exige un jeton à part, sans Gmail, pour qu'une page piégée ne puisse rien lire de privé. Les sites marchands et de crédit bloquent souvent la lecture automatique : Prix suivis en dernier. |
@@ -161,3 +161,52 @@ commence à la première bascule.
   vendredi, 7h40). Banc d'Hermes : 73 sur 73. Reste : l'essai du web sur le Digest d'Athéna (second jeton sans
   Gmail, à créer par lui) ; les outils d'écriture dans Dossiers et Échéances, pour la bascule de la Veille.
 - 23/11/2026, 23h08 : appliqué par la session « Serveur JARVIS » (dépôt `45901b3`, `install.sh` code 0, 4 skills, 16 outils réannoncés, Telegram reconnecté) ; `routines.sh` : `veille-du-matin` posée, premier passage le mardi 24/11 à 7h40 ; trois routines actives, toutes en double. À regarder au premier passage : la lecture du vrai Pilotage et de Gmail par `pilotage_lire` et `gmail_chercher`, encore jamais faite sur les vraies données (l'essai du soir n'a exercé que `jarvis_maintenant`).
+- 24/11/2026 (nuit), sa correction : Supervision retirée d'Hermes (ligne de `routines.conf`, skill, ligne de
+  l'onglet Routines ; ligne 98 du Canal pour Argus réécrite avant qu'il ne la lise). Restent en double : Veille
+  du matin et Semaine à venir (il ne savait pas ce que fait la seconde : question posée par QCM). Essai du web :
+  demandé (« Web ») ; côté JARVIS, profil « veilleur » en cours (0.72.0). Nouveau cap : un scénario de A à Z.
+
+## Scénario des couches (sa demande du 24/11/2026)
+
+Ce qu'il veut : quand l'alerte de son abonnement de couches arrive (« il reste 7 ou 5 jours »), recevoir une
+question : garder la date, l'avancer, ou la reporter d'une ou deux semaines ; puis que ce soit fait.
+
+Ce que montrent ses mails (lus le 24/11/2026, certain) : le marchand envoie « Renouvellement de votre
+abonnement » quelques jours avant de préparer la commande (« Dans N jours… expédiée le JJ/MM/AAAA »), avec un
+lien « Mon compte » pour décaler, avancer, mettre en pause ou résilier ; six mails de ce type en trois mois.
+Son espace client est un formulaire de connexion classique (adresse, mot de passe, jeton anti-rejeu), sans
+captcha visible sur la page de connexion : (Likely) un script sans navigateur peut s'y connecter et changer la
+date ; la page de l'abonnement n'a pas été vue (elle demande la connexion).
+
+Découpage proposé :
+1. **Repérer** le mail : une règle, sans IA (expéditeur et objet), et lire N et la date dans le texte.
+2. **Demander** : une question à 4 choix, sur Telegram par Hermes ou par une notification de JARVIS.
+3. **Agir** : seul point difficile. Soit un outil de JARVIS qui se connecte à l'espace client (mot de passe
+   saisi par lui dans Termius, gardé sur le serveur, jamais vu par Hermes ni par Claude), soit un mail au service
+   client, soit un lien direct qu'il touche lui-même.
+4. **Confirmer** : la nouvelle date relue sur le site, écrite dans le Journal, et dite sur Telegram.
+Décisions demandées par QCM : la façon d'agir, où arrive la question, agir tout de suite ou après un second oui.
+
+Ses réponses (QCM du 24/11/2026) :
+
+| Question | Son choix |
+|---|---|
+| Qui change la date chez le marchand | « JARVIS ou Hermes, mais n'est-ce pas mieux si c'est Hermes ? » Réponse donnée : Hermes décide et déclenche, JARVIS tient le mot de passe et fait le geste. Hermes sur le site lui-même demanderait un navigateur (qui ne tient pas sur le VPS-1) et lui ferait voir le mot de passe |
+| Où arrive la question | **Notification de JARVIS** (carte à boutons dans l'app) |
+| Après son choix | **Tout de suite** : son choix vaut accord pour ce changement précis (ligne ajoutée à l'onglet Autonomie, ligne 21) |
+| Semaine à venir en double | **Retirée** (il ne lit pas ce message) |
+
+Chaîne retenue :
+1. **Hermes** repère le mail (routine du matin), calcule un conseil (dates des dernières livraisons, quantité,
+   rythme) et crée dans JARVIS une **décision** : la question, 4 choix, chacun lié à un geste d'un catalogue fermé.
+2. **JARVIS** notifie ; il touche un bouton ; JARVIS fait le geste aussitôt sur l'espace client, relit la date,
+   confirme par une notification et note le résultat (Journal, « Derniers gestes »).
+3. **Hermes** lit le résultat à son passage suivant et retient son habitude (mémoire).
+À construire, dans l'ordre : la sonde (faite : `jarvis-os/server/install/portail-couches.sh`, lancée par lui dans
+Termius) ; le geste d'après le squelette qu'elle rapporte ; les décisions à boutons de JARVIS (outil
+`jarvis_demander` pour les exécutants) ; la routine et la skill d'Hermes.
+- 24/11/2026 (nuit) : Semaine à venir retirée d'Hermes à sa demande ; il lui reste la Veille du matin en double.
+  Onglet Routines : une seule ligne « Hermes » ; ligne 98 du Canal réécrite. Onglet Autonomie, ligne 21 : décaler,
+  avancer ou garder la livraison des couches après son choix dans JARVIS. Sonde de l'espace client écrite et
+  essayée sur un faux site (`bash jarvis-os/server/tests/portail-sonde.test.sh`, 7 vérifications) : elle ne lit
+  que le squelette des pages, sans donnée personnelle ni secret. Banc d'Hermes : 73 sur 73.
