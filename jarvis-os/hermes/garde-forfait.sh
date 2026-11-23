@@ -36,6 +36,11 @@ prevenir() {   # un message Telegram au propriétaire ; le jeton ne passe jamais
     "$jeton" "$qui" "$texte" | curl -K - -o /dev/null || true
 }
 
+# Hermes arrêté (pas encore configuré, ou à la main) et pas par ce garde : rien à surveiller, aucune lecture
+# (une lecture lance Hermes et la sonde de Claude Code : environ 0,2 à 0,45 Go pendant quelques secondes)
+actif=$(sctl is-active "$SERVICE" 2>/dev/null || true)
+if [ "$actif" != active ] && [ ! -f "$ETAT" ]; then echo "Hermes arrêté : rien à surveiller."; exit 0; fi
+
 json=$(lire_usage) || { echo "Usage du forfait illisible : aucune décision."; exit 0; }
 # le modèle d'Hermes (politique) : une fenêtre propre à un autre modèle (la semaine Sonnet de la voix de JARVIS) ne l'arrête pas
 modele=$(sed -n 's/^  default: "\([a-z]*\)".*/\1/p' "${HERMES_GARDE_POLITIQUE:-/etc/hermes/config.yaml}" 2>/dev/null | head -1)
@@ -60,7 +65,6 @@ print(int(p), r.replace(" ", ""), n.replace(" ", "_"))
 read -r pct remise fenetre <<< "$lu"
 fenetre=${fenetre//_/ }
 heure=$(TZ=Europe/Paris date -d "$remise" '+le %d/%m à %H:%M' 2>/dev/null || echo "à la remise à zéro")
-actif=$(sctl is-active "$SERVICE" 2>/dev/null || true)
 
 if [ "$pct" -ge "$SEUIL" ]; then
   if [ "$actif" = active ]; then

@@ -46,8 +46,11 @@ usage 80 40 50 20; lancer
 verif "80 % (au-dessus de 75 %) : Hermes reste en pause" bash -c "! grep -q start '$T/appels' && [ -f '$T/etat/arret' ]"
 usage 20 40 50 20; lancer
 verif "20 % après la remise à zéro : Hermes relancé, marque retirée, message de reprise" bash -c "grep -q '^start hermes-gateway.service' '$T/appels' && [ ! -f '$T/etat/arret' ] && tail -1 '$T/messages' | grep -q 'Hermes reprend'"
-echo inactive > "$T/etat-service"; usage 20 40 50 20; lancer
+echo inactive > "$T/etat-service"; usage 20 40 50 20; rm -f "$T/lu"; CMD="touch $T/lu; cat $T/usage.json" lancer
 verif "Hermes arrêté à la main : le garde ne le relance jamais" bash -c "! grep -q start '$T/appels'"
+verif "… et ne lit même pas l'usage (pas de sonde inutile)" bash -c "[ ! -f '$T/lu' ] && grep -q 'rien à surveiller' '$T/sortie'"
+usage 90 40 50 20; rm -f "$T/lu"; CMD="touch $T/lu; cat $T/usage.json" lancer
+verif "Hermes arrêté à la main, forfait à 90 % : aucune lecture ni message" bash -c "[ ! -f '$T/lu' ] && [ $(messages) = 2 ]"
 echo active > "$T/etat-service"; usage 10 30 88 20; lancer
 verif "semaine Opus à 88 % (le modèle d'Hermes) : arrêt" grep -q '^stop' "$T/appels"
 rm -f "$T/etat/arret"; echo active > "$T/etat-service"; usage 10 30 40 95; lancer
