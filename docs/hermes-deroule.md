@@ -160,3 +160,4 @@ commence à la première bascule.
   section C de la fiche d'Iris, sans l'astuce ni le trafic, qu'il n'a pas), ligne de `routines.conf` (lundi à
   vendredi, 7h40). Banc d'Hermes : 73 sur 73. Reste : l'essai du web sur le Digest d'Athéna (second jeton sans
   Gmail, à créer par lui) ; les outils d'écriture dans Dossiers et Échéances, pour la bascule de la Veille.
+- 23/11/2026, 23h08 : appliqué par la session « Serveur JARVIS » (dépôt `45901b3`, `install.sh` code 0, 4 skills, 16 outils réannoncés, Telegram reconnecté) ; `routines.sh` : `veille-du-matin` posée, premier passage le mardi 24/11 à 7h40 ; trois routines actives, toutes en double. À regarder au premier passage : la lecture du vrai Pilotage et de Gmail par `pilotage_lire` et `gmail_chercher`, encore jamais faite sur les vraies données (l'essai du soir n'a exercé que `jarvis_maintenant`).
