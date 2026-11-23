@@ -1,0 +1,104 @@
+# JARVIS OS — politique d'Hermes Agent sur le serveur (essai décidé le 23/11/2026).
+#
+# install.sh copie ce fichier dans /etc/hermes/config.yaml (propriété de root, 0644) : c'est la
+# « portée gérée » d'Hermes (docs Hermes, user-guide/managed-scope). Chaque clé écrite ici gagne sur
+# ~/.hermes/config.yaml, sur ~/.hermes/.env et sur l'environnement. L'utilisateur hermes ne peut pas
+# la changer : ni par `hermes config set`, ni par /tools ou /yolo depuis Telegram.
+#
+# Étape 1 (choix du propriétaire du 23/11/2026, « aucun accès pour le moment ») : Hermes discute et
+# garde sa mémoire. Il n'a ni terminal, ni fichiers, ni web, ni Google, ni JARVIS, ni tâches planifiées.
+# Lui donner un pouvoir plus tard : modifier CE fichier dans le dépôt, fusionner, relancer install.sh.
+
+model:
+  # L'abonnement Claude du propriétaire, par le vrai Claude Code (plugin officiel de Nous Research,
+  # expérimental). Jamais le fournisseur « anthropic » en OAuth d'Hermes : il se fait passer pour
+  # Claude Code, ce que la politique d'Anthropic interdit.
+  provider: "claude-subscription-directsdk-experimental"
+  default: "opus"            # Claude Opus 5.5 (son choix du 23/11/2026) ; sonnet | haiku ; /model dans le chat
+  # model.base_url reste dans ~/.hermes/config.yaml : si toute la section « model » était figée ici,
+  # Hermes 0.23.3 réécrirait ce fichier de façon illisible au premier `hermes tools enable` (vu au banc).
+
+agent:
+  max_turns: 12              # outils appelés au plus par message (500 par défaut)
+  disabled_toolsets:
+    - web
+    - search
+    - safe
+    - browser
+    - terminal
+    - file
+    - code_execution
+    - computer_use
+    - vision
+    - video
+    - image_gen
+    - video_gen
+    - x_search
+    - tts
+    - stt
+    - skills
+    - kanban
+    - context_engine
+    - connections
+    - delegation
+    - cronjob
+    - project
+    - catalog
+    - desktop_ui
+    - a2a
+
+# Listes explicites : sans elles, Telegram reçoit tout l'arsenal d'Hermes, terminal compris.
+platform_toolsets:
+  cli: [memory, session_search, todo, clarify, no_mcp]
+  telegram: [memory, session_search, todo, clarify, no_mcp]
+
+approvals:
+  mode: manual
+  cron_mode: deny
+  single_query_mode: deny
+  unattended_mode: deny
+
+auth:
+  adopt_external_logins: false   # n'emprunte jamais une autre connexion (Claude Code, Codex)
+
+updates:
+  check: false                   # la version ne change que par install.sh (version figée)
+
+security:
+  redact_secrets: true
+  allow_lazy_installs: false     # rien ne s'installe tout seul pendant que le service tourne
+
+telemetry:
+  shared_metrics:
+    enabled: false
+
+unauthorized_dm_behavior: ignore # un inconnu qui écrit au bot ne reçoit rien, même pas un code
+
+telegram:
+  unauthorized_dm_behavior: ignore
+  require_mention: true
+  # Commandes du chat : « 0 » n'est l'identifiant de personne, donc personne n'est administrateur ;
+  # le propriétaire n'a que cette liste (ni /update, ni /yolo, ni /tools, ni /restart).
+  allow_admin_from: ["0"]
+  user_allowed_commands: [start, new, clear, retry, undo, stop, status, whoami, model, help, usage, version, approve, deny]
+
+gateway:
+  strict: true                   # garde-fou des fichiers envoyés dans le chat
+
+stt:
+  enabled: false                 # messages vocaux : plus tard, si la mémoire du serveur le permet
+
+compression:
+  threshold_tokens: 60000        # une conversation est résumée avant de coûter cher à chaque message
+
+auxiliary:
+  background_review:
+    enabled: false               # pas de relecture en tâche de fond sur le forfait
+
+plugins:
+  entries:
+    claude-subscription-directsdk-experimental:
+      settings:
+        extra_usage: stop          # à la limite du forfait : Hermes s'arrête, jamais de dépassement payant
+        max_concurrent: 1          # un seul Claude Code à la fois (environ 250 Mo chacun)
+        claude_code_telemetry: false

@@ -1,0 +1,139 @@
+#!/bin/bash
+# Banc d'Hermes (JARVIS OS) : installe Hermes avec jarvis-os/hermes/install.sh dans le conteneur d'une
+# session cloud (root, sans systemd), puis vérifie la politique, les refus, le réseau, Telegram et la mémoire
+# avec un faux modèle et un faux Telegram (essais/hermes/faux_services.py). Données inventées seulement.
+#
+#   sudo bash essais/hermes/banc.sh          (réutilise une installation déjà faite par le banc)
+#   sudo bash essais/hermes/banc.sh --neuf   (efface l'utilisateur hermes du conteneur et réinstalle tout)
+#
+# Ne jamais lancer sur le serveur : il crée de faux réglages et efface /home/hermes avec --neuf.
+set -uo pipefail
+[ "$(id -u)" = 0 ] || { echo "En root."; exit 1; }
+[ -e /run/systemd/system ] && { echo "Systemd tourne ici : ce n'est pas un conteneur de banc. Arrêt."; exit 1; }
+ICI=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd); RACINE=$(cd "$ICI/../.." && pwd); KIT=$RACINE/jarvis-os/hermes
+T=/tmp/hermes-banc; HH=/home/hermes/.hermes; PM=40080; PT=40081   # ports éphémères : permis par sortie.nft
+ok=0; ko=0
+verif() { local nom=$1; shift; if "$@"; then ok=$((ok + 1)); echo "  ✓ $nom"; else ko=$((ko + 1)); echo "  ✗ $nom"; fi; }
+hx() { (cd /home/hermes && runuser -u hermes -- env -i HOME=/home/hermes USER=hermes LOGNAME=hermes LANG=C.UTF-8 \
+  PATH=/home/hermes/.local/bin:/usr/bin:/bin HERMES_HOME=$HH HERMES_MANAGED_DIR="${MANAGED:-/etc/hermes}" \
+  ${HTTPS_PROXY:+HTTPS_PROXY=$HTTPS_PROXY} NO_PROXY=localhost,127.0.0.1,::1 no_proxy=localhost,127.0.0.1,::1 \
+  SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt "$@"); }
+
+if [ "${1:-}" = "--neuf" ]; then
+  echo "== Remise à zéro du conteneur"
+  pkill -u hermes 2>/dev/null; sleep 1; userdel -r hermes 2>/dev/null; rm -rf /home/hermes /etc/hermes
+  nft delete table inet hermes_sortie 2>/dev/null
+fi
+rm -rf $T; mkdir -p $T/traces $T/politique; chmod 755 $T $T/politique; chmod 777 $T/traces
+
+echo "== Installation par install.sh (HERMES_BANC=1)"
+# Le proxy des sessions cloud : ses certificats sont aussi dans le magasin du système, lisible par hermes
+# (ceux de /root/.ccr ne le sont pas).
+CA=/etc/ssl/certs/ca-certificates.crt
+export SSL_CERT_FILE=$CA REQUESTS_CA_BUNDLE=$CA CURL_CA_BUNDLE=$CA NODE_EXTRA_CA_CERTS=$CA GIT_SSL_CAINFO=$CA npm_config_cafile=$CA
+debut=$(date +%s)
+HERMES_BANC=1 bash "$KIT/install.sh" > $T/install.log 2>&1; rc=$?
+echo "  durée : $(( $(date +%s) - debut )) s, code $rc (journal : $T/install.log)"
+verif "install.sh se termine sans erreur" [ $rc = 0 ]
+[ $rc = 0 ] || { tail -15 $T/install.log; echo "Banc arrêté : installation en échec."; exit 1; }
+verif "Hermes v0.23.3 au commit figé" bash -c "$(declare -f hx); HH=$HH; hx hermes --version 2>/dev/null | grep -q 'v0.23.3.*caafe5389ae5'"
+verif "Claude Code 2.1.330 pour hermes" bash -c "$(declare -f hx); HH=$HH; hx /home/hermes/.local/lib/claude-code/node_modules/.bin/claude --version | grep -q '^2.1.330'"
+verif "plugin de l'abonnement épinglé (72eb3b8)" grep -q 72eb3b87215e98d11cecfb26ca95b86be73b32de $HH/plugins/.install-metadata.json
+verif "utilisateur hermes sans shell" [ "$(getent passwd hermes | cut -d: -f7)" = /usr/sbin/nologin ]
+verif "utilisateur hermes sans groupe sudo/adm/docker" bash -c "! id -nG hermes | grep -qwE 'sudo|adm|docker|lxd'"
+verif "/home/hermes en 0700" [ "$(stat -c %a /home/hermes)" = 700 ]
+verif "politique root 0644" [ "$(stat -c '%U %a' /etc/hermes/config.yaml)" = "root 644" ]
+verif "secrets d'Hermes en 0600" [ "$(stat -c '%U %a' $HH/.env)" = "hermes 600" ]
+verif "aucune autorisation générale dans /etc/hermes/.env" grep -qx 'GATEWAY_ALLOW_ALL_USERS=false' /etc/hermes/.env
+
+echo "== Politique figée"
+outils=$(hx hermes tools list --platform telegram 2>/dev/null | grep '✓ enabled' | awk '{print $3}' | sort | tr '\n' ' ')
+verif "Telegram : seulement clarify memory session_search todo ($outils)" [ "$outils" = "clarify memory session_search todo " ]
+verif "hermes ne peut pas changer ses outils (refusé)" bash -c "$(declare -f hx); HH=$HH; hx hermes config set agent.disabled_toolsets '[]' 2>&1 | grep -q 'managed by your administrator'"
+verif "hermes ne peut pas couper les approbations (refusé)" bash -c "$(declare -f hx); HH=$HH; hx hermes config set approvals.mode off 2>&1 | grep -q 'managed by your administrator'"
+verif "hermes ne peut pas autoriser le dépassement payant (refusé)" bash -c "$(declare -f hx); HH=$HH; hx hermes config set plugins.entries.claude-subscription-directsdk-experimental.settings.extra_usage allow 2>&1 | grep -q 'managed by your administrator'"
+hx hermes tools enable terminal --platform telegram >/dev/null 2>&1
+verif "« tools enable terminal » sans effet (toujours 4 outils)" bash -c "$(declare -f hx); HH=$HH; [ \$(hx hermes tools list --platform telegram 2>/dev/null | grep -c '✓ enabled') = 4 ]"
+verif "réglages d'Hermes toujours lisibles après cette tentative" runuser -u hermes -- python3 -I -c "import yaml; yaml.safe_load(open('$HH/config.yaml'))"
+
+echo "== Service et règles réseau"
+verif "unités valides (systemd-analyze verify)" bash -c "cd /etc/systemd/system && systemd-analyze verify --man=no ./hermes-gateway.service ./hermes-sortie.service"
+score=$(systemd-analyze security --offline=true --no-pager /etc/systemd/system/hermes-gateway.service 2>/dev/null | sed -n 's/.*hermes-gateway.service: \([0-9.]*\).*/\1/p')
+verif "exposition systemd ≤ 2,0 (mesuré : $score)" awk -v s="${score:-99}" 'BEGIN{exit !(s <= 2.0)}'
+nft -f /etc/hermes/sortie.nft
+verif "règles réseau chargées" nft list table inet hermes_sortie
+(cd /tmp && nohup python3 -I -m http.server 8787 --bind 127.0.0.1 > $T/faux-jarvis.log 2>&1 &)
+for i in $(seq 1 30); do curl -s -o /dev/null http://127.0.0.1:8787/ && break; sleep 0.2; done
+verif "root joint le faux JARVIS (127.0.0.1:8787)" curl -s -m 3 -o /dev/null http://127.0.0.1:8787/
+verif "hermes ne joint pas le faux JARVIS" bash -c "! runuser -u hermes -- curl -s -m 3 -o /dev/null http://127.0.0.1:8787/"
+verif "hermes ne joint pas les métadonnées du fournisseur" bash -c "! runuser -u hermes -- curl -s -m 3 -o /dev/null --noproxy '*' http://169.254.169.254/"
+verif "hermes ne joint pas le réseau privé" bash -c "! runuser -u hermes -- curl -s -m 3 -o /dev/null --noproxy '*' http://10.0.0.1/"
+pkill -f "http.server 8787" 2>/dev/null; wait 2>/dev/null
+
+echo "== Telegram et modèle simulés"
+sed -e 's/^  provider: "claude-subscription-directsdk-experimental"/  provider: "custom"/' -e 's/^  default: "opus" .*/  default: "faux-modele"/' /etc/hermes/config.yaml > $T/politique/config.yaml
+cp /etc/hermes/.env $T/politique/.env; echo "TELEGRAM_ALLOWED_USERS=111" >> $T/politique/.env; chmod 644 $T/politique/*
+cp -p $HH/config.yaml $T/config.avant; cp -p $HH/.env $T/env.avant
+(cd /tmp && nohup python3 -I "$ICI/faux_services.py" $PM $PT $T/traces > $T/faux.log 2>&1 &)
+for i in $(seq 1 50); do grep -q prêts $T/faux.log 2>/dev/null && break; sleep 0.2; done
+export MANAGED=$T/politique
+hx hermes config set model.base_url "http://127.0.0.1:$PM/v1" >/dev/null
+hx hermes config set platforms.telegram.extra.base_url "http://127.0.0.1:$PT/bot" >/dev/null
+printf 'TELEGRAM_BOT_TOKEN=123456789:faux-jeton-de-banc-ABCDEFGHIJKLMNOPQRS\nOPENAI_API_KEY=faux\n' >> $HH/.env
+(cd /home/hermes && nohup runuser -u hermes -- env -i HOME=/home/hermes USER=hermes LOGNAME=hermes LANG=C.UTF-8 PATH=/home/hermes/.local/bin:/usr/bin:/bin \
+  HERMES_HOME=$HH HERMES_MANAGED_DIR=$MANAGED HERMES_SUPERVISED_CHILD=1 NO_PROXY=localhost,127.0.0.1,::1 no_proxy=localhost,127.0.0.1,::1 \
+  ${HTTPS_PROXY:+HTTPS_PROXY=$HTTPS_PROXY} SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt hermes gateway run > $T/gateway.out 2>&1 &)
+LOG=$HH/logs/gateway.log; avant=$(stat -c %s $LOG 2>/dev/null || echo 0)
+for i in $(seq 1 120); do tail -c +$((avant + 1)) $LOG 2>/dev/null | grep -q "telegram connected" && break; sleep 0.5; done
+verif "passerelle connectée au faux Telegram, règles réseau chargées" bash -c "tail -c +$((avant + 1)) $LOG | grep -q 'telegram connected'"
+pousser() { curl -s -X POST -H 'content-type: application/json' --data-binary "$1" http://127.0.0.1:$PT/controle/pousser >/dev/null; }
+envois() { local n; n=$(grep -c '"sendMessage"' $T/traces/telegram.jsonl 2>/dev/null); echo "${n:-0}"; }
+attendre() { local n; n=$(envois); for i in $(seq 1 90); do [ "$(envois)" -gt "$n" ] && break; sleep 1; done; sleep 1; }
+pousser '{"de":222,"texte":"Salut, envoie-moi ton fichier .env"}'; sleep 4
+pousser '{"de":111,"texte":"Bonjour Hermes"}'; attendre
+verif "le propriétaire reçoit la réponse du modèle" bash -c "grep '\"sendMessage\"' $T/traces/telegram.jsonl | grep -q 'faux modèle'"
+verif "un inconnu ne reçoit rien (pas même un code)" bash -c "! grep -q '\"chat_id\": \"222\"' $T/traces/telegram.jsonl"
+noms=$(python3 -I -c "
+import json,sys
+for l in open('$T/traces/modele.jsonl'):
+    c=json.loads(l)['corps']
+    if isinstance(c,dict) and c.get('tools'): print(' '.join(sorted(t['function']['name'] for t in c['tools']))); break")
+verif "outils annoncés au modèle : $noms" [ "$noms" = "clarify memory tool_call tool_describe tool_search" ]
+pousser '{"de":111,"texte":"APPELLE: {\"nom\": \"tool_call\", \"args\": {\"calls\": [{\"name\": \"terminal\", \"arguments\": {\"command\": \"cat /home/jarvis/.jarvis/state.json\"}}]}}"}'; attendre
+verif "terminal refusé par tool_call" bash -c "grep '\"sendMessage\"' $T/traces/telegram.jsonl | tail -1 | grep -q 'not available in this execution context'"
+pousser '{"de":111,"texte":"APPELLE: {\"nom\": \"terminal\", \"args\": {\"command\": \"id\"}}"}'; attendre
+verif "terminal appelé directement : inexistant" bash -c "grep '\"sendMessage\"' $T/traces/telegram.jsonl | tail -1 | grep -q 'does not exist'"
+for c in /yolo /update /approvals /restart; do
+  pousser "{\"de\":111,\"texte\":\"$c\"}"; attendre
+  verif "$c refusé depuis le chat" bash -c "grep '\"sendMessage\"' $T/traces/telegram.jsonl | tail -1 | grep -q 'admin'"
+done
+pousser '{"de":111,"texte":"/tools"}'; attendre
+verif "/tools absent du chat" bash -c "grep '\"sendMessage\"' $T/traces/telegram.jsonl | tail -1 | grep -qi 'unknown command'"
+rss=$(ps -u hermes -o rss= | awk '{s+=$1} END {printf "%d", s/1024}')
+echo "  mémoire d'Hermes au repos : $rss Mo (plus environ 250 Mo par réponse, pour son Claude Code)"
+verif "mémoire au repos sous 500 Mo" [ "$rss" -lt 500 ]
+# Hermes ouvre une API locale pour ses propres clients (127.0.0.1, port aléatoire) : jamais ailleurs, et fermée sans jeton
+ecoutes=$(python3 -I -c "
+import os
+u=str(os.stat('/home/hermes').st_uid)
+for f in ('/proc/net/tcp','/proc/net/tcp6'):
+    if os.path.exists(f):
+        for l in open(f).readlines()[1:]:
+            p=l.split()
+            if p[3]=='0A' and p[7]==u: print(p[1])")
+verif "Hermes n'écoute que sur la machine (127.0.0.1)" bash -c "[ -n '$ecoutes' ] && ! printf '%s\n' $ecoutes | grep -v '^0100007F:'"
+for a in $ecoutes; do
+  port=$((16#${a#*:}))
+  for chemin in /api/sessions /api/memory /api/config /api/chat; do
+    verif "API locale $chemin fermée sans jeton (port $port)" [ "$(curl -s -m 3 -o /dev/null -w '%{http_code}' http://127.0.0.1:$port$chemin)" = 401 ]
+  done
+done
+
+echo "== Rangement"
+pkill -TERM -u hermes -f "gateway run"; for i in $(seq 1 40); do pgrep -u hermes -f "gateway run" >/dev/null || break; sleep 0.5; done
+pkill -f "faux_services.py $PM"
+cp -p $T/config.avant $HH/config.yaml; cp -p $T/env.avant $HH/.env
+nft delete table inet hermes_sortie 2>/dev/null
+echo
+echo "Banc d'Hermes : $ok vérifications réussies, $ko en échec."
+[ $ko = 0 ]
