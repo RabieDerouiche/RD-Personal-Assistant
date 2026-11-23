@@ -18,6 +18,7 @@ PLUGIN_CATALOGUE=claude-subscription-directsdk                     # catalogue d
 PLUGIN_ID=claude-subscription-directsdk-experimental
 CLAUDE_CODE_VERSION=2.1.330
 SEUIL_FORFAIT=85                                                   # garde du forfait partagé (son choix du 23/11/2026)
+GARDE_CINQ_HEURES=0        # 0 : le garde ne regarde que la semaine (sa demande du 23/11/2026 : il remplit la fenêtre de 5 heures en testant) ; 1 : elle compte aussi
 
 ICI=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 U=hermes
@@ -124,7 +125,7 @@ sed "s#@PATH@#$chemin#" "$ICI/hermes-gateway.service" > /etc/systemd/system/herm
 chmod 0644 /etc/systemd/system/hermes-gateway.service
 # le garde du forfait : une copie root du script (la minuterie n'exécute jamais un fichier du dépôt)
 install -o root -g root -m 0755 "$ICI/garde-forfait.sh" /usr/local/sbin/hermes-garde-forfait
-echo "HERMES_SEUIL_FORFAIT=$SEUIL_FORFAIT" > /etc/hermes/garde.conf && chmod 0644 /etc/hermes/garde.conf
+printf 'HERMES_SEUIL_FORFAIT=%s\nHERMES_GARDE_CINQ_HEURES=%s\n' "$SEUIL_FORFAIT" "$GARDE_CINQ_HEURES" > /etc/hermes/garde.conf && chmod 0644 /etc/hermes/garde.conf
 install -o root -g root -m 0644 "$ICI/hermes-garde.service" /etc/systemd/system/hermes-garde.service
 install -o root -g root -m 0644 "$ICI/hermes-garde.timer" /etc/systemd/system/hermes-garde.timer
 nft -c -f /etc/hermes/sortie.nft 2>/dev/null && echo "Règles réseau : syntaxe vérifiée." || [ "$BANC" = 1 ] || { echo "Règles réseau refusées par nft : arrêt."; exit 1; }
@@ -132,8 +133,13 @@ if [ "$BANC" != 1 ]; then
   systemctl daemon-reload
   systemctl enable --now hermes-sortie.service
   systemctl enable hermes-gateway.service
-  systemctl enable --now hermes-garde.timer   # toutes les 10 min : Hermes s'arrête au-delà de $SEUIL_FORFAIT % du forfait
-  if grep -q '^TELEGRAM_BOT_TOKEN=.' "$HH/.env" 2>/dev/null && [ -n "$autorises" ]; then
+  systemctl enable --now hermes-garde.timer   # toutes les 10 min : Hermes s'arrête au-delà de $SEUIL_FORFAIT % de la semaine
+  if [ -f /var/lib/hermes-garde/arret ]; then
+    # en pause par le garde : c'est lui qui décide, avec ses nouvelles règles (il relance Hermes si le forfait le permet)
+    echo "Hermes est en pause par le garde du forfait : je relance le garde, qui le redémarre si le forfait le permet."
+    systemctl start hermes-garde.service || true
+    journalctl -u hermes-garde -n 1 --no-pager -o cat 2>/dev/null | sed 's/^/  garde : /'
+  elif grep -q '^TELEGRAM_BOT_TOKEN=.' "$HH/.env" 2>/dev/null && [ -n "$autorises" ]; then
     systemctl restart hermes-gateway.service && echo "Hermes relancé avec la nouvelle version ou la nouvelle politique."
   else
     echo "Hermes n'est pas démarré : Telegram n'est pas encore configuré (telegram.sh)."
