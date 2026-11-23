@@ -65,7 +65,8 @@ for i in $(seq 1 90); do
 done
 if tail -c +"$((avant + 1))" "$JOURNAL" 2>/dev/null | grep -q "MCP server 'jarvis'.*registered"; then
   echo "Hermes est relié à JARVIS : $(tail -c +"$((avant + 1))" "$JOURNAL" | grep -o "registered [0-9]* tool" | tail -1 | tr -dc 0-9) outils."
-  echo "Essai : écris à ton bot « Qu'est-ce qui m'attend aujourd'hui ? ». Puis : sudo bash $ICI/routines.sh"
+  echo "Essai, dans Telegram : envoie d'abord /new (une conversation commencée avant garde l'ancienne consigne et n'a pas les outils),"
+  echo "puis « Qu'est-ce qui m'attend aujourd'hui ? ». Ensuite : sudo bash $ICI/routines.sh"
 else
   echo "Hermes a redémarré mais n'a pas encore annoncé la liaison. Contrôle : sudo bash $ICI/diagnostic.sh"
 fi
