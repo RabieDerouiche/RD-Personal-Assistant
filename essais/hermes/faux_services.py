@@ -1,8 +1,13 @@
-"""Banc d'Hermes (JARVIS OS) : un faux modèle compatible OpenAI et un faux Telegram (Bot API).
+"""Banc d'Hermes (JARVIS OS) : un faux modèle compatible OpenAI, un faux Telegram (Bot API) et un faux
+serveur MCP de JARVIS.
 
 Données inventées seulement. Aucun appel réseau sortant : tout reste sur 127.0.0.1.
 
-  python3 -I faux_services.py <port_modele> <port_telegram> <dossier_traces>
+  python3 -I faux_services.py <port_modele> <port_telegram> <dossier_traces> [<port_jarvis>]
+
+- Faux JARVIS (si le 4e argument est donné) : POST /mcp (MCP « Streamable HTTP », réponses JSON), ouvert au seul
+  jeton JETON_JARVIS ; trois outils (pilotage_lire, pilotage_ajouter, jarvis_notifier) ; chaque requête est écrite
+  dans <dossier>/jarvis.jsonl, jeton compris, pour vérifier qu'Hermes l'envoie bien en en-tête.
 
 - Faux modèle : POST /v1/chat/completions (avec ou sans flux), GET /v1/models. Chaque requête est
   écrite dans <dossier>/modele.jsonl (pour vérifier les outils qu'Hermes annonce au modèle).
@@ -184,7 +189,69 @@ class Telegram(BaseHTTPRequestHandler):
         return self._ok(True)
 
 
-for port, gestion in ((PORT_MODELE, Modele), (PORT_TG, Telegram)):
+JETON_JARVIS = "jvf_faux-jeton-du-banc-0123456789"
+OUTILS_JARVIS = [
+    {"name": "pilotage_lire", "description": "Lit un onglet de Pilotage (banc).",
+     "inputSchema": {"type": "object", "properties": {"onglet": {"type": "string"}}, "required": ["onglet"]}},
+    {"name": "pilotage_ajouter", "description": "Ajoute une ligne à un onglet de Pilotage (banc).",
+     "inputSchema": {"type": "object", "properties": {"onglet": {"type": "string"}, "valeurs": {"type": "object"}}, "required": ["onglet", "valeurs"]}},
+    {"name": "jarvis_notifier", "description": "Notifie le propriétaire (banc).",
+     "inputSchema": {"type": "object", "properties": {"titre": {"type": "string"}, "texte": {"type": "string"}}, "required": ["titre", "texte"]}},
+    {"name": "outil_hors_liste", "description": "Un outil que la politique d'Hermes ne retient pas (banc).",
+     "inputSchema": {"type": "object", "properties": {}}},
+]
+
+
+class Jarvis(BaseHTTPRequestHandler):
+    """Le strict nécessaire du serveur MCP de JARVIS (jarvis-os/server/mcp.mjs) : initialize, tools/list, tools/call."""
+
+    def log_message(self, *a):
+        pass
+
+    def _json(self, code, obj=None, extra=()):
+        corps = b"" if obj is None else json.dumps(obj, ensure_ascii=False).encode()
+        self.send_response(code)
+        self.send_header("content-type", "application/json; charset=utf-8")
+        self.send_header("content-length", str(len(corps)))
+        for k, v in extra:
+            self.send_header(k, v)
+        self.end_headers()
+        self.wfile.write(corps)
+
+    def do_GET(self):
+        self._json(405 if self.path == "/mcp" else 404, {"error": "POST seulement"})
+
+    def do_POST(self):
+        corps, jeton = lire_corps(self), self.headers.get("authorization", "")
+        tracer("jarvis.jsonl", {"chemin": self.path, "autorisation": jeton, "corps": corps})
+        if self.path != "/mcp":
+            return self._json(404, {"error": "inconnu"})
+        if jeton != "Bearer " + JETON_JARVIS:
+            return self._json(401, {"error": "invalid_token"}, (("www-authenticate", 'Bearer error="invalid_token"'),))
+        methode, ident, p = corps.get("method", ""), corps.get("id"), corps.get("params") or {}
+        if ident is None:
+            return self._json(202)
+        if methode == "initialize":
+            res = {"protocolVersion": p.get("protocolVersion") or "2025-06-18", "capabilities": {"tools": {"listChanged": False}},
+                   "serverInfo": {"name": "jarvis-os", "version": "banc"}}
+        elif methode == "tools/list":
+            res = {"tools": OUTILS_JARVIS}
+        elif methode == "tools/call":
+            a = p.get("arguments") or {}
+            textes = {"pilotage_lire": "Onglet %s (banc)\nL2 | Bot: Iris | Dernier passage: 23/11/2026 09h10" % a.get("onglet"),
+                      "pilotage_ajouter": "Ligne ajoutée à %s (banc)." % a.get("onglet"), "jarvis_notifier": "Notifié (banc)."}
+            res = {"content": [{"type": "text", "text": textes.get(p.get("name"), "Outil inconnu")}], "isError": p.get("name") not in textes}
+        elif methode == "ping":
+            res = {}
+        else:
+            res = {"resources": []} if methode == "resources/list" else {"prompts": []} if methode == "prompts/list" else None
+        if res is None:
+            return self._json(200, {"jsonrpc": "2.0", "id": ident, "error": {"code": -32601, "message": "Méthode inconnue"}})
+        self._json(200, {"jsonrpc": "2.0", "id": ident, "result": res})
+
+
+services = [(PORT_MODELE, Modele), (PORT_TG, Telegram)] + ([(int(sys.argv[4]), Jarvis)] if len(sys.argv) > 4 else [])
+for port, gestion in services:
     serveur = ThreadingHTTPServer(("127.0.0.1", port), gestion)
     threading.Thread(target=serveur.serve_forever, daemon=True).start()
 print("faux services prêts", flush=True)

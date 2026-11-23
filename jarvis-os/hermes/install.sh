@@ -3,8 +3,9 @@
 #
 #   sudo bash /opt/rd/jarvis-os/hermes/install.sh
 #
-# Relançable sans risque : il remet la politique, le service et les règles réseau à jour, et change de
-# version seulement si HERMES_COMMIT a changé ici. Il ne touche ni à JARVIS, ni à Panier, ni à Caddy,
+# Relançable sans risque : il remet la politique, les skills du dépôt, le service et les règles réseau à jour,
+# et change de version seulement si HERMES_COMMIT a changé ici. La liaison à JARVIS (relier-jarvis.sh) et les
+# routines (routines.sh) ont leur propre script ; il garde ce qu'ils ont posé. Il ne touche ni à JARVIS, ni à Panier, ni à Caddy,
 # ni à ufw, et n'ouvre aucun port. Il ne démarre pas Hermes : c'est telegram.sh qui le fait, une fois
 # Claude relié (connexion-claude.sh) et le bot Telegram créé.
 set -euo pipefail
@@ -95,7 +96,16 @@ comme_hermes ln -sfn "$CC/node_modules/.bin/claude" "$H/.local/bin/claude"   # t
 
 dire "Politique (root) : /etc/hermes"
 install -d -o root -g root -m 0755 /etc/hermes
-install -o root -g root -m 0644 "$ICI/politique.yaml" /etc/hermes/config.yaml
+# Relié à JARVIS (relier-jarvis.sh a posé l'adresse et le jeton) : la politique reçoit son serveur MCP.
+# jarvis.env n'est lu que par systemd (root), qui le passe au service : Hermes ne peut pas le lire sur le disque.
+LIE=0
+if [ -s /etc/hermes/jarvis.env ]; then LIE=1; chown root:root /etc/hermes/jarvis.env; chmod 0600 /etc/hermes/jarvis.env; fi
+{
+  if [ "$LIE" = 1 ]; then sed 's/@MCP@/jarvis/g' "$ICI/politique.yaml"; cat "$ICI/politique-jarvis.yaml"
+  else sed 's/@MCP@/no_mcp/g' "$ICI/politique.yaml"; fi
+} > /etc/hermes/config.yaml.nouveau
+chown root:root /etc/hermes/config.yaml.nouveau && chmod 0644 /etc/hermes/config.yaml.nouveau && mv /etc/hermes/config.yaml.nouveau /etc/hermes/config.yaml
+[ "$LIE" = 1 ] && echo "Relié à JARVIS : outils du serveur MCP ouverts à Telegram et aux routines." || echo "Pas encore relié à JARVIS (relier-jarvis.sh)."
 touch /etc/hermes/.env && chown root:root /etc/hermes/.env && chmod 0644 /etc/hermes/.env
 autorises=$(sed -n 's/^TELEGRAM_ALLOWED_USERS=//p' /etc/hermes/.env | tail -1)   # posé par telegram.sh ; gardé ici
 {
@@ -110,6 +120,18 @@ mv /etc/hermes/.env.nouveau /etc/hermes/.env && chmod 0644 /etc/hermes/.env
 install -o "$U" -g "$U" -m 0600 "$ICI/SOUL.md" "$HH/SOUL.md"
 # model.base_url reste au niveau de l'utilisateur (voir politique.yaml) : vidé, jamais OpenRouter
 comme_hermes hermes config set model.base_url "" >/dev/null
+
+dire "Skills du dépôt : /etc/hermes/skills (root ; Hermes les lit, ne les modifie pas)"
+rm -rf /etc/hermes/skills.nouveau && cp -r "$ICI/skills" /etc/hermes/skills.nouveau
+chown -R root:root /etc/hermes/skills.nouveau && chmod -R u=rwX,go=rX /etc/hermes/skills.nouveau
+rm -rf /etc/hermes/skills && mv /etc/hermes/skills.nouveau /etc/hermes/skills
+# Ces deux réglages ne sont lus que dans ~/.hermes/config.yaml (voir politique.yaml). Les skills livrées avec
+# Hermes (code, GitHub, ordinateur…) supposent un terminal qu'il n'a pas : coupées, elles n'encombrent plus chaque
+# message. Celles qu'il apprendra (~/.hermes/skills, après « /skills approve ») ne sont pas dans cette liste.
+comme_hermes hermes config set skills.external_dirs '["/etc/hermes/skills"]' >/dev/null
+fournies=$(find "$HH/hermes-agent/skills" -name SKILL.md -exec sed -n 's/^name: *//p' {} \; 2>/dev/null | tr -d "\"'" | grep -vx 'hermes-agent' | sort -u | paste -sd, -)
+[ -n "$fournies" ] && comme_hermes hermes config set skills.disabled "[$fournies]" >/dev/null
+echo "Skills du dépôt : $(find /etc/hermes/skills -name SKILL.md | wc -l) ; skills livrées avec Hermes coupées : $(printf '%s' "$fournies" | tr ',' '\n' | grep -c .)."
 comme_hermes hermes config check >/dev/null 2>&1 || echo "(hermes config check signale des avertissements : voir diagnostic.sh)"
 
 dire "Service et règles réseau"
@@ -151,5 +173,7 @@ cat <<FIN
 Étapes suivantes (dans Termius, en SSH ; elles demandent une saisie) :
   1. sudo bash /opt/rd/jarvis-os/hermes/connexion-claude.sh   (relier Claude Code d'Hermes à ton abonnement)
   2. sudo bash /opt/rd/jarvis-os/hermes/telegram.sh           (jeton du bot et ton identifiant Telegram, puis démarrage)
+  3. sudo bash /opt/rd/jarvis-os/hermes/relier-jarvis.sh      (jeton « Exécutant » créé dans JARVIS, Réglages, Assistants reliés)
+Puis, sans saisie : sudo bash /opt/rd/jarvis-os/hermes/routines.sh   (pose les routines du dépôt)
 Contrôle : sudo bash /opt/rd/jarvis-os/hermes/diagnostic.sh
 FIN

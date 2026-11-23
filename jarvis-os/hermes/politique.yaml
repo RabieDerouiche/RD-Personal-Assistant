@@ -5,9 +5,17 @@
 # ~/.hermes/config.yaml, sur ~/.hermes/.env et sur l'environnement. L'utilisateur hermes ne peut pas
 # la changer : ni par `hermes config set`, ni par /tools ou /yolo depuis Telegram.
 #
-# Étape 1 (choix du propriétaire du 23/11/2026, « aucun accès pour le moment ») : Hermes discute et
-# garde sa mémoire. Il n'a ni terminal, ni fichiers, ni web, ni Google, ni JARVIS, ni tâches planifiées.
-# Lui donner un pouvoir plus tard : modifier CE fichier dans le dépôt, fusionner, relancer install.sh.
+# Étapes 3 et 4 (sa demande du 23/11/2026 : « relie Hermes à JARVIS », routines pour alléger Grok Bot, droits
+# équivalents à ceux de Grok Bot) : Hermes discute, garde sa mémoire, lit ses skills et passe par JARVIS pour tout
+# le reste. Il n'a toujours ni terminal, ni fichiers, ni web, ni navigateur, ni jeton Google : Pilotage, Gmail et
+# l'agenda se lisent et s'écrivent par les outils du serveur MCP de JARVIS (profil « exécutant »), qui décide de
+# ce qui est permis, le journalise et peut le suspendre depuis Réglages. docs/hermes-deroule.md.
+# Lui donner un pouvoir de plus : modifier CE fichier dans le dépôt, fusionner, relancer install.sh.
+#
+# @MCP@ est remplacé par install.sh : « jarvis » quand /etc/hermes/jarvis.env existe (relier-jarvis.sh),
+# « no_mcp » sinon ; le bloc mcp_servers (politique-jarvis.yaml) n'est ajouté que dans le premier cas.
+
+timezone: "Europe/Paris"     # heures des routines
 
 model:
   # L'abonnement Claude du propriétaire, par le vrai Claude Code (plugin officiel de Nous Research,
@@ -19,7 +27,7 @@ model:
   # Hermes 0.23.3 réécrirait ce fichier de façon illisible au premier `hermes tools enable` (vu au banc).
 
 agent:
-  max_turns: 12              # outils appelés au plus par message (500 par défaut)
+  max_turns: 30              # outils appelés au plus par message ou par routine (500 par défaut)
   disabled_toolsets:
     - web
     - search
@@ -36,7 +44,6 @@ agent:
     - x_search
     - tts
     - stt
-    - skills
     - kanban
     - context_engine
     - connections
@@ -47,10 +54,28 @@ agent:
     - desktop_ui
     - a2a
 
-# Listes explicites : sans elles, Telegram reçoit tout l'arsenal d'Hermes, terminal compris.
+# Listes explicites : sans elles, Telegram et les routines reçoivent tout l'arsenal d'Hermes, terminal compris.
+# agent.disabled_toolsets s'applique aussi aux routines (cron/scheduler.py d'Hermes 0.23.3).
 platform_toolsets:
-  cli: [memory, session_search, todo, clarify, no_mcp]
-  telegram: [memory, session_search, todo, clarify, no_mcp]
+  cli: [memory, session_search, todo, clarify, skills, @MCP@]
+  telegram: [memory, session_search, todo, clarify, skills, @MCP@]
+  cron: [memory, session_search, todo, skills, @MCP@]
+
+# Routines : créées par root depuis le dépôt (routines.sh), jamais par Hermes lui-même (outil cronjob coupé).
+# Sonnet par défaut : une routine suit une marche à suivre écrite, et il use le forfait environ deux fois
+# moins vite qu'Opus (docs/hermes.md).
+cron:
+  model: "sonnet"
+  model_provider: "claude-subscription-directsdk-experimental"
+  allow_agent_scheduling: false
+
+# Skills : celles du dépôt sont dans /etc/hermes/skills (root, lecture seule pour hermes). Hermes peut en
+# proposer de nouvelles (il apprend) : rien n'est écrit sans « /skills approve » du propriétaire dans Telegram.
+# skills.external_dirs et skills.disabled ne sont lus par Hermes 0.23.3 que dans ~/.hermes/config.yaml (pas
+# dans la politique) : install.sh les y pose. Hermes n'a ni terminal ni fichiers pour y toucher.
+skills:
+  write_approval: true
+  inline_shell: false
 
 approvals:
   mode: manual
@@ -80,7 +105,7 @@ telegram:
   # Commandes du chat : « 0 » n'est l'identifiant de personne, donc personne n'est administrateur ;
   # le propriétaire n'a que cette liste (ni /update, ni /yolo, ni /tools, ni /restart).
   allow_admin_from: ["0"]
-  user_allowed_commands: [start, new, clear, retry, undo, stop, status, whoami, model, help, usage, version, approve, deny]
+  user_allowed_commands: [start, new, clear, retry, undo, stop, status, whoami, model, help, usage, version, approve, deny, skills]
 
 gateway:
   strict: true                   # garde-fou des fichiers envoyés dans le chat
