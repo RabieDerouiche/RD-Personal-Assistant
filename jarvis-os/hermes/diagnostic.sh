@@ -58,6 +58,7 @@ if id hermes >/dev/null 2>&1; then
   if [ -s /etc/hermes/jarvis.env ]; then
     [ "$(stat -c '%U %a' /etc/hermes/jarvis.env)" = "root 600" ] && droits="root, 0600" || droits="ATTENTION : droits $(stat -c '%U %a' /etc/hermes/jarvis.env)"
     grep -q '^mcp_servers:' /etc/hermes/config.yaml && pol="dans la politique" || pol="ATTENTION : absente de la politique (relancer install.sh)"
+    grep -q '^JARVIS_MCP_TOKEN_WEB=.' /etc/hermes/jarvis.env && echo "  jeton « Veilleur » (routine du web) : posé ; serveur « jarvis-web » $(grep -q '^  jarvis-web:' /etc/hermes/config.yaml && echo 'dans la politique' || echo 'ABSENT de la politique (relancer install.sh)')" || echo "  jeton « Veilleur » (routine du web) : pas encore (relier-jarvis.sh --web)"
     echo "  liaison à JARVIS : posée ($droits ; $pol) ; dernière annonce : $(grep -o "MCP server 'jarvis'.*registered [0-9]* tool" /home/hermes/.hermes/logs/agent.log 2>/dev/null | tail -1 | grep -o '[0-9]* tool' || echo 'aucune depuis le dernier journal')"
   else
     echo "  liaison à JARVIS : pas encore (relier-jarvis.sh)"

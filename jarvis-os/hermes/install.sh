@@ -101,11 +101,15 @@ install -d -o root -g root -m 0755 /etc/hermes
 LIE=0
 if [ -s /etc/hermes/jarvis.env ]; then LIE=1; chown root:root /etc/hermes/jarvis.env; chmod 0600 /etc/hermes/jarvis.env; fi
 {
-  if [ "$LIE" = 1 ]; then sed 's/@MCP@/jarvis/g' "$ICI/politique.yaml"; cat "$ICI/politique-jarvis.yaml"
+  if [ "$LIE" = 1 ]; then
+    sed 's/@MCP@/jarvis/g' "$ICI/politique.yaml"; cat "$ICI/politique-jarvis.yaml"
+    # second jeton (« Veilleur ») : le serveur « jarvis-web » de la routine qui lit le web
+    if grep -q '^JARVIS_MCP_TOKEN_WEB=.' /etc/hermes/jarvis.env; then cat "$ICI/politique-jarvis-web.yaml"; fi
   else sed 's/@MCP@/no_mcp/g' "$ICI/politique.yaml"; fi
 } > /etc/hermes/config.yaml.nouveau
 chown root:root /etc/hermes/config.yaml.nouveau && chmod 0644 /etc/hermes/config.yaml.nouveau && mv /etc/hermes/config.yaml.nouveau /etc/hermes/config.yaml
 [ "$LIE" = 1 ] && echo "Relié à JARVIS : outils du serveur MCP ouverts à Telegram et aux routines." || echo "Pas encore relié à JARVIS (relier-jarvis.sh)."
+grep -q '^  jarvis-web:' /etc/hermes/config.yaml && echo "Jeton « Veilleur » posé : serveur « jarvis-web » ouvert à la seule routine du web." || true
 touch /etc/hermes/.env && chown root:root /etc/hermes/.env && chmod 0644 /etc/hermes/.env
 autorises=$(sed -n 's/^TELEGRAM_ALLOWED_USERS=//p' /etc/hermes/.env | tail -1)   # posé par telegram.sh ; gardé ici
 {
