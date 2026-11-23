@@ -91,7 +91,7 @@ discussion répondent 401 (vérifié au banc). `setup.sh` de JARVIS ne touche pa
    version précise) ; pas de vérification automatique ; `/update` interdit dans le chat. Changer de version :
    relire les notes de version, modifier `install.sh`, passer le banc, fusionner, relancer `install.sh`.
 
-Mémoire et processeur : `MemoryHigh=700M`, `MemoryMax=900M`, `OOMScoreAdjust=600` (Hermes est tué avant
+Mémoire et processeur : `MemoryHigh=650M`, `MemoryMax=800M`, `OOMScoreAdjust=600` (Hermes est tué avant
 JARVIS), `CPUWeight=20`.
 
 ## Mesures du banc (conteneur de session, 23/11/2026)
@@ -102,6 +102,44 @@ JARVIS), `CPUWeight=20`.
   pendant une réponse (doc du plugin). Pic attendu : environ 600 Mo.
 - JARVIS se retient sous 900 Mo libres (préparation de Claude), 600 Mo (seconde mission) et 400 Mo (Siri) :
   `diagnostic.sh` calcule la marge sur le vrai serveur et donne le verdict VPS-1 ou VPS-2.
+
+### Mesure du vrai serveur (23/11/2026, commandes en lecture seule, session « Serveur JARVIS »)
+
+| Relevé | Valeur |
+|---|---|
+| Machine | 2 cœurs, 3,8 Go, échange de 2 Go (20 Mo utilisés), disque 29 Go libres sur 38 |
+| Disponible à l'instant | 1,86 Go, JARVIS près de son pic (1,52 Go cache compris ; pic 1,54 Go depuis sa relance du matin) |
+| Autres pics | session d'administration (`jarvis-rc`) 0,7 Go, Panier 0,2 Go, Caddy 0,08 Go |
+| Plus gros processus | l'écoute (Python, environ 1 Go), les Claude Code (0,15 à 0,26 Go chacun) |
+| Historique | aucun processus tué faute de mémoire en 6 jours ; pression mémoire quasi nulle (4 s cumulées) |
+| Ports en écoute | JARVIS 8787, Panier 8790, Caddy 2019 et 80, DNS, SSH : tous couverts par `sortie.nft` |
+
+Verdict (Likely) : **le VPS-1 suffit pour l'étape 1**.
+- Avec Hermes, il reste environ 1,5 Go disponibles au repos et 1,25 Go pendant une de ses réponses.
+- Seul le cumul des pics (session d'administration ouverte, mission de JARVIS et réponse d'Hermes en même
+  temps) peut descendre sous 900 Mo. JARVIS ne prépare alors pas Sonnet d'avance : la première réponse
+  vocale est un peu plus lente, rien ne casse (échange de 2 Go, Hermes tué avant JARVIS).
+- Selon sa règle (« VPS-2 seulement si on est sûr que ce sera bridé »), on reste en VPS-1 et on mesure.
+- Pour la mesure : depuis JARVIS 0.70.1, chaque retenue de JARVIS faute de mémoire est notée dans son
+  journal, et `diagnostic.sh` les compte sur 7 jours.
+- Plafond d'Hermes resserré pour le VPS-1 : `MemoryHigh=650M`, `MemoryMax=800M`.
+
+### Le forfait partagé (sa demande : « Hermes et JARVIS doivent bien fonctionner »)
+
+- (certain, code du plugin) La réserve du plugin (`extra_usage_reserve_percent`, arrêt avant X % de la
+  fenêtre) n'agit que si l'usage supplémentaire payant est activé sur le compte. Il est coupé, et doit le
+  rester : sinon JARVIS et les sessions de développement pourraient le consommer à leur tour.
+- Aujourd'hui, rien n'empêche donc Hermes de consommer toute la fenêtre de 5 heures ou de la semaine :
+  JARVIS s'arrêterait alors aussi jusqu'à la remise à zéro.
+- (guessing, d'après les mesures publiées par le plugin) À l'étape 1 (discussion seule), un message d'Hermes
+  sur Opus prend de l'ordre de 0,02 à 0,1 % de la fenêtre de 5 heures. Le risque viendra avec les routines
+  (étape 4).
+- **Avant l'étape 4**, construire un garde-fou :
+  - une minuterie root lit l'usage du forfait (sans appel au modèle, comme `/usage` du plugin) ;
+  - elle arrête Hermes au-delà d'un seuil choisi par le propriétaire, par exemple 70 %, et le relance
+    après la remise à zéro.
+- Surveiller en attendant : `/usage` dans le chat d'Hermes (même compte, donc même chiffre que JARVIS), et
+  la page d'usage de claude.ai.
 
 Défauts d'Hermes 0.23.3 trouvés au banc et contournés :
 
@@ -154,4 +192,7 @@ retirer : `sudo bash /opt/rd/jarvis-os/hermes/desinstaller.sh` (`--tout` efface 
 
 - 23/11/2026 : kit écrit ; banc depuis zéro (`--neuf`) : 40 vérifications sur 40 (installation 109 s, Hermes au
   repos 325 à 360 Mo selon les passes) ; fusionné dans `main`. Choix : Opus 5.5 par défaut, nouveau bot Telegram.
-  Reste, de son côté : étape 0 (mesure), puis 1 et 1b ; l'étape 2 se fait ensemble.
+- 23/11/2026 : étape 0 faite (mesure du vrai serveur ci-dessus) : VPS-1 suffisant pour l'étape 1 (Likely).
+  JARVIS 0.70.1 note ses retenues faute de mémoire (`garde-memoire.mjs`), comptées par `diagnostic.sh`.
+  Plafond d'Hermes resserré (650/800 Mo). Reste, de son côté : accepter la 0.70.1, étapes 1 et 1b ; l'étape 2
+  se fait ensemble. À faire avant l'étape 4 : le garde-fou du forfait (section « Le forfait partagé »).
