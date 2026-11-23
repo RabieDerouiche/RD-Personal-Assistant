@@ -17,6 +17,7 @@ HERMES_INSTALLEUR_SHA256=c73dad4dcf7c9ecadb98578e28cc763d23d7be3fa1b513545319038
 PLUGIN_CATALOGUE=claude-subscription-directsdk                     # catalogue d'Hermes v0.23.3 : commit 72eb3b8, v0.4.0
 PLUGIN_ID=claude-subscription-directsdk-experimental
 CLAUDE_CODE_VERSION=2.1.330
+SEUIL_FORFAIT=85                                                   # garde du forfait partagé (son choix du 23/11/2026)
 
 ICI=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 U=hermes
@@ -89,6 +90,7 @@ if [ "$(comme_hermes "$CC/node_modules/.bin/claude" --version 2>/dev/null | cut 
   comme_hermes npm install --prefix "$CC" --no-fund --no-audit --omit=dev "@anthropic-ai/claude-code@$CLAUDE_CODE_VERSION" | tail -1
 fi
 comme_hermes "$CC/node_modules/.bin/claude" --version
+comme_hermes ln -sfn "$CC/node_modules/.bin/claude" "$H/.local/bin/claude"   # trouvé par tout appel d'Hermes (PATH)
 
 dire "Politique (root) : /etc/hermes"
 install -d -o root -g root -m 0755 /etc/hermes
@@ -120,11 +122,17 @@ npm_bin=$(ls -d "$HH"/tools/npm-*/bin 2>/dev/null | sort -V | tail -1)
 chemin="${node_bin:+$node_bin:}${npm_bin:+$npm_bin:}$HH/hermes-agent/node_modules/.bin:$H/.local/bin:/usr/local/bin:/usr/bin:/bin"
 sed "s#@PATH@#$chemin#" "$ICI/hermes-gateway.service" > /etc/systemd/system/hermes-gateway.service
 chmod 0644 /etc/systemd/system/hermes-gateway.service
+# le garde du forfait : une copie root du script (la minuterie n'exécute jamais un fichier du dépôt)
+install -o root -g root -m 0755 "$ICI/garde-forfait.sh" /usr/local/sbin/hermes-garde-forfait
+echo "HERMES_SEUIL_FORFAIT=$SEUIL_FORFAIT" > /etc/hermes/garde.conf && chmod 0644 /etc/hermes/garde.conf
+install -o root -g root -m 0644 "$ICI/hermes-garde.service" /etc/systemd/system/hermes-garde.service
+install -o root -g root -m 0644 "$ICI/hermes-garde.timer" /etc/systemd/system/hermes-garde.timer
 nft -c -f /etc/hermes/sortie.nft 2>/dev/null && echo "Règles réseau : syntaxe vérifiée." || [ "$BANC" = 1 ] || { echo "Règles réseau refusées par nft : arrêt."; exit 1; }
 if [ "$BANC" != 1 ]; then
   systemctl daemon-reload
   systemctl enable --now hermes-sortie.service
   systemctl enable hermes-gateway.service
+  systemctl enable --now hermes-garde.timer   # toutes les 10 min : Hermes s'arrête au-delà de $SEUIL_FORFAIT % du forfait
   if grep -q '^TELEGRAM_BOT_TOKEN=.' "$HH/.env" 2>/dev/null && [ -n "$autorises" ]; then
     systemctl restart hermes-gateway.service && echo "Hermes relancé avec la nouvelle version ou la nouvelle politique."
   else

@@ -45,6 +45,9 @@ verif "/home/hermes en 0700" [ "$(stat -c %a /home/hermes)" = 700 ]
 verif "politique root 0644" [ "$(stat -c '%U %a' /etc/hermes/config.yaml)" = "root 644" ]
 verif "secrets d'Hermes en 0600" [ "$(stat -c '%U %a' $HH/.env)" = "hermes 600" ]
 verif "aucune autorisation générale dans /etc/hermes/.env" grep -qx 'GATEWAY_ALLOW_ALL_USERS=false' /etc/hermes/.env
+verif "garde du forfait : copie root 0755, jamais le fichier du dépôt" [ "$(stat -c '%U %a' /usr/local/sbin/hermes-garde-forfait)" = "root 755" ]
+verif "garde du forfait : seuil de 85 %" grep -qx 'HERMES_SEUIL_FORFAIT=85' /etc/hermes/garde.conf
+verif "Claude Code d'Hermes trouvé par son PATH (~/.local/bin/claude)" [ -L /home/hermes/.local/bin/claude ]
 
 echo "== Politique figée"
 outils=$(hx hermes tools list --platform telegram 2>/dev/null | grep '✓ enabled' | awk '{print $3}' | sort | tr '\n' ' ')
@@ -57,7 +60,7 @@ verif "« tools enable terminal » sans effet (toujours 4 outils)" bash -c "$(de
 verif "réglages d'Hermes toujours lisibles après cette tentative" runuser -u hermes -- python3 -I -c "import yaml; yaml.safe_load(open('$HH/config.yaml'))"
 
 echo "== Service et règles réseau"
-verif "unités valides (systemd-analyze verify)" bash -c "cd /etc/systemd/system && systemd-analyze verify --man=no ./hermes-gateway.service ./hermes-sortie.service"
+verif "unités valides (systemd-analyze verify)" bash -c "cd /etc/systemd/system && systemd-analyze verify --man=no ./hermes-gateway.service ./hermes-sortie.service ./hermes-garde.service ./hermes-garde.timer"
 score=$(systemd-analyze security --offline=true --no-pager /etc/systemd/system/hermes-gateway.service 2>/dev/null | sed -n 's/.*hermes-gateway.service: \([0-9.]*\).*/\1/p')
 verif "exposition systemd ≤ 2,0 (mesuré : $score)" awk -v s="${score:-99}" 'BEGIN{exit !(s <= 2.0)}'
 nft -f /etc/hermes/sortie.nft
@@ -128,6 +131,9 @@ for a in $ecoutes; do
     verif "API locale $chemin fermée sans jeton (port $port)" [ "$(curl -s -m 3 -o /dev/null -w '%{http_code}' http://127.0.0.1:$port$chemin)" = 401 ]
   done
 done
+
+echo "== Garde du forfait (faux usage, faux systemctl)"
+verif "banc du garde : $(bash "$ICI/garde.test.sh" 2>&1 | tail -1)" bash "$ICI/garde.test.sh" >/dev/null 2>&1
 
 echo "== Rangement"
 pkill -TERM -u hermes -f "gateway run"; for i in $(seq 1 40); do pgrep -u hermes -f "gateway run" >/dev/null || break; sleep 0.5; done

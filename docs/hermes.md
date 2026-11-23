@@ -57,6 +57,7 @@ nouveau n'était noté dans Pilotage ; c'est sa décision de faire l'essai quand
 | Claude Code d'Hermes | `/home/hermes/.local/lib/claude-code` (2.1.330, séparé de celui de JARVIS) ; connexion dans `/home/hermes/.claude` |
 | Politique (root) | `/etc/hermes/config.yaml` (copie de `politique.yaml`), `/etc/hermes/.env` (identifiant Telegram autorisé, interdictions) |
 | Service | `hermes-gateway.service` (et `hermes-sortie.service` pour les règles réseau, `/etc/hermes/sortie.nft`) |
+| Garde du forfait | `hermes-garde.timer` et `hermes-garde.service`, script `/usr/local/sbin/hermes-garde-forfait` (copie root), seuil dans `/etc/hermes/garde.conf`, état dans `/var/lib/hermes-garde/` |
 
 JARVIS, Panier, Caddy et ufw ne changent pas. Rien n'est ouvert vers Internet : Telegram est interrogé en
 sortie (polling). Hermes ouvre seulement une petite API locale pour ses propres clients (127.0.0.1, port
@@ -129,17 +130,25 @@ Verdict (Likely) : **le VPS-1 suffit pour l'étape 1**.
 - (certain, code du plugin) La réserve du plugin (`extra_usage_reserve_percent`, arrêt avant X % de la
   fenêtre) n'agit que si l'usage supplémentaire payant est activé sur le compte. Il est coupé, et doit le
   rester : sinon JARVIS et les sessions de développement pourraient le consommer à leur tour.
-- Aujourd'hui, rien n'empêche donc Hermes de consommer toute la fenêtre de 5 heures ou de la semaine :
-  JARVIS s'arrêterait alors aussi jusqu'à la remise à zéro.
+- Sans autre garde-fou, Hermes pourrait donc consommer toute la fenêtre de 5 heures ou de la semaine, et JARVIS
+  s'arrêterait aussi jusqu'à la remise à zéro.
 - (guessing, d'après les mesures publiées par le plugin) À l'étape 1 (discussion seule), un message d'Hermes
   sur Opus prend de l'ordre de 0,02 à 0,1 % de la fenêtre de 5 heures. Le risque viendra avec les routines
   (étape 4).
-- **Avant l'étape 4**, construire un garde-fou :
-  - une minuterie root lit l'usage du forfait (sans appel au modèle, comme `/usage` du plugin) ;
-  - elle arrête Hermes au-delà d'un seuil choisi par le propriétaire, par exemple 70 %, et le relance
-    après la remise à zéro.
-- Surveiller en attendant : `/usage` dans le chat d'Hermes (même compte, donc même chiffre que JARVIS), et
-  la page d'usage de claude.ai.
+- **Garde du forfait** (installé par `install.sh`, seuil de **85 %**, son choix du 23/11/2026) :
+  `hermes-garde.timer` lance toutes les 10 minutes `garde-forfait.sh`, dont root garde une copie
+  (`/usr/local/sbin/hermes-garde-forfait`) : la minuterie n'exécute jamais un fichier du dépôt, qui
+  appartient à `jarvis`.
+  - Il lit l'usage par `hermes usage --json` (la lecture de `/usage`, sans appel au modèle ; environ 20 s).
+  - Au-delà du seuil sur la fenêtre de 5 heures, la semaine ou la semaine Opus (le modèle d'Hermes), il
+    arrête Hermes et le prévient sur Telegram. Une fenêtre propre à un autre modèle (la semaine Sonnet de la
+    voix de JARVIS) ne l'arrête pas.
+  - Il le relance sous le seuil moins 10 points (75 %), après la remise à zéro, et le prévient. Il ne relance
+    jamais un Hermes arrêté à la main ; usage illisible : aucune décision.
+  - Seuil : `SEUIL_FORFAIT` dans `install.sh` (écrit dans `/etc/hermes/garde.conf`). Banc :
+    `bash essais/hermes/garde.test.sh` (14 vérifications).
+- Regarder soi-même : `/usage` dans le chat d'Hermes (même compte, donc même chiffre que JARVIS), la page
+  d'usage de claude.ai, ou `diagnostic.sh` (état du garde, dernier contrôle).
 
 Défauts d'Hermes 0.23.3 trouvés au banc et contournés :
 
@@ -195,4 +204,7 @@ retirer : `sudo bash /opt/rd/jarvis-os/hermes/desinstaller.sh` (`--tout` efface 
 - 23/11/2026 : étape 0 faite (mesure du vrai serveur ci-dessus) : VPS-1 suffisant pour l'étape 1 (Likely).
   JARVIS 0.70.1 note ses retenues faute de mémoire (`garde-memoire.mjs`), comptées par `diagnostic.sh`.
   Plafond d'Hermes resserré (650/800 Mo). Reste, de son côté : accepter la 0.70.1, étapes 1 et 1b ; l'étape 2
-  se fait ensemble. À faire avant l'étape 4 : le garde-fou du forfait (section « Le forfait partagé »).
+  se fait ensemble.
+- 23/11/2026 : garde du forfait à 85 % (son choix), installé par `install.sh` ; bancs : garde 14 sur 14, Hermes
+  complet depuis zéro 44 sur 44. Étude pour lui : Google Doc « Hermes sur le serveur de JARVIS : étude de
+  faisabilité (23-11-2026) », dossier `Grok Bot/` (`16GS3h9eLFBtLNzXToOXNm8_Rq-TFKSxGY5bfT1AnFhE`).
