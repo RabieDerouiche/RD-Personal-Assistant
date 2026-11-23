@@ -6,6 +6,8 @@ lui donner (et à Claude), le tout pilotable depuis JARVIS. Objectif à terme : 
 si Hermes fait tout ce que Grok Bot fait, sans compromis sur la qualité ni sur les routines**.
 
 Installation et garde-fous d'Hermes : `docs/hermes.md`. Système Grok Bot : `docs/systeme-grok-bot.md`.
+Version pour lui : Google Doc « Hermes, Grok Bot, Claude et JARVIS : le déroulé (23-11-2026) », dossier `Grok Bot/`
+(`1leDb53BzPGQtd_Y3Ud84qkSi5YKyxTJEu3pQWNPbogI`).
 Rien de personnel ici.
 
 ## Qui fait quoi
@@ -124,3 +126,7 @@ commence à la première bascule.
   agenda, brouillon, notification) ; kit d'Hermes (politique des étapes 3 et 4, `relier-jarvis.sh`,
   `routines.sh`, trois skills, consigne) ; banc d'Hermes 72 sur 72 avec un faux JARVIS. Rien n'est encore en
   service : voir « Mettre en service ».
+- 23/11/2026 : vérifié aussi le vrai `mcp.mjs` devant le client MCP d'Hermes (jeton exécutant : ses outils ; jeton
+  lecture : non ; mauvais jeton : 401) et les en-têtes réels de Pilotage (ligne 3 pour « À toi » et Prix, ligne 1
+  ailleurs ; colonne Bot dans Sorties et Relevés). Bancs de JARVIS : serveur 331, Radar 131, page 226, bout en
+  bout 124.
