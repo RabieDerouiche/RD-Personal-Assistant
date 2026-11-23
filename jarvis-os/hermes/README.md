@@ -9,7 +9,7 @@ Pourquoi, décisions, garde-fous, mesures et étapes : `docs/hermes.md`. Bancs :
 | `politique.yaml` | Copiée dans `/etc/hermes/config.yaml` (root) : ce qu'Hermes a le droit de faire. Hermes ne peut pas la changer. |
 | `politique-jarvis.yaml` | Le serveur MCP de JARVIS (adresse et jeton pris dans l'environnement du service), ajouté à la politique seulement quand la liaison est posée. Liste fermée des outils de JARVIS qu'Hermes voit. |
 | `relier-jarvis.sh` | Étape 3 (Termius : saisie). Demande le jeton « Exécutant » créé dans JARVIS (Réglages, « Assistants reliés (MCP) »), le vérifie depuis l'utilisateur `hermes`, pose `/etc/hermes/jarvis.env` (root, 0600) et relance `install.sh`. |
-| `skills/` | Les skills du dépôt, copiées dans `/etc/hermes/skills` (root : Hermes les lit, ne les modifie pas) : `pilotage` (outils de JARVIS, règles de chaque passage, mode « en double »), une par routine (`veille-du-matin`, `semaine-a-venir`). |
+| `skills/` | Les skills du dépôt, copiées dans `/etc/hermes/skills` (root : Hermes les lit, ne les modifie pas) : `pilotage` (outils de JARVIS, règles de chaque passage, mode « en double »), une par routine (`veille-du-matin`). |
 | `routines.conf`, `routines.sh` | Étape 4 (sans saisie). La liste des routines d'Hermes, une par ligne, et le script qui les pose chez lui (`hermes cron`), recrée ce qui a changé et retire ce qui n'y est plus. `--liste` ne change rien. |
 | `SOUL.md` | Sa consigne permanente : façon de répondre, ce qu'il fait seul ou après un oui, règles qui ne changent jamais. Sans aucune donnée personnelle. |
 | `hermes-gateway.service` | Le service, enfermé (score d'exposition systemd 1,4 au banc), sous JARVIS en priorité mémoire et processeur. |

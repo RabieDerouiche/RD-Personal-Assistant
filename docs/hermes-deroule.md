@@ -186,3 +186,27 @@ Découpage proposé :
    client, soit un lien direct qu'il touche lui-même.
 4. **Confirmer** : la nouvelle date relue sur le site, écrite dans le Journal, et dite sur Telegram.
 Décisions demandées par QCM : la façon d'agir, où arrive la question, agir tout de suite ou après un second oui.
+
+Ses réponses (QCM du 24/11/2026) :
+
+| Question | Son choix |
+|---|---|
+| Qui change la date chez le marchand | « JARVIS ou Hermes, mais n'est-ce pas mieux si c'est Hermes ? » Réponse donnée : Hermes décide et déclenche, JARVIS tient le mot de passe et fait le geste. Hermes sur le site lui-même demanderait un navigateur (qui ne tient pas sur le VPS-1) et lui ferait voir le mot de passe |
+| Où arrive la question | **Notification de JARVIS** (carte à boutons dans l'app) |
+| Après son choix | **Tout de suite** : son choix vaut accord pour ce changement précis (ligne ajoutée à l'onglet Autonomie, ligne 21) |
+| Semaine à venir en double | **Retirée** (il ne lit pas ce message) |
+
+Chaîne retenue :
+1. **Hermes** repère le mail (routine du matin), calcule un conseil (dates des dernières livraisons, quantité,
+   rythme) et crée dans JARVIS une **décision** : la question, 4 choix, chacun lié à un geste d'un catalogue fermé.
+2. **JARVIS** notifie ; il touche un bouton ; JARVIS fait le geste aussitôt sur l'espace client, relit la date,
+   confirme par une notification et note le résultat (Journal, « Derniers gestes »).
+3. **Hermes** lit le résultat à son passage suivant et retient son habitude (mémoire).
+À construire, dans l'ordre : la sonde (faite : `jarvis-os/server/install/portail-couches.sh`, lancée par lui dans
+Termius) ; le geste d'après le squelette qu'elle rapporte ; les décisions à boutons de JARVIS (outil
+`jarvis_demander` pour les exécutants) ; la routine et la skill d'Hermes.
+- 24/11/2026 (nuit) : Semaine à venir retirée d'Hermes à sa demande ; il lui reste la Veille du matin en double.
+  Onglet Routines : une seule ligne « Hermes » ; ligne 98 du Canal réécrite. Onglet Autonomie, ligne 21 : décaler,
+  avancer ou garder la livraison des couches après son choix dans JARVIS. Sonde de l'espace client écrite et
+  essayée sur un faux site (`bash jarvis-os/server/tests/portail-sonde.test.sh`, 7 vérifications) : elle ne lit
+  que le squelette des pages, sans donnée personnelle ni secret. Banc d'Hermes : 73 sur 73.
