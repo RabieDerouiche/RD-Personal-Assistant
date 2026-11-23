@@ -18,7 +18,7 @@ echo "Pression mémoire depuis le démarrage :"; sed 's/^/  /' /proc/pressure/me
 oom=$(journalctl -k -b --no-pager 2>/dev/null | grep -ciE 'out of memory|oom-kill' || true)
 echo "Processus tués faute de mémoire depuis le démarrage : ${oom:-0}"
 
-t "Services (mémoire maintenant / pic depuis leur dernier démarrage)"
+t "Services (mémoire maintenant / pic depuis leur dernier démarrage ; cache des fichiers compris, donc à ne pas additionner)"
 somme_pics=0
 for s in jarvis panier caddy jarvis-rc hermes-gateway; do
   etat=$(systemctl is-active "$s" 2>/dev/null || true)
@@ -67,14 +67,25 @@ t "JARVIS s'est-il retenu faute de mémoire ? (7 derniers jours ; noté depuis J
 retenues=$(journalctl -u jarvis --since "7 days ago" --no-pager -o cat 2>/dev/null | grep -o "mémoire basse : [^(]*" | sed 's/ *$//' || true)
 if [ -n "$retenues" ]; then printf '%s\n' "$retenues" | sort | uniq -c | sed 's/^ */  /'; else echo "  aucune retenue notée"; fi
 
-t "Verdict mémoire (Likely : pics additionnés, comme s'ils arrivaient en même temps)"
-total=$(mo MemTotal); dispo=$(mo MemAvailable)
-hermes_pic=600; [ "$(systemctl is-active hermes-gateway 2>/dev/null)" = active ] && hermes_pic=0   # déjà compté dans les pics
-pire=$((total - somme_pics - 300 - hermes_pic))
-echo "  JARVIS se retient sous 900 Mo libres (préparation de Claude), 600 Mo (seconde mission) et 400 Mo (Siri)."
-echo "  Libre au pire avec Hermes : environ $pire Mo · libre maintenant avec Hermes : environ $((dispo - hermes_pic)) Mo"
-if [ "$pire" -ge 900 ]; then echo "  → VPS actuel suffisant : JARVIS ne devrait jamais se brider à cause d'Hermes."
-elif [ "$((dispo - hermes_pic))" -ge 900 ]; then echo "  → Juste : JARVIS peut se brider aux pics (voix + mission + réponse d'Hermes). Essai possible, à surveiller."
-else echo "  → Insuffisant : passer au VPS-2 (8 Go) avant de démarrer Hermes."
+t "Verdict mémoire (Likely)"
+# Les pics par service comptent le cache des fichiers (récupérable) et ne tombent pas en même temps : ils ne
+# s'additionnent pas (le 23/11, l'installation d'Hermes lancée depuis la session d'administration y avait mis
+# 2,7 Go de cache). Le verdict part de la mémoire disponible maintenant et des retenues notées par JARVIS.
+dispo=$(mo MemAvailable); echange=$(( $(mo SwapTotal) - $(mo SwapFree) ))
+if [ "$(systemctl is-active hermes-gateway 2>/dev/null)" = active ]; then
+  encore=250; quoi="pendant une réponse d'Hermes (son Claude Code, environ 250 Mo)"
+  depuis=$(systemctl show hermes-gateway -p ActiveEnterTimestamp --value 2>/dev/null)
+  depuis_s=$(date -d "$depuis" +%s 2>/dev/null || echo 0)
+  apres=$(journalctl -u jarvis --since "@$depuis_s" --no-pager -o cat 2>/dev/null | grep -c "mémoire basse" || true)
+else
+  encore=600; quoi="avec Hermes démarré et en train de répondre (environ 600 Mo)"; apres=0
 fi
-[ -n "$retenues" ] && echo "  → JARVIS s'est déjà retenu (ci-dessus) : si c'est depuis le démarrage d'Hermes, Hermes le gêne ; passer au VPS-2 ou arrêter Hermes."
+marge=$((dispo - encore))
+echo "  Disponible maintenant : $dispo Mo ; échange utilisé : $echange Mo."
+echo "  JARVIS se retient sous 900 Mo libres (préparation de Sonnet), 600 Mo (seconde mission) et 400 Mo (Siri)."
+echo "  Libre $quoi : environ $marge Mo."
+if [ "${apres:-0}" -gt 0 ]; then echo "  → JARVIS s'est retenu $apres fois depuis le démarrage d'Hermes : passer au VPS-2 (8 Go) ou arrêter Hermes."
+elif [ "$marge" -ge 1500 ]; then echo "  → Confortable : JARVIS ne devrait pas se brider à cause d'Hermes."
+elif [ "$marge" -ge 900 ]; then echo "  → Suffisant : seuls des pics cumulés (session d'administration, mission, réponse d'Hermes) peuvent faire sauter la préparation de Sonnet."
+else echo "  → Insuffisant maintenant : passer au VPS-2 (8 Go) ou arrêter Hermes."
+fi
