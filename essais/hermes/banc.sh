@@ -47,6 +47,7 @@ verif "secrets d'Hermes en 0600" [ "$(stat -c '%U %a' $HH/.env)" = "hermes 600" 
 verif "aucune autorisation générale dans /etc/hermes/.env" grep -qx 'GATEWAY_ALLOW_ALL_USERS=false' /etc/hermes/.env
 verif "garde du forfait : copie root 0755, jamais le fichier du dépôt" [ "$(stat -c '%U %a' /usr/local/sbin/hermes-garde-forfait)" = "root 755" ]
 verif "garde du forfait : seuil de 85 %" grep -qx 'HERMES_SEUIL_FORFAIT=85' /etc/hermes/garde.conf
+verif "garde du forfait : semaine seulement (fenêtre de 5 heures ignorée)" grep -qx 'HERMES_GARDE_CINQ_HEURES=0' /etc/hermes/garde.conf
 verif "Claude Code d'Hermes trouvé par son PATH (~/.local/bin/claude)" [ -L /home/hermes/.local/bin/claude ]
 
 echo "== Politique figée"
@@ -133,7 +134,7 @@ for a in $ecoutes; do
 done
 
 echo "== Garde du forfait (faux usage, faux systemctl)"
-verif "banc du garde : $(bash "$ICI/garde.test.sh" 2>&1 | tail -1)" bash "$ICI/garde.test.sh" >/dev/null 2>&1
+verif "banc du garde : $(bash "$ICI/garde.test.sh" 2>&1 | tail -1)" bash -c "bash '$ICI/garde.test.sh' >/dev/null 2>&1"
 
 echo "== Rangement"
 pkill -TERM -u hermes -f "gateway run"; for i in $(seq 1 40); do pgrep -u hermes -f "gateway run" >/dev/null || break; sleep 0.5; done

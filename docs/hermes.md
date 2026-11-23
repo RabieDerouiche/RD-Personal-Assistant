@@ -19,6 +19,7 @@ nouveau n'était noté dans Pilotage ; c'est sa décision de faire l'essai quand
 | Bot Telegram | **Un nouveau bot** (le jeton de l'ancien bot d'octobre est resté sur l'ancien serveur ; à supprimer chez @BotFather) |
 | Connexion Claude (QCM après le rappel de la zone grise : plugin officiel d'Hermes mais pas approuvé par Anthropic, qui préfère une clé d'API) | **Garder le plugin** ; la clé d'API des crédits inclus dans Max reste le plan B |
 | Pouvoirs | Aucun pour le moment ; à ouvrir progressivement après l'étude de faisabilité et du déroulé idéal |
+| Garde du forfait | Seuil de **85 %** (QCM) ; **sur la semaine seulement** (sa demande du 23/11/2026, une fois Telegram en place : il remplit lui-même la fenêtre de 5 heures en testant JARVIS OS) |
 
 ## L'abonnement Claude dans Hermes : ce qui est permis (vérifié le 23/11/2026)
 
@@ -58,7 +59,7 @@ nouveau n'était noté dans Pilotage ; c'est sa décision de faire l'essai quand
 | Claude Code d'Hermes | `/home/hermes/.local/lib/claude-code` (2.1.330, séparé de celui de JARVIS) ; connexion dans `/home/hermes/.claude` |
 | Politique (root) | `/etc/hermes/config.yaml` (copie de `politique.yaml`), `/etc/hermes/.env` (identifiant Telegram autorisé, interdictions) |
 | Service | `hermes-gateway.service` (et `hermes-sortie.service` pour les règles réseau, `/etc/hermes/sortie.nft`) |
-| Garde du forfait | `hermes-garde.timer` et `hermes-garde.service`, script `/usr/local/sbin/hermes-garde-forfait` (copie root), seuil dans `/etc/hermes/garde.conf`, état dans `/var/lib/hermes-garde/` |
+| Garde du forfait | `hermes-garde.timer` et `hermes-garde.service`, script `/usr/local/sbin/hermes-garde-forfait` (copie root), seuil et fenêtres comptées dans `/etc/hermes/garde.conf`, état dans `/var/lib/hermes-garde/` |
 
 JARVIS, Panier, Caddy et ufw ne changent pas. Rien n'est ouvert vers Internet : Telegram est interrogé en
 sortie (polling). Hermes ouvre seulement une petite API locale pour ses propres clients (127.0.0.1, port
@@ -136,7 +137,8 @@ Verdict (Likely) : **le VPS-1 suffit pour l'étape 1**.
 - (guessing, d'après les mesures publiées par le plugin) À l'étape 1 (discussion seule), un message d'Hermes
   sur Opus prend de l'ordre de 0,02 à 0,1 % de la fenêtre de 5 heures. Le risque viendra avec les routines
   (étape 4).
-- **Garde du forfait** (installé par `install.sh`, seuil de **85 %**, son choix du 23/11/2026) :
+- **Garde du forfait** (installé par `install.sh`, seuil de **85 %** sur la **semaine seulement**, ses choix du
+  23/11/2026) :
   `hermes-garde.timer` lance toutes les 10 minutes `garde-forfait.sh`, dont root garde une copie
   (`/usr/local/sbin/hermes-garde-forfait`) : la minuterie n'exécute jamais un fichier du dépôt, qui
   appartient à `jarvis`.
@@ -144,13 +146,20 @@ Verdict (Likely) : **le VPS-1 suffit pour l'étape 1**.
     Hermes tourne ou qu'il l'a lui-même arrêté : une lecture lance Hermes et la sonde de Claude Code (environ
     0,2 Go pendant 2 s au banc sans connexion, 0,45 Go attendus avec ; Likely). Sa lecture passe après JARVIS
     (`Nice=10`, `CPUWeight=20`, `MemoryMax=600M`).
-  - Au-delà du seuil sur la fenêtre de 5 heures, la semaine ou la semaine Opus (le modèle d'Hermes), il
-    arrête Hermes et le prévient sur Telegram. Une fenêtre propre à un autre modèle (la semaine Sonnet de la
-    voix de JARVIS) ne l'arrête pas.
+  - Au-delà du seuil sur la semaine ou la semaine Opus (le modèle d'Hermes), il arrête Hermes et le prévient
+    sur Telegram. Une fenêtre propre à un autre modèle (la semaine Sonnet de la voix de JARVIS) ne l'arrête
+    pas ; une limite au nom inconnu compte, par prudence.
+  - **La fenêtre de 5 heures (« Current session ») ne compte pas** (sa demande du 23/11/2026 : il la remplit
+    lui-même en testant JARVIS OS, et elle avait atteint 85 % le jour où Telegram a été branché). Conséquence
+    acceptée : si elle arrive à 100 %, Hermes, JARVIS et les sessions de développement s'arrêtent ensemble
+    jusqu'à sa remise à zéro (5 heures au plus), sans rien payer (usage supplémentaire coupé). Aujourd'hui
+    Hermes n'y puise que quand il lui écrit ; à revoir avant les routines (étape 4) : `GARDE_CINQ_HEURES=1`
+    dans `install.sh` la remet.
   - Il le relance sous le seuil moins 10 points (75 %), après la remise à zéro, et le prévient. Il ne relance
     jamais un Hermes arrêté à la main ; usage illisible : aucune décision.
-  - Seuil : `SEUIL_FORFAIT` dans `install.sh` (écrit dans `/etc/hermes/garde.conf`). Banc :
-    `bash essais/hermes/garde.test.sh` (16 vérifications).
+  - Réglages : `SEUIL_FORFAIT` et `GARDE_CINQ_HEURES` dans `install.sh` (écrits dans `/etc/hermes/garde.conf`).
+    `install.sh` relancé pendant une pause du garde ne redémarre pas Hermes lui-même : il relance le garde, qui
+    décide avec ses règles du moment. Banc : `bash essais/hermes/garde.test.sh` (20 vérifications).
 - Regarder soi-même : `/usage` dans le chat d'Hermes (même compte, donc même chiffre que JARVIS), la page
   d'usage de claude.ai, ou `diagnostic.sh` (état du garde, dernier contrôle).
 
@@ -196,7 +205,7 @@ retirer : `sudo bash /opt/rd/jarvis-os/hermes/desinstaller.sh` (`--tout` efface 
 |---|---|---|
 | Claude Code échoue au lancement (« Operation not permitted », « Bad system call ») | Le filtre d'appels système bloque un appel de Claude Code | `sudo systemctl edit hermes-gateway`, ajouter `[Service]` puis `SystemCallFilter=` (vide), redémarrer ; noter l'appel en cause ici |
 | Réponses coupées, « Killed », pic à 900 Mo | Limite mémoire du service | Seulement si `diagnostic.sh` montre de la marge : `MemoryMax=` plus haut dans le même `systemctl edit` |
-| « plan limit », refus jusqu'à une heure donnée | Limite du forfait atteinte (`extra_usage: stop`) | Attendre la remise à zéro ; JARVIS et les sessions de développement sont à la même enveloppe |
+| « plan limit », refus jusqu'à une heure donnée | Limite du forfait atteinte (`extra_usage: stop`) ; le plus souvent la fenêtre de 5 heures, que le garde ne surveille plus | Attendre la remise à zéro ; JARVIS et les sessions de développement sont à la même enveloppe |
 | « Third-party apps now draw from your extra usage » | Anthropic a basculé les apps tierces sur l'usage payant | Ne rien autoriser ; passer au plan B (crédits d'API inclus dans Max), décision du propriétaire |
 | Telegram : « Conflict: terminated by other getUpdates request » | Un autre programme utilise le même jeton | Nouveau jeton (@BotFather, /revoke), puis `telegram.sh` |
 | Hermes ne démarre plus après une commande `hermes tools` ou `hermes config` | Fichier de réglages réécrit illisible (défaut de la 0.23.3) | Reprendre le dernier bon fichier de `/home/hermes/.hermes/backups/config/` (en tant que `hermes`), puis `sudo systemctl restart hermes-gateway` |
@@ -218,3 +227,8 @@ retirer : `sudo bash /opt/rd/jarvis-os/hermes/desinstaller.sh` (`--tout` efface 
 - 23/11/2026, par la session « Serveur JARVIS » (tâche confiée par `send_message`, résultat lu par `list_events`, sans
   recopie par lui) : dépôt à jour (`012837f`), `install.sh` code 0, garde corrigé en place, diagnostic « Confortable »
   (2,75 Go disponibles, 2,15 Go avec Hermes en train de répondre, aucune retenue de JARVIS, échange 0,9 Go). Reste : `connexion-claude.sh` et `telegram.sh` (Termius).
+- 23/11/2026 : Telegram configuré par lui (`telegram.sh`). La fenêtre de 5 heures était à 85 % (lue à 14h18 UTC,
+  remplie par ses essais de JARVIS OS) : sa demande, garde sur la semaine seulement. Fait : `garde-forfait.sh`
+  ignore « Current session » (`HERMES_GARDE_CINQ_HEURES=0` dans `garde.conf`, 1 pour la remettre), messages
+  « semaine » ou « semaine Opus » ; `install.sh` relancé pendant une pause laisse le garde décider. Bancs : garde
+  20 sur 20, Hermes 45 sur 45 ; essai sur les vrais chiffres (semaine 10 %) : Hermes relancé, message de reprise.

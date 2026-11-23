@@ -10,7 +10,7 @@ Pourquoi, décisions, garde-fous, mesures et étapes : `docs/hermes.md`. Bancs :
 | `SOUL.md` | Sa façon de répondre (français, court, certitude), sans aucune donnée personnelle. |
 | `hermes-gateway.service` | Le service, enfermé (score d'exposition systemd 1,4 au banc), sous JARVIS en priorité mémoire et processeur. |
 | `hermes-sortie.service`, `sortie.nft` | Ce que l'utilisateur `hermes` peut joindre : Internet, oui ; JARVIS, Panier, Caddy, SSH, réseau privé, métadonnées du fournisseur, non. |
-| `garde-forfait.sh`, `hermes-garde.service`, `hermes-garde.timer` | Garde du forfait Claude partagé : toutes les 10 minutes, Hermes s'arrête au-delà de 85 % (fenêtre de 5 heures, semaine, semaine Opus), prévient sur Telegram et repart sous 75 %. Root en garde une copie (`/usr/local/sbin/hermes-garde-forfait`) : la minuterie n'exécute jamais un fichier du dépôt. |
+| `garde-forfait.sh`, `hermes-garde.service`, `hermes-garde.timer` | Garde du forfait Claude partagé : toutes les 10 minutes, Hermes s'arrête au-delà de 85 % de la semaine (semaine, semaine Opus ; la fenêtre de 5 heures ne compte pas, sa demande du 23/11/2026), prévient sur Telegram et repart sous 75 %. Root en garde une copie (`/usr/local/sbin/hermes-garde-forfait`) : la minuterie n'exécute jamais un fichier du dépôt. |
 | `connexion-claude.sh` | Relie le Claude Code d'Hermes à l'abonnement (Termius : saisie). |
 | `telegram.sh` | Jeton du bot (saisi sans affichage) et identifiant autorisé, puis démarrage (Termius : saisie). |
 | `diagnostic.sh` | Lecture seule : mémoire, pics, ports, versions, garde-fous, verdict « VPS-1 suffisant ? ». Sortie sans secret. |
