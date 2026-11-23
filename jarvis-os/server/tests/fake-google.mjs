@@ -20,7 +20,7 @@ export function startFakeGoogle() {
   F.drive.push({id: 'profil1', name: 'Profil', mimeType: 'application/vnd.google-apps.document', parents: ['rda'], modifiedTime: '2026-11-20T09:00:00.000Z',
     html: '<html><head><style>p { color: #000 }</style></head><body><h1>Profil</h1><h2>Voyages</h2><p>Préfère les vols directs et le hublot.</p><h2>Finances</h2><p>Banque principale et plafond de dépenses.</p><h2>Repas</h2><ul><li>Végétarien le lundi</li></ul></body></html>'});
   const msgMeta = (id, th) => ({id, threadId: th, labelIds: ['INBOX', 'CATEGORY_PERSONAL'], snippet: 'L&#39;expert passera mardi', internalDate: '1763290000000',
-    payload: {headers: [{name: 'From', value: '"Syndic Dupont" <gestion@syndic.example>'}, {name: 'To', value: 'moi@example.org'}, {name: 'Subject', value: 'RE: Dégât des eaux'}, {name: 'Date', value: 'Sun, 16 Nov 2026 10:00:00 +0100'}]}});
+    payload: {headers: [{name: 'From', value: '"Syndic Dupont" <gestion@syndic.example>'}, {name: 'To', value: 'moi@example.org'}, {name: 'Subject', value: 'RE: Dégât des eaux'}, {name: 'Date', value: 'Sun, 16 Nov 2026 10:00:00 +0100'}, {name: 'Message-ID', value: '<m1@syndic.example>'}]}});
   const full = (m, text) => ({...m, payload: {...m.payload, mimeType: 'multipart/alternative', parts: [{mimeType: 'text/plain', body: {data: b64u(text)}}, {mimeType: 'text/html', body: {data: b64u('<p>html</p>')}}]}});
   /* Radar (21/11/2026) : trois factures mensuelles inventées (les deux mois d'avant et celui-ci), pour la lecture de départ des mails */
   F.radar = {};
@@ -32,6 +32,15 @@ export function startFakeGoogle() {
     F.radar.tpl4 = {id: 'tpl4', threadId: 'tpl4', labelIds: ['INBOX', 'CATEGORY_UPDATES'], snippet: 'Votre plan de paiements', internalDate: String(d0.getTime()),
       text: 'Voici votre nouveau plan de paiements Paiement en 4X.\nVotre achat de 80,00 € EUR auprès de BOUTIQUE EXEMPLE a été divisé en 4 paiements plus petits.\n' + [-10, 20, 50, 80].map((k) => '* 20,00 € EUR le ' + fr(j(k))).join(' ') + '\n',
       payload: {headers: [{name: 'From', value: '"PayPal" <service@paypal.fr>'}, {name: 'To', value: 'moi@example.org'}, {name: 'Subject', value: 'Votre plan de paiements Paiement en 4X est prêt'}, {name: 'Date', value: d0.toUTCString()}]}}; }
+  /* 0.71.0 (exécutants reliés) : des onglets de Pilotage vivants, quand le banc les pose dans F.onglets ({nom: [lignes]}) : une plage
+     « 'Onglet'!A1:Z50 » y est lue, une ligne ajoutée s'y ajoute, une case écrite s'y écrit. Sans F.onglets : les plages figées de F.sheet. */
+  F.onglets = null;
+  const colN = (c) => [...c].reduce((n, x) => n * 26 + x.charCodeAt(0) - 64, 0) - 1;
+  const plage = (r) => { const m = String(r).match(/^'?(.+?)'?!([A-Z]+)(\d+)?(?::([A-Z]+)(\d+)?)?$/); return m ? {nom: m[1].replace(/''/g, "'"), c1: colN(m[2]), l1: +(m[3] || 1), c2: m[4] ? colN(m[4]) : colN(m[2]), l2: m[5] ? +m[5] : m[4] ? 1e6 : +(m[3] || 1)} : null; };
+  /* ses agendas (0.71.0) : le principal porte son adresse, comme chez Google */
+  F.calendriers = [{id: 'proprietaire@example.org', summary: 'proprietaire@example.org', primary: true, accessRole: 'owner'}, {id: 'ech@group.calendar.example', summary: 'Échéances', accessRole: 'owner'},
+    {id: 'pres@group.calendar.example', summary: 'Présence', accessRole: 'owner'}, {id: 'fr.french#holiday@group.v.calendar.example', summary: 'Holidays in France', accessRole: 'reader'}];
+  F.brouillons = []; F.fils = {};   /* brouillons créés (jamais envoyés) ; fils Gmail posés par le banc, au format de l'API */
   const send = (res, st, body) => { res.writeHead(st, {'content-type': 'application/json'}); res.end(st === 204 ? '' : JSON.stringify(body)); };
   const server = http.createServer((req, res) => {
     let raw = ''; req.on('data', (d) => { raw += d; }); req.on('end', () => {
@@ -48,11 +57,19 @@ export function startFakeGoogle() {
       if (!F.valid.has(auth)) return send(res, 401, {error: {code: 401, message: 'Request had invalid authentication credentials.'}});
       let m;
       if (p === '/gmail/users/me/profile') return send(res, 200, {emailAddress: 'proprietaire@example.org'});
+      if ((m = p.match(/^\/sheets\/v4\/spreadsheets\/([^/]+)\/values\/(.+?)(:append)?$/)) && F.onglets && plage(m[2]) && F.onglets[plage(m[2]).nom]) {
+        const g = plage(m[2]), T = F.onglets[g.nom];
+        if (req.method === 'GET') { const v = T.slice(g.l1 - 1, g.l2).map((r) => (r || []).slice(g.c1, g.c2 + 1)); while (v.length && !v[v.length - 1].some((x) => String(x ?? '') !== '')) v.pop(); return send(res, 200, {range: m[2], majorDimension: 'ROWS', values: v}); }
+        if (m[3]) { for (const r of body.values || []) T.push(r); return send(res, 200, {updates: {updatedRange: g.nom + '!A' + T.length + ':H' + T.length, updatedRows: (body.values || []).length}}); }
+        (body.values || []).forEach((r, i) => { const l = g.l1 - 1 + i; while (T.length <= l) T.push([]); r.forEach((x, k) => { while (T[l].length < g.c1 + k) T[l].push(''); T[l][g.c1 + k] = x; }); });
+        return send(res, 200, {updatedRange: m[2], updatedCells: 1});
+      }
       if ((m = p.match(/^\/sheets\/v4\/spreadsheets\/([^/]+)\/values\/(.+?)(:append)?$/))) {
         if (req.method === 'GET') return send(res, 200, {range: m[2], majorDimension: 'ROWS', values: F.sheet[m[2]] || []});
         if (m[3]) { F.appends = F.appends || []; F.appends.push({range: m[2], values: body.values || []}); const row = 100 + F.appends.length; return send(res, 200, {updates: {updatedRange: m[2].split('!')[0] + '!A' + row + ':H' + row, updatedRows: (body.values || []).length}}); }
         return send(res, 200, {updatedRange: m[2], updatedCells: 1});
       }
+      if (p === '/calendar/users/me/calendarList') return send(res, 200, {items: F.calendriers});
       if ((m = p.match(/^\/calendar\/calendars\/([^/]+)\/events(?:\/([^/]+))?$/))) {
         const list = (F.events[m[1]] = F.events[m[1]] || []);
         if (!m[2] && req.method === 'GET') return send(res, 200, {items: list, summary: m[1], timeZone: 'Europe/Paris'});
@@ -65,9 +82,11 @@ export function startFakeGoogle() {
       if (p === '/gmail/users/me/threads' && /\(facture OR /.test(q.q || '')) return send(res, 200, {threads: Object.keys(F.radar).map((id) => ({id})), resultSizeEstimate: Object.keys(F.radar).length});   /* la requête du Radar */
       if (p === '/gmail/users/me/threads' && /"JARVIS Voix" OR \(subject:\(budget OR budgétaire\) Cloud\)/.test(q.q || '')) return send(res, 200, (F.budget || []).length ? {threads: F.budget.map((id) => ({id})), resultSizeEstimate: F.budget.length} : {resultSizeEstimate: 0});   /* 0.48.0 : alertes de budget de Google Cloud */
       if (p === '/gmail/users/me/threads') return send(res, 200, /in:sent/.test(q.q || '') ? {resultSizeEstimate: 0} : {threads: [{id: 'th1'}], resultSizeEstimate: 1});
+      if ((m = p.match(/^\/gmail\/users\/me\/threads\/([^/]+)$/)) && F.fils[m[1]]) return send(res, 200, {id: m[1], messages: F.fils[m[1]]});
       if ((m = p.match(/^\/gmail\/users\/me\/threads\/([^/]+)$/)) && F.radar[m[1]]) { const r = F.radar[m[1]], {text, ...meta} = r, msg = {...meta, id: 'm' + m[1]}; return send(res, 200, {id: m[1], messages: [q.format === 'full' ? full(msg, text) : msg]}); }
       if ((m = p.match(/^\/gmail\/users\/me\/threads\/([^/]+)$/))) return send(res, 200, {id: m[1], messages: [q.format === 'full' ? full(msgMeta('m1', m[1]), "Bonjour,\nL'expert passera mardi à 10h. Merci de confirmer.") : msgMeta('m1', m[1])]});
       if ((m = p.match(/^\/gmail\/users\/me\/threads\/([^/]+)\/modify$/))) return send(res, 200, {id: m[1]});
+      if (p === '/gmail/users/me/drafts' && req.method === 'POST') { const n = F.brouillons.push({raw: (body.message || {}).raw || '', threadId: (body.message || {}).threadId || ''}); return send(res, 200, {id: 'r-neuf' + n, message: {id: 'mb' + n, threadId: (body.message || {}).threadId || 'tb' + n, labelIds: ['DRAFT']}}); }
       if (p === '/gmail/users/me/drafts' && req.method === 'GET') return send(res, 200, {drafts: [{id: 'r-1', message: {id: 'm9', threadId: 'th9'}}]});
       if ((m = p.match(/^\/gmail\/users\/me\/drafts\/([^/]+)$/))) {
         if (req.method === 'DELETE') return send(res, 204);

@@ -79,10 +79,20 @@ function mailMsg(m, withBody) {
   if (withBody) { o.plaintextBody = textOf(m.payload); o.attachments = piecesDe(m.payload); }
   return o;
 }
-const encWord = (s) => /^[\x20-\x7e]*$/.test(s) ? s : '=?UTF-8?B?' + Buffer.from(s, 'utf8').toString('base64') + '?=';
-function rawMail({to, cc, subject, body}) {
+/* un objet hors ASCII : mots encodés UTF-8 (RFC 2047). 0.71.0 : un objet long est coupé en mots de 45 octets au plus, jamais au milieu
+   d'un caractère, chacun sur sa ligne repliée (un mot encodé ne dépasse pas 75 caractères) */
+const encWord = (s) => {
+  if (/^[\x20-\x7e]*$/.test(s)) return s;
+  const mots = []; let lot = '';
+  for (const c of s) { if (lot && Buffer.byteLength(lot + c, 'utf8') > 45) { mots.push(lot); lot = ''; } lot += c; }
+  if (lot) mots.push(lot);
+  return mots.map((m) => '=?UTF-8?B?' + Buffer.from(m, 'utf8').toString('base64') + '?=').join('\r\n ');
+};
+const uneLigne = (v) => String(v || '').replace(/[\r\n]+/g, ' ').trim();
+function rawMail({to, cc, subject, body, inReplyTo, references}) {
   const L = ['To: ' + [].concat(to || []).join(', ')];
   if (cc && [].concat(cc).length) L.push('Cc: ' + [].concat(cc).join(', '));
+  if (inReplyTo) L.push('In-Reply-To: ' + uneLigne(inReplyTo), 'References: ' + uneLigne((references ? references + ' ' : '') + inReplyTo));   /* 0.71.0 : un brouillon de réponse reste dans son fil */
   L.push('Subject: ' + encWord(String(subject || '')), 'MIME-Version: 1.0', 'Content-Type: text/plain; charset=UTF-8', 'Content-Transfer-Encoding: base64', '', Buffer.from(String(body || ''), 'utf8').toString('base64'));
   return b64u(L.join('\r\n'));
 }
@@ -210,7 +220,9 @@ export function createGoogle({S, save, log = () => {}}) {
         }
         return api('PATCH', base + '?sendUpdates=none', b);
       },
-      delete_event: (i) => api('DELETE', `${URLS.cal}/calendars/${enc(i.calendarId || 'primary')}/events/${enc(i.eventId)}?sendUpdates=none`)
+      delete_event: (i) => api('DELETE', `${URLS.cal}/calendars/${enc(i.calendarId || 'primary')}/events/${enc(i.eventId)}?sendUpdates=none`),
+      /* 0.71.0 : ses agendas (lecture seule), pour en choisir un par son nom */
+      list_calendars: async () => { const j = await api('GET', `${URLS.cal}/users/me/calendarList?maxResults=250`); return {calendars: (j.items || []).map((c) => ({id: c.id, summary: c.summaryOverride || c.summary || '', primary: !!c.primary, accessRole: c.accessRole || ''}))}; }
     },
     Gmail: {
       search_threads: async (i) => {
@@ -233,6 +245,16 @@ export function createGoogle({S, save, log = () => {}}) {
         return {drafts};
       },
       send_message: (i) => i.draftId ? api('POST', `${URLS.gmail}/users/me/drafts/send`, {id: i.draftId}) : api('POST', `${URLS.gmail}/users/me/messages/send`, {raw: rawMail(i)}),
+      /* 0.71.0 : un brouillon (jamais un envoi). Avec threadId, il répond dans ce fil : identifiant du dernier message lu pour In-Reply-To */
+      create_draft: async (i) => {
+        let suite = {};
+        if (i.threadId) {
+          try { const x = await api('GET', `${URLS.gmail}/users/me/threads/${enc(i.threadId)}?format=metadata&metadataHeaders=Message-ID&metadataHeaders=References`), d = (x.messages || []).slice(-1)[0];
+            if (d && hdr(d, 'Message-ID')) suite = {inReplyTo: hdr(d, 'Message-ID'), references: hdr(d, 'References')}; } catch { /* sans ces en-têtes, Gmail range quand même le brouillon dans le fil */ }
+        }
+        const x = await api('POST', `${URLS.gmail}/users/me/drafts`, {message: {raw: rawMail({...i, ...suite}), ...(i.threadId ? {threadId: String(i.threadId)} : {})}}), m = x.message || {};
+        return {id: x.id || '', messageId: m.id || '', threadId: m.threadId || '', viewUrl: m.id ? 'https://mail.google.com/mail/#drafts?compose=' + m.id : ''};
+      },
       delete_draft: (i) => api('DELETE', `${URLS.gmail}/users/me/drafts/${enc(i.draftId)}`),
       unlabel_thread: (i) => api('POST', `${URLS.gmail}/users/me/threads/${enc(i.threadId)}/modify`, {removeLabelIds: [].concat(i.labelIds || [])})
     },
