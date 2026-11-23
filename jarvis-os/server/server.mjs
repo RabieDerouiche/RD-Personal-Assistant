@@ -26,10 +26,10 @@ import {createFlux, SECOURS} from './flux.mjs';
 import {createActivite, outilNom} from './activite.mjs';
 import {createRadar} from './radar.mjs';
 import {pique, PERSO_ORAL} from './humour.mjs';   /* 21/11/2026 : sa personnalité à l'oral (« sarcastique assumé ») */
-import {createAudio} from './audio.mjs';   /* 0.64.0 : le message vocal d'un proche, mis au format de l'écoute */
+import {createAudio, typeSon, silence} from './audio.mjs';   /* 0.64.0 : le message vocal d'un proche, mis au format de l'écoute */
 const ACT = createActivite();   /* 0.33.0 : ce que fait Claude à l'instant */
 
-const VERSION = '0.66.0';
+const VERSION = '0.67.0';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PORT = +(process.env.PORT || 8787);
 const HOST = process.env.HOST || '127.0.0.1';
@@ -148,9 +148,20 @@ async function tachesPilotage() {
 }
 /* une tâche pas encore écrite (Google pas relié, panne) : réessayée toutes les 5 minutes pendant 7 jours ; un message vocal est effacé au bout de 7 jours */
 const VOCAUX = path.join(DATA, 'invites');
+/* 0.67.0 : son message vocal est gardé tel qu'elle l'a envoyé (m4a, caf, wav…), pas réencodé : `tc.fichier`, `tc.mime` ; avant, un WAV 16 kHz */
+const fichierDe = (tc) => path.join(VOCAUX, tc.fichier || tc.id + '.wav'), mimeDe = (tc) => tc.mime || 'audio/wav';
+const effacerSon = (tc) => { fs.rm(fichierDe(tc), {force: true}, () => {}); delete tc.vocal; tc.vocalEfface = true; };
+function garderSon(tc, raw, type) {
+  fs.mkdirSync(VOCAUX, {recursive: true, mode: 0o700}); tc.fichier = tc.id + '.' + type.ext; tc.mime = type.mime;
+  fs.writeFileSync(fichierDe(tc), raw, {mode: 0o600});
+  /* 50 messages vocaux gardés au plus : une clé perdue ne remplit pas le disque */
+  const vs = (S.invTaches || []).filter((x) => x.vocal); for (const old of vs.slice(0, Math.max(0, vs.length - 50))) effacerSon(old);
+  save();
+}
+const envoyerSon = (res, tc) => { res.writeHead(200, {'content-type': mimeDe(tc), 'content-length': fs.statSync(fichierDe(tc)).size, 'content-disposition': 'inline; filename="message-vocal.' + (tc.fichier || 'x.wav').split('.').pop() + '"', 'cache-control': 'no-store'}); fs.createReadStream(fichierDe(tc)).pipe(res); };
 setInterval(() => {
   for (const tc of (S.invTaches || []).filter((x) => x.row === null && now() - x.at < 7 * 864e5)) ecrireTacheInvitee(tc).catch(() => {});
-  let chg = false; for (const tc of (S.invTaches || []).filter((x) => x.vocal && now() - x.at > 7 * 864e5)) { fs.rm(path.join(VOCAUX, tc.id + '.wav'), {force: true}, () => {}); delete tc.vocal; tc.vocalEfface = true; chg = true; }
+  let chg = false; for (const tc of (S.invTaches || []).filter((x) => x.vocal && now() - x.at > 7 * 864e5)) { effacerSon(tc); chg = true; }
   if (chg) save();
 }, 300000).unref();
 
@@ -171,6 +182,8 @@ function statutDe(tc, rows, inv) {
   return tc.row === null ? 'Pas encore arrivée' : 'À faire';
 }
 const urgente = (pour) => !pour || pour <= paris(new Date(now())).ymd;
+/* 0.67.0 : le titre d'un message vocal (jamais sa transcription) : son heure et sa durée, pour le retrouver dans Pilotage */
+const titreVocal = (nom, duree) => { const p = paris(new Date(now())); return 'Message vocal de ' + nom + ', ' + String(p.hm || '').replace(':', 'h') + (duree ? ' (' + Math.max(1, Math.round(duree)) + ' s)' : ''); };
 function nouvelleTacheInvitee(inv, texte, pour, extra = {}) {
   const tc = {id: crypto.randomBytes(6).toString('hex'), inv: inv.id, texte, ...(pour ? {pour} : {}), at: now(), row: null, ...extra};
   if (urgente(pour) && S.invRappels !== false) tc.rappel = {restants: RAPPEL_FOIS, prochain: now() + RAPPEL_MS, n: 0};
@@ -181,7 +194,8 @@ function nouvelleTacheInvitee(inv, texte, pour, extra = {}) {
 function pousserInvitee(tc, inv) {
   if (!(S.push && S.push.subs.length)) return;
   const n = tc.rappel ? tc.rappel.n : 0, min = Math.max(1, Math.round((now() - tc.at) / 60000)), pour = tc.pour ? ' (' + pourQuand(tc.pour) + ')' : '';
-  PUSH.send({title: (n ? 'Rappel : ' + (tc.vocal ? 'message vocal de ' : 'tâche de ') : tc.vocal ? 'Message vocal de ' : 'Tâche de ') + inv.nom, body: tc.texte + pour + (n ? ' — envoyée il y a ' + min + ' min' : ''), url: '/#recue=' + tc.id, tag: 'invite-' + tc.id + (n ? '-' + n : '')}, {urgency: 'high'}).catch(() => {});
+  const corps = tc.vocal ? (tc.duree ? Math.max(1, Math.round(tc.duree)) + ' s · ' : '') + 'touche pour l’écouter' : tc.texte;   /* 0.67.0 : sa voix, jamais un texte qui la remplace */
+  PUSH.send({title: (n ? 'Rappel : ' + (tc.vocal ? 'message vocal de ' : 'tâche de ') : tc.vocal ? 'Message vocal de ' : 'Tâche de ') + inv.nom, body: corps + pour + (n ? ' — envoyé' + (tc.vocal ? '' : 'e') + ' il y a ' + min + ' min' : ''), url: '/#recue=' + tc.id, tag: 'invite-' + tc.id + (n ? '-' + n : '')}, {urgency: 'high'}).catch(() => {});
 }
 let rappelsEnCours = false;   /* une relecture lente de Pilotage ne doit pas faire partir deux fois le même rappel */
 async function rappelsInvites() {
@@ -1460,10 +1474,40 @@ const server = http.createServer(async (req, res) => {
        avec la clé de son Raccourci : « Obtenir le contenu de l'URL », puis « Lire le son » ; JARVIS fermé, il entend sa voix */
     if (p === '/api/raccourci/vocal' && req.method === 'GET') {
       if (!racOk(req) && !authed(req)) { res.writeHead(401, {'content-type': 'text/plain; charset=utf-8'}); res.end('Clé du Raccourci refusée : recrée-la dans JARVIS, Réglages, Siri et bouton Action.'); return; }
-      const tc = (S.invTaches || []).filter((x) => x.vocal && now() - x.at < 15 * 60000).pop(), f = tc && path.join(VOCAUX, tc.id + '.wav');
-      if (!f || !fs.existsSync(f)) { res.writeHead(404, {'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store'}); res.end('Aucun message vocal depuis 15 minutes.'); return; }
-      tc.ecoute = tc.ecoute || now(); save();
-      res.writeHead(200, {'content-type': 'audio/wav', 'content-length': fs.statSync(f).size, 'content-disposition': 'inline; filename="message-vocal.wav"', 'cache-control': 'no-store'}); fs.createReadStream(f).pipe(res); return;
+      const tc = (S.invTaches || []).filter((x) => x.vocal && now() - x.at < 15 * 60000).pop();
+      if (!tc || !fs.existsSync(fichierDe(tc))) { res.writeHead(404, {'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store'}); res.end('Aucun message vocal depuis 15 minutes.'); return; }
+      tc.ecoute = tc.ecoute || now(); save(); envoyerSon(res, tc); return;
+    }
+    /* 0.67.0 (sa demande du 23/11/2026 : « Siri doit marcher téléphone verrouillé, deal breaker » ; « on transmet l'audio tel qu'il est, peu importe la
+       langue ») : elle envoie un message audio de Messages (« Dis Siri, envoie un message audio à … », possible téléphone verrouillé) ; son
+       automatisation (« quand je reçois un message de … », exécution immédiate) poste ce message ici avec la clé de son Raccourci, puis « Lire le son »
+       avec la réponse. Un son : gardé tel quel, une tâche « Message vocal de … » avec ses rappels, et la réponse est ce même son (il l'entend aussitôt).
+       « 🔔 » (son raccourci JARVIS) : son dernier message vocal de moins de 15 minutes. Un autre texte (leurs messages de tous les jours) : ignoré, pas
+       gardé, et la réponse est un silence (aucune erreur dans son automatisation). */
+    if (p === '/api/raccourci/message' && req.method === 'POST') {
+      if (!racOk(req) && !authed(req)) { req.resume(); res.writeHead(401, {'content-type': 'text/plain; charset=utf-8'}); res.end('Clé du Raccourci refusée : recrée-la dans JARVIS, Réglages, Siri et bouton Action.'); return; }
+      const raw = await readRaw(req, 25e6), de = nrm(String(url.searchParams.get('de') || '')), invs = S.invites || [];
+      const inv = de ? invs.find((x) => nrm(x.nom) === de) : invs.length === 1 ? invs[0] : null;
+      const rien = () => { const w = silence(); res.writeHead(200, {'content-type': 'audio/wav', 'content-length': w.length, 'cache-control': 'no-store'}); res.end(w); };
+      if (!raw || !inv) return rien();
+      const type = typeSon(raw);
+      if (!type) {
+        if (!/🔔/u.test(raw.subarray(0, 400).toString('utf8'))) return rien();
+        const tc = (S.invTaches || []).filter((x) => x.inv === inv.id && x.vocal && now() - x.at < 15 * 60000).pop();
+        if (!tc || !fs.existsSync(fichierDe(tc))) return rien();
+        tc.ecoute = tc.ecoute || now(); save(); return envoyerSon(res, tc);
+      }
+      S.usage.messagesAudio = (S.usage.messagesAudio || 0) + 1;
+      if (S.invAudioTache !== false) {
+        inv.recents = (inv.recents || []).filter((x) => now() - x < 3600000);
+        if (inv.recents.length < 30) {
+          inv.recents.push(now()); inv.uses = (inv.uses || 0) + 1; inv.last = now();
+          const a = await AUDIO.versWav16k(raw).catch(() => null), duree = a ? Math.round(a.duree * 10) / 10 : 0;
+          const tc = nouvelleTacheInvitee(inv, titreVocal(inv.nom, duree), null, {vocal: true, ...(duree ? {duree} : {}), source: 'messages', ecoute: now()});
+          garderSon(tc, raw, type); await ecrireTacheInvitee(tc); tachesCache.at = 0; pousserInvitee(tc, inv);
+        }
+      }
+      res.writeHead(200, {'content-type': type.mime, 'content-length': raw.length, 'content-disposition': 'inline; filename="message-vocal.' + type.ext + '"', 'cache-control': 'no-store'}); res.end(raw); return;
     }
     /* Raccourcis de l'iPhone : leur propre clé (POST /api/raccourci/cle depuis Réglages), qui n'ouvre que cette adresse ; réponse en texte, à lire à voix haute */
     if (p === '/api/raccourci' && req.method === 'POST') {
@@ -1500,15 +1544,14 @@ const server = http.createServer(async (req, res) => {
       inv.recents = (inv.recents || []).filter((x) => now() - x < 3600000); if (inv.recents.length >= 30) { req.resume(); return say(429, 'Trop de tâches en une heure : réessaie plus tard.'); }
       let texte = '', pour = null, extra = {}, son = null;
       if (p === '/api/invite/vocal') {
-        /* 0.64.0 : sa voix (le fichier du raccourci « Enregistrer de l'audio », ou de sa page) → WAV 16 kHz gardé ici, puis transcrit pour le texte */
-        const raw = await readRaw(req, 25e6); if (!raw || raw.length < 64) return say(raw ? 400 : 413, raw ? "Je n'ai rien reçu : réessaie." : 'Message trop long : 90 secondes au plus.');
-        const a = await AUDIO.versWav16k(raw);
-        if (!a) return say(415, (await AUDIO.m4a()) ? 'Son illisible : réenregistre ton message.' : 'Le serveur ne lit pas ce format : dans ton raccourci, ajoute « Encoder le média » (audio seulement, AIFF) juste avant l’envoi.');
-        if (a.duree < 0.4) return say(400, 'Message trop court : réessaie.');
-        son = a.wav; extra = {vocal: true, duree: Math.round(a.duree * 10) / 10};
-        if (ECOUTE.ready()) { const t = await Promise.race([ECOUTE.transcribe(a.wav, path.join(DATA, 'stt')), new Promise((z) => setTimeout(() => z({ok: false}), 25000))]); if (t.ok) { texte = String(t.text || '').replace(/[\u0000-\u001f\u007f]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 200); S.usage.stt = (S.usage.stt || 0) + 1; } }
-        if (texte.length < 2) texte = 'Message vocal de ' + inv.nom + ' (' + Math.max(1, Math.round(a.duree)) + ' s)'; else extra.transcrit = true;
-        pour = datePour(extra.transcrit ? texte : '');
+        /* 0.64.0 : sa voix (le fichier du raccourci « Enregistrer de l'audio », ou de sa page). 0.67.0 (« on ne traduit pas le message, on le transmet
+           en audio tel qu'il est, peu importe la langue ») : gardée telle quelle, jamais transcrite ; la durée seulement, si le serveur sait la lire */
+        const raw = await readRaw(req, 25e6); if (!raw || raw.length < 64) return say(raw ? 400 : 413, raw ? "Je n'ai rien reçu : réessaie." : 'Message trop long.');
+        const type = typeSon(raw); if (!type) return say(415, 'Son illisible : réenregistre ton message.');
+        const a = await AUDIO.versWav16k(raw).catch(() => null);
+        if (a && a.duree < 0.4) return say(400, 'Message trop court : réessaie.');
+        son = {raw, type}; extra = {vocal: true, ...(a ? {duree: Math.round(a.duree * 10) / 10} : {})};
+        texte = titreVocal(inv.nom, a ? a.duree : 0);
       } else {
         const b = await readBody(req).catch(() => ({})); texte = String((b && (b.texte || b.text)) || '').replace(/[\u0000-\u001f\u007f]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 200);
         if (texte.length < 2) return say(400, "Je n'ai rien entendu : redis ta tâche.");
@@ -1516,17 +1559,11 @@ const server = http.createServer(async (req, res) => {
       }
       inv.recents.push(now()); inv.uses = (inv.uses || 0) + 1; inv.last = now();
       const tc = nouvelleTacheInvitee(inv, texte, pour, extra);
-      if (son) {
-        fs.mkdirSync(VOCAUX, {recursive: true, mode: 0o700}); fs.writeFileSync(path.join(VOCAUX, tc.id + '.wav'), son, {mode: 0o600});
-        /* 50 messages vocaux gardés au plus (3 Mo chacun au plus) : une clé perdue ne remplit pas le disque */
-        const vs = (S.invTaches || []).filter((x) => x.vocal); for (const old of vs.slice(0, Math.max(0, vs.length - 50))) { fs.rm(path.join(VOCAUX, old.id + '.wav'), {force: true}, () => {}); delete old.vocal; old.vocalEfface = true; }
-        save();
-      }
+      if (son) garderSon(tc, son.raw, son.type);
       await ecrireTacheInvitee(tc); tachesCache.at = 0;
       pousserInvitee(tc, inv);
       const quand = pour ? ', ' + pourQuand(pour) : '';
-      /* la même phrase sert à Siri (lue à elle) et au message qu'elle lui envoie ensuite (« 🔔 » + cette phrase) */
-      return say(200, extra.vocal ? (extra.transcrit ? 'Message vocal envoyé : « ' + texte + ' »' + quand + '.' : 'Message vocal envoyé.') : 'C’est noté : « ' + texte + ' »' + quand + '.');
+      return say(200, extra.vocal ? 'Message vocal envoyé.' : 'C’est noté : « ' + texte + ' »' + quand + '.');
     }
     if (p === '/api/invite/taches' && req.method === 'GET') {
       const inv = inviteDe(req); if (!inv) return json(res, 401, {error: 'Clé refusée : demande une nouvelle invitation.'});
@@ -1652,17 +1689,18 @@ const server = http.createServer(async (req, res) => {
       if (p === '/api/raccourci/cle' && req.method === 'POST') { const k = crypto.randomBytes(24).toString('base64url'); S.raccourci = {hash: sha(k), at: now(), uses: 0}; save(); return json(res, 200, {cle: k, url: publicBase(req) + '/api/raccourci'}); }
       if (p === '/api/raccourci/retirer' && req.method === 'POST') { S.raccourci = null; save(); return json(res, 200, {ok: true}); }
       /* 0.62.0 : ses invitations : créer (la clé n'est montrée qu'une fois, dans le lien), lister, retirer */
-      if (p === '/api/invites' && req.method === 'GET') return json(res, 200, {rappels: S.invRappels !== false, m4a: await AUDIO.m4a(), invites: (S.invites || []).map((x) => ({id: x.id, nom: x.nom, at: x.at, uses: x.uses || 0, last: x.last || 0, taches: (S.invTaches || []).filter((y) => y.inv === x.id).length}))});
-      if (p === '/api/invites/reglages' && req.method === 'POST') { const b = await readBody(req); if (typeof b.rappels === 'boolean') { S.invRappels = b.rappels; if (!b.rappels) for (const tc of S.invTaches || []) delete tc.rappel; save(); } return json(res, 200, {rappels: S.invRappels !== false}); }
+      if (p === '/api/invites' && req.method === 'GET') return json(res, 200, {rappels: S.invRappels !== false, audioTache: S.invAudioTache !== false, m4a: await AUDIO.m4a(), invites: (S.invites || []).map((x) => ({id: x.id, nom: x.nom, at: x.at, uses: x.uses || 0, last: x.last || 0, taches: (S.invTaches || []).filter((y) => y.inv === x.id).length}))});
+      if (p === '/api/invites/reglages' && req.method === 'POST') { const b = await readBody(req); if (typeof b.rappels === 'boolean') { S.invRappels = b.rappels; if (!b.rappels) for (const tc of S.invTaches || []) delete tc.rappel; save(); }
+        if (typeof b.audioTache === 'boolean') { S.invAudioTache = b.audioTache; save(); } return json(res, 200, {rappels: S.invRappels !== false, audioTache: S.invAudioTache !== false}); }
       /* 0.64.0 : ce qu'elle a envoyé depuis 48 heures (la page le lit toutes les 15 secondes quand elle est ouverte : rien n'est lu dans Pilotage ici) */
       if (p === '/api/invites/recues' && req.method === 'GET') {
         const nomDe = (id) => ((S.invites || []).find((y) => y.id === id) || {}).nom || '';
-        return json(res, 200, {rappels: S.invRappels !== false, recues: (S.invTaches || []).filter((x) => now() - x.at < 48 * 3600e3).slice(-30).reverse().map((x) => ({id: x.id, nom: nomDe(x.inv), texte: x.texte, pour: x.pour || '', at: x.at, vocal: !!x.vocal, duree: x.duree || 0, fait: !!x.fait, ecoute: x.ecoute || 0,
+        return json(res, 200, {rappels: S.invRappels !== false, recues: (S.invTaches || []).filter((x) => now() - x.at < 48 * 3600e3).slice(-30).reverse().map((x) => ({id: x.id, nom: nomDe(x.inv), texte: x.texte, pour: x.pour || '', at: x.at, vocal: !!x.vocal, duree: x.duree || 0, fait: !!x.fait, ecoute: x.ecoute || 0, ...(x.source ? {source: x.source} : {}),
           rappel: x.rappel && !x.fait && x.rappel.restants > 0 ? {prochain: x.rappel.prochain, restants: x.rappel.restants} : null}))});
       }
       { const ma = p.match(/^\/api\/invites\/audio\/([a-f0-9]{12})$/); if (ma && req.method === 'GET') {
-        const f = path.join(VOCAUX, ma[1] + '.wav'); if (!fs.existsSync(f)) return json(res, 404, {error: 'Message vocal effacé (gardé 7 jours).'});
-        res.writeHead(200, {'content-type': 'audio/wav', 'content-length': fs.statSync(f).size, 'cache-control': 'private, max-age=604800'}); fs.createReadStream(f).pipe(res); return; } }
+        const tc = (S.invTaches || []).find((x) => x.id === ma[1]); if (!tc || !tc.vocal || !fs.existsSync(fichierDe(tc))) return json(res, 404, {error: 'Message vocal effacé (gardé 7 jours).'});
+        res.writeHead(200, {'content-type': mimeDe(tc), 'content-length': fs.statSync(fichierDe(tc)).size, 'cache-control': 'private, max-age=604800'}); fs.createReadStream(fichierDe(tc)).pipe(res); return; } }
       { const mr = p.match(/^\/api\/invites\/recues\/([a-f0-9]{12})$/); if (mr && req.method === 'POST') {
         const tc = (S.invTaches || []).find((x) => x.id === mr[1]); if (!tc) return json(res, 404, {error: 'Tâche introuvable.'});
         const b = await readBody(req).catch(() => ({})), inv = (S.invites || []).find((x) => x.id === tc.inv);
@@ -1682,7 +1720,7 @@ const server = http.createServer(async (req, res) => {
         const k = crypto.randomBytes(24).toString('base64url'), x = {id: crypto.randomBytes(5).toString('hex'), nom, hash: sha(k), at: now(), uses: 0}; S.invites = [...(S.invites || []), x]; save();
         return json(res, 200, {id: x.id, nom, cle: k, url: publicBase(req) + '/api/invite/tache', lien: publicBase(req) + '/invite/#cle=' + k});
       }
-      { const mi = p.match(/^\/api\/invites\/([a-f0-9]{6,20})$/); if (mi && req.method === 'DELETE') { S.invites = (S.invites || []).filter((x) => x.id !== mi[1]); for (const tc of (S.invTaches || []).filter((x) => x.inv === mi[1])) { delete tc.rappel; if (tc.vocal) { fs.rm(path.join(VOCAUX, tc.id + '.wav'), {force: true}, () => {}); delete tc.vocal; tc.vocalEfface = true; } } save(); return json(res, 200, {ok: true}); } }   /* 0.64.0 : ses messages vocaux sont effacés avec l'accès */
+      { const mi = p.match(/^\/api\/invites\/([a-f0-9]{6,20})$/); if (mi && req.method === 'DELETE') { S.invites = (S.invites || []).filter((x) => x.id !== mi[1]); for (const tc of (S.invTaches || []).filter((x) => x.inv === mi[1])) { delete tc.rappel; if (tc.vocal) effacerSon(tc); } save(); return json(res, 200, {ok: true}); } }   /* 0.64.0 : ses messages vocaux sont effacés avec l'accès */
       if (p === '/api/raccourci/etat') return json(res, 200, {active: !!S.raccourci, at: S.raccourci && S.raccourci.at, uses: (S.raccourci && S.raccourci.uses) || 0, last: S.raccourci && S.raccourci.last, url: publicBase(req) + '/api/raccourci'});
       if (p === '/api/push/subscribe' && req.method === 'POST') { const b = await readBody(req); const r = PUSH.subscribe(b.subscription, deviceOf(req), 'https://' + String(req.headers.host || 'jarvis.invalid').split(':')[0]);   /* sujet VAPID : toujours une adresse https (Apple refuse un sujet http) */ if (r.ok) NOTIFY.tick({only: 'canal', force: true}).catch(() => {}); return json(res, r.ok ? 200 : 400, r); }
       if (p === '/api/push/unsubscribe' && req.method === 'POST') { const b = await readBody(req); return json(res, 200, PUSH.unsubscribe(String(b.endpoint || ''))); }

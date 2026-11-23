@@ -10,7 +10,9 @@
 <!-- JARVIS OS 0.62.0 (son choix du 22/11/2026) : la page d'un proche invité. Sa clé (dans le lien d'invitation, puis gardée dans ce
      téléphone) n'ouvre que trois adresses du serveur : ajouter une tâche, envoyer un message vocal (0.64.0), voir le statut des siennes.
      Rien d'autre de JARVIS n'est lisible ici. 0.64.0 (ses choix du 22/11/2026) : « sa propre voix » ; il l'entend dès qu'il ouvre JARVIS,
-     une notification part, puis un rappel toutes les 5 minutes jusqu'à « C'est fait ». -->
+     une notification part, puis un rappel toutes les 5 minutes jusqu'à « C'est fait ». 0.67.0 (ses retours du 23/11/2026 : Siri doit marcher
+     téléphone verrouillé ; sa voix doit arriver telle quelle, jamais transcrite, quelle que soit la langue) : d'abord le message audio de Messages
+     par Siri ; la dictée écrite par Siri est retirée ; le raccourci JARVIS reste, téléphone déverrouillé. -->
 <style>
   :root { --bg: #f5f6fa; --carte: #ffffff; --texte: #141826; --doux: #5b6478; --ligne: #e2e5ee; --accent: #2f6fed; --ok: #1f9d55; --attente: #b7791f; --rayon: 16px; color-scheme: light dark; }
   @media (prefers-color-scheme: dark) { :root { --bg: #0b1020; --carte: #141a2e; --texte: #e8eefc; --doux: #9fb0d0; --ligne: #26304d; --accent: #7cc4ff; --ok: #4ade80; --attente: #fbbf24; } }
@@ -54,6 +56,11 @@
 <body>
 <main>
   <header><h1 id="titre">Envoyer une tâche</h1><p class="sous" id="sous">Elle arrive tout de suite dans ses tâches, avec une notification.</p></header>
+  <section class="carte" id="siri-audio" hidden>
+    <h2>Avec Siri, même téléphone verrouillé</h2>
+    <p style="margin:0 0 8px">Dis : <b>« Dis Siri, envoie un message audio à <span id="adest">lui</span> »</b>, puis parle. Il reçoit ta voix telle quelle, dans la langue que tu veux, et son iPhone la joue tout de suite.</p>
+    <p class="sous" style="margin:0">Une fois, si Siri te demande de déverrouiller (noms des menus devinés) : Réglages, Siri, active « Autoriser Siri en mode verrouillé » ; puis Réglages, Face ID et code, « Autoriser l’accès en mode verrouillé » : active Siri.</p>
+  </section>
   <section class="carte" id="sans-cle" hidden><p>Ouvre le lien d’invitation que tu as reçu : il contient ta clé. Sans lui, cette page ne peut rien envoyer.</p></section>
   <section class="carte" id="envoi" hidden>
     <form id="form">
@@ -65,39 +72,23 @@
   </section>
   <section class="carte" id="vocal" hidden>
     <h2>Message vocal</h2>
-    <p class="sous" style="margin:0 0 10px">Il l’entend avec ta voix dès qu’il ouvre JARVIS ; une notification part, puis un rappel toutes les 5 minutes jusqu’à ce que ce soit fait.</p>
+    <p class="sous" style="margin:0 0 10px">Depuis cette page. Il l’entend avec ta voix, telle quelle ; une notification part, puis un rappel toutes les 5 minutes jusqu’à ce que ce soit fait.</p>
     <div class="micro"><button type="button" id="enr">🎤 Enregistrer</button><button type="button" class="discret" id="annuler" hidden>Annuler</button><span class="chrono" id="chrono"></span></div>
     <p class="msg" id="msg3" role="status"></p>
   </section>
   <section class="carte" id="liste-c" hidden><h2>Tes tâches envoyées</h2><ul id="liste"></ul><p class="vide" id="vide" hidden>Rien d’envoyé pour l’instant.</p></section>
-  <section class="carte" id="siri" hidden>
-    <details>
-      <summary>Tâche écrite avec Siri : « Dis Siri, <span id="phrase">tâche pour lui</span> »</summary>
-      <p class="sous" style="margin-top:8px">Une fois, dans l’app Raccourcis de ton iPhone (noms des menus devinés, ils peuvent varier un peu) :</p>
-      <ol>
-        <li>Touche « + », puis nomme le raccourci « <b id="nomrac">Tâche pour lui</b> » : c’est la phrase à dire à Siri.</li>
-        <li>Ajoute l’action « Dicter le texte » (langue : français).</li>
-        <li>Ajoute « Obtenir le contenu de l’URL », avec l’adresse <code id="url"></code> <button class="discret" type="button" data-copie="url">Copier</button></li>
-        <li>Touche la flèche de cette action : méthode <b>POST</b> ; en-tête <b>Authorization</b> = <code id="cle">Bearer …</code> <button class="discret" type="button" data-copie="cle">Copier</button> ; corps de la requête <b>JSON</b> : un champ texte « texte » = « Texte dicté ».</li>
-        <li>Ajoute « Énoncer le texte » avec « Contenu de l’URL » : Siri te dira « C’est noté ».</li>
-        <li>Essaie : « Dis Siri, <span id="phrase2">tâche pour lui</span> », puis dicte la tâche (« … pour demain » met la date).</li>
-      </ol>
-      <p class="msg" id="msg2" role="status"></p>
-    </details>
-  </section>
   <section class="carte" id="siri-vocal" hidden>
     <details>
-      <summary>Message vocal avec Siri : « Dis Siri, <span id="vphrase">message pour lui</span> »</summary>
+      <summary>Par JARVIS, avec un raccourci (téléphone déverrouillé)</summary>
       <p class="sous" style="margin-top:8px">Une fois, dans l’app Raccourcis (noms des menus devinés, ils peuvent varier un peu) :</p>
       <ol>
         <li>Touche « + », puis nomme le raccourci « <b id="vnomrac">Message pour lui</b> ».</li>
         <li>Ajoute « Enregistrer de l’audio » ; touche la flèche : « Commencer l’enregistrement » = <b>Immédiatement</b> (tu touches l’écran pour arrêter).</li>
-        <li id="v-encoder" hidden>Ajoute « Encoder le média » : active <b>Audio seulement</b>, format <b>AIFF</b> (ton serveur ne lit pas encore le son de l’iPhone tel quel).</li>
         <li>Ajoute « Obtenir le contenu de l’URL », avec l’adresse <code id="vurl"></code> <button class="discret" type="button" data-copie="vurl">Copier</button></li>
-        <li>Touche la flèche de cette action : méthode <b>POST</b> ; en-tête <b>Authorization</b> = <code id="vcle">Bearer …</code> <button class="discret" type="button" data-copie="cle">Copier</button> ; corps de la requête <b>Fichier</b> = « <span id="vfichier">Audio enregistré</span> ».</li>
+        <li>Touche la flèche de cette action : méthode <b>POST</b> ; en-tête <b>Authorization</b> = <code id="vcle">Bearer …</code> <button class="discret" type="button" data-copie="cle">Copier</button> ; corps de la requête <b>Fichier</b> = « Audio enregistré ».</li>
         <li>Ajoute « Énoncer le texte » avec « Contenu de l’URL » : Siri te dira « Message vocal envoyé ».</li>
-        <li>Ajoute « Envoyer un message » : à <b id="vdest">lui</b>, message = « 🔔 » suivi de « Contenu de l’URL » ; touche la flèche et désactive « Afficher lors de l’exécution ». C’est la sonnette : son iPhone joue ta voix même quand JARVIS est fermé.</li>
-        <li>Essaie : « Dis Siri, <span id="vphrase2">message pour lui</span> », parle, puis touche l’écran.</li>
+        <li>Ajoute « Envoyer un message » : à <b id="vdest">lui</b>, message = « 🔔 » seulement ; touche la flèche et désactive « Afficher lors de l’exécution ». C’est la sonnette : son iPhone joue ta voix, telle quelle.</li>
+        <li>Essaie : « Dis Siri, <span id="vphrase2">message pour lui</span> », parle, puis touche l’écran (Siri demande de déverrouiller : c’est pour ça que le message audio de Messages, plus haut, passe en premier).</li>
       </ol>
       <p class="msg" id="msg4" role="status"></p>
     </details>
@@ -113,13 +104,13 @@
   if (h.get('cle')) { ecrire('jarvis.invite.cle', h.get('cle')); if (h.get('pour')) ecrire('jarvis.invite.pour', h.get('pour')); history.replaceState(null, '', location.pathname); }
   const cle = lire('jarvis.invite.cle'), pour = lire('jarvis.invite.pour');
   if (!cle) { $('sans-cle').hidden = false; return; }
-  ['envoi', 'vocal', 'liste-c', 'siri', 'siri-vocal'].forEach((id) => { $(id).hidden = false; });
-  if (pour) { $('titre').textContent = 'Une tâche pour ' + pour; ['phrase', 'phrase2'].forEach((id) => { $(id).textContent = 'tâche pour ' + pour; }); $('nomrac').textContent = 'Tâche pour ' + pour;
-    ['vphrase', 'vphrase2'].forEach((id) => { $(id).textContent = 'message pour ' + pour; }); $('vnomrac').textContent = 'Message pour ' + pour; $('vdest').textContent = pour; }
-  const url = location.origin + '/api/invite/tache', vurl = location.origin + '/api/invite/vocal';
-  $('url').textContent = url; $('vurl').textContent = vurl; $('cle').textContent = 'Bearer ' + cle; $('vcle').textContent = 'Bearer ' + cle;
+  ['siri-audio', 'envoi', 'vocal', 'liste-c', 'siri-vocal'].forEach((id) => { $(id).hidden = false; });
+  if (pour) { $('titre').textContent = 'Une tâche pour ' + pour; $('adest').textContent = pour;
+    $('vphrase2').textContent = 'message pour ' + pour; $('vnomrac').textContent = 'Message pour ' + pour; $('vdest').textContent = pour; }
+  const vurl = location.origin + '/api/invite/vocal';
+  $('vurl').textContent = vurl; $('vcle').textContent = 'Bearer ' + cle;
   document.querySelectorAll('[data-copie]').forEach((b) => b.addEventListener('click', async () => {
-    const v = b.dataset.copie === 'url' ? url : b.dataset.copie === 'vurl' ? vurl : 'Bearer ' + cle, out = b.closest('#siri-vocal') ? $('msg4') : $('msg2');
+    const v = b.dataset.copie === 'vurl' ? vurl : 'Bearer ' + cle, out = $('msg4');
     try { await navigator.clipboard.writeText(v); out.textContent = 'Copié.'; } catch (e) { out.textContent = 'Copie impossible : sélectionne le texte et copie-le.'; }
   }));
   const hdr = {'content-type': 'application/json', authorization: 'Bearer ' + cle};
@@ -129,8 +120,6 @@
       const r = await fetch('/api/invite/taches', {headers: hdr});
       if (r.status === 401) { $('msg').textContent = 'Ton invitation a été retirée : demande-en une nouvelle.'; $('msg').classList.add('erreur'); return; }
       const j = await r.json(), l = (j && j.taches) || [];
-      /* 0.64.0 : le serveur ne lit pas le son de l'iPhone tel quel → une étape de plus dans le raccourci (AIFF) */
-      if (j && j.m4a === false) { $('v-encoder').hidden = false; $('vfichier').textContent = 'Média encodé'; }
       $('liste').replaceChildren(...l.map((x) => { const li = document.createElement('li'), t = document.createElement('span'), s = document.createElement('span');
         t.className = 't'; t.textContent = (x.vocal ? '🎤 ' : '') + x.texte; const sm = document.createElement('small'); sm.textContent = 'envoyée le ' + new Date(x.at).toLocaleDateString('fr-FR', {day: 'numeric', month: 'short'}) + (x.pour ? ' · pour ' + jour(x.pour) : ''); t.append(sm);
         const fait = /^fait/i.test(x.statut); s.className = 'statut' + (fait ? ' fait' : ''); s.textContent = fait ? 'Faite ✓' : x.statut; li.append(t, s); return li; }));

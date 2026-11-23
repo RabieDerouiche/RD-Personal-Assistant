@@ -4,7 +4,7 @@
    AIFF gros-boutiste (« Encoder le média » de l'iPhone), AIFF-C « sowt » et « fl32 » ; un fichier qui n'est pas du son est refusé ;
    le Python de l'écoute (PyAV) est essayé s'il est là (sinon : signalé, pas un échec). */
 import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path'; import {fileURLToPath} from 'node:url'; import {spawnSync} from 'node:child_process';
-import {createAudio} from '../audio.mjs';
+import {createAudio, typeSon, silence} from '../audio.mjs';
 const HERE = path.dirname(fileURLToPath(import.meta.url)), TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'jarvis-audio-'));
 let fails = 0; const ok = (n, c, i) => { console.log((c ? 'OK    ' : 'ÉCHEC ') + n + (i ? ' :: ' + i : '')); if (!c) fails++; };
 const FR = 44100, N = FR, la = (i, fr = FR) => Math.sin(2 * Math.PI * 440 * i / fr) * 0.5;
@@ -38,6 +38,11 @@ for (const [nom, buf] of [['WAV 16 bits stéréo 44,1 kHz', wav({})], ['WAV 24 b
 { const long = wav({voies: 1, fr: 16000}), d = Buffer.alloc(16000 * 2 * 100), big = Buffer.concat([long.subarray(0, long.length - 32000), d]); big.writeUInt32LE(d.length, long.length - 32000 - 4);
   const r = await A.versWav16k(big); ok('100 s → coupé à 90 s', !!r && Math.abs(r.duree - 90) < 0.01, r && String(r.duree)); }
 ok('un fichier qui n’est pas du son (ni PyAV ni ffmpeg) → refusé ; le serveur dit alors de passer par AIFF', (await A.versWav16k(Buffer.from('x'.repeat(200)))) === null && (await A.m4a()) === false);
+/* 0.67.0 : son genre reconnu à ses premiers octets (gardé et rendu tel quel) ; un texte n'est pas du son ; le silence de réponse */
+{ const z = (t, n = 64) => Buffer.concat([Buffer.from(t, 'latin1'), Buffer.alloc(n)]);
+  const g = [wav({}), aiff({}), z('\0\0\0\x18ftypM4A '), z('caff'), z('OggS'), z('ID3\x04'), z('#!AMR\n')].map((b) => (typeSon(b) || {}).ext);
+  ok('0.67 : genre d’un son à ses premiers octets (wav, aiff, m4a, caf, ogg, mp3, amr) ; un message écrit n’en est pas un ; silence de 0,2 s',
+    g.join() === 'wav,aiff,m4a,caf,ogg,mp3,amr' && typeSon(Buffer.from('Tu rentres à quelle heure ce soir ?')) === null && silence().length === 6444 && silence().subarray(44).every((x) => x === 0), g.join()); }
 /* le vrai convertisseur (stt/audio_helper.py), si un Python avec PyAV est là ; ffmpeg fabrique un m4a de 1 s (sinon : pas essayé) */
 const py = process.env.JARVIS_AUDIO_PY_ESSAI || 'python3', helper = path.join(HERE, '..', 'stt', 'audio_helper.py');
 if (spawnSync(py, [helper, '--essai']).status === 0 && spawnSync('ffmpeg', ['-version']).status === 0) {
