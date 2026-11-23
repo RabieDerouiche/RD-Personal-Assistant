@@ -6,12 +6,12 @@
 
 | Question | Choix |
 |---|---|
-| Maquette | **Version 3 validée** (`essais/jarvis-os-ux/`, en ligne sur GitHub Pages) |
+| Maquette | **Version 3 validée** (`essais/jarvis-os-ux/`, servie par le serveur à `/maquettes/ux/` depuis la 0.53.0) |
 | Barre du bas | **5 portes fixes** : Aujourd'hui, Pour moi, orbe (Claude), Agenda, Espaces. Plus de favoris ni de menu « Tout » |
 | Ordre | **Tout d'un coup** (recommandation « navigation d'abord » refusée) |
 | Méthode | **Remplacer directement** : l'app (`essais/jarvis-os-maquette/index.html`) est modifiée en place (recommandation « construire à côté » refusée) |
 
-Conséquence retenue : le travail se fait sur une branche, poussée régulièrement, et n'est **fusionné dans `main` qu'une fois, quand toute la refonte passe les bancs** (maquette, bout en bout, serveur, check-up). Fusionner avant mettrait une app à moitié refaite sur son iPhone (la mise à jour est proposée à chaque fusion, 0.27.0). D'autres sessions modifient la même page (Radar, voix) : fusionner `main` dans la branche souvent, et lire leurs entrées dans `docs/jarvis-os.md`.
+Conséquence retenue (historique : fusionnée en 0.54.0 ; depuis, chaque version est fusionnée seule) : le travail se fait sur une branche, poussée régulièrement, et n'est **fusionné dans `main` qu'une fois, quand toute la refonte passe les bancs** (maquette, bout en bout, serveur, check-up). Fusionner avant mettrait une app à moitié refaite sur son iPhone (la mise à jour est proposée à chaque fusion, 0.27.0). D'autres sessions modifient la même page (Radar, voix) : fusionner `main` dans la branche souvent, et lire leurs entrées dans `docs/jarvis-os.md`.
 
 ## Cible (ce que la maquette fixe)
 
@@ -40,7 +40,7 @@ Conséquence retenue : le travail se fait sur une branche, poussée régulièrem
 | Achats, Voyages, Sorties, Papiers, Argent | Espaces, une tuile vivante chacun, puis leur page sur le même modèle |
 | Réglages | Espaces, « Coulisses », Réglages (+ État des systèmes) |
 
-## Étapes (une seule fusion à la fin)
+## Étapes (une seule fusion à la fin ; historique : fusionnée en 0.54.0, depuis chaque version est fusionnée seule)
 
 1. Coquille : barre à 5 portes, piles par onglet, en-tête avec retour, glisser depuis le bord, Espaces, adresses anciennes ; bancs mis à jour.
 2. Globe : barre, écran de JARVIS de l'accueil, feuille de Claude ; ses états branchés sur la vraie discussion (réflexion, réponse mot par mot).
@@ -54,12 +54,12 @@ Conséquence retenue : le travail se fait sur une branche, poussée régulièrem
 ## Carte du code (par nom : les numéros de ligne bougent)
 
 - Page : `essais/jarvis-os-maquette/index.html`, un seul script (IIFE) ; les couches « JARVIS OS » réassignent les fonctions plus haut (la dernière gagne). Défilement dans `#scroller`, pas `window`.
-- Coquille : `boot()` (barre à favoris, feuille « Tout », `drawBar`, `placeInd`), `VIEWS`, `TITLES`, `VIEWTITLE`, `TAB`, `NAV`/`navTrack`/`navBack`, `renderView`, `go` (réassignée pour le mode « une par une »), `hashchange`, `voirUrl` (`#voir-…` → Pour moi). Le serveur envoie des liens vers `/#suivi` et `/#demandes` (`server.mjs`, `sante.mjs`, `notify.mjs`) : **`#suivi` doit rester une adresse valide**.
+- Coquille : `boot()` (barre à 5 portes `PORTES`, orbe dans `.talk-slot`, `drawBar`, `placeInd`), `VIEWS`, `TITLES`, `VIEWTITLE`, `TAB`, `NAV`/`navTrack`/`navBack`, `renderView`, `go` (réassignée pour le mode « une par une »), `hashchange`, `voirUrl` (`#voir-…` → Pour moi). Le serveur envoie des liens vers `/#suivi` et `/#demandes` (`server.mjs`, `sante.mjs`, `notify.mjs`) : **`#suivi` doit rester une adresse valide**.
 - Couches : `#sheet` (`openSheet(cfg)`/`closeSheet`), `#app` (`openApp`, `SCREEN.*` : taches, papiers, depot réutilisés ailleurs), `#chat` (`openChat`/`closeChat`/`renderChat`, `window.JarvisAsk` = `askOpen`), `swipeToClose()`.
 - Vues effectives : accueil = `homeDash` (récolte `ACC_ORIG` dans un bloc hors écran) ; Pour moi = sections `#pm-dec`, `#pm-todo`, `#pm-proj`, `#pm-rep`, `#pm-wait`, `#pm-mail` ; suivi = 13 panneaux (`pendPanel`, réponses reçues, `costPanel`, `queuePanel`, `claudePanel`, dossiers, ligne Papiers, `SCREEN.taches`, `missionsPanel`, relances, `consoPanel`, `sysBox`+`santeBox`, `histPanel`) ; equipe = `agentPage` si `AGENT`, sinon héros de Claude, `mateCard`, `teamStats`, `liveFil`, « Tes ordres » ; automatisations = `routinesPanel` + une frise par bot.
 - À réutiliser : `C(bot, taille)` (personnages, ids internes hydra, medusa…), `JarvisVoice.holo(o)` (globe, états idle, listening, thinking, speaking ; `mountButton` ne rend pas l'objet du globe), `voyPhoto`, `compImg`, `priceChart`, `radLoad`/`radReste`/`radEur`, `metLoad`/`metLine`, `pourMoiN()`, `homeData()`, `dayItems()`.
 - Claude : `sendChat` (attente, flux `onText`, fin) ; `mainsBusy(b)` reçoit déjà idle, thinking, speaking : c'est là que le globe doit être piloté.
-- Bancs liés à la navigation : `banc.cjs` (favoris, « Tout », `.talk-slot .jv-btn`, `#voir-…`, routes, Équipe `.team .mate`, `.lf`, Suivi `.pend-x .track`, Automatisations `.auto.card`), `banc-serveur.mjs` (`.fav-handle`, `#missions`, `.mis-panel`, `.rel-panel`, `.conso-panel`, `.sante-box`, `#routines`, routes `#suivi` et `#automatisations`), `audit.cjs` (liste des routes, `.all-sheet`).
+- Bancs liés à la navigation : `banc.cjs` (barre à 5 portes : il vérifie l'absence de `.fav-handle` et de `.all-sheet` ; `.talk-slot .jv-btn`, `#voir-…`, routes, Équipe `.team .mate`, `.lf`, Suivi `.pend-x .track`, Automatisations `.auto.card`), `banc-serveur.mjs` (`#missions`, `.mis-panel`, `.rel-panel`, `.conso-panel`, `.sante-box`, `#routines`, routes `#suivi` et `#automatisations`), `audit.cjs` (liste des routes ; `.all-sheet` encore compté parmi les couches, sans effet).
 
 ## État
 
@@ -67,6 +67,7 @@ Conséquence retenue : le travail se fait sur une branche, poussée régulièrem
 - 22/11/2026 : **appliquée en 0.54.0** (une seule fusion). Fait : étapes 1 (coquille, Espaces, retour par le bord), 2 (Équipe absorbe Suivi et Automatisations par récolte des panneaux d'origine ; Pour moi en filtres), 3 (globe vivant dans `holo.ts`, écran de JARVIS sur l'accueil, états du globe pendant la discussion), une partie de 4 (grands titres, photos des sorties, photo du prochain voyage dans Espaces) et 8 (bancs maquette, bout en bout, check-up adaptés). Reste, à proposer au propriétaire : 7 (discussion et rubriques par-dessus en feuille du bas) et le reste de 6 (Achats, Voyages, Argent, Papiers sur le modèle de la maquette : carte phare, un filtre, lignes illustrées), le nettoyage du CSS du menu « Tout ».
 - Où est quoi dans le code (couches ajoutées en fin de script, repérées « refonte UX ») : `rootOf()` et `NAVLBL` près de `TAB` ; `navTrack`/`navBack` (retour vers Espaces) ; `boot()` (barre, bord gauche) ; `VIEWS.espaces` avant `boot()` ; `hudScreen()`/`hudLines()` avant `homeDash()` ; en fin de script : Équipe et Pour moi (`EQF`, `PMF`, `EQHASH`), états du globe (`uxState`, enveloppes de `renderChat`, `mainsBusy`, `closeChat`), grands titres et `sorCard` avec photo.
 - 22/11/2026 : **0.55.0, l'app vivante et fluide** (sa demande après la 0.54.0) : transitions de page dans le sens du geste avec l'ancienne page qui part pendant que la nouvelle arrive, filtres en fondu, fenêtres qui montent et redescendent, chiffres qui comptent, ciel animé ; détail dans `docs/jarvis-os.md` (0.55.0). Code : fin du script, bloc « l'app vivante et fluide » (`UXM`, `kindOf`, `cloneVisual`, `ghostOut`, `countUp`, enveloppes de `renderView`, `closeChat`, `closeApp`).
-- 22/11/2026 : **0.57.0, l'effet « waouh », la vitesse, l'abonnement refusé en clair** (son retour sur la 0.55.0 ; appliqué sans question, à sa demande) ; détail et mesures dans `docs/jarvis-os.md` (0.56.0). Code : `holo.ts` (globe en calques), bloc « l'effet waouh » en fin de script (`decorate`, `reveal`, inclinaison sous le doigt, zoom depuis l'élément touché, cercle de l'orbe, sol et parallaxe), `mailPanelBox`.
+- 22/11/2026 : **0.57.0, l'effet « waouh », la vitesse, l'abonnement refusé en clair** (son retour sur la 0.55.0 ; appliqué sans question, à sa demande) ; détail et mesures dans `docs/jarvis-os.md` (0.57.0). Code : `holo.ts` (globe en calques), bloc « l'effet waouh » en fin de script (`decorate`, `reveal`, inclinaison sous le doigt, zoom depuis l'élément touché, cercle de l'orbe, sol et parallaxe), `mailPanelBox`.
 - 22/11/2026 : **0.58.0, fini les blocs bleus** (QCM : « A + bord irisé phare ») ; détail dans `docs/jarvis-os.md` (0.58.0). Code : bloc « 0.58.0 : fini les blocs bleus » en fin de script (`PGC`, `setPg`, style `#ux-cartes`). **Prochaine étape choisie (QCM)** : le reste de l'étape 6, Achats, Voyages, Argent, Papiers sur le modèle de la maquette (carte phare en photo, un seul filtre, lignes illustrées) ; puis l'étape 7 (feuille du bas).
 - 22/11/2026 : **0.59.0**, chargement de l'accueil, brief en rubriques, barre qui répond ; détail dans `docs/jarvis-os.md` (0.59.0).
+- 23/11/2026 (0.69.0) : restent l'étape 6 (Achats, Voyages, Argent, Papiers sur le modèle de la maquette), l'étape 7 (rubriques par-dessus et discussion en feuille du bas : `openApp()` existe toujours) et le nettoyage du CSS `.fav-handle` / `.all-sheet` (début de `index.html`). Aucune version de 0.60.0 à 0.69.0 ne les traite.
