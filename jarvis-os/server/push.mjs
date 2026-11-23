@@ -68,11 +68,21 @@ export function createPush({S, save, log = () => {}, allowHttp = false}) {
     save(); return {ok: true, count: S.push.subs.length};
   }
   function unsubscribe(endpoint) { const n = S.push.subs.length; S.push.subs = S.push.subs.filter((x) => x.endpoint !== endpoint); save(); return {ok: true, removed: n - S.push.subs.length}; }
+  /* 0.69.0 (son retour du 23/11/2026 : « quand on clique sur une notification, elle rouvre Jarvis sur la page déjà ouverte, pas sur l'alerte ») :
+     avec le format déclaratif, l'iPhone ouvre lui-même l'adresse de la notification, sans passer par le service worker ; l'app déjà ouverte revient
+     au premier plan sans changer d'adresse. Chaque notification a donc un identifiant, mis dans son adresse (« /?n=<id>#voir-… ») et gardé dans la
+     liste des dernières (S.notifs, 40 au plus ; une notification de même « tag » remplace la précédente, comme sur l'iPhone) : l'app ouverte par
+     elle la retrouve par l'adresse, l'app ramenée au premier plan la retrouve dans la liste (envoyée pendant son absence, pas encore vue). */
+  if (!Array.isArray(S.notifs)) S.notifs = [];
+  const avecId = (url, id) => { const s = String(url || '/'), i = s.indexOf('#'), base = i >= 0 ? s.slice(0, i) : s, hash = i >= 0 ? s.slice(i) : ''; return (base || '/') + (base.includes('?') ? '&' : '?') + 'n=' + id + hash; };
+  function vues(ids) { const l = new Set((Array.isArray(ids) ? ids : [ids]).map(String)); let n = 0; for (const x of S.notifs) if (l.has(x.id) && !x.vue) { x.vue = Date.now(); n++; } if (n) save(); return {ok: true, vues: n}; }
   /* message : {title, body, url, badge, tag}. Envoyé à chaque appareil abonné ; un abonnement expiré (404, 410) est retiré. */
   async function send(msg, opts = {}) {
-    const subs = S.push.subs.slice(), out = [];
+    const subs = S.push.subs.slice(), out = [], id = crypto.randomBytes(6).toString('hex'), cible = String(msg.url || '/');
+    S.notifs = [{id, at: Date.now(), title: String(msg.title || 'JARVIS').slice(0, 120), body: String(msg.body || '').slice(0, 300), url: cible, ...(msg.tag ? {tag: String(msg.tag).slice(0, 80)} : {})}]
+      .concat(S.notifs.filter((x) => !(msg.tag && x.tag === msg.tag))).slice(0, 40);
     /* format « déclaratif » de Safari (18.4 et plus), lu aussi par notre service worker sur les autres navigateurs */
-    const payload = JSON.stringify({web_push: 8030, notification: {title: String(msg.title || 'JARVIS').slice(0, 120), body: String(msg.body || '').slice(0, 600), navigate: msg.url || '/', lang: 'fr-FR', tag: msg.tag || undefined, app_badge: msg.badge != null ? String(msg.badge) : undefined}});
+    const payload = JSON.stringify({web_push: 8030, notification: {title: String(msg.title || 'JARVIS').slice(0, 120), body: String(msg.body || '').slice(0, 600), navigate: avecId(cible, id), lang: 'fr-FR', tag: msg.tag || undefined, app_badge: msg.badge != null ? String(msg.badge) : undefined}});
     for (const s of subs) {
       try {
         const body = encrypt({payload, p256dh: s.keys.p256dh, auth: s.keys.auth});
@@ -92,5 +102,5 @@ export function createPush({S, save, log = () => {}, allowHttp = false}) {
     log('notification « ' + msg.title + ' » : ' + out.filter((x) => x.ok).length + '/' + out.length + (detail ? ' · refus : ' + detail : ''));
     return out;
   }
-  return {publicKey, subscribe, unsubscribe, send, status: () => ({publicKey: publicKey(), count: S.push.subs.length, prefs: S.push.prefs, last: S.push.last || null})};
+  return {publicKey, subscribe, unsubscribe, send, vues, notifs: () => S.notifs, status: () => ({publicKey: publicKey(), count: S.push.subs.length, prefs: S.push.prefs, last: S.push.last || null})};
 }

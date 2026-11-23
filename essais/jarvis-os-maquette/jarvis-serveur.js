@@ -243,6 +243,9 @@
     radarProposition: (id, oui, modif) => req('/api/radar/proposition', {id, oui, modif: modif || null}).then((r) => (r.status === 200 ? r.j : null)).catch(() => null),
     /* 0.68.0 : « Tout relire » ({tout: false} : les derniers jours) ; un refus (Google pas relié) remonte avec son message, au lieu de remplacer les données de la page */
     radarLire: (tout) => req('/api/radar/lire', {tout: tout !== false}).then((r) => { if (r.status !== 200 && r.status !== 202) throw new Error((r.j && r.j.error) || 'Relecture refusée'); return r.j; }),
+    /* 0.69.0 : les dernières notifications (ce qu'elles annoncent) et « vue » : l'app ramenée au premier plan par l'une d'elles l'ouvre */
+    notifs: () => req('/api/notifs').then((r) => (r.status === 200 ? r.j : null)).catch(() => null),
+    notifsVues: (ids) => req('/api/notifs/vue', {ids}).then((r) => (r.status === 200 ? r.j : null)).catch(() => null),
     radarPlan: (id, action) => req('/api/radar/plan', {id, action}).then((r) => (r.status === 200 ? r.j : null)).catch(() => null),   /* 0.68.0 : un paiement en plusieurs fois « plus à payer » ou remis */
     radarReproposer: (cle) => req('/api/radar/reproposer', {cle}).then((r) => (r.status === 200 ? r.j : null)).catch(() => null),   /* 0.68.0 : ce qu'il a écarté revient dans « À valider » */
     /* 0.62.0 : ses invitations (un proche qui lui envoie des tâches) */

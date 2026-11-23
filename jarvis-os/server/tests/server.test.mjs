@@ -43,6 +43,7 @@ const env = {...process.env, JARVIS_HUMOUR: '0' /* réponses exactes : la pique 
 Object.assign(env, {JARVIS_STEAM_URL: VB, JARVIS_STT_HELPER: path.join(HERE, 'fake-stt.mjs'), JARVIS_TOUR_HELPER: path.join(HERE, 'fake-tour.mjs'), JARVIS_PREP_MEM: '1', JARVIS_RD_RACINE: 'rda', JARVIS_VOIX_GOOGLE_URL: GURL, JARVIS_VOIX_GOOGLE_PLAFOND: '220', JARVIS_ROUTINES_MS: '400', JARVIS_METEO_URL: 'http://127.0.0.1:' + MET.address().port + '/v1/forecast', JARVIS_ECOUTE_SCRIPT: path.join(DATA, 'fausse-install.sh'),
   /* 0.64.0 : message vocal (faux convertisseur à la place de PyAV, pas de ffmpeg) et rappels toutes les 0,7 s au lieu de 5 min */
   JARVIS_AUDIO_PY: process.execPath, JARVIS_AUDIO_HELPER: path.join(HERE, 'fake-audio.mjs'), JARVIS_FFMPEG: '', JARVIS_RAPPEL_MS: '700', JARVIS_RAPPEL_TICK_MS: '150', JARVIS_TACHES_CACHE_MS: '0'});
+const sansN = (u) => String(u || '').replace(/\?n=[0-9a-f]{12}(?=#|$)/, '');   /* 0.69.0 : l'adresse d'une notification sans son identifiant */
 const results = []; let fails = 0;
 { const H = ['Domaine', 'Fait', 'Valeur'], v = (x) => pauseDepuisFaits([H, ['Grok Bot', "Grok en pause jusqu'au", x]]);
   const okP = v('17/11/2026 13h05') === Date.parse('2026-11-17T13:05:00+01:00') && v('14/07/2027 12h47') === Date.parse('2027-07-14T12:47:00+02:00') && v('Reprise faite, sonnettes envoyées') === null && pauseDepuisFaits([H, ['x', 'Autre', 'y']]) === undefined;
@@ -234,7 +235,7 @@ try {
       /* les rappels : la notification à l'arrivée, puis toutes les 0,7 s ici (5 min en vrai) ; « Fait » dans Pilotage les arrête */
       await attends(1600);
       const ns = notes(), arr = ns.filter((x) => x.tag === 'invite-' + r1.id), rap = ns.filter((x) => (x.tag || '').startsWith('invite-' + r1.id + '-'));
-      ok('rappels : notification à l’arrivée (« Message vocal de Nour », « 1 s · touche pour l’écouter », aucun texte à sa place), qui ouvre la tâche dans JARVIS', arr.length === 1 && arr[0].title === 'Message vocal de Nour' && arr[0].body === '1 s · touche pour l’écouter' && arr[0].navigate === '/#recue=' + r1.id, JSON.stringify(arr));
+      ok('rappels : notification à l’arrivée (« Message vocal de Nour », « 1 s · touche pour l’écouter », aucun texte à sa place), qui ouvre la tâche dans JARVIS', arr.length === 1 && arr[0].title === 'Message vocal de Nour' && arr[0].body === '1 s · touche pour l’écouter' && sansN(arr[0].navigate) === '/#recue=' + r1.id, JSON.stringify(arr));
       ok('rappels : puis « Rappel : message vocal de Nour », une étiquette par rappel (l’iPhone sonne à chaque fois)', rap.length >= 1 && rap[0].title === 'Rappel : message vocal de Nour' && /^1 s · touche pour l’écouter — envoyé il y a \d+ min$/.test(rap[0].body) && new Set(rap.map((x) => x.tag)).size === rap.length, JSON.stringify(rap.slice(0, 2)));
       rc = await G('/api/invites/recues'); const rA2 = rc.body.recues.find((x) => x.id === rA.id);
       ok('rappels : « Fait » dans Pilotage → plus de rappel, JARVIS la voit faite', rA2 && rA2.fait === true && rA2.rappel === null && !ns.some((x) => (x.tag || '').startsWith('invite-' + rA.id + '-')), JSON.stringify(rA2));
@@ -346,17 +347,21 @@ try {
       ok('notifications : essai reçu, chiffré (aes128gcm) et signé (VAPID), sans en-tête Topic ni « Urgency: normal » (refusés par Apple)', r.body.ok && t0.h['content-encoding'] === 'aes128gcm' && !('topic' in t0.h) && !('urgency' in t0.h) && crypto.verify('sha256', Buffer.from(jwt[0] + '.' + jwt[1]), {key: pk, dsaEncoding: 'ieee-p1363'}, ub(jwt[2])) && JSON.parse(ub(jwt[1])).aud === PURL && last().title === 'JARVIS', JSON.stringify(open(t0)).slice(0, 120));
       FG.sheet['Canal!A1:H3000'] = [FG.sheet['Canal!A1:H3000'][0], ['16/11/2026', 'Rabie', 'Iris', 'Ordre', 'Relève les prix', 'Fait', 'Prix relevés : 3 produits.', 'Prix : Robot'], ['17/11/2026', 'Iris', 'Rabie', 'Question', 'Oui/Non : je relance le syndic ?', 'À faire', '', '']];
       let n0 = got.length; r = await check('canal');
-      ok('notifications : un bot a répondu et un bot te demande, en un seul message, avec la pastille', got.length === n0 + 1 && /^2 nouvelles de tes bots$/.test(last().title) && /Iris a répondu \(Prix : Robot\) : Prix relevés/.test(last().body) && /Iris te demande/.test(last().body) && last().app_badge === '1' && last().navigate === '/#voir-recent', JSON.stringify(last()));
+      ok('notifications : un bot a répondu et un bot te demande, en un seul message, avec la pastille', got.length === n0 + 1 && /^2 nouvelles de tes bots$/.test(last().title) && /Iris a répondu \(Prix : Robot\) : Prix relevés/.test(last().body) && /Iris te demande/.test(last().body) && last().app_badge === '1' && sansN(last().navigate) === '/#voir-recent', JSON.stringify(last()));
       n0 = got.length; r = await check('canal'); ok('notifications : rien de neuf, rien d\'envoyé', got.length === n0);
       FG.sheet['Canal!A1:H3000'] = FG.sheet['Canal!A1:H3000'].concat([['18/11/2026', 'Rabie', 'Iris', 'Ordre', 'Regarde le bail', 'À faire', '', '']]); n0 = got.length; await check('canal');
       FG.sheet['Canal!A1:H3000'][3] = ['18/11/2026', 'Rabie', 'Iris', 'Ordre', 'Regarde le bail', 'Fait', 'Bail trouvé dans Logement.', '']; await check('canal');
-      ok('notifications : une seule réponse mène à sa ligne du Canal (« /#voir-4 »), l\'app l\'ouvre', got.length === n0 + 1 && last().title === 'Iris a répondu' && last().navigate === '/#voir-4', JSON.stringify(last()));
+      ok('notifications : une seule réponse mène à sa ligne du Canal (« /#voir-4 »), l\'app l\'ouvre', got.length === n0 + 1 && last().title === 'Iris a répondu' && sansN(last().navigate) === '/#voir-4', JSON.stringify(last()));
+      /* 0.69.0 : chaque notification a son identifiant dans son adresse, et la liste des dernières le garde, avec ce qu'elle annonce ; « vue » */
+      { const n1 = last(), id = (String(n1.navigate).match(/^\/\?n=([0-9a-f]{12})#voir-4$/) || [])[1], l1 = (await G('/api/notifs')).body, x1 = id && l1.notifs.find((x) => x.id === id);
+        const v1 = await G('/api/notifs/vue', {ids: [id]}), l2 = (await G('/api/notifs')).body, x2 = id && l2.notifs.find((x) => x.id === id);
+        ok('notifications 0.69 : l’identifiant est dans l’adresse (« /?n=…#voir-4 ») ; la liste des dernières le donne avec son titre et sa cible ; « vue » le marque', !!x1 && x1.url === '/#voir-4' && x1.title === 'Iris a répondu' && !x1.vue && v1.body.vues === 1 && !!x2.vue, JSON.stringify([n1.navigate, x1, v1.body])); }
       /* 0.26.0 : Plutus, le bot ajouté le 20/11/2026 (liste des bots dans bots.mjs) : sa question est annoncée ; une demande faite dans son chat,
          écrite déjà « Fait » (« Via chat »), n'est pas annoncée (il vient d'avoir la réponse dans le chat) */
       FG.sheet['Canal!A1:H3000'] = FG.sheet['Canal!A1:H3000'].concat([['20/11/2026', 'Rabie', 'Plutus', 'Via chat', 'Cherche trois pistes de revenus', 'Fait', 'Trois pistes notées.', '']]); n0 = got.length; await check('canal');
       const viaChat = got.length === n0;
       FG.sheet['Canal!A1:H3000'] = FG.sheet['Canal!A1:H3000'].concat([['20/11/2026', 'Plutus', 'Rabie', 'Piste freelance', 'Oui/Non : je prépare une offre de mission ?', 'À faire', '', '']]); await check('canal');
-      ok('notifications : Plutus te demande (nouveau bot reconnu) ; une ligne « Via chat » déjà faite ne sonne pas', viaChat && got.length === n0 + 1 && last().title === 'Plutus te demande' && /offre de mission/.test(last().body) && last().navigate === '/#voir-6', JSON.stringify([viaChat, last()]));
+      ok('notifications : Plutus te demande (nouveau bot reconnu) ; une ligne « Via chat » déjà faite ne sonne pas', viaChat && got.length === n0 + 1 && last().title === 'Plutus te demande' && /offre de mission/.test(last().body) && sansN(last().navigate) === '/#voir-6', JSON.stringify([viaChat, last()]));
       const t = paris(new Date()), fr = (n) => { const d = new Date(Date.UTC(t.y, t.m - 1, t.d + n)); return String(d.getUTCDate()).padStart(2, '0') + '/' + String(d.getUTCMonth() + 1).padStart(2, '0') + '/' + d.getUTCFullYear(); };
       FG.sheet["'Échéances'!A1:H1000"] = [['Date', 'Sujet', 'Domaine', 'Rappels', 'Statut', 'Bot', 'Remarque', 'Nature'], [fr(0), 'Rendez-vous notaire', 'Logement', '', 'À venir', 'Iris', '', ''], [fr(0), 'Déjà fait', '', '', 'Fait', 'Iris', '', ''], [fr(7), 'Fin de la promo', '', '', 'À venir', 'Kairos', '', ''], [fr(3), 'Pas aujourd\'hui', '', '', 'À venir', 'Iris', '', ''], [fr(14), 'Fermeture de la crèche (essai)', 'Famille', '2 semaines avant', 'À venir', 'Iris', '', ''], [fr(21), 'Pas ce palier', 'Famille', '1 semaine avant', 'À venir', 'Iris', '', '']];
       FG.sheet['Papiers!A1:G300'] = [['Document', 'Personne', 'Où il est', "Valable jusqu'au", 'Sert pour', 'Mis à jour le', 'Remarque'], ['Passeport', 'Lui', 'Drive', fr(30), 'voyage', '', ''], ['Carte', 'Lui', 'Drive', 'sans date', '', '', '']];
@@ -544,7 +549,7 @@ try {
       let m = await until(async () => ((await G('/api/missions')).body.missions || []).find((x) => x.id === mid && x.status === 'terminee'));
       ok('missions : lancée depuis JARVIS, faite par Claude (compte rendu gardé)', r.status === 200 && m && /Compte rendu : mission faite \(Compare trois assurances/.test(m.result), JSON.stringify(m));
       let nm = await until(() => got.length ? open(got[got.length - 1]) : null);
-      ok('missions : notification « Mission terminée » avec le début du compte rendu, vers Suivi', nm && nm.title === 'Mission terminée' && /^Compare trois assurances habitation — Compte rendu/.test(nm.body) && nm.navigate === '/#suivi', JSON.stringify(nm));
+      ok('missions : notification « Mission terminée » avec le début du compte rendu, vers la mission elle-même (0.69.0)', nm && nm.title === 'Mission terminée' && /^Compare trois assurances habitation — Compte rendu/.test(nm.body) && /^\/#voir-mission-[\w-]+$/.test(sansN(nm.navigate)), JSON.stringify(nm));
       r = await G('/api/mission', {texte: 'lente : une recherche qui prend du temps'}); const lid = r.body.id;
       const t1 = Date.now(), q1 = await rac({texte: 'Quoi de neuf ?'}), m1 = ((await G('/api/missions')).body.missions || []).find((x) => x.id === lid);
       ok('missions : à part, elles ne bloquent ni Siri ni la conversation', /Tu as dit : Quoi de neuf \?/.test(q1) && m1 && m1.status === 'envoyee', (Date.now() - t1) + ' ms, ' + (m1 && m1.status));
@@ -602,7 +607,7 @@ try {
         ok('revérifier papiers : texte cherché dans Papiers seulement (jamais Papiers privés), lecture seule', dq.some((q) => /fullText contains 'quittance'/.test(q) && /'pap' in parents/.test(q)) && !dq.some((q) => /'priv'/.test(q)) && FG.calls.slice(c0).filter((x) => x.path.startsWith('/drive')).every((x) => x.method === 'GET'), dq.length + ' requêtes');
         r = await G('/api/relances'); ok('revérifier : relance sur la ligne écrite, demain à 9 h', r.body.prevues.some((x) => x.source === 'verif' && x.ligne >= 100 && /Voir si Iris a pris en compte la revérification de « Quittance de mai »/.test(x.quoi)));
         let nv = await until(() => got.length > n0 ? open(got[got.length - 1]) : null);
-        ok('revérifier : notification « Trouvé · Iris prévenue »', nv && nv.title === 'Trouvé · Iris prévenue' && /Quittance de mai/.test(nv.body) && nv.navigate === '/#suivi', JSON.stringify(nv));
+        ok('revérifier : notification « Trouvé · Iris prévenue »', nv && nv.title === 'Trouvé · Iris prévenue' && /Quittance de mai/.test(nv.body) && /^\/#voir-mission-[\w-]+$/.test(sansN(nv.navigate)), JSON.stringify(nv));
         s0 = sends(); a0 = appends(); n0 = got.length;
         const v2 = await G('/api/verifier', {ou: 'papiers', demande: {titre: 'Assurance scolaire', bot: 'Iris', demande: 'Envoie l’attestation d’assurance scolaire', depuis: ymd(-2)}});
         const v3 = await G('/api/verifier', {ou: 'papiers', demande: {titre: 'Carte grise', bot: 'Iris', demande: 'Retrouve la carte grise', depuis: ymd(-2)}});
@@ -632,7 +637,7 @@ try {
         const r3 = await G('/api/cote', {id: 'a:Passé', titre: 'Date passée', jusqu: '2020-01-01T09:00'}); const l1 = (await G('/api/cote')).body.cartes || [];
         ok('de côté : sans date et jusqu\'à une date gardées par le serveur ; date passée refusée', r.status === 200 && r2.status === 200 && r3.status === 400 && l1.map((x) => x.id).sort().join() === 'a:Bientôt,a:Passeport', JSON.stringify(l1));
         await new Promise((z) => setTimeout(z, 1400)); const n1 = got.length; r = await G('/api/cote/rappel', {}); const ms2 = got.slice(n1).map((b) => open(b));
-        ok('de côté : la carte datée revient seule (notification « De retour »), puis le rappel des cartes encore de côté', r.body.revenues === 1 && r.body.rappel === true && ms2.some((x) => x.title === 'De retour dans Pour moi' && x.body === 'Bientôt de retour') && ms2.some((x) => x.title === '1 carte mise de côté' && x.body === 'Passeport' && x.navigate === '/#voir-cote'), JSON.stringify(ms2));
+        ok('de côté : la carte datée revient seule (notification « De retour »), puis le rappel des cartes encore de côté', r.body.revenues === 1 && r.body.rappel === true && ms2.some((x) => x.title === 'De retour dans Pour moi' && x.body === 'Bientôt de retour') && ms2.some((x) => x.title === '1 carte mise de côté' && x.body === 'Passeport' && sansN(x.navigate) === '/#voir-cote'), JSON.stringify(ms2));
         r = await G('/api/cote/retirer', {id: 'a:Passeport'}); ok('de côté : remise dans Pour moi', r.body.retiree === true && !((await G('/api/cote')).body.cartes || []).length); }
       const q2 = await rac({texte: 'Mission : prépare une liste de questions pour le notaire'});
       m = await until(async () => ((await G('/api/missions')).body.missions || []).find((x) => /liste de questions pour le notaire/.test(x.text) && x.status === 'terminee'));

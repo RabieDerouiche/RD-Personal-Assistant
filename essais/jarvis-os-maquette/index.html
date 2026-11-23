@@ -4522,7 +4522,7 @@ void main(){
   }
   function radAlert(x, vue) {
     const t = RAD_A[x.type] || ['Alerte', 'pulse'];
-    return h('article', {class: 'card item rad-alert is-' + x.type + (vue ? ' is-vue' : '')},
+    return h('article', {class: 'card item rad-alert is-' + x.type + (vue ? ' is-vue' : ''), 'data-alerte': x.id || x.k},
       h('div', {class: 'rad-al-h'}, h('span', {class: 'hm-ic', html: icon(t[1], 17)}), h('div', {class: 'hm-tx'}, h('b', {text: x.titre || t[0]}), h('small', {text: x.service + ' · ' + radDate(x.date) + (x.n > 1 ? ' · ' + x.n + ' mails' : '')}))),
       x.montant != null ? h('p', {class: 'rad-amt'}, h('b', {text: radEur(x.montant)}), x.avant ? h('span', {class: 'rad-up', text: 'avant : ' + radEur(x.avant)}) : null) : null,
       x.texte ? h('p', {class: 'item-why', text: x.texte}) : null,
@@ -4692,7 +4692,7 @@ void main(){
           h('span', {class: 'mchip', text: 'lu ' + radLu(d.maj)}))));
   }
   function radFixes(R, d) {
-    const row = (o, done) => h('button', {type: 'button', class: 'hm-row rad-fx' + (done ? ' is-done' : '') + (o.x.ponctuel ? ' is-ponctuel' : ''),
+    const row = (o, done) => h('button', {type: 'button', class: 'hm-row rad-fx' + (done ? ' is-done' : '') + (o.x.ponctuel ? ' is-ponctuel' : ''), 'data-date': radYmd(o.date),
       onclick: () => (o.x.ponctuel ? (radPlanDe(o.x.plan) ? radPlanSheet(radPlanDe(o.x.plan)) : toast('Prélèvement ponctuel', 'Annoncé par un mail (paiement en plusieurs fois) : il compte jusqu’à son jour, puis disparaît.')) : radEdit(o.x))},
       h('span', {class: 'rad-fx-d', text: radJour(o.date)}),
       h('span', {class: 'hm-tx'}, h('b', {text: o.x.service}), h('small', {text: (o.x.ponctuel ? 'Ponctuel · annoncé par mail' : (o.x.cat || 'Autres')) + (radYmd(o.raw) !== radYmd(o.date) ? ' · décalé du ' + radJour(o.raw) : '') + (o.x.estime ? (o.x.ponctuel ? ' · date estimée' : ' · montant estimé') : '')})),
@@ -8092,7 +8092,7 @@ void main(){
     const load = async () => {
       const ms = await JS.missions();
       if (!ms) { list.replaceChildren(h('p', {class: 'muted', text: 'Ton serveur ne les connaît pas encore : « Mettre à jour le serveur » dans Réglages.'})); return; }
-      list.replaceChildren(...(ms.length ? ms.map((m) => { const k = ST[m.status] || ST.envoyee; return h('details', Object.assign({class: 'mis-it'}, m.status === 'a_approuver' ? {open: ''} : {}),
+      list.replaceChildren(...(ms.length ? ms.map((m) => { const k = ST[m.status] || ST.envoyee; return h('details', Object.assign({class: 'mis-it', 'data-mission': m.id}, m.status === 'a_approuver' ? {open: ''} : {}),
         h('summary', {}, h('span', {class: 'pill ' + k[1], text: k[0]}), h('span', {class: 'mis-t', text: (m.agentNom ? 'Ordre à ' + m.agentNom + ' : ' : '') + m.text}), h('small', {class: 'mis-d', text: fmt(new Date(m.done || m.at), {weekday: 'short', hour: '2-digit', minute: '2-digit'})})),
         m.essais > 1 ? h('p', {class: 'muted mis-rep', text: 'Reprise après un redémarrage du serveur.'}) : null,
         m.par ? h('p', {class: 'muted mis-par', text: 'Proposée par ' + m.par + (m.status === 'a_approuver' ? ' : elle attend ton accord.' : '.')}) : null, accord(m),   /* 0.39.0 */
@@ -8269,10 +8269,8 @@ void main(){
   setTimeout(() => voirUrl(location.hash), 0);
   try { if (navigator.serviceWorker && typeof navigator.serviceWorker.addEventListener === 'function') navigator.serviceWorker.addEventListener('message', (ev) => {
     const d = ev.data || {}; if (d.type !== 'jarvis-notif') return;
-    let u = null; try { u = new URL(d.url || '/', location.href); } catch (e) { u = null; }
-    if (u && voirUrl(u.hash)) return;
     if (LV.mcp) lvReread(Object.keys(LV_SOURCES));
-    const id = u ? u.hash.slice(1) : ''; if (VIEWS[id] && id !== TAB) go(id);
+    ouvrirNotif(d.url);   /* 0.69.0 : le même aiguillage que l'adresse et le retour au premier plan (#voir-…, #recue=…, une rubrique) */
   }); } catch (e) { /* navigateur sans service worker : la relecture au retour dans l'app suffit */ }
   let HID_AT = 0;
   document.addEventListener('visibilitychange', () => { if (document.hidden) { HID_AT = Date.now(); return; } if (HID_AT && Date.now() - HID_AT > 20000 && LV.mcp) lvReread(Object.keys(LV_SOURCES)); HID_AT = 0; });
@@ -9438,7 +9436,7 @@ void main(){
     ["Copie l'ID client et le code secret du client, colle-les ici, Enregistrer, puis « Connecter Google ». Google dira « application non validée » : c'est normal, c'est la tienne (Paramètres avancés, Accéder à JARVIS), et coche tous les accès.", '']];
   /* JARVIS OS 0.12.0 : carte « Notifications » des Réglages. Sur l'iPhone, elles ne marchent que depuis l'icône de l'écran d'accueil. */
   async function notifCard(JS, msg, redraw) {
-    const card = h('section', {class: 'card set-card notif-card'}, h('b', {text: 'Notifications'}));
+    const card = h('section', {class: 'card set-card notif-card', id: 'notif-card'}, h('b', {text: 'Notifications'}));
     const out = h('p', {class: 'set-msg'}), say = (t, bad) => { out.textContent = t; out.classList.toggle('is-bad', !!bad); };
     const ok = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
     const home = (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
@@ -9693,6 +9691,114 @@ void main(){
   document.addEventListener('visibilitychange', () => { if (!document.hidden) setTimeout(() => recRelire(true).catch(() => {}), 600); });
   setInterval(() => { recRelire(true).catch(() => {}); }, 15000);
   setTimeout(() => { recHash().then((vu) => { if (!vu) recRelire(true).catch(() => {}); }).catch(() => {}); }, 1200);
+
+  /* ================= JARVIS OS 0.69.0 : une notification ouvre ce qu'elle annonce =================
+     Son retour du 23/11/2026 : « quand on clique sur une notification Jarvis, elle nous renvoie sur Jarvis mais pas sur le bloc qui a lancé
+     l'alerte ; elle rouvre l'onglet déjà ouvert, et c'est nul ». Avec le format déclaratif, l'iPhone ouvre lui-même l'adresse de la notification
+     (sans le service worker), et une app déjà ouverte revient au premier plan sans changer d'adresse. Un seul aiguillage (ouvrirNotif), trois chemins :
+     1. l'app s'ouvre sur l'adresse de la notification (« /?n=<id>#voir-… ») ;
+     2. le service worker transmet l'adresse (navigateurs qui passent par lui) ;
+     3. l'app revient au premier plan : elle demande au serveur les notifications envoyées pendant son absence et pas encore vues ; une seule :
+        elle l'ouvre (« Annuler » ramène où il était) ; plusieurs : une feuille les liste.
+     Et dans l'app ouverte, une notification qui arrive s'affiche aussi en bandeau, avec « Voir » (sauf celles du Canal et les tâches reçues : la page
+     les annonce déjà). Le bloc visé est centré et mis en évidence. */
+  /* contour prioritaire : les cartes ont leurs propres animations et ombres (0.55.0, 0.57.0), qui l'emportaient sur une animation */
+  document.head.append(h('style', {text: 'html .is-cible{outline:2px solid rgba(var(--c1),.95)!important;outline-offset:3px!important;box-shadow:0 0 0 1px rgba(var(--c1),.45),0 0 30px rgba(var(--c1),.5)!important}'
+    + '.notif-row{width:100%;text-align:left;font:inherit;cursor:pointer;box-sizing:border-box}.notif-row .hm-tx{min-width:0;flex:1;display:flex;flex-direction:column;gap:2px}'}));
+  const cssq = (x) => (window.CSS && CSS.escape ? CSS.escape(String(x)) : String(x).replace(/["\\]/g, '\\$&'));
+  const panneauNomme = (re) => Array.from(document.querySelectorAll('#view section, #view .panel')).find((p) => re.test(((p.querySelector('h2') || {}).textContent || '').trim())) || null;
+  /* le bloc visé : cherché pendant 7 s au plus (les données arrivent du serveur), centré et mis en évidence ; redessiné entre-temps, il est retrouvé.
+     Compté en essais (pas à l'horloge) ; une nouvelle cible remplace la précédente */
+  let CIBLE = 0;
+  function cibler(trouver, ouvrir) {
+    const jeton = ++CIBLE; let vu = null, n = 0, essais = 0, stable = 0;
+    const essai = () => {
+      if (jeton !== CIBLE) return;
+      essais++; let e = null; try { e = trouver(); } catch (x) { e = null; }
+      if (e && e !== vu) {
+        vu = e; n++; stable = 0; if (ouvrir) { try { ouvrir(e); } catch (x) { /* rien */ } }
+        try { e.scrollIntoView({block: 'center', behavior: n > 1 ? 'auto' : 'smooth'}); } catch (x) { /* rien */ }
+        e.classList.remove('is-cible'); void e.offsetWidth; e.classList.add('is-cible'); setTimeout(() => e.classList.remove('is-cible'), 2700);
+        document.querySelectorAll('[data-vise]').forEach((x) => { if (x !== e) x.removeAttribute('data-vise'); }); e.setAttribute('data-vise', '');   /* le dernier bloc visé (lu par les bancs) */
+      } else if (vu && vu.isConnected) stable++;
+      if (essais < 24 && stable < 8) setTimeout(essai, 300);
+    };
+    setTimeout(essai, 150);
+  }
+  const vers = (hash) => { try { history.replaceState(null, '', hash ? hash : location.pathname + location.search); } catch (e) { /* rien */ } };
+  /* les adresses précises des notifications du serveur ; les autres (#voir-<ligne>, #voir-idee-…) restent à leurs aiguillages d'avant */
+  const VOIRURL_NOTIF = voirUrl;
+  voirUrl = function (hash) {
+    const s = String(hash || ''); let m;
+    if ((m = s.match(/^#voir-radar-(.+)$/))) {   /* Radar : l'alerte elle-même (paiement échoué…), ou les prélèvements de demain */
+      const k = decodeURIComponent(m[1]); vers('#argent');
+      RAD.f = k === 'veille' ? 'fixes' : 'alertes'; if (radOn()) radLoad(true);
+      if (TAB !== 'argent') go('argent'); else renderView(true);
+      if (k === 'veille') { const t = radAuj(), dem = radYmd(radD(t.getFullYear(), t.getMonth(), t.getDate() + 1)); cibler(() => document.querySelector('.rad-fx[data-date="' + dem + '"]') || document.querySelector('.rad-fixes > .panel')); }
+      else cibler(() => { const e = document.querySelector('.rad-alert[data-alerte="' + cssq(k) + '"]'); if (e) return e; const d = document.querySelector('.rad-vues'); if (d && !d.open) { d.open = true; d.dispatchEvent(new Event('toggle')); } return null; });
+      return true;
+    }
+    if ((m = s.match(/^#voir-mission-([\w-]+)$/))) {   /* une mission (terminée, en échec, à approuver) : sa fiche dépliée */
+      const id = m[1]; vers('#suivi'); go('suivi');
+      cibler(() => document.querySelector('.mis-it[data-mission="' + cssq(id) + '"]'), (e) => { e.open = true; });
+      return true;
+    }
+    if (s === '#voir-relances') { vers('#suivi'); go('suivi'); cibler(() => document.getElementById('relances')); return true; }
+    if (s === '#voir-sante') { vers('#reglages'); go('reglages'); cibler(() => panneauNomme(/^État des systèmes/)); return true; }
+    if (s === '#voir-brief') { vers(''); go('accueil'); cibler(() => { const b = document.getElementById('brief-card'); return b && !b.hidden ? b : null; }); return true; }
+    if (s === '#voir-echeances') { vers('#agenda'); go('agenda'); cibler(() => panneauNomme(/^Dates clés/)); return true; }   /* les rappels du jour : échéances et papiers, dans « Dates clés » */
+    if ((m = s.match(/^#voir-reglages-(\w+)$/))) {   /* Réglages : la carte concernée (mémoire, voix, assistants reliés, notifications) */
+      const id = {memoire: 'mem-card', voix: 'voixg-card', mcp: 'mcp-card', notifs: 'notif-card'}[m[1]]; vers('#reglages'); go('reglages');
+      if (id) cibler(() => document.getElementById(id));
+      return true;
+    }
+    return VOIRURL_NOTIF(hash);
+  };
+  const NOTIF = {faits: new Set(), cache: 0, poll: 0, depuis: Date.now()};
+  const notifAPI = () => (SRV_OS && window.JarvisServeur && window.JarvisServeur.notifs ? window.JarvisServeur : null);
+  function notifVue(ids) { ids = (ids || []).filter(Boolean); if (!ids.length) return; ids.forEach((i) => NOTIF.faits.add(i)); const JS = notifAPI(); if (JS && JS.notifsVues) JS.notifsVues(ids).catch(() => {}); }
+  /* l'aiguillage : une adresse de notification (« /?n=<id>#voir-… », « #recue=… », une rubrique) ouvre ce qu'elle annonce */
+  function ouvrirNotif(url, id) {
+    let u = null; try { u = new URL(url || '/', location.href); } catch (e) { u = null; }
+    const n = id || (u && u.searchParams.get('n')) || ''; if (n) notifVue([n]);
+    const hash = u ? u.hash : '';
+    if (hash && voirUrl(hash)) return true;
+    if (/^#recue=/.test(hash)) { vers(hash); recHash().catch(() => {}); return true; }
+    const v = hash.slice(1); if (v && VIEWS[v]) { go(v); return true; }
+    return false;
+  }
+  /* chemin 1 : l'app ouverte par une notification (« ?n=<id> ») : retirée de l'adresse, marquée vue ; son « #… » est ouvert par les aiguillages du démarrage */
+  { const n = new URLSearchParams(location.search).get('n'); if (n) { NOTIF.ouverte = n; notifVue([n]); const q = location.search.replace(/([?&])n=[^&]*(&|$)/, (m, a, b) => (b ? a : '')).replace(/^&/, '?'); try { history.replaceState(null, '', location.pathname + q + location.hash); } catch (e) { /* rien */ } } }
+  const heureN = (ms) => { const d = new Date(ms); return pad2(d.getHours()) + 'h' + pad2(d.getMinutes()); };
+  function notifsFeuille(l) {
+    openSheet({kicker: 'Pendant ton absence', title: l.length + ' notifications', actions: [], say: 'Touche celle que tu veux ouvrir : tu arrives sur ce qu’elle annonce.',
+      extra: () => h('div', {class: 'stack'}, l.map((x) => h('button', {type: 'button', class: 'hm-row notif-row', onclick: () => { closeSheet(); ouvrirNotif(x.url, x.id); }},
+        h('span', {class: 'hm-ic', html: icon('bolt', 17)}), h('span', {class: 'hm-tx'}, h('b', {text: x.title}), x.body ? h('small', {text: x.body.length > 140 ? x.body.slice(0, 137) + '…' : x.body}) : null, h('small', {class: 'muted', text: 'à ' + heureN(x.at)})))))});
+  }
+  /* chemin 3 : de retour au premier plan, les notifications envoyées pendant l'absence (moins de 15 minutes, pas encore vues) */
+  async function notifsRetour(depuis) {
+    const JS = notifAPI(); if (!JS) return;
+    const r = await JS.notifs().catch(() => null); if (!r || !Array.isArray(r.notifs)) return;
+    const l = r.notifs.filter((x) => !x.vue && !NOTIF.faits.has(x.id) && x.at >= depuis && Date.now() - x.at < 15 * 60e3 && !/#recue=/.test(x.url));   /* une tâche reçue s'ouvre déjà seule au retour (avec sa voix) */
+    if (!l.length) return;
+    if (l.length === 1) { const x = l[0], av = TAB; ouvrirNotif(x.url, x.id); toast(x.title, 'Ouvert depuis ta notification.', true, () => go(av)); return; }
+    notifVue(l.map((x) => x.id)); notifsFeuille(l);
+  }
+  /* dans l'app ouverte : une notification qui arrive s'affiche aussi en bandeau (sauf celles du Canal : la page les annonce déjà), avec « Voir » */
+  async function notifsSurveiller() {
+    const JS = notifAPI(); if (!JS || document.hidden) return;
+    const r = await JS.notifs().catch(() => null); if (!r || !Array.isArray(r.notifs)) return;
+    const neuves = r.notifs.filter((x) => !x.vue && !NOTIF.faits.has(x.id) && x.at > NOTIF.depuis && !/^\/?#(voir-(\d+|recent|cote|courrier)$|recue=)/.test(x.url)).reverse();
+    NOTIF.depuis = Math.max(NOTIF.depuis, ...r.notifs.map((x) => x.at));
+    neuves.slice(-3).forEach((x, i) => { NOTIF.faits.add(x.id); setTimeout(() => alertShow(x.title, x.body || '', () => ouvrirNotif(x.url, x.id)), i * 400); });
+  }
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) { NOTIF.cache = Date.now(); return; }
+    const depuis = NOTIF.cache; NOTIF.cache = 0; if (depuis) setTimeout(() => { notifsRetour(depuis - 10e3).then(() => { NOTIF.depuis = Date.now(); }).catch(() => {}); }, 500);   /* 10 s : l'écart d'horloge entre l'iPhone et le serveur */
+  });
+  setInterval(() => { notifsSurveiller().catch(() => {}); }, 30000);
+  window.addEventListener('jv-notifs', () => { notifsSurveiller().catch(() => {}); });   /* bancs : sans attendre les 30 s */
+  setTimeout(() => { NOTIF.depuis = Date.now(); }, 2500);   /* app fermée : l'iPhone l'ouvre sur l'adresse de la notification (chemin 1) */
   async function voixCard(JS) {
     const card = h('section', {class: 'card set-card voixg-card', id: 'voixg-card'}, h('b', {text: 'Voix du serveur : Pierre ou Google'}));
     let st = await JS.voixGoogle.etat();

@@ -693,6 +693,17 @@ srv.listen(0, async () => {
       await p.tap('.tab[data-tab="espaces"]'); await p.waitForTimeout(600);
       ok('Radar : la rubrique Argent est une tuile d’Espaces (maquette)', await p.evaluate(() => !!document.querySelector('.esp-tile[data-go="argent"]')));
       p = await page('#argent'); await p.screenshot({path: path.join(SH, 'radar.png')}); }
+    /* 0.69.0 (son retour du 23/11/2026 : « elle rouvre Jarvis sur la page déjà ouverte, pas sur l'alerte ») : une notification ouvre ce qu'elle annonce,
+       mis en évidence : l'alerte du Radar, les dates clés, l'état des systèmes ; l'app déjà ouverte reçoit l'adresse du service worker */
+    { const q = await page('#voir-radar-ra1');
+      const etat = () => q.evaluate(() => ({hash: location.hash, seg: (document.querySelector('.rad-seg button[aria-pressed="true"]') || {}).textContent || '', cible: [...document.querySelectorAll('[data-vise]')].map((x) => x.getAttribute('data-alerte') || ((x.querySelector('h2') || {}).textContent || '').trim() || x.id)}));
+      const a = await etat();
+      await q.evaluate(() => { location.hash = '#voir-echeances'; }); await q.waitForTimeout(1300); const c1 = await etat();
+      await q.evaluate(() => { location.hash = '#voir-sante'; }); await q.waitForTimeout(1300); const c2 = await etat();
+      await q.evaluate(() => { location.hash = '#accueil'; }); await q.waitForTimeout(1000);
+      await q.evaluate(() => navigator.serviceWorker && navigator.serviceWorker.dispatchEvent(new MessageEvent('message', {data: {type: 'jarvis-notif', url: '/?n=abcdef012345#voir-radar-ra2'}}))); await q.waitForTimeout(1300); const c3 = await etat();
+      ok('Notifications 0.69 : « #voir-radar-<alerte> » ouvre Argent sur l’alerte, mise en évidence ; « #voir-echeances » les dates clés ; « #voir-sante » l’état des systèmes ; app déjà ouverte : l’adresse transmise par le service worker ouvre l’alerte',
+        a.hash === '#argent' && /^Alertes/.test(a.seg) && a.cible.includes('ra1') && c1.hash === '#agenda' && c1.cible.some((x) => /Dates clés/.test(x)) && c2.hash === '#reglages' && c2.cible.some((x) => /État des systèmes/.test(x)) && c3.hash === '#argent' && c3.cible.includes('ra2') && !c3.cible.includes('ra1'), JSON.stringify([a, c1, c2, c3])); }
     /* Reste à payer (21/11/2026 ; ses choix : dans JARVIS, ses dépenses seulement, notification la veille + la page Radar). Date fixée au lundi
        23/11/2026 : paie le 28 (un samedi : avancée au vendredi 27) ; prélèvements du week-end et des jours fériés décalés au jour ouvré suivant. */
     { const ctx = await b.newContext({...devices['iPhone 15 Pro Max']}); await ctx.addInitScript(PAUSE_INIT); const q = await ctx.newPage(); q.on('pageerror', (e) => errs.push('reste à payer : ' + e.message));

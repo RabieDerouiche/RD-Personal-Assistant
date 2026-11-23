@@ -21,7 +21,7 @@ export function createSante({S, save, push, checks, now = () => Date.now()}) {
     S.sante.at = t; save();
     if (found.length && S.push && S.push.subs.length) {
       const body = found.map(([, it]) => it.nom + ' : ' + it.detail).join('\n');
-      await push.send({title: found.length === 1 ? 'JARVIS : ' + found[0][1].nom.toLowerCase() : 'JARVIS : ' + found.length + ' choses à réparer', body, url: '/#suivi', tag: 'sante'}, {urgency: 'high'});
+      await push.send({title: found.length === 1 ? 'JARVIS : ' + found[0][1].nom.toLowerCase() : 'JARVIS : ' + found.length + ' choses à réparer', body, url: '/#voir-sante', tag: 'sante'}, {urgency: 'high'});
       found.forEach(([, it]) => { it.notifiedAt = t; }); save();
     }
     return {problemes: Object.values(S.sante.items).filter((x) => !x.ok).length, notifies: found.length};

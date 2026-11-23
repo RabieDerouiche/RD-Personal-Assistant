@@ -462,10 +462,10 @@
       {date: rIso(55), service: 'Assurance auto', montant: null, type: 'fin', rythme: 'annuel', note: 'Échéance du contrat : un comparatif peut être prêt un mois avant.'},
       {date: rIso(32), service: 'Paiement en 4 fois : Boutique', montant: 29.55, type: 'echeance', plan: 'pl1', note: 'Échéance 4 sur 4.'}],
     alertes: [
-      {date: rIso(-6), type: 'echec', titre: 'Paiement échoué', service: 'Plateforme vidéo', montant: 9.99, texte: '3 tentatives : l’abonnement s’arrête si le moyen de paiement n’est pas mis à jour.'},
-      {date: rIso(-9), type: 'essai', titre: 'Essai gratuit qui devient payant', service: 'Appli de notes', montant: 7.99, texte: 'Premier prélèvement dans 24 jours.'},
-      {date: rIso(-21), type: 'hausse', titre: 'Hausse de prix', service: 'Plateforme d’animation', montant: 69.99, avant: 59.99, texte: 'À partir du prochain renouvellement.'},
-      {date: rIso(-33), type: 'inhabituel', titre: 'Facture deux fois plus haute que d’habitude', service: 'Électricité', montant: 96.40, avant: 48.20, texte: 'Habituellement 48,20 € par mois.'}],
+      {id: 'ra1', date: rIso(-6), type: 'echec', titre: 'Paiement échoué', service: 'Plateforme vidéo', montant: 9.99, texte: '3 tentatives : l’abonnement s’arrête si le moyen de paiement n’est pas mis à jour.'},
+      {id: 'ra2', date: rIso(-9), type: 'essai', titre: 'Essai gratuit qui devient payant', service: 'Appli de notes', montant: 7.99, texte: 'Premier prélèvement dans 24 jours.'},
+      {id: 'ra3', date: rIso(-21), type: 'hausse', titre: 'Hausse de prix', service: 'Plateforme d’animation', montant: 69.99, avant: 59.99, texte: 'À partir du prochain renouvellement.'},
+      {id: 'ra4', date: rIso(-33), type: 'inhabituel', titre: 'Facture deux fois plus haute que d’habitude', service: 'Électricité', montant: 96.40, avant: 48.20, texte: 'Habituellement 48,20 € par mois.'}],
     abonnements: [
       {service: 'Plateforme vidéo', cat: 'Vidéo et musique', prix: 9.99, rythme: 'mensuel', depuis: '03/2023'},
       {service: 'Plateforme d’animation', cat: 'Vidéo et musique', prix: 59.99, rythme: 'annuel', depuis: '01/2022', hausse: 'passe à 69,99 €'},

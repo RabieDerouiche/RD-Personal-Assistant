@@ -165,6 +165,24 @@ try {
       ok('Messages 0.67 : son message audio relayé par l’automatisation revient tel quel ; JARVIS ouvre sa fiche (« Message vocal de Nour », « Écouter sa voix ») sans le rejouer (déjà entendu)',
         rp.status === 200 && rb.equals(w) && r3.ouverte && /^Message vocal de Nour · /.test(r3.kicker) && r3.boutons.some((x) => /^▶ Écouter sa voix/.test(x)) && joue1 === joue0, JSON.stringify([rp.status, r3, joue0, joue1]));
       await fetch(BASE + '/api/raccourci/retirer', {method: 'POST', headers: AH, body: '{}'}); }   /* la clé du Raccourci est créée plus loin, par sa carte (essai 0.13.0) */
+    /* 0.69.0 (son retour du 23/11/2026 : « elle rouvre Jarvis sur la page déjà ouverte, pas sur l'alerte ») : l'iPhone ramène l'app au premier plan sans
+       changer son adresse ; l'app retrouve la notification envoyée pendant son absence et ouvre ce qu'elle annonce, ou la montre en bandeau si elle était ouverte */
+    { const fermer = () => q.evaluate(() => { const s = document.getElementById('sheet'), f = s && [...s.querySelectorAll('button')].find((x) => /Fermer/.test(x.textContent)); if (f) f.click(); });
+      const cache = (v) => q.evaluate((v) => { Object.defineProperty(document, 'hidden', {configurable: true, get: () => v}); document.dispatchEvent(new Event('visibilitychange')); }, v);
+      { const l0 = await fetch(BASE + '/api/notifs', {headers: AH}).then((x) => x.json()); await fetch(BASE + '/api/notifs/vue', {method: 'POST', headers: AH, body: JSON.stringify({ids: l0.notifs.map((x) => x.id)})}); }   /* les notifications des essais d'avant : déjà vues */
+      await fermer(); await q.evaluate(() => { location.hash = '#accueil'; }); await q.waitForTimeout(800);
+      await cache(true); await fetch(BASE + '/api/push/test', {method: 'POST', headers: AH, body: '{}'}); await cache(false); await q.waitForTimeout(3000);
+      const n1 = await q.evaluate(() => ({hash: location.hash, carte: !!document.getElementById('notif-card'), cible: [...document.querySelectorAll('[data-vise]')].map((x) => x.id), toast: [...document.querySelectorAll('.toast')].map((x) => x.innerText.replace(/\s+/g, ' ')).join(' | ')}));
+      const l1 = await fetch(BASE + '/api/notifs', {headers: AH}).then((x) => x.json()), x1 = l1.notifs.find((x) => x.tag === 'essai');
+      ok('notifications 0.69 : l’app déjà ouverte, ramenée au premier plan par une notification, ouvre ce qu’elle annonce (l’essai → la carte Notifications de Réglages, mise en évidence), le dit, et la marque vue',
+        n1.hash === '#reglages' && n1.carte && n1.cible.includes('notif-card') && /Ouvert depuis ta notification/.test(n1.toast) && !!x1 && x1.url === '/#voir-reglages-notifs' && !!x1.vue, JSON.stringify([n1, x1]));
+      /* l'app ouverte au premier plan : la notification arrive aussi en bandeau, « Voir » l'ouvre */
+      await q.evaluate(() => { location.hash = '#accueil'; }); await q.waitForTimeout(800);
+      await fetch(BASE + '/api/push/test', {method: 'POST', headers: AH, body: '{}'}); await q.evaluate(() => window.dispatchEvent(new Event('jv-notifs'))); await q.waitForTimeout(1500);
+      const b1 = await q.evaluate(() => { const t = [...document.querySelectorAll('.toast.alert-t')].find((x) => /Les notifications marchent/.test(x.textContent)); const v = t && [...t.querySelectorAll('button')].find((x) => x.textContent.trim() === 'Voir'); if (v) v.click(); return !!t; });
+      await q.waitForTimeout(2000); const b2 = await q.evaluate(() => location.hash);
+      ok('notifications 0.69 : app ouverte, la notification arrive en bandeau ; « Voir » ouvre ce qu’elle annonce', b1 && b2 === '#reglages', JSON.stringify([b1, b2]));
+    }
     await q.goto(BASE + '/?serveur#reglages'); await q.waitForTimeout(3500);
     const r2 = await q.evaluate(() => { const c = document.querySelector('.invite-card'); if (c) c.scrollIntoView(); return c ? {rap: !!c.querySelector('#iv-rap') && c.querySelector('#iv-rap').checked, det: [...c.querySelectorAll('details summary')].map((x) => x.textContent), url: c.textContent.includes('/api/raccourci/message'), at: !!c.querySelector('#iv-at') && c.querySelector('#iv-at').checked} : null; });
     ok('vocal (Réglages) : rappels cochés ; « Sa voix, téléphone verrouillé (Messages) » (adresse de son automatisation, 0.67) ; messages audio en tâches cochés ; « Avec tes AirPods »', r2 && r2.rap && r2.det.includes('Sa voix, téléphone verrouillé (Messages)') && r2.det.includes('Avec tes AirPods') && r2.url && r2.at, JSON.stringify(r2));
@@ -230,6 +248,11 @@ try {
     await q.evaluate(() => { const it = [...document.querySelectorAll('#missions .mis-it')].find((x) => /Ordre à Kairos/.test(x.textContent)); it.querySelector('.mis-accord .btn.ghost').click(); }); await q.waitForTimeout(4500);
     const ms = await fetch(BASE + '/api/missions', {headers: {authorization: 'Bearer ' + tk}}).then((x) => x.json()).then((j) => j.missions);
     ok('MCP : « Approuver » lance la mission chez Claude ; « Refuser » écarte l\'ordre', ms.some((x) => /Compare trois box/.test(x.text) && ['envoyee', 'terminee'].includes(x.status)) && ms.some((x) => /Surveille le prix de la box/.test(x.text) && x.status === 'refusee'), JSON.stringify(ms.filter((x) => /box/.test(x.text)).map((x) => [x.text.slice(0, 24), x.status])));
+    /* 0.69.0 : la notification d'une mission ouvre sa fiche dépliée (adresse de la notification, au démarrage de l'app) ; l'identifiant quitte l'adresse, le reste demeure */
+    { const mid = (ms.find((x) => /Compare trois box/.test(x.text)) || {}).id || '';
+      await q.goto(BASE + '/?serveur&n=0123456789ab#voir-mission-' + mid); await q.waitForTimeout(4500);
+      const m1 = await q.evaluate((id) => { const d = document.querySelector('.mis-it[data-mission="' + id + '"]'); return {hash: location.hash, search: location.search, ouverte: !!d && d.open}; }, mid);
+      ok('notifications 0.69 : « /?n=…#voir-mission-<id> » ouvre Équipe sur la mission, sa fiche dépliée ; l’identifiant quitte l’adresse, « ?serveur » reste', !!mid && m1.hash === '#suivi' && m1.ouverte && m1.search === '?serveur', JSON.stringify([mid, m1])); }
     await q.goto(BASE + '/?serveur#reglages'); await q.waitForTimeout(3000); await q.evaluate(() => { const c = document.getElementById('mcp-card'); if (c) c.scrollIntoView(); }); await q.screenshot({path: SH + 'mcp-reglages.png'});
     for (const x of ms.filter((y) => /box/.test(y.text))) await fetch(BASE + '/api/missions/' + x.id, {method: 'DELETE', headers: {authorization: 'Bearer ' + tk}});   /* le banc suivant attend « Aucune mission » */
     /* 0.40.0 : la voix Google — la clé collée dans Réglages (jamais relue), le choix Pierre ou Google, la liste des voix, puis la lecture par Google */
