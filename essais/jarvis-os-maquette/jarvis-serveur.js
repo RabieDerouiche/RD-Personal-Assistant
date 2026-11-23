@@ -231,8 +231,9 @@
       etat: () => req('/api/mcp').then((r) => (r.status === 200 ? r.j : null)).catch(() => null),
       decider: (id, oui) => req('/api/mcp/decider', {id, oui}).then((r) => (r.status === 200 ? r.j : null)).catch(() => null),
       retirer: (id) => req('/api/mcp/retirer', {id}).then((r) => (r.status === 200 ? r.j : null)).catch(() => null),
-      /* 0.71.0 : un jeton fixe par assistant, avec son profil (« lecture » ou « executant ») ; un refus (400) revient avec sa raison */
-      jeton: (nom, profil) => req('/api/mcp/jeton', {nom, profil: profil || 'lecture'}).then((r) => (r.status === 200 || (r.status === 400 && r.j && r.j.error) ? r.j : null)).catch(() => null),
+      /* 0.71.0 : un jeton fixe par assistant, avec son profil (« lecture » ou « executant ») ; un refus (400) revient avec sa raison.
+         0.72.0 : profil « veilleur », et `signe` (facultatif), le nom d'un jeton exécutant sous lequel il écrit dans Pilotage */
+      jeton: (nom, profil, signe) => req('/api/mcp/jeton', {nom, profil: profil || 'lecture', ...(signe ? {signe} : {})}).then((r) => (r.status === 200 || (r.status === 400 && r.j && r.j.error) ? r.j : null)).catch(() => null),
       suspendre: (id, oui) => req('/api/mcp/suspendre', {id, oui}).then((r) => (r.status === 200 ? r.j : null)).catch(() => null)
     },
     missionStatut: (id, status) => req('/api/missions/' + encodeURIComponent(id), {status}).then((r) => (r.status === 200 ? r.j : null)).catch(() => null),
