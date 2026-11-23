@@ -21,6 +21,7 @@ But : qu'il sache en une minute ce que la semaine lui demande. Charge d'abord la
 4. Garde seulement ce qui demande quelque chose de lui du lundi au dimanche : rendez-vous à préparer, échéance,
    réponse attendue, dossier dont la prochaine étape tombe dans la semaine, fermeture de crèche, jour férié,
    déplacement.
+   Pour chaque échéance de la semaine : ce qui est déjà prêt et ce qu'il reste à décider.
 5. Message, dans cet ordre, sans titre inutile :
    - « À faire cette semaine » : 5 lignes au plus, la plus urgente d'abord, chacune avec son jour.
    - « Jour par jour » : une ligne par jour qui a quelque chose (lundi 24 : …).
