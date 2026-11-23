@@ -32,7 +32,7 @@ Si un ID ne répond plus, retrouve le fichier avec `search_files` par titre.
 
 ## Grok Bot en bref
 
-**Hermes n'existe plus** : arrêté et remplacé par Grok Bot. Ne le mentionne plus, ne lis plus `État Hermes`, n'écris plus dans `Notes de Claude/`, ne signale plus son absence.
+**L'ancien Hermes** (OpenRouter et Telegram, 28/10 au 03/11/2026) est arrêté et remplacé par Grok Bot : ne lis plus `État Hermes`, n'écris plus dans `Notes de Claude/`. **Hermes Agent revient en essai sur le serveur de JARVIS** (sa demande du 23/11/2026 : tester des routines, peut-être alléger ou remplacer Grok Bot, puis le relier à JARVIS) : lis `docs/hermes.md` avant d'y toucher (kit `jarvis-os/hermes/`, étape en cours, garde-fous, abonnement Claude par le plugin officiel, jamais l'OAuth intégré d'Hermes). Grok Bot ne change pas pendant l'essai.
 
 | Bot | Domaine |
 |---|---|
