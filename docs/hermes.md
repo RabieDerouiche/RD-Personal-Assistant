@@ -217,6 +217,7 @@ retirer : `sudo bash /opt/rd/jarvis-os/hermes/desinstaller.sh` (`--tout` efface 
 | « plan limit », refus jusqu'à une heure donnée | Limite du forfait atteinte (`extra_usage: stop`) ; le plus souvent la fenêtre de 5 heures, que le garde ne surveille plus | Attendre la remise à zéro ; JARVIS et les sessions de développement sont à la même enveloppe |
 | « Third-party apps now draw from your extra usage » | Anthropic a basculé les apps tierces sur l'usage payant | Ne rien autoriser ; passer au plan B (crédits d'API inclus dans Max), décision du propriétaire |
 | Telegram : « Conflict: terminated by other getUpdates request » | Un autre programme utilise le même jeton | Nouveau jeton (@BotFather, /revoke), puis `telegram.sh` |
+| Après un changement de politique ou de consigne, Hermes répond encore « je n'ai pas accès à JARVIS » | La conversation Telegram a commencé avant : elle garde l'ancienne consigne et l'ancienne liste d'outils (vu le 23/11/2026 : liaison posée à 20:38 UTC, 16 outils, et réponse « pas encore accès ») | Dans Telegram : `/new`, puis reposer la question |
 | Hermes ne démarre plus après une commande `hermes tools` ou `hermes config` | Fichier de réglages réécrit illisible (défaut de la 0.23.3) | Reprendre le dernier bon fichier de `/home/hermes/.hermes/backups/config/` (en tant que `hermes`), puis `sudo systemctl restart hermes-gateway` |
 
 ## État
@@ -258,4 +259,5 @@ retirer : `sudo bash /opt/rd/jarvis-os/hermes/desinstaller.sh` (`--tout` efface 
   Caddy depuis l'utilisateur `hermes`, le vrai Claude dans une routine, « /skills approve » dans Telegram.
 - 23/11/2026, 19h30 : sur le serveur (session « Serveur JARVIS »), dépôt `3c4d4a8`, JARVIS 0.71.0, `install.sh`
   code 0 avec la politique des étapes 3 et 4 (pas encore relié). Ses choix par QCM et la suite : `docs/hermes-deroule.md`.
-
+- 23/11/2026, 21h38 (heure de Paris) : **étape 3 faite**, par lui (`relier-jarvis.sh` dans Termius) : `jarvis.env` root 0600, 16 outils de JARVIS annoncés par Hermes, aucune erreur (contrôle en lecture seule par la session « Serveur JARVIS »). Son premier essai a répondu « pas encore accès » : conversation commencée avant la liaison (`/new` ; ajouté au message de `relier-jarvis.sh` et au dépannage).
+- 23/11/2026, 22h54 : **étape 4 faite** par la session « Serveur JARVIS » : `routines.sh` code 0, routines `supervision` (prochain passage le mercredi 25/11 à 8h50) et `semaine-a-venir` (dimanche 29/11 à 18h10) actives, en double. Reste : son essai dans une conversation neuve (`/new`), puis faire connaître Hermes à la Charte et à Argus ; ensuite la Veille du matin et l'essai du web (`docs/hermes-deroule.md`).

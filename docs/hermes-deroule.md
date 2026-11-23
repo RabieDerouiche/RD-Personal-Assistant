@@ -150,3 +150,4 @@ commence à la première bascule.
   et Échéances, skill, ligne de `routines.conf`) ; (2) essai du web sur le Digest (profil de jeton sans Gmail,
   second serveur MCP dans la politique d'Hermes, outil `web` pour cette seule routine, skill) ; (3) comparaison
   des routines en double à partir du 07/12/2026, à sa demande.
+- 23/11/2026, 22h54 (heure de Paris) : **en service**. Liaison posée par lui à 21h38 (16 outils, aucune erreur) ; routines `supervision` et `semaine-a-venir` posées, en double (premiers passages : mercredi 25/11 à 8h50, dimanche 29/11 à 18h10). Fin du double et comparaison : à partir du 07/12/2026. Son premier essai sur Telegram a répondu « pas encore accès » : conversation commencée avant la liaison, `/new` à faire. Pas encore fait : la vague « faire connaître Hermes » (Charte, Argus, onglet Routines), après son essai réussi ; les outils qui touchent le vrai Google (lecture de Pilotage, Gmail, agendas) seront éprouvés par cet essai.
