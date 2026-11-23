@@ -1,0 +1,11 @@
+# JARVIS OS — toutes les 10 minutes, le garde du forfait Claude partagé (hermes-garde.service).
+[Unit]
+Description=Garde du forfait Claude partagé, toutes les 10 minutes (essai JARVIS OS)
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=10min
+AccuracySec=1min
+
+[Install]
+WantedBy=timers.target

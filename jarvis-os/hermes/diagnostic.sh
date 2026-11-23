@@ -56,6 +56,9 @@ if id hermes >/dev/null 2>&1; then
   nft list table inet hermes_sortie >/dev/null 2>&1 && echo "  règles réseau hermes_sortie : chargées" || echo "  ATTENTION : règles réseau hermes_sortie absentes"
   echo "  outils actifs sur Telegram : $(hx hermes tools list --platform telegram 2>/dev/null | grep -c '✓ enabled') (attendu : 4)"
   echo "  exposition systemd : $(systemd-analyze security --no-pager hermes-gateway.service 2>/dev/null | sed -n 's/.*Overall exposure level for hermes-gateway.service: //p')"
+  seuil=$(sed -n 's/^HERMES_SEUIL_FORFAIT=//p' /etc/hermes/garde.conf 2>/dev/null)
+  echo "  garde du forfait : $(systemctl is-active hermes-garde.timer 2>/dev/null || echo absent) (seuil ${seuil:-?} %)$([ -f /var/lib/hermes-garde/arret ] && echo ' ; HERMES EN PAUSE : forfait au-dessus du seuil')"
+  journalctl -u hermes-garde -n 1 --no-pager -o cat 2>/dev/null | sed 's/^/    dernier contrôle : /'
   echo "  dernières lignes utiles du journal :"
   grep -E "telegram connected|Connected to Telegram|ERROR|Traceback|plan limit|extra usage|denied" /home/hermes/.hermes/logs/gateway.log 2>/dev/null | tail -5 | cut -c1-160 | sed -E 's/[0-9]{6,}/<n>/g; s/^/    /'
 fi
