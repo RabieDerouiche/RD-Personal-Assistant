@@ -3392,16 +3392,20 @@ void main(){
   /* 0.60.0 : la conversation à la voix (mains libres) : Claude agit et fait valider de vive voix, sans bouton */
   const voixOn = () => typeof MAINS === 'object' && !!MAINS.on;
   /* 0.63.0 (ses choix : « une réflexion solide et juste plutôt qu'une réponse rapide », « oui, partout ») : sur le serveur, la discussion
-     a Opus qui réfléchit (à la voix comme à l'écrit), sauf s'il choisit « Rapide » à l'écrit */
+     a Opus qui réfléchit (à la voix comme à l'écrit), sauf s'il choisit « Rapide » à l'écrit. 0.70.0 (son choix du 23/11/2026 : « je veux mimer
+     ce qu'on a depuis l'app Claude ») : à la voix, le serveur fait répondre Sonnet tout de suite, et Opus qui réfléchit s'il dit « réfléchis bien » */
   const chatTier = () => (!SRV_OS ? CHAT.tier : voixOn() ? 'voix' : CHAT.tier === 'quick' ? 'quick' : 'juste');
   /* une phrase qui demande d'agir part directement à Claude (pas de détour par les réponses instantanées) */
   const voixAction = (x) => /\b(ajoute[rz]?|note[rz]?|rappelle[rz]?|programme[rz]?|envoie[rz]?|dis a|demande a|previens|relance[rz]?|cree[rz]?|confie[rz]?|retiens|reporte[rz]?|decale[rz]?|deplace[rz]?|supprime[rz]?|annule[rz]?|coche[rz]?|termine[rz]?|j ai (fini|fait|appele|envoye|paye|regle)|c est fait|marque[rz]?|prepare[rz]?|organise[rz]?)\b/.test(lvLow(x).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' '));   /* 0.61.0 : au niveau de sendChat (déclarée plus bas, elle restait invisible pour lui) */
-  /* 0.63.0 (son choix : « je préfère une réflexion solide et juste qu'une réponse rapide, travaille sur la qualité ») : la justesse d'abord */
-  const VOIX_AGIR = "EN CONVERSATION À LA VOIX (Rabie te parle, mains libres) : il ne touche aucun bouton. La justesse compte plus que la vitesse : prends le temps de réfléchir avant de répondre. "
+  /* 0.63.0 (son choix : « je préfère une réflexion solide et juste qu'une réponse rapide, travaille sur la qualité ») : la justesse d'abord.
+     0.70.0 (son choix du 23/11/2026 : « je veux mimer ce qu'on a depuis l'app Claude ») : une conversation de vive voix, comme la voix de l'app Claude :
+     tu réponds tout de suite, court ; la justesse reste (rien de deviné), la longue réflexion seulement s'il la demande */
+  const VOIX_AGIR = "EN CONVERSATION À LA VOIX (Rabie te parle, mains libres) : il ne touche aucun bouton. C'est une conversation de vive voix, comme avec la voix de l'app Claude : réponds tout de suite, en une à trois phrases, l'essentiel d'abord ; il dira « dis-m'en plus » s'il veut le détail. "
     + "Vérifie dans ses données (agenda, tâches, demandes, Pilotage) avant d'affirmer ; ne devine jamais une date, un nom, un lieu ni un montant ; si une information manque ou si sa phrase peut se comprendre de deux façons, pose une seule question courte plutôt que de supposer. "
     + "Avant d'agir, comprends l'intention exacte et reformule l'objet précis (qui, quoi, quand) ; tiens compte de ce qui existe déjà (une tâche ou une échéance déjà là, un bot déjà sollicité) pour ne rien faire en double. "
     + "Une tâche, un souvenir, une relance, cocher ou reporter une tâche : fais-le aussitôt avec l'outil et dis-le en une phrase. Un ordre à un bot, une échéance, une routine, la tâche Claude, la mise à jour d'un dossier, supprimer une tâche : dis exactement ce qui partira, puis demande « Je l'envoie ? » (ou « Je la programme ? ») ; son oui l'exécute. "
-    + "Plusieurs demandes d'un coup : traite-les toutes. Réponses claires et complètes, sans remplissage : elles sont lues à voix haute. ";
+    + "Plusieurs demandes d'un coup : traite-les toutes. Réponses courtes et claires, sans remplissage ni liste lue en entier (les trois premiers éléments, puis « tu veux la suite ? ») : elles sont lues à voix haute. "
+    + "S'il te demande de réfléchir (« réfléchis bien », « à fond », « en profondeur »), prends le temps qu'il faut et réponds complètement. ";
   function voixRules(ctx) {
     return ctx.replace(/Après la réponse, ajoute toujours une dernière ligne qui commence par « Suite : »[^\n]*\n/, '').replace("ces outils ne font que proposer, Rabie confirme d'un bouton. ", 'à la voix, comme dit plus bas. ').replace('Rabie le confirmera d\'un bouton. ', 'il le confirme de vive voix. ').replace(/(Tu es Claude, le chef[^]*?tu répartis le travail\. )/, '$1' + VOIX_AGIR);
   }
