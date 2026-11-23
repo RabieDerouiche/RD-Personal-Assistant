@@ -10,6 +10,12 @@ EnvironmentFile=-/etc/hermes/garde.conf
 ExecStart=/usr/local/sbin/hermes-garde-forfait
 StateDirectory=hermes-garde
 TimeoutStartSec=150
+# JARVIS d'abord : la lecture d'usage (Hermes et la sonde de Claude Code, quelques secondes) passe après lui
+Nice=10
+CPUWeight=20
+IOWeight=20
+OOMScoreAdjust=700
+MemoryMax=600M
 NoNewPrivileges=yes
 PrivateTmp=yes
 ProtectSystem=full
