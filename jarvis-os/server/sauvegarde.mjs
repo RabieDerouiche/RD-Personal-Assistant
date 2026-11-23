@@ -16,7 +16,11 @@ export function createSauvegarde({S, save, read, linked, dir, now = () => Date.n
   const files = () => fs.readdirSync(dir).filter((f) => /^\d{4}-\d{2}-\d{2}\.json$/.test(f)).sort();
   const load = (f) => { try { return JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8')); } catch { return null; } };
 
-  async function run() {
+  /* 0.70.0 : une seule copie à la fois (« Sauvegarder maintenant » pendant la copie de la nuit reçoit la même) ; après un échec,
+     la copie automatique est réessayée toutes les 30 minutes, pas chaque minute (19 lectures de Pilotage à chaque essai) */
+  let enCours = null, essai = 0;
+  function run() { if (!enCours) enCours = copier().finally(() => { enCours = null; }); return enCours; }
+  async function copier() {
     const t = paris(new Date(now())), copy = {at: now(), onglets: {}}, manque = [];
     for (const [nom, plage] of ONGLETS) {
       try { copy.onglets[nom] = await read("'" + nom + "'!" + plage); } catch (e) { manque.push(nom); }
@@ -31,7 +35,8 @@ export function createSauvegarde({S, save, read, linked, dir, now = () => Date.n
   /* chaque minute : une copie par jour, après l'heure prévue, si Google est relié */
   async function tick() {
     const t = paris(new Date(now()));
-    if (!linked() || S.sauvegarde.last === t.ymd || t.hm < heure) return null;
+    if (!linked() || S.sauvegarde.last === t.ymd || t.hm < heure || enCours || now() - essai < 30 * 60000) return null;
+    essai = now();
     return run();
   }
   /* ce qui a changé entre deux copies (par défaut : les deux dernières), onglet par onglet, ligne par ligne */

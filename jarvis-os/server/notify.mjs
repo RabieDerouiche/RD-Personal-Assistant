@@ -54,6 +54,9 @@ export function createNotifier({S, save, push, read, linked, pause, now = () => 
   S.notify = Object.assign({canal: null, digest: '', resume: '', lastCanal: 0}, S.notify || {});
   const prefs = () => S.push.prefs || {};
   const ready = () => S.push.subs.length > 0 && linked();
+  /* 0.70.0 : la journée (ou la reprise) n'est marquée faite qu'après des lectures de Pilotage réussies ; une lecture ratée (Google 503,
+     réseau) est réessayée 10 minutes plus tard, au lieu de perdre les rappels du jour. En mémoire seulement : un redémarrage réessaie tout de suite. */
+  const REESSAI = 10 * 60000; let digestEssai = 0, resumeEssai = 0;
 
   /* 1. le Canal : réponses des bots aux lignes du propriétaire ou de Claude, et nouvelles demandes des bots pour lui */
   function canalEvents(rows) {
@@ -98,17 +101,19 @@ export function createNotifier({S, save, push, read, linked, pause, now = () => 
   /* 2. les rappels du matin, une fois par jour à l'heure choisie */
   async function checkDigest(force) {
     const t = paris(new Date(now()));
-    if (!force && (S.notify.digest === t.ymd || t.hm < (prefs().heure || '08:00'))) return null;
-    S.notify.digest = t.ymd; save();
-    if (prefs().rappels === false) return {lines: 0, sent: false};
+    if (!force && (S.notify.digest === t.ymd || t.hm < (prefs().heure || '08:00') || now() - digestEssai < REESSAI)) return null;
+    digestEssai = now();
+    if (prefs().rappels === false) { S.notify.digest = t.ymd; save(); return {lines: 0, sent: false}; }
     const lines = [];
-    const ech = await read("'Échéances'!A1:H1000"), ce = cols(ech), iD = ce('date'), iS = ce('sujet'), iSt = ce('statut');
+    const ech = await read("'Échéances'!A1:H1000"), pap = await read('Papiers!A1:G300');
+    S.notify.digest = t.ymd; save();
+    const ce = cols(ech), iD = ce('date'), iS = ce('sujet'), iSt = ce('statut');
     if (iD >= 0 && iS >= 0) ech.slice(1).forEach((r) => { const n = daysTo(r[iD], t); if ([0, 1, 7].includes(n) && OPEN(iSt >= 0 ? r[iSt] : '')) lines.push({n, t: when(n) + ' : ' + String(r[iS]).trim()}); });
     /* 0.20.0 : et les paliers de la colonne Rappels (3 mois, 1 mois, 1 semaine, vendredi d'avant…), sans doublon avec les rappels ci-dessus */
     const iR = ce('rappels');
     if (iD >= 0 && iS >= 0 && iR >= 0) ech.slice(1).forEach((r) => { const n = daysTo(r[iD], t); if (n == null || n <= 1 || n === 7 || !OPEN(iSt >= 0 ? r[iSt] : '')) return; if (paliers(r[iR], r[iD]).includes(t.ymd)) lines.push({n, t: (n % 7 === 0 && n <= 56 ? 'Dans ' + n / 7 + ' semaine' + (n > 7 ? 's' : '') : n >= 28 && n <= 31 ? 'Dans 1 mois' : when(n)) + ' : ' + String(r[iS]).trim()}); });
-    const pap = await read('Papiers!A1:G300'), cp = cols(pap), iDoc = cp('document'), iV = cp("valable jusqu'au"), iP = cp('personne');
-    if (iDoc >= 0 && iV >= 0) pap.slice(1).forEach((r) => { const n = daysTo(r[iV], t); if ([0, 7, 30, 90].includes(n)) lines.push({n, t: String(r[iDoc]).trim() + (iP >= 0 && r[iP] ? ' (' + String(r[iP]).trim() + ')' : '') + (n === 0 ? " : n'est plus valable dès aujourd'hui" : ' : expire dans ' + n + ' jours')}); });
+    const cp = cols(pap), iDoc = cp('document'), iV = cp("valable jusqu'au"), iP = cp('personne');
+    if (iDoc >= 0 && iV >= 0) pap.slice(1).forEach((r) => { const n = daysTo(r[iV], t); if ([0, 7, 30, 90].includes(n)) lines.push({n, t: String(r[iDoc]).trim() + (iP >= 0 && r[iP] ? ' (' + String(r[iP]).trim() + ')' : '') + (n === 0 ? " : dernier jour de validité aujourd'hui" : ' : expire dans ' + n + ' jours')}); });
     if (!lines.length) return {lines: 0, sent: false};
     lines.sort((a, b) => a.n - b.n);
     await push.send({title: lines.length === 1 ? 'Rappel du jour' : lines.length + ' rappels du jour', body: lines.slice(0, 5).map((x) => x.t).join('\n') + (lines.length > 5 ? '\n… et ' + (lines.length - 5) + ' autres' : ''), url: '/#voir-echeances', tag: 'rappels'});
@@ -118,9 +123,11 @@ export function createNotifier({S, save, push, read, linked, pause, now = () => 
   /* 3. fin de la pause de Grok (ligne « Grok en pause jusqu'au » de l'onglet Faits, sinon la date des réglages du serveur) : combien de lignes attendent les bots */
   async function checkResume(force) {
     const end = pause ? await pause() : (S.config && S.config.grokPauseUntil ? Date.parse(S.config.grokPauseUntil) : NaN), until = String(end);
-    if (!end || isNaN(end) || end > now() || now() - end > 24 * 3600000 || (!force && S.notify.resume === until)) return null;   /* une reprise de plus de 24 h n'est plus une nouvelle */
+    if (!end || isNaN(end) || end > now() || now() - end > 24 * 3600000 || (!force && (S.notify.resume === until || now() - resumeEssai < REESSAI))) return null;   /* une reprise de plus de 24 h n'est plus une nouvelle */
+    resumeEssai = now();
+    const rows = await read('Canal!A1:H3000');
     S.notify.resume = until; save();
-    const rows = await read('Canal!A1:H3000'), c = cols(rows), iPour = c('pour'), iSt = c('statut');
+    const c = cols(rows), iPour = c('pour'), iSt = c('statut');
     const per = {}; rows.slice(1).forEach((r) => { const p = low(r[iPour]); if (BOTS.includes(p) && low(r[iSt]) === 'a faire') per[String(r[iPour]).trim()] = (per[String(r[iPour]).trim()] || 0) + 1; });
     const n = Object.values(per).reduce((a, b) => a + b, 0);
     if (!n) return {lines: 0, sent: false};

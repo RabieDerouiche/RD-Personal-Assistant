@@ -51,9 +51,22 @@ export const sansBalises = (html) => String(html || '').replace(/<(style|script|
   .replace(/<br\s*\/?>/gi, '\n').replace(/<\/(p|div|tr|li|h[1-6]|table)>/gi, '\n').replace(/<\/t[dh]>/gi, ' | ').replace(/<[^>]+>/g, '')
   .replace(/&#x([0-9a-f]+);/gi, (_, x) => point(parseInt(x, 16))).replace(/&#(\d+);/g, (_, d) => point(+d)).replace(/&([a-z]+);/gi, (m, n) => ENT[n] || ENT[n.toLowerCase()] || m)
   .replace(/[ \t\u00a0]+/g, ' ').replace(/ *\n[ \n]*/g, '\n').trim();
+/* 0.70.0 : le corps d'une partie dans son jeu de caractères (en-tête Content-Type). Avant, tout était lu en UTF-8 : une facture en ISO-8859-1
+   ou windows-1252 perdait ses « é » et ses « € » (le Radar n'y trouvait plus le montant). Un corps déjà en UTF-8 valide reste lu en UTF-8. */
+function corpsDe(part) {
+  const b = Buffer.from(String(part.body.data || '').replace(/-/g, '+').replace(/_/g, '/'), 'base64');
+  const ct = ((part.headers || []).find((h) => h && /^content-type$/i.test(String(h.name || ''))) || {}).value || '';
+  const cs = ((String(ct).match(/charset\s*=\s*["']?([\w.:-]+)/i) || [])[1] || '').toLowerCase();
+  if (cs && !/^(utf-?8|us-ascii|ascii)$/.test(cs)) {
+    let utf8 = false;
+    if (b.some((x) => x > 127)) { try { new TextDecoder('utf-8', {fatal: true}).decode(b); utf8 = true; } catch { /* pas de l'UTF-8 */ } }
+    if (!utf8) { try { return new TextDecoder(cs).decode(b); } catch { /* jeu inconnu : UTF-8, comme avant */ } }
+  }
+  return b.toString('utf8');
+}
 function partOf(part, type) {
   if (!part) return '';
-  if (part.mimeType === type && part.body && part.body.data) return b64d(part.body.data);
+  if (part.mimeType === type && part.body && part.body.data) return corpsDe(part);
   for (const p of part.parts || []) { const t = partOf(p, type); if (t) return t; }
   return '';
 }
@@ -93,6 +106,16 @@ export function createGoogle({S, save, log = () => {}}) {
   const G = S.google;
   const pending = new Map();   /* state OAuth → {redirect, at} : 10 minutes, usage unique */
   let access = {token: '', exp: 0};
+  /* 0.70.0 : chaque appel à Google a un délai (30 s) ; avant, une connexion muette figeait une lecture de Pilotage ou une action de la page
+     au moins 5 minutes. La lecture du corps compte dans le délai : elle ne passe plus pour une réponse vide. */
+  const DELAI = +process.env.JARVIS_GOOGLE_DELAI_MS || 30000;
+  const estDelai = (e) => !!e && (e.name === 'TimeoutError' || e.name === 'AbortError');
+  const errDelai = () => new ToolError('tool_error', 'Google ne répond pas (' + Math.round(DELAI / 1000) + ' s) : réessaie dans un moment.');
+  const gfetch = async (url, o = {}) => {
+    try { return await fetch(url, {...o, signal: AbortSignal.timeout(DELAI)}); }
+    catch (e) { if (estDelai(e)) throw errDelai(); if (e instanceof TypeError && /fetch failed/i.test(e.message)) throw new ToolError('tool_error', 'Google est injoignable pour l’instant (réseau) : réessaie dans un moment.'); throw e; }
+  };
+  const lireJson = async (r) => { try { return await r.json(); } catch (e) { if (estDelai(e)) throw errDelai(); return {}; } };
 
   const status = (redirect) => ({configured: !!(G.clientId && G.clientSecret), linked: !!G.refresh, account: G.account || '', linkedAt: G.linkedAt || 0,
     clientId: G.clientId ? G.clientId.slice(0, 12) + '…' : '', redirect, scopes: SCOPES});
@@ -113,8 +136,8 @@ export function createGoogle({S, save, log = () => {}}) {
     return {ok: true, url: URLS.auth + '?' + q};
   }
   async function tokenCall(params) {
-    const r = await fetch(URLS.token, {method: 'POST', headers: {'content-type': 'application/x-www-form-urlencoded'}, body: new URLSearchParams(params)});
-    const j = await r.json().catch(() => ({}));
+    const r = await gfetch(URLS.token, {method: 'POST', headers: {'content-type': 'application/x-www-form-urlencoded'}, body: new URLSearchParams(params)});
+    const j = await lireJson(r);
     if (!r.ok) throw new ToolError(j.error === 'invalid_grant' ? 'needs_reauth' : 'tool_error', j.error_description || j.error || 'HTTP ' + r.status, r.status);
     return j;
   }
@@ -136,24 +159,33 @@ export function createGoogle({S, save, log = () => {}}) {
   async function unlink() {
     const t = G.refresh;
     G.refresh = ''; G.account = ''; G.linkedAt = 0; access = {token: '', exp: 0}; save();
-    if (t) { try { await fetch(URLS.revoke, {method: 'POST', headers: {'content-type': 'application/x-www-form-urlencoded'}, body: new URLSearchParams({token: t})}); } catch { /* rien */ } }
+    if (t) { try { await gfetch(URLS.revoke, {method: 'POST', headers: {'content-type': 'application/x-www-form-urlencoded'}, body: new URLSearchParams({token: t})}); } catch { /* rien */ } }
     return {ok: true};
   }
+  /* 0.70.0 : un seul renouvellement du jeton à la fois, partagé par les appels qui tombent ensemble (les tics de 60 s) ; un renouvellement
+     lancé avec l'accès d'avant (compte changé ou délié entre-temps) n'écrase plus le nouveau, ni ne l'efface s'il est refusé */
+  let enCours = null;
   async function token() {
     if (!G.refresh) throw new ToolError('server_not_connected', 'Google n’est pas relié à JARVIS (Réglages, Connecter Google).');
     if (access.token && Date.now() < access.exp) return access.token;
-    try {
-      const j = await tokenCall({client_id: G.clientId, client_secret: G.clientSecret, refresh_token: G.refresh, grant_type: 'refresh_token'});
-      access = {token: j.access_token, exp: Date.now() + (j.expires_in || 3600) * 1000 - 60e3};
-      return access.token;
-    } catch (e) { if (e.code === 'needs_reauth') { G.refresh = ''; save(); } throw e; }
+    const rt = G.refresh;
+    if (!enCours || enCours.rt !== rt) {
+      const p = tokenCall({client_id: G.clientId, client_secret: G.clientSecret, refresh_token: rt, grant_type: 'refresh_token'})
+        .then((j) => { if (G.refresh === rt) access = {token: j.access_token, exp: Date.now() + (j.expires_in || 3600) * 1000 - 60e3}; return j.access_token; },
+          (e) => { if (e.code === 'needs_reauth' && G.refresh === rt) { G.refresh = ''; save(); } throw e; })
+        .finally(() => { if (enCours && enCours.p === p) enCours = null; });
+      enCours = {rt, p};
+    }
+    let t;
+    try { t = await enCours.p; } catch (e) { if (G.refresh && G.refresh !== rt) return token(); throw e; }   /* compte changé entre-temps : avec le nouveau */
+    return G.refresh === rt ? t : token();
   }
   async function api(method, url, body, retry = true) {
     const t = await token();
-    const r = await fetch(url, {method, headers: {authorization: 'Bearer ' + t, ...(body ? {'content-type': 'application/json'} : {})}, body: body ? JSON.stringify(body) : undefined});
-    if (r.status === 401 && retry) { access = {token: '', exp: 0}; return api(method, url, body, false); }
+    const r = await gfetch(url, {method, headers: {authorization: 'Bearer ' + t, ...(body ? {'content-type': 'application/json'} : {})}, body: body ? JSON.stringify(body) : undefined});
+    if (r.status === 401 && retry) { if (access.token === t) access = {token: '', exp: 0}; return api(method, url, body, false); }
     if (r.status === 204) return {};
-    const j = await r.json().catch(() => ({}));
+    const j = await lireJson(r);
     if (!r.ok) {
       const msg = (j.error && (j.error.message || j.error)) || 'HTTP ' + r.status;
       const code = r.status === 401 ? 'needs_reauth' : r.status === 403 && /scope|insufficient/i.test(JSON.stringify(j)) ? 'not_granted' : 'tool_error';
@@ -165,9 +197,9 @@ export function createGoogle({S, save, log = () => {}}) {
   /* 0.37.0 : une réponse en texte (l'export d'un Google Doc) */
   async function apiText(url, retry = true) {
     const t = await token();
-    const r = await fetch(url, {headers: {authorization: 'Bearer ' + t}});
-    if (r.status === 401 && retry) { access = {token: '', exp: 0}; return apiText(url, false); }
-    const tx = await r.text();
+    const r = await gfetch(url, {headers: {authorization: 'Bearer ' + t}});
+    if (r.status === 401 && retry) { if (access.token === t) access = {token: '', exp: 0}; return apiText(url, false); }
+    let tx = ''; try { tx = await r.text(); } catch (e) { if (estDelai(e)) throw errDelai(); throw e; }
     if (!r.ok) throw new ToolError(r.status === 401 ? 'needs_reauth' : 'tool_error', 'HTTP ' + r.status, r.status);
     return tx;
   }
@@ -184,8 +216,15 @@ export function createGoogle({S, save, log = () => {}}) {
       list_events: async (i) => {
         const q = new URLSearchParams({singleEvents: 'true', orderBy: i.orderBy === 'updated' ? 'updated' : 'startTime', maxResults: String(Math.min(+i.pageSize || 250, 2500)), timeZone: TZ});
         if (i.startTime) q.set('timeMin', rfc(i.startTime)); if (i.endTime) q.set('timeMax', rfc(i.endTime)); if (i.query) q.set('q', i.query);
-        const j = await api('GET', `${URLS.cal}/calendars/${enc(i.calendarId || 'primary')}/events?${q}`);
-        return {events: j.items || [], summary: j.summary || '', timeZone: j.timeZone || TZ};
+        /* 0.70.0 : les pages suivantes aussi (2 500 événements au plus) : au-delà d'une page, les derniers mois manquaient sans avertissement,
+           et Google peut couper une page plus tôt */
+        const items = []; let page = '', j0 = null;
+        do {
+          if (page) q.set('pageToken', page);
+          const j = await api('GET', `${URLS.cal}/calendars/${enc(i.calendarId || 'primary')}/events?${q}`);
+          j0 = j0 || j; items.push(...(j.items || [])); page = j.nextPageToken || '';
+        } while (page && items.length < 2500);
+        return {events: items, summary: j0.summary || '', timeZone: j0.timeZone || TZ};
       },
       create_event: (i) => {
         const when = (t) => i.allDay ? {date: String(t).slice(0, 10)} : {dateTime: rfc(t), timeZone: TZ};
@@ -253,9 +292,9 @@ export function createGoogle({S, save, log = () => {}}) {
       search_text: async (i) => {
         const term = String(i.query || '').replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, 80);
         if (term.length < 3) return {files: []};
-        const key = JSON.stringify(i.roots || []), c = SEARCH_CACHE.get(key);
-        const tree = c && Date.now() - c.at < 600000 ? c.tree : await T['Google Drive'].folder_tree({roots: i.roots, foldersOnly: true});
-        SEARCH_CACHE.set(key, {at: Date.now(), tree});
+        const key = JSON.stringify(i.roots || []), c = SEARCH_CACHE.get(key), frais = c && Date.now() - c.at < 600000;
+        const tree = frais ? c.tree : await T['Google Drive'].folder_tree({roots: i.roots, foldersOnly: true});
+        if (!frais) SEARCH_CACHE.set(key, {at: Date.now(), tree});   /* 0.70.0 : relue au bout de 10 minutes, même si les recherches se suivent */
         const inTree = new Set([...tree.roots.map((r) => r.id), ...tree.folders.map((f) => f.id)].filter(Boolean));
         const qs = (v) => "'" + String(v).replace(/\\/g, '\\\\').replace(/'/g, "\\'") + "'";
         /* la requête porte sur les seuls dossiers demandés (par lots de 30), pages suivies : un mot fréquent ailleurs dans le Drive ne cache pas les papiers */

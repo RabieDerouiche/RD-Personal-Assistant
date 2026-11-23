@@ -1355,7 +1355,7 @@ async function voix(b, send, gone, owner) {
   if (q && !(q.kind === 'meteo' && !q.court)) {
     let reply = null; try { reply = await instantReply(q, text); } catch { reply = null; }
     if (reply) {
-      reply = pique(q.kind, reply, paris(new Date(now())).hm);
+      reply = pique(q.kind, reply, paris(new Date(now())).hm, Math.random, text);   /* 0.70.0 : la question compte aussi (un mot grave, pas de pique) */
       S.msgs.push({who: 'me', text, at: t0}, {who: 'jarvis', text: reply, at: now(), agent: 'claude'}); S.usage.instant = (S.usage.instant || 0) + 1; save();
       return send('done', {reply, missions: [], agent: 'claude', instant: q.kind, timing: {total: now() - t0, first: now() - t0, instant: true}});
     }
@@ -1784,7 +1784,7 @@ const server = http.createServer(async (req, res) => {
         if (!q || (q.kind === 'meteo' && !q.court)) return json(res, 200, {kind: null});
         let reply = null; try { reply = await instantReply(q, text); } catch { reply = null; }
         if (!reply) return json(res, 200, {kind: null});
-        reply = pique(q.kind, reply, paris(new Date(now())).hm);   /* une pique écrite d'avance, après l'information (son choix du 21/11/2026) */
+        reply = pique(q.kind, reply, paris(new Date(now())).hm, Math.random, text);   /* 0.70.0 : la question compte aussi ; une pique écrite d'avance, après l'information (son choix du 21/11/2026) */
         S.usage.instant = (S.usage.instant || 0) + 1; save();
         return json(res, 200, {kind: q.kind, reply});
       }

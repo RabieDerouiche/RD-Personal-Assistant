@@ -232,6 +232,9 @@ try {
     await q.goto(BASE + '/?serveur#reglages'); await q.waitForTimeout(3500);
     const c1 = await q.evaluate(() => { const c = document.getElementById('mcp-card'); return c ? {txt: c.textContent, urgent: c.dataset.urgent === '1'} : null; });
     ok('MCP : une demande d\'accès apparaît dans Réglages (en tête), avec les mêmes 4 chiffres que la page de l\'assistant', !!c1 && c1.txt.includes('Claude demande l’accès à JARVIS') && !!chiffres && c1.txt.includes(chiffres) && c1.urgent, JSON.stringify([chiffres, c1 && c1.txt.slice(0, 300)]));
+    // 0.70.0 — A5-mcp-memoire : l'app reçoit l'adresse où l'assistant sera renvoyé (un faux « Claude » renvoie ailleurs que claude.ai)
+    { const em = await fetch(BASE + '/api/mcp', {headers: {authorization: 'Bearer ' + tk}}).then((x) => x.json());
+      ok('MCP 0.70 : la demande en attente dit où l’assistant sera renvoyé (claude.ai), avec ses 4 chiffres', (em.demandes || []).length === 1 && em.demandes[0].retour === 'claude.ai' && em.demandes[0].chiffres === chiffres, JSON.stringify(em.demandes)); }
     await q.evaluate(() => document.querySelector('#mcp-card .mcp-d .btn.main').click()); await q.waitForTimeout(1200);
     const att = await fetch(BASE + '/oauth/attente/' + aid).then((x) => x.json()), c2 = await q.evaluate(() => document.getElementById('mcp-card').textContent);
     ok('MCP : « Autoriser » dans JARVIS renvoie l\'assistant à sa page avec un code', att.statut === 'accordee' && /code=/.test(att.redirect || '') && /Claude est relié à JARVIS/.test(c2), JSON.stringify([att.statut, c2.slice(-120)]));
@@ -592,6 +595,41 @@ try {
       ok('voix : reporter une tâche se fait aussitôt ; la supprimer attend un « oui vas-y merci » ; une tâche introuvable est dite, rien n’est coché', e6.cartes.some((c) => /Tâche à reporter/i.test(c) && /C'est parti/.test(c)) && e7.cartes.some((c) => /Tâche à supprimer/i.test(c) && /Supprimer/.test(c)) && e8.cartes.some((c) => /Tâche à supprimer/i.test(c) && /C'est parti/.test(c)) && e8.eux.some((x) => /tâche supprimée/.test(x)) && e9.eux.some((x) => /Je ne trouve pas la tâche « Repeindre la lune »/.test(x)), JSON.stringify([e6.cartes.slice(-1), e7.cartes.slice(-1), e8, e9.eux])); }
     await v.tap('#chat .mains-fin').catch(() => {});
     await v.close(); }
+  // 0.70.0 — A6-voix
+  /* mains libres : une phrase finie pendant que la précédente s'écrit encore (écoute lente) ne l'annule plus : les deux partent ensemble,
+     dans l'ordre ; une lecture coupée (au fil de la réponse, ou « Écouter ») rend à l'iPhone les sons déjà préparés */
+  { const w = await ctx.newPage(); w.on('pageerror', (e) => errs.push('A6-voix : ' + e.message));
+    const samples = []; let lents = 0;
+    await w.route('**/api/stt', async (route) => { const r = route.request(); if (!r.headers()['x-tour'] && lents++ === 0) await new Promise((z) => setTimeout(z, 6000)); route.continue().catch(() => {}); });   /* la 1re phrase s'écrit lentement */
+    w.on('request', (r) => { if (/\/api\/sample$/.test(r.url())) samples.push(r.url()); });
+    await w.addInitScript(() => {
+      try { const s0 = JSON.parse(localStorage.getItem('jarvis.settings') || '{}'); s0.orbe = 'conversation'; localStorage.setItem('jarvis.settings', JSON.stringify(s0)); } catch (e) { /* rien */ }
+      const AC = window.AudioContext || window.webkitAudioContext; const ac = new AC(), osc = ac.createOscillator(), g = ac.createGain(), dest = ac.createMediaStreamDestination();
+      g.gain.value = 0; osc.frequency.value = 220; osc.connect(g); g.connect(dest); osc.start();
+      window.__talk = (ms) => { ac.resume(); const t0 = ac.currentTime + 0.02; g.gain.setValueAtTime(0.6, t0); g.gain.setValueAtTime(0, t0 + ms / 1000); };
+      navigator.mediaDevices.getUserMedia = async () => { await ac.resume(); return dest.stream.clone(); };
+    });
+    await w.goto(BASE + '/?serveur#accueil'); await w.waitForTimeout(3000);
+    await w.tap('.talk-slot .jv-btn'); await w.waitForTimeout(1500);
+    const n0 = await w.evaluate(() => document.querySelectorAll('#chat .msg.me').length);
+    await w.evaluate(() => window.__talk(1800)); await w.waitForTimeout(4300);   /* 1re phrase (« pas finie » pour Smart Turn) : elle part après 1,6 s de silence */
+    await w.evaluate(() => window.__talk(1800)); await w.waitForTimeout(9500);   /* 2e phrase, finie avant que la 1re soit écrite */
+    const moi = await w.evaluate(() => [...document.querySelectorAll('#chat .msg.me')].map((x) => x.textContent));
+    ok('mains libres (0.70.0) : une phrase finie pendant que la précédente s’écrit encore ne l’annule plus : les deux partent ensemble, dans l’ordre, en une seule question', moi.length === n0 + 1 && (moi[n0].match(/raconte lentement ta journée/gi) || []).length === 2 && samples.length === 1, JSON.stringify([moi.slice(n0), samples.length, lents]));
+    await w.tap('#chat .mains-fin').catch(() => {}); await w.waitForTimeout(500);
+    const urls = await w.evaluate(async () => {
+      const V = window.JarvisVoice, made = [], freed = new Set(), c0 = URL.createObjectURL, r0 = URL.revokeObjectURL, delai = (ms) => new Promise((z) => setTimeout(z, ms));
+      URL.createObjectURL = (b) => { const u = c0.call(URL, b); made.push(u); return u; }; URL.revokeObjectURL = (u) => { freed.add(u); return r0.call(URL, u); };
+      const texte = 'Première phrase assez longue pour partir seule à la voix. Deuxième phrase, elle aussi assez longue pour être préparée. Troisième phrase, préparée pendant que la première se lit.';
+      const kind = V.sayKind(), fl = V.sayFlux({onStart: () => V.hush()}); fl.push(texte); fl.end();   /* coupée dès qu'elle commence : les trois sons sont déjà demandés */
+      await Promise.race([fl.done, delai(4000)]);
+      const p = V.say(texte); V.hush(); await Promise.race([p, delai(4000)]);
+      await delai(2500);   /* les sons préparés arrivent après la coupure */
+      URL.createObjectURL = c0; URL.revokeObjectURL = r0;
+      return {kind, made: made.length, rendus: made.filter((u) => freed.has(u)).length};
+    });
+    ok('voix (0.70.0) : une lecture coupée (au fil de la réponse, ou « Écouter ») rend à l’iPhone tous les sons déjà préparés', urls.kind === 'serveur' && urls.made === 6 && urls.rendus === urls.made, JSON.stringify(urls));
+    await w.close(); }
   /* 0.33.0 : l'activité en direct — une mission lancée apparaît sur l'accueil (« En ce moment ») avec son plan et ce qu'elle fait, et sur l'orbe (pastille) ;
      elle en part une fois finie ; Suivi montre ses étapes */
   { const q = await ctx.newPage(); q.on('pageerror', (e) => errs.push('activité : ' + e.message));

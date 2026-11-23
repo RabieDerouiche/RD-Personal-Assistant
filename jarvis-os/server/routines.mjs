@@ -36,7 +36,7 @@ function moment(seg) {
 export function lirePhrase(phrase) {
   const p = String(phrase || '').replace(/\s+/g, ' ').trim().slice(0, 600);
   if (p.length < 6) return {erreur: 'Phrase trop courte.'};
-  const segs = p.split(/\s*[,;:]\s*/).filter(Boolean);
+  const segs = p.split(/\s*(?:[,;]|:(?!\d))\s*/).filter(Boolean);   /* 0.70.0 : « à 7:30 » n'est pas coupé (deux-points suivi d'un chiffre = une heure) */
   let best = -1, m0 = {heure: null, jours: null, jourDuMois: null};
   segs.forEach((s, i) => { const m = moment(s), score = (m.heure ? 1 : 0) + (m.jours || m.jourDuMois ? 2 : 0); if (score > 0 && (best < 0 || score > ((m0.heure ? 1 : 0) + (m0.jours || m0.jourDuMois ? 2 : 0)))) { best = i; m0 = m; } });
   let texte;
@@ -82,10 +82,10 @@ export function createRoutines({S, save, now, paris, lancer, log = () => {}}) {
     const q = propre(base), texte = genre === 'brief' ? 'Brief du matin' : String(base.texte || '').trim().slice(0, 600);
     if (!q.heure || (!q.jours && !q.jourDuMois)) return {ok: false, error: 'Il faut un jour et une heure.'};
     if (genre === 'mission' && texte.length < 4) return {ok: false, error: 'Il faut dire quoi faire.'};
-    if (genre === 'brief') { const deja = R().find((x) => x.genre === 'brief'); if (deja) { Object.assign(deja, q, {actif: true}); save(); return {ok: true, routine: deja}; } }
+    if (genre === 'brief') { const deja = R().find((x) => x.genre === 'brief'); if (deja) { Object.assign(deja, q, {actif: true}); dejaPassee(deja); save(); return {ok: true, routine: deja}; } }
     if (R().filter((x) => x.genre === 'mission').length >= 30) return {ok: false, error: 'Trente routines au plus.'};
     const r = {id: crypto.randomUUID().slice(0, 8), genre, texte, ...q, actif: true, cree: now(), source: o.source === 'claude' ? 'claude' : 'app', dernierJour: '', derniere: 0};
-    R().push(r); save();
+    dejaPassee(r); R().push(r); save();
     return {ok: true, routine: r};
   }
   function modifier(id, o) {
@@ -93,8 +93,12 @@ export function createRoutines({S, save, now, paris, lancer, log = () => {}}) {
     if (typeof o.actif === 'boolean') r.actif = o.actif;
     if (o.heure || o.jours || o.jourDuMois) { const q = propre({...r, ...o}); if (q.heure && (q.jours || q.jourDuMois)) Object.assign(r, q); }
     if (typeof o.texte === 'string' && r.genre === 'mission' && o.texte.trim().length >= 4) r.texte = o.texte.trim().slice(0, 600);
+    if (typeof o.actif === 'boolean' || o.heure || o.jours || o.jourDuMois) dejaPassee(r);
     save(); return r;
   }
+  /* 0.70.0 : créée, reprise ou déplacée à une heure déjà passée aujourd'hui : comptée comme faite pour aujourd'hui, comme l'annonce
+     « prochaine » (avant, elle partait dans les 30 secondes) ; le rattrapage après un redémarrage du serveur ne change pas */
+  function dejaPassee(r) { const t = paris(new Date(now())); if (due(r, t) && minutes(t.hm) > minutes(r.heure)) r.dernierJour = t.ymd; }
   function supprimer(id) { const n = R().length; S.routines = R().filter((x) => x.id !== id); save(); return S.routines.length < n; }
   /* est-elle due maintenant ? (jour, heure passée de moins de 2 heures, pas déjà partie aujourd'hui) */
   function due(r, t) {

@@ -141,6 +141,11 @@ function play(url: string, g: number): Promise<boolean> {
     a.play().then(() => { started = true; }, () => end(false));
   });
 }
+/* 0.70.0 : les sons déjà préparés (les deux phrases suivantes) d'une lecture coupée sont rendus à la mémoire de l'iPhone ;
+   rendre un son déjà joué (play() l'a rendu) ne fait rien */
+function rendre(urls: Array<Promise<string | null> | null | undefined>) {
+  for (const p of urls) if (p) p.then((u) => { if (u) try { URL.revokeObjectURL(u); } catch { /* rien */ } }, () => { /* rien */ });
+}
 /* lit le texte ; la promesse se termine quand tout est dit ou coupé (hush) */
 export async function say(text: string): Promise<void> {
   hush(); prime();   /* appelé pendant l'appui sur « Écouter » : le son est débloqué tout de suite, avant d'attendre la voix du serveur */
@@ -150,13 +155,15 @@ export async function say(text: string): Promise<void> {
     if (srv.serverVoice()) {
       if (!audio) { try { audio = new Audio(); } catch { audio = null; } }
       const urls = parts.map((p, i) => (i < 2 ? srv.ttsUrl(p).catch(() => null) : null) as Promise<string | null> | null);
-      for (let i = 0; i < parts.length; i++) {
-        if (g !== gen) return;
-        if (i + 2 < parts.length && !urls[i + 2]) urls[i + 2] = srv.ttsUrl(parts[i + 2]).catch(() => null);
-        const url = await (urls[i] || (urls[i] = srv.ttsUrl(parts[i]).catch(() => null)));
-        if (g !== gen) { if (url) try { URL.revokeObjectURL(url); } catch { /* rien */ } return; }
-        if (!url || !(await play(url, g))) { if (g !== gen) return; await local(parts[i], g); }
-      }
+      try {
+        for (let i = 0; i < parts.length; i++) {
+          if (g !== gen) return;
+          if (i + 2 < parts.length && !urls[i + 2]) urls[i + 2] = srv.ttsUrl(parts[i + 2]).catch(() => null);
+          const url = await (urls[i] || (urls[i] = srv.ttsUrl(parts[i]).catch(() => null)));
+          if (g !== gen) { if (url) try { URL.revokeObjectURL(url); } catch { /* rien */ } return; }
+          if (!url || !(await play(url, g))) { if (g !== gen) return; await local(parts[i], g); }
+        }
+      } finally { if (g !== gen) rendre(urls); }
     } else for (const p of parts) { if (g !== gen) return; await local(p, g); }
   } finally { if (g === gen) { talking = false; audioMode('auto'); } }
 }
@@ -189,6 +196,7 @@ export function sayFlux(o: {clean?: (t: string) => string, onStart?: () => void}
   hush(); held = false;
   const g = ++gen, keepMic = !!conv, queue: string[] = [];
   let raw = '', off = 0, fin = false, began = false, wake: (() => void) | null = null;
+  const urls: Array<Promise<string | null> | undefined> = [];   /* 0.70.0 : gardés ici pour être rendus si la lecture est coupée */
   const clean = (t: string) => { try { return (o.clean ? o.clean(t) : t).replace(/\s+/g, ' ').trim(); } catch { return t.trim(); } };
   const cut = (final: boolean) => {
     const r = decoupe(raw, off, !queue.length, final); off = r.off;
@@ -196,7 +204,6 @@ export function sayFlux(o: {clean?: (t: string) => string, onStart?: () => void}
     if (wake) { const w = wake; wake = null; w(); }
   };
   const run = async () => {
-    const urls: Array<Promise<string | null> | undefined> = [];
     const prep = (k: number) => { if (srv.serverVoice() && queue[k] && !urls[k]) urls[k] = srv.ttsUrl(queue[k]).catch(() => null); };
     for (let i = 0; ; ) {
       if (g !== gen) return;
@@ -214,7 +221,7 @@ export function sayFlux(o: {clean?: (t: string) => string, onStart?: () => void}
       i++;
     }
   };
-  const done = run().finally(() => { if (g === gen) { talking = false; if (!keepMic) audioMode('auto'); } });
+  const done = run().finally(() => { if (g !== gen) rendre(urls); else { talking = false; if (!keepMic) audioMode('auto'); } });
   return {
     push(t: string) { if (g !== gen || fin) return; raw = String(t || ''); if (off > raw.length) off = raw.length; cut(false); },
     end() { if (g !== gen || fin) return; cut(true); fin = true; if (wake) { const w = wake; wake = null; w(); } },

@@ -34,10 +34,12 @@ const P = {
   bot: ['Je transmets ton impatience, avec tact.', 'Les bots aussi ont leurs humeurs.', 'Je surveille. Discrètement. Comme toujours.']
 };
 const dernier = {};
-/* la pique d'une réponse instantanée (genre : heure, date, meteo, agenda, pourmoi, bot ; hm : heure de Paris « HH:MM ») */
-export function pique(genre, reponse, hm, alea = Math.random) {
+/* la pique d'une réponse instantanée (genre : heure, date, meteo, agenda, pourmoi, bot ; hm : heure de Paris « HH:MM ») ;
+   0.70.0 : question = la phrase qu'il a dite : un sujet sérieux dans la question (« pour l'enterrement… », « aux urgences avec mon fils »)
+   supprime aussi la pique, même si la réponse (l'heure, la météo) n'en dit rien */
+export function pique(genre, reponse, hm, alea = Math.random, question = '') {
   const r = String(reponse || '');
-  if (!r || SERIEUX.test(r) || process.env.JARVIS_HUMOUR === '0') return reponse;
+  if (!r || SERIEUX.test(r + ' ' + String(question || '')) || process.env.JARVIS_HUMOUR === '0') return reponse;
   const h = parseInt(String(hm || '12:00').slice(0, 2), 10), s = r.toLowerCase();
   let l = null;
   if (genre === 'heure') l = h < 6 ? P.heure.nuit : h < 10 ? P.heure.matin : h < 20 ? P.heure.jour : P.heure.soir;
