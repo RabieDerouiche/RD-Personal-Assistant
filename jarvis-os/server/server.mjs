@@ -29,7 +29,7 @@ import {pique, PERSO_ORAL} from './humour.mjs';   /* 21/11/2026 : sa personnalit
 import {createAudio, typeSon, silence} from './audio.mjs';   /* 0.64.0 : le message vocal d'un proche, mis au format de l'écoute */
 const ACT = createActivite();   /* 0.33.0 : ce que fait Claude à l'instant */
 
-const VERSION = '0.67.0';
+const VERSION = '0.68.0';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PORT = +(process.env.PORT || 8787);
 const HOST = process.env.HOST || '127.0.0.1';
@@ -1083,7 +1083,7 @@ const GUIDE_JARVIS = `\n\n[JARVIS OS ${VERSION} : ce que tu es et ce que tu sais
 - Routines et brief du matin : « Tout », Automatisations, « Routines de Claude » (une routine en une phrase ; outil programmer_routine).
 - Automatisations de l'iPhone : Réglages, « Siri et bouton Action », « Automatisations » (actions brief, agenda, demain, pourmoi, meteo).
 - Assistants reliés (app Claude, Grok Bot) : Réglages, « Assistants reliés (MCP) » ; leurs propositions dans Espaces, Équipe, filtre Demandes, « Missions de Claude » (« À approuver »).
-- Argent (Radar) : « Tout », rubrique « Argent » : ses dépenses fixes, sa paie, le reste à payer, ce que ses mails annoncent. Ses chiffres ne te sont jamais donnés (rien de bancaire dans tes consignes) : pour une question d'argent, renvoie-le à cette rubrique, sans rien inventer.
+- Argent (Radar) : Espaces, tuile « Argent » : ses dépenses fixes, sa paie, le reste à payer, ses paiements en plusieurs fois (« En plusieurs fois » dans « Fixes », un achat par ligne ; « Plus à payer » pour un achat annulé ou remboursé), ce que ses mails annoncent (« À venir », « Alertes » : une alerte vue va dans « Déjà vues », « Remettre » la rend ; une réponse Retirer ou Garder se défait dans « Tes réponses », « Annuler » ; ce qu'il a écarté revient avec « Reproposer », sous « Écartées » en bas de « Fixes ») ; « Tout relire (13 mois) » relit ses mails (0.68.0). Ses chiffres ne te sont jamais donnés (rien de bancaire dans tes consignes) : pour une question d'argent, renvoie-le à cette rubrique, sans rien inventer.
 - Notifications : Réglages, « Notifications ». Mise à jour : proposée à l'ouverture, ou Réglages, carte « JARVIS », « Mettre à jour le serveur ».
 L'état du moment (voix, compteurs, écoute, mémoire, routines, assistants) arrive avec chaque question dans la ligne [JARVIS …] : réponds à partir d'elle, sans dire que tu ne peux pas vérifier. Pour un réglage : son état, puis les étapes exactes. Un changement du code de JARVIS se demande dans sa session de développement (Claude Code) : ne le confie jamais à la tâche Claude du serveur.]`;
 const nbFr = (n) => Number(n || 0).toLocaleString('fr-FR');

@@ -241,7 +241,10 @@
     radar: () => req('/api/radar').then((r) => (r.status === 200 ? r.j : null)).catch(() => null),
     radarSet: (cle, valeur) => req('/api/radar/set', {cle, valeur}).then((r) => { if (r.status !== 200) throw new Error((r.j && r.j.error) || 'Refusé'); return r.j; }),
     radarProposition: (id, oui, modif) => req('/api/radar/proposition', {id, oui, modif: modif || null}).then((r) => (r.status === 200 ? r.j : null)).catch(() => null),
-    radarLire: () => req('/api/radar/lire', {}).then((r) => r.j || null).catch(() => null),
+    /* 0.68.0 : « Tout relire » ({tout: false} : les derniers jours) ; un refus (Google pas relié) remonte avec son message, au lieu de remplacer les données de la page */
+    radarLire: (tout) => req('/api/radar/lire', {tout: tout !== false}).then((r) => { if (r.status !== 200 && r.status !== 202) throw new Error((r.j && r.j.error) || 'Relecture refusée'); return r.j; }),
+    radarPlan: (id, action) => req('/api/radar/plan', {id, action}).then((r) => (r.status === 200 ? r.j : null)).catch(() => null),   /* 0.68.0 : un paiement en plusieurs fois « plus à payer » ou remis */
+    radarReproposer: (cle) => req('/api/radar/reproposer', {cle}).then((r) => (r.status === 200 ? r.j : null)).catch(() => null),   /* 0.68.0 : ce qu'il a écarté revient dans « À valider » */
     /* 0.62.0 : ses invitations (un proche qui lui envoie des tâches) */
     invites: {liste: () => req('/api/invites').then((r) => (r.status === 200 ? r.j.invites : null)).catch(() => null), creer: (nom) => req('/api/invites', {nom}).then((r) => r.j).catch(() => null),
       retirer: (id) => req('/api/invites/' + id, null, 'DELETE').then((r) => r.status === 200).catch(() => false),

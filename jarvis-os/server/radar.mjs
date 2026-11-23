@@ -111,11 +111,16 @@ export function echeancier(texte, ref) {
   for (const m of s.matchAll(new RegExp(NB + '\\s?(?:€|eur\\b|euros?\\b)(?:\\s?eur\\b)?[^€\\d]{0,40}?(?:' + D + ')', 'g'))) {
     const v = montantDe(m[1]); if (!v) continue;
     const x = m[2] ? annee0(+m[2], +m[3] - 1, m[4], ref) : m[5] ? annee0(+m[5], MOIS_FR.indexOf(m[6]), m[7], ref) : m[8] ? annee0(+m[9], MOIS_EN.indexOf(m[8]), m[10], ref) : ref;
-    if (x && !isNaN(x) && !vus.has(ymd(x))) { vus.add(ymd(x)); out.push({date: ymd(x), montant: v}); }
+    if (x && !isNaN(x) && !vus.has(ymd(x))) { vus.add(ymd(x)); out.push({date: ymd(x), montant: v, ...(m[11] ? {auj: true} : {})}); }
   }
-  return out.slice(0, 12);
+  /* 0.68.0 : PayPal écrit l'échéance du jour deux fois (« 20,00 € à régler aujourd'hui * 20,00 € le 3 novembre », exemple inventé) ; un mail arrivé la veille au
+     soir (heure UTC) la datait d'un jour plus tôt : 5 échéances au lieu de 4. « Aujourd'hui » s'efface devant la même échéance datée, à 3 jours près. */
+  const sans = out.filter((e) => !e.auj || !out.some((y) => y !== e && !y.auj && Math.abs(y.montant - e.montant) <= 0.02 && Math.abs(depuisYmd(y.date) - depuisYmd(e.date)) <= 3 * 864e5));
+  return sans.map(({date, montant}) => ({date, montant})).sort((a, b) => (a.date < b.date ? -1 : 1)).slice(0, 24);
 }
 const EN_FOIS = /echeancier|mensualisation|mensualites|divise en \d+|en \d+ ?(fois|x)\b|\d+ ?x\b|plusieurs fois|installments?|pay in \d/;   /* pas « échéance » seul : une facture a sa « date d'échéance » */
+/* 0.68.0 : un paiement en plusieurs fois (PayPal « Paiement en 4X », « 4xCB » de Cofidis, « payer en 3 fois »…), pas une mensualisation d'énergie ou d'impôt */
+const BNPL = /(paiement|payer|achat|pret|financement|reglement) en \d{1,2} ?(x|fois)\b|\b\d{1,2} ?x ?cb\b|pay in \d|plusieurs fois|paiement fractionne|buy now,? pay later/;
 /* 0.54.0 : une résiliation confirmée (pas « pour résilier, rendez-vous… ») */
 const RESILIE = /confirmation de (la |votre |ta )?resiliation|resiliation (de (votre|ton) |du )(contrat|abonnement|forfait|ligne|adhesion)[^.\n]{0,40}(prise en compte|confirmee|effective|enregistree|a bien ete)|(?<!(si|lorsque|quand|une fois que|des que) )(votre|ton) (abonnement|contrat|forfait|ligne|adhesion)[^.\n]{0,40}(a ete|est|sera) (bien )?(resilie|annule|termine|cloture|arrete)e?s?\b|nous (avons bien )?(pris en compte|enregistre|recu|traite) (votre |ta )?(demande de )?resiliation|(?<!(until|unless|if|when|once) )(your )?subscription (has been|was|is now) (cancel+ed|terminated)|we('ve| have) cancel+ed your|your (subscription|membership|plan)[^.\n]{0,30}(has )?(ended|been cancel+ed|will end)|desabonnement (confirme|pris en compte)/;
 /* 0.54.0 : un contrat qui commence ou se renouvelle avec son prix (avis d'échéance d'assurance, souscription, bienvenue) */
@@ -260,8 +265,10 @@ export function marchand(objet, texte, nom) {
   const m = x.match(/\b(?:marchand|merchant|commer[cç]ant)\b[ \t]*(?::|\n)\s*([^\n]{2,40}?)\s*(?:\n|$)/i) || o.match(/(?:paiement [àa]|payment to|receipt from|re[cç]u de|reçu pour votre paiement [àa])\s+(.{2,40}?)(?:\.\.\.|\s*\[|\s*$)/i)
     || o.match(/^your\s+(.{2,40}?)\s+receipt\b/i) || x.match(/(?:payment to|receipt from)\s+([^:\n]{2,40}?)\s*(?::|\n)/i)
     /* 0.51.0 : paiement en plusieurs fois (« auprès de BOUTIQUE », « sur le site BOUTIQUE », « chez BOUTIQUE ») */
-    || x.match(/aupr[eè]s de\s+(?!(?:votre|vos|notre|nos|la|le|les|des|un|une|ce|cette|son|sa|ses|leur|leurs)\s)([^\s.,|][^.,|\n]{0,30}?)(?=\s+(?:a [ée]t[ée]|est|pour|le|du)(?:\s|$)|\s*[.,|\n]|$)/i)
+    || x.match(/aupr[eè]s de\s+(?!(?:votre|vos|notre|nos|la|le|les|des|un|une|ce|cette|son|sa|ses|leur|leurs)\s)([^\s.,|][^.,|:\n]{0,30}?)(?=\s+(?:a [ée]t[ée]|est|pour|le|du|en \d{1,2} ?(?:fois|x)\b)(?:\s|$)|\s*[.,|:\n]|$)/i)   /* 0.68.0 : « auprès de BOUTIQUE en 10 fois : » */
     || x.match(/sur le site (?:internet )?(?!(?:votre|vos|notre|nos|la|le|les|des|un|une|de|du)\s)([^\s.,|][^.,|\n]{0,30}?)(?=\s+(?:r[ée]alis[ée]|le|du|pour)(?:\s|$)|\s*[.,|\n]|$)/i)
+    /* 0.68.0 : « votre achat chez BOUTIQUE en utilisant Paiement en 4X » */
+    || x.match(/\b(?:achat|commande) chez\s+(?!(?:votre|vos|notre|nos|la|le|les|des|un|une)\s)([^\s.,|][^.,|\n]{0,30}?)(?=\s+(?:en utilisant|avec|via|le|du|pour)(?:\s|$)|\s*[.,|\n]|$)/i)
     || o.match(/\bchez\s+([^\s.,|][^.,|\n]{0,30}?)\s*$/i);
   const v = m ? m[1].replace(/[,.]?\s*(inc|ltd|llc|sas|sarl)\.?$/i, '').trim() : '';
   return v && !GENERIQUE.test(plat(v)) ? v : (nom && !GENERIQUE.test(plat(nom)) && !/paypal|stripe|link|wise|lydia|sumup|klarna|alma|oney/i.test(nom) ? String(nom).trim() : '');
@@ -271,11 +278,19 @@ export function lireMail(m) {
   const texte = String(m.texte || '').slice(0, 20000), objet = String(m.objet || ''), date = String(m.date || '').slice(0, 10), ref = /^\d{4}-\d{2}-\d{2}$/.test(date) ? depuisYmd(date) : null;
   const tout = objet + '\n' + texte, s = plat(tout), dom = domaine(m.sender);
   let g = genre(objet, texte);
+  /* 0.68.0 : « aujourd'hui » se compte à l'heure de Paris (un mail de 0 h 30 n'est pas de la veille) */
+  const refP = /T\d\d:/.test(String(m.date || '')) && !isNaN(Date.parse(m.date)) ? parisJour(Date.parse(m.date)) : ref;
   /* 0.51.0 : un échéancier (au moins deux montants datés, dans un mail de paiement en plusieurs fois) : des prélèvements ponctuels */
-  const ech = g === 'adhesion' ? [] : echeancier(tout, ref), mt = ech.map((e) => e.montant), plusieurs = ech.length >= 2 && EN_FOIS.test(s) && Math.max(...mt) <= Math.min(...mt) * 1.1 + 0.05;   /* des échéances égales */
+  const ech = g === 'adhesion' ? [] : echeancier(tout, refP), mt = ech.map((e) => e.montant), plusieurs = ech.length >= 2 && EN_FOIS.test(s) && Math.max(...mt) <= Math.min(...mt) * 1.1 + 0.05;   /* des échéances égales */
   if (plusieurs) g = 'echeance';
-  /* 0.54.0 : un échéancier long (5 échéances égales ou plus, une par mois : énergie, impôts, assurance) : une dépense fixe avec un début et une fin */
-  const sauts = ech.slice(1).map((e, i) => Math.round((depuisYmd(e.date) - depuisYmd(ech[i].date)) / 864e5)), long = plusieurs && ech.length >= 5 && sauts.every((d) => d >= 26 && d <= 35);
+  /* 0.68.0 : l'avis de rétractation et les informations précontractuelles d'un paiement en plusieurs fois (« vous avez accepté un prêt de
+     80,00 € », exemple inventé) ne sont pas une échéance : avant, le montant de l'achat entier pouvait compter comme un prélèvement */
+  const info = !plusieurs && /(droit|delai) de retractation|informations precontractuelles|explications precontractuelles/.test(s) && BNPL.test(s);
+  if (info) g = 'autre';
+  /* 0.54.0 : un échéancier long (5 échéances égales ou plus, une par mois : énergie, impôts, assurance) : une dépense fixe avec un début et une fin ;
+     0.68.0 : pas un paiement en 10 fois (il reste un paiement en plusieurs fois, avec ses échéances) */
+  const bnpl = BNPL.test(s) || (INTERMEDIAIRES.test(dom) && /\bfois\b|echeance/.test(s));
+  const sauts = ech.slice(1).map((e, i) => Math.round((depuisYmd(e.date) - depuisYmd(ech[i].date)) / 864e5)), long = plusieurs && !bnpl && ech.length >= 5 && sauts.every((d) => d >= 26 && d <= 35);
   if (long) g = 'mensualisation';
   if (g === 'echec' && (CARTES.test(dom) || /titres?[- ]resto|titres?[- ]restaurant|il ne reste que/.test(s))) g = 'autre';
   const aa = g === 'hausse' ? avantApres(tout) : null;
@@ -299,8 +314,15 @@ export function lireMail(m) {
   /* 0.56.0 : le jour de prélèvement écrit une fois (souscription, contrat) : « Votre date de prélèvement : le 20 de chaque mois » */
   const jm = s.match(/prelev(?:ement|e|ee|es)?\b[^.\n|]{0,30}?\ble (\d{1,2})(?:er)? (?:de chaque mois|du mois|chaque mois)/), jourMois = jm && +jm[1] >= 1 && +jm[1] <= 31 ? +jm[1] : null;
   const cle = inter ? (mar ? dom + ':' + plat(mar).replace(/[^a-z0-9]/g, '') : '') : dom + (/^(finances|impots)\.gouv\.fr$/.test(dom) ? ':' + plat(service).replace(/[^a-z0-9]/g, '') : '');
+  /* 0.68.0 : un paiement en plusieurs fois : en combien de fois, l'identifiant du plan (PayPal l'écrit dans ses liens : il relie le plan, ses rappels
+     et ses confirmations), le montant de l'achat et ce qui reste à payer (« Montant restant 41,14 € », écrit après chaque échéance payée) */
+  const fm = s.match(/(?:en |divise en )(\d{1,2}) ?(?:fois|x|echeances|paiements|mensualites)\b|\b(\d{1,2}) ?x ?cb\b/), fois = fm ? +(fm[1] || fm[2]) || null : null;
+  const tx = texte.replace(/[  ]/g, ' '), planId = g === 'echeance' ? (tx.match(/plan_id=([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i) || [])[1] || '' : '';
+  const rs = g === 'echeance' ? tx.match(new RegExp('(?:montant|solde) restant(?:\\s+d[uû])?[^\\d€]{0,30}?' + NB + EURO, 'i')) : null, restant = rs ? (/^0+(?:[.,]0+)?$/.test(rs[1].trim()) ? 0 : montantDe(rs[1])) : null;
+  const tt = g === 'echeance' ? tx.match(new RegExp("(?:votre achat de|achat (?:de|d['’]un montant de)|d['’]un montant de|montant (?:total|de la transaction|de l['’]achat)|total (?:[àa] payer|d[uû]))\\s*:?[^\\d€]{0,24}?" + NB + EURO, 'i')) : null, total = tt ? montantDe(tt[1]) : null;
   return {id: m.id, fil: m.fil || '', objet: objet.slice(0, 140), dom, cle, service, genre: g, montant, avant: aa ? aa.avant : null, datePrel, date,
-    ...(plusieurs ? {echeances: ech, fois: +((s.match(/(?:en |divise en )(\d{1,2}) ?(?:fois|x|echeances)\b/) || [])[1]) || null} : {}), ...(hors && montant && hors < montant ? {hors} : {}), ...(paye ? {paye: true} : {}),
+    ...(plusieurs ? {echeances: ech} : {}), ...(g === 'echeance' ? {fois, ...(planId ? {planId} : {}), ...(restant != null ? {restant} : {}), ...(total ? {total} : {})} : plusieurs ? {fois} : {}),
+    ...(hors && montant && hors < montant ? {hors} : {}), ...(paye ? {paye: true} : {}),
     ...(ry ? {rythme: ry} : {}), ...(long ? {debut: ech[0].date, fin: ech[ech.length - 1].date} : {}), ...(jourMois ? {jourMois} : {}),
     sur: ['echec', 'essai', 'renouvellement', 'adhesion', 'resiliation', 'contrat', 'mensualisation'].includes(g) || (g === 'mensualite' && !!montant) || (g === 'hausse' && !!montant) || ((g === 'facture' || g === 'echeance') && !!montant)};
 }
@@ -375,9 +397,13 @@ const SYS_CLAUDE = "Tu lis des mails de facturation pour le tableau des dépense
    minute puis reprendre (5 fois au plus), au lieu d'abandonner. Une lecture interrompue reprend au mois où elle s'était arrêtée. */
 const estQuota = (e) => /quota|rate ?limit|\b429\b|too many requests|userRateLimitExceeded|resource has been exhausted/i.test(String((e && e.message) || e));
 export function createRadar({file, gmail, claude = async () => ({ok: false, error: 'Claude absent.'}), push = async () => [], now = Date.now, log = () => {}, matin = '06:50', soir = '19:00', moisDepart = 13, maxClaude = 60, parLot = 8, maxPdf = 80,
-  budget = 4000, horloge = Date.now, attente = (ms) => new Promise((z) => setTimeout(z, ms)), pauseQuota = 65000}) {
+  budget = 4000, horloge = Date.now, attente = (ms) => new Promise((z) => setTimeout(z, ms)), pauseQuota = 65000, delaiGmail = 90000, bloquee = 15 * 60e3}) {
   const lireFichier = () => { try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return {}; } };
-  const R = Object.assign({fixes: [], revenus: null, notif: {veille: true, seuil: 20, echec: true}, propositions: [], refus: [], releves: [], alertes: [], avenir: [], ponctuels: [], mandats: [], finis: [], gardes: {}, vus: [], fils: {}, scan: null, jours: {}, maj: null}, lireFichier());
+  /* 0.68.0 : plans (paiements en plusieurs fois), plansRetires (ceux qu'il a dits « plus à payer »), alertesVues (« Vu », gardé ici et plus
+     seulement dans un iPhone), traitees (ses réponses aux alertes, pour « Annuler »), refusNoms (le nom de ce qu'il a écarté), claudeLus (ce que
+     Claude a déjà lu, pour qu'une relecture ne lui renvoie pas les mêmes mails) */
+  const R = Object.assign({fixes: [], revenus: null, notif: {veille: true, seuil: 20, echec: true}, propositions: [], refus: [], releves: [], alertes: [], avenir: [], ponctuels: [], mandats: [], finis: [], gardes: {}, vus: [], fils: {}, scan: null, jours: {}, maj: null,
+    plans: {}, plansRetires: [], alertesVues: {}, traitees: [], refusNoms: {}, claudeLus: {}}, lireFichier());
   if (R.scan && R.scan.enCours) { R.scan.enCours = false; R.scan.erreur = R.scan.erreur || 'Lecture interrompue (serveur redémarré) : elle reprend à la prochaine ouverture du Radar.'; }
   if (R.scan && estQuota(R.scan.erreur)) R.scan.erreur = 'Google a limité la lecture de tes mails : elle reprend à ta prochaine ouverture du Radar.';
   /* 0.49.0 : « les dépenses relevées n'ont pas de sens » : la lecture d'avant prenait trop de mails ; elle est refaite avec les nouvelles règles */
@@ -392,6 +418,14 @@ export function createRadar({file, gmail, claude = async () => ({ok: false, erro
   /* 0.66.0 : prélèvements lus dans l'échéancier des appels (syndic), relevés reportés écartés, échéancier des contrats (assurance de prêt) :
      lecture de départ refaite ; ses dépenses fixes, sa paie et ce qu'il a écarté restent */
   if (R.version < 6) { Object.assign(R, {releves: [], fils: {}, vus: [], scan: null, propositions: [], alertes: [], avenir: [], ponctuels: [], mandats: [], finis: [], version: 6, revise: true}); }
+  /* 0.68.0 (ses retours du 23/11/2026 : « il répétait les mêmes alertes », « les paiements en plusieurs fois ne sont pas bien gérés ») : plans de
+     paiement en plusieurs fois, alertes sans doublon ; lecture de départ refaite (ses dépenses fixes, sa paie, ses refus et ses réponses restent).
+     Pendant la relecture, ce qu'il voyait reste affiché, sans les fausses alertes « Plus de facture » répétées de la relecture d'avant. */
+  function oublier() { Object.assign(R, {releves: [], fils: {}, vus: [], scan: null, propositions: [], alertes: [], avenir: [], ponctuels: [], mandats: [], finis: [], plans: {}, joursCle: {}}); }
+  if (R.version < 7) {
+    const avant = R.version === 6 && R.scan && R.scan.fini ? {releves: R.releves, propositions: R.propositions, alertes: (R.alertes || []).filter((a) => a.type !== 'silence'), avenir: R.avenir, ponctuels: R.ponctuels, plans: {}} : null;
+    oublier(); R.version = 7; if (avant) R.avant = avant;
+  }
   if (!R.finis) R.finis = []; if (!R.gardes) R.gardes = {};
   const sauver = () => { const tmp = file + '.tmp'; fs.writeFileSync(tmp, JSON.stringify(R), {mode: 0o600}); fs.renameSync(tmp, file); };
   let occupe = null;   /* une lecture des mails à la fois */
@@ -425,8 +459,8 @@ export function createRadar({file, gmail, claude = async () => ({ok: false, erro
   function regler(cle, v) {
     if (cle === 'fixes') {
       if (!Array.isArray(v) || v.length > 200) return {ok: false, error: 'Liste illisible.'}; const l = v.map(propre); if (l.some((x) => !x)) return {ok: false, error: 'Une dépense est incomplète (nom, montant, jour de 1 à 31).'};
-      /* 0.54.0 : une dépense lue dans ses mails qu'il retire ne lui est plus proposée */
-      for (const f of R.fixes) if (f.source === 'mail' && cleDe(f) && !l.some((x) => x.id === f.id)) R.refus = [...new Set([...R.refus, cleDe(f)])].slice(-300);
+      /* 0.54.0 : une dépense lue dans ses mails qu'il retire ne lui est plus proposée (0.68.0 : sauf s'il la repropose, depuis « Écartées ») */
+      for (const f of R.fixes) if (f.source === 'mail' && cleDe(f) && !l.some((x) => x.id === f.id)) ecarter(cleDe(f), f.service);
       R.fixes = l;
     }
     else if (cle === 'revenus') {
@@ -442,9 +476,19 @@ export function createRadar({file, gmail, claude = async () => ({ok: false, erro
   const nomPlat = (s) => plat(s).replace(/[^a-z0-9]/g, '');
   const cleDe = (x) => x.cle || x.dom || '';
   const connue = (p) => R.fixes.some((f) => (cleDe(f) && cleDe(f) === cleDe(p)) || nomPlat(f.service) === nomPlat(p.service));
+  /* 0.68.0 : ce qu'il écarte garde son nom, pour la liste « Écartées » et « Reproposer » */
+  function ecarter(cle, service) {
+    if (!cle) return;
+    R.refus = [...new Set([...R.refus.filter((k) => k !== cle), cle])].slice(-300);
+    R.refusNoms = {...(R.refusNoms || {}), [cle]: TXT(service, 80) || (R.refusNoms || {})[cle] || ''};
+    const garde = new Set(R.refus), noms = {}; for (const [k, v] of Object.entries(R.refusNoms)) if (garde.has(k)) noms[k] = v; R.refusNoms = noms;
+  }
+  /* 0.68.0 : pendant une relecture, la page montre ce qu'il voyait avant (R.avant) : une réponse à ce qu'il voit doit le retrouver */
+  const enRelecture = () => !!(R.avant && !(R.scan && R.scan.fini));
+  const vue = () => (enRelecture() ? {...R, ...R.avant} : R);
   function proposition(id, oui, modif) {
-    const p = R.propositions.find((x) => x.id === id); if (!p) return {ok: false, error: 'Proposition introuvable.'};
-    R.propositions = R.propositions.filter((x) => x.id !== id);
+    const p = R.propositions.find((x) => x.id === id) || (enRelecture() ? (R.avant.propositions || []).find((x) => x.id === id) : null); if (!p) return {ok: false, error: 'Proposition introuvable.'};
+    R.propositions = R.propositions.filter((x) => x.id !== id); if (R.avant && R.avant.propositions) R.avant.propositions = R.avant.propositions.filter((x) => x.id !== id);
     if (oui) {
       const f = propre({...p, ...(modif || {}), id: 'f' + p.id.slice(1), source: 'mail', dom: p.dom, cle: p.cle}, 0); if (!f) return {ok: false, error: 'Dépense incomplète.'};
       /* 0.51.0 : la facture du mois déjà lue (prélèvement à venir) compte tout de suite à son vrai montant */
@@ -452,16 +496,34 @@ export function createRadar({file, gmail, claude = async () => ({ok: false, erro
       if (r && !f.prochain) f.prochain = {date: r.datePrel, montant: r.montant};
       R.fixes.push(f);
     }
-    else R.refus = [...new Set([...R.refus, cleDe(p)])].slice(-300);
+    else ecarter(cleDe(p), p.service);
     sauver(); return {ok: true};
+  }
+  /* 0.68.0 (« j'ai supprimé toutes les alertes par erreur… j'arrive plus à les récupérer ») : ce qu'il a écarté ou retiré revient dans « À valider »
+     si ses mails le montrent encore */
+  function reproposer(cle) {
+    if (!cle || (!R.refus.includes(cle) && !R.finis.includes(cle))) return {ok: false, error: 'Rien d’écarté à ce nom.'};
+    R.refus = R.refus.filter((k) => k !== cle); R.finis = R.finis.filter((k) => k !== cle); const noms = {...(R.refusNoms || {})}; delete noms[cle]; R.refusNoms = noms;
+    ranger(); sauver();
+    return {ok: true, revenue: R.propositions.some((p) => cleDe(p) === cle)};
   }
 
   /* 0.54.0 (son choix du 22/11/2026 : « il me demande ») : une résiliation ou des factures qui ont cessé font une alerte ; il répond
      Retirer (la dépense s'arrête à la date annoncée, ou sort tout de suite, et n'est plus proposée) ou Garder (plus d'alerte pour ce silence) */
+  /* 0.68.0 (« j'ai supprimé toutes les alertes par erreur… j'arrive plus à les récupérer ») : « Vu » est gardé ici (avant : dans un seul iPhone,
+     sans retour possible) et se défait (« Remettre ») ; chaque réponse (Retirer, Garder, Appliquer) est notée avec la dépense d'avant, pour « Annuler » */
+  const copie = (x) => JSON.parse(JSON.stringify(x));
   function alerte(id, action) {
-    const a = R.alertes.find((x) => x.id === id); if (!a || !a.fixe) return {ok: false, error: 'Alerte introuvable.'};
+    if (action === 'annuler') return annulerAlerte(id);
+    const liste = enRelecture() ? R.alertes.concat((R.avant.alertes || []).filter((y) => !R.alertes.some((z) => z.id === y.id))) : R.alertes;
+    const a = liste.find((x) => x.id === id); if (!a) return {ok: false, error: 'Alerte introuvable.'};
+    if (action === 'vu' || action === 'revoir') {
+      const v = {...(R.alertesVues || {})}; if (action === 'vu') v[id] = ymd(auj()); else delete v[id];
+      R.alertesVues = Object.fromEntries(Object.entries(v).sort((x, y) => (x[1] < y[1] ? 1 : -1)).slice(0, 500)); sauver(); return {ok: true};
+    }
+    if (!a.fixe) return {ok: false, error: 'Alerte introuvable.'};
     if (action !== 'retirer' && action !== 'garder' && !(action === 'appliquer' && a.type === 'calendrier')) return {ok: false, error: 'Action inconnue.'};
-    const f = R.fixes.find((x) => x.id === a.fixe), t0 = ymd(auj());
+    const f = R.fixes.find((x) => x.id === a.fixe), t0 = ymd(auj()), trace = {...copie(a), action, le: t0, ...(f && action !== 'garder' ? {avant: copie(f)} : {})};
     /* 0.66.0 : les montants de son contrat (un par mois) remplacent son montant fixe ; « Garder » : son montant reste, plus de question */
     if (a.type === 'calendrier') {
       const c = a.calendrier || {};
@@ -469,12 +531,33 @@ export function createRadar({file, gmail, claude = async () => ({ok: false, erro
         Object.assign(f, {paliers: c.paliers, rythme: 'mensuel', ...(c.jour ? {jour: c.jour} : {}), ...(c.debut ? {debut: c.debut} : {}), ...(c.fin ? {fin: c.fin} : {}), ...(c.contrat ? {contrat: c.contrat} : {})});
         delete f.mois; delete f.estime; delete f.variable; f.montant = montantPalier(f.paliers, t0.slice(0, 7)) ?? f.montant;
       }
-      if (f && action !== 'appliquer') R.gardes = {...R.gardes, ['c' + f.id]: c.fin || true};
-      R.alertes = R.alertes.filter((x) => x !== a); sauver(); return {ok: true};
+      if (f && action !== 'appliquer') { R.gardes = {...R.gardes, ['c' + f.id]: c.fin || true}; trace.garde = 'c' + f.id; }
     }
-    if (f && action === 'retirer') { if (a.fin && a.fin >= t0) f.fin = a.fin; else { R.fixes = R.fixes.filter((x) => x !== f); if (cleDe(f)) R.refus = [...new Set([...R.refus, cleDe(f)])].slice(-300); } }
-    if (f && action === 'garder') R.gardes = {...R.gardes, [(a.type === 'resiliation' ? 'r' : '') + f.id]: a.type === 'silence' ? a.dernier : true};
-    R.alertes = R.alertes.filter((x) => x !== a); sauver(); return {ok: true};
+    else {
+      if (f && action === 'retirer') { if (a.fin && a.fin >= t0) f.fin = a.fin; else { R.fixes = R.fixes.filter((x) => x !== f); if (cleDe(f)) { ecarter(cleDe(f), f.service); trace.ecarte = cleDe(f); } } }
+      if (f && action === 'garder') { const k = (a.type === 'resiliation' ? 'r' : '') + f.id; R.gardes = {...R.gardes, [k]: a.type === 'silence' ? a.dernier : true}; trace.garde = k; }
+    }
+    R.traitees = [trace].concat((R.traitees || []).filter((x) => x.id !== id)).slice(0, 40);
+    R.alertes = R.alertes.filter((x) => x.id !== id); if (R.avant && R.avant.alertes) R.avant.alertes = R.avant.alertes.filter((x) => x.id !== id);
+    sauver(); return {ok: true};
+  }
+  function annulerAlerte(id) {
+    const x = (R.traitees || []).find((y) => y.id === id); if (!x) return {ok: false, error: 'Réponse introuvable.'};
+    /* la dépense d'avant revient (retirée, arrêtée, ou passée au tableau du contrat) ; un « Garder » est oublié ; l'alerte revient */
+    if (x.avant && x.action !== 'garder') { const i = R.fixes.findIndex((f) => f.id === x.avant.id); if (i >= 0) R.fixes[i] = x.avant; else R.fixes.push(x.avant); }
+    if (x.ecarte) { R.refus = R.refus.filter((k) => k !== x.ecarte); const n = {...(R.refusNoms || {})}; delete n[x.ecarte]; R.refusNoms = n; }
+    if (x.garde) { const g = {...R.gardes}; delete g[x.garde]; R.gardes = g; }
+    R.traitees = R.traitees.filter((y) => y !== x);
+    const {action, le, avant, ecarte, garde, ...al} = x; if (!R.alertes.some((y) => y.id === id)) R.alertes.push(al);
+    ranger(); sauver(); return {ok: true};
+  }
+  /* 0.68.0 : un paiement en plusieurs fois qui n'est plus à payer (achat annulé, remboursé, rétractation) : ses échéances ne comptent plus ; « Remettre » */
+  function plan(id, action) {
+    const p = vue().plans[id] || R.plans[id]; if (!p) return {ok: false, error: 'Paiement introuvable.'};
+    if (action === 'retirer') R.plansRetires = [...new Set([...(R.plansRetires || []), id])].slice(-200);
+    else if (action === 'remettre') R.plansRetires = (R.plansRetires || []).filter((k) => k !== id);
+    else return {ok: false, error: 'Action inconnue.'};
+    ranger(); sauver(); return {ok: true};
   }
 
   /* ---------- lecture des mails ---------- */
@@ -488,11 +571,17 @@ export function createRadar({file, gmail, claude = async () => ({ok: false, erro
       await attente(Math.max(250, 60000 - (t - appels[0].t) + 50));
     }
   }
-  /* un appel à Gmail dans le budget ; une limite de Google atteinte : une minute de pause, puis on reprend */
-  async function gm(fn, cout) {
+  /* un appel à Gmail dans le budget ; une limite de Google atteinte : une minute de pause, puis on reprend.
+     0.68.0 (« la relecture des mails est buggée, j'arrive pas à la relancer ») : un appel qui ne répond pas échoue au bout de 90 s (avant, il pouvait
+     tenir la lecture, donc le bouton, indéfiniment) ; une lecture abandonnée (remplacée par une nouvelle) s'arrête à son appel suivant */
+  const avecDelai = (pr, ms) => { let t; return Promise.race([pr, new Promise((_, non) => { t = setTimeout(() => non(new Error('Gmail ne répond pas (' + Math.round(ms / 1000) + ' s).')), ms); })]).finally(() => clearTimeout(t)); };
+  async function gm(fn, cout, o) {
     for (let k = 0; ; k++) {
+      if (o && o.run && o.run.abandon) throw new Error('Lecture remplacée par une nouvelle.');
       await budgetGmail(cout);
-      try { return await fn(); } catch (e) {
+      if (o && o.run && o.run.abandon) throw new Error('Lecture remplacée par une nouvelle.');
+      try { const r = await avecDelai(Promise.resolve().then(fn), delaiGmail); if (R.scan) R.scan.vie = now(); return r; } catch (e) {
+        if (o && o.run && o.run.abandon) throw new Error('Lecture remplacée par une nouvelle.');
         if (!estQuota(e) || k >= 5) throw e;
         log('radar : limite de Gmail atteinte, reprise dans une minute');
         if (R.scan && R.scan.enCours) { R.scan.pause = 'Google limite les lectures par minute : je reprends dans une minute.'; sauver(); }
@@ -501,13 +590,13 @@ export function createRadar({file, gmail, claude = async () => ({ok: false, erro
       }
     }
   }
-  async function lireRequete(q, n) {
-    const r = await gm(() => gmail.chercher(q, n), 10), fils = (r && r.threads) || [], dejaVus = vus(), lus = [];
+  async function lireRequete(q, n, o) {
+    const r = await gm(() => gmail.chercher(q, n), 10, o), fils = (r && r.threads) || [], dejaVus = vus(), lus = [];
     for (const t of fils) {
       const h = t.historyId ? String(t.historyId) : '';
       if (h && R.fils[t.id] === h) continue;   /* fil déjà lu et inchangé */
       if (!h && (t.messages || []).length && t.messages.every((m) => dejaVus.has(m.id))) continue;
-      let x; try { x = await gm(() => gmail.fil(t.id), 10); } catch (e) { if (estQuota(e)) throw e; log('radar : fil illisible ' + (e.message || e)); continue; }
+      let x; try { x = await gm(() => gmail.fil(t.id), 10, o); } catch (e) { if (estQuota(e) || (o && o.run && o.run.abandon)) throw e; log('radar : fil illisible ' + (e.message || e)); continue; }
       if (h) R.fils[t.id] = h;
       for (const m of (x && x.messages) || []) {
         if (dejaVus.has(m.id) || (m.labelIds || []).includes('SENT')) continue;
@@ -546,6 +635,55 @@ export function createRadar({file, gmail, claude = async () => ({ok: false, erro
   /* 0.54.0 : une dépense annoncée par un seul mail (contrat, échéancier long, renouvellement annuel) : proposée tout de suite */
   const annonce = (lu, x) => { R.mandats = R.mandats.filter((m) => m.cle !== lu.cle).concat([{id: 'p' + hash(lu.cle), cle: lu.cle, dom: lu.dom, service: lu.service, cat: categorie(lu.dom, lu.service), montant: null, rythme: 'mensuel',
     source: 'mail', preuves: 1, dernier: lu.date, depuis: lu.date.slice(5, 7) + '/' + lu.date.slice(0, 4), ...(lu.objet || lu.fil ? {exemple: {objet: lu.objet || '', date: lu.date, ...(lu.fil ? {url: 'https://mail.google.com/mail/u/0/#all/' + lu.fil} : {})}} : {}), ...x}]).slice(-30); };
+  /* ---------- 0.68.0 : les paiements en plusieurs fois, un plan par achat ----------
+     Le mail du plan donne toutes ses échéances (passées comprises : « 2 sur 4 payées ») ; un rappel donne la vraie date d'une échéance ; une
+     confirmation la marque payée et dit ce qui reste. Ils se rejoignent par l'identifiant du plan (PayPal), sinon par le marchand, le montant de
+     l'échéance (à 2 centimes) et sa date (à 12 jours). Sans le mail du plan, la confirmation et son « Montant restant » donnent les échéances
+     suivantes, une par mois (dates estimées). */
+  const VIA = [['paypal', 'PayPal'], ['cofidis', 'Cofidis'], ['alma', 'Alma'], ['oney', 'Oney'], ['klarna', 'Klarna'], ['floa', 'Floa'], ['scalapay', 'Scalapay'], ['younited', 'Younited'], ['cetelem', 'Cetelem'], ['sofinco', 'Sofinco'], ['franfinance', 'Franfinance'], ['pledg', 'Pledg']];
+  const viaDe = (dom) => { const v = VIA.find(([k]) => String(dom || '').includes(k)); return v ? v[1] : ''; };
+  const ecart = (a, b) => Math.abs(depuisYmd(a) - depuisYmd(b)) / 864e5;
+  const memeAchat = (p, lu) => (lu.cle ? p.cle === lu.cle : !p.cle && p.dom === lu.dom && nomPlat(p.service) === nomPlat(lu.service));
+  const pareille = (e, montant, date) => Math.abs(e.montant - montant) <= 0.02 && ecart(e.date, date) <= 12;
+  function noterPlan(lu) {
+    const via = viaDe(lu.dom), fil = lu.fil || '', base = {cle: lu.cle, dom: lu.dom, service: lu.service, via, fil, objet: lu.objet || ''};
+    if (lu.echeances && lu.echeances.length >= 2) {
+      const ech = lu.echeances.map((e) => ({date: e.date, montant: e.montant})), total = lu.total || Math.round(ech.reduce((s, e) => s + cents(e.montant), 0)) / 100;
+      const deja = (lu.planId && R.plans['pp' + lu.planId]) || Object.values(R.plans).find((p) => !p.partiel && memeAchat(p, lu) && p.echeances.length && ecart(p.echeances[0].date, ech[0].date) <= 3 && Math.abs((p.total || 0) - total) <= 0.05);
+      const id = deja ? deja.id : lu.planId ? 'pp' + lu.planId : 'pl' + hash((lu.cle || nomPlat(lu.service)) + '|' + ech[0].date + '|' + cents(total));
+      /* ce que ses rappels et ses confirmations ont déjà dit (vraie date, payée) reste */
+      const echs = ech.map((e) => { const a = deja && deja.echeances.find((y) => pareille(y, e.montant, e.date)); return a ? {...e, ...(a.exact ? {date: a.date, exact: true} : {}), ...(a.payee ? {payee: true} : {})} : e; });
+      R.plans[id] = {...(deja || {}), ...base, id, fois: lu.fois || ech.length, total, echeances: echs, date: lu.date, maj: [lu.date, (deja && deja.maj) || ''].sort().pop()};
+      delete R.plans[id].partiel;
+      /* un rappel ou une confirmation lus avant le plan (un plan partiel du même achat) le rejoignent ; ses dates estimées s'effacent */
+      for (const p of Object.values(R.plans)) {
+        if (!p.partiel || p.id === id || !memeAchat(p, lu)) continue;
+        const surs = p.echeances.filter((e) => !e.estime); if (!surs.length || !surs.every((e) => echs.some((y) => pareille(y, e.montant, e.date)))) continue;
+        for (const e of surs) { const y = echs.find((z) => pareille(z, e.montant, e.date)); if (e.payee) y.payee = true; if (e.exact) { y.date = e.date; y.exact = true; } }
+        if (p.restant != null && !(R.plans[id].restantLe > p.restantLe)) Object.assign(R.plans[id], {restant: p.restant, restantLe: p.restantLe});
+        delete R.plans[p.id];
+      }
+      return;
+    }
+    /* un rappel (« ta prochaine échéance de 20,00 € sera due le 3 décembre ») ou une confirmation (« le paiement a été débité le 3 novembre ») ; exemples inventés */
+    const d = lu.datePrel || (lu.paye ? lu.date : null); if (!lu.montant || !d) return;
+    const cands = lu.planId && R.plans['pp' + lu.planId] ? [R.plans['pp' + lu.planId]] : Object.values(R.plans).filter((p) => memeAchat(p, lu));
+    for (const p of cands) {
+      const e = p.echeances.find((x) => pareille(x, lu.montant, d) && !(x.payee && !lu.paye)); if (!e) continue;
+      e.date = d; e.exact = true; delete e.estime; if (lu.paye) e.payee = true;
+      if (lu.restant != null && !(p.restantLe > d)) Object.assign(p, {restant: lu.restant, restantLe: d});
+      if (!p.fil) p.fil = fil; if (lu.date > (p.maj || '')) p.maj = lu.date;
+      return;
+    }
+    const ech = [{date: d, montant: lu.montant, exact: true, ...(lu.paye ? {payee: true} : {})}];
+    if (lu.paye && lu.restant > 0) {
+      const n = Math.max(1, Math.min(11, Math.round(lu.restant / lu.montant))), x = depuisYmd(d); let reste = cents(lu.restant);
+      for (let i = 1; i <= n; i++) { const y = x.getUTCFullYear(), m = x.getUTCMonth() + i, v = i === n ? reste : Math.min(reste, cents(lu.montant)); reste -= v; ech.push({date: ymd(J(y, m, Math.min(x.getUTCDate(), dim(y, m)))), montant: v / 100, estime: true}); }
+    }
+    const id = lu.planId ? 'pp' + lu.planId : 'pl' + hash((lu.cle || nomPlat(lu.service)) + '|' + d + '|' + cents(lu.montant));
+    if (!R.plans[id]) R.plans[id] = {...base, id, fois: lu.fois || (ech.length > 1 ? ech.length : null), total: null, echeances: ech, date: lu.date, maj: lu.date, partiel: true, ...(lu.restant != null ? {restant: lu.restant, restantLe: d} : {})};
+  }
+  const nomPlan = (p) => (p.fois ? 'Paiement en ' + p.fois + ' fois : ' : 'Paiement en plusieurs fois : ') + p.service;
   function retenir(lu, {depart}) {
     const t = auj(), age = lu.date ? Math.round((t - depuisYmd(lu.date)) / 864e5) : 0, fx = lu.cle ? R.fixes.find((f) => cleDe(f) === lu.cle) : null;
     /* un renouvellement chiffré compte aussi comme un paiement du service (pour repérer sa régularité) */
@@ -584,7 +722,7 @@ export function createRadar({file, gmail, claude = async () => ({ok: false, erro
     if (lu.genre === 'mensualite') {
       if (!lu.cle || !lu.montant) return;
       const f = R.fixes.find((x) => !x.fin && ((cleDe(x) && cleDe(x) === lu.cle) || nomPlat(x.service) === nomPlat(lu.service)));
-      if (f) { if (Math.abs(f.montant - lu.montant) >= 0.01 && age <= 120) { R.alertes.push({id: 'a' + lu.id, date: lu.date, type: 'mensualite', titre: 'Nouvelle mensualité', service: f.service, montant: lu.montant, avant: f.montant, texte: 'Ta dépense fixe passe à ' + eur(lu.montant) + ' par mois.', fil: lu.fil}); f.montant = lu.montant; delete f.estime; } }
+      if (f) { if (Math.abs(f.montant - lu.montant) >= 0.01 && age <= 120) { R.alertes.push({id: 'a' + lu.id, date: lu.date, cle: lu.cle || '', type: 'mensualite', titre: 'Nouvelle mensualité', service: f.service, montant: lu.montant, avant: f.montant, texte: 'Ta dépense fixe passe à ' + eur(lu.montant) + ' par mois.', fil: lu.fil}); f.montant = lu.montant; delete f.estime; } }
       else { const prec = R.releves.filter((r) => (r.cle || r.dom) === lu.cle && r.datePrel).map((r) => +r.datePrel.slice(8, 10)), ancien = R.mandats.find((m) => m.cle === lu.cle && !m.jourApprox), j0 = lu.datePrel || lu.date;
         const connu = (R.joursCle || {})[lu.cle], jour = ancien ? ancien.jour : connu || (prec.length ? plusFrequent(prec) : +j0.slice(8, 10));
         annonce(lu, {montant: lu.montant, jour, ...(ancien || connu || prec.length || lu.datePrel ? {} : {jourApprox: true}), rythme: 'mensuel', mensualite: true}); }
@@ -594,20 +732,10 @@ export function createRadar({file, gmail, claude = async () => ({ok: false, erro
     if (lu.genre === 'renouvellement' && lu.cle && lu.datePrel && (lu.montant ? lu.rythme : lu.rythme === 'annuel'))
       annonce(lu, {montant: lu.montant || null, jour: +lu.datePrel.slice(8, 10), rythme: lu.rythme, ...(lu.rythme !== 'mensuel' ? {mois: +lu.datePrel.slice(5, 7)} : {}), ...(lu.montant ? {} : {aide: 'le prix n’est pas écrit dans le mail'})});
     if (lu.genre === 'renouvellement' && lu.cle) R.releves.push({id: lu.id, fil: lu.fil || '', objet: lu.objet || '', dom: lu.dom, cle: lu.cle, service: lu.service, montant: lu.montant || null, date: lu.date, datePrel: lu.datePrel || null, genre: 'facture'});   /* 0.49.0 : même sans montant (une box livrée chaque mois) */
-    /* une échéance datée (paiement en plusieurs fois) : un prélèvement ponctuel, compté dans le reste à payer jusqu'à son jour */
-    /* 0.51.0 : un échéancier complet (paiement en 4 fois) : chaque échéance à venir ; une échéance déjà débitée ne compte plus */
-    if (lu.genre === 'echeance' && lu.echeances && lu.echeances.length) {
-      const nom = lu.fois ? 'Paiement en ' + lu.fois + ' fois : ' + lu.service : lu.service;
-      lu.echeances.forEach((e, i) => { if (e.date < ymd(t)) return;
-        R.ponctuels.push({id: 'e' + lu.id + '-' + i, date: e.date, service: nom, montant: e.montant, fil: lu.fil});
-        R.avenir.push({id: 'v' + lu.id + '-' + i, date: e.date, service: nom, montant: e.montant, type: 'echeance', note: 'Échéance d’un paiement en plusieurs fois.'}); });
-      return;
-    }
-    if (lu.genre === 'echeance' && lu.montant && lu.datePrel && lu.datePrel >= ymd(t) && !(lu.paye && lu.datePrel <= lu.date)) {
-      R.ponctuels.push({id: 'e' + lu.id, date: lu.datePrel, service: lu.service, montant: lu.montant, fil: lu.fil});
-      R.avenir.push({id: 'v' + lu.id, date: lu.datePrel, service: lu.service, montant: lu.montant, type: 'echeance', note: 'Échéance d’un paiement en plusieurs fois.'});
-      return;
-    }
+    /* une échéance datée (paiement en plusieurs fois) : un prélèvement ponctuel, compté dans le reste à payer jusqu'à son jour.
+       0.68.0 (« les paiements en plusieurs fois ne sont pas bien gérés… rien ne s'affiche ») : un plan par achat (le mail du plan, ses rappels, ses
+       confirmations), au lieu d'échéances isolées ; ses échéances à venir sont rangées par ranger() */
+    if (lu.genre === 'echeance') { noterPlan(lu); return; }
     /* 0.51.0 : l'adhésion à un prélèvement mensuel (impôts) : proposée tout de suite, à partir de son premier prélèvement, montant à compléter */
     if (lu.genre === 'adhesion' && lu.datePrel && lu.cle) {
       R.mandats = R.mandats.filter((x) => x.cle !== lu.cle).concat([{id: 'p' + crypto.createHash('sha1').update(lu.cle).digest('hex').slice(0, 10), cle: lu.cle, dom: lu.dom, service: lu.service, cat: categorie(lu.dom, lu.service), montant: lu.montant || null,
@@ -624,19 +752,22 @@ export function createRadar({file, gmail, claude = async () => ({ok: false, erro
       /* 0.51.0 : la facture du mois d'une dépense fixe, prélevée plus tard : le reste à payer prend son vrai montant */
       if (fx && lu.montant && lu.datePrel && lu.datePrel >= ymd(t) && !lu.hors) fx.prochain = {date: lu.datePrel, montant: lu.montant};
       if (fx && lu.montant && !depart && !fx.estime) {
-        if (lu.montant > fx.montant * 1.5) R.alertes.push({id: 'a' + lu.id, date: lu.date, type: 'inhabituel', titre: 'Montant inhabituel', service: fx.service, montant: lu.montant, avant: fx.montant, texte: 'Habituellement ' + eur(fx.montant) + '.', fil: lu.fil});
-        else if (lu.montant > fx.montant * 1.02) { R.alertes.push({id: 'a' + lu.id, date: lu.date, type: 'hausse', titre: 'Hausse de prix', service: fx.service, montant: lu.montant, avant: fx.montant, texte: 'Le montant de ta dépense fixe passe à ' + eur(lu.montant) + '.', fil: lu.fil}); fx.montant = lu.montant; }
+        if (lu.montant > fx.montant * 1.5) R.alertes.push({id: 'a' + lu.id, date: lu.date, cle: lu.cle || '', type: 'inhabituel', titre: 'Montant inhabituel', service: fx.service, montant: lu.montant, avant: fx.montant, texte: 'Habituellement ' + eur(fx.montant) + '.', fil: lu.fil});
+        else if (lu.montant > fx.montant * 1.02) { R.alertes.push({id: 'a' + lu.id, date: lu.date, cle: lu.cle || '', type: 'hausse', titre: 'Hausse de prix', service: fx.service, montant: lu.montant, avant: fx.montant, texte: 'Le montant de ta dépense fixe passe à ' + eur(lu.montant) + '.', fil: lu.fil}); fx.montant = lu.montant; }
         else if (lu.montant < fx.montant * 0.98) fx.montant = lu.montant;
       }
       return;
     }
     if (age > 45) return;   /* une vieille alerte de l'historique ne sert plus */
     if (lu.genre === 'echec') {
-      R.alertes.push({id: 'a' + lu.id, date: lu.date, type: 'echec', titre: 'Paiement échoué', service: lu.service, montant: lu.montant, texte: 'Mets à jour ton moyen de paiement chez ' + lu.service + ', sinon le service peut s’arrêter.', fil: lu.fil});
+      /* 0.68.0 : un second mail pour le même paiement échoué (le jour même ou le lendemain) ne renvoie pas de notification */
+      const relance = R.alertes.some((a) => a.type === 'echec' && ((lu.cle && a.cle === lu.cle) || nomPlat(a.service) === nomPlat(lu.service)) && ecart(a.date, lu.date) <= 1);
+      if (relance) depart = true;
+      R.alertes.push({id: 'a' + lu.id, date: lu.date, cle: lu.cle || '', type: 'echec', titre: 'Paiement échoué', service: lu.service, montant: lu.montant, texte: 'Mets à jour ton moyen de paiement chez ' + lu.service + ', sinon le service peut s’arrêter.', fil: lu.fil});
       if (!depart && R.notif.echec !== false) push({title: 'Paiement échoué : ' + lu.service, body: (lu.montant ? eur(lu.montant) + '. ' : '') + 'Mets à jour ton moyen de paiement, sinon le service peut s’arrêter.', url: '/#argent', tag: 'radar-echec-' + lu.id}).catch(() => {});
     }
-    if (lu.genre === 'essai') R.alertes.push({id: 'a' + lu.id, date: lu.date, type: 'essai', titre: 'Essai gratuit qui devient payant', service: lu.service, montant: lu.montant, texte: lu.datePrel ? 'Premier prélèvement le ' + jourCourt(depuisYmd(lu.datePrel)) + '.' : 'L’essai se termine bientôt.', fil: lu.fil});
-    if (lu.genre === 'hausse' && lu.montant) R.alertes.push({id: 'a' + lu.id, date: lu.date, type: 'hausse', titre: 'Hausse de prix', service: lu.service, montant: lu.montant, avant: lu.avant, texte: lu.datePrel ? 'À partir du ' + jourCourt(depuisYmd(lu.datePrel)) + '.' : 'À partir du prochain prélèvement.', fil: lu.fil});
+    if (lu.genre === 'essai') R.alertes.push({id: 'a' + lu.id, date: lu.date, cle: lu.cle || '', type: 'essai', titre: 'Essai gratuit qui devient payant', service: lu.service, montant: lu.montant, texte: lu.datePrel ? 'Premier prélèvement le ' + jourCourt(depuisYmd(lu.datePrel)) + '.' : 'L’essai se termine bientôt.', fil: lu.fil});
+    if (lu.genre === 'hausse' && lu.montant) R.alertes.push({id: 'a' + lu.id, date: lu.date, cle: lu.cle || '', type: 'hausse', titre: 'Hausse de prix', service: lu.service, montant: lu.montant, avant: lu.avant, texte: lu.datePrel ? 'À partir du ' + jourCourt(depuisYmd(lu.datePrel)) + '.' : 'À partir du prochain prélèvement.', fil: lu.fil});
     if (['essai', 'renouvellement', 'hausse'].includes(lu.genre) && lu.datePrel && lu.datePrel >= ymd(t))
       R.avenir.push({id: 'v' + lu.id, date: lu.datePrel, service: lu.service, montant: lu.montant, avant: lu.avant, type: lu.genre === 'hausse' ? 'hausse' : lu.genre, note: lu.genre === 'essai' ? 'Fin de l’essai gratuit : premier prélèvement si rien n’est fait.' : ''});
   }
@@ -644,12 +775,35 @@ export function createRadar({file, gmail, claude = async () => ({ok: false, erro
     const t = auj(), garde = ymd(J(t.getUTCFullYear(), t.getUTCMonth() - moisDepart - 1, 1));
     const uniq = (l) => { const s = new Set(); return l.filter((x) => (s.has(x.id) ? false : s.add(x.id))); };
     R.releves = uniq(R.releves).filter((r) => r.date >= garde).slice(-3000);
-    R.alertes = uniq(R.alertes).filter((a) => Math.round((t - depuisYmd(a.date)) / 864e5) <= 60).slice(-60);
-    R.avenir = uniq(R.avenir).filter((v) => v.date >= ymd(t)).slice(-60);
-    /* 0.51.0 : la même échéance annoncée par deux mails (l'échéancier, puis le rappel) ne compte qu'une fois */
-    const unique = (l) => { const s = new Set(); return l.filter((x) => { const k = x.date + '|' + cents(x.montant); return s.has(k) ? false : s.add(k); }); };
-    R.ponctuels = unique(uniq(R.ponctuels).filter((v) => v.date >= ymd(t))).slice(-60);
-    R.avenir = R.avenir.filter((v) => v.type !== 'echeance').concat(unique(R.avenir.filter((v) => v.type === 'echeance'))).sort((a, b) => (a.date < b.date ? -1 : 1));
+    R.alertes = uniq(R.alertes).filter((a) => Math.round((t - depuisYmd(a.date)) / 864e5) <= 60);
+    /* 0.68.0 (« il répétait les mêmes alertes ») : plusieurs mails pour la même chose (paiement échoué puis ses relances, fin d'essai annoncée trois
+       fois, hausse rappelée) font une seule alerte, la plus récente, qui dit combien de mails en parlent */
+    const sujet = (a) => a.type + '|' + (a.fixe || a.cle || nomPlat(a.service)) + (['hausse', 'mensualite', 'inhabituel'].includes(a.type) ? '|' + cents(a.montant) : '');
+    { const gardees = [], tete = new Map();
+      for (const a of R.alertes.slice().sort((x, y) => (x.date < y.date ? 1 : x.date > y.date ? -1 : 0))) {
+        const k = sujet(a), p = tete.get(k);
+        if (p && ['silence', 'calendrier', 'resiliation'].includes(a.type)) continue;   /* une seule par dépense */
+        if (p && ecart(p.date, a.date) <= 45) { p.n = (p.n || 1) + (a.n || 1); p.autres = [...new Set([...(p.autres || []), a.id, ...(a.autres || [])])].slice(0, 20); continue; }
+        tete.set(k, a); gardees.push(a);
+      }
+      R.alertes = gardees.slice(0, 60); }
+    const t0 = ymd(t);
+    /* 0.68.0 : les plans de paiement en plusieurs fois ; un plan fini depuis 45 jours s'en va ; ses échéances à venir sont les prélèvements ponctuels
+       (reste à payer, notification de la veille, « À venir ») ; un plan qu'il a dit « plus à payer » ne compte plus */
+    const finPlan = (p) => p.echeances.reduce((m, e) => (e.date > m ? e.date : m), ''), retires = new Set(R.plansRetires || []);
+    for (const [id, p] of Object.entries(R.plans || {})) if (!p || !Array.isArray(p.echeances) || !p.echeances.length || finPlan(p) < ymd(plus(t, -45))) delete R.plans[id];
+    { const l = Object.values(R.plans).sort((a, b) => ((a.maj || '') < (b.maj || '') ? 1 : -1)); if (l.length > 60) for (const p of l.slice(60)) delete R.plans[p.id]; }
+    R.ponctuels = []; const avEch = [];
+    for (const p of Object.values(R.plans)) {
+      if (retires.has(p.id)) continue;
+      const nom = nomPlan(p), n = p.fois || p.echeances.length;
+      p.echeances.forEach((e, i) => { if (e.date < t0 || e.payee) return;
+        R.ponctuels.push({id: p.id + '-' + i, plan: p.id, date: e.date, service: nom, montant: e.montant, fil: p.fil, ...(e.estime ? {estime: true} : {})});
+        avEch.push({id: 'v' + p.id + '-' + i, plan: p.id, date: e.date, service: nom, montant: e.montant, type: 'echeance', note: 'Échéance ' + (i + 1) + ' sur ' + n + (e.estime ? ', date estimée' : '') + '.'}); });
+    }
+    R.ponctuels.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+    R.avenir = uniq(R.avenir).filter((v) => v.type !== 'echeance' && v.date >= t0).slice(-60).concat(avEch).sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+    R.traitees = (R.traitees || []).filter((x) => x.le && ecart(x.le, t0) <= 120);
     for (const f of R.fixes) if (f.prochain && f.prochain.date < ymd(t)) delete f.prochain;
     for (const f of R.fixes) if (f.paliers && f.paliers.length) { const v = montantPalier(f.paliers, ymd(t).slice(0, 7)); if (v != null) f.montant = v; }   /* 0.66.0 */
     const mois0 = ymd(J(t.getUTCFullYear(), t.getUTCMonth() - 1, 1)), adh = new Set(R.mandats.filter((m) => m.debut && m.montant == null && m.debut >= mois0).map((m) => m.cle));
@@ -657,14 +811,17 @@ export function createRadar({file, gmail, claude = async () => ({ok: false, erro
     /* une annonce reste proposée tant qu'elle vaut : un échéancier jusqu'à sa fin, une adhésion jusqu'au mois de son début, un contrat 2 mois (un an s'il est annuel) */
     const frais = (m) => (m.fin ? m.fin >= ymd(t) : m.debut && m.montant == null ? m.debut >= mois0 : Math.round((t - depuisYmd(m.dernier)) / 864e5) <= 400);   /* 0.56.0 : une annonce vaut un an (un contrat ne renvoie pas de mail chaque mois) */
     R.propositions = rg.concat(R.mandats.filter((m) => !rgCles.has(m.cle) && frais(m))).map((p) => ({...p, cle: p.cle || p.dom})).filter((p) => !R.refus.includes(cleDe(p)) && !R.finis.includes(cleDe(p)) && !connue(p));
-    /* 0.54.0 : une dépense fixe lue dans ses mails dont les factures ont cessé (deux échéances sans facture) : « toujours d'actualité ? » */
+    /* 0.54.0 : une dépense fixe lue dans ses mails dont les factures ont cessé (deux échéances sans facture) : « toujours d'actualité ? ».
+       0.68.0 : jamais pendant une lecture de ses mails (lue mois par mois, une dépense semblait muette à chaque mois pas encore lu : une alerte
+       par mois et par dépense, toutes fausses) ; une seule par dépense, qui s'efface dès qu'une facture revient */
     const per = {mensuel: 31, trimestriel: 92, annuel: 366};
-    for (const f of R.fixes) {
-      if (f.source !== 'mail' || f.fin) continue;
-      const l = R.releves.filter((r) => (cleDe(f) && (r.cle || r.dom) === cleDe(f)) || nomPlat(r.service) === nomPlat(f.service)); if (l.length < 2) continue;
-      const der = l.map((r) => r.datePrel || r.date).sort().pop(), age = Math.round((t - depuisYmd(der)) / 864e5), id = 'z' + f.id + der.replace(/-/g, '');
-      if (age <= 2 * (per[f.rythme] || 31) + 10 || R.gardes[f.id] === der || R.alertes.some((a) => a.id === id)) continue;
-      R.alertes.push({id, date: ymd(t), type: 'silence', titre: 'Plus de facture', service: f.service, montant: f.montant, fixe: f.id, dernier: der, texte: 'Dernière facture le ' + jourCourt(depuisYmd(der)) + '. Toujours d’actualité ?'});
+    if (!(R.scan && R.scan.enCours)) for (const f of R.fixes) {
+      const id = 'z' + f.id, i = R.alertes.findIndex((a) => a.type === 'silence' && a.fixe === f.id);
+      const l = f.source === 'mail' && !f.fin ? R.releves.filter((r) => (cleDe(f) && (r.cle || r.dom) === cleDe(f)) || nomPlat(r.service) === nomPlat(f.service)) : [];
+      const der = l.length >= 2 ? l.map((r) => r.datePrel || r.date).sort().pop() : null, age = der ? Math.round((t - depuisYmd(der)) / 864e5) : 0;
+      if (!der || age <= 2 * (per[f.rythme] || 31) + 10 || R.gardes[f.id] === der) { if (i >= 0) R.alertes.splice(i, 1); continue; }
+      const a = {id, date: i >= 0 ? R.alertes[i].date : t0, type: 'silence', titre: 'Plus de facture', service: f.service, montant: f.montant, fixe: f.id, dernier: der, texte: 'Dernière facture le ' + jourCourt(depuisYmd(der)) + '. Toujours d’actualité ?'};
+      if (i >= 0) R.alertes[i] = a; else R.alertes.push(a);
     }
     R.alertes = R.alertes.filter((a) => !a.fixe || R.fixes.some((f) => f.id === a.fixe && !f.fin));
     R.maj = new Date(now()).toISOString();
@@ -683,7 +840,7 @@ export function createRadar({file, gmail, claude = async () => ({ok: false, erro
       if (!contrat && (!['facture', 'renouvellement'].includes(x.lu.genre) || (x.lu.montant && x.lu.datePrel))) continue;
       reste--; if (R.scan && o.depart) R.scan.pdf = (R.scan.pdf || 0) + 1;
       let d = x.pdf.data;
-      if (!d) { try { d = ((await gm(() => gmail.pj(x.pdf.mid, x.pdf.aid), 10)) || {}).data || ''; } catch (e) { if (estQuota(e)) throw e; log('radar : pièce jointe illisible (' + TXT(e.message || e, 120) + ')'); continue; } }
+      if (!d) { try { d = ((await gm(() => gmail.pj(x.pdf.mid, x.pdf.aid), 10, o)) || {}).data || ''; } catch (e) { if (estQuota(e) || (o && o.run && o.run.abandon)) throw e; log('radar : pièce jointe illisible (' + TXT(e.message || e, 120) + ')'); continue; } }
       const texte = texteDePdf(Buffer.from(String(d).replace(/-/g, '+').replace(/_/g, '/'), 'base64'));
       if (!texte) continue;
       /* 0.66.0 : le tableau des cotisations d'un contrat : le montant de chaque mois (assurance de prêt) */
@@ -710,11 +867,18 @@ export function createRadar({file, gmail, claude = async () => ({ok: false, erro
     }
   }
   async function lire(q, n, o) {
-    const lus0 = await lireRequete(q, n); await parPdf(lus0, o);
+    const lus0 = await lireRequete(q, n, o); await parPdf(lus0, o);
+    if (o.run && o.run.abandon) throw new Error('Lecture remplacée par une nouvelle.');
     for (const x of lus0) if (x.lu.jourMois && x.lu.cle) R.joursCle = {...(R.joursCle || {}), [x.lu.cle]: x.lu.jourMois};   /* 0.56.0 : même d'un mail qui n'est pas une facture (souscription) */
     const lus = lus0, surs = lus.filter((x) => x.lu.sur), aClaude = lus.filter((x) => !x.lu.sur && x.lu.genre === 'facture');
-    const envoyes = aClaude.slice(0, o.depart ? Math.max(0, maxClaude - ((R.scan && R.scan.claude) || 0)) : 16);   /* au départ 60 mails au plus pour Claude, ensuite 16 par jour */
-    const compris = envoyes.length ? await parClaude(envoyes) : [], lus2 = new Set(compris.map((x) => x.lu.id));
+    /* 0.68.0 : ce que Claude a déjà lu sert encore (une relecture ne lui renvoie pas les mêmes mails) */
+    const cache = R.claudeLus || (R.claudeLus = {}), dejaLus = aClaude.filter((x) => cache[x.lu.id]).map((x) => ({...x, lu: {...x.lu, ...cache[x.lu.id], parClaude: true, sur: true}}));
+    const envoyes = aClaude.filter((x) => !cache[x.lu.id]).slice(0, o.depart ? Math.max(0, maxClaude - ((R.scan && R.scan.claude) || 0)) : 16);   /* au départ 60 mails au plus pour Claude, ensuite 16 par jour */
+    const neufs = envoyes.length ? await parClaude(envoyes) : [];
+    if (o.run && o.run.abandon) throw new Error('Lecture remplacée par une nouvelle.');
+    for (const x of neufs) cache[x.lu.id] = {genre: x.lu.genre, service: x.lu.service, montant: x.lu.montant, avant: x.lu.avant, datePrel: x.lu.datePrel};
+    { const ks = Object.keys(cache); if (ks.length > 800) for (const k of ks.slice(0, ks.length - 800)) delete cache[k]; }
+    const compris = neufs.concat(dejaLus), lus2 = new Set(compris.map((x) => x.lu.id));
     if (R.scan && o.depart) R.scan.claude = (R.scan.claude || 0) + envoyes.length;
     /* une facture que ni les règles ni Claude ne chiffrent est gardée sans montant (sa régularité compte) */
     for (const x of surs.concat(compris, aClaude.filter((y) => !lus2.has(y.lu.id)))) retenir(x.lu, o);
@@ -724,21 +888,22 @@ export function createRadar({file, gmail, claude = async () => ({ok: false, erro
   /* 0.54.0 : tout ce qu'envoient ses fournisseurs connus (dépenses fixes, factures lues), quel que soit l'objet : hausses de tarif, changements d'offre, résiliations */
   const fournisseurs = () => { const d = [...new Set(R.fixes.map((f) => f.dom || String(f.cle || '').split(':')[0]).concat(R.releves.map((r) => r.dom)).filter((x) => x && /\./.test(x) && !INTERMEDIAIRES.test(x) && !CARTES.test(x) && !PERSO.test(x)))].slice(0, 30);
     return d.length ? 'from:(' + d.join(' OR ') + ')' + FILTRE : ''; };
-  async function depart() {
+  async function depart(run) {
+    const o = {depart: true, run}, stop = () => { if (run && run.abandon) throw new Error('Lecture remplacée par une nouvelle.'); };
     const reprise = R.scan && !R.scan.fini ? Math.min(R.scan.mois || 0, moisDepart) : 0;   /* une lecture interrompue reprend au mois suivant */
-    R.scan = {enCours: true, debut: now(), mois: reprise, total: moisDepart, lus: (reprise && R.scan.lus) || 0, claude: (reprise && R.scan.claude) || 0, pdf: (reprise && R.scan.pdf) || 0, fini: null, erreur: '', pause: ''}; sauver();
+    R.scan = {enCours: true, debut: now(), vie: now(), mois: reprise, total: moisDepart, lus: (reprise && R.scan.lus) || 0, claude: (reprise && R.scan.claude) || 0, pdf: (reprise && R.scan.pdf) || 0, fini: null, erreur: '', pause: '', ...(R.avant ? {complet: true} : {})}; sauver();
     try {
       const t = auj();
       for (let k = moisDepart - 1 - reprise; k >= 0; k--) {
         const a = J(t.getUTCFullYear(), t.getUTCMonth() - k, 1), b = J(t.getUTCFullYear(), t.getUTCMonth() - k + 1, 1);
-        R.scan.lus += await lire(REQUETE + ' after:' + gDate(a) + ' before:' + gDate(b), 100, {depart: true});
-        R.scan.lus += await lire(REQUETE_CORPS + ' after:' + gDate(a) + ' before:' + gDate(b), 60, {depart: true});
-        R.scan.mois += 1; ranger(); sauver();
+        stop(); R.scan.lus += await lire(REQUETE + ' after:' + gDate(a) + ' before:' + gDate(b), 100, o);
+        stop(); R.scan.lus += await lire(REQUETE_CORPS + ' after:' + gDate(a) + ' before:' + gDate(b), 60, o);
+        stop(); R.scan.mois += 1; ranger(); sauver();
       }
-      const fq = fournisseurs(); if (fq) R.scan.lus += await lire(fq + ' newer_than:' + moisDepart + 'm', 150, {depart: true});
+      const fq = fournisseurs(); if (fq) { stop(); R.scan.lus += await lire(fq + ' newer_than:' + moisDepart + 'm', 150, o); }
       /* 0.66.0 : ses contrats en cours (certificat d'adhésion, avenant, échéancier) peuvent dater de plusieurs années : cherchés sur 4 ans */
-      R.scan.lus += await lire(REQUETE_CONTRATS + ' newer_than:4y', 40, {depart: true});
-      R.scan.fini = now();
+      stop(); R.scan.lus += await lire(REQUETE_CONTRATS + ' newer_than:4y', 40, o);
+      stop(); R.scan.fini = now();
       /* 0.66.0 : relue avec de nouvelles règles, une dépense lue dans ses mails prend le montant de ses derniers prélèvements (alerte « Montant
          corrigé ») ; ce qu'il a saisi à la main n'est jamais touché */
       if (R.revise) {
@@ -752,25 +917,56 @@ export function createRadar({file, gmail, claude = async () => ({ok: false, erro
         delete R.revise;
       }
     } catch (e) {
+      if (run && run.abandon) return;   /* une lecture plus récente a pris la main : celle-ci n'écrit plus rien */
       R.scan.erreur = estQuota(e) ? 'Google a limité la lecture de tes mails : elle reprendra où elle s’est arrêtée à ta prochaine ouverture du Radar (dans 10 minutes au plus tôt).' : 'Lecture de tes mails interrompue : ' + TXT(e.message || e, 140);
       log('radar : lecture de départ interrompue (' + TXT(e.message || e, 200) + ')');
     }
-    R.scan.enCours = false; ranger(); sauver();
+    if (run && run.abandon) return;
+    R.scan.enCours = false;
+    /* 0.68.0 : relue jusqu'au bout, la nouvelle lecture remplace ce qu'il voyait ; le bilan dit ce qu'elle a trouvé */
+    if (R.scan.fini) { const av = R.avant; delete R.avant; ranger(); R.scan.bilan = bilan(av); } else ranger();
+    sauver();
   }
-  async function quotidien() {
-    try { await lire(REQUETE + ' newer_than:3d', 60, {depart: false}); await lire(REQUETE_CORPS + ' newer_than:3d', 30, {depart: false}); const fq = fournisseurs(); if (fq) await lire(fq + ' newer_than:3d', 30, {depart: false}); }
-    catch (e) { log('radar : lecture du matin impossible (' + (e.message || e) + ')'); }
+  const actifs = () => Object.values(R.plans || {}).filter((p) => !(R.plansRetires || []).includes(p.id) && p.echeances.some((e) => !e.payee && e.date >= ymd(auj())));
+  const bilan = (av) => ({le: now(), lus: R.scan.lus || 0, propositions: R.propositions.length, nouvelles: R.propositions.filter((p) => !((av && av.propositions) || []).some((q) => q.id === p.id)).length,
+    alertes: R.alertes.filter((a) => !(R.alertesVues || {})[a.id]).length, plans: actifs().length});
+  async function quotidien(run) {
+    const o = {depart: false, run};
+    try { await lire(REQUETE + ' newer_than:3d', 60, o); await lire(REQUETE_CORPS + ' newer_than:3d', 30, o); const fq = fournisseurs(); if (fq) await lire(fq + ' newer_than:3d', 30, o); }
+    catch (e) { if (run && run.abandon) return; log('radar : lecture du matin impossible (' + (e.message || e) + ')'); }
+    if (run && run.abandon) return;
     ranger(); sauver();
   }
-  const lancer = (fn) => { if (occupe) return occupe; occupe = fn().finally(() => { occupe = null; }); return occupe; };
+  /* une lecture à la fois. 0.68.0 : une lecture figée (aucune réponse de Gmail depuis 15 minutes) est abandonnée et une nouvelle part : avant, le
+     bouton renvoyait sans fin la lecture bloquée */
+  let run0 = null;
+  const figee = () => !!(occupe && R.scan && R.scan.enCours && now() - (R.scan.vie || R.scan.debut || 0) > bloquee);
+  const abandonner = () => { if (run0) run0.abandon = true; occupe = null; run0 = null; };
+  const lancer = (fn) => {
+    if (occupe && figee()) { log('radar : lecture figée abandonnée'); abandonner(); }
+    if (occupe) return occupe;
+    const run = {abandon: false}; run0 = run;
+    const p = fn(run).catch((e) => log('radar : lecture impossible (' + TXT(e.message || e, 200) + ')')).finally(() => { if (run0 === run) { occupe = null; run0 = null; } });
+    occupe = p; return p;
+  };
   const lireMaintenant = () => lancer(R.scan && R.scan.fini ? quotidien : depart);
+  /* 0.68.0 (« la relecture des mails est buggée, j'arrive pas à la relancer ») : avant, « Relire mes mails » ne relisait que les 3 derniers jours,
+     mails déjà vus exclus, sans rien montrer. « Tout relire » relit ses 13 mois avec les règles du jour ; ses dépenses fixes, sa paie, ses refus,
+     ses alertes vues et ses réponses restent ; ce qu'il voyait reste affiché jusqu'à la fin de la lecture. */
+  function relireTout() {
+    if (occupe && !figee()) return occupe;
+    abandonner();
+    if (!enRelecture()) R.avant = {releves: R.releves, propositions: R.propositions, alertes: R.alertes, avenir: R.avenir, ponctuels: R.ponctuels, plans: R.plans};
+    oublier(); sauver();
+    return lancer(depart);
+  }
 
   /* ---------- la veille à 19 h : ce qui part demain, au-dessus de son seuil ---------- */
   async function veille() {
     if (!R.notif.veille) return null;
-    const dem = plus(auj(), 1), l = resteA(R.fixes, rev(), dem, 'mois', R.ponctuels).liste.filter((o) => ymd(o.le) === ymd(dem) && cents(o.f.montant) >= cents(R.notif.seuil || 0));
+    const pc = vue().ponctuels, dem = plus(auj(), 1), l = resteA(R.fixes, rev(), dem, 'mois', pc).liste.filter((o) => ymd(o.le) === ymd(dem) && cents(o.f.montant) >= cents(R.notif.seuil || 0));
     if (!l.length) return null;
-    const r = resteA(R.fixes, rev(), dem, 'paie', R.ponctuels);
+    const r = resteA(R.fixes, rev(), dem, 'paie', pc);
     const msg = {title: 'Demain : ' + (l.length === 1 ? l[0].f.service : l.length + ' prélèvements'), url: '/#argent', tag: 'radar-veille-' + ymd(dem),
       body: l.map((o) => o.f.service + ' : ' + (o.f.estime ? 'environ ' : '') + eur(o.f.montant)).join('\n') + '\nReste à payer d’ici ta paie ' + (rev().des ? '(au plus tard le ' : 'du ') + jourCourt(r.fin) + (rev().des ? ')' : '') + ' : ' + eur(r.total) + '.'};
     await push(msg).catch(() => {});
@@ -802,28 +998,57 @@ export function createRadar({file, gmail, claude = async () => ({ok: false, erro
     const t0 = ymd(auj());   /* un prélèvement annoncé, pas encore passé, n'est pas de l'historique */
     return [...parM.values()].filter((r) => (r.datePrel || r.date) <= t0).reverse().slice(0, 6).map((r) => ({date: r.date, ...(r.datePrel ? {datePrel: r.datePrel} : {}), montant: r.montant, ...(r.hors && r.montant > r.hors ? {hors: r.hors} : {})}));
   }
+  const urlDe = (fil) => 'https://mail.google.com/mail/u/0/#all/' + fil;
+  /* 0.68.0 : un plan tel que la page le montre : ses échéances (payées, à venir), ce qui reste, la prochaine */
+  function planVu(p, t0, retires) {
+    const ech = p.echeances.map((e) => ({date: e.date, montant: e.montant, ...(e.payee || e.date < t0 ? {payee: true} : {}), ...(e.estime ? {estime: true} : {}), ...(e.exact ? {exact: true} : {})})).sort((a, b) => (a.date < b.date ? -1 : 1));
+    const restent = ech.filter((e) => !e.payee), som = (l) => Math.round(l.reduce((s, e) => s + cents(e.montant), 0)) / 100;
+    return {id: p.id, nom: nomPlan(p), service: p.service, via: p.via || '', fois: p.fois || ech.length, total: p.total || som(ech), echeances: ech, payees: ech.length - restent.length, reste: som(restent), prochaine: restent[0] || null,
+      fin: ech.length ? ech[ech.length - 1].date : '', ...(p.restant != null ? {restant: p.restant} : {}), ...(p.partiel ? {partiel: true} : {}), ...(retires.has(p.id) ? {retire: true} : {}), ...(p.fil ? {url: urlDe(p.fil)} : {}), objet: p.objet || ''};
+  }
+  /* 0.68.0 : le nom de ce qu'il a écarté (gardé depuis cette version ; avant, retrouvé dans ses mails lus, sinon tiré de l'adresse) */
+  const nomDeCle = (cle) => { const r = R.releves.concat((R.avant && R.avant.releves) || []).find((x) => (x.cle || x.dom) === cle) || R.mandats.find((m) => m.cle === cle); if (r) return r.service;
+    const [d, m] = String(cle).split(':'); return m ? m.toUpperCase() : nomService('', 'x@' + d); };
   function etat() {
-    const t = auj();
-    return {maj: R.maj, google: !!gmail.lie(), fixes: R.fixes, revenus: rev(), notif: R.notif, propositions: R.propositions, ponctuels: R.ponctuels.filter((v) => v.date >= ymd(t)).sort((a, b) => (a.date < b.date ? -1 : 1)),
-      scan: R.scan ? {enCours: !!R.scan.enCours, mois: R.scan.mois, total: R.scan.total, lus: R.scan.lus, fini: R.scan.fini, erreur: R.scan.erreur, pause: R.scan.pause || ''} : null,
-      avenir: R.avenir.filter((v) => v.date >= ymd(t)).sort((a, b) => (a.date < b.date ? -1 : 1)), alertes: R.alertes.slice().sort((a, b) => (a.date < b.date ? 1 : -1)).map((a) => (a.fil ? {...a, url: 'https://mail.google.com/mail/u/0/#all/' + a.fil} : a)),
+    const t = auj(), t0 = ymd(t), V = vue(), vus = R.alertesVues || {}, retires = new Set(R.plansRetires || []);
+    const plans = Object.values(V.plans || {}).map((p) => planVu(p, t0, retires));
+    const rang = (p) => (p.retire ? 2 : p.prochaine ? 0 : 1);
+    return {maj: R.maj, google: !!gmail.lie(), fixes: R.fixes, revenus: rev(), notif: R.notif, propositions: V.propositions, ponctuels: V.ponctuels.filter((v) => v.date >= t0).sort((a, b) => (a.date < b.date ? -1 : 1)),
+      scan: R.scan ? {enCours: !!R.scan.enCours, mois: R.scan.mois, total: R.scan.total, lus: R.scan.lus, fini: R.scan.fini, erreur: R.scan.erreur, pause: R.scan.pause || '', ...(R.scan.complet ? {complet: true} : {}), ...(R.scan.bilan ? {bilan: R.scan.bilan} : {})} : null,
+      relecture: enRelecture(),
+      avenir: V.avenir.filter((v) => v.date >= t0).sort((a, b) => (a.date < b.date ? -1 : 1)),
+      /* 0.68.0 : « vu » vient du serveur ; ses réponses aux alertes (pour « Annuler ») ; ce qu'il a écarté (pour « Reproposer ») ; ses paiements en plusieurs fois */
+      alertes: V.alertes.slice().sort((a, b) => (a.date < b.date ? 1 : -1)).map((a) => ({...a, ...(a.fil ? {url: urlDe(a.fil)} : {}), ...(vus[a.id] ? {vu: vus[a.id]} : {})})),
+      traitees: (R.traitees || []).map(({avant, ...x}) => ({...x, ...(x.fil ? {url: urlDe(x.fil)} : {})})),
+      ecartees: R.refus.slice().reverse().slice(0, 60).map((cle) => ({cle, service: (R.refusNoms || {})[cle] || nomDeCle(cle)})),
+      plans: plans.sort((a, b) => rang(a) - rang(b) || (rang(a) === 0 ? (a.prochaine.date < b.prochaine.date ? -1 : 1) : a.fin < b.fin ? 1 : -1)),
       /* 0.56.0 : les dernières factures lues de chaque dépense fixe (montant, jour), pour qu'il vérifie d'un coup d'œil */
-      historiques: Object.fromEntries(R.fixes.filter((f) => f.source === 'mail').map((f) => [f.id, histoDe(R.releves.filter((r) => (cleDe(f) && (r.cle || r.dom) === cleDe(f)) || nomPlat(r.service) === nomPlat(f.service)))]).filter(([, l]) => l.length)),
-      abonnements: R.fixes.filter((f) => f.cat === 'Abonnements' && !(f.fin && f.fin < ymd(t))).map((f) => ({service: f.service, cat: sousCategorie(f), prix: f.montant, rythme: f.rythme, depuis: f.depuis || ''})),
+      historiques: Object.fromEntries(R.fixes.filter((f) => f.source === 'mail').map((f) => [f.id, histoDe(V.releves.filter((r) => (cleDe(f) && (r.cle || r.dom) === cleDe(f)) || nomPlat(r.service) === nomPlat(f.service)))]).filter(([, l]) => l.length)),
+      abonnements: R.fixes.filter((f) => f.cat === 'Abonnements' && !(f.fin && f.fin < t0)).map((f) => ({service: f.service, cat: sousCategorie(f), prix: f.montant, rythme: f.rythme, depuis: f.depuis || ''})),
       mois: moisDe(t), navigo: null};
   }
   /* les adresses de la page (appareil relié, vérifié avant) */
   async function traiter(method, p, corps) {
+    const lu = async () => { try { return (await corps()) || {}; } catch { return {}; } };
     if (p === '/api/radar' && method === 'GET') {
-      /* première ouverture : la lecture de ses 13 mois commence ; une lecture interrompue reprend (au plus une fois toutes les 10 minutes) */
-      if (gmail.lie() && !occupe && (!R.scan || (!R.scan.fini && now() - (R.scan.debut || 0) > 600e3))) lireMaintenant().catch(() => {});
+      /* première ouverture : la lecture de ses 13 mois commence ; une lecture interrompue reprend (au plus une fois toutes les 10 minutes) ;
+         0.68.0 : une lecture figée aussi */
+      if (gmail.lie() && (!occupe || figee()) && (!R.scan || (!R.scan.fini && now() - (R.scan.debut || 0) > 600e3))) lireMaintenant().catch(() => {});
       return {status: 200, body: etat()};
     }
-    if (p === '/api/radar/set' && method === 'POST') { const b = await corps(); const r = regler(b.cle, b.valeur); return {status: r.ok ? 200 : 400, body: r.ok ? etat() : r}; }
-    if (p === '/api/radar/proposition' && method === 'POST') { const b = await corps(); const r = proposition(String(b.id || ''), b.oui === true, b.modif || null); return {status: r.ok ? 200 : 404, body: r.ok ? etat() : r}; }
-    if (p === '/api/radar/alerte' && method === 'POST') { const b = await corps(); const r = alerte(String(b.id || ''), String(b.action || '')); return {status: r.ok ? 200 : 404, body: r.ok ? etat() : r}; }
-    if (p === '/api/radar/lire' && method === 'POST') { if (!gmail.lie()) return {status: 409, body: {error: 'Google n’est pas relié à JARVIS.'}}; lireMaintenant().catch(() => {}); return {status: 202, body: etat()}; }
+    if (p === '/api/radar/set' && method === 'POST') { const b = await lu(); const r = regler(b.cle, b.valeur); return {status: r.ok ? 200 : 400, body: r.ok ? etat() : r}; }
+    if (p === '/api/radar/proposition' && method === 'POST') { const b = await lu(); const r = proposition(String(b.id || ''), b.oui === true, b.modif || null); return {status: r.ok ? 200 : 404, body: r.ok ? etat() : r}; }
+    if (p === '/api/radar/alerte' && method === 'POST') { const b = await lu(); const r = alerte(String(b.id || ''), String(b.action || '')); return {status: r.ok ? 200 : 404, body: r.ok ? etat() : r}; }
+    if (p === '/api/radar/plan' && method === 'POST') { const b = await lu(); const r = plan(String(b.id || ''), String(b.action || '')); return {status: r.ok ? 200 : 404, body: r.ok ? etat() : r}; }   /* 0.68.0 */
+    if (p === '/api/radar/reproposer' && method === 'POST') { const b = await lu(); const r = reproposer(String(b.cle || '')); return {status: r.ok ? 200 : 404, body: r.ok ? {...etat(), revenue: r.revenue} : r}; }   /* 0.68.0 */
+    /* 0.68.0 : « Tout relire » (par défaut) ; une lecture interrompue reprend où elle s'était arrêtée ; {tout: false} : les derniers jours seulement */
+    if (p === '/api/radar/lire' && method === 'POST') {
+      if (!gmail.lie()) return {status: 409, body: {error: 'Google n’est pas relié à JARVIS : relie-le dans Réglages.'}};
+      const b = await lu();
+      (b.tout === false ? lireMaintenant() : R.scan && !R.scan.fini && (!occupe || figee()) ? lancer(depart) : relireTout()).catch(() => {});
+      return {status: 202, body: etat()};
+    }
     return null;
   }
-  return {etat, traiter, regler, proposition, alerte, lireMaintenant, veille, tic, demarrer, attendre: () => occupe || Promise.resolve(), brut: () => R};
+  return {etat, traiter, regler, proposition, alerte, plan, reproposer, lireMaintenant, relireTout, veille, tic, demarrer, attendre: () => occupe || Promise.resolve(), brut: () => R};
 }

@@ -459,7 +459,8 @@
       {date: rIso(6), service: 'Assistant IA', montant: 21.60, type: 'renouvellement', rythme: 'mensuel', note: 'Passé en note de frais chaque mois.'},
       {date: rIso(24), service: 'Appli de notes', montant: 7.99, type: 'essai', rythme: 'mensuel', note: 'Fin de l’essai gratuit : premier prélèvement si rien n’est fait.'},
       {date: rIso(12), service: 'Stockage photos', montant: 2.99, type: 'renouvellement', rythme: 'mensuel'},
-      {date: rIso(55), service: 'Assurance auto', montant: null, type: 'fin', rythme: 'annuel', note: 'Échéance du contrat : un comparatif peut être prêt un mois avant.'}],
+      {date: rIso(55), service: 'Assurance auto', montant: null, type: 'fin', rythme: 'annuel', note: 'Échéance du contrat : un comparatif peut être prêt un mois avant.'},
+      {date: rIso(32), service: 'Paiement en 4 fois : Boutique', montant: 29.55, type: 'echeance', plan: 'pl1', note: 'Échéance 4 sur 4.'}],
     alertes: [
       {date: rIso(-6), type: 'echec', titre: 'Paiement échoué', service: 'Plateforme vidéo', montant: 9.99, texte: '3 tentatives : l’abonnement s’arrête si le moyen de paiement n’est pas mis à jour.'},
       {date: rIso(-9), type: 'essai', titre: 'Essai gratuit qui devient payant', service: 'Appli de notes', montant: 7.99, texte: 'Premier prélèvement dans 24 jours.'},
@@ -496,8 +497,13 @@
       {id: 'f16', service: 'Plateforme d’animation', cat: 'Abonnements', montant: 69.99, jour: D(41).getDate(), mois: D(41).getMonth() + 1, rythme: 'annuel', source: 'mail'}],
     revenus: {jour: 28, avance: true},
     notif: {veille: true, seuil: 20, echec: true},
-    /* ce que le serveur trouve dans les mails : un prélèvement ponctuel (paiement en 4 fois) et deux dépenses récurrentes à valider (inventés) */
-    ponctuels: [{id: 'e1', date: rIso(2), service: 'Paiement en 4 fois : Boutique', montant: 29.55}],
+    /* ce que le serveur trouve dans les mails : un paiement en 4 fois en cours et un autre fini (0.68.0 : un plan par achat), leurs échéances à venir,
+       et des dépenses récurrentes à valider (inventés) */
+    plans: [{id: 'pl1', nom: 'Paiement en 4 fois : Boutique', service: 'Boutique', via: 'PayPal', fois: 4, total: 118.2, payees: 2, reste: 59.1, prochaine: {date: rIso(2), montant: 29.55}, fin: rIso(32), objet: 'Votre plan de paiements Paiement en 4X est prêt',
+      echeances: [{date: rIso(-58), montant: 29.55, payee: true}, {date: rIso(-28), montant: 29.55, payee: true}, {date: rIso(2), montant: 29.55}, {date: rIso(32), montant: 29.55}]},
+      {id: 'pl2', nom: 'Paiement en 3 fois : Magasin de sport', service: 'Magasin de sport', via: 'Cofidis', fois: 3, total: 89.97, payees: 3, reste: 0, prochaine: null, fin: rIso(-15), objet: 'Consultez l’échéancier de vos achats financés',
+        echeances: [{date: rIso(-75), montant: 29.99, payee: true}, {date: rIso(-45), montant: 29.99, payee: true}, {date: rIso(-15), montant: 29.99, payee: true}]}],
+    ponctuels: [{id: 'pl1-2', plan: 'pl1', date: rIso(2), service: 'Paiement en 4 fois : Boutique', montant: 29.55}, {id: 'pl1-3', plan: 'pl1', date: rIso(32), service: 'Paiement en 4 fois : Boutique', montant: 29.55}],
     propositions: [{id: 'pa', service: 'Club de sport', cat: 'Autres', montant: 29.90, jour: 26, rythme: 'mensuel', source: 'mail', preuves: 6, dernier: rIso(-28), depuis: '05/2026', exemple: {objet: 'Votre facture du mois', date: rIso(-28)}},
       {id: 'pb', service: 'Stockage en ligne', cat: 'Abonnements', montant: 1.99, jour: 14, rythme: 'mensuel', source: 'mail', preuves: 12, dernier: rIso(-9), depuis: '11/2025', exemple: {objet: 'Reçu de votre paiement mensuel', date: rIso(-9)}},
       {id: 'pc', service: 'Garde d’enfant (exemple)', cat: 'Autres', montant: null, jour: 5, jourApprox: true, rythme: 'mensuel', source: 'mail', preuves: 13, dernier: rIso(-18), depuis: '11/2025', exemple: {objet: 'Votre facture du mois (en pièce jointe)', date: rIso(-18)}}],

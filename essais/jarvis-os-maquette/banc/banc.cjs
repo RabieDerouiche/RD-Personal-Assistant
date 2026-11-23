@@ -652,11 +652,14 @@ srv.listen(0, async () => {
         chips: (document.querySelector('.rad-hero .mchips') || {}).textContent || '', segs: [...document.querySelectorAll('.rad-seg button')].map((x) => x.textContent), fixes: document.querySelectorAll('.rad-fixes').length,
         nav: (document.querySelector('.rad-nav b') || {}).textContent || '', large: document.documentElement.scrollWidth <= innerWidth + 1}));
       ok('Radar : la rubrique Argent s\'ouvre sur le reste à payer d\'ici la paie, 5 filtres (Fixes d\'abord), le conseil Navigo, sans déborder', r0.t === 'Argent' && /^Reste à payer d’ici ta paie du \S+ \d\d\/\d\d$/.test(r0.k) && /^\d[\d\s]*,\d\d €$/.test(r0.big)
-        && /2 échéances sous 7 jours/.test(r0.chips) && r0.segs.length === 5 && /^Fixes \(16\)$/.test(r0.segs[0]) && /^À venir \(6\)$/.test(r0.segs[1]) && r0.fixes === 1 && /^Navigo de .+ : reste en Liberté\+$/.test(r0.nav) && r0.large, JSON.stringify(r0));
+        && /2 échéances sous 7 jours/.test(r0.chips) && /En plusieurs fois : 59,10 €/.test(r0.chips) && r0.segs.length === 5 && /^Fixes \(16\)$/.test(r0.segs[0]) && /^À venir \(7\)$/.test(r0.segs[1]) && r0.fixes === 1 && /^Navigo de .+ : reste en Liberté\+$/.test(r0.nav) && r0.large, JSON.stringify(r0));
       const avenir = () => p.evaluate(() => [...document.querySelectorAll('.rad-seg button')].find((x) => /^À venir/.test(x.textContent)).click()).then(() => p.waitForTimeout(400));
       await avenir();
       ok('Radar : à venir dans l\'ordre des dates ; le plus proche signalé, avec la hausse par rapport à l\'an dernier', await p.evaluate(() => { const c = [...document.querySelectorAll('.rad-due')], j = c.map((x) => +((x.querySelector('.ech-date span').textContent.match(/\d+/) || [0])[0]));
-        return c.length === 6 && c[0].classList.contains('is-soon') && /dans 3 j/.test(c[0].textContent) && /\+33 % \(avant : 59,99 €\)/.test(c[0].textContent) && j.every((v, i) => !i || v >= j[i - 1]) && /montant à venir/.test(c[5].textContent); }));
+        return c.length === 7 && c[0].classList.contains('is-soon') && /dans 3 j/.test(c[0].textContent) && /\+33 % \(avant : 59,99 €\)/.test(c[0].textContent) && j.every((v, i) => !i || v >= j[i - 1]) && /montant à venir/.test(c[6].textContent); }));
+      /* 0.68.0 : une échéance d'un paiement en plusieurs fois : son achat (PayPal, 4 fois, ce qui reste), « Voir le paiement » ; ni « Je garde » ni « Résilier » */
+      ok('Radar 0.68 : dans « À venir », l’échéance d’un paiement en 4 fois dit son achat et ce qui reste, avec « Voir le paiement » (plus « Je garde », « Comparer », « Résilier »)', await p.evaluate(() => { const c = document.querySelector('.rad-due-ech'); if (!c) return false; const b = [...c.querySelectorAll('.row-actions button')].map((x) => x.textContent.trim());
+        return /Paiement en 4 fois · PayPal/i.test(c.querySelector('.nature').textContent) && /Boutique/.test(c.textContent) && /reste 59,10 € sur 118,20 €/.test(c.textContent) && /Échéance 4 sur 4/.test(c.textContent) && b.join() === 'Voir le paiement' && !/Je garde|Résilier|Comparer/.test(c.textContent); }));
       await p.evaluate(() => [...document.querySelectorAll('.rad-due')][0].querySelector('.row-actions button').click()); await p.waitForTimeout(500);
       const r1 = await p.evaluate(() => ({kept: document.querySelector('.rad-due').classList.contains('is-kept') && /gardé/.test(document.querySelector('.rad-due .nature').textContent), toast: [...document.querySelectorAll('.toast')].some((x) => /Gardé/.test(x.textContent))}));
       await p.reload(); await p.waitForTimeout(1800); await avenir();
@@ -667,6 +670,14 @@ srv.listen(0, async () => {
         return a.length === 4 && ['echec', 'essai', 'hausse', 'inhabituel'].every((k) => a.some((x) => x.classList.contains('is-' + k))) && !a.some((x) => /facture mobile/i.test(x.textContent)) && a.every((x) => x.querySelector('.hm-ic svg')) && /avant : 48,20 €/.test(a[3].textContent); }));
       await p.evaluate(() => document.querySelector('.rad-alert .row-actions button').click()); await p.waitForTimeout(400);
       ok('Radar : « Vu » retire l\'alerte et met les compteurs à jour', await p.evaluate(() => document.querySelectorAll('.rad-alert').length === 3 && [...document.querySelectorAll('.rad-seg button')].some((x) => x.textContent === 'Alertes (3)') && /3 alertes/.test(document.querySelector('.rad-hero .mchips').textContent)));
+      /* 0.68.0 (« j'ai supprimé toutes les alertes par erreur… j'arrive plus à les récupérer ») : « Déjà vues » et « Remettre », et « Annuler » dans la notification */
+      const vu1 = await p.evaluate(() => ({s: (document.querySelector('.rad-vues summary') || {}).textContent || '', annuler: [...document.querySelectorAll('.toast')].some((x) => /Vu/.test(x.textContent) && /Annuler/.test(x.textContent))}));
+      await p.evaluate(() => { const d = document.querySelector('.rad-vues'); d.open = true; d.dispatchEvent(new Event('toggle')); }); await p.waitForTimeout(300);
+      const vu2 = await p.evaluate(() => [...document.querySelectorAll('.rad-vues .rad-alert')].map((x) => x.innerText.replace(/\s+/g, ' ')));
+      await p.evaluate(() => [...document.querySelectorAll('.rad-vues .rad-alert .row-actions button')].find((x) => /Remettre/.test(x.textContent)).click()); await p.waitForTimeout(400);
+      const vu3 = await p.evaluate(() => document.querySelectorAll('.rad-alert').length === 4 && !document.querySelector('.rad-vues') && /4 alertes/.test(document.querySelector('.rad-hero .mchips').textContent));
+      ok('Radar 0.68 : une alerte vue reste dans « Déjà vues (1) » (« Annuler » dans la notification) ; « Remettre » la rend (4 alertes)', vu1.s === 'Déjà vues (1)' && vu1.annuler && vu2.length === 1 && /Remettre/.test(vu2[0]) && /Paiement échoué/.test(vu2[0]) && vu3, JSON.stringify([vu1, vu2, vu3]));
+      await p.evaluate(() => document.querySelector('.rad-alert .row-actions button').click()); await p.waitForTimeout(300);
       await p.evaluate(() => [...document.querySelectorAll('.rad-seg button')].find((x) => /^Abonnements/.test(x.textContent)).click()); await p.waitForTimeout(400);
       ok('Radar : abonnements rangés par catégorie, total juste (991,60 € par an, 82,63 € par mois), aucune ligne ne déborde', await p.evaluate(() => { const v = document.getElementById('view').getBoundingClientRect();
         return /9 abonnements : 991,60 € par an, soit 82,63 € par mois/.test(document.querySelector('.rad-tot').textContent) && document.querySelectorAll('#view .panel').length === 4 && document.querySelectorAll('.rad-abo').length === 9
@@ -694,6 +705,19 @@ srv.listen(0, async () => {
         && /^4 prélèvements · prochain : Livraison de repas, abonnement, aujourd’hui, 5,99 €$/.test(ra.p) && /depuis ta paie du mer\. 28\/10 : 1\s435,07 €$/.test(ra.prog) && ra.w === '91%' && ra.rows.length === 4
         && /^lun\. 23\/11 Livraison de repas, abonnement Abonnements · décalé du dim\. 22\/11 5,99 €$/.test(ra.rows[0]) && /^mer\. 25\/11 Paiement en 4 fois : Boutique Ponctuel · annoncé par mail 29,55 €$/.test(ra.rows[1]) && /^jeu\. 26\/11 Console de jeux/.test(ra.rows[3])
         && /^Déjà prélevé \(12\) : 1\s435,07 €$/.test(ra.deja) && ra.rules === 16 && ra.large, JSON.stringify(ra));
+      /* 0.68.0 (« les paiements en plusieurs fois ne sont pas bien gérés… rien ne s'affiche ») : un achat par ligne, sa fiche, « Plus à payer » et « Remettre » */
+      const pl0 = await q.evaluate(() => ({h: (document.querySelector('.rad-plans .panel-h') || {}).innerText || '', row: (document.querySelector('.rad-plans .rad-plan') || {}).innerText || '', fin: (document.querySelector('.rad-plans-fin summary') || {}).textContent || ''}));
+      await q.evaluate(() => document.querySelector('.rad-plans .rad-plan').click()); await q.waitForTimeout(800);
+      const pl1 = await q.evaluate(() => ({l: [...document.querySelectorAll('.rad-plan-l li')].map((x) => x.textContent), b: [...document.querySelectorAll('.rad-plan-sheet button')].map((x) => x.textContent.trim())}));
+      await q.evaluate(() => [...document.querySelectorAll('.rad-plan-sheet button')].find((x) => /Plus à payer/.test(x.textContent)).click()); await q.waitForTimeout(800);
+      const pl2 = await rs(), pl2b = await q.evaluate(() => ({act: document.querySelectorAll('.rad-plans .rad-plan:not(.is-retire):not(.is-fini)').length, ret: document.querySelectorAll('.rad-plan.is-retire').length, chip: !!document.querySelector('.rad-chip-plans')}));
+      await q.evaluate(() => document.querySelector('.rad-plan.is-retire').click()); await q.waitForTimeout(800);
+      await q.evaluate(() => [...document.querySelectorAll('.rad-plan-sheet button')].find((x) => /Remettre/.test(x.textContent)).click()); await q.waitForTimeout(800);
+      const pl3 = await rs();
+      ok('Radar 0.68 : « En plusieurs fois » : l’achat (PayPal, 4 fois, 2 sur 4 payées, 59,10 € restent) ; sa fiche liste les 4 échéances ; « Plus à payer » sort l’échéance du reste à payer (110,48 €), « Remettre » la rend (140,03 €)',
+        /^En plusieurs fois \(1\)\s+59,10 € restent$/.test(pl0.h) && /Boutique/.test(pl0.row) && /PayPal · 4 fois · 118,20 €/.test(pl0.row) && /2 sur 4 payées/.test(pl0.row) && /Terminés ou plus à payer \(1\)/.test(pl0.fin)
+        && pl1.l.length === 4 && pl1.l.filter((x) => /payée/.test(x)).length === 2 && pl1.b.includes('Plus à payer') && pl2.big === '110,48 €' && !pl2.rows.some((x) => /Boutique/.test(x)) && pl2b.act === 0 && pl2b.ret === 1 && !pl2b.chip
+        && pl3.big === '140,03 €' && pl3.rows.some((x) => /Paiement en 4 fois : Boutique/.test(x)), JSON.stringify([pl0, pl1, pl2.big, pl2b, pl3.big]));
       await q.evaluate(() => [...document.querySelectorAll('.rad-notif button')].find((x) => /exemple/.test(x.textContent)).click()); await q.waitForTimeout(500);
       const ex = await q.evaluate(() => [...document.querySelectorAll('.toast')].map((x) => x.textContent).join(' | '));
       ok('Reste à payer : l\'exemple de notification part la veille (mar. 24/11 à 19 h), avec tous les prélèvements d\'au moins 20 € du lendemain et le reste d\'ici la paie', /mar\. 24\/11 à 19 h : « Demain : 2 prélèvements \(Paiement en 4 fois : Boutique, 29,55 € ; Complémentaire santé, 24,50 €\)\. Reste à payer d’ici ta paie du ven\. 27\/11 : 134,04 €\. »/.test(ex), ex);
@@ -786,6 +810,15 @@ srv.listen(0, async () => {
       ok('Radar 0.56 : « Plus de facture » propose Retirer ou Garder ; « Retirer » sort la dépense du reste à payer (29,90 € de moins) et de la liste, et l’alerte disparaît',
         av.rows.some((x) => /Salle \(exemple\)/.test(x)) && !!al && /Toujours d’actualité/.test(al.t) && al.b.some((x) => /Retirer/.test(x)) && al.b.some((x) => /Garder/.test(x)) && /Retirée/.test(toast1)
         && !ap.rules.some((x) => /Salle \(exemple\)/.test(x)) && !ap.alerte && av.big !== ap.big, JSON.stringify([av, al, toast1, ap]));
+      /* 0.68.0 : « Retirer » par erreur se défait : « Tes réponses », « Annuler » ; la dépense et l'alerte reviennent */
+      await q.evaluate(() => [...document.querySelectorAll('.rad-seg button')].find((x) => /^Alertes/.test(x.textContent)).click()); await q.waitForTimeout(500);
+      const tr = await q.evaluate(() => ({s: (document.querySelector('.rad-traitees summary') || {}).textContent || '', t: ((document.querySelector('.rad-tr') || {}).textContent || '').replace(/\s+/g, ' ')}));
+      await q.evaluate(() => [...document.querySelectorAll('.rad-tr button')].find((x) => /Annuler/.test(x.textContent)).click()); await q.waitForTimeout(700);
+      const an = await q.evaluate(() => ({alerte: !!document.querySelector('.rad-alert.is-silence'), tr: !!document.querySelector('.rad-traitees')}));
+      await q.evaluate(() => [...document.querySelectorAll('.rad-seg button')].find((x) => /^Fixes/.test(x.textContent)).click()); await q.waitForTimeout(500);
+      const an2 = await q.evaluate(() => ({big: document.querySelector('.rad-big').textContent, rules: [...document.querySelectorAll('.rad-rule')].map((x) => x.innerText.replace(/\s+/g, ' ').trim())}));
+      ok('Radar 0.68 : « Retirer » par erreur : « Tes réponses (1) » dit « retirée » ; « Annuler » remet la dépense (reste à payer d’avant) et l’alerte revient',
+        tr.s === 'Tes réponses (1)' && /Plus de facture · Salle \(exemple\)/.test(tr.t) && /retirée/.test(tr.t) && an.alerte && !an.tr && an2.big === av.big && an2.rules.some((x) => /Salle \(exemple\)/.test(x)), JSON.stringify([tr, an, an2.big, av.big]));
       await ctx.close(); }
     /* 0.66.0 (sa demande : « mon assurance emprunteur n'est pas fixe, le contrat d'adhésion a toutes les infos ») : l'alerte « Montants de ton contrat »
        propose Appliquer ; la dépense suit alors le tableau (montant du mois, prochains changements, dernier prélèvement) ; données d'exemple */
