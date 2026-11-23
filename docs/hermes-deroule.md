@@ -62,7 +62,7 @@ Ouvrir un accès direct plus tard reste possible : c'est sa décision, par QCM.
 |---|---|---|
 | Argus : Supervision (lun, mer, ven) | **Hermes, en double** | Phase 1, maintenant. Hermes voit en plus un Grok Bot en pause, qu'Argus ne peut pas signaler. |
 | Iris : Semaine à venir (dim) | **Hermes, en double** | Phase 1, maintenant. |
-| Iris : Veille du matin (lun-ven) | Hermes, en double puis bascule | Phase 2. Demande d'écrire dans Dossiers et Échéances : outils à ajouter à JARVIS, bornés à ces colonnes. |
+| Iris : Veille du matin (lun-ven) | **Hermes, en double** (7h40) | Depuis le 24/11/2026. En double il n'écrit rien dans Dossiers ni Échéances : il note au Journal ce qu'il aurait écrit. Pour la bascule : outils de JARVIS à ajouter, bornés à ces colonnes. |
 | Athéna : Digest IA et .NET ; Ulysse : Sorties du week-end ; Kairos : Liste du mois, Prix suivis | Hermes avec le web, ou routines de JARVIS | Phase 3, son choix (QCM). Le web d'Hermes marche sans clé (services gratuits, limités) ; il exige un jeton à part, sans Gmail, pour qu'une page piégée ne puisse rien lire de privé. Les sites marchands et de crédit bloquent souvent la lecture automatique : Prix suivis en dernier. |
 | Iris : Courrier prioritaire ; Kairos : Signal prix ; Chronos : Facture reçue | Restent chez Grok Bot | Phase 4 seulement s'il le demande : il faut que JARVIS repère le mail à son arrivée et réveille Hermes (écarté le 17/11 tant que les alias de Grok Bot existent). |
 | Chronos : notes de frais, validation des jours, CRA (8 routines) | **Restent chez Grok Bot** | Trois portails avec connexion, codes et sessions qui expirent ; un navigateur ne tient pas sur le VPS-1 à côté de JARVIS (Likely). C'est le verrou du remplacement complet. |
@@ -151,3 +151,12 @@ commence à la première bascule.
   second serveur MCP dans la politique d'Hermes, outil `web` pour cette seule routine, skill) ; (3) comparaison
   des routines en double à partir du 07/12/2026, à sa demande.
 - 23/11/2026, 22h54 (heure de Paris) : **en service**. Liaison posée par lui à 21h38 (16 outils, aucune erreur) ; routines `supervision` et `semaine-a-venir` posées, en double (premiers passages : mercredi 25/11 à 8h50, dimanche 29/11 à 18h10). Fin du double et comparaison : à partir du 07/12/2026. Son premier essai sur Telegram a répondu « pas encore accès » : conversation commencée avant la liaison, `/new` à faire. Pas encore fait : la vague « faire connaître Hermes » (Charte, Argus, onglet Routines), après son essai réussi ; les outils qui touchent le vrai Google (lecture de Pilotage, Gmail, agendas) seront éprouvés par cet essai.
+- 23/11/2026, 23h00 : son essai dans une conversation neuve réussit (agenda, « À toi », échéances, météo, lus par
+  JARVIS ; il n'a pas écrit le taux d'une offre de crédit). Fait ensuite, la vague « faire connaître Hermes » :
+  paragraphe « Hermes » dans la Charte (après les noms des bots), ligne 98 du Canal pour Argus (demande
+  technique, sans sonnette : skill « registre » à jour, ne pas prendre ses lignes pour une anomalie ; traitée à
+  sa Supervision du mercredi 25/11 à 8h44, avant le premier passage d'Hermes), trois lignes « Hermes » dans
+  l'onglet Routines (État « En double »). **Veille du matin en double** : skill `veille-du-matin` (d'après la
+  section C de la fiche d'Iris, sans l'astuce ni le trafic, qu'il n'a pas), ligne de `routines.conf` (lundi à
+  vendredi, 7h40). Banc d'Hermes : 73 sur 73. Reste : l'essai du web sur le Digest d'Athéna (second jeton sans
+  Gmail, à créer par lui) ; les outils d'écriture dans Dossiers et Échéances, pour la bascule de la Veille.

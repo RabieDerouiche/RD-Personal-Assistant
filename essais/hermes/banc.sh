@@ -65,9 +65,10 @@ verif "réglages d'Hermes toujours lisibles après cette tentative" runuser -u h
 
 echo "== Skills du dépôt, pas encore relié à JARVIS"
 verif "sans jeton : aucun serveur MCP dans la politique (no_mcp partout)" bash -c "! grep -q '^mcp_servers:' /etc/hermes/config.yaml && grep -q 'telegram: \[.*no_mcp\]' /etc/hermes/config.yaml && grep -q 'cron: \[.*no_mcp\]' /etc/hermes/config.yaml"
-verif "skills du dépôt : 3, à root, lues mais pas modifiables par hermes" bash -c "[ \$(find /etc/hermes/skills -name SKILL.md | wc -l) = 3 ] && [ \"\$(stat -c %U /etc/hermes/skills/jarvis/pilotage/SKILL.md)\" = root ] && runuser -u hermes -- test -r /etc/hermes/skills/jarvis/pilotage/SKILL.md && ! runuser -u hermes -- test -w /etc/hermes/skills/jarvis/pilotage/SKILL.md && ! runuser -u hermes -- test -w /etc/hermes/skills/jarvis"
+verif "skills du dépôt : 4, à root, lues mais pas modifiables par hermes" bash -c "[ \$(find /etc/hermes/skills -name SKILL.md | wc -l) = 4 ] && [ \"\$(stat -c %U /etc/hermes/skills/jarvis/pilotage/SKILL.md)\" = root ] && runuser -u hermes -- test -r /etc/hermes/skills/jarvis/pilotage/SKILL.md && ! runuser -u hermes -- test -w /etc/hermes/skills/jarvis/pilotage/SKILL.md && ! runuser -u hermes -- test -w /etc/hermes/skills/jarvis"
 actives=$(hx hermes skills list 2>/dev/null | grep ' enabled ' | awk '{print $2}' | sort | tr '\n' ' ')
-verif "skills actives : celles du dépôt et hermes-agent ($actives)" [ "$actives" = "hermes-agent pilotage semaine-a-venir supervision " ]
+verif "skills actives : celles du dépôt et hermes-agent ($actives)" [ "$actives" = "hermes-agent pilotage semaine-a-venir supervision veille-du-matin " ]
+verif "routines.conf du dépôt : $(bash "$ICI/routines-conf.test.sh" 2>&1 | tail -1)" bash -c "bash '$ICI/routines-conf.test.sh' >/dev/null 2>&1"
 verif "routines.sh refuse tant qu'Hermes n'est pas relié à JARVIS" bash -c "bash '$KIT/routines.sh' 2>&1 | grep -q 'relier-jarvis.sh'"
 verif "relier-jarvis.sh refuse hors d'un terminal" bash -c "bash '$KIT/relier-jarvis.sh' < /dev/null 2>&1 | grep -q 'vrai terminal'"
 
