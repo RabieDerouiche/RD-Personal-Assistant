@@ -4,11 +4,12 @@
 set -uo pipefail
 ICI=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd); KIT=$ICI/../../jarvis-os/hermes
 n=0; ko=0
-while IFS='|' read -r nom etat horaire skills consigne; do
+while IFS='|' read -r nom etat horaire skills outils consigne; do
   case "$nom" in ''|'#'*) continue ;; esac
-  nom=$(echo $nom); etat=$(echo $etat); horaire=$(echo "$horaire" | sed 's/^ *//; s/ *$//'); skills=$(echo $skills | tr -d ' '); n=$((n + 1))
+  nom=$(echo $nom); etat=$(echo $etat); horaire=$(echo "$horaire" | sed 's/^ *//; s/ *$//'); skills=$(echo $skills | tr -d ' '); outils=$(echo $outils | tr -d ' '); n=$((n + 1))
   if ! [[ "$nom" =~ ^[a-z0-9-]{2,40}$ ]] || ! [[ "$etat" =~ ^(actif|pause)$ ]] || [ "$(echo "$horaire" | wc -w)" != 5 ] \
-     || ! [[ "$horaire" =~ ^[0-9*,/\ -]+$ ]] || [ "${#consigne}" -lt 10 ]; then echo "  ✗ ligne mal écrite : $nom"; ko=$((ko + 1)); continue; fi
+     || ! [[ "$horaire" =~ ^[0-9*,/\ -]+$ ]] || ! [[ "$outils" =~ ^(-|[a-z0-9_,-]{2,120})$ ]] || [ "${#consigne}" -lt 10 ]; then echo "  ✗ ligne mal écrite : $nom"; ko=$((ko + 1)); continue; fi
+  case ",$outils," in *,web,*) case ",$outils," in *,jarvis,*|*,terminal,*|*,file,*) echo "  ✗ $nom : une routine du web ne doit avoir ni « jarvis », ni terminal, ni fichiers"; ko=$((ko + 1)) ;; esac ;; esac
   for s in ${skills//,/ }; do [ -f "$KIT/skills/jarvis/$s/SKILL.md" ] || { echo "  ✗ $nom : skill « $s » absente du kit"; ko=$((ko + 1)); }; done
   grep -q "^name: $nom\$" "$KIT/skills/jarvis/$nom/SKILL.md" 2>/dev/null || { echo "  ✗ $nom : pas de skill du même nom"; ko=$((ko + 1)); }
 done < "$KIT/routines.conf"

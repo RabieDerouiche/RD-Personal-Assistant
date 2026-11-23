@@ -65,9 +65,9 @@ verif "réglages d'Hermes toujours lisibles après cette tentative" runuser -u h
 
 echo "== Skills du dépôt, pas encore relié à JARVIS"
 verif "sans jeton : aucun serveur MCP dans la politique (no_mcp partout)" bash -c "! grep -q '^mcp_servers:' /etc/hermes/config.yaml && grep -q 'telegram: \[.*no_mcp\]' /etc/hermes/config.yaml && grep -q 'cron: \[.*no_mcp\]' /etc/hermes/config.yaml"
-verif "skills du dépôt : 2, à root, lues mais pas modifiables par hermes" bash -c "[ \$(find /etc/hermes/skills -name SKILL.md | wc -l) = 2 ] && [ \"\$(stat -c %U /etc/hermes/skills/jarvis/pilotage/SKILL.md)\" = root ] && runuser -u hermes -- test -r /etc/hermes/skills/jarvis/pilotage/SKILL.md && ! runuser -u hermes -- test -w /etc/hermes/skills/jarvis/pilotage/SKILL.md && ! runuser -u hermes -- test -w /etc/hermes/skills/jarvis"
+verif "skills du dépôt : 3, à root, lues mais pas modifiables par hermes" bash -c "[ \$(find /etc/hermes/skills -name SKILL.md | wc -l) = 3 ] && [ \"\$(stat -c %U /etc/hermes/skills/jarvis/pilotage/SKILL.md)\" = root ] && runuser -u hermes -- test -r /etc/hermes/skills/jarvis/pilotage/SKILL.md && ! runuser -u hermes -- test -w /etc/hermes/skills/jarvis/pilotage/SKILL.md && ! runuser -u hermes -- test -w /etc/hermes/skills/jarvis"
 actives=$(hx hermes skills list 2>/dev/null | grep ' enabled ' | awk '{print $2}' | sort | tr '\n' ' ')
-verif "skills actives : celles du dépôt et hermes-agent ($actives)" [ "$actives" = "hermes-agent pilotage veille-du-matin " ]
+verif "skills actives : celles du dépôt et hermes-agent ($actives)" [ "$actives" = "digest-ia hermes-agent pilotage veille-du-matin " ]
 verif "routines.conf du dépôt : $(bash "$ICI/routines-conf.test.sh" 2>&1 | tail -1)" bash -c "bash '$ICI/routines-conf.test.sh' >/dev/null 2>&1"
 verif "routines.sh refuse tant qu'Hermes n'est pas relié à JARVIS" bash -c "bash '$KIT/routines.sh' 2>&1 | grep -q 'relier-jarvis.sh'"
 verif "relier-jarvis.sh refuse hors d'un terminal" bash -c "bash '$KIT/relier-jarvis.sh' < /dev/null 2>&1 | grep -q 'vrai terminal'"
@@ -94,11 +94,21 @@ relier "jvf_un-mauvais-jeton-de-banc-000"
 verif "mauvais jeton : refusé par JARVIS, rien n'est posé" bash -c "grep -q 'refuse ce jeton' $T/relier.log && [ ! -e /etc/hermes/jarvis.env ]"
 relier "pas-un-jeton"
 verif "saisie qui n'est pas un jeton de JARVIS : refusée avant tout appel" bash -c "grep -q 'jvf_' $T/relier.log && [ ! -e /etc/hermes/jarvis.env ]"
+relier "jvf_faux-jeton-veilleur-0123456789"
+verif "jeton « Veilleur » donné à la place du jeton principal : refusé, rien n'est posé" bash -c "grep -q 'profil « Veilleur » : c.est celui de la routine du web' $T/relier.log && [ ! -e /etc/hermes/jarvis.env ]"
 relier "jvf_faux-jeton-du-banc-0123456789"
-verif "bon jeton, vérifié depuis l'utilisateur hermes : liaison posée" grep -q "JARVIS répond à Hermes : 4 outils" $T/relier.log
+verif "bon jeton, vérifié depuis l'utilisateur hermes : liaison posée" grep -Eq "JARVIS répond à Hermes : [0-9]+ outils, profil « Exécutant »" $T/relier.log
 verif "jarvis.env : root, 0600 (illisible pour hermes sur le disque)" bash -c "[ \"\$(stat -c '%U %a' /etc/hermes/jarvis.env)\" = 'root 600' ] && ! runuser -u hermes -- cat /etc/hermes/jarvis.env >/dev/null 2>&1"
 verif "le jeton n'est écrit ni dans la politique ni dans un journal lisible" bash -c "! grep -rqs 'jvf_faux-jeton-du-banc-0123456789' /etc/hermes/config.yaml /var/log/hermes-relier.log $HH/config.yaml $HH/logs"
 verif "politique reliée : serveur MCP « jarvis », 16 outils retenus, ouvert à Telegram et aux routines" bash -c "grep -q '^mcp_servers:' /etc/hermes/config.yaml && [ \$(sed -n '/include:/,/resources:/p' /etc/hermes/config.yaml | grep -c '^        - ') = 16 ] && grep -q 'telegram: \[.*skills, jarvis\]' /etc/hermes/config.yaml && grep -q 'cron: \[.*skills, jarvis\]' /etc/hermes/config.yaml"
+
+echo "== Second jeton, pour la routine du web (relier-jarvis.sh --web)"
+relier_web() { printf '%s\n' "$1" | HERMES_BANC=1 script -qec "bash '$KIT/relier-jarvis.sh' --web" /dev/null > $T/relier-web.log 2>&1; }
+relier_web "jvf_faux-jeton-du-banc-0123456789"
+verif "jeton « Exécutant » donné pour le web : refusé (il voit les mails), rien n'est ajouté" bash -c "grep -q 'il voit tes mails' $T/relier-web.log && ! grep -q '^JARVIS_MCP_TOKEN_WEB=' /etc/hermes/jarvis.env && ! grep -q '^  jarvis-web:' /etc/hermes/config.yaml"
+relier_web "jvf_faux-jeton-veilleur-0123456789"
+verif "jeton « Veilleur » : posé à côté du premier (jarvis.env : root, 0600, trois lignes)" bash -c "grep -q 'profil « Veilleur »' $T/relier-web.log && [ \"\$(stat -c '%U %a' /etc/hermes/jarvis.env)\" = 'root 600' ] && [ \$(grep -c . /etc/hermes/jarvis.env) = 3 ] && grep -q '^JARVIS_MCP_TOKEN=jvf_faux-jeton-du-banc' /etc/hermes/jarvis.env && grep -q '^JARVIS_MCP_TOKEN_WEB=jvf_faux-jeton-veilleur' /etc/hermes/jarvis.env"
+verif "politique : serveur « jarvis-web » à 5 outils, absent de Telegram et des routines par défaut ; « web » dans aucune liste" bash -c "grep -q '^  jarvis-web:' /etc/hermes/config.yaml && [ \$(sed -n '/^  jarvis-web:/,\$p' /etc/hermes/config.yaml | grep -c '^        - ') = 5 ] && ! grep -E '^  (cli|telegram|cron): ' /etc/hermes/config.yaml | grep -Eq 'jarvis-web|web[],]'"
 
 echo "== Telegram et modèle simulés"
 sed -e 's/^  provider: "claude-subscription-directsdk-experimental"/  provider: "custom"/' -e 's/^  default: "opus" .*/  default: "faux-modele"/' \
@@ -141,7 +151,11 @@ pousser '{"de":111,"texte":"/tools"}'; attendre
 verif "/tools absent du chat" bash -c "grep '\"sendMessage\"' $T/traces/telegram.jsonl | tail -1 | grep -qi 'unknown command'"
 echo "== Outils de JARVIS et routines (étapes 3 et 4)"
 dernier() { grep '"sendMessage"' $T/traces/telegram.jsonl | tail -1; }
-verif "au démarrage : les outils de JARVIS retenus par la politique, pas celui hors liste" bash -c "grep \"MCP server 'jarvis'\" $HH/logs/agent.log | tail -1 | grep 'registered 3 tool' | grep -qv outil_hors_liste"
+verif "au démarrage : les outils de JARVIS retenus par la politique, pas celui hors liste" bash -c "grep \"MCP server 'jarvis'\" $HH/logs/agent.log | tail -1 | grep 'registered 4 tool' | grep -qv outil_hors_liste"
+verif "… et le serveur « jarvis-web » avec ses 3 outils du banc, sans les mails" bash -c "grep \"MCP server 'jarvis-web'\" $HH/logs/agent.log | tail -1 | grep 'registered 3 tool' | grep -qv gmail"
+outil_web=$(grep "MCP server 'jarvis-web'" $HH/logs/agent.log | tail -1 | grep -o 'mcp__[a-z_-]*__pilotage_lire' | head -1)
+pousser '{"de":111,"texte":"APPELLE: {\"nom\": \"tool_describe\", \"args\": {\"names\": [\"web_search\", \"'"$outil_web"'\"]}}"}'; attendre
+verif "Telegram : ni le web ni le serveur « jarvis-web » (réservés à la routine du web)" bash -c "$(declare -f dernier); T=$T; dernier | grep -q 'not.*found.*pilotage' && dernier | grep -q 'search.*is not available in this execution context'"
 pousser '{"de":111,"texte":"APPELLE: {\"nom\": \"tool_call\", \"args\": {\"calls\": [{\"name\": \"mcp__jarvis__pilotage_lire\", \"arguments\": {\"onglet\": \"État\"}}]}}"}'; attendre
 verif "Telegram : Hermes lit Pilotage par JARVIS" bash -c "$(declare -f dernier); T=$T; dernier | grep -q 'Onglet État'"
 verif "… avec son jeton en en-tête" bash -c "grep '\"tools/call\"' $T/traces/jarvis.jsonl | grep -q 'Bearer jvf_faux-jeton-du-banc-0123456789'"
@@ -152,8 +166,8 @@ pousser '{"de":111,"texte":"APPELLE: {\"nom\": \"cronjob_manage\", \"args\": {\"
 verif "Hermes ne peut pas créer de routine lui-même (outil cronjob absent)" bash -c "$(declare -f dernier); T=$T; dernier | grep -qiE 'does not exist|not available'"
 cat > $T/routines.conf <<'FIN'
 # routines du banc (données inventées)
-lecture | actif | 0 9 * * 1 | pilotage | APPELLE: {"nom": "mcp__jarvis__pilotage_lire", "args": {"onglet": "Routines"}}
-dormante | pause | 30 18 * * 0 | pilotage,veille-du-matin | Routine du banc, en pause, jamais lancée.
+lecture | actif | 0 9 * * 1 | pilotage | - | APPELLE: {"nom": "mcp__jarvis__pilotage_lire", "args": {"onglet": "Routines"}}
+dormante | pause | 30 18 * * 0 | pilotage,veille-du-matin | - | Routine du banc, en pause, jamais lancée.
 FIN
 routines() { HERMES_BANC=1 HERMES_MANAGED_DIR=$T/politique HERMES_ROUTINES_CONF=$T/routines.conf HERMES_ROUTINES_ETAT=$T/routines.etat bash "$KIT/routines.sh" "$@" > $T/routines.log 2>&1; }
 routines
@@ -162,7 +176,7 @@ routines
 verif "relancé sans changement : rien n'est recréé" bash -c "[ \$(grep -c 'inchangée' $T/routines.log) = 2 ] && ! grep -q '✓' $T/routines.log"
 sed -i 's/^lecture | actif | 0 9 /lecture | actif | 15 9 /' $T/routines.conf; routines
 verif "horaire changé : la routine est recréée, l'autre ne bouge pas" bash -c "grep -q '✓ lecture : recréée' $T/routines.log && grep -q '= dormante : inchangée' $T/routines.log"
-echo "mauvaise | actif | tous les jours | pilotage | Ligne mal écrite du banc." >> $T/routines.conf; routines; rc=$?
+echo "mauvaise | actif | tous les jours | pilotage | - | Ligne mal écrite du banc." >> $T/routines.conf; routines; rc=$?
 verif "ligne mal écrite : refusée, code d'erreur, les autres restent" bash -c "[ $rc != 0 ] && grep -q '✗ ligne refusée' $T/routines.log && [ \$(grep -c 'inchangée' $T/routines.log) = 2 ]"
 sed -i '/^mauvaise /d' $T/routines.conf
 ident=$(python3 -I -c "import json; print(next(j['id'] for j in json.load(open('$HH/cron/jobs.json'))['jobs'] if j.get('name') == 'jarvis-lecture'))")
@@ -182,6 +196,26 @@ echo "  mémoire d'Hermes pendant une routine : $pic Mo au plus (plus environ 25
 verif "mémoire pendant une routine sous 550 Mo" [ "${pic:-999}" -lt 550 ]
 sed -i '/^dormante /d' $T/routines.conf; routines
 verif "ligne retirée de la liste : la routine est supprimée chez Hermes" bash -c "grep -q '− dormante : retirée' $T/routines.log && ! grep -q 'jarvis-dormante' $HH/cron/jobs.json"
+echo "melange | actif | 0 7 * * 1 | digest-ia | web,jarvis | Routine du banc qui voudrait le web et les mails." >> $T/routines.conf; routines; rc=$?
+verif "une routine qui demande le web et le serveur « jarvis » (mails) est refusée" bash -c "[ $rc != 0 ] && grep -q '✗ melange : le web et le serveur « jarvis » ne vont pas ensemble' $T/routines.log && ! grep -q 'jarvis-melange' $HH/cron/jobs.json"
+sed -i '/^melange /d' $T/routines.conf
+cat >> $T/routines.conf <<FIN
+veilleuse | actif | 0 8 * * 1 | digest-ia | web,memory,skills,jarvis-web | APPELLE: {"nom": "tool_call", "args": {"calls": [{"name": "$outil_web", "arguments": {"onglet": "Sources"}}]}}
+veilleuse-mails | actif | 3 8 * * 1 | digest-ia | web,memory,skills,jarvis-web | APPELLE: {"nom": "tool_call", "args": {"calls": [{"name": "mcp__jarvis__gmail_chercher", "arguments": {"requete": "essai"}}]}}
+veilleuse-outils | actif | 5 8 * * 1 | digest-ia | web,memory,skills,jarvis-web | APPELLE: {"nom": "tool_describe", "args": {"names": ["web_search", "web_extract"]}}
+FIN
+routines
+verif "routine du web posée avec sa liste exacte d'outils (web, memory, skills, jarvis-web)" python3 -I -c "
+import json, sys
+j = [x for x in json.load(open('$HH/cron/jobs.json'))['jobs'] if x.get('name') == 'jarvis-veilleuse']
+sys.exit(0 if len(j) == 1 and j[0].get('enabled_toolsets') == ['web', 'memory', 'skills', 'jarvis-web'] else 1)"
+lancer_routine() { local id; id=$(python3 -I -c "import json; print(next(j['id'] for j in json.load(open('$HH/cron/jobs.json'))['jobs'] if j.get('name') == 'jarvis-$1'))"); local n0; n0=$(envois); hx hermes cron run "$id" > $T/cron-run.log 2>&1; for i in $(seq 1 90); do [ "$(envois)" -gt "$n0" ] && break; sleep 1; done; sleep 1; }
+lancer_routine veilleuse
+verif "routine du web : elle lit l'onglet Sources par le jeton « Veilleur »" bash -c "$(declare -f dernier); T=$T; dernier | grep -q 'Onglet Sources' && grep '\"tools/call\"' $T/traces/jarvis.jsonl | tail -1 | grep 'Bearer jvf_faux-jeton-veilleur' | grep -q Sources"
+lancer_routine veilleuse-mails
+verif "… et n'a pas l'outil des mails du serveur « jarvis » (aucun appel reçu par JARVIS)" bash -c "$(declare -f dernier); T=$T; dernier | grep -q 'chercher.*is not available in this session' && ! grep '\"tools/call\"' $T/traces/jarvis.jsonl | grep -q gmail_chercher"
+lancer_routine veilleuse-outils
+verif "… et dispose de la recherche et de la lecture de pages web" bash -c "$(declare -f dernier); T=$T; [ \$(dernier | grep -o 'listed tool, not a deferred one' | wc -l) = 2 ] && ! dernier | grep -q 'not available'"
 : > $T/routines.conf; routines   # rangement : plus aucune routine du banc
 
 rss=$(ps -u hermes -o rss= | awk '{s+=$1} END {printf "%d", s/1024}')

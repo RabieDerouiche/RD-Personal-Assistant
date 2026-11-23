@@ -63,7 +63,8 @@ Ouvrir un accès direct plus tard reste possible : c'est sa décision, par QCM.
 | Argus : Supervision (lun, mer, ven) | Reste chez Grok Bot | Essayée en double le 23/11/2026, retirée le 24/11 à sa demande : surveiller les bots de Grok Bot n'a de sens que chez Grok Bot (et JARVIS repère déjà seul une pause de Grok). |
 | Iris : Semaine à venir (dim) | **Hermes, en double** | Phase 1, maintenant. |
 | Iris : Veille du matin (lun-ven) | **Hermes, en double** (7h40) | Depuis le 24/11/2026. En double il n'écrit rien dans Dossiers ni Échéances : il note au Journal ce qu'il aurait écrit. Pour la bascule : outils de JARVIS à ajouter, bornés à ces colonnes. |
-| Athéna : Digest IA et .NET ; Ulysse : Sorties du week-end ; Kairos : Liste du mois, Prix suivis | Hermes avec le web, ou routines de JARVIS | Phase 3, son choix (QCM). Le web d'Hermes marche sans clé (services gratuits, limités) ; il exige un jeton à part, sans Gmail, pour qu'une page piégée ne puisse rien lire de privé. Les sites marchands et de crédit bloquent souvent la lecture automatique : Prix suivis en dernier. |
+| Athéna : Digest IA et .NET | **Hermes, en double, avec le web** (lundi 9h10) | Depuis le 24/11/2026 (son choix : essai du web sur cette seule routine). Elle a l'outil web et le serveur « jarvis-web » (jeton « Veilleur ») ; jamais les mails. Posée dès qu'il a créé le second jeton. |
+| Ulysse : Sorties du week-end ; Kairos : Liste du mois, Prix suivis | Après l'essai du web | Phase 3, son choix (QCM). Le web d'Hermes marche sans clé (services gratuits, limités) ; il exige un jeton à part, sans Gmail, pour qu'une page piégée ne puisse rien lire de privé. Les sites marchands et de crédit bloquent souvent la lecture automatique : Prix suivis en dernier. |
 | Iris : Courrier prioritaire ; Kairos : Signal prix ; Chronos : Facture reçue | Restent chez Grok Bot | Phase 4 seulement s'il le demande : il faut que JARVIS repère le mail à son arrivée et réveille Hermes (écarté le 17/11 tant que les alias de Grok Bot existent). |
 | Chronos : notes de frais, validation des jours, CRA (8 routines) | **Restent chez Grok Bot** | Trois portails avec connexion, codes et sessions qui expirent ; un navigateur ne tient pas sur le VPS-1 à côté de JARVIS (Likely). C'est le verrou du remplacement complet. |
 | Argus : Bilan du lundi | Reste chez Grok Bot | Il lit la consommation de Grok dans l'app de Grok. |
@@ -210,3 +211,14 @@ Termius) ; le geste d'après le squelette qu'elle rapporte ; les décisions à b
   avancer ou garder la livraison des couches après son choix dans JARVIS. Sonde de l'espace client écrite et
   essayée sur un faux site (`bash jarvis-os/server/tests/portail-sonde.test.sh`, 7 vérifications) : elle ne lit
   que le squelette des pages, sans donnée personnelle ni secret. Banc d'Hermes : 73 sur 73.
+- 24/11/2026 (nuit) : **essai du web prêt**. JARVIS 0.72.0 (profil « veilleur », signature). Kit : `web` n'est plus dans
+  `agent.disabled_toolsets` (ni le groupe « safe », qui le contenait : vu au banc), mais dans aucune liste de
+  `platform_toolsets` ; `politique-jarvis-web.yaml` (serveur « jarvis-web », 5 outils) ajouté par `install.sh` quand
+  le second jeton est posé (`relier-jarvis.sh --web`, qui refuse un jeton « Exécutant ») ; `routines.conf` a une
+  colonne « outils » (liste exacte d'une routine, écrite dans `enabled_toolsets` par `routines.sh`, qui refuse le
+  web avec le serveur « jarvis ») ; skill `digest-ia` d'après la fiche d'Athéna. Les six rubriques « actuelles »
+  d'Athéna ne sont écrites nulle part que je puisse lire (son texte de routine n'est pas dans « Textes des
+  routines ») : la skill part de l'onglet Sources et de rubriques déduites. Banc d'Hermes : 84 sur 84 (au banc,
+  Telegram n'a ni le web ni « jarvis-web » ; la routine du web lit Sources par le jeton « Veilleur », n'a pas
+  l'outil des mails, a `web_search` et `web_extract`). **Non vérifié** : la recherche web sans clé elle-même
+  (services gratuits d'Exa, Parallel, Firecrawl, Keenable, d'après la doc d'Hermes) : premier vrai passage.

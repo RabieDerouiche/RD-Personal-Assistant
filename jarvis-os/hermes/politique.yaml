@@ -29,9 +29,10 @@ model:
 agent:
   max_turns: 30              # outils appelés au plus par message ou par routine (500 par défaut)
   disabled_toolsets:
-    - web
-    - search
-    - safe
+    # « web » (recherche et lecture de pages) n'est plus coupé depuis l'essai du web (sa demande du 24/11/2026), mais
+    # aucune liste de platform_toolsets ne le contient : seule la routine qui le demande dans routines.conf l'a,
+    # avec le serveur « jarvis-web » (jeton « Veilleur » : ni mails, ni agenda, ni dossiers). Le groupe « safe »
+    # (web, vision, image_gen) n'est plus cité non plus : le couper coupait le web ; vision et image_gen restent coupés.
     - browser
     - terminal
     - file

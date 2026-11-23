@@ -197,9 +197,13 @@ OUTILS_JARVIS = [
      "inputSchema": {"type": "object", "properties": {"onglet": {"type": "string"}, "valeurs": {"type": "object"}}, "required": ["onglet", "valeurs"]}},
     {"name": "jarvis_notifier", "description": "Notifie le propriétaire (banc).",
      "inputSchema": {"type": "object", "properties": {"titre": {"type": "string"}, "texte": {"type": "string"}}, "required": ["titre", "texte"]}},
+    {"name": "gmail_chercher", "description": "Cherche dans les mails (banc) : réservé au jeton « exécutant ».",
+     "inputSchema": {"type": "object", "properties": {"requete": {"type": "string"}}, "required": ["requete"]}},
     {"name": "outil_hors_liste", "description": "Un outil que la politique d'Hermes ne retient pas (banc).",
      "inputSchema": {"type": "object", "properties": {}}},
 ]
+JETON_JARVIS_WEB = "jvf_faux-jeton-veilleur-0123456789"      # second jeton, profil « veilleur » : ni mails ni outil hors liste
+OUTILS_VEILLEUR = ("pilotage_lire", "pilotage_ajouter", "jarvis_notifier")
 
 
 class Jarvis(BaseHTTPRequestHandler):
@@ -226,8 +230,9 @@ class Jarvis(BaseHTTPRequestHandler):
         tracer("jarvis.jsonl", {"chemin": self.path, "autorisation": jeton, "corps": corps})
         if self.path != "/mcp":
             return self._json(404, {"error": "inconnu"})
-        if jeton != "Bearer " + JETON_JARVIS:
+        if jeton not in ("Bearer " + JETON_JARVIS, "Bearer " + JETON_JARVIS_WEB):
             return self._json(401, {"error": "invalid_token"}, (("www-authenticate", 'Bearer error="invalid_token"'),))
+        veilleur = jeton == "Bearer " + JETON_JARVIS_WEB
         methode, ident, p = corps.get("method", ""), corps.get("id"), corps.get("params") or {}
         if ident is None:
             return self._json(202)
@@ -235,11 +240,14 @@ class Jarvis(BaseHTTPRequestHandler):
             res = {"protocolVersion": p.get("protocolVersion") or "2025-06-18", "capabilities": {"tools": {"listChanged": False}},
                    "serverInfo": {"name": "jarvis-os", "version": "banc"}}
         elif methode == "tools/list":
-            res = {"tools": OUTILS_JARVIS}
+            res = {"tools": [o for o in OUTILS_JARVIS if o["name"] in OUTILS_VEILLEUR] if veilleur else OUTILS_JARVIS}
         elif methode == "tools/call":
             a = p.get("arguments") or {}
             textes = {"pilotage_lire": "Onglet %s (banc)\nL2 | Bot: Iris | Dernier passage: 23/11/2026 09h10" % a.get("onglet"),
-                      "pilotage_ajouter": "Ligne ajoutée à %s (banc)." % a.get("onglet"), "jarvis_notifier": "Notifié (banc)."}
+                      "pilotage_ajouter": "Ligne ajoutée à %s (banc)." % a.get("onglet"), "jarvis_notifier": "Notifié (banc).",
+                      "gmail_chercher": "Aucun fil (banc)."}
+            if veilleur:
+                textes = {k: v + " [jeton veilleur]" for k, v in textes.items() if k in OUTILS_VEILLEUR}
             res = {"content": [{"type": "text", "text": textes.get(p.get("name"), "Outil inconnu")}], "isError": p.get("name") not in textes}
         elif methode == "ping":
             res = {}

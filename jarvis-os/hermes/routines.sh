@@ -32,6 +32,18 @@ for j in jobs:
         print("\t".join((str(j.get("id")), n, etat, str(j.get("next_run_at") or "-")[:16].replace("T", " "), str(j.get("last_status") or "jamais passée"))))
 ' "$HH/cron/jobs.json"
 }
+outils_de() {   # la liste exacte des outils d'une routine (enabled_toolsets) : `hermes cron create` n'a pas d'option pour elle
+  python3 -I -c '
+import json, os, sys
+chemin, nom, outils = sys.argv[1], sys.argv[2], [x for x in sys.argv[3].split(",") if x]
+d = json.load(open(chemin)); vus = [j for j in d.get("jobs") or [] if j.get("name") == nom]
+if len(vus) != 1: sys.exit(1)
+vus[0]["enabled_toolsets"] = outils
+st = os.stat(chemin); tmp = chemin + ".jarvis"
+with open(tmp, "w") as f: json.dump(d, f, ensure_ascii=False, indent=2)
+os.chown(tmp, st.st_uid, st.st_gid); os.chmod(tmp, 0o600); os.replace(tmp, chemin)
+' "$HH/cron/jobs.json" "$1" "$2"
+}
 lister() {
   local n=0
   while IFS=$'\t' read -r _ nom etat prochain dernier; do
@@ -53,13 +65,23 @@ touch "$ETAT" && chmod 0644 "$ETAT"
 voulues=""; erreurs=0; nouvel_etat=$(mktemp)
 while IFS= read -r ligne || [ -n "$ligne" ]; do
   case "$ligne" in ''|'#'*) continue ;; esac
-  IFS='|' read -r nom etat horaire skills consigne <<< "$ligne"
-  nom=$(echo $nom); etat=$(echo $etat); horaire=$(echo "$horaire" | sed 's/^ *//; s/ *$//'); skills=$(echo $skills | tr -d ' ')
+  IFS='|' read -r nom etat horaire skills outils consigne <<< "$ligne"
+  nom=$(echo $nom); etat=$(echo $etat); horaire=$(echo "$horaire" | sed 's/^ *//; s/ *$//'); skills=$(echo $skills | tr -d ' '); outils=$(echo $outils | tr -d ' ')
   consigne=$(printf '%s' "$consigne" | sed 's/^ *//; s/ *$//')
   if ! [[ "$nom" =~ ^[a-z0-9-]{2,40}$ ]] || ! [[ "$etat" =~ ^(actif|pause)$ ]] || [ "$(echo "$horaire" | wc -w)" != 5 ] \
-     || ! [[ "$horaire" =~ ^[0-9*,/\ -]+$ ]] || [ "${#consigne}" -lt 10 ]; then
-    echo "  ✗ ligne refusée (nom | actif ou pause | cron à 5 champs | skills | consigne) : ${ligne:0:70}"; erreurs=$((erreurs + 1)); continue
+     || ! [[ "$horaire" =~ ^[0-9*,/\ -]+$ ]] || ! [[ "$outils" =~ ^(-|[a-z0-9_,-]{2,120})$ ]] || [ "${#consigne}" -lt 10 ]; then
+    echo "  ✗ ligne refusée (nom | actif ou pause | cron à 5 champs | skills | outils | consigne) : ${ligne:0:70}"; erreurs=$((erreurs + 1)); continue
   fi
+  # une routine qui lit le web n'a jamais le serveur « jarvis » (mails, agenda, dossiers), et attend le jeton « Veilleur »
+  case ",$outils," in
+    *,web,*|*,search,*|*,browser,*)
+      case ",$outils," in *,jarvis,*) echo "  ✗ $nom : le web et le serveur « jarvis » ne vont pas ensemble (prends « jarvis-web »)"; erreurs=$((erreurs + 1)); continue ;; esac ;;
+  esac
+  case ",$outils," in *,jarvis-web,*)
+    if [ "${HERMES_BANC:-0}" != 1 ] && ! grep -q '^JARVIS_MCP_TOKEN_WEB=.' /etc/hermes/jarvis.env 2>/dev/null; then
+      echo "  … $nom : en attente du jeton « Veilleur » (sudo bash $ICI/relier-jarvis.sh --web) ; pas posée"; continue
+    fi ;;
+  esac
   options=()
   for s in ${skills//,/ }; do
     [ -n "$(find "$SKILLS" -mindepth 2 -maxdepth 2 -type d -name "$s" 2>/dev/null)" ] || { echo "  ✗ $nom : skill « $s » absente de $SKILLS"; erreurs=$((erreurs + 1)); continue 2; }
@@ -74,7 +96,11 @@ while IFS= read -r ligne || [ -n "$ligne" ]; do
   [ -n "$ident" ] && hx hermes cron remove "$ident" >/dev/null 2>&1
   [ "$etat" = pause ] && options+=(--paused --paused-reason "en pause dans routines.conf")
   if hx hermes cron create "$horaire" "$consigne" --name "jarvis-$nom" --deliver "telegram:$qui" --catch-up on --no-wrap-response "${options[@]}" >/dev/null 2>&1; then
-    echo "  ✓ $nom : $([ -n "$ident" ] && echo recréée || echo posée) ($etat, $horaire)"; echo "jarvis-$nom $empreinte" >> "$nouvel_etat"
+    if [ "$outils" != "-" ] && ! outils_de "jarvis-$nom" "$outils"; then
+      ident=$(poses | awk -F'\t' -v n="jarvis-$nom" '$2 == n {print $1}' | head -1); [ -n "$ident" ] && hx hermes cron remove "$ident" >/dev/null 2>&1
+      echo "  ✗ $nom : sa liste d'outils n'a pas pu être écrite ; routine retirée plutôt que laissée avec les outils par défaut"; erreurs=$((erreurs + 1)); continue
+    fi
+    echo "  ✓ $nom : $([ -n "$ident" ] && echo recréée || echo posée) ($etat, $horaire$([ "$outils" != "-" ] && echo ", outils : $outils"))"; echo "jarvis-$nom $empreinte" >> "$nouvel_etat"
   else
     echo "  ✗ $nom : Hermes a refusé la routine (sudo -u hermes hermes cron create …)"; erreurs=$((erreurs + 1))
   fi
