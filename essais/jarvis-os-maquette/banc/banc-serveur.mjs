@@ -648,6 +648,33 @@ try {
     const a3 = await q.evaluate(() => { const it = [...document.querySelectorAll('#missions .mis-it')].find((x) => /budget des vacances/.test(x.textContent)); if (it) it.open = true; return it ? {etapes: it.querySelectorAll('.mis-etapes li').length, outil: (it.querySelector('.mis-outil') || {}).textContent || '', txt: it.textContent.slice(0, 160)} : null; });
     ok('missions : Suivi montre le plan de la mission en cours et ce qu\'elle fait à l\'instant', a3 && a3.etapes === 3 && /À l’instant : Recherche web/.test(a3.outil), JSON.stringify(a3));
     await q.close(); }
+  // 0.70.0 — B3-page-5-pont
+  /* missions relues toutes les 5 s pendant qu'une tourne (Équipe › Demandes), fiche dépliée gardée ; Réglages sans rebâtir Suivi ;
+     la carte « Assistants reliés » relue au retour dans Réglages (missions servies par le banc, inventées) */
+  { const q = await ctx.newPage(); q.on('pageerror', (e) => errs.push('0.70 : ' + e.message));
+    let lus = 0; const at0 = Date.now();
+    await q.route('**/api/missions', (route) => { if (route.request().method() !== 'GET') return route.continue(); lus++;
+      return route.fulfill({status: 200, contentType: 'application/json', body: JSON.stringify({missions: [{id: 'm-b3-cours', status: 'envoyee', text: 'Mission d’essai qui tourne', at: at0, etapes: [{t: 'Lire', s: 'fait'}, {t: 'Comparer', s: 'en cours'}], outil: 'Recherche web n° ' + lus},
+        {id: 'm-b3-fini', status: 'terminee', text: 'Mission d’essai finie', at: at0 - 60000, done: at0 - 30000, result: 'Compte rendu d’essai.'}]})}); });
+    await q.goto(BASE + '/?serveur#suivi'); await q.waitForTimeout(2500);
+    await q.evaluate(() => { const d = document.querySelector('.mis-it[data-mission="m-b3-fini"]'); if (d) { d.open = true; d.querySelector('summary').focus(); } });   /* ouverte au doigt : le titre garde le focus */
+    const n0 = lus; await q.waitForTimeout(11000);
+    const mi = await q.evaluate(() => ({outil: (document.querySelector('.mis-it[data-mission="m-b3-cours"] .mis-outil') || {}).textContent || '', fini: !!(document.querySelector('.mis-it[data-mission="m-b3-fini"]') || {}).open}));
+    ok('0.70 : missions : pendant qu’une mission tourne, Équipe › Demandes relit ses étapes toutes les 5 s (avant : figées) ; une fiche dépliée le reste', lus - n0 >= 2 && +((mi.outil.match(/(\d+)$/) || [])[1] || 0) > n0 && mi.fini, JSON.stringify({n0, lus, mi}));
+    await q.close(); }
+  { const q = await ctx.newPage(); q.on('pageerror', (e) => errs.push('0.70 : ' + e.message));
+    const vus = {}; q.on('request', (r) => { try { const u = new URL(r.url()); if (r.method() === 'GET' && /^\/api\/(missions|relances|conso|sante|mcp)$/.test(u.pathname)) vus[u.pathname] = (vus[u.pathname] || 0) + 1; } catch (e) { /* rien */ } });
+    await q.goto(BASE + '/?serveur#reglages'); await q.waitForTimeout(4000);
+    const lecture = [], s0 = vus['/api/sante'] || 0;
+    for (let i = 0; i < 3; i++) { lecture.push(await q.evaluate(() => { window.__uxRerender(); const s = document.querySelector('.sante-box'); return s ? s.textContent : ''; })); await q.waitForTimeout(500); }
+    const sys = await q.evaluate(() => [...document.querySelectorAll('#view .panel h2')].filter((x) => /^État des systèmes/.test(x.textContent)).length);
+    ok('0.70 : Réglages : « État des systèmes » (et la santé du serveur) sans rebâtir Suivi : aucune lecture des missions, relances ni consommation, la santé relue au plus toutes les 30 s, plus de « Lecture de l’état du serveur… » à chaque rafraîchissement', sys === 1 && (vus['/api/sante'] || 0) - s0 === 0 && !vus['/api/missions'] && !vus['/api/relances'] && !vus['/api/conso'] && lecture.every((t) => /Ton serveur/.test(t) && !/Lecture de l’état du serveur/.test(t)), JSON.stringify({sys, s0, vus, lecture: lecture.map((t) => t.slice(0, 50))}));
+    const txt = await q.evaluate(() => (document.getElementById('mcp-card') || {}).textContent || '');
+    await q.evaluate(() => document.querySelector('.tab[data-tab="agenda"]').click()); await q.waitForTimeout(500); const a0 = vus['/api/mcp'] || 0; await q.waitForTimeout(3500); const a1 = vus['/api/mcp'] || 0;
+    await q.evaluate(() => document.querySelector('.tab[data-tab="espaces"]').click()); await q.waitForTimeout(700); await q.evaluate(() => document.querySelector('.esp-row[data-go="reglages"]').click()); await q.waitForTimeout(300);
+    const m0 = vus['/api/mcp'] || 0; await q.waitForTimeout(9000); const m1 = vus['/api/mcp'] || 0;
+    ok('0.70 : Réglages : revenu d’une autre rubrique, la carte « Assistants reliés » se relit de nouveau (aucun appel pendant qu’elle n’est pas à l’écran) ; elle renvoie à « Équipe, filtre Demandes », plus à Suivi', a1 === a0 && m1 - m0 >= 2 && /attend ton accord dans Équipe, filtre Demandes/.test(txt) && !/dans Suivi/.test(txt), JSON.stringify({a0, a1, m0, m1, txt: txt.slice(0, 200)}));
+    await q.close(); }
   /* 0.24.0 : chercher un produit à partir d'une idée, par le serveur (faux Claude) */
   { await p.goto(BASE + '/?serveur#achats'); await p.waitForTimeout(3500);
     await p.evaluate(() => document.querySelectorAll('#toasts .toast').forEach((t) => t.remove()));

@@ -15,8 +15,11 @@
   const settings = () => { try { return JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (e) { return {}; } };
   const BASE = location.origin;
   const token = () => settings().serverToken || '';
+  /* 0.70.0 : un réseau coupé ou un serveur injoignable donne un message en français (avant : « Load failed » de Safari, affiché tel quel) */
   const req = async (p, body, method) => {
-    const r = await fetch(BASE + p, {method: method || (body ? 'POST' : 'GET'), headers: {'content-type': 'application/json', authorization: 'Bearer ' + token()}, body: body ? JSON.stringify(body) : undefined});
+    let r;
+    try { r = await fetch(BASE + p, {method: method || (body ? 'POST' : 'GET'), headers: {'content-type': 'application/json', authorization: 'Bearer ' + token()}, body: body ? JSON.stringify(body) : undefined}); }
+    catch (e) { throw new Error('Serveur JARVIS injoignable'); }
     let j = {}; try { j = await r.json(); } catch (e) { j = {}; }
     return {status: r.status, j};
   };
@@ -27,7 +30,11 @@
     let r;
     try { r = await req('/api/tool', {server, tool, input: input || {}}); } catch (e) { fail('tool_error', server, 'Serveur JARVIS injoignable.'); }
     if (r.status === 401) fail('server_not_connected', server, 'Cet iPhone n’est plus relié au serveur JARVIS (Réglages).');
-    if (r.j && r.j.error) fail(r.j.error.code || 'tool_error', server, r.j.error.message);
+    /* 0.70.0 : l'erreur du serveur peut être une simple phrase ; et une réponse qui n'est pas 200 (Caddy en 502 pendant un redémarrage, corps vide)
+       n'est jamais un succès : avant, l'écriture ou l'envoi étaient annoncés « faits » alors que rien n'était parti */
+    const er = r.j && r.j.error;
+    if (er) fail((typeof er === 'object' && er.code) || 'tool_error', server, (typeof er === 'object' ? er.message : String(er)) || 'Erreur du serveur JARVIS.');
+    if (r.status !== 200) fail('upstream_error', server, 'Serveur JARVIS indisponible (' + r.status + ') : rien n’est fait, réessaie dans un moment.');
     return {payload: r.j.payload, content: []};
   }
   const mcp = {
@@ -76,6 +83,9 @@
      « Arrêter » (opts.signal) coupe la réponse et Claude avec elle */
   /* 0.57.0 : l'abonnement refusé (message anglais de Claude Code, arrivé comme une réponse) devient une erreur claire, en français */
   const ABO = /can.?t use your Claude subscription|payment is past due|claude\.ai\/settings\/billing/i, ABO_FR = 'Claude ne peut plus utiliser ton abonnement sur le serveur : Anthropic signale un paiement en retard ou un abonnement à renouveler. Vérifie sur claude.ai (Réglages, Facturation) ; si tout est payé, reconnecte Claude sur le serveur (claude auth login, depuis la session Serveur JARVIS).';
+  /* 0.70.0 : seulement le message de Claude Code lui-même (court, qui parle de « Claude subscription ») ; une vraie réponse qui cite
+     « payment is past due » (un mail de relance en anglais) ou donne le lien de facturation passe telle quelle */
+  const estAbo = (t) => { t = String(t || ''); return t.length < 600 && /Claude subscription/i.test(t) && ABO.test(t); };
   async function flux(input, opts, tools) {
     let r;
     try { r = await fetch(BASE + '/api/sample', {method: 'POST', headers: {'content-type': 'application/json', authorization: 'Bearer ' + token()}, signal: opts.signal,
@@ -83,8 +93,8 @@
     catch (e) { if (opts.signal && opts.signal.aborted) throw {code: 'cancelled', message: 'Arrêté.'}; throw {code: 'tool_error', message: 'Serveur JARVIS injoignable.'}; }
     if (r.status !== 200 || !r.body || !r.body.getReader) {
       let j = {}; try { j = await r.json(); } catch (e) { j = {}; }
-      if (r.status === 200 && j.text != null) { if (ABO.test(String(j.text))) throw {code: 'tool_error', message: ABO_FR}; return {text: String(j.text)}; }
-      if (j && j.error && ABO.test(String(j.error))) throw {code: 'tool_error', message: ABO_FR};
+      if (r.status === 200 && j.text != null) { if (estAbo(j.text)) throw {code: 'tool_error', message: ABO_FR}; return {text: String(j.text)}; }
+      if (j && j.error && estAbo(j.error)) throw {code: 'tool_error', message: ABO_FR};
       throw {code: r.status === 401 ? 'server_not_connected' : 'tool_error', message: (j && j.error) || 'Claude indisponible sur le serveur.'};
     }
     const rd = r.body.getReader(), dec = new TextDecoder(); let buf = '', brut = '', fin = null, err = null, modele = '', secours = false;
@@ -96,7 +106,7 @@
           const bloc = buf.slice(0, i).trim(); buf = buf.slice(i + 2);
           const m = /^event: (\w+)\ndata: (.*)$/s.exec(bloc); if (!m) continue;
           let d = {}; try { d = JSON.parse(m[2]); } catch (e) { continue; }
-          if (m[1] === 'delta') { brut += d.d || ''; if (ABO.test(brut)) continue; if (opts.onText) try { opts.onText({text: enCours(brut), delta: d.d || ''}); } catch (e) { /* rien */ } }
+          if (m[1] === 'delta') { brut += d.d || ''; if (estAbo(brut)) continue; if (opts.onText) try { opts.onText({text: enCours(brut), delta: d.d || ''}); } catch (e) { /* rien */ } }
           else if (m[1] === 'done') { fin = String(d.text != null ? d.text : brut); modele = String(d.modele || ''); secours = !!d.secours; }   /* 0.33.0 : le modèle qui a répondu */
           else if (m[1] === 'error') err = String(d.message || 'Claude indisponible sur le serveur.');
         }
@@ -106,7 +116,7 @@
       if (opts.signal && opts.signal.aborted) throw {code: 'cancelled', message: 'Arrêté.', text: deja || undefined};
       throw {code: 'tool_error', message: 'Réponse interrompue.', text: deja || undefined};
     }
-    if ((err && ABO.test(err)) || ABO.test(brut) || (fin != null && ABO.test(fin))) throw {code: 'tool_error', message: ABO_FR};
+    if ((err && estAbo(err)) || estAbo(brut) || (fin != null && estAbo(fin))) throw {code: 'tool_error', message: ABO_FR};
     if (err) throw {code: 'tool_error', message: err, text: enCours(brut) || undefined};
     if (fin == null) throw {code: 'tool_error', message: 'Réponse interrompue.', text: enCours(brut) || undefined};
     return {text: fin, modele, secours};
@@ -134,22 +144,27 @@
   window.claude = {use: async (name) => (name === 'mcp' ? mcp : name === 'sample' ? sample : null)};
 
   /* pour l'écran Réglages de la page : appairage et accès Google */
+  const INJ = 'Serveur JARVIS injoignable : vérifie le réseau, puis réessaie.', INDISPO = 'Serveur JARVIS indisponible pour l’instant (il redémarre peut-être) : réessaie dans un moment.';
+  const repOk = (r) => (r.status >= 500 && !(r.j && r.j.error) ? {ok: false, error: INDISPO} : r.j);
   window.JarvisServeur = {
     base: BASE,
     linked: () => !!token(),
     async pair(code) {
-      const r = await fetch(BASE + '/api/pair', {method: 'POST', headers: {'content-type': 'application/json'}, body: JSON.stringify({code: String(code || '').trim(), device: 'JARVIS OS'})});
+      let r;   /* 0.70.0 : hors réseau, « Relier » le dit (avant : rien ne s'affichait) */
+      try { r = await fetch(BASE + '/api/pair', {method: 'POST', headers: {'content-type': 'application/json'}, body: JSON.stringify({code: String(code || '').trim(), device: 'JARVIS OS'})}); }
+      catch (e) { return {ok: false, error: INJ}; }
       const j = await r.json().catch(() => ({}));
-      if (!r.ok || !j.token) return {ok: false, error: j.error || 'Code refusé.'};
+      if (!r.ok || !j.token) return {ok: false, error: j.error || (r.status >= 500 ? INDISPO : 'Code refusé.')};
       const s = settings(); s.serverUrl = BASE; s.serverToken = j.token;
       try { localStorage.setItem(KEY, JSON.stringify(s)); } catch (e) { return {ok: false, error: 'Stockage du téléphone indisponible.'}; }
       return {ok: true};
     },
     unpair() { const s = settings(); s.serverToken = ''; try { localStorage.setItem(KEY, JSON.stringify(s)); } catch (e) { /* rien */ } },
     google: () => req('/api/google').then((r) => (r.status === 200 ? r.j : null)).catch(() => null),
-    googleConfig: (clientId, clientSecret) => req('/api/google/config', {clientId, clientSecret}).then((r) => r.j),
-    googleLink: () => req('/api/google/link', {}).then((r) => r.j),
-    googleUnlink: () => req('/api/google/unlink', {}).then((r) => r.j),
+    /* 0.70.0 : serveur injoignable ou en train de redémarrer : un message, jamais un appui sans effet */
+    googleConfig: (clientId, clientSecret) => req('/api/google/config', {clientId, clientSecret}).then(repOk).catch(() => ({ok: false, error: INJ})),
+    googleLink: () => req('/api/google/link', {}).then(repOk).catch(() => ({ok: false, error: INJ})),
+    googleUnlink: () => req('/api/google/unlink', {}).then(repOk).catch(() => ({ok: false, error: INJ})),
     status: () => req('/api/status').then((r) => (r.status === 200 ? r.j : null)).catch(() => null),
     update: () => req('/api/update', {}).then((r) => r.j).catch(() => ({ok: false, message: 'Serveur injoignable.'})),
     /* 0.27.0 : mise à jour proposée au lancement (comme Panier) — une version plus récente dans le dépôt ? ; l'empreinte du serveur (sans jeton) */
@@ -239,10 +254,10 @@
     /* 0.37.0 : la mémoire durable (ce qu'il a demandé de retenir, et l'état de son Profil) */
     /* Radar (21/11/2026) : dépenses fixes, paie, reste à payer, dépenses trouvées dans les mails ; les montants restent sur le serveur */
     radar: () => req('/api/radar').then((r) => (r.status === 200 ? r.j : null)).catch(() => null),
-    radarSet: (cle, valeur) => req('/api/radar/set', {cle, valeur}).then((r) => { if (r.status !== 200) throw new Error((r.j && r.j.error) || 'Refusé'); return r.j; }),
+    radarSet: (cle, valeur) => req('/api/radar/set', {cle, valeur}).then((r) => { if (r.status !== 200) throw new Error((r.j && r.j.error) || (r.status >= 500 ? 'Serveur JARVIS indisponible' : 'Refusé')); return r.j; }),
     radarProposition: (id, oui, modif) => req('/api/radar/proposition', {id, oui, modif: modif || null}).then((r) => (r.status === 200 ? r.j : null)).catch(() => null),
     /* 0.68.0 : « Tout relire » ({tout: false} : les derniers jours) ; un refus (Google pas relié) remonte avec son message, au lieu de remplacer les données de la page */
-    radarLire: (tout) => req('/api/radar/lire', {tout: tout !== false}).then((r) => { if (r.status !== 200 && r.status !== 202) throw new Error((r.j && r.j.error) || 'Relecture refusée'); return r.j; }),
+    radarLire: (tout) => req('/api/radar/lire', {tout: tout !== false}).then((r) => { if (r.status !== 200 && r.status !== 202) throw new Error((r.j && r.j.error) || (r.status >= 500 ? 'Serveur JARVIS indisponible' : 'Relecture refusée')); return r.j; }),
     /* 0.69.0 : les dernières notifications (ce qu'elles annoncent) et « vue » : l'app ramenée au premier plan par l'une d'elles l'ouvre */
     notifs: () => req('/api/notifs').then((r) => (r.status === 200 ? r.j : null)).catch(() => null),
     notifsVues: (ids) => req('/api/notifs/vue', {ids}).then((r) => (r.status === 200 ? r.j : null)).catch(() => null),

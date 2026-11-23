@@ -29,6 +29,7 @@
   .rang > div { flex: 1 1 160px; }
   button { font: inherit; font-weight: 600; line-height: 1; border: 0; border-radius: 12px; padding: 14px 18px; background: var(--accent); color: #fff; cursor: pointer; }
   @media (prefers-color-scheme: dark) { button { color: #0b1020; } }
+  button:disabled { opacity: .6; cursor: default; }
   button.discret { background: transparent; color: var(--accent); border: 1px solid var(--ligne); padding: 10px 14px; font-size: 15px; }
   .msg { min-height: 1.4em; margin: 10px 0 0; }
   .msg.erreur { color: #d64545; }
@@ -128,13 +129,16 @@
   }
   $('form').addEventListener('submit', async (e) => {
     e.preventDefault();
-    const texte = $('texte').value.trim(); if (texte.length < 2) { $('texte').focus(); return; }
+    const texte = $('texte').value.trim(); if (texte.length < 2) { $('msg').classList.add('erreur'); $('msg').textContent = 'Écris d’abord la tâche.'; $('texte').focus(); return; }
+    /* 0.70.0 : « Envoyer » ne part qu'une fois par envoi (un second appui sur un réseau lent créait la même tâche deux fois) */
+    const b = $('form').querySelector('button[type=submit]'); if (b.disabled) return; b.disabled = true;
     $('msg').classList.remove('erreur'); $('msg').textContent = 'Envoi…';
     try {
       const r = await fetch('/api/invite/tache', {method: 'POST', headers: hdr, body: JSON.stringify({texte, ...($('pour').value ? {pour: $('pour').value} : {})})});
       $('msg').textContent = await r.text(); $('msg').classList.toggle('erreur', !r.ok);
       if (r.ok) { $('texte').value = ''; $('pour').value = ''; charger(); }
     } catch (err) { $('msg').textContent = 'Le serveur ne répond pas : réessaie dans un moment.'; $('msg').classList.add('erreur'); }
+    finally { b.disabled = false; }
   });
   /* 0.64.0 : le message vocal depuis cette page : le micro, enregistré en WAV 16 kHz (ce que l'écoute du serveur lit), 90 secondes au plus */
   const REC = {flux: null, ctx: null, src: null, proc: null, morceaux: [], t0: 0, minuteur: 0};
