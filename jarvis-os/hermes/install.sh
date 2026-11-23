@@ -138,7 +138,7 @@ if [ "$BANC" != 1 ]; then
     # en pause par le garde : c'est lui qui décide, avec ses nouvelles règles (il relance Hermes si le forfait le permet)
     echo "Hermes est en pause par le garde du forfait : je relance le garde, qui le redémarre si le forfait le permet."
     systemctl start hermes-garde.service || true
-    journalctl -u hermes-garde -n 1 --no-pager -o cat 2>/dev/null | sed 's/^/  garde : /'
+    journalctl -u hermes-garde -n 30 --utc --no-pager -o short-iso 2>/dev/null | grep -E ': (Forfait|Hermes|Usage) ' | tail -1 | sed -E 's/^([0-9T:-]+)[^ ]* [^ ]+ [^ ]+: /\1 UTC : /; s/T/ /; s/^/  garde : /'
   elif grep -q '^TELEGRAM_BOT_TOKEN=.' "$HH/.env" 2>/dev/null && [ -n "$autorises" ]; then
     systemctl restart hermes-gateway.service && echo "Hermes relancé avec la nouvelle version ou la nouvelle politique."
   else

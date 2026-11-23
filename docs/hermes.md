@@ -232,3 +232,10 @@ retirer : `sudo bash /opt/rd/jarvis-os/hermes/desinstaller.sh` (`--tout` efface 
   ignore « Current session » (`HERMES_GARDE_CINQ_HEURES=0` dans `garde.conf`, 1 pour la remettre), messages
   « semaine » ou « semaine Opus » ; `install.sh` relancé pendant une pause laisse le garde décider. Bancs : garde
   20 sur 20, Hermes 45 sur 45 ; essai sur les vrais chiffres (semaine 10 %) : Hermes relancé, message de reprise.
+- 23/11/2026, appliqué par la session « Serveur JARVIS » (tâche par `send_message`, sans recopie par lui) : dépôt
+  `0bc2d17`, `install.sh` code 0. Hermes, mis en pause par l'ancien garde pour la fenêtre de 5 heures, relancé par
+  le nouveau (« Forfait à 11 % (semaine) : Hermes relancé ») ; Telegram reconnecté à 14h42 UTC ; `garde.conf` à
+  85 % et `HERMES_GARDE_CINQ_HEURES=0` ; jarvis, hermes-gateway, hermes-sortie et la minuterie actifs ;
+  diagnostic « Confortable » (2,75 Go disponibles, aucune retenue de JARVIS, 1 identifiant, 4 outils, score 1,4).
+  **Étape 2 faite.** Prochaine : étape 3 (relier à JARVIS), sur sa demande. Ensuite, le diagnostic et
+  `install.sh` affichent le dernier message du garde avec son heure (et non la ligne de fin de systemd).
