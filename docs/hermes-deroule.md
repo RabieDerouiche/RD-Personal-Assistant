@@ -10,6 +10,15 @@ Version pour lui : Google Doc « Hermes, Grok Bot, Claude et JARVIS : le déroul
 (`1leDb53BzPGQtd_Y3Ud84qkSi5YKyxTJEu3pQWNPbogI`).
 Rien de personnel ici.
 
+## Ses décisions (QCM du 23/11/2026 au soir)
+
+| Question | Son choix |
+|---|---|
+| Routines à mettre en double d'abord | Supervision (Argus) et Semaine à venir (Iris), **puis la Veille du matin d'Iris** (à préparer : écriture bornée dans Dossiers et Échéances) |
+| Routines qui demandent le web | **Essai du web chez Hermes**, sur le Digest d'Athéna seulement, en double, avec un jeton à part qui ne voit pas ses mails |
+| Chronos (portails) | **Reste chez Grok Bot** : pas de remplacement complet pour l'instant |
+| Durée du double | **2 semaines** avant la comparaison et sa décision de bascule |
+
 ## Qui fait quoi
 
 | Pièce | Rôle | Ce qu'elle ne fait pas |
@@ -130,3 +139,14 @@ commence à la première bascule.
   lecture : non ; mauvais jeton : 401) et les en-têtes réels de Pilotage (ligne 3 pour « À toi » et Prix, ligne 1
   ailleurs ; colonne Bot dans Sorties et Relevés). Bancs de JARVIS : serveur 331, Radar 131, page 226, bout en
   bout 124.
+- 23/11/2026, 19h30 (heure de Paris), par la session « Serveur JARVIS » : dépôt `3c4d4a8`, JARVIS relancé en
+  **0.71.0** (actif, répond en HTTPS), `install.sh` d'Hermes code 0 (3 skills du dépôt, 44 coupées, Telegram
+  reconnecté, 5 outils sur Telegram et 4 pour les routines, plafonds mémoire 850/1000 Mo). Pas encore relié :
+  il lui reste à créer le jeton « Hermes » dans Réglages et à lancer `relier-jarvis.sh` dans Termius ; ensuite
+  `routines.sh` par la session du serveur, puis la vague « faire connaître Hermes » (Charte, Argus, onglet
+  Routines). Mémoire : verdict « Suffisant » (1,7 Go disponibles : JARVIS venait de recharger son écoute,
+  1 Go) ; à remesurer après les premiers passages.
+- À faire ensuite, selon ses réponses : (1) Veille du matin en double (outils de JARVIS pour écrire dans Dossiers
+  et Échéances, skill, ligne de `routines.conf`) ; (2) essai du web sur le Digest (profil de jeton sans Gmail,
+  second serveur MCP dans la politique d'Hermes, outil `web` pour cette seule routine, skill) ; (3) comparaison
+  des routines en double à partir du 07/12/2026, à sa demande.
