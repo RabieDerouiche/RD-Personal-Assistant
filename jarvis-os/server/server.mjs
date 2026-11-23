@@ -29,7 +29,7 @@ import {pique, PERSO_ORAL} from './humour.mjs';   /* 21/11/2026 : sa personnalit
 import {createAudio, typeSon, silence} from './audio.mjs';   /* 0.64.0 : le message vocal d'un proche, mis au format de l'écoute */
 const ACT = createActivite();   /* 0.33.0 : ce que fait Claude à l'instant */
 
-const VERSION = '0.68.0';
+const VERSION = '0.69.0';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PORT = +(process.env.PORT || 8787);
 const HOST = process.env.HOST || '127.0.0.1';
@@ -520,7 +520,7 @@ async function runMission(m, reprise) {
   if (r.ok) { const x = relancesDuTexte(res, 'mission'); res = x.text + (x.relance ? '\n\nRelance prévue le ' + new Intl.DateTimeFormat('fr-FR', {timeZone: 'Europe/Paris', weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit'}).format(new Date(x.relance.quand)) + ' : ' + x.relance.quoi : ''); }
   m.status = r.ok ? 'terminee' : 'echouee'; m.done = now(); m.result = String(res).slice(0, 6000); save();
   /* 0.15.0 : notification de fin, sur chaque appareil abonné */
-  if (S.push && S.push.subs.length) PUSH.send({title: r.ok ? 'Mission terminée' : 'Mission en échec', body: m.text.slice(0, 80) + ' — ' + String(m.result).replace(/\s+/g, ' ').slice(0, 220), url: '/#suivi', tag: 'mission-' + m.id}, {urgency: 'high'}).catch(() => {});
+  if (S.push && S.push.subs.length) PUSH.send({title: r.ok ? 'Mission terminée' : 'Mission en échec', body: m.text.slice(0, 80) + ' — ' + String(m.result).replace(/\s+/g, ' ').slice(0, 220), url: '/#voir-mission-' + m.id, tag: 'mission-' + m.id}, {urgency: 'high'}).catch(() => {});
 }
 /* 0.15.0 : une mission lancée par le propriétaire depuis JARVIS ou Siri (il l'a demandée : pas d'accord à redonner) */
 function newMission(text, parentId) {
@@ -570,13 +570,13 @@ async function relanceVerifier(r) {
     if (rep || ['fait', 'annule', 'annulee'].includes(st)) return {title: qui + ' a répondu', body: sujet + ' : ' + (rep || g('statut')).slice(0, 220) + retard, url: '/#voir-' + r.ligne};
     return {title: 'Toujours rien de ' + qui, body: r.quoi + ' (ligne ' + r.ligne + ' du Canal, ' + (g('statut') || 'sans statut') + ')' + retard, url: '/#voir-' + r.ligne};
   }
-  return {title: 'Rappel', body: r.quoi + retard, url: '/#suivi'};
+  return {title: 'Rappel', body: r.quoi + retard, url: '/#voir-relances'};
 }
 async function relanceTick() {
   const due = S.relances.filter((x) => x.statut === 'prevue' && x.quand <= now());
   for (const r of due) {
     if (r.verif) { r.statut = 'faite'; r.fait = now(); try { r.resultat = await verifRelancer(r.verif); } catch (e) { r.resultat = 'Revérification impossible : ' + (e.message || e); } save(); continue; }
-    let msg; try { msg = await relanceVerifier(r); } catch (e) { msg = {title: 'Rappel', body: r.quoi + ' (Pilotage illisible pour le vérifier)', url: '/#suivi'}; }
+    let msg; try { msg = await relanceVerifier(r); } catch (e) { msg = {title: 'Rappel', body: r.quoi + ' (Pilotage illisible pour le vérifier)', url: '/#voir-relances'}; }
     r.statut = 'faite'; r.fait = now(); r.resultat = msg.title + ' : ' + msg.body; save();
     if (S.push && S.push.subs.length) await PUSH.send({...msg, tag: 'relance-' + r.id}, {urgency: 'high'}).catch(() => {});
   }
@@ -741,7 +741,7 @@ async function runVerif(m) {
   });
   S.usage.missions++;
   let j = null; try { const t = String(r.text || ''); j = JSON.parse(t.slice(t.indexOf('{'), t.lastIndexOf('}') + 1)); } catch { j = null; }
-  const fin = (status, result, push) => { m.status = status; m.done = now(); m.result = String(result).slice(0, 6000); save(); if (push && S.push && S.push.subs.length) PUSH.send({...push, url: '/#suivi', tag: 'verif-' + m.id}, {urgency: 'high'}).catch(() => {}); };
+  const fin = (status, result, push) => { m.status = status; m.done = now(); m.result = String(result).slice(0, 6000); save(); if (push && S.push && S.push.subs.length) PUSH.send({...push, url: '/#voir-mission-' + m.id, tag: 'verif-' + m.id}, {urgency: 'high'}).catch(() => {}); };
   if (!r.ok || !j) return fin('echouee', r.ok ? 'Réponse de Claude illisible : rien écrit.' : r.error, {title: 'Revérification en échec', body: '« ' + v.titre + ' » : ' + (r.ok ? 'réponse illisible' : r.error)});
   const constat = String(j.constat || '').trim(), src = String(j.source || '').trim(), lien = /^https:\/\//.test(String(j.lien || '')) ? String(j.lien).trim() : '';
   const seen = constat + (src ? '\nSource : ' + src : '') + (lien ? '\n' + lien : '') + (j.certitude ? ' (' + j.certitude + ')' : '');
@@ -1013,7 +1013,7 @@ const ROUT = createRoutines({S, save, now, paris, log: (t) => { S.routinesErr = 
   lancer: async (r) => {
     if (r.genre === 'brief') {
       const {texte, parts} = await briefData(); S.brief = {at: now(), texte, parts}; save();
-      if (S.push && S.push.subs.length) await PUSH.send({title: 'Brief du matin', body: texte.replace(/^Bonjour\. Nous sommes [^.]+\. /, '').slice(0, 230), url: '/#accueil', tag: 'brief'}, {urgency: 'normal'}).catch(() => {});
+      if (S.push && S.push.subs.length) await PUSH.send({title: 'Brief du matin', body: texte.replace(/^Bonjour\. Nous sommes [^.]+\. /, '').slice(0, 230), url: '/#voir-brief', tag: 'brief'}, {urgency: 'normal'}).catch(() => {});
       return;
     }
     const m = newMission(r.texte); m.source = 'routine'; m.par = 'Routine ' + quandDit(r); save();
@@ -1030,7 +1030,7 @@ function mcpProposer(agent, texte, client) {
   if (S.missions.filter((x) => x.status === 'a_approuver' && x.source === 'mcp').length >= 10) throw new Error('Dix propositions attendent déjà son accord dans JARVIS : qu’il les traite d’abord.');
   const m = {id: uid(), agent, text: texte, status: 'a_approuver', at: now(), priority: 'normale', source: 'mcp', par: client.name};
   S.missions.push(m); save();
-  if (S.push && S.push.subs.length) PUSH.send({title: (agent === 'claude' ? 'Mission' : 'Ordre à ' + (BOT_NOMS[agent] || agent)) + ' proposé par ' + client.name, body: texte.slice(0, 160) + ' — à approuver dans JARVIS.', url: '/#suivi', tag: 'mcp-' + m.id}, {urgency: 'normal'}).catch(() => {});
+  if (S.push && S.push.subs.length) PUSH.send({title: (agent === 'claude' ? 'Mission' : 'Ordre à ' + (BOT_NOMS[agent] || agent)) + ' proposé par ' + client.name, body: texte.slice(0, 160) + ' — à approuver dans JARVIS.', url: '/#voir-mission-' + m.id, tag: 'mcp-' + m.id}, {urgency: 'normal'}).catch(() => {});
   return m;
 }
 const MCP_LECTURE = {readOnlyHint: true, destructiveHint: false, openWorldHint: false};
@@ -1109,7 +1109,7 @@ function etatJarvisLigne() {
 }
 const mcpBase = (req) => (process.env.JARVIS_PUBLIC_URL || publicBase(req)).replace(/\/+$/, '');
 const JMCP = createMcp({S, save, now, version: VERSION, base: mcpBase, outils: MCP_OUTILS, journal: mcpJournal,
-  prevenir: ({titre, texte}) => { if (S.push && S.push.subs.length) PUSH.send({title: titre, body: texte, url: '/#reglages', tag: 'mcp-acces'}, {urgency: 'high'}).catch(() => {}); }});
+  prevenir: ({titre, texte}) => { if (S.push && S.push.subs.length) PUSH.send({title: titre, body: texte, url: '/#voir-reglages-mcp', tag: 'mcp-acces'}, {urgency: 'high'}).catch(() => {}); }});
 
 const memoireEtat = () => ({items: MEM.liste(), profil: {lu: !!PROFIL.texte, at: PROFIL.at || null, modifie: PROFIL.modifie, retire: PROFIL.retire, doublons: PROFIL.doublons, err: PROFIL.err, taille: PROFIL.texte.length},
   propositions: S.memProps || [], rangement: {dernier: (S.memRange || {}).dernier || null, enCours: !!(S.memRange || {}).enCours, n: (S.memRange || {}).n || 0, echanges: JOURNAL.taille()}});
@@ -1134,7 +1134,7 @@ async function ranger(tout) {
   const nouv = props.map((x) => ({texte: String((x && x.texte) || (typeof x === 'string' ? x : '')).replace(/\s+/g, ' ').trim().slice(0, 300), remplace: String((x && x.remplace) || '').replace(/\s+/g, ' ').trim().slice(0, 300)}))
     .filter((x) => x.texte.length >= 3 && !interdit(x.texte) && !deja.has(x.texte.toLowerCase()) && !att.some((y) => y.texte.toLowerCase() === x.texte.toLowerCase())).slice(0, 5).map((x) => ({id: uid(), ...x, at: now()}));
   S.memProps = att.concat(nouv).slice(-10); R.n = nouv.length; save();
-  if (nouv.length && S.push && S.push.subs.length) PUSH.send({title: 'Mémoire : ' + nouv.length + (nouv.length > 1 ? ' propositions' : ' proposition'), body: 'Claude propose de retenir : ' + nouv.map((x) => x.texte).join(' ; ').slice(0, 200), url: '/#reglages', tag: 'memoire'}, {urgency: 'normal'}).catch(() => {});
+  if (nouv.length && S.push && S.push.subs.length) PUSH.send({title: 'Mémoire : ' + nouv.length + (nouv.length > 1 ? ' propositions' : ' proposition'), body: 'Claude propose de retenir : ' + nouv.map((x) => x.texte).join(' ; ').slice(0, 200), url: '/#voir-reglages-memoire', tag: 'memoire'}, {urgency: 'normal'}).catch(() => {});
   return {ok: true, nouvelles: nouv.length};
 }
 const rangeTick = setInterval(() => {
@@ -1365,7 +1365,7 @@ const VG = createVoixGoogle({fichier: path.join(DATA, 'voix-google.json'), compt
   plafondJour: Math.min(+process.env.JARVIS_VOIX_GOOGLE_JOUR || 100000, Math.min(+process.env.JARVIS_VOIX_GOOGLE_PLAFOND || 990000, 1000000)),   /* 0.47.0 : une boucle ne vide pas le mois */
   miroir: {lire: () => S.voixGoogleCompteur || null, ecrire: (c) => { S.voixGoogleCompteur = c; save(); }},   /* 0.47.0 : le compteur en double (son fichier, et ici) */
   coupure: () => S.voixGoogleCoupure || null,   /* 0.48.0 : coupée par une alerte de budget de Google Cloud, jusqu'à « Relancer Google » */
-  alerte: ({titre, texte}) => { S.voixGoogleAlerte = {at: now(), titre, texte}; if (S.push && S.push.subs.length) PUSH.send({title: titre, body: texte, url: '/#reglages', tag: 'voix-google'}, {urgency: 'high'}).catch(() => {}); },
+  alerte: ({titre, texte}) => { S.voixGoogleAlerte = {at: now(), titre, texte}; if (S.push && S.push.subs.length) PUSH.send({title: titre, body: texte, url: '/#voir-reglages-voix', tag: 'voix-google'}, {urgency: 'high'}).catch(() => {}); },
   log: (t) => { S.voixGoogleErr = {at: now(), t: String(t).slice(0, 300)}; }});
 /* 0.47.0 : qui a dit la dernière phrase du serveur, et pourquoi pas Google (Réglages, état donné à Claude, en-tête x-jarvis-voix) */
 let VOIXD = null;
@@ -1391,7 +1391,7 @@ async function budgetGoogle() {
       S.voixGoogleCoupure = {at: now(), raison: 'alerte de budget de Google Cloud reçue', fils: nouveaux.slice(0, 10)}; save();
       const titre = 'Voix Google coupée', texte = 'Google Cloud t’a envoyé une alerte de budget : Pierre parle. Vérifie ta facturation Google Cloud, puis « Relancer Google » dans Réglages.';
       S.voixGoogleAlerte = {at: now(), titre, texte};
-      if (S.push && S.push.subs.length) PUSH.send({title: titre, body: texte, url: '/#reglages', tag: 'voix-google'}, {urgency: 'high'}).catch(() => {});
+      if (S.push && S.push.subs.length) PUSH.send({title: titre, body: texte, url: '/#voir-reglages-voix', tag: 'voix-google'}, {urgency: 'high'}).catch(() => {});
     } else if (nouveaux.length) { S.voixGoogleCoupure.fils = [...new Set([...(S.voixGoogleCoupure.fils || []), ...nouveaux])].slice(-20); save(); }
   } catch (e) { BUDGET = {at: now(), err: String(e && e.message || e).slice(0, 160), n: 0}; }
   return BUDGET;
@@ -1663,6 +1663,9 @@ const server = http.createServer(async (req, res) => {
       if (p === '/api/maj') return json(res, 200, await majVerifie(url.searchParams.get('force') === '1'));   /* 0.27.0 : une version plus récente ? */
       /* notifications : clé publique, abonnement de cet appareil, essai, préférences, vérification immédiate */
       if (p === '/api/push') return json(res, 200, PUSH.status());
+      /* 0.69.0 : les dernières notifications et ce qu'elles annoncent : l'app ramenée au premier plan par l'une d'elles l'ouvre (l'iPhone ne change pas son adresse) */
+      if (p === '/api/notifs' && req.method === 'GET') return json(res, 200, {notifs: PUSH.notifs().slice(0, 20)});
+      if (p === '/api/notifs/vue' && req.method === 'POST') { const b = await readBody(req); return json(res, 200, PUSH.vues(Array.isArray(b.ids) ? b.ids.slice(0, 40) : [String(b.id || '')])); }
       if (p === '/api/sauvegarde') return json(res, 200, {...SAV.status(), changements: SAV.diff()});
       /* missions (0.15.0) : lancer, suivre ; tour de Claude : réglage, dernier tour, tour immédiat */
       if (p === '/api/mission' && req.method === 'POST') { const b = await readBody(req); const t = String(b.texte || '').trim(); if (t.length < 4) return json(res, 400, {error: 'Mission vide.'}); if (b.parent && !S.missions.some((x) => x.id === b.parent && x.agent === 'claude')) return json(res, 404, {error: 'Mission d’origine introuvable.'}); const m = newMission(t, b.parent); return json(res, 200, {ok: true, id: m.id}); }
@@ -1724,7 +1727,7 @@ const server = http.createServer(async (req, res) => {
       if (p === '/api/raccourci/etat') return json(res, 200, {active: !!S.raccourci, at: S.raccourci && S.raccourci.at, uses: (S.raccourci && S.raccourci.uses) || 0, last: S.raccourci && S.raccourci.last, url: publicBase(req) + '/api/raccourci'});
       if (p === '/api/push/subscribe' && req.method === 'POST') { const b = await readBody(req); const r = PUSH.subscribe(b.subscription, deviceOf(req), 'https://' + String(req.headers.host || 'jarvis.invalid').split(':')[0]);   /* sujet VAPID : toujours une adresse https (Apple refuse un sujet http) */ if (r.ok) NOTIFY.tick({only: 'canal', force: true}).catch(() => {}); return json(res, r.ok ? 200 : 400, r); }
       if (p === '/api/push/unsubscribe' && req.method === 'POST') { const b = await readBody(req); return json(res, 200, PUSH.unsubscribe(String(b.endpoint || ''))); }
-      if (p === '/api/push/test' && req.method === 'POST') { const r = await PUSH.send({title: 'JARVIS', body: 'Les notifications marchent sur cet appareil.', url: '/#reglages', tag: 'essai'}); return json(res, 200, {ok: r.some((x) => x.ok), results: r}); }
+      if (p === '/api/push/test' && req.method === 'POST') { const r = await PUSH.send({title: 'JARVIS', body: 'Les notifications marchent sur cet appareil.', url: '/#voir-reglages-notifs', tag: 'essai'}); return json(res, 200, {ok: r.some((x) => x.ok), results: r}); }
       if (p === '/api/push/prefs' && req.method === 'POST') { const b = await readBody(req), pr = S.push.prefs;
         if (typeof b.bots === 'boolean') pr.bots = b.bots; if (typeof b.rappels === 'boolean') pr.rappels = b.rappels; if (/^([01]\d|2[0-3]):[0-5]\d$/.test(String(b.heure || ''))) pr.heure = b.heure; save(); return json(res, 200, {prefs: pr}); }
       if (p === '/api/push/check' && req.method === 'POST') { const b = await readBody(req); return json(res, 200, await notifyTick({only: ['canal', 'digest', 'resume'].includes(b.only) ? b.only : undefined, force: true})); }

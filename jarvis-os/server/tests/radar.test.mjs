@@ -92,7 +92,7 @@ try {
   /* la veille à 19 h : lundi 23/11, le crédit part le mardi 24 */
   maintenant = Date.parse('2026-11-23T18:05:00Z'); RD.tic(); await new Promise((z) => setTimeout(z, 50));
   const v = appels.push.find((m) => /^Demain/.test(m.title));
-  ok('Radar : à 19 h, la notification de la veille (« Demain : Crédit immobilier, 1 150,00 € », reste à payer d’ici la paie du ven. 27/11)', !!v && v.title === 'Demain : Crédit immobilier' && /Crédit immobilier : 1\s150,00 €/.test(v.body) && /Reste à payer d’ici ta paie du ven\. 27\/11 : 1\s150,00 €\./.test(v.body) && v.url === '/#argent', JSON.stringify(v));
+  ok('Radar : à 19 h, la notification de la veille (« Demain : Crédit immobilier, 1 150,00 € », reste à payer d’ici la paie du ven. 27/11), qui ouvre les prélèvements de demain (0.69.0)', !!v && v.title === 'Demain : Crédit immobilier' && /Crédit immobilier : 1\s150,00 €/.test(v.body) && /Reste à payer d’ici ta paie du ven\. 27\/11 : 1\s150,00 €\./.test(v.body) && v.url === '/#voir-radar-veille', JSON.stringify(v));
   RD.tic(); await new Promise((z) => setTimeout(z, 50));
   ok('Radar : une seule notification de la veille par jour', appels.push.filter((m) => /^Demain/.test(m.title)).length === 1);
   await RD.traiter('POST', '/api/radar/set', async () => ({cle: 'notif', valeur: {veille: true, seuil: 2000, echec: true}}));
@@ -100,7 +100,7 @@ try {
   /* chaque matin : un nouveau paiement échoué notifie tout de suite */
   mail('ec2', 'info@video-exemple.com', 'Video Exemple', 'Payment declined', 'Your payment of €9.99 was declined. Update your payment method.', '2026-11-24T05:00:00Z');
   maintenant = Date.parse('2026-11-24T06:00:00Z'); RD.tic(); await RD.attendre(); await new Promise((z) => setTimeout(z, 50));
-  ok('Radar : à 6 h 50, un nouveau paiement échoué → notification tout de suite', appels.push.some((m) => m.title === 'Paiement échoué : Video Exemple' && m.url === '/#argent'), JSON.stringify(appels.push.map((m) => m.title)));
+  ok('Radar : à 6 h 50, un nouveau paiement échoué → notification tout de suite, qui ouvre son alerte (0.69.0)', appels.push.some((m) => m.title === 'Paiement échoué : Video Exemple' && /^\/#voir-radar-a\w+$/.test(m.url) && RD.etat().alertes.some((a) => '/#voir-radar-' + a.id === m.url)), JSON.stringify(appels.push.map((m) => m.title)));
   mail('ech', 'service@paypal.fr', 'PayPal', "L'échéance de votre Paiement en 4X approche", '| Votre prochaine échéance de 29,55 € EUR sera due le 25/11/2026. |\n| Marchand |\n| BOUTIQUE EXEMPLE |', '2026-11-24T05:10:00Z');
   maintenant = Date.parse('2026-11-24T07:00:00Z'); await RD.lireMaintenant(); await RD.traiter('POST', '/api/radar/set', async () => ({cle: 'notif', valeur: {veille: true, seuil: 20, echec: true}}));
   const e3 = RD.etat();

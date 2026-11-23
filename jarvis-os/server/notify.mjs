@@ -111,7 +111,7 @@ export function createNotifier({S, save, push, read, linked, pause, now = () => 
     if (iDoc >= 0 && iV >= 0) pap.slice(1).forEach((r) => { const n = daysTo(r[iV], t); if ([0, 7, 30, 90].includes(n)) lines.push({n, t: String(r[iDoc]).trim() + (iP >= 0 && r[iP] ? ' (' + String(r[iP]).trim() + ')' : '') + (n === 0 ? " : n'est plus valable dès aujourd'hui" : ' : expire dans ' + n + ' jours')}); });
     if (!lines.length) return {lines: 0, sent: false};
     lines.sort((a, b) => a.n - b.n);
-    await push.send({title: lines.length === 1 ? 'Rappel du jour' : lines.length + ' rappels du jour', body: lines.slice(0, 5).map((x) => x.t).join('\n') + (lines.length > 5 ? '\n… et ' + (lines.length - 5) + ' autres' : ''), url: '/#agenda', tag: 'rappels'});
+    await push.send({title: lines.length === 1 ? 'Rappel du jour' : lines.length + ' rappels du jour', body: lines.slice(0, 5).map((x) => x.t).join('\n') + (lines.length > 5 ? '\n… et ' + (lines.length - 5) + ' autres' : ''), url: '/#voir-echeances', tag: 'rappels'});
     return {lines: lines.length, sent: true};
   }
 

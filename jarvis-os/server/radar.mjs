@@ -764,7 +764,7 @@ export function createRadar({file, gmail, claude = async () => ({ok: false, erro
       const relance = R.alertes.some((a) => a.type === 'echec' && ((lu.cle && a.cle === lu.cle) || nomPlat(a.service) === nomPlat(lu.service)) && ecart(a.date, lu.date) <= 1);
       if (relance) depart = true;
       R.alertes.push({id: 'a' + lu.id, date: lu.date, cle: lu.cle || '', type: 'echec', titre: 'Paiement échoué', service: lu.service, montant: lu.montant, texte: 'Mets à jour ton moyen de paiement chez ' + lu.service + ', sinon le service peut s’arrêter.', fil: lu.fil});
-      if (!depart && R.notif.echec !== false) push({title: 'Paiement échoué : ' + lu.service, body: (lu.montant ? eur(lu.montant) + '. ' : '') + 'Mets à jour ton moyen de paiement, sinon le service peut s’arrêter.', url: '/#argent', tag: 'radar-echec-' + lu.id}).catch(() => {});
+      if (!depart && R.notif.echec !== false) push({title: 'Paiement échoué : ' + lu.service, body: (lu.montant ? eur(lu.montant) + '. ' : '') + 'Mets à jour ton moyen de paiement, sinon le service peut s’arrêter.', url: '/#voir-radar-a' + lu.id, tag: 'radar-echec-' + lu.id}).catch(() => {});
     }
     if (lu.genre === 'essai') R.alertes.push({id: 'a' + lu.id, date: lu.date, cle: lu.cle || '', type: 'essai', titre: 'Essai gratuit qui devient payant', service: lu.service, montant: lu.montant, texte: lu.datePrel ? 'Premier prélèvement le ' + jourCourt(depuisYmd(lu.datePrel)) + '.' : 'L’essai se termine bientôt.', fil: lu.fil});
     if (lu.genre === 'hausse' && lu.montant) R.alertes.push({id: 'a' + lu.id, date: lu.date, cle: lu.cle || '', type: 'hausse', titre: 'Hausse de prix', service: lu.service, montant: lu.montant, avant: lu.avant, texte: lu.datePrel ? 'À partir du ' + jourCourt(depuisYmd(lu.datePrel)) + '.' : 'À partir du prochain prélèvement.', fil: lu.fil});
@@ -967,7 +967,7 @@ export function createRadar({file, gmail, claude = async () => ({ok: false, erro
     const pc = vue().ponctuels, dem = plus(auj(), 1), l = resteA(R.fixes, rev(), dem, 'mois', pc).liste.filter((o) => ymd(o.le) === ymd(dem) && cents(o.f.montant) >= cents(R.notif.seuil || 0));
     if (!l.length) return null;
     const r = resteA(R.fixes, rev(), dem, 'paie', pc);
-    const msg = {title: 'Demain : ' + (l.length === 1 ? l[0].f.service : l.length + ' prélèvements'), url: '/#argent', tag: 'radar-veille-' + ymd(dem),
+    const msg = {title: 'Demain : ' + (l.length === 1 ? l[0].f.service : l.length + ' prélèvements'), url: '/#voir-radar-veille', tag: 'radar-veille-' + ymd(dem),
       body: l.map((o) => o.f.service + ' : ' + (o.f.estime ? 'environ ' : '') + eur(o.f.montant)).join('\n') + '\nReste à payer d’ici ta paie ' + (rev().des ? '(au plus tard le ' : 'du ') + jourCourt(r.fin) + (rev().des ? ')' : '') + ' : ' + eur(r.total) + '.'};
     await push(msg).catch(() => {});
     return msg;
