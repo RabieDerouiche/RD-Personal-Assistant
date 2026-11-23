@@ -1460,6 +1460,8 @@
   .voixg-etapes { margin: 8px 0; padding-left: 20px; display: grid; gap: 4px; font-size: 14px; } .voixg-sel { flex: 1; min-width: 0; }
   .voixg-qui { margin: 6px 0 2px; font-weight: 600; } .voixg-qui.is-bad, .voixg-err { color: var(--danger); } .voixg-err { margin: 4px 0; font-size: 13.5px; }
   .mcp-d { padding: 10px; margin: 8px 0; border-radius: 12px; border: 1px solid rgba(168, 85, 247, .5); background: rgba(168, 85, 247, .12); } .mcp-code { font: 700 18px/1 ui-monospace, monospace; letter-spacing: .2em; }
+  .mcp-jeton { flex-wrap: wrap; } .mcp-jeton.is-off > span:first-child { opacity: .6; } .mcp-form { margin: 8px 0; } .mcp-profil-dit { margin: 0; font-size: 13px; } .mcp-actes { margin-top: 10px; }
+  .mcp-acte > span { display: grid; gap: 2px; } .mcp-acte-tx { font-size: 13.5px; } .mcp-jeton-neuf { overflow-wrap: anywhere; font: 12.5px var(--mono); }
   .mis-accord { margin: 8px 0; } .mis-par { font-size: 13px; margin: 4px 0; }
   .skill-it span { display: block; } .skill-it small { display: inline; }
   .mem-add { display: flex; gap: 8px; } .mem-in { flex: 1; min-width: 0; padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(56, 189, 248, .35); background: transparent; color: inherit; font: inherit; }
@@ -9872,36 +9874,70 @@ void main(){
     return card;
   }
   /* 0.39.0 (choix du 21/11/2026, « Serveur MCP ») : l'app Claude et Grok Bot reliés à JARVIS — l'adresse à donner, les demandes d'accès
-     à accorder (les mêmes 4 chiffres que sur la page de l'assistant), les assistants reliés (« Retirer »), un jeton fixe, les derniers accès */
+     à accorder (les mêmes 4 chiffres que sur la page de l'assistant), les assistants reliés (« Retirer »), un jeton fixe, les derniers accès.
+     0.71.0 (« exécutants reliés », 23/11/2026) : un jeton fixe par assistant, avec son nom et son profil (lecture, ou exécutant comme Hermes),
+     « Suspendre » / « Reprendre », « Retirer » (confirmé), et les derniers gestes des exécutants (ce qu'ils ont écrit) */
+  const MCP_PROFILS = {lecture: 'Lecture et propositions', executant: 'Exécutant : lit Pilotage, Gmail et l’agenda, écrit dans Pilotage, prépare des brouillons, te notifie'};
+  const MCP_GESTES = {pilotage_ajouter: 'ligne ajoutée', pilotage_etat: 'onglet État', canal_repondre: 'réponse dans le Canal', gmail_brouillon: 'brouillon', jarvis_notifier: 'notification'};
   async function mcpCard(JS) {
     const card = h('section', {class: 'card set-card mcp-card', id: 'mcp-card'}, h('b', {text: 'Assistants reliés (MCP)'}));
     let st = await JS.mcp.etat();
     if (!st) { card.append(h('p', {class: 'muted', text: 'Ton serveur ne le connaît pas encore : touche « Mettre à jour le serveur » plus bas.'})); return card; }
-    const out = h('p', {class: 'set-msg'}), dem = h('div', {class: 'mcp-dem'}), rel = h('ul', {class: 'mem-list'}), jr = h('p', {class: 'muted mcp-jr'});
+    const out = h('p', {class: 'set-msg'}), dem = h('div', {class: 'mcp-dem'}), rel = h('ul', {class: 'mem-list'}), jr = h('p', {class: 'muted mcp-jr'}), gestes = h('div', {class: 'mcp-actes'});
+    const dire = (t, bad) => { out.classList.toggle('is-bad', !!bad); out.textContent = t; };
+    const neuf = Array.isArray(st.fixes);   /* un serveur d'avant la 0.71.0 ne connaît qu'un jeton fixe, sans profil */
     const copier = (t) => h('button', {type: 'button', class: 'btn ghost sm', onclick: async () => { try { await navigator.clipboard.writeText(t); toast('Copié', t.length > 60 ? t.slice(0, 24) + '…' : t); } catch (e) { /* le texte reste affiché */ } }}, 'Copier');
     const maj = (r) => { if (r) { st = Object.assign({}, st, r); paint(); } return r; };
     const paint = () => {
       card.dataset.urgent = (st.demandes || []).length ? '1' : '';
       dem.replaceChildren(...(st.demandes || []).map((d) => h('div', {class: 'mcp-d'},
         h('p', {}, h('b', {text: d.nom}), document.createTextNode(' demande l’accès à JARVIS. Code : '), h('b', {class: 'mcp-code', text: d.chiffres}), document.createTextNode(' (le même doit s’afficher sur sa page).')),
-        h('div', {class: 'row-actions'}, h('button', {type: 'button', class: 'btn main sm', onclick: async () => { if (maj(await JS.mcp.decider(d.id, true))) out.textContent = d.nom + ' est relié à JARVIS.'; }}, 'Autoriser'),
-          h('button', {type: 'button', class: 'btn ghost sm', onclick: async () => { if (maj(await JS.mcp.decider(d.id, false))) out.textContent = 'Refusé.'; }}, 'Refuser')))));
+        h('div', {class: 'row-actions'}, h('button', {type: 'button', class: 'btn main sm', onclick: async () => { if (maj(await JS.mcp.decider(d.id, true))) dire(d.nom + ' est relié à JARVIS.'); }}, 'Autoriser'),
+          h('button', {type: 'button', class: 'btn ghost sm', onclick: async () => { if (maj(await JS.mcp.decider(d.id, false))) dire('Refusé.'); }}, 'Refuser')))));
       const items = (st.relies || []).map((c) => h('li', {class: 'mem-it'}, h('span', {text: c.nom + (c.vu ? ' · dernier accès ' + fmt(new Date(c.vu), {weekday: 'short', hour: '2-digit', minute: '2-digit'}) : '')}),
-        h('button', {type: 'button', class: 'btn ghost sm', onclick: async () => { if (maj(await JS.mcp.retirer(c.id))) out.textContent = c.nom + ' n’a plus accès à JARVIS.'; }}, 'Retirer')));
-      if (st.fixe) items.push(h('li', {class: 'mem-it'}, h('span', {text: 'Jeton fixe : ' + st.fixe.nom}), h('button', {type: 'button', class: 'btn ghost sm', onclick: async () => { if (maj(await JS.mcp.retirer('fixe'))) out.textContent = 'Jeton fixe retiré.'; }}, 'Retirer')));
+        h('button', {type: 'button', class: 'btn ghost sm', onclick: async () => { if (maj(await JS.mcp.retirer(c.id))) dire(c.nom + ' n’a plus accès à JARVIS.'); }}, 'Retirer')));
+      /* les jetons fixes : chacun son nom, son profil, « Suspendre » ou « Reprendre », « Retirer » (confirmé : le jeton ne se retrouve pas) */
+      (neuf ? st.fixes : st.fixe ? [{id: 'fixe', nom: st.fixe.nom, profil: 'lecture'}] : []).forEach((f) => items.push(h('li', {class: 'mem-it mcp-jeton' + (f.suspendu ? ' is-off' : ''), 'data-jeton': f.id},
+        h('span', {}, h('b', {text: f.nom}), h('small', {class: 'muted', text: ' · ' + (MCP_PROFILS[f.profil] || MCP_PROFILS.lecture) + (f.suspendu ? ' · suspendu : ses appels sont refusés' : f.vu ? ' · dernier accès ' + fmt(new Date(f.vu), {weekday: 'short', hour: '2-digit', minute: '2-digit'}) : '')})),
+        h('span', {class: 'rout-act'},
+          neuf && JS.mcp.suspendre ? h('button', {type: 'button', class: 'btn ghost sm', onclick: async () => { const etait = !!f.suspendu; if (maj(await JS.mcp.suspendre(f.id, !etait))) dire(etait ? f.nom + ' a de nouveau accès à JARVIS.' : f.nom + ' est suspendu : JARVIS refuse ses appels jusqu’à « Reprendre ».'); else dire('Le serveur ne répond pas : rien n’est changé.', true); }}, f.suspendu ? 'Reprendre' : 'Suspendre') : null,
+          h('button', {type: 'button', class: 'btn ghost sm danger', onclick: () => confirmSheet({bot: 'claude', title: 'Retirer le jeton de ' + f.nom + ' ?', ok: 'Oui, retirer', cost: 'free', say: 'Son jeton ne marchera plus. Pour le relier de nouveau, il faudra créer un jeton et le lui redonner. Pour une pause, « Suspendre » suffit.', run: async () => { if (maj(await JS.mcp.retirer(f.id))) dire('Jeton de ' + f.nom + ' retiré.'); else dire('Le serveur ne répond pas : rien n’est retiré.', true); }})}, 'Retirer')))));
       rel.replaceChildren(...(items.length ? items : [h('li', {class: 'muted', text: 'Aucun assistant relié pour l’instant.'})]));
       const vus = (st.journal || []).filter((x) => x.genre === 'outil').slice(0, 3);
       jr.textContent = vus.length ? 'Derniers accès : ' + vus.map((x) => x.nom + ', ' + x.outil.replace(/^jarvis_/, '').replace(/_/g, ' ') + ' (' + fmt(new Date(x.at), {hour: '2-digit', minute: '2-digit'}) + ')').join(' · ') : '';
+      /* ce que les exécutants ont écrit (Pilotage, brouillons, notifications), le plus récent d'abord */
+      const actes = (st.actes || []).slice(0, 8), exe = (st.fixes || []).some((f) => f.profil === 'executant');
+      gestes.replaceChildren(...(actes.length || exe ? [h('small', {class: 'pick-label', text: 'Derniers gestes des exécutants'}),
+        actes.length ? h('ul', {class: 'mem-list'}, actes.map((x) => h('li', {class: 'mem-it mcp-acte'}, h('span', {}, h('small', {class: 'muted', text: fmt(new Date(x.at), {day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'}) + ' · ' + x.nom + ' · ' + (MCP_GESTES[x.outil] || String(x.outil || '').replace(/_/g, ' '))}), h('span', {class: 'mcp-acte-tx', text: x.resume})))))
+          : h('p', {class: 'muted', text: 'Aucun pour l’instant : chaque ligne écrite dans Pilotage, chaque brouillon et chaque notification apparaîtra ici.'})] : []));
+    };
+    /* créer un jeton fixe : un nom, un profil ; le jeton est montré une seule fois */
+    const idn = 'mcp-' + (++SEQ), idp = 'mcp-' + (++SEQ), nomJ = h('input', {class: 'inp', id: idn, type: 'text', maxlength: '40', placeholder: 'ex. Hermes', autocomplete: 'off'});
+    const profJ = h('select', {class: 'inp', id: idp}, h('option', {value: 'lecture', text: 'Lecture et propositions'}), h('option', {value: 'executant', text: 'Exécutant'})), profDit = h('p', {class: 'muted mcp-profil-dit', text: MCP_PROFILS.lecture + '.'});
+    profJ.addEventListener('change', () => { profDit.textContent = profJ.value === 'executant' ? MCP_PROFILS.executant + '. Il n’envoie aucun mail, ne supprime rien, ne paie rien ; il signe de son nom ce qu’il écrit.' : MCP_PROFILS.lecture + '.'; });
+    const creer = async (ev) => {
+      if (ev) ev.preventDefault(); const n = nomJ.value.trim(), pr = neuf ? profJ.value : 'lecture';
+      if (pr === 'executant' && !n) { dire('Donne-lui un nom : il signe de ce nom ses lignes dans Pilotage.', true); nomJ.focus(); return; }
+      const r = await JS.mcp.jeton(n || 'Jeton fixe', pr);
+      if (!r) { dire('Le serveur ne répond pas : aucun jeton créé.', true); return; }
+      if (r.error || !r.jeton) { dire(r.error || 'Aucun jeton créé.', true); return; }
+      const jeton = r.jeton; delete r.jeton; delete r.id; maj(r); nomJ.value = ''; out.classList.remove('is-bad');
+      out.replaceChildren(document.createTextNode('Jeton de ' + (n || 'Jeton fixe') + ', montré une seule fois (en-tête « Authorization: Bearer … ») : '), h('code', {class: 'mcp-jeton-neuf', text: jeton}), copier(jeton));
     };
     card.append(h('p', {class: 'muted', text: 'L’app Claude (et Grok Bot) peut lire JARVIS (ta journée, tes missions, ce qu’il retient, la météo) et te proposer une mission ou un ordre à un bot : la proposition attend ton accord dans Suivi. Rien ne part sans toi.'}),
       h('div', {class: 'set-uri'}, h('small', {text: 'Adresse à donner (app Claude : Réglages, Connecteurs, « Ajouter un connecteur personnalisé ») :'}), h('code', {text: st.adresse}), copier(st.adresse)),
       dem, rel, jr,
-      h('details', {class: 'mcp-fixe'}, h('summary', {text: 'Jeton fixe, pour un client qui accepte un en-tête'}),
-        h('div', {class: 'row-actions'}, h('button', {type: 'button', class: 'btn sm', onclick: async () => { const r = maj(await JS.mcp.jeton('Jeton fixe')); if (r && r.jeton) out.replaceChildren(document.createTextNode('Jeton, montré une seule fois (en-tête « Authorization: Bearer … ») : '), h('code', {text: r.jeton}), copier(r.jeton)); }}, 'Créer un jeton fixe'))),
-      out);
+      h('details', {class: 'mcp-fixe'}, h('summary', {text: 'Jeton fixe, pour un assistant qui accepte un en-tête (Hermes, Grok Bot)'}),
+        h('form', {class: 'pick-form mcp-form', onsubmit: creer},
+          h('label', {for: idn, class: 'pick-label', text: 'Son nom'}), nomJ,
+          neuf ? [h('label', {for: idp, class: 'pick-label', text: 'Son profil'}), profJ, profDit] : null,
+          h('button', {type: 'submit', class: 'btn sm'}, 'Créer un jeton fixe')),
+        h('p', {class: 'muted', text: 'Le même nom remplace son jeton (l’ancien ne marche plus), sans toucher aux autres.'})),
+      out, gestes);
     paint();
     /* une demande d'accès arrive pendant que Réglages est ouvert : elle apparaît d'elle-même */
-    const tick = async () => { if (!document.body.contains(card)) return; const r = await JS.mcp.etat(); if (r && JSON.stringify(r.demandes || []) !== JSON.stringify(st.demandes || [])) { st = r; paint(); } setTimeout(tick, 3000); };
+    const vuDe = (x) => JSON.stringify([x.demandes || [], (x.fixes || []).map((f) => [f.id, !!f.suspendu]), ((x.actes || [])[0] || {}).at || 0]);   /* 0.71.0 : un geste d'exécutant aussi */
+    const tick = async () => { if (!document.body.contains(card)) return; const r = await JS.mcp.etat(); if (r && vuDe(r) !== vuDe(st)) { st = r; paint(); } setTimeout(tick, 3000); };
     setTimeout(tick, 3000);
     return card;
   }

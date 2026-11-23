@@ -26,6 +26,8 @@ Environment="PATH=@PATH@"
 Environment="HERMES_HOME=/home/hermes/.hermes" "HERMES_SUPERVISED_CHILD=1" "HERMES_MANAGED_DIR=/etc/hermes"
 Environment="CLAUDE_SUBSCRIPTION_DIRECTSDK_COMMAND=/home/hermes/.local/lib/claude-code/node_modules/.bin/claude"
 Environment="DISABLE_AUTOUPDATER=1"
+# Liaison à JARVIS (relier-jarvis.sh) : adresse et jeton du serveur MCP, lus par systemd en root (fichier 0600)
+EnvironmentFile=-/etc/hermes/jarvis.env
 UnsetEnvironment=ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN ANTHROPIC_BASE_URL ANTHROPIC_TOKEN CLAUDE_CODE_OAUTH_TOKEN OPENROUTER_API_KEY OPENAI_API_KEY
 Restart=always
 RestartSec=5
@@ -42,9 +44,10 @@ StandardError=journal
 # Mesuré au banc (23/11/2026) : 325 à 360 Mo au repos, plus environ 250 Mo par Claude Code lancé pour une
 # réponse (un seul à la fois, politique.yaml). Serveur mesuré le même jour : 1,86 Go disponibles sur 3,8 Go,
 # JARVIS près de son pic. Au-delà de MemoryHigh, Hermes est ralenti et poussé vers l'échange (2 Go) avant JARVIS.
-# Hermes règle son propre cache sur MemoryMax.
-MemoryHigh=650M
-MemoryMax=800M
+# Hermes règle son propre cache sur MemoryMax. Avec la liaison à JARVIS et une routine en cours (étapes 3 et 4,
+# banc du 23/11/2026 au soir) : 360 Mo au repos, 500 Mo au plus pendant une routine, plus le Claude Code (250 Mo).
+MemoryHigh=850M
+MemoryMax=1000M
 OOMScoreAdjust=600
 CPUWeight=20
 IOWeight=20

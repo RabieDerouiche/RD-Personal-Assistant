@@ -18,7 +18,7 @@ nouveau n'était noté dans Pilotage ; c'est sa décision de faire l'essai quand
 | Modèle | Son abonnement Claude, par le plugin (« déjà accepté ») ; par défaut **Claude Opus 5.5** (second QCM : le plus capable, pour juger honnêtement ; il use le forfait environ deux fois plus vite que Sonnet) ; `/model` dans le chat pour changer |
 | Bot Telegram | **Un nouveau bot** (le jeton de l'ancien bot d'octobre est resté sur l'ancien serveur ; à supprimer chez @BotFather) |
 | Connexion Claude (QCM après le rappel de la zone grise : plugin officiel d'Hermes mais pas approuvé par Anthropic, qui préfère une clé d'API) | **Garder le plugin** ; la clé d'API des crédits inclus dans Max reste le plan B |
-| Pouvoirs | Aucun pour le moment ; à ouvrir progressivement après l'étude de faisabilité et du déroulé idéal |
+| Pouvoirs | Aucun au départ. **Depuis sa demande du 23/11/2026 au soir** (« droits équivalents à Grok Bot », routines pour alléger Grok Bot, relier à JARVIS) : Pilotage, Gmail et l'agenda **par les outils du serveur MCP de JARVIS** (profil « exécutant »), des routines posées depuis le dépôt, des skills ; toujours ni web, ni terminal, ni fichiers, ni jeton Google. Tout le déroulé : `docs/hermes-deroule.md` |
 | Garde du forfait | Seuil de **85 %** (QCM) ; **sur la semaine seulement** (sa demande du 23/11/2026, une fois Telegram en place : il remplit lui-même la fenêtre de 5 heures en testant JARVIS OS) |
 
 ## L'abonnement Claude dans Hermes : ce qui est permis (vérifié le 23/11/2026)
@@ -74,9 +74,17 @@ discussion répondent 401 (vérifié au banc). `setup.sh` de JARVIS ne touche pa
    9,6). Aucun code d'Hermes ne tourne en root : son unité est écrite par `install.sh` (mêmes lignes que
    `hermes gateway install --system`, relevées au banc).
 2. **Politique figée par root** (« portée gérée » d'Hermes) : Hermes ne peut la changer ni par
-   `hermes config`, ni par le chat. Étape 1 : sur Telegram, 4 outils seulement (`memory`, `session_search`,
-   `todo`, `clarify`) ; pas de terminal, fichiers, web, navigateur, code, vision, skills, sous-agents, tâches
-   planifiées, connexions ni MCP ; 12 appels d'outils au plus par message ; approbations manuelles.
+   `hermes config`, ni par le chat. Sur Telegram, 5 outils (`memory`, `session_search`, `todo`, `clarify`,
+   `skills`) et, une fois relié, ceux de JARVIS (liste fermée dans `politique-jarvis.yaml`) ; les routines ont
+   les mêmes sans `clarify`. Pas de terminal, fichiers, web, navigateur, code, vision, sous-agents ni
+   connexions ; Hermes ne peut pas créer de routine lui-même (outil `cronjob` coupé : elles viennent de
+   `routines.conf`) ; 30 appels d'outils au plus par message ou par routine ; approbations manuelles, refus
+   d'office dans une routine. Une skill qu'il propose attend « /skills approve ».
+   - `agent.disabled_toolsets` vaut aussi pour les routines ; `skills.external_dirs` et `skills.disabled` ne
+     sont lus par la 0.23.3 que dans `~/.hermes/config.yaml` (posés par `install.sh`), pas dans la politique.
+   - **Liaison à JARVIS** : adresse et jeton dans `/etc/hermes/jarvis.env` (root, 0600), lus par systemd et
+     passés au service ; jamais dans le dépôt ni dans la politique. JARVIS borne ce que le jeton permet
+     (profil, plafonds par jour, journal des écritures) et le suspend d'un bouton.
 3. **Commandes du chat** : personne n'est administrateur ; il garde `/new`, `/stop`, `/model`, `/usage`,
    `/status`, `/retry`, `/undo`… et n'a ni `/update`, ni `/yolo`, ni `/tools`, ni `/restart`, ni `/approvals`.
 4. **Telegram** : seul son identifiant (imposé par root) est servi ; un inconnu ne reçoit rien, pas même un
@@ -94,8 +102,9 @@ discussion répondent 401 (vérifié au banc). `setup.sh` de JARVIS ne touche pa
    version précise) ; pas de vérification automatique ; `/update` interdit dans le chat. Changer de version :
    relire les notes de version, modifier `install.sh`, passer le banc, fusionner, relancer `install.sh`.
 
-Mémoire et processeur : `MemoryHigh=650M`, `MemoryMax=800M`, `OOMScoreAdjust=600` (Hermes est tué avant
-JARVIS), `CPUWeight=20`.
+Mémoire et processeur : `MemoryHigh=850M`, `MemoryMax=1000M` depuis les routines (banc du 23/11/2026 au
+soir : 360 Mo au repos, 500 Mo au plus pendant une routine, plus 250 Mo pour son Claude Code ; 650 et 800
+avant), `OOMScoreAdjust=600` (Hermes est tué avant JARVIS), `CPUWeight=20`.
 
 ## Mesures du banc (conteneur de session, 23/11/2026)
 
@@ -191,9 +200,9 @@ côté d'ufw, Claude Code sous le filtre d'appels système. `diagnostic.sh` cont
 | 1. Installer | Lui, session « Serveur JARVIS » | `sudo bash /opt/rd/jarvis-os/hermes/install.sh` (Hermes ne démarre pas encore) |
 | 1b. Relier Claude | Lui, Termius (saisie) | `sudo bash /opt/rd/jarvis-os/hermes/connexion-claude.sh` |
 | 2. Telegram | Ensemble : lui dans Telegram (@BotFather, @userinfobot) et dans Termius | `sudo bash /opt/rd/jarvis-os/hermes/telegram.sh` |
-| 3. Relier à JARVIS | Plus tard | Serveur MCP de JARVIS (7 outils : lecture et propositions qui attendent son accord), par l'adresse publique en HTTPS ; un jeton fixe à son nom, sans écraser celui d'un autre client (aujourd'hui JARVIS n'en garde qu'un : à rendre multiple avant) ; ajouter `mcp-jarvis` à `platform_toolsets.telegram` dans la politique |
-| 4. Routines | Plus tard | Tâches planifiées d'Hermes (`cronjob`), comparées à Grok Bot sur une routine sans portail ; il faudra alors le « linger » de l'utilisateur `hermes` (`systemd-run --user`) |
-| 5. Déroulé idéal | Claude, sur sa demande | Propositions de répartition Hermes, JARVIS, Grok Bot |
+| 3. Relier à JARVIS | Lui : JARVIS 0.71.0 puis, dans Réglages, « Assistants reliés (MCP) », un jeton fixe « Hermes », profil « Exécutant » ; dans Termius (saisie) | `sudo bash /opt/rd/jarvis-os/hermes/relier-jarvis.sh` : vérifie le jeton depuis l'utilisateur `hermes`, par l'adresse publique en HTTPS, pose `/etc/hermes/jarvis.env` et relance `install.sh` |
+| 4. Routines | Session « Serveur JARVIS » (sans saisie) | `sudo bash /opt/rd/jarvis-os/hermes/routines.sh` : pose les routines de `routines.conf` (elles tournent dans le service d'Hermes, sans « linger » : vérifié au banc) ; `--liste` pour les voir |
+| 5. Déroulé | Fait le 23/11/2026 | `docs/hermes-deroule.md` : qui fait quoi, droits, routines en double, bascule, skills |
 
 Tous les jours : `sudo systemctl status hermes-gateway`, `sudo journalctl -u hermes-gateway -n 50`,
 `sudo bash /opt/rd/jarvis-os/hermes/diagnostic.sh`. Arrêter : `sudo systemctl stop hermes-gateway`. Tout
@@ -239,3 +248,11 @@ retirer : `sudo bash /opt/rd/jarvis-os/hermes/desinstaller.sh` (`--tout` efface 
   diagnostic « Confortable » (2,75 Go disponibles, aucune retenue de JARVIS, 1 identifiant, 4 outils, score 1,4).
   **Étape 2 faite.** Prochaine : étape 3 (relier à JARVIS), sur sa demande. Ensuite, le diagnostic et
   `install.sh` affichent le dernier message du garde avec son heure (et non la ligne de fin de systemd).
+- 23/11/2026 au soir, sa demande (« mets en place le workflow idéal », droits équivalents à Grok Bot, routines,
+  liaison à JARVIS, skills) : `docs/hermes-deroule.md`. Kit : politique des étapes 3 et 4 (`@MCP@`,
+  `politique-jarvis.yaml`), `relier-jarvis.sh`, `routines.conf` et `routines.sh`, skills `pilotage`,
+  `supervision`, `semaine-a-venir`, consigne refaite, diagnostic (liaison, skills, routines), plafond mémoire
+  850/1000 Mo. JARVIS 0.71.0 : jetons fixes nommés et profil « exécutant ». Banc d'Hermes : 72 sur 72 avec un
+  faux JARVIS (liaison par un faux terminal, jeton en en-tête, outil hors liste invisible, routine posée,
+  recréée, retirée et lancée, skill chargée, 500 Mo au plus). Non vérifiable au banc : le vrai JARVIS derrière
+  Caddy depuis l'utilisateur `hermes`, le vrai Claude dans une routine, « /skills approve » dans Telegram.

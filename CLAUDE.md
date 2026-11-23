@@ -32,7 +32,7 @@ Si un ID ne répond plus, retrouve le fichier avec `search_files` par titre.
 
 ## Grok Bot en bref
 
-**L'ancien Hermes** (OpenRouter et Telegram, 28/10 au 03/11/2026) est arrêté et remplacé par Grok Bot : ne lis plus `État Hermes`, n'écris plus dans `Notes de Claude/`. **Hermes Agent revient en essai sur le serveur de JARVIS** (sa demande du 23/11/2026 : tester des routines, peut-être alléger ou remplacer Grok Bot, puis le relier à JARVIS) : lis `docs/hermes.md` avant d'y toucher (kit `jarvis-os/hermes/`, étape en cours, garde-fous, abonnement Claude par le plugin officiel, jamais l'OAuth intégré d'Hermes). Grok Bot ne change pas pendant l'essai.
+**L'ancien Hermes** (OpenRouter et Telegram, 28/10 au 03/11/2026) est arrêté et remplacé par Grok Bot : ne lis plus `État Hermes`, n'écris plus dans `Notes de Claude/`. **Hermes Agent revient en essai sur le serveur de JARVIS** (sa demande du 23/11/2026 : tester des routines, peut-être alléger ou remplacer Grok Bot, puis le relier à JARVIS) : lis `docs/hermes.md` avant d'y toucher (kit `jarvis-os/hermes/`, étape en cours, garde-fous, abonnement Claude par le plugin officiel, jamais l'OAuth intégré d'Hermes) et `docs/hermes-deroule.md` (sa demande du 23/11/2026 au soir : qui fait quoi entre JARVIS, Hermes, Grok Bot et Claude ; droits d'Hermes, toujours par les outils du serveur MCP de JARVIS ; routines « en double » puis bascule sur sa décision ; skills). Une routine de Grok Bot ne se retire qu'après comparaison et son oui.
 
 | Bot | Domaine |
 |---|---|
@@ -102,5 +102,6 @@ Si un ID ne répond plus, retrouve le fichier avec `search_files` par titre.
 | CV, lettre de motivation, candidature | `cv` |
 | Analyse ponctuelle du budget ou d'un relevé, sur demande explicite | `finances` |
 | Remplir ou modifier le profil | `profil` |
+| Routine ou skill d'Hermes, comparaison d'une routine « en double », bascule | `hermes` |
 
 Si le Profil contient encore des `[à compléter]` utiles à la tâche, pose au maximum 3 questions, puis propose de les enregistrer (skill `profil`).

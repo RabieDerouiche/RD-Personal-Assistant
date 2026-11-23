@@ -1,0 +1,33 @@
+
+# Ajouté par install.sh à /etc/hermes/config.yaml quand /etc/hermes/jarvis.env existe (relier-jarvis.sh).
+# L'adresse et le jeton ne sont jamais dans le dépôt : ils viennent de l'environnement du service
+# (EnvironmentFile=/etc/hermes/jarvis.env, root:hermes 0640). Une variable absente : la liaison échoue, fermée.
+mcp_servers:
+  jarvis:
+    url: "${JARVIS_MCP_URL}"
+    headers:
+      Authorization: "Bearer ${JARVIS_MCP_TOKEN}"
+    timeout: 90
+    connect_timeout: 20
+    trust: full              # c'est JARVIS qui borne les écritures (profil du jeton, plafonds, journal)
+    tools:
+      # Seuls ces outils existent pour Hermes, même si JARVIS en publiait d'autres un jour.
+      include:
+        - jarvis_maintenant
+        - jarvis_agenda
+        - jarvis_missions
+        - jarvis_memoire
+        - jarvis_meteo
+        - jarvis_proposer_mission
+        - jarvis_proposer_ordre
+        - pilotage_lire
+        - pilotage_ajouter
+        - pilotage_etat
+        - canal_repondre
+        - gmail_chercher
+        - gmail_lire
+        - gmail_brouillon
+        - agenda_lire
+        - jarvis_notifier
+      resources: false
+      prompts: false

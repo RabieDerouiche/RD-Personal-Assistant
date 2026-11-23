@@ -54,7 +54,16 @@ if id hermes >/dev/null 2>&1; then
   echo "  identifiants Telegram autorisés (imposés par root) : ${n:-0}"
   grep -q '^TELEGRAM_BOT_TOKEN=.' /home/hermes/.hermes/.env 2>/dev/null && echo "  jeton du bot : posé" || echo "  jeton du bot : absent (telegram.sh)"
   nft list table inet hermes_sortie >/dev/null 2>&1 && echo "  règles réseau hermes_sortie : chargées" || echo "  ATTENTION : règles réseau hermes_sortie absentes"
-  echo "  outils actifs sur Telegram : $(hx hermes tools list --platform telegram 2>/dev/null | grep -c '✓ enabled') (attendu : 4)"
+  echo "  outils actifs sur Telegram : $(hx hermes tools list --platform telegram 2>/dev/null | grep -c '✓ enabled') (attendu : 5), pour les routines : $(hx hermes tools list --platform cron 2>/dev/null | grep -c '✓ enabled') (attendu : 4)"
+  if [ -s /etc/hermes/jarvis.env ]; then
+    [ "$(stat -c '%U %a' /etc/hermes/jarvis.env)" = "root 600" ] && droits="root, 0600" || droits="ATTENTION : droits $(stat -c '%U %a' /etc/hermes/jarvis.env)"
+    grep -q '^mcp_servers:' /etc/hermes/config.yaml && pol="dans la politique" || pol="ATTENTION : absente de la politique (relancer install.sh)"
+    echo "  liaison à JARVIS : posée ($droits ; $pol) ; dernière annonce : $(grep -o "MCP server 'jarvis'.*registered [0-9]* tool" /home/hermes/.hermes/logs/agent.log 2>/dev/null | tail -1 | grep -o '[0-9]* tool' || echo 'aucune depuis le dernier journal')"
+  else
+    echo "  liaison à JARVIS : pas encore (relier-jarvis.sh)"
+  fi
+  echo "  skills : $(find /etc/hermes/skills -name SKILL.md 2>/dev/null | wc -l) du dépôt (root) ; apprises par Hermes : $(find /home/hermes/.hermes/skills -name SKILL.md -newer /etc/hermes/config.yaml 2>/dev/null | wc -l) depuis la dernière installation ; en attente de « /skills approve » : $(find /home/hermes/.hermes/pending/skills -mindepth 1 -maxdepth 1 2>/dev/null | wc -l)"
+  echo "  routines (routines.sh --liste) :"; bash "$(dirname "${BASH_SOURCE[0]}")/routines.sh" --liste 2>/dev/null | sed 's/^/  /'
   echo "  exposition systemd : $(systemd-analyze security --no-pager hermes-gateway.service 2>/dev/null | sed -n 's/.*Overall exposure level for hermes-gateway.service: //p')"
   seuil=$(sed -n 's/^HERMES_SEUIL_FORFAIT=//p' /etc/hermes/garde.conf 2>/dev/null)
   [ "$(sed -n 's/^HERMES_GARDE_CINQ_HEURES=//p' /etc/hermes/garde.conf 2>/dev/null)" = 1 ] && fenetres="semaine et fenêtre de 5 heures" || fenetres="semaine seulement"
@@ -79,7 +88,7 @@ if [ "$(systemctl is-active hermes-gateway 2>/dev/null)" = active ]; then
   depuis_s=$(date -d "$depuis" +%s 2>/dev/null || echo 0)
   apres=$(journalctl -u jarvis --since "@$depuis_s" --no-pager -o cat 2>/dev/null | grep -c "mémoire basse" || true)
 else
-  encore=600; quoi="avec Hermes démarré et en train de répondre (environ 600 Mo)"; apres=0
+  encore=750; quoi="avec Hermes démarré, une routine en cours et son Claude Code (environ 750 Mo)"; apres=0
 fi
 marge=$((dispo - encore))
 echo "  Disponible maintenant : $dispo Mo ; échange utilisé : $echange Mo."
