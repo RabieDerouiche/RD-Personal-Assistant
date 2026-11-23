@@ -9405,16 +9405,22 @@ void main(){
       cb.addEventListener('change', async () => { const r = await JS.invites.reglages({rappels: cb.checked}); if (!r) { cb.checked = !cb.checked; say('Le serveur ne répond pas : rien n’est changé.', true); return; } say(r.rappels ? 'Rappels toutes les 5 minutes, jusqu’à « C’est fait ».' : 'Plus de rappel : seulement la notification à l’arrivée.'); });
       card.append(h('label', {class: 'invite-rap', for: 'iv-rap'}, cb, h('span', {text: 'Me rappeler ses tâches toutes les 5 minutes (6 fois au plus, la nuit aussi), jusqu’à « C’est fait ». Une tâche pour un autre jour n’est pas rappelée.'})));
       if (st.m4a === false) card.append(h('p', {class: 'muted', text: 'Ton serveur ne lit pas encore le son de l’iPhone tel quel (l’écoute n’est pas installée) : sa page lui fait ajouter « Encoder le média » (AIFF) à son raccourci vocal.'}));
-      const vurl = location.origin + '/api/raccourci/vocal';
-      card.append(h('details', {class: 'invite-det'}, h('summary', {text: 'Entendre sa voix quand JARVIS est fermé'}),
-        h('p', {class: 'muted', text: 'Son raccourci vocal t’envoie aussi un message « 🔔 ». Une automatisation de ton iPhone joue alors sa voix (iOS 17 ou plus ; noms des menus devinés) :'}),
+      /* 0.67.0 (sa demande : « Siri doit marcher téléphone verrouillé » ; « l'audio tel qu'il est, peu importe la langue ») : elle envoie un message
+         audio de Messages par Siri ; son automatisation le poste à JARVIS (tâche, rappels) et joue sa voix, telle quelle */
+      const nomI = (l[0] && l[0].nom) || '', murl = location.origin + '/api/raccourci/message' + (l.length > 1 && nomI ? '?de=' + encodeURIComponent(nomI) : '');
+      const at = h('input', {type: 'checkbox', id: 'iv-at'}); at.checked = st.audioTache !== false;
+      at.addEventListener('change', async () => { const r = await JS.invites.reglages({audioTache: at.checked}); if (!r) { at.checked = !at.checked; say('Le serveur ne répond pas : rien n’est changé.', true); return; } say(r.audioTache ? 'Ses messages audio deviennent des tâches, avec leurs rappels.' : 'Ses messages audio sont seulement joués.'); });
+      card.append(h('details', {class: 'invite-det', open: ''}, h('summary', {text: 'Sa voix, téléphone verrouillé (Messages)'}),
+        h('p', {class: 'muted', text: 'Elle dit « Dis Siri, envoie un message audio à ' + ((() => { try { return localStorage.getItem('jarvis.invite.moi') || ''; } catch (e) { return ''; } })() || 'toi') + ' » : ça marche téléphone verrouillé, et tu reçois sa voix telle quelle, dans n’importe quelle langue. Pour qu’elle joue toute seule et compte dans JARVIS, une automatisation sur ton iPhone (iOS 17 ou plus ; noms des menus devinés) :'}),
         h('ol', {class: 'siri-steps'},
-          h('li', {text: 'App Raccourcis, onglet Automatisation, « + », « Message ». Expéditeur : elle ; « Le message contient » : 🔔 ; choisis « Exécuter immédiatement ».'}),
-          h('li', {}, 'Action « Obtenir le contenu de l’URL » : ', h('code', {text: vurl}), ' ; en-tête Authorization = Bearer suivi de la clé de ton raccourci « Jarvis » (carte Siri ci-dessus ; si tu ne l’as plus, recrée-la et mets-la aussi dans « Jarvis »).'),
-          h('li', {text: 'Action « Lire le son », avec « Contenu de l’URL ».'})),
-        h('div', {class: 'row-actions'}, h('button', {type: 'button', class: 'btn ghost sm', onclick: async () => { try { await navigator.clipboard.writeText(vurl); say('Adresse copiée.'); } catch (e) { say('Copie impossible : sélectionne l’adresse.', true); } }}, 'Copier l’adresse'))));
+          h('li', {text: 'App Raccourcis, onglet Automatisation, « + », « Message ». Expéditeur : ' + (nomI || 'elle') + ' ; laisse « Le message contient » vide ; choisis « Exécuter immédiatement » et désactive « Me notifier ».'}),
+          h('li', {}, 'Action « Obtenir le contenu de l’URL » : ', h('code', {text: murl}), ' ; méthode POST ; en-tête Authorization = Bearer suivi de la clé de ton raccourci « Jarvis » (carte Siri ci-dessus) ; corps de la requête « Fichier » = « Entrée du raccourci ».'),
+          h('li', {text: 'Action « Lire le son », avec « Contenu de l’URL ». Un message audio : tu l’entends aussitôt, et JARVIS en fait une tâche. Ses messages écrits : ignorés par JARVIS (un silence, rien de gardé).'}),
+          h('li', {text: 'Si tu avais l’automatisation « 🔔 » de la 0.64, supprime-la : celle-ci la remplace.'})),
+        h('div', {class: 'row-actions'}, h('button', {type: 'button', class: 'btn ghost sm', onclick: async () => { try { await navigator.clipboard.writeText(murl); say('Adresse copiée.'); } catch (e) { say('Copie impossible : sélectionne l’adresse.', true); } }}, 'Copier l’adresse')),
+        h('label', {class: 'invite-rap', for: 'iv-at'}, at, h('span', {text: 'Ses messages audio deviennent des tâches, avec les rappels (sinon : seulement joués).'}))));
       card.append(h('details', {class: 'invite-det'}, h('summary', {text: 'Avec tes AirPods'}),
-        h('p', {class: 'muted', text: 'Réglages de l’iPhone, Notifications, « Annoncer les notifications » : active-le, puis Messages (Siri te lit son « 🔔 », l’automatisation joue sa voix). Si JARVIS est dans la liste, active-le aussi pour les rappels.'})));
+        h('p', {class: 'muted', text: 'Réglages de l’iPhone, Notifications, « Annoncer les notifications » : active-le, puis Messages. L’automatisation ci-dessus joue sa voix dans tes AirPods. Si JARVIS est dans la liste, active-le aussi pour les rappels.'})));
     }
     if (l.length) card.append(h('ul', {class: 'mem-list'}, l.map((x) => h('li', {class: 'mem-it'},
       h('span', {}, h('b', {text: x.nom}), h('small', {class: 'muted', text: ' · depuis le ' + fmt(new Date(x.at), {day: 'numeric', month: 'long'}) + ' · ' + x.taches + ' tâche' + (x.taches > 1 ? 's' : '') + (x.last ? ', dernière le ' + fmt(new Date(x.last), {day: 'numeric', month: 'short'}) : '')})),
@@ -9505,9 +9511,8 @@ void main(){
     const ecoute = h('button', {type: 'button', class: 'btn main2 rec-play', onclick: async () => { ecoute.disabled = true; const ok = await recJouer(x); ecoute.disabled = false; if (ok) JS.agir(x.id, 'ecoute'); else toast(x.vocal ? 'Message vocal' : 'Lecture', x.vocal ? 'Le son ne part pas : monte le volume, puis réessaie.' : 'La voix ne part pas : réessaie.', true); }},
       x.vocal ? '▶ Écouter sa voix' + (x.duree ? ' (' + Math.max(1, Math.round(x.duree)) + ' s)' : '') : '🔊 Me la lire');
     const plusTard = (m) => act('Dans ' + m + ' min', {cost: 'free', go: () => { JS.agir(x.id, 'plustard', m).then((r) => { if (r && r.prochain) { x.rappel = {prochain: r.prochain, restants: 6}; x.fait = false; recPeindre(); toast('Rappel', 'Je te la rappelle à ' + recHeure(r.prochain) + '.'); } else toast('Rappel', 'Le serveur ne répond pas : rien n’est changé.', true); }); return null; }});
-    const compris = !/^Message vocal de /.test(x.texte);
     openSheet({kicker: (x.vocal ? 'Message vocal de ' : 'Tâche de ') + (x.nom || 'ton invitée') + ' · ' + recQuand(x.at), title: x.texte,
-      say: x.vocal ? (compris ? 'Ce que j’ai compris de sa voix : écoute-la pour être sûr.' : 'Je n’ai pas compris les mots : écoute-la.') : 'Elle te l’a envoyée' + (x.pour ? ' pour le ' + fmt(new Date(x.pour + 'T12:00:00'), {weekday: 'long', day: 'numeric', month: 'long'}) : '') + '.',
+      say: x.vocal ? (x.source === 'messages' ? 'Sa voix, telle qu’elle te l’a envoyée par Messages.' : 'Sa voix, telle qu’elle l’a enregistrée.') : 'Elle te l’a envoyée' + (x.pour ? ' pour le ' + fmt(new Date(x.pour + 'T12:00:00'), {weekday: 'long', day: 'numeric', month: 'long'}) : '') + '.',
       extraTop: () => h('div', {class: 'rec-top'}, h('div', {class: 'row-actions'}, ecoute), etat),
       actions: x.fait ? [] : [act('C’est fait', {tone: 'main', cost: 'free', go: () => { JS.agir(x.id, 'fait').then((r) => { if (r && r.ok) { x.fait = true; x.rappel = null; recPeindre(); toast('C’est fait', r.pilotage ? 'Plus de rappel ; elle voit « Faite ✓ ».' : 'Plus de rappel. Pilotage n’a pas été mis à jour : coche-la aussi dans tes tâches.', !r.pilotage); } else toast('C’est fait', 'Le serveur ne répond pas : réessaie.', true); }); return null; }}), plusTard(5), plusTard(15)]});
     if (jouer) setTimeout(async () => { const ok = await recJouer(x); if (ok) JS.agir(x.id, 'ecoute'); }, 400);
@@ -9535,8 +9540,9 @@ void main(){
     neuves.forEach((x) => recVu(x.id));
     const x = neuves[0], sh = $('sheet');
     /* il est déjà dans une fiche ou dans la discussion : sa voix joue, un bandeau (à toucher) remplace la fiche, qui ne lui prend pas la main */
-    if ((sh && !sh.hidden) || CHAT.open) { alertShow((x.vocal ? 'Message vocal de ' : 'Tâche de ') + (x.nom || 'ton invitée'), x.texte, () => recOuvrir(x, false)); recJouer(x).then((ok) => { if (ok) recAPI().agir(x.id, 'ecoute'); }).catch(() => {}); }
-    else recOuvrir(x, true);
+    /* 0.67.0 : un message vocal déjà joué par son iPhone (automatisation « Lire le son ») n'est pas rejoué : la fiche s'ouvre, sans son */
+    if ((sh && !sh.hidden) || CHAT.open) { alertShow((x.vocal ? 'Message vocal de ' : 'Tâche de ') + (x.nom || 'ton invitée'), x.vocal ? 'Touche pour l’écouter.' : x.texte, () => recOuvrir(x, false)); if (!x.ecoute) recJouer(x).then((ok) => { if (ok) recAPI().agir(x.id, 'ecoute'); }).catch(() => {}); }
+    else recOuvrir(x, !x.ecoute);
     if (neuves.length > 1) toast('Envoyées par ' + (x.nom || 'ton invitée'), 'Et ' + (neuves.length - 1) + ' autre' + (neuves.length > 2 ? 's' : '') + ' : dans Mes tâches.', true);
   }
   async function recHash() {

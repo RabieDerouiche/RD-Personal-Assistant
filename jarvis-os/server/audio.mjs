@@ -101,3 +101,19 @@ export function createAudio({py = '', helper = '', ffmpeg = 'ffmpeg', tmp}) {
   }
   return {versWav16k, m4a};
 }
+/* 0.67.0 (sa demande du 23/11/2026 : « on ne traduit pas le message, on le transmet en audio tel qu'il est, peu importe la langue ») : le genre
+   d'un fichier son, reconnu à ses premiers octets, pour le garder et le rendre tel quel (l'iPhone lit tous ces formats) ; null : pas du son */
+export function typeSon(b) {
+  if (!Buffer.isBuffer(b) || b.length < 16) return null;
+  const a = (i, n) => b.toString('latin1', i, i + n);
+  if (a(0, 4) === 'RIFF' && a(8, 4) === 'WAVE') return {ext: 'wav', mime: 'audio/wav'};
+  if (a(0, 4) === 'FORM' && (a(8, 4) === 'AIFF' || a(8, 4) === 'AIFC')) return {ext: 'aiff', mime: 'audio/aiff'};
+  if (a(4, 4) === 'ftyp') return {ext: 'm4a', mime: 'audio/mp4'};
+  if (a(0, 4) === 'caff') return {ext: 'caf', mime: 'audio/x-caf'};
+  if (a(0, 4) === 'OggS') return {ext: 'ogg', mime: 'audio/ogg'};
+  if (a(0, 5) === '#!AMR') return {ext: 'amr', mime: 'audio/amr'};
+  if (a(0, 3) === 'ID3' || (b[0] === 0xff && (b[1] & 0xe0) === 0xe0)) return {ext: 'mp3', mime: 'audio/mpeg'};
+  return null;
+}
+/* un silence de 0,2 s : la réponse quand il n'y a rien à faire entendre (son automatisation « Lire le son » ne fait alors aucune erreur) */
+export function silence() { const n = 3200, w = Buffer.alloc(44 + n * 2); w.write('RIFF', 0); w.writeUInt32LE(36 + n * 2, 4); w.write('WAVEfmt ', 8); w.writeUInt32LE(16, 16); w.writeUInt16LE(1, 20); w.writeUInt16LE(1, 22); w.writeUInt32LE(16000, 24); w.writeUInt32LE(32000, 28); w.writeUInt16LE(2, 32); w.writeUInt16LE(16, 34); w.write('data', 36); w.writeUInt32LE(n * 2, 40); return w; }
