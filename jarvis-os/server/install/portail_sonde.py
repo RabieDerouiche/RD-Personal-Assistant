@@ -1,6 +1,7 @@
 """JARVIS OS — sonde d'un espace client (scénario des couches, docs/hermes-deroule.md).
 
-Se connecte à l'espace client du marchand avec les identifiants du propriétaire (fichier 0600, jamais affichés),
+Se connecte à l'espace client du marchand avec les identifiants du propriétaire (coffre chiffré de systemd, ouvert
+en mémoire pour ce seul programme par portail-couches.sh ; jamais affichés, jamais écrits),
 ouvre les pages de l'abonnement et n'en écrit que le SQUELETTE : formulaires, champs, boutons, liens, adresses
 appelées par les scripts de la page. Sert à écrire ensuite le geste « changer la date de la prochaine livraison »
 sans navigateur. Ne modifie rien chez le marchand : des lectures seulement (GET), après la connexion.
@@ -8,7 +9,8 @@ sans navigateur. Ne modifie rien chez le marchand : des lectures seulement (GET)
 Rien de personnel ne sort : valeurs des champs masquées (sauf dates et petits nombres), adresses mail, téléphones,
 longs numéros et jetons masqués ; ni cookie, ni mot de passe, ni jeton anti-rejeu dans la sortie.
 
-  python3 -I portail_sonde.py --secrets <fichier.env> --sortie <fichier.txt> [--base https://…] [--pages a,b]
+  python3 -I portail_sonde.py --secrets-env SECRET --sortie <fichier.txt> [--base https://…] [--pages a,b]
+  (banc : --secrets <fichier> à la place)
 """
 import argparse
 import html.parser
@@ -124,12 +126,18 @@ def adresses_des_scripts(texte):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--secrets", required=True)
+    ap.add_argument("--secrets", help="fichier des identifiants (banc)")
+    ap.add_argument("--secrets-env", help="nom de la variable qui donne le chemin du secret ouvert par systemd (ou /dev/stdin)")
     ap.add_argument("--sortie", required=True)
     ap.add_argument("--base", default=BASE)
     ap.add_argument("--pages", default=",".join(PAGES))
     o = ap.parse_args()
-    secrets = dict(l.strip().split("=", 1) for l in open(o.secrets, encoding="utf-8") if "=" in l and not l.startswith("#"))
+    import os
+    source = os.environ.get(o.secrets_env, "") if o.secrets_env else o.secrets
+    if not source:
+        print("Aucun secret donné."); return 2
+    lignes = sys.stdin.read().splitlines() if source == "-" else open(source, encoding="utf-8").read().splitlines()   # « - » : sur l'entrée (banc)
+    secrets = dict(l.strip().split("=", 1) for l in lignes if "=" in l and not l.startswith("#"))
     mail, passe = secrets.get("LPC_EMAIL", ""), secrets.get("LPC_MOT_DE_PASSE", "")
     if not mail or not passe:
         print("Identifiants absents du fichier."); return 2
