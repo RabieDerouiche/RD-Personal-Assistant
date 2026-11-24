@@ -9964,12 +9964,12 @@ void main(){
       return true;
     }
     if (s === '#voir-relances') { vers('#suivi'); go('suivi'); cibler(() => document.getElementById('relances')); return true; }
-    if (s === '#voir-sante') { vers('#reglages'); go('reglages'); regOnglet('general'); cibler(() => panneauNomme(/^État des systèmes/)); return true; }
+    if (s === '#voir-sante') { vers('#reglages'); go('reglages'); if (!regVoit('general')) regOnglet('general'); cibler(() => panneauNomme(/^État des systèmes/)); return true; }
     if (s === '#voir-brief') { vers(''); go('accueil'); cibler(() => { const b = document.getElementById('brief-card'); return b && !b.hidden ? b : null; }); return true; }
     if (s === '#voir-echeances') { vers('#agenda'); go('agenda'); cibler(() => panneauNomme(/^Dates clés/)); return true; }   /* les rappels du jour : échéances et papiers, dans « Dates clés » */
     if ((m = s.match(/^#voir-reglages-(\w+)$/))) {   /* Réglages : la carte concernée (mémoire, voix, assistants reliés, notifications) */
       const id = {memoire: 'mem-card', voix: 'voixg-card', mcp: 'mcp-card', notifs: 'notif-card'}[m[1]]; vers('#reglages'); go('reglages');
-      if (id) cibler(() => document.getElementById(id), (e) => { if (e.dataset.onglet) regOnglet(e.dataset.onglet); });   /* 0.78.0 : son onglet d'abord */
+      if (id) cibler(() => document.getElementById(id), (e) => { if (e.dataset.onglet && !regVoit(e.dataset.onglet)) regOnglet(e.dataset.onglet); });   /* 0.78.0 : son onglet d'abord, sauf si elle se voit déjà (onglet « Tout ») */
       return true;
     }
     return VOIRURL_NOTIF(hash);

@@ -115,7 +115,9 @@ try {
     await onglet('Tout').tap(); const v3 = await vus();
     ok('onglet « Tout » : la page entière, comme avant', v3.length >= 10 && v3.includes('Coffre') && v3.includes('Notifications') && v3.includes('État des systèmes'), String(v3.length));
     await p.goto(BASE + '/?serveur#voir-reglages-mcp'); await p.waitForSelector('#mcp-card', {timeout: 20000}); await p.waitForTimeout(1500);
-    ok('un lien direct vers une carte (assistants reliés) ouvre son onglet, « Connexions »', await choisi() === 'Connexions' && await p.locator('#mcp-card').isVisible() && await carte.isHidden(), await choisi());
+    ok('depuis « Tout », un lien direct vers une carte la montre sans changer d\'onglet (elle se voit déjà)', await choisi() === 'Tout' && await p.locator('#mcp-card').isVisible(), await choisi());
+    await onglet('Général').tap(); await p.goto(BASE + '/?serveur#voir-reglages-mcp'); await p.waitForSelector('#mcp-card', {timeout: 20000}); await p.waitForTimeout(1500);
+    ok('depuis « Général », un lien direct vers une carte (assistants reliés) ouvre son onglet, « Connexions »', await choisi() === 'Connexions' && await p.locator('#mcp-card').isVisible() && await carte.isHidden(), await choisi());
     await onglet('Sécurité').tap(); await p.reload(); await p.waitForSelector('#coffre-card', {timeout: 20000});
     ok('l\'onglet choisi est retenu après un rechargement', await choisi() === 'Sécurité');
     if (process.env.COFFRE_APP_CAPTURE) { await carte.scrollIntoViewIfNeeded(); await p.screenshot({path: process.env.COFFRE_APP_CAPTURE}); }   /* pour relire la carte à l'œil */
