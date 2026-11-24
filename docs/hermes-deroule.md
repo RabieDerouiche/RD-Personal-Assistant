@@ -377,6 +377,13 @@ Fait dans le dépôt le 24/11/2026 (pas encore sur le serveur : le coffre n'y es
   le serveur ne fait que passer le paquet), « Verrouiller » ; absente tant que le coffre n'est pas installé. Routes
   `/api/coffre…` réservées à un appareil relié. Banc : `node jarvis-os/server/tests/coffre-app.test.mjs` (20).
   Non essayé : Safari, l'app de l'écran d'accueil, NordPass (son essai du point 4).
-- Reste à construire : le verrou de l'app par la passkey, le bouton d'arrêt d'urgence, la notification « coffre
-  verrouillé » après un redémarrage, puis l'accès Google dans le coffre.
-
+- **Verrou de l'app par passkey (0.75.0, son choix du 24/11/2026 au QCM)** : carte « Verrou de l'app » de Réglages ;
+  l'activation est l'essai (passkey créée puis prouvée dans l'app, sinon rien ne change) ; verrou actif, chaque
+  appareil relié prouve la passkey (Face ID) à chaque lancement de l'app et après 5 minutes sans usage ; l'ouverture
+  est gardée par le serveur, en mémoire. Secours sans passkey : `node server.mjs verrou --retirer`, service arrêté.
+  Hors du verrou : Raccourci Siri, invitations, assistants MCP. Banc : `node jarvis-os/server/tests/verrou.test.mjs`
+  (34). Non essayé : Safari, l'app de l'écran d'accueil, NordPass. La page d'essai `/maquettes/passkey/` ne sert plus
+  (son essai du 24/11 à midi, dans Chrome : toujours aucune clé « prf » ; le point 4 n'a pas été fait).
+- Reste à construire : le bouton d'arrêt d'urgence, la notification « coffre verrouillé » après un redémarrage,
+  l'accès Google dans le coffre ; et, pour les couches, la question à boutons (ne dépend pas de lui) puis le geste
+  (après sa sonde).

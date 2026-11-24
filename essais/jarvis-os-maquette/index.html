@@ -10137,6 +10137,52 @@ void main(){
     paint();
     return card;
   }
+  /* 0.75.0 (ses choix du 24/11/2026) : le verrou de l'app par passkey. L'activer est l'essai : la passkey est créée puis prouvée ici même
+     (Face ID) ; si la preuve échoue, rien n'est activé. Désactiver, ajouter ou retirer une passkey redemande Face ID. */
+  async function verrouCard(JS) {
+    let st = await JS.verrou.etat();
+    if (!st) return null;   /* un serveur d'avant la 0.75.0 */
+    const card = h('section', {class: 'card set-card verrou-card', id: 'verrou-card'}, h('b', {text: 'Verrou de l’app'}));
+    const etat = h('p', {class: 'verrou-etat'}), zone = h('div', {class: 'verrou-zone'}), out = h('p', {class: 'set-msg'});
+    const dire = (t, bad) => { out.classList.toggle('is-bad', !!bad); out.textContent = t; };
+    const prendre = (r) => { if (r && typeof r.actif === 'boolean') st = r; return r && !r.error; };
+    let occupe = false;
+    const geste = (fn) => async () => { if (occupe) return; occupe = true; try { await fn(); } finally { occupe = false; paint(); } };
+    const prouver = async () => { const r = await JS.verrou.prouver(); if (!prendre(r)) { dire((r && r.error) || 'Le serveur ne répond pas.', true); return false; } return true; };
+    const activer = geste(async () => {
+      dire('');
+      if (!st.cles.length) { const c = await JS.verrou.creer('Passkey de JARVIS'); if (!prendre(c)) { dire((c && c.error) || 'Le serveur ne répond pas.', true); return; } }
+      dire('Passkey prête. Prouve-la maintenant (Face ID) : c’est l’essai.');
+      if (!(await prouver())) return;
+      const a = await JS.verrou.activer(); if (!prendre(a)) { dire((a && a.error) || 'Le serveur ne répond pas.', true); return; }
+      dire('Verrou activé : JARVIS demandera ta passkey à chaque ouverture.');
+    });
+    const ajouter = geste(async () => { dire(''); if (!(await prouver())) return; const c = await JS.verrou.creer('Passkey de JARVIS ' + (st.cles.length + 1)); if (!prendre(c)) { dire((c && c.error) || 'Le serveur ne répond pas.', true); return; } if (await prouver()) dire('Passkey ajoutée et prouvée.'); else dire('Passkey créée mais pas prouvée : elle sera oubliée dans 10 minutes.', true); });
+    const eteindre = geste(async () => { dire(''); if (!(await prouver())) return; const r = await JS.verrou.desactiver(); if (prendre(r)) dire('Verrou désactivé : le jeton de l’appareil suffit de nouveau.'); else dire((r && r.error) || 'Le serveur ne répond pas.', true); });
+    const retirer = (k) => geste(async () => { dire(''); if (!(await prouver())) return; const r = await JS.verrou.retirer(k.id); if (prendre(r)) dire('Passkey retirée.'); else dire((r && r.error) || 'Le serveur ne répond pas.', true); });
+    const paint = () => {
+      card.dataset.etat = st.actif ? 'actif' : 'eteint';
+      const n = st.cles.length, pk = n + ' passkey' + (n > 1 ? 's' : '');
+      if (!JS.verrou.possible()) { etat.textContent = (st.actif ? 'Activé · ' + pk + '. ' : '') + 'Cet appareil ne sait pas présenter de passkey ici.'; zone.replaceChildren(); return; }
+      if (!st.actif) {
+        etat.textContent = 'Désactivé : le jeton gardé par l’app suffit pour ouvrir JARVIS.' + (n ? ' ' + pk + ' déjà enregistrée' + (n > 1 ? 's' : '') + '.' : '');
+        zone.replaceChildren(h('button', {type: 'button', class: 'btn main sm', onclick: activer}, n ? 'Activer (Face ID)' : 'Activer avec une passkey (Face ID)'),
+          h('p', {class: 'muted set-small', text: 'Ton gestionnaire de mots de passe garde la passkey ; Face ID la présente à chaque ouverture de l’app, et après ' + st.inactif + ' min sans usage. Tous les appareils reliés devront la présenter. Rien n’est activé si l’essai échoue. Hors du verrou : le Raccourci Siri, les invitations et les assistants reliés, qui ont leurs propres clés. Secours si la passkey est perdue : sur le serveur, « node server.mjs verrou --retirer ».'}));
+        return;
+      }
+      etat.textContent = 'Activé · ' + pk + '. Face ID à chaque ouverture de l’app, et après ' + st.inactif + ' min sans usage.';
+      zone.replaceChildren(
+        h('ul', {class: 'mem-list'}, st.cles.map((k) => h('li', {class: 'mem-it'}, h('span', {}, h('b', {text: k.nom}), h('small', {class: 'muted', text: ' · créée le ' + fmt(new Date(k.at), {day: 'numeric', month: 'short'})})),
+          n > 1 ? h('button', {type: 'button', class: 'btn ghost sm danger', onclick: retirer(k)}, 'Retirer') : null))),
+        h('div', {class: 'row-actions'},
+          h('button', {type: 'button', class: 'btn ghost sm', onclick: geste(async () => { await JS.verrou.verrouiller(); })}, 'Verrouiller maintenant'),
+          h('button', {type: 'button', class: 'btn ghost sm', onclick: ajouter}, 'Ajouter une passkey'),
+          h('button', {type: 'button', class: 'btn ghost sm danger', onclick: eteindre}, 'Désactiver')));
+    };
+    card.append(etat, zone, out);
+    paint();
+    return card;
+  }
   async function mcpCard(JS) {
     const card = h('section', {class: 'card set-card mcp-card', id: 'mcp-card'}, h('b', {text: 'Assistants reliés (MCP)'}));
     let st = await JS.mcp.etat();
@@ -10334,6 +10380,7 @@ void main(){
       if (JS.tour) parts.push(await tourCard(JS)); /* JARVIS OS 0.15.0 : tour de Claude */
       if (JS.sauvegarde) parts.push(await savCard(JS)); /* JARVIS OS 0.14.0 : sauvegarde de Pilotage */
       if (JS.mcp) { const mc = await mcpCard(JS); if (mc.dataset.urgent) parts.unshift(mc); else parts.push(mc); } /* JARVIS OS 0.39.0 : assistants reliés (en tête si une demande attend) */
+      if (JS.verrou) { const vc = await verrouCard(JS); if (vc) parts.push(vc); } /* JARVIS OS 0.75.0 : le verrou de l'app par passkey */
       if (JS.coffre) { const cc = await coffreCard(JS); if (cc) { if (cc.dataset.etat === 'verrouille' || cc.dataset.etat === 'bloque') parts.unshift(cc); else parts.push(cc); } } /* JARVIS OS 0.74.0 : le coffre (en tête s'il attend son ouverture) */
       if (JS.voixGoogle) parts.push(await voixCard(JS)); /* JARVIS OS 0.40.0 : la voix Google, plafonnée */
       if (JS.memoire) parts.push(await memoireCard(JS)); /* JARVIS OS 0.37.0 : la mémoire durable */

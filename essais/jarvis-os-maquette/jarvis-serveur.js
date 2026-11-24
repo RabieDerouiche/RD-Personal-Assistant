@@ -21,6 +21,7 @@
     try { r = await fetch(BASE + p, {method: method || (body ? 'POST' : 'GET'), headers: {'content-type': 'application/json', authorization: 'Bearer ' + token()}, body: body ? JSON.stringify(body) : undefined}); }
     catch (e) { throw new Error('Serveur JARVIS injoignable'); }
     let j = {}; try { j = await r.json(); } catch (e) { j = {}; }
+    if (r.status === 423 && j && j.verrou) montrerVerrou();   /* 0.75.0 : le serveur est verrouillé pour cet appareil */
     return {status: r.status, j};
   };
   const fail = (code, server, message) => { throw {code, server, message: message || code}; };
@@ -146,6 +147,81 @@
   /* pour l'écran Réglages de la page : appairage et accès Google */
   const INJ = 'Serveur JARVIS injoignable : vérifie le réseau, puis réessaie.', INDISPO = 'Serveur JARVIS indisponible pour l’instant (il redémarre peut-être) : réessaie dans un moment.';
   const repOk = (r) => (r.status >= 500 && !(r.j && r.j.error) ? {ok: false, error: INDISPO} : r.j);
+  /* 0.75.0 (ses choix du 24/11/2026 : « Face ID à chaque ouverture », « Tout dans NordPass ») : le verrou de l'app par passkey.
+     Le serveur garde l'ouverture, liée à cet appareil : rien de plus n'est confié à l'app. Ici : la preuve (WebAuthn, Face ID), l'écran
+     « JARVIS est verrouillé », et le verrouillage demandé à chaque lancement de l'app (pas à un simple rechargement : « jarvis.ouverture »
+     vit le temps de l'app, dans sessionStorage). « jarvis.verrou » (localStorage) retient seulement que le verrou est actif, pour poser
+     l'écran avant toute demande. Le serveur reverrouille seul après 5 minutes sans demande (l'app à l'arrière-plan). */
+  const VKEY = 'jarvis.verrou', SKEY = 'jarvis.ouverture';
+  const mem = (v) => { try { if (v === undefined) return sessionStorage.getItem(SKEY) === '1'; if (v) sessionStorage.setItem(SKEY, '1'); else sessionStorage.removeItem(SKEY); } catch (e) { /* stockage refusé */ } return false; };
+  const drapeau = (v) => { try { if (v === undefined) return localStorage.getItem(VKEY) === '1'; if (v) localStorage.setItem(VKEY, '1'); else localStorage.removeItem(VKEY); } catch (e) { /* stockage refusé */ } return false; };
+  const enB = (b) => { const o = new Uint8Array(b); let t = ''; for (let i = 0; i < o.length; i++) t += String.fromCharCode(o[i]); return btoa(t).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); };
+  const deB = (t) => { const b = atob(String(t).replace(/-/g, '+').replace(/_/g, '/')), o = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) o[i] = b.charCodeAt(i); return o; };
+  const refusPasskey = (e) => (e && e.name === 'NotAllowedError' ? 'Face ID annulé ou refusé.' : e && e.name === 'InvalidStateError' ? 'Cette passkey existe déjà sur cet appareil.' : 'La passkey n’a pas répondu sur cet appareil.');
+  const verrou = {
+    possible: () => !!(window.PublicKeyCredential && navigator.credentials && navigator.credentials.create && navigator.credentials.get),
+    etat: () => req('/api/verrou').then((r) => (r.j && typeof r.j.actif === 'boolean' ? r.j : null)).catch(() => null),
+    /* prouver une passkey : Face ID, puis le serveur vérifie la signature et ouvre cet appareil */
+    async prouver() {
+      let o; try { o = await req('/api/verrou/defi'); } catch (e) { return {error: INJ}; }
+      if (o.status !== 200 || !o.j.challenge) return {error: (o.j && o.j.error) || INDISPO};
+      let c;
+      try { c = await navigator.credentials.get({publicKey: {challenge: deB(o.j.challenge), rpId: o.j.rpId, allowCredentials: o.j.allowCredentials.map((x) => ({type: 'public-key', id: deB(x.id)})), userVerification: 'required', timeout: o.j.timeout}}); }
+      catch (e) { return {error: refusPasskey(e)}; }
+      if (!c || !c.response) return {error: 'La passkey n’a pas répondu sur cet appareil.'};
+      let r; try { r = await req('/api/verrou/ouvrir', {id: enB(c.rawId), clientData: enB(c.response.clientDataJSON), authData: enB(c.response.authenticatorData), signature: enB(c.response.signature)}); } catch (e) { return {error: INJ}; }
+      if (r.status !== 200) return {error: (r.j && r.j.error) || 'Preuve refusée.'};
+      mem(true); return r.j;
+    },
+    /* créer une passkey (elle ne compte qu'après sa première preuve) */
+    async creer(nom) {
+      let o; try { o = await req('/api/verrou/creer'); } catch (e) { return {error: INJ}; }
+      if (o.status !== 200 || !o.j.challenge) return {error: (o.j && o.j.error) || INDISPO};
+      let c;
+      try { c = await navigator.credentials.create({publicKey: {...o.j, challenge: deB(o.j.challenge), user: {...o.j.user, id: deB(o.j.user.id)}, excludeCredentials: (o.j.excludeCredentials || []).map((x) => ({type: 'public-key', id: deB(x.id)}))}}); }
+      catch (e) { return {error: refusPasskey(e)}; }
+      if (!c || !c.response || !c.response.attestationObject) return {error: 'La passkey n’a pas été créée.'};
+      let r; try { r = await req('/api/verrou/creer', {clientData: enB(c.response.clientDataJSON), attestation: enB(c.response.attestationObject), nom: nom || ''}); } catch (e) { return {error: INJ}; }
+      return r.status === 200 ? r.j : {error: (r.j && r.j.error) || 'Passkey refusée.'};
+    },
+    activer: () => req('/api/verrou/activer', {}).then((r) => { if (r.status === 200) { drapeau(true); return r.j; } return {error: (r.j && r.j.error) || 'Refusé.'}; }).catch(() => ({error: INJ})),
+    desactiver: () => req('/api/verrou/desactiver', {}).then((r) => { if (r.status === 200) { drapeau(false); return r.j; } return {error: (r.j && r.j.error) || 'Refusé.'}; }).catch(() => ({error: INJ})),
+    retirer: (id) => req('/api/verrou/retirer', {id}).then((r) => (r.status === 200 ? r.j : {error: (r.j && r.j.error) || 'Refusé.'})).catch(() => ({error: INJ})),
+    verrouiller: () => req('/api/verrou/verrouiller', {}).then(() => { mem(false); montrerVerrou(); return true; }).catch(() => false)
+  };
+  let ecran = null;
+  function montrerVerrou() {
+    drapeau(true);
+    if (typeof document === 'undefined') return;
+    const poser = () => {
+      if (ecran || !document.body) return;
+      const el = (t, css, txt) => { const x = document.createElement(t); x.style.cssText = css; if (txt) x.textContent = txt; return x; };
+      const fond = el('div', 'position:fixed;inset:0;z-index:2147483647;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:32px;background:#05070d;color:#e6edf7;font:500 16px/1.5 system-ui,-apple-system,sans-serif;text-align:center');
+      fond.id = 'verrou-ecran'; fond.setAttribute('role', 'dialog'); fond.setAttribute('aria-modal', 'true'); fond.setAttribute('aria-label', 'JARVIS est verrouillé');
+      const msg = el('p', 'margin:0;min-height:1.5em;font-size:14px;color:#fca5a5'); msg.setAttribute('role', 'status');
+      const btn = el('button', 'appearance:none;border:0;border-radius:999px;padding:14px 26px;font:600 16px system-ui,-apple-system,sans-serif;color:#fff;background:linear-gradient(90deg,#0ea5e9,#a855f7);cursor:pointer', 'Déverrouiller');
+      btn.type = 'button'; btn.id = 'verrou-ouvrir';
+      btn.addEventListener('click', async () => {
+        if (!verrou.possible()) { msg.textContent = 'Cet appareil ne sait pas présenter de passkey ici.'; return; }
+        btn.disabled = true; msg.textContent = '';
+        const r = await verrou.prouver();
+        if (r && !r.error) { location.reload(); return; }
+        btn.disabled = false; msg.textContent = (r && r.error) || 'Le serveur ne répond pas.';
+      });
+      fond.append(el('h1', 'margin:0;font:700 24px system-ui,-apple-system,sans-serif', 'JARVIS est verrouillé'), el('p', 'margin:0;max-width:26em;color:#9fb0c8', 'Ta passkey l’ouvre (Face ID).'), btn, msg);
+      document.body.append(fond); ecran = fond; try { btn.focus(); } catch (e) { /* rien */ }
+    };
+    if (document.body) poser(); else document.addEventListener('DOMContentLoaded', poser);
+  }
+  const cacherVerrou = () => { if (ecran) { ecran.remove(); ecran = null; } };
+  /* ce que dit le serveur fait foi : verrou éteint (retiré dans Termius) → l'écran part ; actif et fermé pour cet appareil → l'écran vient */
+  const verifierVerrou = () => verrou.etat().then((e) => { if (!e) return; drapeau(e.actif); if (!e.actif) cacherVerrou(); else if (!e.ouvert) { mem(false); montrerVerrou(); } });
+  if (token() && typeof document !== 'undefined') {   /* seulement dans une page (un banc charge ce fichier sans elle) */
+    if (drapeau() && !mem()) { montrerVerrou(); req('/api/verrou/verrouiller', {}).catch(() => null).then(verifierVerrou); }   /* l'app vient d'être lancée : Face ID */
+    else verifierVerrou();
+    setInterval(() => { if (!document.hidden && drapeau() && !ecran) verifierVerrou(); }, 60000);   /* l'app à l'écran reste ouverte ; à l'arrière-plan, plus rien ne part */
+    document.addEventListener('visibilitychange', () => { if (!document.hidden && drapeau()) verifierVerrou(); });
+  }
   window.JarvisServeur = {
     base: BASE,
     linked: () => !!token(),
@@ -253,6 +329,7 @@
       verifier: () => req('/api/voix/google/verifier', {}).then((r) => (r.status === 200 ? r.j : null)).catch(() => null),   /* 0.47.0 : une vraie phrase demandée à Google (comptée) */
       relancer: () => req('/api/voix/google/relancer', {}).then((r) => (r.status === 200 ? r.j : null)).catch(() => null)   /* 0.48.0 : après une alerte de budget de Google Cloud, lui seul relance Google */
     },
+    verrou,   /* 0.75.0 : le verrou de l'app par passkey */
     /* 0.74.0 : le coffre en mémoire du serveur (jarvis-coffre). La phrase est scellée ICI, pour le coffre seul (sceller.mjs : la clé et un
        défi à usage unique viennent du coffre) ; le serveur de JARVIS ne reçoit que le paquet chiffré. Rien n'est gardé dans l'app. */
     coffre: {

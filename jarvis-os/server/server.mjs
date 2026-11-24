@@ -29,9 +29,10 @@ import {createRadar} from './radar.mjs';
 import {pique, PERSO_ORAL} from './humour.mjs';   /* 21/11/2026 : sa personnalité à l'oral (« sarcastique assumé ») */
 import {createAudio, typeSon, silence} from './audio.mjs';   /* 0.64.0 : le message vocal d'un proche, mis au format de l'écoute */
 import {createCoffreLien} from './coffre-lien.mjs';   /* 0.74.0 : le coffre en mémoire, ouvert depuis l'app */
+import {createVerrou} from './verrou.mjs';   /* 0.75.0 : le verrou de l'app par passkey */
 const ACT = createActivite();   /* 0.33.0 : ce que fait Claude à l'instant */
 
-const VERSION = '0.74.0';
+const VERSION = '0.75.0';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PORT = +(process.env.PORT || 8787);
 const HOST = process.env.HOST || '127.0.0.1';
@@ -112,6 +113,21 @@ if (process.argv[2] === 'urgence') {
   if (sortie.reste) process.exit(1);
   process.exit(0);
 }
+/* ---------- verrou de l'app (verrou.mjs) : `node server.mjs verrou --etat | --retirer`, sans lancer le serveur ----------
+   Le secours quand plus aucune passkey ne marche (iPhone et gestionnaire de mots de passe perdus, adresse du serveur changée : une
+   passkey est liée à une adresse). --retirer, service arrêté, éteint le verrou et oublie ses passkeys : les appareils reliés rouvrent
+   JARVIS avec leur seul jeton, comme avant. Il faut être sur le serveur, sous l'utilisateur jarvis : c'est la preuve demandée. */
+if (process.argv[2] === 'verrou') {
+  const mode = process.argv[3];
+  if ((mode !== '--etat' && mode !== '--retirer') || process.argv.length !== 4) { console.error('Usage : node server.mjs verrou --etat | --retirer   (--retirer : service arrêté)'); process.exit(2); }
+  let E;
+  try { E = JSON.parse(fs.readFileSync(FILE, 'utf8')); if (!E || typeof E !== 'object' || Array.isArray(E)) throw new Error('forme'); }
+  catch (e) { if (e.code === 'ENOENT') { console.log(JSON.stringify({mode: mode.slice(2), actif: false, passkeys: 0})); process.exit(0); } console.error('[jarvis] verrou : state.json illisible ou abîmé (' + (e.code || 'JSON') + ') : rien n’a été changé.'); process.exit(1); }
+  const v = E.verrou && typeof E.verrou === 'object' ? E.verrou : {}, avant = {actif: v.actif === true, passkeys: Array.isArray(v.cles) ? v.cles.length : 0};
+  if (mode === '--retirer') { E.verrou = {actif: false, cles: []}; const tmp = FILE + '.tmp'; fs.writeFileSync(tmp, JSON.stringify(E), {mode: 0o600}); fs.chmodSync(tmp, 0o600); fs.renameSync(tmp, FILE); }
+  console.log(JSON.stringify({mode: mode.slice(2), ...avant}));
+  process.exit(0);
+}
 /* réserve Grok épuisée le 13/11/2026, remise à zéro le mardi 17/11 à 12h : pas de sonnette avant */
 const S =Object.assign({tokens: [], msgs: [], missions: [], session: null, usage: {chats: 0, missions: 0}, config: {grokPauseUntil: ''}}, load());
 /* 0.73.0 : un rangement de la mémoire coupé par un redémarrage (mise à jour, panne) ne bloque plus les suivants */
@@ -123,6 +139,7 @@ function save() {
 
 /* ---------- accès Google direct (Pilotage, agenda, Gmail) : voir google.mjs ---------- */
 const GG = createGoogle({S, save});
+const VERROU = createVerrou({S, save, now, journal: (t) => console.log('[jarvis] ' + t), inactif: +(process.env.JARVIS_VERROU_INACTIF_MS || 300000), frais: +(process.env.JARVIS_VERROU_FRAIS_MS || 120000)});   /* 0.75.0 */
 const publicBase = (req) => (req.headers['x-forwarded-proto'] || (req.socket.encrypted ? 'https' : 'http')).split(',')[0].trim() + '://' + req.headers.host;
 const googleRedirect = (req) => publicBase(req) + '/api/google/callback';
 const escHtml = (t) => String(t).replace(/[&<>"]/g, (c) => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
@@ -161,7 +178,10 @@ function pair(code, device) {
   S.tokens.push({hash: sha(token), at: now(), device: String(device || 'iPhone').slice(0, 40)}); save();
   return {status: 200, body: {token, version: VERSION}};
 }
-const authed = (req) => { const m = /^Bearer (.+)$/.exec(req.headers.authorization || ''); if (!m) return false; const h = sha(m[1]); return S.tokens.some((t) => t.hash === h); };
+/* 0.75.0 : `appareil` dit quel appareil relié présente son jeton (son empreinte, ou '') ; `authed` exige en plus, verrou actif, une ouverture
+   vivante pour cet appareil (verrou.mjs). Tout ce qui s'appuyait sur `authed` passe donc derrière le verrou, sans exception à entretenir. */
+const appareil = (req) => { const m = /^Bearer (.+)$/.exec(req.headers.authorization || ''); if (!m) return ''; const h = sha(m[1]); return S.tokens.some((t) => t.hash === h) ? h : ''; };
+const authed = (req) => { const d = appareil(req); return !!d && VERROU.passe(d); };
 const deviceOf = (req) => { const m = /^Bearer (.+)$/.exec(req.headers.authorization || ''); const t = m && S.tokens.find((x) => x.hash === sha(m[1])); return t ? t.hash.slice(0, 12) : ''; };
 /* 0.73.0 : la liste des appareils reliés pour Réglages : empreinte courte (comme deviceOf), nom donné à l'appairage, date, et celui qui demande */
 const appareilsListe = (req) => { const moi = deviceOf(req); return S.tokens.map((t) => ({id: t.hash.slice(0, 12), nom: String(t.device || 'Appareil'), at: +t.at || 0, moi: t.hash.slice(0, 12) === moi})); };
@@ -1997,7 +2017,27 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/google/callback') { const r = await GG.callback(url.searchParams); if (r.ok) { S.googleVu = true; save(); } res.writeHead(r.ok ? 200 : 400, {'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'referrer-policy': 'no-referrer'}); res.end(googlePage(r)); return; }
     if (await JMCP.traiter(req, res, p, url)) return;   /* 0.39.0 : /mcp, /oauth/…, /.well-known/… (leur propre accès) */
     if (p.startsWith('/api/')) {
-      if (!authed(req)) return json(res, 401, {error: 'Appareil non relié.'});
+      /* 0.75.0 : le verrou de l'app par passkey (verrou.mjs). Ces routes demandent un appareil relié, pas une ouverture : c'est par elles
+         qu'un appareil verrouillé s'ouvre. Créer, activer, désactiver, retirer demandent en plus de passer le verrou (et, pour les trois
+         derniers, une preuve de moins de 2 minutes). L'origine attendue est l'adresse publique du serveur ; le domaine (rpId), son nom. */
+      if (p === '/api/verrou' || p.startsWith('/api/verrou/')) {
+        const d = appareil(req); if (!d) return json(res, 401, {error: 'Appareil non relié.'});
+        const u = new URL(mcpBase(req)), origine = u.origin, rpId = u.hostname, etat = (code = 200, plus = {}) => json(res, code, {...VERROU.etat(d), ...plus});
+        if (p === '/api/verrou' && req.method === 'GET') { VERROU.passe(d); return etat(); }
+        if (p === '/api/verrou/verrouiller' && req.method === 'POST') { req.resume(); VERROU.verrouiller(d); return etat(); }
+        if (p === '/api/verrou/defi' && req.method === 'GET') { const o = VERROU.optionsOuvrir(d, rpId); return o ? json(res, 200, o) : json(res, 404, {error: 'Aucune passkey enregistrée.'}); }
+        if (p === '/api/verrou/ouvrir' && req.method === 'POST') { const b = await readBody(req, 16000); return VERROU.ouvrir(d, b, origine, rpId) ? etat() : etat(403, {error: 'Preuve refusée.'}); }
+        if (!VERROU.passe(d)) return etat(423, {error: 'JARVIS est verrouillé.', verrou: true});
+        /* verrou actif : ajouter une passkey demande, comme le désactiver, une preuve de moins de 2 minutes (une app laissée ouverte ne suffit pas) */
+        if (p === '/api/verrou/creer' && VERROU.etat(d).actif && !VERROU.etat(d).recente) { req.resume(); return etat(403, {error: 'Prouve d’abord ta passkey (Face ID).'}); }
+        if (p === '/api/verrou/creer' && req.method === 'GET') { const o = VERROU.optionsCreer(d, rpId); return o ? json(res, 200, o) : json(res, 400, {error: 'Huit passkeys au plus : retires-en une.'}); }
+        if (p === '/api/verrou/creer' && req.method === 'POST') { const b = await readBody(req, 40000), r = VERROU.creer(d, b, origine, rpId); return r ? etat(200, {cree: r.id}) : etat(400, {error: 'Passkey refusée (défi expiré, autre adresse, Face ID manquant ou type de clé inconnu).'}); }
+        if (p === '/api/verrou/activer' && req.method === 'POST') { req.resume(); return VERROU.activer(d) ? etat() : etat(403, {error: 'Prouve d’abord ta passkey (Face ID).'}); }
+        if (p === '/api/verrou/desactiver' && req.method === 'POST') { req.resume(); return VERROU.desactiver(d) ? etat() : etat(403, {error: 'Prouve d’abord ta passkey (Face ID).'}); }
+        if (p === '/api/verrou/retirer' && req.method === 'POST') { const b = await readBody(req); return VERROU.retirer(d, String(b.id || '')) ? etat() : etat(403, {error: 'Refusé : prouve d’abord ta passkey ; la dernière passkey d’un verrou actif ne se retire pas.'}); }
+        return json(res, 404, {error: 'Inconnu.'});
+      }
+      if (!authed(req)) return appareil(req) ? json(res, 423, {error: 'JARVIS est verrouillé.', verrou: true}) : json(res, 401, {error: 'Appareil non relié.'});
       if (p.startsWith('/api/radar')) { const r = await RADAR.traiter(req.method, p, () => readBody(req)); if (r) return json(res, r.status, r.body); }   /* Radar (21/11/2026) */
       if (p === '/api/google') return json(res, 200, GG.status(googleRedirect(req)));
       if (p === '/api/google/config' && req.method === 'POST') { const r = GG.configure(await readBody(req)); return json(res, r.ok ? 200 : 400, {...r, google: GG.status(googleRedirect(req))}); }
