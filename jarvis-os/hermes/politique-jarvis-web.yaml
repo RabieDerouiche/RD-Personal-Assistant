@@ -1,0 +1,20 @@
+  # Ajouté par install.sh quand /etc/hermes/jarvis.env contient JARVIS_MCP_TOKEN_WEB (relier-jarvis.sh --web).
+  # Le même serveur de JARVIS, vu par un second jeton au profil « Veilleur » : l'onglet Sources, sa ligne du
+  # Journal et de l'État, une notification. Rien de privé : c'est le seul serveur de la routine qui lit le web,
+  # pour qu'une page piégée ne puisse rien lui faire lire de ses mails, de son agenda ni de ses dossiers.
+  jarvis-web:
+    url: "${JARVIS_MCP_URL}"
+    headers:
+      Authorization: "Bearer ${JARVIS_MCP_TOKEN_WEB}"
+    timeout: 90
+    connect_timeout: 20
+    trust: full
+    tools:
+      include:
+        - pilotage_lire
+        - pilotage_ajouter
+        - pilotage_etat
+        - jarvis_notifier
+        - jarvis_meteo
+      resources: false
+      prompts: false

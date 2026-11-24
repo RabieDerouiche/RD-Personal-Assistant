@@ -1,4 +1,4 @@
-/* Banc du lot B1-page-1-2 (0.70.0) : node tests/fiab-b1.test.mjs (aucun réseau, aucun vrai Google ni Claude, aucun coût ; données inventées).
+/* Banc du lot B1-page-1-2 (0.73.0) : node tests/fiab-b1.test.mjs (aucun réseau, aucun vrai Google ni Claude, aucun coût ; données inventées).
    La page (essais/jarvis-os-maquette/index.html) est un seul script : on y prend quelques fonctions pures, par leur nom, pour les essayer ici,
    et on vérifie le contrat avec le serveur : les messages d'erreur que la page reprend tels quels viennent de google.mjs, en français. */
 import fs from 'node:fs'; import path from 'node:path'; import vm from 'node:vm'; import {fileURLToPath} from 'node:url';

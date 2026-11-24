@@ -52,7 +52,7 @@ export function createVoixGoogle({fichier, compteurFichier, base = 'https://text
     const b64 = (o) => Buffer.from(JSON.stringify(o)).toString('base64url'), iat = Math.floor(now() / 1000);
     const corps = b64({alg: 'RS256', typ: 'JWT'}) + '.' + b64({iss: sa.email, scope: 'https://www.googleapis.com/auth/cloud-platform', aud: sa.uri, iat, exp: iat + 3600});
     const sig = crypto.createSign('RSA-SHA256').update(corps).sign(sa.cle, 'base64url');
-    /* 0.70.0 : 10 s au plus pour le jeton (le minuteur de 15 s d'appel() ne couvre que la synthèse), avec une raison en français */
+    /* 0.73.0 : 10 s au plus pour le jeton (le minuteur de 15 s d'appel() ne couvre que la synthèse), avec une raison en français */
     let r;
     try { r = await fetch(sa.uri, {method: 'POST', signal: AbortSignal.timeout(delaiJeton), headers: {'content-type': 'application/x-www-form-urlencoded'}, body: new URLSearchParams({grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer', assertion: corps + '.' + sig}).toString()}); }
     catch (e) { if (e && e.name === 'TimeoutError') throw new Error('Google n’a pas donné de jeton à temps (' + String(delaiJeton / 1000).replace('.', ',') + ' s)'); throw e; }
@@ -167,7 +167,7 @@ export function createVoixGoogle({fichier, compteurFichier, base = 'https://text
     try { j = await appel('/v1/text:synthesize', {input: {text: t}, voice: {languageCode: LANGUE, name: nomOk(nom) ? nom : VOIX_DEFAUT}, audioConfig: {audioEncoding: 'LINEAR16', sampleRateHertz: 24000}}); }
     catch (e) { erreur(e, info); return null; }
     if (!j.audioContent) { erreur(new Error('réponse de Google sans son'), info); return null; }
-    /* 0.70.0 : écrit à côté puis renommé : le cache (« déjà dite ») ne voit jamais un son à moitié écrit */
+    /* 0.73.0 : écrit à côté puis renommé : le cache (« déjà dite ») ne voit jamais un son à moitié écrit */
     fs.writeFileSync(sortie + '.part', Buffer.from(j.audioContent, 'base64')); fs.renameSync(sortie + '.part', sortie);
     ERR = {n: 0, jusqu: 0, dernier: ERR.dernier}; OK = {at: now(), nom: nomOk(nom) ? nom : VOIX_DEFAUT, octets: n};
     return sortie;

@@ -1,4 +1,4 @@
-/* Banc 0.70.0 — lot A4 (PDF, accès Google, comparatifs et idées) : node tests/fiab-a4.test.mjs
+/* Banc 0.73.0 — lot A4 (PDF, accès Google, comparatifs et idées) : node tests/fiab-a4.test.mjs
    Aucun vrai Google, aucun vrai Claude, aucun réseau : faux serveur local, faux Claude, faux téléchargements. Données inventées. */
 import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path'; import http from 'node:http'; import zlib from 'node:zlib';
 import {fileURLToPath} from 'node:url';

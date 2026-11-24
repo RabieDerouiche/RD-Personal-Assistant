@@ -11,7 +11,7 @@ import fs from 'node:fs';
 import crypto from 'node:crypto';
 
 /* rien de bancaire, aucun secret : mots du domaine, IBAN, et toute suite de 12 chiffres ou plus (carte, compte ; un téléphone en a 10) */
-/* 0.70.0 : bornes de mot Unicode : \b ne connaît que les lettres sans accent (« mensualité », « restant dû », « à découvert » passaient) */
+/* 0.73.0 : bornes de mot Unicode : \b ne connaît que les lettres sans accent (« mensualité », « restant dû », « à découvert » passaient) */
 const MOTS = /(?<![\p{L}\p{N}])(iban|bic|rib|cvv|cryptogramme|carte bancaire|carte bleue|num[ée]ro de (carte|compte)|identifiant bancaire|code (pin|secret|confidentiel|d'acc[eè]s)|mot de passe|mdp|password|solde (du|de mon|de son|bancaire)|(à|en) d[ée]couvert|d[ée]couvert (bancaire|autoris[ée]))(?![\p{L}\p{N}])/iu;
 /* 21/11/2026 (Radar) : les chiffres d'un crédit (mensualité, restant dû, taux) ne vont pas en mémoire : elle est lue par le serveur MCP,
    que Grok Bot peut joindre (règle du 12/11/2026 : ces chiffres jamais chez les bots). Le Radar les garde à part, sur le serveur seulement. */
@@ -19,7 +19,7 @@ const CREDIT = '(?:cr[ée]dit|pr[eê]t (?:immobilier|personnel|auto|travaux|[àa
 const B0 = '(?<![\\p{L}\\p{N}])', B1 = '(?![\\p{L}\\p{N}])';
 const CREDIT_CHIFFRE = new RegExp(B0 + CREDIT + B1 + '[^\\n]{0,60}\\d|\\d[^\\n]{0,60}' + B0 + CREDIT + B1, 'iu');
 export function interdit(t) {
-  const s = String(t || '').normalize('NFC').replace(/[’‘ʼ]/g, "'");   /* 0.70.0 : l'apostrophe de l'iPhone (’) compte comme ' */
+  const s = String(t || '').normalize('NFC').replace(/[’‘ʼ]/g, "'");   /* 0.73.0 : l'apostrophe de l'iPhone (’) compte comme ' */
   return MOTS.test(s) || /\bFR\d{2}\s?\d{4}/i.test(s) || /\d{12,}/.test(s.replace(/[\s.\-]/g, '')) || CREDIT_CHIFFRE.test(s);
 }
 
@@ -75,7 +75,7 @@ export function profilTexte(html, maxLen = 6000) {
   const texte = (x) => x.replace(/<br\s*\/?>/gi, '\n').replace(/<\/(p|li|h[1-6]|tr|div)>/gi, '\n').replace(/<li[^>]*>/gi, '- ').replace(/<[^>]+>/g, '')
     .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;|&rsquo;/g, '’').replace(/&#(\d+);/g, (m, n) => String.fromCharCode(+n))
     .split('\n').map((l) => l.replace(/\s+/g, ' ').trim()).filter(Boolean).join('\n');
-  let out = '', retire = 0, saute = 0;   /* 0.70.0 : les sous-parties (titres de niveau inférieur) d'une partie retirée partent avec elle */
+  let out = '', retire = 0, saute = 0;   /* 0.73.0 : les sous-parties (titres de niveau inférieur) d'une partie retirée partent avec elle */
   for (const p of parts) {
     const m = /^<h([1-4])[^>]*>([\s\S]*?)<\/h[1-4]>/i.exec(p), niv = m ? +m[1] : 0, titre = m ? texte(m[2]) : '';
     if (saute && niv && niv <= saute) saute = 0;

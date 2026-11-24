@@ -1,0 +1,315 @@
+# Hermes, Grok Bot, Claude et JARVIS : le déroulé (depuis le 23/11/2026)
+
+Sa demande du 23/11/2026 : mettre en place le déroulé idéal avec Hermes, lui donner des droits équivalents à
+ceux de Grok Bot, commencer des routines pour alléger Grok Bot, relier Hermes à JARVIS, voir quelles skills
+lui donner (et à Claude), le tout pilotable depuis JARVIS. Objectif à terme : remplacer Grok Bot, **seulement
+si Hermes fait tout ce que Grok Bot fait, sans compromis sur la qualité ni sur les routines**.
+
+Installation et garde-fous d'Hermes : `docs/hermes.md`. Système Grok Bot : `docs/systeme-grok-bot.md`.
+Version pour lui : Google Doc « Hermes, Grok Bot, Claude et JARVIS : le déroulé (23-11-2026) », dossier `Grok Bot/`
+(`1leDb53BzPGQtd_Y3Ud84qkSi5YKyxTJEu3pQWNPbogI`).
+Rien de personnel ici.
+
+## Ses décisions (QCM du 23/11/2026 au soir)
+
+| Question | Son choix |
+|---|---|
+| Routines à mettre en double d'abord | Supervision (Argus) et Semaine à venir (Iris), puis la Veille du matin d'Iris. **Corrigé par lui le 24/11/2026** : la Supervision « ne sert à rien sur Hermes » (elle surveille les bots de Grok Bot : la refaire n'allège rien et n'apprend rien) : retirée. Veille du matin : oui. Il veut « du lourd » : un vrai scénario automatisable de A à Z (voir « Scénario des couches ») |
+| Routines qui demandent le web | **Essai du web chez Hermes**, sur le Digest d'Athéna seulement, en double, avec un jeton à part qui ne voit pas ses mails |
+| Chronos (portails) | **Reste chez Grok Bot** : pas de remplacement complet pour l'instant |
+| Durée du double | **2 semaines** avant la comparaison et sa décision de bascule |
+
+## Qui fait quoi
+
+| Pièce | Rôle | Ce qu'elle ne fait pas |
+|---|---|---|
+| **JARVIS OS** (son app, son serveur) | Tour de contrôle : tout s'y voit et s'y décide. Seule porte vers Google pour Hermes (serveur MCP, profil « exécutant »). Notifications, rappels d'échéances, brief sans IA, Radar. | Ne remplace pas un bot : il borne, il montre, il notifie. |
+| **Hermes** (Telegram, serveur) | Exécutant des routines à heure fixe sur Pilotage, Gmail et l'agenda ; discussion ; apprend (mémoire, skills). Sur l'abonnement Claude, Sonnet pour les routines. | Ni web, ni terminal, ni fichiers, ni navigateur, ni jeton Google. Aucun portail. |
+| **Grok Bot** (7 bots) | Ce qu'il fait de mieux : les portails de Chronos, le traitement d'un mail à son arrivée (alias des bots), l'app iPhone et la voix. Reste la référence de chaque routine tant qu'elle n'est pas basculée. | — |
+| **Claude** (sessions de développement) | Le code (JARVIS, kit d'Hermes), les fiches, la Charte, les skills, la comparaison des routines « en double », sur demande. | Aucune routine, aucune veille de sa propre initiative. |
+
+## Les droits d'Hermes (équivalents à ceux de Grok Bot, bornés par JARVIS)
+
+Hermes n'a aucun accès direct : chaque geste passe par un outil du serveur MCP de JARVIS, ouvert au seul jeton
+« Hermes » (profil « exécutant », créé par le propriétaire dans Réglages, suspendu ou retiré d'un bouton).
+L'onglet Autonomie de Pilotage fait foi ; ce tableau en est l'application.
+
+| Geste | Hermes | Outil de JARVIS |
+|---|---|---|
+| Lire Pilotage (tous les onglets des bots) | Seul | `pilotage_lire` |
+| Lire ses mails, son agenda principal, Échéances, Présence, jours fériés | Seul | `gmail_chercher`, `gmail_lire`, `jarvis_agenda`, `agenda_lire` |
+| Écrire ses lignes : Journal, Canal (sous son nom), Sorties, Relevés, sa ligne d'État | Seul | `pilotage_ajouter`, `pilotage_etat`, `canal_repondre` |
+| Préparer un brouillon de mail | Seul, puis il l'informe | `gmail_brouillon` (jamais d'envoi) |
+| Le notifier sur l'iPhone | Seul, 12 par jour au plus | `jarvis_notifier` |
+| Demander un travail à Claude ou un ordre à un bot | Proposition : il l'approuve dans JARVIS | `jarvis_proposer_mission`, `jarvis_proposer_ordre` |
+| Envoyer un mail, créer un événement, modifier un dossier ou une échéance tenus par un bot | Pas d'outil aujourd'hui | à ouvrir routine par routine |
+| Payer, acheter, réserver, supprimer, partager, Drive, « Papiers privés », Radar | Jamais | aucun outil |
+
+Pourquoi par JARVIS plutôt qu'avec le skill Google d'Hermes (son propre jeton Google et un terminal) :
+- (certain, code de la 0.23.3) ce skill demande toujours les droits complets (envoi de mail, Drive entier avec
+  partage et corbeille) et exige l'outil terminal ; « confirmer d'abord » n'y est qu'une consigne au modèle ;
+- un mail piégé lu par un agent qui a un terminal et Internet peut faire sortir des données ; sans terminal ni
+  web, il ne peut qu'appeler les outils que JARVIS lui laisse ;
+- JARVIS note chaque écriture (« Derniers gestes des exécutants »), plafonne par jour, et coupe d'un bouton ;
+- une seule connexion Google à tenir (celle de JARVIS, déjà publiée).
+Ouvrir un accès direct plus tard reste possible : c'est sa décision, par QCM.
+
+## Les routines de Grok Bot : où elles vont
+
+24 routines dans l'onglet Routines le 23/11/2026 (hors passages lancés par la plateforme).
+
+| Routines | Destination | Quand, à quelle condition |
+|---|---|---|
+| Argus : Supervision (lun, mer, ven) | Reste chez Grok Bot | Essayée en double le 23/11/2026, retirée le 24/11 à sa demande : surveiller les bots de Grok Bot n'a de sens que chez Grok Bot (et JARVIS repère déjà seul une pause de Grok). |
+| Iris : Semaine à venir (dim) | **Hermes, en double** | Phase 1, maintenant. |
+| Iris : Veille du matin (lun-ven) | **Hermes, en double** (7h40) | Depuis le 24/11/2026. En double il n'écrit rien dans Dossiers ni Échéances : il note au Journal ce qu'il aurait écrit. Pour la bascule : outils de JARVIS à ajouter, bornés à ces colonnes. |
+| Athéna : Digest IA et .NET | **Hermes, en double, avec le web** (lundi 9h10) | Depuis le 24/11/2026 (son choix : essai du web sur cette seule routine). Elle a l'outil web et le serveur « jarvis-web » (jeton « Veilleur ») ; jamais les mails. Posée dès qu'il a créé le second jeton. |
+| Ulysse : Sorties du week-end ; Kairos : Liste du mois, Prix suivis | Après l'essai du web | Phase 3, son choix (QCM). Le web d'Hermes marche sans clé (services gratuits, limités) ; il exige un jeton à part, sans Gmail, pour qu'une page piégée ne puisse rien lire de privé. Les sites marchands et de crédit bloquent souvent la lecture automatique : Prix suivis en dernier. |
+| Iris : Courrier prioritaire ; Kairos : Signal prix ; Chronos : Facture reçue | Restent chez Grok Bot | Phase 4 seulement s'il le demande : il faut que JARVIS repère le mail à son arrivée et réveille Hermes (écarté le 17/11 tant que les alias de Grok Bot existent). |
+| Chronos : notes de frais, validation des jours, CRA (8 routines) | **Restent chez Grok Bot** | Trois portails avec connexion, codes et sessions qui expirent ; un navigateur ne tient pas sur le VPS-1 à côté de JARVIS (Likely). C'est le verrou du remplacement complet. |
+| Argus : Bilan du lundi | Reste chez Grok Bot | Il lit la consommation de Grok dans l'app de Grok. |
+| Sonnettes (6) | Restent tant que le bot garde une routine | Hermes n'a pas besoin de sonnette par mail : ses lignes du Canal sont lues à chaque passage ; un réveil local par JARVIS viendra s'il le faut. |
+
+## La méthode de bascule (pas de compromis sur la qualité)
+
+1. **En double** : Hermes fait la routine en même temps que le bot de Grok Bot, sans rien déranger : il n'écrit
+   que sa ligne du Journal (« En double : <routine> ») et sa ligne d'État, et envoie son résultat sur Telegram
+   (« En double · <routine> »). Le bot de Grok Bot reste la référence.
+2. **Comparaison** par Claude, à sa demande (skill `hermes`) : au moins 3 passages, exemples datés, verdict
+   « au niveau », « meilleur » ou « en dessous », et la correction de skill à faire.
+3. **Bascule** : sa décision, par QCM. Fiche du bot mise à jour, ligne du Canal pour ce bot (routine mise en
+   pause, jamais supprimée), `routines.conf` sans « en double », onglet Routines.
+4. **Retour arrière** : l'inverse, en une vague.
+
+Tant qu'une routine est en double, Grok Bot n'est pas allégé : c'est le prix de la comparaison. L'allègement
+commence à la première bascule.
+
+## Les skills
+
+- **Hermes, du dépôt** (`jarvis-os/hermes/skills/`, copiées dans `/etc/hermes/skills`, en lecture seule pour
+  lui) : `pilotage` (les outils de JARVIS, les règles de chaque passage, le mode « en double » : c'est sa
+  Charte), `supervision`, `semaine-a-venir`. Une skill par routine ; la routine la charge seule.
+- **Hermes, apprises** : il propose une skill quand une tâche lui a demandé plusieurs essais ou qu'il est
+  corrigé ; rien n'est écrit sans « /skills approve » du propriétaire dans Telegram (`/skills pending` les
+  montre). `diagnostic.sh` les compte. Une skill apprise qui vaut pour tous passe dans le dépôt.
+- **Hermes, livrées avec lui** (44 : code, GitHub, ordinateur…) : coupées. Elles supposent un terminal et
+  alourdissaient chaque message.
+- **Claude** (`.claude/skills/`) : `hermes` (changer une routine ou une skill, comparer une routine en double,
+  préparer une bascule, appliquer sur le serveur). Les sept autres ne changent pas.
+- **JARVIS** (`jarvis-os/server/skills/`) : les skills relues de ses missions ; rien à ajouter pour Hermes.
+
+## Le forfait
+
+- Routines sur **Sonnet** (`cron.model` de la politique), discussion sur Opus (`/model` pour changer).
+- Phase 1 : 4 passages par semaine. (guessing) Un passage lit une dizaine d'onglets : de l'ordre de 1 % de la
+  fenêtre de 5 heures chacun, à mesurer sur les premiers passages (`/usage`).
+- Le garde arrête Hermes à 85 % de la semaine (`docs/hermes.md`). La fenêtre de 5 heures n'est pas gardée (sa
+  demande) : une routine qui tombe sur une fenêtre pleine échoue et le dit sur Telegram ; elle n'est pas
+  rejouée. Une routine manquée parce qu'Hermes était arrêté est rejouée une fois à son retour.
+- (Likely) Faire tourner des routines par un outil tiers sur l'abonnement reste dans la zone grise décrite dans
+  `docs/hermes.md` ; le plan B (crédits d'API inclus dans Max) est prêt.
+
+## Piloter depuis JARVIS
+
+- Réglages, « Assistants reliés (MCP) » : le jeton « Hermes » (profil « Exécutant »), « Suspendre »,
+  « Reprendre », « Retirer », et ses derniers gestes (date, outil, ce qu'il a écrit).
+- Équipe : Hermes y apparaît dès sa première ligne dans l'onglet État (comme tout bot).
+- Une demande pour Hermes : une ligne du Canal `Pour = Hermes` ; il la traite à son prochain passage et répond
+  dans la colonne Réponse. Ses questions arrivent dans « À toi » (`Pour = Rabie`).
+- À venir, sur sa demande : voir et lancer les routines d'Hermes depuis JARVIS ; un réveil local d'Hermes par
+  JARVIS (sans mail) quand une ligne lui est adressée.
+
+## Mettre en service (ordre)
+
+| Étape | Qui, où |
+|---|---|
+| 1. JARVIS 0.71.0 : « Nouvelle version disponible », « Mettre à jour » | Lui, dans JARVIS |
+| 2. Kit d'Hermes : `git pull`, `install.sh` (skills, politique ; Hermes redémarre, toujours sans JARVIS) | Session « Serveur JARVIS », confiée par Claude |
+| 3. Jeton : Réglages, « Assistants reliés (MCP) », nom « Hermes », profil « Exécutant » ; copier le jeton | Lui, dans JARVIS |
+| 4. `sudo bash /opt/rd/jarvis-os/hermes/relier-jarvis.sh` : coller le jeton | Lui, dans Termius (saisie) |
+| 5. `routines.sh`, puis `diagnostic.sh` | Session « Serveur JARVIS », confiée par Claude |
+| 6. Faire connaître Hermes aux bots : nom dans la Charte, ligne du Canal pour Argus (il ne doit pas prendre les lignes d'Hermes pour une anomalie), lignes dans l'onglet Routines | Claude, dans la même vague |
+
+## État
+
+- 23/11/2026 : déroulé écrit ; JARVIS 0.71.0 (jetons fixes nommés, profil « exécutant », outils Pilotage, Gmail,
+  agenda, brouillon, notification) ; kit d'Hermes (politique des étapes 3 et 4, `relier-jarvis.sh`,
+  `routines.sh`, trois skills, consigne) ; banc d'Hermes 72 sur 72 avec un faux JARVIS. Rien n'est encore en
+  service : voir « Mettre en service ».
+- 23/11/2026 : vérifié aussi le vrai `mcp.mjs` devant le client MCP d'Hermes (jeton exécutant : ses outils ; jeton
+  lecture : non ; mauvais jeton : 401) et les en-têtes réels de Pilotage (ligne 3 pour « À toi » et Prix, ligne 1
+  ailleurs ; colonne Bot dans Sorties et Relevés). Bancs de JARVIS : serveur 331, Radar 131, page 226, bout en
+  bout 124.
+- 23/11/2026, 19h30 (heure de Paris), par la session « Serveur JARVIS » : dépôt `3c4d4a8`, JARVIS relancé en
+  **0.71.0** (actif, répond en HTTPS), `install.sh` d'Hermes code 0 (3 skills du dépôt, 44 coupées, Telegram
+  reconnecté, 5 outils sur Telegram et 4 pour les routines, plafonds mémoire 850/1000 Mo). Pas encore relié :
+  il lui reste à créer le jeton « Hermes » dans Réglages et à lancer `relier-jarvis.sh` dans Termius ; ensuite
+  `routines.sh` par la session du serveur, puis la vague « faire connaître Hermes » (Charte, Argus, onglet
+  Routines). Mémoire : verdict « Suffisant » (1,7 Go disponibles : JARVIS venait de recharger son écoute,
+  1 Go) ; à remesurer après les premiers passages.
+- À faire ensuite, selon ses réponses : (1) Veille du matin en double (outils de JARVIS pour écrire dans Dossiers
+  et Échéances, skill, ligne de `routines.conf`) ; (2) essai du web sur le Digest (profil de jeton sans Gmail,
+  second serveur MCP dans la politique d'Hermes, outil `web` pour cette seule routine, skill) ; (3) comparaison
+  des routines en double à partir du 07/12/2026, à sa demande.
+- 23/11/2026, 22h54 (heure de Paris) : **en service**. Liaison posée par lui à 21h38 (16 outils, aucune erreur) ; routines `supervision` et `semaine-a-venir` posées, en double (premiers passages : mercredi 25/11 à 8h50, dimanche 29/11 à 18h10). Fin du double et comparaison : à partir du 07/12/2026. Son premier essai sur Telegram a répondu « pas encore accès » : conversation commencée avant la liaison, `/new` à faire. Pas encore fait : la vague « faire connaître Hermes » (Charte, Argus, onglet Routines), après son essai réussi ; les outils qui touchent le vrai Google (lecture de Pilotage, Gmail, agendas) seront éprouvés par cet essai.
+- 23/11/2026, 23h00 : son essai dans une conversation neuve réussit (agenda, « À toi », échéances, météo, lus par
+  JARVIS ; il n'a pas écrit le taux d'une offre de crédit). Fait ensuite, la vague « faire connaître Hermes » :
+  paragraphe « Hermes » dans la Charte (après les noms des bots), ligne 98 du Canal pour Argus (demande
+  technique, sans sonnette : skill « registre » à jour, ne pas prendre ses lignes pour une anomalie ; traitée à
+  sa Supervision du mercredi 25/11 à 8h44, avant le premier passage d'Hermes), trois lignes « Hermes » dans
+  l'onglet Routines (État « En double »). **Veille du matin en double** : skill `veille-du-matin` (d'après la
+  section C de la fiche d'Iris, sans l'astuce ni le trafic, qu'il n'a pas), ligne de `routines.conf` (lundi à
+  vendredi, 7h40). Banc d'Hermes : 73 sur 73. Reste : l'essai du web sur le Digest d'Athéna (second jeton sans
+  Gmail, à créer par lui) ; les outils d'écriture dans Dossiers et Échéances, pour la bascule de la Veille.
+- 23/11/2026, 23h08 : appliqué par la session « Serveur JARVIS » (dépôt `45901b3`, `install.sh` code 0, 4 skills, 16 outils réannoncés, Telegram reconnecté) ; `routines.sh` : `veille-du-matin` posée, premier passage le mardi 24/11 à 7h40 ; trois routines actives, toutes en double. À regarder au premier passage : la lecture du vrai Pilotage et de Gmail par `pilotage_lire` et `gmail_chercher`, encore jamais faite sur les vraies données (l'essai du soir n'a exercé que `jarvis_maintenant`).
+- 24/11/2026 (nuit), sa correction : Supervision retirée d'Hermes (ligne de `routines.conf`, skill, ligne de
+  l'onglet Routines ; ligne 98 du Canal pour Argus réécrite avant qu'il ne la lise). Restent en double : Veille
+  du matin et Semaine à venir (il ne savait pas ce que fait la seconde : question posée par QCM). Essai du web :
+  demandé (« Web ») ; côté JARVIS, profil « veilleur » en cours (0.72.0). Nouveau cap : un scénario de A à Z.
+
+## Scénario des couches (sa demande du 24/11/2026)
+
+Ce qu'il veut : quand l'alerte de son abonnement de couches arrive (« il reste 7 ou 5 jours »), recevoir une
+question : garder la date, l'avancer, ou la reporter d'une ou deux semaines ; puis que ce soit fait.
+
+Ce que montrent ses mails (lus le 24/11/2026, certain) : le marchand envoie « Renouvellement de votre
+abonnement » quelques jours avant de préparer la commande (« Dans N jours… expédiée le JJ/MM/AAAA »), avec un
+lien « Mon compte » pour décaler, avancer, mettre en pause ou résilier ; six mails de ce type en trois mois.
+Son espace client est un formulaire de connexion classique (adresse, mot de passe, jeton anti-rejeu), sans
+captcha visible sur la page de connexion : (Likely) un script sans navigateur peut s'y connecter et changer la
+date ; la page de l'abonnement n'a pas été vue (elle demande la connexion).
+
+Découpage proposé :
+1. **Repérer** le mail : une règle, sans IA (expéditeur et objet), et lire N et la date dans le texte.
+2. **Demander** : une question à 4 choix, sur Telegram par Hermes ou par une notification de JARVIS.
+3. **Agir** : seul point difficile. Soit un outil de JARVIS qui se connecte à l'espace client (mot de passe
+   saisi par lui dans Termius, gardé sur le serveur, jamais vu par Hermes ni par Claude), soit un mail au service
+   client, soit un lien direct qu'il touche lui-même.
+4. **Confirmer** : la nouvelle date relue sur le site, écrite dans le Journal, et dite sur Telegram.
+Décisions demandées par QCM : la façon d'agir, où arrive la question, agir tout de suite ou après un second oui.
+
+Ses réponses (QCM du 24/11/2026) :
+
+| Question | Son choix |
+|---|---|
+| Qui change la date chez le marchand | « JARVIS ou Hermes, mais n'est-ce pas mieux si c'est Hermes ? » Réponse donnée : Hermes décide et déclenche, JARVIS tient le mot de passe et fait le geste. Hermes sur le site lui-même demanderait un navigateur (qui ne tient pas sur le VPS-1) et lui ferait voir le mot de passe |
+| Où arrive la question | **Notification de JARVIS** (carte à boutons dans l'app) |
+| Après son choix | **Tout de suite** : son choix vaut accord pour ce changement précis (ligne ajoutée à l'onglet Autonomie, ligne 21) |
+| Semaine à venir en double | **Retirée** (il ne lit pas ce message) |
+
+Chaîne retenue :
+1. **Hermes** repère le mail (routine du matin), calcule un conseil (dates des dernières livraisons, quantité,
+   rythme) et crée dans JARVIS une **décision** : la question, 4 choix, chacun lié à un geste d'un catalogue fermé.
+2. **JARVIS** notifie ; il touche un bouton ; JARVIS fait le geste aussitôt sur l'espace client, relit la date,
+   confirme par une notification et note le résultat (Journal, « Derniers gestes »).
+3. **Hermes** lit le résultat à son passage suivant et retient son habitude (mémoire).
+À construire, dans l'ordre : la sonde (faite : `jarvis-os/server/install/portail-couches.sh`, lancée par lui dans
+Termius) ; le geste d'après le squelette qu'elle rapporte ; les décisions à boutons de JARVIS (outil
+`jarvis_demander` pour les exécutants) ; la routine et la skill d'Hermes.
+- 24/11/2026 (nuit) : Semaine à venir retirée d'Hermes à sa demande ; il lui reste la Veille du matin en double.
+  Onglet Routines : une seule ligne « Hermes » ; ligne 98 du Canal réécrite. Onglet Autonomie, ligne 21 : décaler,
+  avancer ou garder la livraison des couches après son choix dans JARVIS. Sonde de l'espace client écrite et
+  essayée sur un faux site (`bash jarvis-os/server/tests/portail-sonde.test.sh`, 7 vérifications) : elle ne lit
+  que le squelette des pages, sans donnée personnelle ni secret. Banc d'Hermes : 73 sur 73.
+- 24/11/2026 (nuit) : **essai du web prêt**. JARVIS 0.72.0 (profil « veilleur », signature). Kit : `web` n'est plus dans
+  `agent.disabled_toolsets` (ni le groupe « safe », qui le contenait : vu au banc), mais dans aucune liste de
+  `platform_toolsets` ; `politique-jarvis-web.yaml` (serveur « jarvis-web », 5 outils) ajouté par `install.sh` quand
+  le second jeton est posé (`relier-jarvis.sh --web`, qui refuse un jeton « Exécutant ») ; `routines.conf` a une
+  colonne « outils » (liste exacte d'une routine, écrite dans `enabled_toolsets` par `routines.sh`, qui refuse le
+  web avec le serveur « jarvis ») ; skill `digest-ia` d'après la fiche d'Athéna. Les six rubriques « actuelles »
+  d'Athéna ne sont écrites nulle part que je puisse lire (son texte de routine n'est pas dans « Textes des
+  routines ») : la skill part de l'onglet Sources et de rubriques déduites. Banc d'Hermes : 84 sur 84 (au banc,
+  Telegram n'a ni le web ni « jarvis-web » ; la routine du web lit Sources par le jeton « Veilleur », n'a pas
+  l'outil des mails, a `web_search` et `web_extract`). **Non vérifié** : la recherche web sans clé elle-même
+  (services gratuits d'Exa, Parallel, Firecrawl, Keenable, d'après la doc d'Hermes) : premier vrai passage.
+
+## Autres workflows étudiés pour Hermes (sa question du 24/11/2026)
+
+Sa question : sur quoi Hermes serait plus efficace, et quoi ajouter à ce que fait déjà JARVIS. Réponse donnée :
+Hermes n'est aujourd'hui « plus efficace » sur rien par ses moyens (même serveur, même Claude, même forfait que
+JARVIS, et moins d'outils que ses missions) ; son intérêt est la mémoire d'un passage à l'autre, le jugement
+sur des mails à heure fixe sans la réserve Grok, et les boucles « repérer, demander, agir, confirmer, retenir ».
+
+| Sujet | Déjà géré par | Verdict |
+|---|---|---|
+| Dossiers qui dorment (tiers muet depuis N jours : carte Relancer / Attendre / Clore, brouillon de relance) | Iris, au cas par cas, sans règle de délai ; dépend de la réserve Grok (une relance manquée pendant la pause du 13 au 17/11) | Le plus utile ; à greffer sur la Veille du matin, sans passage en plus ; demande un outil borné pour écrire dans Dossiers et une ligne dans la Charte |
+| Abonnements et renouvellements | Le Radar de JARVIS (mails lus chaque matin par règles) ; Hermes n'a pas le droit de lire le Radar | Doublon : si des boutons Garder / Résilier sont voulus, ils vont dans le Radar, sans Hermes |
+| Mail à l'arrivée sans Grok | Iris (Courrier prioritaire), Kairos (Signal prix), Chronos (Facture reçue) | Seul Courrier prioritaire est transférable (Signal prix exige le web, Facture reçue un portail) ; plus de filtres Gmail à la main, mais le plus gros chantier |
+| Retours et garanties d'achats | Personne (Likely ; Charte non relue) | Nouveau, gain incertain ; sans le web, délai légal de 14 jours par défaut |
+
+**Sa décision (QCM du 24/11/2026) : « Rien avant la comparaison ».** On termine le scénario des couches, la Veille
+du matin reste en double, et rien d'autre n'est ajouté à Hermes avant la comparaison (à partir du 07/12/2026, à
+sa demande). Ne repropose pas ces sujets d'ici là.
+
+## Le coffre (sa question du 24/11/2026 : « c'est pas en clair j'espère »)
+
+La première version de `portail-couches.sh` gardait l'adresse et le mot de passe en clair dans le dossier de JARVIS
+(0600). Deux défauts : en clair, et lisible par le Claude des missions de JARVIS (même utilisateur, hors de la
+liste des fichiers que son garde-fou lui interdit). Refait avant toute saisie :
+
+- **Chiffré dès la saisie** par systemd (`systemd-creds encrypt`, AES-256-GCM) dans `/etc/jarvis-portail/couches.cred`
+  (root, 0600, dossier 0700). Le clair ne touche jamais le disque. La clé est celle de la machine
+  (`/var/lib/systemd/credential.secret`, root 0400), plus la puce TPM s'il y en a une.
+- **Ouvert en mémoire pour un seul programme** : une copie root de la sonde (`/usr/local/lib/jarvis-portail/`, jamais un
+  fichier du dépôt), lancée par `systemd-run` sous l'utilisateur `jarvis-portail` (sans shell), enfermée
+  (`LoadCredentialEncrypted`, `ProtectSystem=strict`, `ProtectHome`, 3 minutes au plus).
+- **Personne d'autre** : ni le serveur de JARVIS, ni son Claude, ni Hermes, ni Claude Code, ni la session du serveur
+  ne lisent le coffre. Le geste « changer la date » sera un guichet de la même forme : JARVIS demande un geste
+  d'une liste fermée, un programme root-enfermé l'exécute avec le coffre ouvert.
+- **Limites** (dites à lui) : root sur le serveur peut déchiffrer ; une copie de tout le disque emporte la clé avec
+  le coffre (pas de TPM sur le VPS, à confirmer par `--essai`) ; au moment de la connexion le mot de passe est en
+  clair en mémoire, forcément. Un coffre externe (Bitwarden, 1Password) déplacerait le problème : il faut un jeton
+  sur le serveur pour l'ouvrir ; son seul gain est de pouvoir le révoquer à distance. Conseil : un mot de passe
+  propre à ce site.
+- `--essai` vérifie le coffre sur une machine sans saisie ni vrai secret (pour la session « Serveur JARVIS ») ;
+  `--retirer` efface tout. Banc : `sudo bash jarvis-os/server/tests/portail-coffre.test.sh` (10 vérifications).
+  Non vérifiable au banc : le lancement par `systemd-run` (pas de systemd dans le conteneur) : c'est `--essai`
+  sur le serveur qui le prouve.
+
+## Le coffre en mémoire (ses réponses du 24/11/2026 : « sécuriser au maximum », il a NordPass)
+
+Ses positions, par QCM :
+- NordPass à chaque usage (Face ID) : bien pour les couches, **refusé comme règle** : une tâche où Hermes doit être
+  autonome à 100 % serait bloquée.
+- Coffre chiffré avec la clé de la machine (`systemd-creds`) : **refusé** : « quiconque a accès au disque peut tout
+  faire ».
+- Retenu : **un coffre dont la clé n'est jamais sur le disque, seulement en mémoire, pour tout** (mots de passe de
+  sites et accès Google de JARVIS). Il le déverrouille une fois après chaque redémarrage du serveur ; ensuite tout
+  est autonome. Il accepte le prix : après un redémarrage, JARVIS n'a plus Google et Hermes attend, jusqu'au
+  déverrouillage.
+
+Faits vérifiés le 24/11/2026 :
+- (Likely, aide de NordPass) NordPass a une ligne de commande (`np signin` par le navigateur, `np unlock` avec le mot
+  de passe maître, verrouillage après 15 minutes) ; aucun jeton de service ni accès limité à un élément trouvé :
+  la mettre sur le serveur exposerait tout son coffre NordPass. **NordPass reste sur son iPhone** : il y garde la
+  phrase du coffre du serveur. Un élément NordPass accepte plusieurs adresses (certain).
+- (certain) Le VPS n'a pas de puce TPM ; l'accès Google de JARVIS est aujourd'hui en clair dans `state.json` (0600).
+
+Montage à construire (`jarvis-coffre`) :
+1. Un service à part (utilisateur dédié, code à root, enfermé, sans échange ni image mémoire). Sur le disque :
+   la clé du coffre enveloppée par une clé dérivée de sa phrase (scrypt), et chaque secret chiffré (AES-256-GCM).
+   En mémoire, après déverrouillage seulement : la clé.
+2. **Déverrouillage après un redémarrage** : JARVIS le prévient par une notification (sa clé de notification reste
+   lisible au démarrage) ; il lance `sudo jarvis-coffre ouvrir` dans Termius et colle la phrase gardée dans
+   NordPass. La phrase ne passe ni par JARVIS, ni par Hermes, ni par une conversation. `fermer` reverrouille tout.
+3. Deux portées de secret : « service » (l'accès Google : rendu au serveur de JARVIS, qui le garde en mémoire et ne
+   l'écrit plus dans `state.json`) et « guichet » (mots de passe de sites : jamais rendus ; seuls des gestes d'une
+   liste fermée, à root, s'en servent, comme « décaler la livraison des couches »).
+4. Après la bascule de l'accès Google : lui faire refaire « Reconnecter » (et changer le secret du client Google),
+   pour que l'ancien jeton, resté une semaine en clair sur le disque, ne vaille plus rien.
+5. Redémarrages : vérifier que les mises à jour automatiques ne redémarrent pas le serveur seules.
+Limite qui reste, dite à lui : quelqu'un qui prend la main en root sur le serveur allumé peut lire la mémoire.
+
+En attendant : `portail-couches.sh` ne garde **plus rien** par défaut (identifiants passés par un tube au programme
+enfermé, ni disque, ni échange, ni image mémoire) ; `--garder` (coffre de systemd) reste pour mémoire. Banc :
+`sudo bash jarvis-os/server/tests/portail-coffre.test.sh` (13 vérifications).
+- 24/11/2026 : **`jarvis-coffre` écrit** (`jarvis-os/coffre/` : service `coffre.mjs`, commande `jarvis-coffre`, unité, `install.sh`,
+  `README.md`). Sur le disque : la clé enveloppée par scrypt (N=2^17) et chaque secret en AES-256-GCM lié à son
+  nom et à sa portée ; en mémoire après `ouvrir` seulement. Deux prises : `admin.sock` (root : créer, ouvrir,
+  fermer, mettre, retirer, changer la phrase) et `service.sock` (groupe `jarvis-coffre-clients`, où `install.sh`
+  met `jarvis` : état, lire un secret « service », écrire un secret `jarvis-…`, fermer). Un secret « guichet »
+  n'est rendu par aucune commande. Bancs relancés par Claude : 75 et 30, tout passe ; `install.sh` passé au banc
+  (sans systemd). **Non vérifié** : l'unité sous un vrai systemd (seulement `systemd-analyze`). Pas encore
+  branché : l'accès Google de JARVIS (prochaine étape : `google.mjs` lit et écrit ses jetons dans le coffre,
+  JARVIS notifie « coffre verrouillé », puis « Reconnecter ») ; le geste des couches par le guichet.
+

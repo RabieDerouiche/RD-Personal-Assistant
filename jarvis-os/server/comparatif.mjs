@@ -85,7 +85,7 @@ export const cleProduit = (nom, marque) => {
   if (m && k.indexOf(m) === 0) k = k.slice(m.length).trim();
   return k.split(' ').filter((w) => (w.length > 1 || /\d/.test(w)) && !/^(la|le|les|de|du|des|et|en|avec|pour|a|au|aux|sa|son|ses)$/.test(w)).join(' ');   /* les chiffres comptent : « Maison 1 » n'est pas « Maison 2 » */
 };
-/* 0.70.0 : une adresse IP du serveur lui-même ou d'un réseau privé, réservé ou local (IPv4, IPv6, IPv4 écrite en IPv6) */
+/* 0.73.0 : une adresse IP du serveur lui-même ou d'un réseau privé, réservé ou local (IPv4, IPv6, IPv4 écrite en IPv6) */
 export function ipPrivee(ip) {
   ip = String(ip || '').toLowerCase().replace(/^\[|\]$/g, '');
   const m4 = ip.match(/^::ffff:(?:0:)?(\d+\.\d+\.\d+\.\d+)$/); if (m4) ip = m4[1];
@@ -94,7 +94,7 @@ export function ipPrivee(ip) {
   if (!net.isIPv6(ip)) return true;   /* illisible : refusée */
   return ip.startsWith('::') || /^f[c-f]/.test(ip) || ip.startsWith('64:ff9b:');   /* ::1, ::, IPv4 en IPv6, réseaux privés, locaux, multidiffusion, NAT64 */
 }
-/* 0.70.0 : une adresse du web public, qu'on peut demander sans risque (http ou https, pas de nom local, aucune IP privée derrière le nom) ;
+/* 0.73.0 : une adresse du web public, qu'on peut demander sans risque (http ou https, pas de nom local, aucune IP privée derrière le nom) ;
    « confiance » : une origine permise quand même (réglée par le propriétaire) */
 export async function adresseSure(u, confiance = '', lookup = dns.lookup) {
   let h; try { h = new URL(u); } catch { return false; }
@@ -105,7 +105,7 @@ export async function adresseSure(u, confiance = '', lookup = dns.lookup) {
   if (net.isIP(host)) return !ipPrivee(host);
   try { const l = await lookup(host, {all: true}); return l.length > 0 && !l.some((x) => ipPrivee(x.address)); } catch { return false; }
 }
-/* 0.70.0 : le corps d'une réponse, « max » octets au plus (lu en flux : une image de plusieurs centaines de Mo n'est plus mise en mémoire
+/* 0.73.0 : le corps d'une réponse, « max » octets au plus (lu en flux : une image de plusieurs centaines de Mo n'est plus mise en mémoire
    avant d'être refusée) ; au-delà : null, ou le début si « tronquer » */
 export async function lireCorps(r, max, tronquer = false) {
   const annule = async () => { try { await r.body?.cancel(); } catch { /* rien */ } };
@@ -131,7 +131,7 @@ export function createComparatifs({S, save, DATA, runClaude, model, ideesModel, 
      image Steam pour un jeu vidéo), les télécharge, écarte les trop petites, puis Claude les REGARDE et garde la bonne (le produit lui-même,
      sans bannière ni prix). Gardée sur le serveur. */
   const UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1';
-  /* 0.70.0 : les adresses viennent du web (réponse de Claude, fiches des vendeurs) : jamais le serveur lui-même ni le réseau local (l'API
+  /* 0.73.0 : les adresses viennent du web (réponse de Claude, fiches des vendeurs) : jamais le serveur lui-même ni le réseau local (l'API
      d'administration de Caddy, les autres services, les métadonnées de l'hébergeur), y compris au bout d'une redirection, suivie à la main
      (3 au plus). Seule exception : l'adresse de Steam réglée par le propriétaire (JARVIS_STEAM_URL, le faux web des bancs d'essai). */
   const confiance = (() => { try { return new URL(steamBase).origin; } catch { return ''; } })();
@@ -214,9 +214,9 @@ export function createComparatifs({S, save, DATA, runClaude, model, ideesModel, 
   async function photos(famille, vars) {
     const dir = path.join(workDir, 'photos-' + sha(famille + now()).slice(0, 10)); fs.mkdirSync(dir, {recursive: true});
     try { return await photosDans(dir, famille, vars); }
-    finally { fs.rm(dir, {recursive: true, force: true}, () => {}); }   /* 0.70.0 : le dossier de travail est effacé même après une erreur (disque plein…) */
+    finally { fs.rm(dir, {recursive: true, force: true}, () => {}); }   /* 0.73.0 : le dossier de travail est effacé même après une erreur (disque plein…) */
   }
-  /* 0.70.0 : le nom d'une variante sans accents, signes ni ponctuation (« Thermomix® TM7 » = « Thermomix TM7 ») */
+  /* 0.73.0 : le nom d'une variante sans accents, signes ni ponctuation (« Thermomix® TM7 » = « Thermomix TM7 ») */
   const nomNet = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
   async function photosDans(dir, famille, vars) {
     const list = [];
@@ -240,7 +240,7 @@ export function createComparatifs({S, save, DATA, runClaude, model, ideesModel, 
         system: PHOTO_SYSTEM, model: visionModel, cwd: dir, timeoutMs: 5 * 60000, effort: 'low', settings, tools: {allow: ['Read'], deny: ['Bash', 'Edit', 'Write', 'Glob', 'Grep', 'NotebookEdit', 'WebSearch', 'WebFetch', 'Task']}});
       const t = String(r.text || ''); const j = r.ok ? JSON.parse(t.slice(t.indexOf('{'), t.lastIndexOf('}') + 1)) : null; if (j && Array.isArray(j.choix)) choix = j.choix;
     } catch { choix = null; }
-    /* 0.70.0 : le choix de Claude est retrouvé même s'il a retouché le nom (®, accents, guillemets), sinon par le fichier choisi
+    /* 0.73.0 : le choix de Claude est retrouvé même s'il a retouché le nom (®, accents, guillemets), sinon par le fichier choisi
        (les candidates d'une variante sont nommées v<rang>-…) ; un « null » de sa part reste un refus */
     return list.map((x, k) => {
       let f = null;
@@ -285,7 +285,7 @@ export function createComparatifs({S, save, DATA, runClaude, model, ideesModel, 
     c.statut = 'pret'; c.at = now(); c.ver = VER; menage(); save();
   }
 
-  /* 0.70.0 : les comparatifs en file ou en préparation. Avant, un comparatif encore en file (sans heure de début) était remis en file à chaque
+  /* 0.73.0 : les comparatifs en file ou en préparation. Avant, un comparatif encore en file (sans heure de début) était remis en file à chaque
      ouverture d'Achats : passages de Claude en double, et le premier résultat écrit dans un objet perdu */
   const enFile = new Set();
   /* la page demande le comparatif d'un produit : gardé s'il existe et n'est pas vieux, sinon préparé (un à la fois) */
@@ -307,7 +307,7 @@ export function createComparatifs({S, save, DATA, runClaude, model, ideesModel, 
   }
   const liste = () => Object.values(S.comparatifs).map(view);
 
-  /* 0.70.0 : le ménage. Avant, rien n'était jamais effacé : une photo par variante et par proposition (jusqu'à 6 Mo chacune) et un comparatif
+  /* 0.73.0 : le ménage. Avant, rien n'était jamais effacé : une photo par variante et par proposition (jusqu'à 6 Mo chacune) et un comparatif
      par jeu de variantes, gardés pour toujours (et réécrits à chaque sauvegarde de l'état). Restent : les 5 comparatifs les plus récents de
      chaque produit, et les photos qu'un comparatif ou une recherche montre encore (une photo de moins d'un jour reste : elle attend peut-être
      sa fiche). Fait au démarrage et après chaque comparatif ou recherche terminés. */
@@ -333,10 +333,10 @@ export function createComparatifs({S, save, DATA, runClaude, model, ideesModel, 
   /* ---------- 0.24.0 : chercher un produit à partir d'une idée ---------- */
   S.idees = Array.isArray(S.idees) ? S.idees : [];
   menage();
-  try { for (const d of fs.readdirSync(workDir)) if (/^photos-[0-9a-f]{10}$/.test(d)) fs.rmSync(path.join(workDir, d), {recursive: true, force: true}); } catch { /* pas encore de dossier de travail */ }   /* 0.70.0 : les restes d'un arrêt brutal */
+  try { for (const d of fs.readdirSync(workDir)) if (/^photos-[0-9a-f]{10}$/.test(d)) fs.rmSync(path.join(workDir, d), {recursive: true, force: true}); } catch { /* pas encore de dossier de travail */ }   /* 0.73.0 : les restes d'un arrêt brutal */
   let qIdees = Promise.resolve();
   const num = (x) => (x === '' || x == null || isNaN(+x) || +x < 0 ? null : Math.round(+x * 100) / 100), note10 = (x) => (num(x) == null ? null : Math.max(0, Math.min(10, Math.round(+x * 10) / 10)));
-  /* 0.70.0 : les recherches en file ou en cours. Une recherche « en cours » qui n'y est pas a été interrompue (serveur redémarré). Avant, elle
+  /* 0.73.0 : les recherches en file ou en cours. Une recherche « en cours » qui n'y est pas a été interrompue (serveur redémarré). Avant, elle
      était déclarée interrompue au bout de 40 minutes, alors qu'elle pouvait attendre son tour (les recherches passent une à une, jusqu'à
      50 minutes chacune avec les photos) : la relancer faisait deux passages d'Opus et deux notifications */
   const actifs = new Set();
@@ -376,7 +376,7 @@ export function createComparatifs({S, save, DATA, runClaude, model, ideesModel, 
     if (j.certitude) L.certitude = clean(j.certitude, 20);
     L.sources = Array.from(new Set(L.sources.concat([].concat(j.sources || []).filter((u) => /^https?:\/\//.test(u))))).slice(0, 6);
   }
-  /* 0.70.0 : une recherche effacée (ou remplacée) en chemin s'arrête à l'étape suivante, sans notification */
+  /* 0.73.0 : une recherche effacée (ou remplacée) en chemin s'arrête à l'étape suivante, sans notification */
   const gardee = (x) => S.idees.includes(x);
   const fini = (x) => { if (gardee(x)) onIdee(x); };
   async function rechercher(x) {
@@ -427,7 +427,7 @@ export function createComparatifs({S, save, DATA, runClaude, model, ideesModel, 
     if (idee.length < 2) return {ok: false, error: 'Dis-moi ton idée, ex. maison de poupée.'};
     const sig = sha([idee, pour, min, max, n].join('|').toLowerCase()).slice(0, 16);
     let x = S.idees.find((y) => y.sig === sig);
-    if (x && actifs.has(x.id)) return {ok: true, recherche: vueIdee(x)};   /* 0.70.0 : déjà en file ou en cours, même pour « refaire » */
+    if (x && actifs.has(x.id)) return {ok: true, recherche: vueIdee(x)};   /* 0.73.0 : déjà en file ou en cours, même pour « refaire » */
     if (x && !b.refaire) { const v = vueIdee(x); if (['en_cours', 'photos'].includes(v.statut) || (v.statut === 'pret' && now() - x.at < 12 * 3600000)) return {ok: true, recherche: v}; }
     if (S.idees.filter((y) => vueIdee(y).statut === 'en_cours').length >= 3) return {ok: false, error: 'Trois recherches sont déjà en cours : attends qu’une se termine.'};
     x = {id: 'i' + sha(sig + now()).slice(0, 10), sig, idee, pour, min, max, n, at: now(), debut: now(), statut: 'en_cours', erreur: '', data: null};

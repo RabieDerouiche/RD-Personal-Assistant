@@ -46,7 +46,7 @@ export function occurrences(f, a, b) {
     out.push({f: ff, brut, le});
   }
   /* 0.51.0 : la facture du mois est arrivée (« 160,00 € prélevés le 28 ») : son montant et son jour, à la place de l'habituel.
-     0.70.0 : à une seule échéance de son mois, la plus proche (un prélèvement du samedi 31 octobre reporté au lundi 2 novembre fait deux
+     0.73.0 : à une seule échéance de son mois, la plus proche (un prélèvement du samedi 31 octobre reporté au lundi 2 novembre fait deux
      échéances en novembre : la facture ne remplaçait pas seulement celle du 2, mais aussi celle du 30) */
   if (f.prochain && f.prochain.date) {
     const pm = String(f.prochain.date).slice(0, 7), d = depuisYmd(f.prochain.date); let best = null;
@@ -84,7 +84,7 @@ export function montantDe(s) {
   if (/^\d{5,6}$/.test(String(s).trim())) n = n / 100;   /* 0.56.0 : « 15359€ » collé (virgule perdue dans la mise en page) = 153,59 € ; pas « 56 800 € » */
   return isFinite(n) && n > 0 && n < 20000 ? n : null;
 }
-/* 0.70.0 : le montant rendu par Claude : un nombre, ou un texte (« 49,90 € », « €1,234.56 », « 12,5 EUR ») ; avant, « 49,90 € » devenait 4 990 €
+/* 0.73.0 : le montant rendu par Claude : un nombre, ou un texte (« 49,90 € », « €1,234.56 », « 12,5 EUR ») ; avant, « 49,90 € » devenait 4 990 €
    (le « € » cachait la virgule) et 12000 devenait 120 (la règle du « 15359€ » collé, faite pour le texte des mails) */
 export function montantClaude(v) {
   if (typeof v === 'number') return isFinite(v) && v > 0 && v < 20000 ? Math.round(v * 100) / 100 : null;
@@ -289,13 +289,13 @@ export function marchand(objet, texte, nom) {
 }
 /* un mail lu : {id, fil, dom, cle, service, genre, montant, avant, datePrel, date, sur} ; « sur » = les règles ont tout compris */
 export function lireMail(m) {
-  /* 0.70.0 : le jour du mail est celui de Paris (Google donne l'heure UTC : une facture de 0 h 40 le 1er était datée du 31, « vers le 31 ») ;
+  /* 0.73.0 : le jour du mail est celui de Paris (Google donne l'heure UTC : une facture de 0 h 40 le 1er était datée du 31, « vers le 31 ») ;
      une date sans heure reste telle quelle */
   const iso = String(m.date || ''), date = /T\d\d:/.test(iso) && !isNaN(Date.parse(iso)) ? ymd(parisJour(Date.parse(iso))) : iso.slice(0, 10);
   const texte = String(m.texte || '').slice(0, 20000), objet = String(m.objet || ''), ref = /^\d{4}-\d{2}-\d{2}$/.test(date) ? depuisYmd(date) : null;
   const tout = objet + '\n' + texte, s = plat(tout), dom = domaine(m.sender);
   let g = genre(objet, texte);
-  /* 0.68.0 : « aujourd'hui » se compte à l'heure de Paris (un mail de 0 h 30 n'est pas de la veille) ; 0.70.0 : la date du mail l'est déjà */
+  /* 0.68.0 : « aujourd'hui » se compte à l'heure de Paris (un mail de 0 h 30 n'est pas de la veille) ; 0.73.0 : la date du mail l'est déjà */
   const refP = ref;
   /* 0.51.0 : un échéancier (au moins deux montants datés, dans un mail de paiement en plusieurs fois) : des prélèvements ponctuels */
   const ech = g === 'adhesion' ? [] : echeancier(tout, refP), mt = ech.map((e) => e.montant), plusieurs = ech.length >= 2 && EN_FOIS.test(s) && Math.max(...mt) <= Math.min(...mt) * 1.1 + 0.05;   /* des échéances égales */
@@ -415,7 +415,7 @@ const SYS_CLAUDE = "Tu lis des mails de facturation pour le tableau des dépense
 const estQuota = (e) => /quota|rate ?limit|\b429\b|too many requests|userRateLimitExceeded|resource has been exhausted/i.test(String((e && e.message) || e));
 export function createRadar({file, gmail, claude = async () => ({ok: false, error: 'Claude absent.'}), push = async () => [], now = Date.now, log = () => {}, matin = '06:50', soir = '19:00', moisDepart = 13, maxClaude = 60, parLot = 8, maxPdf = 80,
   budget = 4000, horloge = Date.now, attente = (ms) => new Promise((z) => setTimeout(z, ms)), pauseQuota = 65000, delaiGmail = 90000, bloquee = 15 * 60e3}) {
-  /* 0.70.0 : un radar.json abîmé (édition à la main ratée, incident du disque) n'est plus écrasé sans bruit par un état vide au premier tic : il est
+  /* 0.73.0 : un radar.json abîmé (édition à la main ratée, incident du disque) n'est plus écrasé sans bruit par un état vide au premier tic : il est
      mis de côté (radar-illisible-<date>.json, droits 600 : il garde sa mensualité de crédit, et le garde-fou de Claude interdit déjà les *.json du
      dossier) et le journal le dit. Pas de fichier : un Radar neuf, comme avant. */
   const lireFichier = () => {
@@ -431,7 +431,7 @@ export function createRadar({file, gmail, claude = async () => ({ok: false, erro
      Claude a déjà lu, pour qu'une relecture ne lui renvoie pas les mêmes mails) */
   const R = Object.assign({fixes: [], revenus: null, notif: {veille: true, seuil: 20, echec: true}, propositions: [], refus: [], releves: [], alertes: [], avenir: [], ponctuels: [], mandats: [], finis: [], gardes: {}, vus: [], fils: {}, scan: null, jours: {}, maj: null,
     plans: {}, plansRetires: [], alertesVues: {}, traitees: [], refusNoms: {}, claudeLus: {}}, lireFichier());
-  /* 0.70.0 : les mails « nouvelle mensualité » déjà appliqués à une dépense fixe (gardés hors de oublier()) : « Tout relire » ne les réapplique pas,
+  /* 0.73.0 : les mails « nouvelle mensualité » déjà appliqués à une dépense fixe (gardés hors de oublier()) : « Tout relire » ne les réapplique pas,
      sa correction à la main reste. Un fichier d'avant les retrouve dans les alertes encore gardées. */
   if (!Array.isArray(R.mensAppliquees)) R.mensAppliquees = (R.alertes || []).concat((R.avant && R.avant.alertes) || []).filter((a) => a && a.type === 'mensualite' && /^a/.test(a.id || '')).map((a) => a.id.slice(1)).slice(-200);
   if (R.scan && R.scan.enCours) { R.scan.enCours = false; R.scan.erreur = R.scan.erreur || 'Lecture interrompue (serveur redémarré) : elle reprend à la prochaine ouverture du Radar.'; }
@@ -518,7 +518,7 @@ export function createRadar({file, gmail, claude = async () => ({ok: false, erro
   const vue = () => (enRelecture() ? {...R, ...R.avant} : R);
   function proposition(id, oui, modif) {
     const p = R.propositions.find((x) => x.id === id) || (enRelecture() ? (R.avant.propositions || []).find((x) => x.id === id) : null); if (!p) return {ok: false, error: 'Proposition introuvable.'};
-    /* 0.70.0 : retirée d'« À valider » seulement une fois sa saisie acceptée (avant : une saisie refusée la faisait disparaître sans l'ajouter) */
+    /* 0.73.0 : retirée d'« À valider » seulement une fois sa saisie acceptée (avant : une saisie refusée la faisait disparaître sans l'ajouter) */
     const retirer = () => { R.propositions = R.propositions.filter((x) => x.id !== id); if (R.avant && R.avant.propositions) R.avant.propositions = R.avant.propositions.filter((x) => x.id !== id); };
     if (oui) {
       const f = propre({...p, ...(modif || {}), id: 'f' + p.id.slice(1), source: 'mail', dom: p.dom, cle: p.cle}, 0); if (!f) return {ok: false, error: 'Dépense incomplète : il faut un nom, un montant de moins de 100 000 € et un jour de 1 à 31.'};
@@ -559,7 +559,7 @@ export function createRadar({file, gmail, claude = async () => ({ok: false, erro
     /* 0.66.0 : les montants de son contrat (un par mois) remplacent son montant fixe ; « Garder » : son montant reste, plus de question */
     if (a.type === 'calendrier') {
       const c = a.calendrier || {};
-      /* 0.70.0 : une fin plus proche (« Retirer » après une résiliation) n'est pas repoussée à celle du contrat */
+      /* 0.73.0 : une fin plus proche (« Retirer » après une résiliation) n'est pas repoussée à celle du contrat */
       if (f && action === 'appliquer' && Array.isArray(c.paliers) && c.paliers.length) {
         Object.assign(f, {paliers: c.paliers, rythme: 'mensuel', ...(c.jour ? {jour: c.jour} : {}), ...(c.debut ? {debut: c.debut} : {}), ...(c.fin && !(f.fin && f.fin < c.fin) ? {fin: c.fin} : {}), ...(c.contrat ? {contrat: c.contrat} : {})});
         delete f.mois; delete f.estime; delete f.variable; f.montant = montantPalier(f.paliers, t0.slice(0, 7)) ?? f.montant;
@@ -623,7 +623,7 @@ export function createRadar({file, gmail, claude = async () => ({ok: false, erro
       }
     }
   }
-  /* 0.70.0 : les fils et les messages lus ne sont marqués « déjà lus » (R.fils, R.vus) qu'une fois leurs relevés retenus, à la fin de lire() :
+  /* 0.73.0 : les fils et les messages lus ne sont marqués « déjà lus » (R.fils, R.vus) qu'une fois leurs relevés retenus, à la fin de lire() :
      avant, une lecture coupée (limite de Google, lecture figée remplacée) les marquait sans les compter, et la reprise les sautait pour de bon */
   async function lireRequete(q, n, o) {
     const r = await gm(() => gmail.chercher(q, n), 10, o), fils = (r && r.threads) || [], dejaVus = vus(), lus = [], marques = {fils: [], vus: []};
@@ -738,7 +738,7 @@ export function createRadar({file, gmail, claude = async () => ({ok: false, erro
       const mots = [nom, lu.service, c.creancier].filter(Boolean).map(nomPlat).filter((w) => w.length >= 4);
       const f = R.fixes.find((x) => !(x.fin && x.fin < ymd(t)) && ((cleDe(x) && cleDe(x) === lu.cle) || mots.some((w) => nomPlat(x.service).includes(w)) || (assur && /assurance.*(pret|emprunt|credit)|emprunteur/.test(plat(x.service)))));
       if (f) {
-        /* 0.70.0 : le même tableau déjà appliqué puis arrêté plus tôt (« Retirer » après une résiliation) ne repropose pas de le remettre jusqu'au bout */
+        /* 0.73.0 : le même tableau déjà appliqué puis arrêté plus tôt (« Retirer » après une résiliation) ne repropose pas de le remettre jusqu'au bout */
         const memes = f.paliers && f.paliers.length === c.paliers.length && f.paliers.every((p, i) => p.du === c.paliers[i].du && cents(p.montant) === cents(c.paliers[i].montant));
         const deja = f.paliers && f.paliers.length === c.paliers.length && (f.fin === cal.fin || !!(memes && f.fin && f.fin < cal.fin));
         if (!deja && R.gardes['c' + f.id] !== cal.fin && !R.alertes.some((a) => a.type === 'calendrier' && a.fixe === f.id))
@@ -754,7 +754,7 @@ export function createRadar({file, gmail, claude = async () => ({ok: false, erro
     if (lu.genre === 'contrat') { if (lu.cle && lu.montant) { const j0 = lu.datePrel || lu.date, ry = lu.rythme || 'mensuel'; annonce(lu, {montant: lu.montant, jour: +j0.slice(8, 10), ...(lu.datePrel ? {} : {jourApprox: true}), rythme: ry, ...(ry !== 'mensuel' ? {mois: +j0.slice(5, 7)} : {}), ...(lu.datePrel && lu.datePrel > ymd(t) ? {debut: lu.datePrel} : {})}); } return; }
     if (lu.genre === 'resiliation') {
       if (lu.cle) R.finis = [...new Set([...R.finis, lu.cle])].slice(-200);
-      /* 0.70.0 : aussi une dépense qui a une fin plus lointaine (mensualisation, contrat passé au tableau, assurance de prêt jusqu'en 2045) ;
+      /* 0.73.0 : aussi une dépense qui a une fin plus lointaine (mensualisation, contrat passé au tableau, assurance de prêt jusqu'en 2045) ;
          pas une qui s'arrête déjà à la date annoncée ou avant (« Retirer » déjà fait) */
       const f = R.fixes.find((x) => !(x.fin && x.fin <= (lu.datePrel || lu.date)) && ((lu.cle && cleDe(x) === lu.cle) || nomPlat(x.service) === nomPlat(lu.service)));
       if (f && !R.gardes['r' + f.id] && !R.alertes.some((a) => a.type === 'resiliation' && a.fixe === f.id)) R.alertes.push({id: 'r' + lu.id, date: lu.date, type: 'resiliation', titre: 'Résiliation', service: f.service, montant: f.montant, fixe: f.id,
@@ -765,7 +765,7 @@ export function createRadar({file, gmail, claude = async () => ({ok: false, erro
     if (lu.genre === 'mensualite') {
       if (!lu.cle || !lu.montant) return;
       const f = R.fixes.find((x) => !x.fin && ((cleDe(x) && cleDe(x) === lu.cle) || nomPlat(x.service) === nomPlat(lu.service)));
-      /* 0.70.0 : un mail de mensualité ne change sa dépense qu'une fois : relu (« Tout relire »), il ne défait pas sa correction à la main */
+      /* 0.73.0 : un mail de mensualité ne change sa dépense qu'une fois : relu (« Tout relire »), il ne défait pas sa correction à la main */
       const deja = R.mensAppliquees.includes(lu.id); if (!deja) R.mensAppliquees = R.mensAppliquees.concat([lu.id]).slice(-200);
       if (f) { if (!deja && Math.abs(f.montant - lu.montant) >= 0.01 && age <= 120) { R.alertes.push({id: 'a' + lu.id, date: lu.date, cle: lu.cle || '', type: 'mensualite', titre: 'Nouvelle mensualité', service: f.service, montant: lu.montant, avant: f.montant, texte: 'Ta dépense fixe passe à ' + eur(lu.montant) + ' par mois.', fil: lu.fil}); f.montant = lu.montant; delete f.estime; } }
       else { const prec = R.releves.filter((r) => (r.cle || r.dom) === lu.cle && r.datePrel).map((r) => +r.datePrel.slice(8, 10)), ancien = R.mandats.find((m) => m.cle === lu.cle && !m.jourApprox), j0 = lu.datePrel || lu.date;
@@ -847,7 +847,7 @@ export function createRadar({file, gmail, claude = async () => ({ok: false, erro
         avEch.push({id: 'v' + p.id + '-' + i, plan: p.id, date: e.date, service: nom, montant: e.montant, type: 'echeance', note: 'Échéance ' + (i + 1) + ' sur ' + n + (e.estime ? ', date estimée' : '') + '.'}); });
     }
     R.ponctuels.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
-    /* 0.70.0 : plusieurs rappels du même renouvellement (ou de la même fin d'essai, de la même hausse) font une seule ligne « À venir » : celle du
+    /* 0.73.0 : plusieurs rappels du même renouvellement (ou de la même fin d'essai, de la même hausse) font une seule ligne « À venir » : celle du
        dernier mail lu qui donne un montant */
     const avs = new Map();
     for (const v of uniq(R.avenir).filter((v) => v.type !== 'echeance' && v.date >= t0)) { const k = v.type + '|' + nomPlat(v.service) + '|' + v.date, p = avs.get(k); if (!p || v.montant != null || p.montant == null) avs.set(k, v); }
@@ -872,7 +872,7 @@ export function createRadar({file, gmail, claude = async () => ({ok: false, erro
       const a = {id, date: i >= 0 ? R.alertes[i].date : t0, type: 'silence', titre: 'Plus de facture', service: f.service, montant: f.montant, fixe: f.id, dernier: der, texte: 'Dernière facture le ' + jourCourt(depuisYmd(der)) + '. Toujours d’actualité ?'};
       if (i >= 0) R.alertes[i] = a; else R.alertes.push(a);
     }
-    /* 0.70.0 : une alerte liée à une dépense reste tant qu'elle vaut pour elle : « Montants de ton contrat » tant que la dépense court jusqu'à la
+    /* 0.73.0 : une alerte liée à une dépense reste tant qu'elle vaut pour elle : « Montants de ton contrat » tant que la dépense court jusqu'à la
        fin du contrat (avant : effacée dès que la dépense avait une fin, même en 2045 ; arrêtée plus tôt, après une résiliation « Retirer » :
        effacée) ; « Résiliation » tant que la dépense va plus loin que la fin annoncée ; « Plus de facture » pour une dépense sans fin, comme avant */
     const vaut = (a, f) => (a.type === 'calendrier' ? !(f.fin && (f.fin < t0 || (a.calendrier && a.calendrier.fin && f.fin < a.calendrier.fin))) : a.type === 'resiliation' ? !(f.fin && f.fin <= (a.fin || a.date)) : !f.fin);
@@ -935,7 +935,7 @@ export function createRadar({file, gmail, claude = async () => ({ok: false, erro
     if (R.scan && o.depart) R.scan.claude = (R.scan.claude || 0) + envoyes.length;
     /* une facture que ni les règles ni Claude ne chiffrent est gardée sans montant (sa régularité compte) */
     for (const x of surs.concat(compris, aClaude.filter((y) => !lus2.has(y.lu.id)))) retenir(x.lu, o);
-    marquer(lus0.marques);   /* 0.70.0 : relevés retenus : leurs fils et leurs messages sont maintenant « déjà lus » */
+    marquer(lus0.marques);   /* 0.73.0 : relevés retenus : leurs fils et leurs messages sont maintenant « déjà lus » */
     return lus.length;
   }
   /* au départ : ses 13 derniers mois, un mois à la fois (du plus ancien au plus récent), puis les propositions */
@@ -1008,7 +1008,7 @@ export function createRadar({file, gmail, claude = async () => ({ok: false, erro
      mails déjà vus exclus, sans rien montrer. « Tout relire » relit ses 13 mois avec les règles du jour ; ses dépenses fixes, sa paie, ses refus,
      ses alertes vues et ses réponses restent ; ce qu'il voyait reste affiché jusqu'à la fin de la lecture. */
   function relireTout() {
-    /* 0.70.0 : pendant la lecture du matin, la relecture part dès qu'elle finit (avant : rien n'était relu, et la route répondait quand même 202) ;
+    /* 0.73.0 : pendant la lecture du matin, la relecture part dès qu'elle finit (avant : rien n'était relu, et la route répondait quand même 202) ;
        pendant une lecture de départ, rien de plus (elle lit déjà tout) */
     if (occupe && !figee()) return R.scan && R.scan.enCours ? occupe : occupe.then(() => relireTout());
     abandonner();
@@ -1020,7 +1020,7 @@ export function createRadar({file, gmail, claude = async () => ({ok: false, erro
   /* ---------- la veille à 19 h : ce qui part demain, au-dessus de son seuil ---------- */
   async function veille() {
     if (!R.notif.veille) return null;
-    /* 0.70.0 : pendant une relecture, ce qu'il voyait avant (R.avant) ne compte plus un paiement qu'il a dit « plus à payer » depuis */
+    /* 0.73.0 : pendant une relecture, ce qu'il voyait avant (R.avant) ne compte plus un paiement qu'il a dit « plus à payer » depuis */
     const ret = new Set(R.plansRetires || []), pc = vue().ponctuels.filter((x) => !(x.plan && ret.has(x.plan))), dem = plus(auj(), 1), l = resteA(R.fixes, rev(), dem, 'mois', pc).liste.filter((o) => ymd(o.le) === ymd(dem) && cents(o.f.montant) >= cents(R.notif.seuil || 0));
     if (!l.length) return null;
     const r = resteA(R.fixes, rev(), dem, 'paie', pc);
@@ -1029,7 +1029,7 @@ export function createRadar({file, gmail, claude = async () => ({ok: false, erro
     await push(msg).catch(() => {});
     return msg;
   }
-  /* 0.70.0 : une écriture impossible (disque plein, dossier en lecture seule) est notée au journal ; avant, l'erreur sortait du minuteur et
+  /* 0.73.0 : une écriture impossible (disque plein, dossier en lecture seule) est notée au journal ; avant, l'erreur sortait du minuteur et
      arrêtait tout le serveur, chaque minute après 6 h 50 ou 19 h */
   function tic() {
     const noter = () => { try { sauver(); } catch (e) { log('radar : radar.json non enregistré (' + TXT((e && e.message) || e, 200) + ')'); } };
@@ -1078,7 +1078,7 @@ export function createRadar({file, gmail, claude = async () => ({ok: false, erro
     return {maj: R.maj, google: !!gmail.lie(), fixes: R.fixes, revenus: rev(), notif: R.notif, propositions: V.propositions, ponctuels: V.ponctuels.filter((v) => v.date >= t0 && !(v.plan && retires.has(v.plan))).sort((a, b) => (a.date < b.date ? -1 : 1)),
       scan: R.scan ? {enCours: !!R.scan.enCours, mois: R.scan.mois, total: R.scan.total, lus: R.scan.lus, fini: R.scan.fini, erreur: R.scan.erreur, pause: R.scan.pause || '', ...(R.scan.complet ? {complet: true} : {}), ...(R.scan.bilan ? {bilan: R.scan.bilan} : {})} : null,
       relecture: enRelecture(),
-      /* 0.70.0 : ni les échéances d'un paiement « plus à payer » (pendant une relecture, R.avant les gardait) */
+      /* 0.73.0 : ni les échéances d'un paiement « plus à payer » (pendant une relecture, R.avant les gardait) */
       avenir: V.avenir.filter((v) => v.date >= t0 && !(v.plan && retires.has(v.plan))).sort((a, b) => (a.date < b.date ? -1 : 1)),
       /* 0.68.0 : « vu » vient du serveur ; ses réponses aux alertes (pour « Annuler ») ; ce qu'il a écarté (pour « Reproposer ») ; ses paiements en plusieurs fois */
       alertes: V.alertes.slice().sort((a, b) => (a.date < b.date ? 1 : -1)).map((a) => ({...a, ...(a.fil ? {url: urlDe(a.fil)} : {}), ...(vus[a.id] ? {vu: vus[a.id]} : {})})),

@@ -5,7 +5,7 @@
    avec leur table ToUnicode. Pas les scans (images) ni les PDF chiffrés : le texte rendu est alors vide. */
 import zlib from 'node:zlib';
 
-/* 0.70.0 : un PDF piégé ne doit ni geler ni noyer le serveur (la lecture est synchrone, sur le fil du serveur : la page, Siri et les
+/* 0.73.0 : un PDF piégé ne doit ni geler ni noyer le serveur (la lecture est synchrone, sur le fil du serveur : la page, Siri et les
    notifications attendraient). Chaque lecture a un budget : temps, octets décompressés (16 Mo par flux), entrées des tables des polices,
    formulaires lus. Au-delà, le texte déjà lu est rendu. Les images et les polices incluses ne sont plus décompressées (ce n'est pas du texte). */
 const LIMITES = {ms: 2500, octets: 32e6, flux: 16e6, entrees: 500000, formulaires: 300};
@@ -19,7 +19,7 @@ const winAnsi = (bytes) => { let o = ''; for (const b of bytes) o += WIN[b] || S
 /* les objets du fichier : {numéro: {dict, flux (Buffer décodé ou null)}} */
 function objets(buf) {
   const s = buf.toString('latin1'), out = new Map();
-  const re = /(?<!\d)(\d{1,10})\s+(\d{1,5})\s+obj\b/g; let m;   /* 0.70.0 : sans retour en arrière sur une longue suite de chiffres */
+  const re = /(?<!\d)(\d{1,10})\s+(\d{1,5})\s+obj\b/g; let m;   /* 0.73.0 : sans retour en arrière sur une longue suite de chiffres */
   while ((m = re.exec(s))) {
     garde();
     const debut = m.index + m[0].length, fin = s.indexOf('endobj', debut); if (fin < 0) break;
@@ -52,7 +52,7 @@ function a85(b) {
   return Buffer.from(out);
 }
 const ahx = (b) => { let s = b.toString('latin1'); const e = s.indexOf('>'); if (e >= 0) s = s.slice(0, e); s = s.replace(/[^0-9a-fA-F]/g, ''); return Buffer.from(s.length % 2 ? s + '0' : s, 'hex'); };
-/* 0.70.0 : 16 Mo au plus par flux, et 32 Mo pour tout le PDF (un flux de 5 Mo pouvait en donner 5 Go) */
+/* 0.73.0 : 16 Mo au plus par flux, et 32 Mo pour tout le PDF (un flux de 5 Mo pouvait en donner 5 Go) */
 function inflate(b) {
   const lim = Math.min(LIMITES.flux, B ? B.octets : LIMITES.flux); if (lim < 1) return null;
   for (const f of [(x) => zlib.inflateSync(x, {maxOutputLength: lim}), (x) => zlib.inflateSync(x, {maxOutputLength: lim, finishFlush: zlib.constants.Z_SYNC_FLUSH}), (x) => zlib.inflateRawSync(x, {maxOutputLength: lim})]) {
@@ -61,7 +61,7 @@ function inflate(b) {
   return null;
 }
 function decode(dict, brut) {
-  if (/\/Subtype\s*\/(Image|Type1C|CIDFontType0C|OpenType)\b|\/Length1\b/.test(dict)) return null;   /* 0.70.0 : une image ou une police incluse n'est pas du texte */
+  if (/\/Subtype\s*\/(Image|Type1C|CIDFontType0C|OpenType)\b|\/Length1\b/.test(dict)) return null;   /* 0.73.0 : une image ou une police incluse n'est pas du texte */
   const f = (dict.match(/\/Filter\s*(\[[^\][]*\]|\/\w+)/) || [])[1] || '', l = f.match(/\/\w+/g) || [];
   let b = Buffer.from(brut);
   for (const x of l) {   /* les filtres dans l'ordre ; une image (DCT, CCITT, JBIG2…) n'est pas du texte */
@@ -115,7 +115,7 @@ function largeurs(objs, o) {
   const first = nombre(o.dict, 'FirstChar', 0), l = (tableau(o.dict, 'Widths', objs).match(/[\d.]+/g) || []).map(Number), std = standard((o.dict.match(/\/BaseFont\s*\/([^\s/<>[\]]+)/) || [])[1] || '');
   return (code) => (code >= first && code - first < l.length && l[code - first] > 0 ? l[code - first] : std(code));
 }
-/* 0.70.0 : les blocs « début … fin » d'un texte, sans expression régulière (elle repartait jusqu'au bout du texte pour chaque début sans fin) */
+/* 0.73.0 : les blocs « début … fin » d'un texte, sans expression régulière (elle repartait jusqu'au bout du texte pour chaque début sans fin) */
 function blocs(txt, debut, fin) {
   const out = [];
   for (let i = txt.indexOf(debut); i >= 0;) { const j = txt.indexOf(fin, i + debut.length); if (j < 0) break; out.push(txt.slice(i + debut.length, j)); i = txt.indexOf(debut, j + fin.length); }
@@ -187,11 +187,11 @@ function texteFlux(c, polices, ctx = null) {
     if (/\s/.test(ch)) { i++; continue; }
     if (ch === '%') { while (i < s.length && s[i] !== '\n' && s[i] !== '\r') i++; continue; }
     if (ch === '(') { pile.push(chaine()); continue; }
-    if (ch === '<' && s[i + 1] !== '<') { const j = s.indexOf('>', i); if (j < 0) break;   /* 0.70.0 : sans « > », l'analyse repartait du début du flux, sans fin */
+    if (ch === '<' && s[i + 1] !== '<') { const j = s.indexOf('>', i); if (j < 0) break;   /* 0.73.0 : sans « > », l'analyse repartait du début du flux, sans fin */
       const h = s.slice(i + 1, j).replace(/\s/g, ''); pile.push({s: [...Buffer.from(h.length % 2 ? h + '0' : h, 'hex')]}); i = j + 1; continue; }
     if (ch === '<' || ch === '>') { i += 2; continue; }
     if (ch === '[') { pile.push('['); crochets++; i++; continue; }
-    if (ch === ']') { let a = []; if (crochets) { a = pile.splice(pile.lastIndexOf('[')); a.shift(); crochets--; } pile.push({a}); i++; continue; }   /* 0.70.0 : un « ] » sans « [ » ne fouille plus toute la pile */
+    if (ch === ']') { let a = []; if (crochets) { a = pile.splice(pile.lastIndexOf('[')); a.shift(); crochets--; } pile.push({a}); i++; continue; }   /* 0.73.0 : un « ] » sans « [ » ne fouille plus toute la pile */
     if (ch === '/') { const m = s.slice(i).match(/^\/[^\s/<>[\]()%{}]*/); pile.push({nom: m[0]}); i += m[0].length; continue; }
     const m = s.slice(i, i + 40).match(/^[+-]?(\d+\.?\d*|\.\d+)/);
     if (m) { pile.push(+m[0]); i += m[0].length; continue; }
@@ -199,7 +199,7 @@ function texteFlux(c, polices, ctx = null) {
     i += op[0].length; const o = op[0], a = pile; pile = []; crochets = 0;
     if (o === 'ID') { const e = s.indexOf('EI', i); i = e < 0 ? s.length : e + 2; continue; }   /* image incluse : sautée */
     /* 0.56.0 : un formulaire (« /Fm0 Do ») porte souvent tout le texte de la page : lu avec ses propres polices.
-       0.70.0 : 300 formulaires au plus par PDF, et plus aucun une fois le texte assez long (un formulaire qui s'appelait lui-même N fois multipliait le travail par N⁴) */
+       0.73.0 : 300 formulaires au plus par PDF, et plus aucun une fois le texte assez long (un formulaire qui s'appelait lui-même N fois multipliait le travail par N⁴) */
     if (o === 'Do' && ctx && ctx.prof < 4) { garde(); const n = a.find((v) => v && v.nom), num = n ? ctx.xobjs.get(n.nom.slice(1)) : null, x = num != null ? ctx.objs.get(num) : null;
       if (x && x.flux && /\/Subtype\s*\/Form/.test(x.dict) && (!B || (B.formulaires-- > 0 && B.sortie < B.max))) { const res = sousDict(x.dict, 'Resources', ctx.objs) || '', pol2 = new Map(polices); for (const [k, v] of ressources(res, 'Font', ctx.objs)) pol2.set(k, ctx.pol(v));
         const xo2 = new Map(ctx.xobjs); for (const [k, v] of ressources(res, 'XObject', ctx.objs)) xo2.set(k, v);
@@ -227,7 +227,7 @@ export function texteDePdf(buf, max = 100000, lim = {}) {
     if (!Buffer.isBuffer(buf) || buf.length < 20 || buf.subarray(0, 1024).toString('latin1').indexOf('%PDF') < 0) return '';
     if (/\/Encrypt\b/.test(buf.subarray(Math.max(0, buf.length - 4096)).toString('latin1'))) return '';
     const objs = objets(buf), global = new Map(), lus = new Set();
-    /* toutes les polices nommées du fichier (repli quand une page hérite de ses ressources) ; 0.70.0 : un même dictionnaire n'est lu qu'une fois */
+    /* toutes les polices nommées du fichier (repli quand une page hérite de ses ressources) ; 0.73.0 : un même dictionnaire n'est lu qu'une fois */
     for (const [, o] of objs) { garde(); const f = sousDict(o.dict, 'Font', objs); if (!f || lus.has(f)) continue; lus.add(f); for (const m of f.matchAll(/\/([^\s/<>[\]()]+)\s+(\d{1,10})\s+\d{1,10}\s+R/g)) if (!global.has(m[1])) global.set(m[1], +m[2]); }
     const cache = new Map(), pol = (n) => { if (!cache.has(n)) cache.set(n, police(objs, n)); return cache.get(n); };
     const pages = [...objs].filter(([, o]) => { garde(); return /\/Type\s*\/Page\b(?!s)/.test(o.dict); }).sort((p, q) => p[0] - q[0]);
@@ -242,6 +242,6 @@ export function texteDePdf(buf, max = 100000, lim = {}) {
       if (txt.length > max) break;
     }
     return net();
-  } catch (e) { return e instanceof Epuise ? net() : ''; }   /* 0.70.0 : budget de temps épuisé : le texte déjà lu */
+  } catch (e) { return e instanceof Epuise ? net() : ''; }   /* 0.73.0 : budget de temps épuisé : le texte déjà lu */
   finally { B = null; }
 }

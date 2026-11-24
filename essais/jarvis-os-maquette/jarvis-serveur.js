@@ -15,7 +15,7 @@
   const settings = () => { try { return JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (e) { return {}; } };
   const BASE = location.origin;
   const token = () => settings().serverToken || '';
-  /* 0.70.0 : un réseau coupé ou un serveur injoignable donne un message en français (avant : « Load failed » de Safari, affiché tel quel) */
+  /* 0.73.0 : un réseau coupé ou un serveur injoignable donne un message en français (avant : « Load failed » de Safari, affiché tel quel) */
   const req = async (p, body, method) => {
     let r;
     try { r = await fetch(BASE + p, {method: method || (body ? 'POST' : 'GET'), headers: {'content-type': 'application/json', authorization: 'Bearer ' + token()}, body: body ? JSON.stringify(body) : undefined}); }
@@ -30,7 +30,7 @@
     let r;
     try { r = await req('/api/tool', {server, tool, input: input || {}}); } catch (e) { fail('tool_error', server, 'Serveur JARVIS injoignable.'); }
     if (r.status === 401) fail('server_not_connected', server, 'Cet iPhone n’est plus relié au serveur JARVIS (Réglages).');
-    /* 0.70.0 : l'erreur du serveur peut être une simple phrase ; et une réponse qui n'est pas 200 (Caddy en 502 pendant un redémarrage, corps vide)
+    /* 0.73.0 : l'erreur du serveur peut être une simple phrase ; et une réponse qui n'est pas 200 (Caddy en 502 pendant un redémarrage, corps vide)
        n'est jamais un succès : avant, l'écriture ou l'envoi étaient annoncés « faits » alors que rien n'était parti */
     const er = r.j && r.j.error;
     if (er) fail((typeof er === 'object' && er.code) || 'tool_error', server, (typeof er === 'object' ? er.message : String(er)) || 'Erreur du serveur JARVIS.');
@@ -83,7 +83,7 @@
      « Arrêter » (opts.signal) coupe la réponse et Claude avec elle */
   /* 0.57.0 : l'abonnement refusé (message anglais de Claude Code, arrivé comme une réponse) devient une erreur claire, en français */
   const ABO = /can.?t use your Claude subscription|payment is past due|claude\.ai\/settings\/billing/i, ABO_FR = 'Claude ne peut plus utiliser ton abonnement sur le serveur : Anthropic signale un paiement en retard ou un abonnement à renouveler. Vérifie sur claude.ai (Réglages, Facturation) ; si tout est payé, reconnecte Claude sur le serveur (claude auth login, depuis la session Serveur JARVIS).';
-  /* 0.70.0 : seulement le message de Claude Code lui-même (court, qui parle de « Claude subscription ») ; une vraie réponse qui cite
+  /* 0.73.0 : seulement le message de Claude Code lui-même (court, qui parle de « Claude subscription ») ; une vraie réponse qui cite
      « payment is past due » (un mail de relance en anglais) ou donne le lien de facturation passe telle quelle */
   const estAbo = (t) => { t = String(t || ''); return t.length < 600 && /Claude subscription/i.test(t) && ABO.test(t); };
   async function flux(input, opts, tools) {
@@ -150,8 +150,8 @@
     base: BASE,
     linked: () => !!token(),
     async pair(code) {
-      let r;   /* 0.70.0 : hors réseau, « Relier » le dit (avant : rien ne s'affichait) */
-      /* 0.70.0 : le genre d'appareil dans son nom (« JARVIS OS · iPhone »), pour les reconnaître dans la liste des appareils reliés */
+      let r;   /* 0.73.0 : hors réseau, « Relier » le dit (avant : rien ne s'affichait) */
+      /* 0.73.0 : le genre d'appareil dans son nom (« JARVIS OS · iPhone »), pour les reconnaître dans la liste des appareils reliés */
       const nav = typeof navigator !== 'undefined' ? navigator : {}, ua = String(nav.userAgent || '');
       const genre = /iPad/.test(ua) || (/Macintosh/.test(ua) && nav.maxTouchPoints > 1) ? 'iPad' : /iPhone/.test(ua) ? 'iPhone' : /Android/.test(ua) ? 'Android' : /Macintosh/.test(ua) ? 'Mac' : /Windows/.test(ua) ? 'PC' : '';
       try { r = await fetch(BASE + '/api/pair', {method: 'POST', headers: {'content-type': 'application/json'}, body: JSON.stringify({code: String(code || '').trim(), device: 'JARVIS OS' + (genre ? ' · ' + genre : '')})}); }
@@ -162,18 +162,18 @@
       try { localStorage.setItem(KEY, JSON.stringify(s)); } catch (e) { return {ok: false, error: 'Stockage du téléphone indisponible.'}; }
       return {ok: true};
     },
-    /* 0.70.0 : la clé est d'abord retirée du serveur (4 s au plus, hors réseau tant pis), puis effacée du téléphone */
+    /* 0.73.0 : la clé est d'abord retirée du serveur (4 s au plus, hors réseau tant pis), puis effacée du téléphone */
     async unpair() {
       if (token()) await Promise.race([req('/api/appareils/delier', {}).catch(() => null), new Promise((r) => setTimeout(r, 4000))]);
       const s = settings(); s.serverToken = ''; try { localStorage.setItem(KEY, JSON.stringify(s)); } catch (e) { /* rien */ }
     },
-    /* 0.70.0 : les appareils reliés (carte « Serveur JARVIS » de Réglages) et le retrait d'un autre appareil ; null : serveur trop ancien ou injoignable */
+    /* 0.73.0 : les appareils reliés (carte « Serveur JARVIS » de Réglages) et le retrait d'un autre appareil ; null : serveur trop ancien ou injoignable */
     appareils: {
       liste: () => req('/api/appareils').then((r) => (r.status === 200 && r.j && Array.isArray(r.j.appareils) ? r.j.appareils : null)).catch(() => null),
       retirer: (id) => req('/api/appareils/retirer', {id}).then((r) => (r.status === 200 ? r.j : {ok: false, error: (r.j && r.j.error) || (r.status >= 500 ? INDISPO : 'Retrait refusé.'), appareils: r.j && r.j.appareils})).catch(() => ({ok: false, error: INJ}))
     },
     google: () => req('/api/google').then((r) => (r.status === 200 ? r.j : null)).catch(() => null),
-    /* 0.70.0 : serveur injoignable ou en train de redémarrer : un message, jamais un appui sans effet */
+    /* 0.73.0 : serveur injoignable ou en train de redémarrer : un message, jamais un appui sans effet */
     googleConfig: (clientId, clientSecret) => req('/api/google/config', {clientId, clientSecret}).then(repOk).catch(() => ({ok: false, error: INJ})),
     googleLink: () => req('/api/google/link', {}).then(repOk).catch(() => ({ok: false, error: INJ})),
     googleUnlink: () => req('/api/google/unlink', {}).then(repOk).catch(() => ({ok: false, error: INJ})),
@@ -258,7 +258,10 @@
       etat: () => req('/api/mcp').then((r) => (r.status === 200 ? r.j : null)).catch(() => null),
       decider: (id, oui) => req('/api/mcp/decider', {id, oui}).then((r) => (r.status === 200 ? r.j : null)).catch(() => null),
       retirer: (id) => req('/api/mcp/retirer', {id}).then((r) => (r.status === 200 ? r.j : null)).catch(() => null),
-      jeton: (nom) => req('/api/mcp/jeton', {nom}).then((r) => (r.status === 200 ? r.j : null)).catch(() => null)
+      /* 0.71.0 : un jeton fixe par assistant, avec son profil (« lecture » ou « executant ») ; un refus (400) revient avec sa raison.
+         0.72.0 : profil « veilleur », et `signe` (facultatif), le nom d'un jeton exécutant sous lequel il écrit dans Pilotage */
+      jeton: (nom, profil, signe) => req('/api/mcp/jeton', {nom, profil: profil || 'lecture', ...(signe ? {signe} : {})}).then((r) => (r.status === 200 || (r.status === 400 && r.j && r.j.error) ? r.j : null)).catch(() => null),
+      suspendre: (id, oui) => req('/api/mcp/suspendre', {id, oui}).then((r) => (r.status === 200 ? r.j : null)).catch(() => null)
     },
     missionStatut: (id, status) => req('/api/missions/' + encodeURIComponent(id), {status}).then((r) => (r.status === 200 ? r.j : null)).catch(() => null),
     /* 0.38.0 : les skills relues des missions */

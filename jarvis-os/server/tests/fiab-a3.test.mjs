@@ -1,4 +1,4 @@
-/* Banc 0.70.0 — A3-radar (fiabilité du Radar) : node tests/fiab-a3.test.mjs (aucun vrai Google, aucun vrai Claude, aucun coût).
+/* Banc 0.73.0 — A3-radar (fiabilité du Radar) : node tests/fiab-a3.test.mjs (aucun vrai Google, aucun vrai Claude, aucun coût).
    Mails, services et montants inventés. */
 import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path'; import zlib from 'node:zlib';
 import {J, ymd, occurrences, resteA, lireMail, montantClaude, montantDe, createRadar} from '../radar.mjs';

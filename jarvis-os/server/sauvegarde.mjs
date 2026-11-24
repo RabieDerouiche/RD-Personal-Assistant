@@ -16,7 +16,7 @@ export function createSauvegarde({S, save, read, linked, dir, now = () => Date.n
   const files = () => fs.readdirSync(dir).filter((f) => /^\d{4}-\d{2}-\d{2}\.json$/.test(f)).sort();
   const load = (f) => { try { return JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8')); } catch { return null; } };
 
-  /* 0.70.0 : une seule copie à la fois (« Sauvegarder maintenant » pendant la copie de la nuit reçoit la même) ; après un échec,
+  /* 0.73.0 : une seule copie à la fois (« Sauvegarder maintenant » pendant la copie de la nuit reçoit la même) ; après un échec,
      la copie automatique est réessayée toutes les 30 minutes, pas chaque minute (19 lectures de Pilotage à chaque essai) */
   let enCours = null, essai = 0;
   function run() { if (!enCours) enCours = copier().finally(() => { enCours = null; }); return enCours; }

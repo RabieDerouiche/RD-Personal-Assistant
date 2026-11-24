@@ -1,0 +1,28 @@
+# JARVIS OS — garde du forfait Claude partagé (posé par install.sh ; lancé par hermes-garde.timer).
+# Exécute la copie root du script (/usr/local/sbin/hermes-garde-forfait), jamais un fichier du dépôt.
+[Unit]
+Description=Garde du forfait Claude partagé : Hermes s'arrête au-delà du seuil (essai JARVIS OS)
+After=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=-/etc/hermes/garde.conf
+ExecStart=/usr/local/sbin/hermes-garde-forfait
+StateDirectory=hermes-garde
+TimeoutStartSec=150
+# JARVIS d'abord : la lecture d'usage (Hermes et la sonde de Claude Code, quelques secondes) passe après lui
+Nice=10
+CPUWeight=20
+IOWeight=20
+OOMScoreAdjust=700
+MemoryMax=600M
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=full
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+LockPersonality=yes
+RestrictRealtime=yes

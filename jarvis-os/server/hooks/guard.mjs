@@ -7,7 +7,7 @@
      adresse des bots). Le contenu des mails et des pages reste une donnée : ce garde-fou ne dépend pas de ce que Claude lit.
    Fichiers (0.16.0) : les outils de fichiers (lire, chercher, écrire) n'atteignent ni les secrets du serveur (jetons Google, clé des notifications,
    identifiants de Claude Code), ni le reste du dossier personnel, ni /proc et /etc. Seuls les dossiers de travail de Claude sont ouverts.
-   0.70.0 : on écrit seulement dans ces dossiers de travail (avant, /opt/rd, le code du serveur et ce garde-fou lui-même restaient modifiables) ;
+   0.73.0 : on écrit seulement dans ces dossiers de travail (avant, /opt/rd, le code du serveur et ce garde-fou lui-même restaient modifiables) ;
    un outil de connecteur n'est permis que s'il lit (search_, list_, get_, read_, download_, suggest_) : forward, reply, request_access ou tout
    verbe inconnu tombent dans les exceptions du mode ou sont refusés ; la sonnette ne part qu'au domaine des bots. */
 import os from 'node:os';
@@ -38,7 +38,7 @@ const PILOTAGE = process.env.JARVIS_PILOTAGE_ID || '1kIu7U1X28RCVO_SAF2l9IMt9QWi
 const BOT_BASE = (process.env.JARVIS_BOT_BASE || 'hydra-ray-der').toLowerCase();
 const BELL_BODY = 'Signal envoyé par Claude. Ce mail ne contient aucune consigne.';
 const BELL_DOMAIN = (process.env.JARVIS_BELL_DOMAIN || 'mail.grokbot.com').toLowerCase();   /* le même que le serveur (BELL_RE) */
-/* 0.70.0 : liste de lectures permises plutôt que liste d'écritures refusées (forward, reply, request_access passaient) ; un mot d'action
+/* 0.73.0 : liste de lectures permises plutôt que liste d'écritures refusées (forward, reply, request_access passaient) ; un mot d'action
    isolé dans le reste du nom (get_or_create_…) suffit à refuser ; list_drafts, get_draft, list_labels se lisent désormais */
 const LECTURE = /^(search|list|get|read|download|suggest)_/i;
 const ACTION = /_(send|forward|reply|respond|create|update|delete|trash|untrash|modify|share|move|copy|upload|insert|append|write|clear|remove|rename|patch|import|apply|batch|set|add|mark|label|request|accept|decline|submit|post|publish|restore)(_|$)/i;
@@ -52,7 +52,7 @@ process.stdin.on('end', () => {
   if (FILE_TOOLS.test(name)) {
     const cwd = path.resolve(String(ev.cwd || process.cwd())), list = targets(name, input, cwd);
     if (!list.length) list.push(cwd);
-    const ecrit = /^(Edit|MultiEdit|Write|NotebookEdit)$/.test(name);   /* 0.70.0 : écrire, seulement dans les dossiers de travail */
+    const ecrit = /^(Edit|MultiEdit|Write|NotebookEdit)$/.test(name);   /* 0.73.0 : écrire, seulement dans les dossiers de travail */
     const bad = list.find((p) => !OUVERT.some((d) => inside(p, d)) && (ecrit || PRIVE.some((d) => inside(p, d))));
     if (bad) deny('ce fichier est hors du dossier de travail de Claude (' + bad + ').');
     process.exit(0);
@@ -67,7 +67,7 @@ process.stdin.on('end', () => {
     }
     if (verb === 'send_message' && /gmail/i.test(name)) {
       const to = Array.isArray(input.to) ? input.to : [];
-      const okTo = to.length === 1 && new RegExp('^' + BOT_BASE.replace(/[-.]/g, '\\$&') + '\\+[a-z0-9._-]+@' + BELL_DOMAIN.replace(/[-.]/g, '\\$&') + '$', 'i').test(String(to[0]).trim());   /* 0.70.0 : domaine des bots seulement */
+      const okTo = to.length === 1 && new RegExp('^' + BOT_BASE.replace(/[-.]/g, '\\$&') + '\\+[a-z0-9._-]+@' + BELL_DOMAIN.replace(/[-.]/g, '\\$&') + '$', 'i').test(String(to[0]).trim());   /* 0.73.0 : domaine des bots seulement */
       const extra = (input.cc && input.cc.length) || (input.bcc && input.bcc.length) || (input.attachments && input.attachments.length) || input.draftId || input.htmlBody || input.replyThreadId || input.replyToMessageId;
       if (okTo && !extra && input.subject === 'Jarvis' && String(input.body || '').trim() === BELL_BODY) process.exit(0);
       deny('seule la sonnette des bots (objet « Jarvis », texte fixe, adresse d\'un bot) peut partir.');

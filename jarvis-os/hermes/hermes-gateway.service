@@ -1,0 +1,91 @@
+# JARVIS OS — Hermes Agent (passerelle Telegram), essai décidé le 23/11/2026 (docs/hermes.md).
+# Posé par install.sh dans /etc/systemd/system/ (propriété de root). Les lignes de [Service] reprennent
+# celles que `hermes gateway install --system` écrit en 0.23.3 (relevées au banc), sans jamais lancer
+# de code d'Hermes en root ; le reste enferme Hermes : il ne voit ni /home/jarvis, ni /root, ni /opt,
+# ne peut rien écrire hors de /home/hermes, et JARVIS garde la priorité sur la mémoire et le processeur.
+# Rien d'ouvert vers Internet (Telegram en interrogation sortante) ; une API locale sur 127.0.0.1, fermée sans jeton.
+
+[Unit]
+Description=Hermes Agent (passerelle Telegram, essai JARVIS OS)
+After=network-online.target hermes-sortie.service
+Wants=network-online.target
+Requires=hermes-sortie.service
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User=hermes
+Group=hermes
+WorkingDirectory=/home/hermes/.hermes
+ExecStart="/home/hermes/.hermes/hermes-agent/.hermes/bin/hermes" "gateway" "run"
+ExecReload=/bin/kill -USR1 $MAINPID
+ExecStop=-"/home/hermes/.hermes/hermes-agent/.hermes/bin/hermes" "--run-module" "gateway.systemd_stop_mark"
+ExecStopPost=-"/home/hermes/.hermes/hermes-agent/.hermes/bin/hermes" "--run-module" "gateway.cgroup_cleanup"
+Environment="HOME=/home/hermes" "USER=hermes" "LOGNAME=hermes" "LANG=C.UTF-8"
+Environment="PATH=@PATH@"
+Environment="HERMES_HOME=/home/hermes/.hermes" "HERMES_SUPERVISED_CHILD=1" "HERMES_MANAGED_DIR=/etc/hermes"
+Environment="CLAUDE_SUBSCRIPTION_DIRECTSDK_COMMAND=/home/hermes/.local/lib/claude-code/node_modules/.bin/claude"
+Environment="DISABLE_AUTOUPDATER=1"
+# Liaison à JARVIS (relier-jarvis.sh) : adresse et jeton du serveur MCP, lus par systemd en root (fichier 0600)
+EnvironmentFile=-/etc/hermes/jarvis.env
+UnsetEnvironment=ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN ANTHROPIC_BASE_URL ANTHROPIC_TOKEN CLAUDE_CODE_OAUTH_TOKEN OPENROUTER_API_KEY OPENAI_API_KEY
+Restart=always
+RestartSec=5
+RestartForceExitStatus=75
+SuccessExitStatus=75
+RestartPreventExitStatus=78
+KillMode=mixed
+KillSignal=SIGTERM
+TimeoutStopSec=70
+StandardOutput=journal
+StandardError=journal
+
+# ---- JARVIS d'abord : Hermes est le premier sacrifié si la mémoire manque
+# Mesuré au banc (23/11/2026) : 325 à 360 Mo au repos, plus environ 250 Mo par Claude Code lancé pour une
+# réponse (un seul à la fois, politique.yaml). Serveur mesuré le même jour : 1,86 Go disponibles sur 3,8 Go,
+# JARVIS près de son pic. Au-delà de MemoryHigh, Hermes est ralenti et poussé vers l'échange (2 Go) avant JARVIS.
+# Hermes règle son propre cache sur MemoryMax. Avec la liaison à JARVIS et une routine en cours (étapes 3 et 4,
+# banc du 23/11/2026 au soir) : 360 Mo au repos, 500 Mo au plus pendant une routine, plus le Claude Code (250 Mo).
+MemoryHigh=850M
+MemoryMax=1000M
+OOMScoreAdjust=600
+CPUWeight=20
+IOWeight=20
+Nice=5
+TasksMax=256
+
+# ---- Enfermement (systemd)
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+ProtectSystem=strict
+ReadWritePaths=/home/hermes
+ProtectHome=tmpfs
+BindPaths=/home/hermes
+InaccessiblePaths=-/opt -/srv -/var/lib/caddy -/var/backups -/var/mail -/var/spool/cron
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+ProtectProc=invisible
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+RemoveIPC=yes
+UMask=0077
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged
+SystemCallErrorNumber=EPERM
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+# Pas de métadonnées du fournisseur (169.254.169.254) ni de multidiffusion ; la boucle locale est
+# filtrée par hermes-sortie (seuls le DNS local et les ports éphémères d'Hermes lui-même).
+IPAddressDeny=link-local multicast
+
+[Install]
+WantedBy=multi-user.target

@@ -155,7 +155,7 @@ srv.listen(0, async () => {
       ok('Pour moi : filtres Tout, Décider, À faire, Infos ; « Décider » ne garde que « À décider »', segs === 'tout,decider,faire,infos' && await p.evaluate(() => !document.getElementById('pm-dec').hidden && [...document.querySelectorAll('.pm-sec')].filter((x) => !x.hidden).length === 1 && !document.querySelector('.pm-sum:not([hidden])')), segs);
       await p.tap('.tab[data-tab="accueil"]'); await p.waitForTimeout(400); await p.tap('.tab[data-tab="demandes"]'); await p.waitForTimeout(500);
       ok('Pour moi rouvert : de nouveau sur « Tout »', await p.evaluate(() => document.querySelector('.ux-seg [aria-pressed="true"]').dataset.f === 'tout' && [...document.querySelectorAll('.pm-sec')].every((x) => !x.hidden))); }
-    // 0.70.0 — B3-page-5-pont
+    // 0.73.0 — B3-page-5-pont
     /* Pour moi en filtres, recherche, Équipe, Athéna sans accent, brief, langue, CSS du menu « Tout », page d'un proche */
     { const ctxF = async (init) => { const c = await b.newContext({...devices['iPhone 15 Pro Max']}); await c.addInitScript(PAUSE_INIT); if (init) await c.addInitScript(init); const q = await c.newPage(); q.on('pageerror', (e) => errs.push('0.70 : ' + e.message)); return q; };
       const filtre = (q, k) => q.evaluate((f) => document.querySelector('.ux-seg [data-f="' + f + '"]').click(), k).then(() => q.waitForTimeout(500));
@@ -605,8 +605,8 @@ srv.listen(0, async () => {
       const open = await q.evaluate(() => !document.querySelector('.face-open') && [...document.querySelectorAll('.hm-h h2')].some((x) => x.textContent === 'Papiers privés') && document.querySelectorAll('.pt').length > 8);
       ok('Face ID : activé dans Papiers, papiers privés verrouillés au retour, ouverts après Face ID', on && locked && open, [on, locked, open].join(' '));
       await ctx.close(); }
-    // 0.70.0 — B1-page-1-2
-    /* 0.70.0 — B1-page-1-2 (fiabilité et petits conforts) : jour qui change, boutons qui ouvrent un lien, erreurs de la discussion, échéances
+    // 0.73.0 — B1-page-1-2
+    /* 0.73.0 — B1-page-1-2 (fiabilité et petits conforts) : jour qui change, boutons qui ouvrent un lien, erreurs de la discussion, échéances
        et dossiers, Papiers (lecture en échec, réponse en retard, clavier, Face ID), Radar, Achats, adresses, sphères. Données inventées. */
     { const p2 = (n) => String(n).padStart(2, '0'), frD = (n, an) => { const d = new Date(); d.setHours(12, 0, 0, 0); d.setDate(d.getDate() + n); if (an) d.setFullYear(d.getFullYear() + an); return p2(d.getDate()) + '/' + p2(d.getMonth() + 1) + '/' + d.getFullYear(); };
       const isoD = (n) => { const d = new Date(); d.setHours(12, 0, 0, 0); d.setDate(d.getDate() + n); return d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate()); };
@@ -621,7 +621,7 @@ srv.listen(0, async () => {
         const j1 = await jour();
         await q.keyboard.press('Escape'); await q.waitForTimeout(500); await vis(q, true); await vis(q, false); await q.waitForTimeout(3500);
         const j2 = await jour();
-        ok('0.70.0 — B1 : app restée ouverte passé minuit, reprise le matin : pas rechargée sous une feuille ouverte ; au retour suivant, rechargée sur le nouveau jour (« Mardi 24 novembre », plus lundi 23)', /lundi 23 novembre/i.test(j0.hud) && j1.mark === 1 && j1.sheet && j2.mark === 0 && /mardi 24 novembre/i.test(j2.hud), JSON.stringify([j0, j1, j2]));
+        ok('0.73.0 — B1 : app restée ouverte passé minuit, reprise le matin : pas rechargée sous une feuille ouverte ; au retour suivant, rechargée sur le nouveau jour (« Mardi 24 novembre », plus lundi 23)', /lundi 23 novembre/i.test(j0.hud) && j1.mark === 1 && j1.sheet && j2.mark === 0 && /mardi 24 novembre/i.test(j2.hud), JSON.stringify([j0, j1, j2]));
         /* une écriture « Dans 5 s » en attente quand l'app passe derrière : le rechargement attend qu'elle soit partie */
         await q.evaluate(() => { window.__b1jour = 2; document.getElementById('gs-btn').click(); }); await q.waitForTimeout(300); await q.fill('#gs-in', 'attestation école'); await q.waitForTimeout(400);
         await q.evaluate(() => { const r = [...document.querySelectorAll('#gsearch .gs-row')].find((y) => /Envoyer l.attestation/.test(y.textContent)); if (r) r.click(); }); await q.waitForTimeout(1500);
@@ -630,7 +630,7 @@ srv.listen(0, async () => {
         const w1 = await jour(); await q.waitForTimeout(5000);
         const w2 = await q.evaluate(() => ({mark: window.__b1jour || 0, ecrit: (window.__calls || []).some((c) => c.tool === 'update_values' && /^'?Échéances'?!/.test(c.input.range || '') && /"Fait"/.test(JSON.stringify(c.input.values)))}));
         await q.waitForTimeout(23000); const w3 = await jour();
-        ok('0.70.0 — B1 : une écriture « Dans 5 s » encore en attente au changement de jour : la page attend qu’elle soit partie (statut « Fait » écrit), puis se recharge sur le nouveau jour', w1.mark === 2 && w2.mark === 2 && w2.ecrit && w3.mark === 0 && /\b25\b/.test(w3.today) && /nov/.test(w3.today), JSON.stringify([w1, w2, w3]));
+        ok('0.73.0 — B1 : une écriture « Dans 5 s » encore en attente au changement de jour : la page attend qu’elle soit partie (statut « Fait » écrit), puis se recharge sur le nouveau jour', w1.mark === 2 && w2.mark === 2 && w2.ecrit && w3.mark === 0 && /\b25\b/.test(w3.today) && /nov/.test(w3.today), JSON.stringify([w1, w2, w3]));
         await ctx.close(); }
       /* page#3 : une question tapée dans la discussion, puis la discussion fermée sans l'envoyer (le brouillon est gardé hors du champ) :
          passé minuit, le retour ne recharge pas la page et le texte reste ; une fois vidé, le retour suivant passe au nouveau jour */
@@ -643,7 +643,7 @@ srv.listen(0, async () => {
         const d1 = await q.evaluate(() => ({mark: window.__b1jour || 0, brouillon: (document.getElementById('chat-in') || {}).value || ''}));
         await q.evaluate(() => { const c = document.getElementById('chat-in'); if (c) c.value = ''; }); await vis(q, true); await vis(q, false); await q.waitForTimeout(3500);
         const d2 = await q.evaluate(() => ({mark: window.__b1jour || 0, hud: (document.querySelector('.hud-date') || {}).textContent || ''}));
-        ok('0.70.0 — B1 : un brouillon laissé dans la discussion fermée, passé minuit : pas de rechargement au retour, le texte reste ; vidé, la page passe au nouveau jour au retour suivant',
+        ok('0.73.0 — B1 : un brouillon laissé dans la discussion fermée, passé minuit : pas de rechargement au retour, le texte reste ; vidé, la page passe au nouveau jour au retour suivant',
           ferme && d1.mark === 3 && /longue question/.test(d1.brouillon) && d2.mark === 0 && /mardi 24 novembre/i.test(d2.hud), JSON.stringify([ferme, d1, d2]));
         await ctx.close(); }
       /* échéances, dossiers, liens, page d'un bot, Achats, Papiers, adresses : sur les données d'exemple en direct, plus quelques lignes inventées */
@@ -662,51 +662,51 @@ srv.listen(0, async () => {
         const clic = (re) => q.evaluate((src) => { const r = new RegExp(src), x = [...document.querySelectorAll('#sheet button')].find((y) => r.test(y.textContent.trim())); if (x) x.click(); return !!x; }, re);
         /* page-1#8 : une date passée se dit au passé */
         const s1 = await ouvre('attestation école', "Envoyer l'attestation");
-        ok('0.70.0 — B1 : une échéance « à faire par moi » en retard se dit au passé (« C’est à toi de jouer : en retard de 2 jours. », plus « …, il y a 2 jours »)', !!s1 && s1.say === "C'est à toi de jouer : en retard de 2 jours.", JSON.stringify(s1 && s1.say));
+        ok('0.73.0 — B1 : une échéance « à faire par moi » en retard se dit au passé (« C’est à toi de jouer : en retard de 2 jours. », plus « …, il y a 2 jours »)', !!s1 && s1.say === "C'est à toi de jouer : en retard de 2 jours.", JSON.stringify(s1 && s1.say));
         /* page-1#7 : pas de « Fin de validité dans -5 j » */
         const s2 = await ouvre('badge essai', 'badge');
-        ok('0.70.0 — B1 : une fin de validité passée n’a plus de conseil « Fin de validité dans -5 j » ; la feuille dit « Expirée depuis le… »', !!s2 && !/-\d/.test(s2.smart) && /Expirée depuis le/.test(s2.say), JSON.stringify(s2 && [s2.smart, s2.say]));
+        ok('0.73.0 — B1 : une fin de validité passée n’a plus de conseil « Fin de validité dans -5 j » ; la feuille dit « Expirée depuis le… »', !!s2 && !/-\d/.test(s2.smart) && /Expirée depuis le/.test(s2.say), JSON.stringify(s2 && [s2.smart, s2.say]));
         /* page-1#9 : dossier sans date de dernier contact, et « du syndic » */
         const s3 = await ouvre('Dossier sans date', 'Dossier sans date');
         const s4 = await ouvre('Toit qui fuit', 'Toit qui fuit');
-        ok('0.70.0 — B1 : dossier sans « Dernier contact » : ni « depuis 0 jours », ni date inventée, ni conseil ; un dossier vieux de 12 jours : « Sans nouvelles du syndic depuis 12 jours »', !!s3 && s3.say === "J'attends le syndic." && !/\b[01] jours|depuis le/.test(s3.txt) && !s3.smart && !!s4 && /Sans nouvelles du syndic depuis 12 jours/.test(s4.smart), JSON.stringify([s3 && [s3.say, s3.smart], s4 && s4.smart]));
+        ok('0.73.0 — B1 : dossier sans « Dernier contact » : ni « depuis 0 jours », ni date inventée, ni conseil ; un dossier vieux de 12 jours : « Sans nouvelles du syndic depuis 12 jours »', !!s3 && s3.say === "J'attends le syndic." && !/\b[01] jours|depuis le/.test(s3.txt) && !s3.smart && !!s4 && /Sans nouvelles du syndic depuis 12 jours/.test(s4.smart), JSON.stringify([s3 && [s3.say, s3.smart], s4 && s4.smart]));
         /* page-1#2 : « Ouvrir le document » et « Voir l'offre » ouvrent le lien ; sans lien, pas de bouton qui ne fait rien */
         const s5 = await ouvre('validité attestation assurance', "validité de l'attestation"); const o5 = await clic('^Ouvrir le document'); await q.waitForTimeout(400);
         const s6 = await ouvre('Robot Alpha offre lancement', 'offre de lancement'); const o6 = await clic("^Voir l'offre"); await q.waitForTimeout(400);
         const s7 = await ouvre('Black Friday', 'Black Friday');
         const ouv = await q.evaluate(() => window.__ouv.slice());
-        ok('0.70.0 — B1 : « Ouvrir le document » (fin de validité) ouvre le lien Drive du papier ; « Voir l’offre » ouvre la page du vendeur du prix suivi ; une offre sans lien n’a plus de « Voir l’offre » qui ne fait rien', !!s5 && o5 && !!s6 && o6 && ouv[0] === 'https://drive.google.com/file/d/abc/view' && ouv[1] === 'https://example.org/x7' && !!s7 && !s7.btns.some((x) => /^Voir l'offre/.test(x)), JSON.stringify([o5, o6, ouv, s7 && s7.btns]));
+        ok('0.73.0 — B1 : « Ouvrir le document » (fin de validité) ouvre le lien Drive du papier ; « Voir l’offre » ouvre la page du vendeur du prix suivi ; une offre sans lien n’a plus de « Voir l’offre » qui ne fait rien', !!s5 && o5 && !!s6 && o6 && ouv[0] === 'https://drive.google.com/file/d/abc/view' && ouv[1] === 'https://example.org/x7' && !!s7 && !s7.btns.some((x) => /^Voir l'offre/.test(x)), JSON.stringify([o5, o6, ouv, s7 && s7.btns]));
         /* page-1#4 : « Prévoir la prochaine » ajoute une ligne neuve dans Échéances (même jour l'an prochain), sans ligne Canal ni écriture sur l'ancienne */
         await ouvre('Renouveler assurance habitation', 'Renouveler'); const c0 = await q.evaluate(() => window.__calls.length);
         const f1 = await clic("^C'est fait"); await q.waitForTimeout(700); const f2 = await clic('^Prévoir la prochaine'); await q.waitForTimeout(6500);
         const nx = await q.evaluate((c0) => window.__calls.slice(c0).map((c) => ({tool: c.tool, range: c.input.range || '', v: JSON.stringify(c.input.values || '')})), c0);
         const app = nx.filter((c) => c.tool === 'append_values' && /Renouveler l'assurance habitation/.test(c.v));
-        ok('0.70.0 — B1 : « C’est fait » puis « Prévoir la prochaine » : une ligne neuve dans Échéances, le même jour l’an prochain, et aucune ligne Canal pour le bot', f1 && f2 && app.length === 1 && /^'?Échéances'?!A1/.test(app[0].range) && app[0].v.includes(frD(3, 1)) && /À venir/.test(app[0].v), JSON.stringify(nx));
+        ok('0.73.0 — B1 : « C’est fait » puis « Prévoir la prochaine » : une ligne neuve dans Échéances, le même jour l’an prochain, et aucune ligne Canal pour le bot', f1 && f2 && app.length === 1 && /^'?Échéances'?!A1/.test(app[0].range) && app[0].v.includes(frD(3, 1)) && /À venir/.test(app[0].v), JSON.stringify(nx));
         /* page-2#5 : une ligne du Canal pour « Tous » ne fait plus planter la page d'Iris */
         await q.keyboard.press('Escape'); await q.evaluate(() => { location.hash = '#equipe'; }); await q.waitForTimeout(1200);
         await q.evaluate(() => { const f = document.querySelector('.ux-seg [data-f="bots"]'); if (f) f.click(); }); await q.waitForTimeout(700);
         await q.evaluate(() => { const m = [...document.querySelectorAll('.team .mate')].find((x) => x.querySelector('b').textContent === 'Iris'); if (m) m.click(); }); await q.waitForTimeout(1200);
-        ok('0.70.0 — B1 : la page d’Iris s’ouvre même avec une ligne du Canal « Pour : Tous » qui a une réponse (« Réponse de Tous »)', await q.evaluate(() => /Iris/.test(document.getElementById('view-title').textContent) && /Réponse de Tous/.test(document.getElementById('view').textContent)) && errs.length === e0, errs.slice(e0).join(' | '));
+        ok('0.73.0 — B1 : la page d’Iris s’ouvre même avec une ligne du Canal « Pour : Tous » qui a une réponse (« Réponse de Tous »)', await q.evaluate(() => /Iris/.test(document.getElementById('view-title').textContent) && /Réponse de Tous/.test(document.getElementById('view').textContent)) && errs.length === e0, errs.slice(e0).join(' | '));
         /* page-2#10 : un produit sans seuils */
         await q.evaluate(() => { location.hash = '#achats'; }); await q.waitForTimeout(1500);
         const bo = await q.evaluate(() => { const c = [...document.querySelectorAll('#view .fam')].find((x) => /Bouilloire/.test(x.textContent)); return c ? {g: !!c.querySelector('.gauge'), t: c.innerText.replace(/\s+/g, ' ')} : null; });
-        ok('0.70.0 — B1 : un produit suivi sans seuils : pas de jauge « Achat ≤ 0,00 € », et « Seuils pas encore fixés » au lieu de « Au-dessus de tes seuils »', !!bo && !bo.g && /Seuils pas encore fixés/.test(bo.t) && !/≤ 0,00|Au-dessus de tes seuils/.test(bo.t), JSON.stringify(bo));
+        ok('0.73.0 — B1 : un produit suivi sans seuils : pas de jauge « Achat ≤ 0,00 € », et « Seuils pas encore fixés » au lieu de « Au-dessus de tes seuils »', !!bo && !bo.g && /Seuils pas encore fixés/.test(bo.t) && !/≤ 0,00|Au-dessus de tes seuils/.test(bo.t), JSON.stringify(bo));
         /* page-1#2 : « Ouvrir » d'un papier de Pilotage ouvre son lien Drive */
         await q.evaluate(() => { location.hash = '#papiers'; }); await q.waitForTimeout(1500);
         const op = await q.evaluate(() => { window.__ouv = []; const c = [...document.querySelectorAll('.pap-dates .card')].find((x) => /Attestation assurance/.test(x.textContent)); const bt = c && [...c.querySelectorAll('button')].find((y) => /^Ouvrir/.test(y.textContent.trim()) && !/^Ouvrir le/.test(y.textContent.trim())); if (bt) bt.click(); return !!bt; });
         await q.waitForTimeout(500);
         const op2 = await q.evaluate(() => ({ouv: window.__ouv.slice(), toast: document.getElementById('toasts').textContent}));
-        ok('0.70.0 — B1 : Papiers, « Ouvrir » ouvre le lien Drive de l’onglet Papiers (plus seulement « Document ouvert : rien à écrire »)', op && op2.ouv.length === 1 && op2.ouv[0] === 'https://drive.google.com/file/d/abc/view' && !/Rien à écrire/.test(op2.toast), JSON.stringify(op2));
+        ok('0.73.0 — B1 : Papiers, « Ouvrir » ouvre le lien Drive de l’onglet Papiers (plus seulement « Document ouvert : rien à écrire »)', op && op2.ouv.length === 1 && op2.ouv[0] === 'https://drive.google.com/file/d/abc/view' && !/Rien à écrire/.test(op2.toast), JSON.stringify(op2));
         /* page-2#14 : « 1 suivi » */
         await q.evaluate(() => { window.__G['Papiers'].splice(2); location.hash = '#voir-recent'; }); await q.waitForTimeout(2500); await q.evaluate(() => { location.hash = '#espaces'; }); await q.waitForTimeout(1200);
-        ok('0.70.0 — B1 : Espaces, un seul papier suivi : « 1 suivi » (plus « 1 suivis »)', await q.evaluate(() => document.querySelector('.esp-tile[data-go="papiers"] .esp-v').textContent === '1 suivi'), await q.evaluate(() => document.querySelector('.esp-tile[data-go="papiers"] .esp-v').textContent));
+        ok('0.73.0 — B1 : Espaces, un seul papier suivi : « 1 suivi » (plus « 1 suivis »)', await q.evaluate(() => document.querySelector('.esp-tile[data-go="papiers"] .esp-v').textContent === '1 suivi'), await q.evaluate(() => document.querySelector('.esp-tile[data-go="papiers"] .esp-v').textContent));
         /* page-2#11 : « #__proto__ », « #constructor », « #toString » ne font plus planter le rendu */
         await q.context().close();
         const e1 = errs.length, q1 = await page('#__proto__');
         const a1 = await q1.evaluate(() => ({hud: !!document.querySelector('.hud'), t: document.getElementById('view-title').textContent}));
         await q1.context().close(); const q2 = await page('#constructor'); await q2.evaluate(() => { location.hash = '#toString'; }); await q2.waitForTimeout(800);
         const a2 = await q2.evaluate(() => ({hud: !!document.querySelector('.hud'), t: document.getElementById('view-title').textContent}));
-        ok('0.70.0 — B1 : les adresses #__proto__, #constructor et #toString mènent à l’accueil, sans erreur ni titre « [object Object] »', a1.hud && a2.hud && !/object/i.test(a1.t + a2.t) && errs.length === e1, JSON.stringify([a1, a2, errs.slice(e1)]));
+        ok('0.73.0 — B1 : les adresses #__proto__, #constructor et #toString mènent à l’accueil, sans erreur ni titre « [object Object] »', a1.hud && a2.hud && !/object/i.test(a1.t + a2.t) && errs.length === e1, JSON.stringify([a1, a2, errs.slice(e1)]));
         await q2.context().close(); }
       /* page-1#3, pont-sw-voix#3, page-1#6 : la discussion (Claude simulé : un refus du serveur, puis deux échéances proposées) */
       { const ctx = await b.newContext({...devices['iPhone 15 Pro Max']}); await ctx.addInitScript(PAUSE_INIT);
@@ -724,20 +724,20 @@ srv.listen(0, async () => {
         const dern = () => q.evaluate(() => { const m = [...document.querySelectorAll('#chat .msg.them p')]; return m.length ? m[m.length - 1].textContent : ''; });
         await q.fill('#chat-in', 'Test : abonnement refusé ?'); await q.tap('#chat .chat-row .btn.main'); await q.waitForTimeout(1500);
         const r1 = await dern();
-        ok('0.70.0 — B1 : discussion, le message français du serveur (abonnement refusé) est dit tel quel, plus « Réponse interrompue : réessaie. »', /ne peut plus utiliser ton abonnement sur le serveur \(essai\)/.test(r1) && !/interrompue/.test(r1), r1);
+        ok('0.73.0 — B1 : discussion, le message français du serveur (abonnement refusé) est dit tel quel, plus « Réponse interrompue : réessaie. »', /ne peut plus utiliser ton abonnement sur le serveur \(essai\)/.test(r1) && !/interrompue/.test(r1), r1);
         await q.fill('#chat-in', 'Rappelle-moi la fin de la promo du robot'); await q.tap('#chat .chat-row .btn.main'); await q.waitForTimeout(1800);
         const pr = await q.evaluate(() => [...document.querySelectorAll('#chat .msg.proposal.is-act')].map((x) => x.innerText.replace(/\s+/g, ' ')));
         const c0 = await q.evaluate(() => window.__calls.length);
         await q.evaluate(() => { const x = [...document.querySelectorAll('#chat .msg.proposal.is-act')].find((y) => /promo du robot/.test(y.textContent)); if (x) x.querySelector('.btn.main').click(); }); await q.waitForTimeout(6500);
         const ap = await q.evaluate((c0) => window.__calls.slice(c0).filter((c) => c.tool === 'append_values' && /promo du robot/.test(JSON.stringify(c.input.values))).map((c) => c.input.values[0]), c0);
-        ok('0.70.0 — B1 : outil ajouter_echeance, nature « Offre » (valeur de Pilotage) et « Un bot s’en occupe » (apostrophe typographique) reconnues ; l’offre arrive dans Échéances en « Offre », domaine Achats', pr.length === 2 && /Offre qui se termine/.test(pr[0]) && /Un bot s'en occupe/.test(pr[1]) && ap.length === 1 && ap[0].includes('Offre') && ap[0].includes('Achats') && !ap[0].includes('À faire par moi'), JSON.stringify([pr, ap]));
+        ok('0.73.0 — B1 : outil ajouter_echeance, nature « Offre » (valeur de Pilotage) et « Un bot s’en occupe » (apostrophe typographique) reconnues ; l’offre arrive dans Échéances en « Offre », domaine Achats', pr.length === 2 && /Offre qui se termine/.test(pr[0]) && /Un bot s'en occupe/.test(pr[1]) && ap.length === 1 && ap[0].includes('Offre') && ap[0].includes('Achats') && !ap[0].includes('À faire par moi'), JSON.stringify([pr, ap]));
         await ctx.close(); }
       /* page-2#1 : une lecture du Drive en échec ne se relance plus en boucle ; « Réessayer » relance une fois */
       { const q = await pageWith({fail: {folder_tree: 'tool_error'}}, '#papiers');
         const n1 = await q.evaluate(() => window.__calls.filter((c) => c.tool === 'folder_tree').length), carte = await q.evaluate(() => !!document.querySelector('.pap-note') && /Réessayer/.test(document.querySelector('.pap-note').textContent));
         await q.evaluate(() => { const x = [...document.querySelectorAll('.pap-note button')].find((y) => /Réessayer/.test(y.textContent)); if (x) x.click(); }); await q.waitForTimeout(1500);
         const n2 = await q.evaluate(() => window.__calls.filter((c) => c.tool === 'folder_tree').length);
-        ok('0.70.0 — B1 : Papiers, Drive illisible : une seule lecture (plus de boucle), la carte « Drive illisible » et « Réessayer » s’affichent ; « Réessayer » relance une seule lecture', n1 === 1 && carte && n2 === 2 && await q.evaluate(() => !!document.querySelector('.pap-note')), JSON.stringify([n1, carte, n2]));
+        ok('0.73.0 — B1 : Papiers, Drive illisible : une seule lecture (plus de boucle), la carte « Drive illisible » et « Réessayer » s’affichent ; « Réessayer » relance une seule lecture', n1 === 1 && carte && n2 === 2 && await q.evaluate(() => !!document.querySelector('.pap-note')), JSON.stringify([n1, carte, n2]));
         await q.context().close(); }
       /* page-2#13 et page-2#6 : l'arbre du Drive qui arrive pendant une recherche ne ferme pas le clavier ; une réponse arrivée en retard est ignorée */
       { const ctx = await b.newContext({...devices['iPhone 15 Pro Max']}); await ctx.addInitScript(PAUSE_INIT);
@@ -748,12 +748,12 @@ srv.listen(0, async () => {
         const avant = await q.evaluate(() => { const i = document.querySelector('.pap-search'); i.__b1 = 1; i.focus(); return !document.querySelector('.pt:not(.is-ghost)'); });
         await q.keyboard.type('passeport', {delay: 40}); await q.waitForTimeout(3000);
         const kb = await q.evaluate(() => ({meme: !!(document.activeElement && document.activeElement.__b1 === 1), val: document.activeElement && document.activeElement.value, res: document.querySelectorAll('.pap-res .pf').length, tuiles: document.querySelectorAll('.pt:not(.is-ghost)').length}));
-        ok('0.70.0 — B1 : Papiers, l’arbre du Drive arrive pendant la saisie : le champ garde le clavier (même élément, même texte) et les résultats s’affichent', avant && kb.meme && kb.val === 'passeport' && kb.res >= 3, JSON.stringify(kb));
+        ok('0.73.0 — B1 : Papiers, l’arbre du Drive arrive pendant la saisie : le champ garde le clavier (même élément, même texte) et les résultats s’affichent', avant && kb.meme && kb.val === 'passeport' && kb.res >= 3, JSON.stringify(kb));
         await q.evaluate(() => { document.activeElement.blur(); }); await q.fill('.pap-search', ''); await q.waitForTimeout(300);
         await q.evaluate(() => { window.__lent = {pub: 50, prive: 900}; document.querySelector('.pap-priv').click(); }); await q.waitForTimeout(150);
         await q.evaluate(() => document.querySelector('.pap-priv').click()); await q.waitForTimeout(1600);
         const pv = await q.evaluate(() => ({h: [...document.querySelectorAll('.hm-h h2')].some((x) => x.textContent === 'Papiers privés'), t: [...document.querySelectorAll('.pt b')].some((x) => /Impôts|Banque/.test(x.textContent)), lien: (document.querySelector('.pap-priv') || {}).textContent || ''}));
-        ok('0.70.0 — B1 : Papiers, « Afficher » puis aussitôt « Masquer » les papiers privés : la lecture des privés arrivée en retard est ignorée (rien de privé affiché)', !pv.h && !pv.t && /Afficher les papiers privés/.test(pv.lien), JSON.stringify(pv));
+        ok('0.73.0 — B1 : Papiers, « Afficher » puis aussitôt « Masquer » les papiers privés : la lecture des privés arrivée en retard est ignorée (rien de privé affiché)', !pv.h && !pv.t && /Afficher les papiers privés/.test(pv.lien), JSON.stringify(pv));
         await ctx.close(); }
       /* page-2#2 : Face ID ne se contourne plus (recherche, recherche partout, « Retirer », dossier resté ouvert) */
       { const ctx = await b.newContext({...devices['iPhone 15 Pro Max']}); await ctx.addInitScript(PAUSE_INIT); const q = await ctx.newPage(); q.on('pageerror', (e) => errs.push('B1 faceid : ' + e.message));
@@ -778,7 +778,7 @@ srv.listen(0, async () => {
         await q.evaluate(() => { location.hash = '#accueil'; }); await q.waitForTimeout(800);
         await q.clock.setFixedTime(new Date(Date.now() + 6 * 60000)); await q.evaluate(() => { location.hash = '#papiers'; }); await q.waitForTimeout(1200);
         const f5 = await q.evaluate(() => !document.querySelector('.pap-h') && !!document.querySelector('.face-open'));
-        ok('0.70.0 — B1 : Face ID, papiers privés verrouillés : absents de la recherche de Papiers et de la recherche partout ; « Retirer » demande Face ID (refusé : la protection reste) ; un dossier privé resté ouvert ne se rouvre pas une fois le verrou revenu', f1 === 0 && f2 === 0 && f3 && f4 && f5, JSON.stringify([f1, f2, f3, f4, f5]));
+        ok('0.73.0 — B1 : Face ID, papiers privés verrouillés : absents de la recherche de Papiers et de la recherche partout ; « Retirer » demande Face ID (refusé : la protection reste) ; un dossier privé resté ouvert ne se rouvre pas une fois le verrou revenu', f1 === 0 && f2 === 0 && f3 && f4 && f5, JSON.stringify([f1, f2, f3, f4, f5]));
         await ctx.close(); }
       /* page-2#3, page-2#14, page-2#9 : Radar, la facture du mois ne compte qu'une fois ; « Fixes (N) » = la liste ; abonnement trimestriel */
       { const ctx = await b.newContext({...devices['iPhone 15 Pro Max']}); await ctx.addInitScript(PAUSE_INIT);
@@ -789,10 +789,10 @@ srv.listen(0, async () => {
         await q.clock.setFixedTime(new Date('2027-02-20T10:00:00')); await q.goto(base + '#argent'); await q.waitForTimeout(3000);
         const rd = await q.evaluate(() => { const pn = [...document.querySelectorAll('.rad-fixes .panel')].find((x) => /^D’ici/.test((x.querySelector('h2') || {}).textContent || ''));
           return {rows: pn ? [...pn.querySelectorAll('.rad-fx')].map((x) => x.innerText.replace(/\s+/g, ' ')).filter((t) => /Box essai/.test(t)) : null, seg: (document.querySelector('.rad-seg button') || {}).textContent, liste: ([...document.querySelectorAll('.rad-fixes .panel h2')].find((x) => /^Mes dépenses fixes/.test(x.textContent)) || {}).textContent}; });
-        ok('0.70.0 — B1 : Radar, prélèvement du 28 reporté au 1er mars (week-end) et facture de mars annoncée : comptée une seule fois (50 € le 01/03, plus deux fois) ; « Fixes (1) » comme « Mes dépenses fixes (1) » (une dépense finie ne compte plus)', !!rd.rows && rd.rows.length === 1 && /01\/03/.test(rd.rows[0]) && /50,00/.test(rd.rows[0]) && rd.seg === 'Fixes (1)' && rd.liste === 'Mes dépenses fixes (1)', JSON.stringify(rd));
+        ok('0.73.0 — B1 : Radar, prélèvement du 28 reporté au 1er mars (week-end) et facture de mars annoncée : comptée une seule fois (50 € le 01/03, plus deux fois) ; « Fixes (1) » comme « Mes dépenses fixes (1) » (une dépense finie ne compte plus)', !!rd.rows && rd.rows.length === 1 && /01\/03/.test(rd.rows[0]) && /50,00/.test(rd.rows[0]) && rd.seg === 'Fixes (1)' && rd.liste === 'Mes dépenses fixes (1)', JSON.stringify(rd));
         await q.evaluate(() => { window.__RADAR.abonnements.push({service: 'Assurance essai', cat: 'Assurances', prix: 45, rythme: 'trimestriel'}); const x = [...document.querySelectorAll('.rad-seg button')].find((y) => /^Abonnements/.test(y.textContent)); if (x) x.click(); }); await q.waitForTimeout(800);
         const ab = await q.evaluate(() => ([...document.querySelectorAll('.rad-abo')].find((x) => /Assurance essai/.test(x.textContent)) || {}).innerText || '');
-        ok('0.70.0 — B1 : Radar, un abonnement trimestriel de 45 € : « 45,00 € par trimestre » et « 180,00 € par an » (plus « par mois »)', /45,00\s€ par trimestre/.test(ab) && /180,00\s€ par an/.test(ab), ab.replace(/\s+/g, ' '));
+        ok('0.73.0 — B1 : Radar, un abonnement trimestriel de 45 € : « 45,00 € par trimestre » et « 180,00 € par an » (plus « par mois »)', /45,00\s€ par trimestre/.test(ab) && /180,00\s€ par an/.test(ab), ab.replace(/\s+/g, ' '));
         await ctx.close(); }
       /* page-2#8 : « Mettre en pause » propose le vrai Black Friday et les soldes à venir */
       { const ctx = await b.newContext({...devices['iPhone 15 Pro Max']}); await ctx.addInitScript(PAUSE_INIT); const q = await ctx.newPage(); q.on('pageerror', (e) => errs.push('B1 pause : ' + e.message));
@@ -800,14 +800,14 @@ srv.listen(0, async () => {
         await q.evaluate(() => { const f = [...document.querySelectorAll('#view .fam')].find((x) => /Robot Alpha/.test(x.textContent)); if (f) f.querySelector('.fam-hit').click(); }); await q.waitForTimeout(1000);
         await q.evaluate(() => { const x = [...document.querySelectorAll('#view button')].find((y) => /^Mettre en pause/.test(y.textContent.trim())); if (x) x.click(); }); await q.waitForTimeout(1000);
         const ch = await q.evaluate(() => { const s = document.getElementById('sheet'); return s.hidden ? '' : s.innerText.replace(/\s+/g, ' '); });
-        ok('0.70.0 — B1 : Achats, « Mettre en pause » le 24/11/2026 : « Jusqu’au Black Friday (27/11) » et « Jusqu’aux soldes de janvier (06/01) » (plus le 23/11 écrit en dur)', /Jusqu'au Black Friday \(27\/11\)/.test(ch) && /Jusqu'aux soldes de janvier \(06\/01\)/.test(ch) && !/23\/11/.test(ch), ch.slice(0, 300));
+        ok('0.73.0 — B1 : Achats, « Mettre en pause » le 24/11/2026 : « Jusqu’au Black Friday (27/11) » et « Jusqu’aux soldes de janvier (06/01) » (plus le 23/11 écrit en dur)', /Jusqu'au Black Friday \(27\/11\)/.test(ch) && /Jusqu'aux soldes de janvier \(06\/01\)/.test(ch) && !/23\/11/.test(ch), ch.slice(0, 300));
         await ctx.close(); }
       /* page-1#5 : « Réduire les animations » : aucune sphère gardée en mémoire */
       { const ctx = await b.newContext({...devices['iPhone 15 Pro Max'], reducedMotion: 'reduce'}); await ctx.addInitScript(PAUSE_INIT); const q = await ctx.newPage(); q.on('pageerror', (e) => errs.push('B1 sphères : ' + e.message));
         await q.goto(base + '#equipe'); await q.waitForTimeout(2500);
         for (const t of ['accueil', 'demandes', 'equipe', 'accueil', 'equipe']) { await q.evaluate((x) => { location.hash = '#' + x; }, t); await q.waitForTimeout(500); }
         const ns = await q.evaluate(() => ({n: window.__nSpheres(), vues: document.querySelectorAll('.chr canvas').length}));
-        ok('0.70.0 — B1 : « Réduire les animations » : les sphères s’affichent, aucune n’est gardée pour une animation qui ne tourne pas (fuite de canevas)', ns.n === 0 && ns.vues > 0, JSON.stringify(ns));
+        ok('0.73.0 — B1 : « Réduire les animations » : les sphères s’affichent, aucune n’est gardée pour une animation qui ne tourne pas (fuite de canevas)', ns.n === 0 && ns.vues > 0, JSON.stringify(ns));
         await ctx.close(); }
       /* page-1#11 : contexte WebGL perdu (iOS, mémoire) : les sphères restent dessinées, puis le globe revient */
       { const ctx = await b.newContext({...devices['iPhone 15 Pro Max']}); await ctx.addInitScript(PAUSE_INIT);
@@ -821,7 +821,7 @@ srv.listen(0, async () => {
         await q.evaluate(() => { if (window.__b1ext) window.__b1ext.restoreContext(); }); await q.waitForTimeout(900);
         const a2 = await px();
         /* avant : après la perte, seule la silhouette restait (pixel à moitié transparent, alpha 105), même une fois le contexte rendu */
-        ok('0.70.0 — B1 : contexte WebGL perdu : les sphères restent pleines (dessin simple), puis le globe revient avec le contexte', w0 === 1 && a0 >= 250 && a1 >= 250 && a2 >= 250, JSON.stringify({w0, a0, a1, a2}));
+        ok('0.73.0 — B1 : contexte WebGL perdu : les sphères restent pleines (dessin simple), puis le globe revient avec le contexte', w0 === 1 && a0 >= 250 && a1 >= 250 && a2 >= 250, JSON.stringify({w0, a0, a1, a2}));
         await ctx.close(); }
     }
     /* 18/11/2026, passe globale : notifications (lien profond, bandeau qui se ferme, « Voir »), compteurs, Équipe, champs date */
@@ -1148,7 +1148,7 @@ srv.listen(0, async () => {
         && fiche.pal[0] === 'Ce mois-ci : 30,90 €' && fiche.pal.includes('Dès août 2027 : 32,10 €') && fiche.pal.includes('Dès septembre 2027 : 36,40 €') && fiche.pal.includes('Dernier prélèvement : décembre 2047') && /Votre contrat \(exemple\)/.test(fiche.lu)
         && fiche.ro && fiche.v === '30,90' && fiche.suit && !!garde && garde.n === 7 && garde.fin === '2047-12-05' && garde.m === 30.9, JSON.stringify([al, toast1, rule, fiche, garde]));
       await ctx.close(); }
-    // 0.70.0 — B2-page-3-4
+    // 0.73.0 — B2-page-3-4
     /* lot B2 (pages 3 et 4) : fonctions pures relues dans index.html et jouées hors navigateur, puis les gestes dans la maquette */
     { const vm = require('vm'), HTML = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
       const fnSrc = (start) => { const i = HTML.indexOf(start); if (i < 0) throw new Error('introuvable : ' + start); return HTML.slice(i, HTML.indexOf('\n  }\n', i) + 4); };
@@ -1158,15 +1158,15 @@ srv.listen(0, async () => {
       /* page-4#9 : « Revérifier demain à 9 h » vise le lendemain civil, même la nuit d'un changement d'heure (fuseau de Paris) */
       { const code = 'const vm = require("vm"), R = Date, res = []; for (const t of ["2027-03-27T23:30:00", "2026-10-25T00:30:00", "2026-12-31T22:00:00"]) { const now = new R(t).getTime(); class D extends R { constructor(...a) { if (a.length) super(...a); else super(now); } static now() { return now; } } const c = {Date: D, String}; vm.runInNewContext(' + JSON.stringify(lineSrc('  const demain9 = ')) + ' + "; out = demain9();", c); res.push(c.out); } console.log(JSON.stringify(res));';
         const r = JSON.parse(require('child_process').execFileSync(process.execPath, ['-e', code], {env: Object.assign({}, process.env, {TZ: 'Europe/Paris'})}).toString());
-        ok('0.70.0 : « Revérifier demain à 9 h » vise le lendemain, même la nuit des changements d\'heure (samedi 27/03 23 h 30, dimanche 25/10 0 h 30, 31/12)', r.join(' ') === '2027-03-28T09:00 2026-10-26T09:00 2027-01-01T09:00', r.join(' ')); }
+        ok('0.73.0 : « Revérifier demain à 9 h » vise le lendemain, même la nuit des changements d\'heure (samedi 27/03 23 h 30, dimanche 25/10 0 h 30, 31/12)', r.join(' ') === '2027-03-28T09:00 2026-10-26T09:00 2027-01-01T09:00', r.join(' ')); }
       /* page-3#7 : la météo d'un voyage porte sur le voyage, pas sur la date où les dates ont été fixées ; voyage à cheval sur deux années */
       { const src = fnSrc('  function voyRange(v) {'), f = (t) => { const r = run(src + '; out = voyRange({when: ' + JSON.stringify(t) + '});', {TODAY: new Date(2026, 10, 23, 12)}); return r ? r.map(iso).join('→') : null; };
         const a = f('Fixées par Ulysse le 16/11/2026 : aller le 27/02/2027, retour le 06/03/2027'), c = f('du 26/12 au 02/01/2027'), d = f('aller le 05/03/2027, retour le 20/03/2027'), e = f('Départ fixé le 12/03/2027, retour le 20/03/2027'), g = f('aller le 26/12/2026, retour le 02/01');
-        ok('0.70.0 : météo du voyage sur la bonne période (« Fixées le 16/11 : aller le 27/02, retour le 06/03 » ; « du 26/12 au 02/01/2027 » ; « Départ fixé le 12/03 » garde son départ)', a === '2027-02-27→2027-03-06' && c === '2026-12-26→2027-01-02' && d === '2027-03-05→2027-03-20' && e === '2027-03-12→2027-03-20' && g === '2026-12-26→2027-01-02', [a, c, d, e, g].join(' | ')); }
+        ok('0.73.0 : météo du voyage sur la bonne période (« Fixées le 16/11 : aller le 27/02, retour le 06/03 » ; « du 26/12 au 02/01/2027 » ; « Départ fixé le 12/03 » garde son départ)', a === '2027-02-27→2027-03-06' && c === '2026-12-26→2027-01-02' && d === '2027-03-05→2027-03-20' && e === '2027-03-12→2027-03-20' && g === '2026-12-26→2027-01-02', [a, c, d, e, g].join(' | ')); }
       /* page-3#8 : « Oui depuis JARVIS » jamais pour supprimer, arrêter ou mettre en pause une routine */
       { const src = lineSrc('  function isRoutineDem(d)'), f = (ask) => run(src + '; out = isRoutineDem(' + JSON.stringify({kind: 'oui', title: 'Routines (exemple)', ask, f: {}}) + ');', {});
         const r = [f('Crée ta routine Sonnette Ulysse'), f('Supprimer la routine Pegasus'), f('Arrêter la routine du soir'), f('Mets ta routine du soir en pause'), f('Désactiver la routine X')];
-        ok('0.70.0 : « Oui depuis JARVIS » pour créer une routine, jamais pour la supprimer, l\'arrêter, la désactiver ou la mettre en pause', r.join(',') === 'true,false,false,false,false', r.join(',')); }
+        ok('0.73.0 : « Oui depuis JARVIS » pour créer une routine, jamais pour la supprimer, l\'arrêter, la désactiver ou la mettre en pause', r.join(',') === 'true,false,false,false,false', r.join(',')); }
       /* page-3#9 : dates sans année au passage du Nouvel An (semaine du CRA, rappel de fermeture, offre terminée) */
       { const base0 = lineSrc('  const nearYear = '), pad2 = (n) => String(n).padStart(2, '0');
         const h0 = (tag, attrs, ...kids) => ({tag, attrs: attrs || {}, kids, append(...k) { this.kids.push(...k); }});
@@ -1177,11 +1177,11 @@ srv.listen(0, async () => {
           {TODAY: new Date(2026, 9, 1, 12), pad2, lsGet: () => [], RAPPEL_SORTIS: 'x', S: {echeances: [{iso: '2026-12-24', title: 'Fermeture de la crèche', rem: '1 mois avant, la semaine d’avant'}]}});
         const exp = run(base0 + '\n' + lineSrc('  const OFFRE = ') + '\n' + fnSrc('  function expOf(d) {') + '; out = !!expOf({live: true, due: null, title: "Offre de bienvenue", ask: "Activer l\'offre de bienvenue, terminée le 15/12"});',
           {TODAY: new Date(2027, 0, 5, 12), pad2, expAcked: () => false, short: String});
-        ok('0.70.0 : au Nouvel An, « semaine du 28/12 » lue le 4 janvier est la semaine passée ; « du 24/12 au 02/01/2027 » commence en 2026 ; « terminée le 15/12 » lue en janvier est expirée', cra === 'Ta présence, semaine du -7' && rap === '2026-12-24' && exp === true, [cra, rap, exp].join(' | ')); }
+        ok('0.73.0 : au Nouvel An, « semaine du 28/12 » lue le 4 janvier est la semaine passée ; « du 24/12 au 02/01/2027 » commence en 2026 ; « terminée le 15/12 » lue en janvier est expirée', cra === 'Ta présence, semaine du -7' && rap === '2026-12-24' && exp === true, [cra, rap, exp].join(' | ')); }
       /* page-3#12 : les échecs de Claude dits en français */
       { const f = (e) => run(fnSrc('  function aiErr(e) {') + '; out = aiErr(' + e + ');', {});
         const r = [f('new SyntaxError("JSON Parse error: Unexpected identifier")'), f('{code: "réponse illisible"}'), f('{code: "tool_error", message: "Serveur JARVIS injoignable."}'), f('{code: "tool_error"}'), f('{code: "tool_error", message: "tool_error"}')];
-        ok('0.70.0 : échec du carnet ou de l\'aide à la décision en français (ni message JSON anglais, ni « tool_error »)', r.join(' | ') === 'réponse illisible | réponse illisible | Serveur JARVIS injoignable | Claude ne répond pas pour l’instant | Claude ne répond pas pour l’instant', r.join(' | ')); }
+        ok('0.73.0 : échec du carnet ou de l\'aide à la décision en français (ni message JSON anglais, ni « tool_error »)', r.join(' | ') === 'réponse illisible | réponse illisible | Serveur JARVIS injoignable | Claude ne répond pas pour l’instant | Claude ne répond pas pour l’instant', r.join(' | ')); }
       /* page-4#1 et page-4#5 : « pas encore soumis » n'est pas « fait » ; le Journal (5000 lignes) n'est mis en forme qu'une fois pour toutes les échéances */
       { let calls = 0; const now = new Date().toISOString(), rows = [];
         for (let i = 0; i < 4999; i++) rows.push({'Bot': 'Athéna', 'Date et heure': now, 'Sujet': 'Veille', 'Détail': 'Envoyée.'});
@@ -1194,7 +1194,7 @@ srv.listen(0, async () => {
         const neg = es.map((e) => ctx.echDone(e)), calls1 = calls;
         ctx.LV.t.jour = {rows: rows.slice(0, 4999).concat([{'Bot': 'Chronos', 'Date et heure': now, 'Sujet': 'CRA client novembre', 'Détail': 'Soumis sur le portail.'}])};
         const pos = ctx.echDone(es[0]);
-        ok('0.70.0 : échéance « faite par le bot » : « pas encore soumis » ne compte pas, « soumis sur le portail » oui ; le Journal de 5000 lignes mis en forme une seule fois pour 10 échéances', neg.every((x) => x === null) && calls1 === 5000 && !!pos && /Soumis sur le portail/.test(pos.text), JSON.stringify({neg: neg.filter(Boolean).length, calls1, pos: pos && pos.text})); } }
+        ok('0.73.0 : échéance « faite par le bot » : « pas encore soumis » ne compte pas, « soumis sur le portail » oui ; le Journal de 5000 lignes mis en forme une seule fois pour 10 échéances', neg.every((x) => x === null) && calls1 === 5000 && !!pos && /Soumis sur le portail/.test(pos.text), JSON.stringify({neg: neg.filter(Boolean).length, calls1, pos: pos && pos.text})); } }
     /* page-3#1 : Gmail refuse l'envoi : ni ligne « Brouillon envoyé », ni dossier « en attente », ni sonnette ; le brouillon et la demande restent */
     { const q = await pageWith({fail: {send_message: 'tool_error'}}, '#demandes');
       await q.evaluate(() => { document.querySelectorAll('#toasts .toast').forEach((t) => t.remove()); const c = [...document.querySelectorAll('article')].find((x) => /Résiliation StreamPlus/.test(x.textContent) && /Plus…|Ouvrir ›/.test(x.textContent)); [...c.querySelectorAll('button')].find((x) => /^(Plus…|Ouvrir ›)$/.test(x.textContent.trim())).click(); }); await q.waitForTimeout(900);
@@ -1205,7 +1205,7 @@ srv.listen(0, async () => {
       const r = await q.evaluate((t) => ({writes: (window.__calls || []).filter((c) => c.t >= t && /append_values|update_values/.test(c.tool)).map((c) => c.input.range), sends: (window.__calls || []).filter((c) => c.t >= t && c.tool === 'send_message').length,
         canal: window.__G.Canal.length, dos: JSON.stringify(window.__G.Dossiers.find((x) => x[0] === 'Résiliation StreamPlus')), toasts: [...document.querySelectorAll('#toasts .toast')].map((x) => x.textContent).join(' || '),
         card: [...document.querySelectorAll('article')].some((x) => /Résiliation StreamPlus/.test(x.textContent)), drafts: window.__MAIL.drafts.map((d) => d.id)}), t0);
-      ok('0.70.0 : envoi refusé par Gmail : rien d\'autre n\'est écrit (ni Canal, ni dossier, ni sonnette), « Mail non envoyé », la demande et le brouillon restent', !r.writes.length && r.sends === 1 && r.canal === avant.canal && r.dos === avant.dos && /Mail non envoyé/.test(r.toasts) && /aucune sonnette/.test(r.toasts) && r.card && r.drafts.includes('DRAFT3'), JSON.stringify(r).slice(0, 400));
+      ok('0.73.0 : envoi refusé par Gmail : rien d\'autre n\'est écrit (ni Canal, ni dossier, ni sonnette), « Mail non envoyé », la demande et le brouillon restent', !r.writes.length && r.sends === 1 && r.canal === avant.canal && r.dos === avant.dos && /Mail non envoyé/.test(r.toasts) && /aucune sonnette/.test(r.toasts) && r.card && r.drafts.includes('DRAFT3'), JSON.stringify(r).slice(0, 400));
       await q.context().close(); }
     /* page-3#2, page-3#4, page-3#5, page-3#11, page-3#12 dans Pour moi */
     { const q = await page('#demandes');
@@ -1216,16 +1216,16 @@ srv.listen(0, async () => {
       await q.tap('#status .st.is-pause'); await q.waitForTimeout(500);
       await q.evaluate(() => { const b = [...document.querySelectorAll('#sheet button')].find((x) => /^Changer la date/.test(x.textContent.trim())); if (b) b.click(); }); await q.waitForTimeout(700);
       const ps = await q.evaluate(() => document.getElementById('sheet').innerText.replace(/\s+/g, ' '));
-      ok('0.70.0 : la fenêtre « Pause de Grok » donne l\'heure de la remise à zéro avec ses minutes (12h47)', /Chaque \S+ à 12h47 \(prochaine :/.test(ps), (ps.match(/Remise à zéro.{0,60}/) || [''])[0]);
+      ok('0.73.0 : la fenêtre « Pause de Grok » donne l\'heure de la remise à zéro avec ses minutes (12h47)', /Chaque \S+ à 12h47 \(prochaine :/.test(ps), (ps.match(/Remise à zéro.{0,60}/) || [''])[0]);
       /* page-3#12 : l'aide à la décision dit « probable », pas « Likely » */
       await ouvre('Passeport'); await q.evaluate(() => [...document.querySelectorAll('#sheet button')].find((x) => /second avis de Claude|Aide à la décision/.test(x.textContent)).click()); await q.waitForTimeout(1500);
       const aid = await q.evaluate(() => (document.querySelector('#sheet .aid') || {}).textContent || '');
-      ok('0.70.0 : aide à la décision en français : « (probable) », jamais « (Likely) »', /\(probable\)/.test(aid) && !/Likely/.test(aid), aid.slice(0, 160));
+      ok('0.73.0 : aide à la décision en français : « (probable) », jamais « (Likely) »', /\(probable\)/.test(aid) && !/Likely/.test(aid), aid.slice(0, 160));
       /* page-3#2 : un « Lien : javascript:… » écrit par un bot n'a pas de bouton ; un lien https en a un */
       await q.evaluate(() => { const G = window.__G, d0 = G['À toi'][3][0]; G['À toi'].push([d0, 'Iris', 'Lien piégé (exemple)', 'À faire : Confirmer le rendez-vous | Lien : javascript:alert(1)'], [d0, 'Iris', 'Lien sûr (exemple)', 'À faire : Confirmer le rendez-vous | Lien : https://exemple.fr/rdv']); location.hash = '#voir-recent'; });
       await q.waitForTimeout(2500);
       const bad = await ouvre('Lien piégé \\(exemple\\)'), good = await ouvre('Lien sûr \\(exemple\\)');
-      ok('0.70.0 : « Lien : javascript:… » d\'une demande : aucun bouton « Ouvrir le lien » ; un lien https garde le sien', !bad.some((x) => /^Ouvrir le lien/.test(x)) && good.some((x) => /^Ouvrir le lien/.test(x)), JSON.stringify([bad.slice(0, 4), good.slice(0, 4)]));
+      ok('0.73.0 : « Lien : javascript:… » d\'une demande : aucun bouton « Ouvrir le lien » ; un lien https garde le sien', !bad.some((x) => /^Ouvrir le lien/.test(x)) && good.some((x) => /^Ouvrir le lien/.test(x)), JSON.stringify([bad.slice(0, 4), good.slice(0, 4)]));
       await q.evaluate(() => { const s = document.querySelector('#sheet:not([hidden]) .sheet-close'); if (s) s.click(); }); await q.waitForTimeout(400);
       /* page-3#5 : « Rien à faire » puis « Annuler » : le mail revient ; « Supprimer ce brouillon » puis « Annuler » : le brouillon revient */
       const tri = () => q.evaluate(() => [...document.querySelectorAll('#pm-mail li.tri b')].map((x) => x.textContent));
@@ -1240,14 +1240,14 @@ srv.listen(0, async () => {
       await q.evaluate(() => { document.querySelectorAll('#toasts .toast').forEach((t) => t.remove()); const c = [...document.querySelectorAll('article')].find((x) => /Brouillon Gmail/.test(x.textContent) && /Texte sans destinataire/.test(x.textContent)); [...c.querySelectorAll('button')].find((x) => /^Supprimer/.test(x.textContent.trim())).click(); }); await q.waitForTimeout(900);
       await q.evaluate(() => { const b = [...document.querySelectorAll('#sheet .btn')].find((x) => /^Oui : supprimer/.test(x.textContent)); if (b) b.click(); }); await q.waitForTimeout(700);
       const b1 = await brou(), un = await annul(); await q.waitForTimeout(900); const b2 = await brou();
-      ok('0.70.0 : « Annuler » après « Rien à faire » fait revenir le mail (plus caché sur l\'appareil) ; après « Supprimer ce brouillon », le brouillon revient', m0.length >= 2 && m1.length === m0.length - 1 && m2.join('|') === m0.join('|') && hid === '[]' && b0 && !b1 && un && b2, JSON.stringify({m0, m1, m2, hid, b0, b1, un, b2}));
+      ok('0.73.0 : « Annuler » après « Rien à faire » fait revenir le mail (plus caché sur l\'appareil) ; après « Supprimer ce brouillon », le brouillon revient', m0.length >= 2 && m1.length === m0.length - 1 && m2.join('|') === m0.join('|') && hid === '[]' && b0 && !b1 && un && b2, JSON.stringify({m0, m1, m2, hid, b0, b1, un, b2}));
       /* page-3#4 : la ligne de la tâche a bougé (tri, suppression) : rien n'est écrit sur la ligne d'une autre tâche */
       await q.evaluate(() => { const T = window.__G['Tâches'], a = T[1]; T[1] = T[2]; T[2] = a; });
       const t0 = await q.evaluate(() => Date.now());
       await q.evaluate(() => { document.querySelectorAll('#toasts .toast').forEach((t) => t.remove()); const c = [...document.querySelectorAll('#pm-taches article')].find((x) => /Appeler le plombier/.test(x.textContent)); [...c.querySelectorAll('button')].find((x) => /^C'est fait/.test(x.textContent.trim())).click(); });
       await q.waitForTimeout(6500);
       const tk = await q.evaluate((t) => ({upd: (window.__calls || []).filter((c) => c.t >= t && c.tool === 'update_values' && /Tâches/.test(c.input.range)).length, st: window.__G['Tâches'].slice(1).map((x) => x[1] + ':' + x[3]), toasts: [...document.querySelectorAll('#toasts .toast')].map((x) => x.textContent).join(' || ')}), t0);
-      ok('0.70.0 : Tâches : « C\'est fait » vérifie que la ligne n\'a pas bougé (rien écrit sur une autre tâche)', tk.upd === 0 && /la ligne a bougé/.test(tk.toasts) && tk.st.filter((x) => /:Fait$/.test(x)).join() === 'Vieille tâche:Fait', JSON.stringify(tk).slice(0, 300));
+      ok('0.73.0 : Tâches : « C\'est fait » vérifie que la ligne n\'a pas bougé (rien écrit sur une autre tâche)', tk.upd === 0 && /la ligne a bougé/.test(tk.toasts) && tk.st.filter((x) => /:Fait$/.test(x)).join() === 'Vieille tâche:Fait', JSON.stringify(tk).slice(0, 300));
       await q.context().close(); }
     /* page-3#3 et page-3#6 : un voyage mis en pause puis repris garde son étape ; une case cochée reste cochée après la relecture */
     { let q = await page('#voyages');
@@ -1256,12 +1256,12 @@ srv.listen(0, async () => {
       const btn = (re) => q.evaluate((src) => { const b = [...document.querySelectorAll('#view button')].find((x) => new RegExp(src).test(x.innerText)); if (b) b.click(); return !!b; }, re);
       await voy('Lisbonne'); const p1 = await btn('^Mettre en pause'); await q.waitForTimeout(6500); const s1 = await statut();
       await q.waitForTimeout(1200); const p2 = await btn('^Reprendre le projet'); await q.waitForTimeout(6500); const s2 = await statut();
-      ok('0.70.0 : voyage mis en pause puis repris : « En pause (Options) », puis « Options » de nouveau (plus « Dates »)', p1 && p2 && s1 === 'En pause (Options)' && s2 === 'Options', JSON.stringify([p1, s1, p2, s2]));
+      ok('0.73.0 : voyage mis en pause puis repris : « En pause (Options) », puis « Options » de nouveau (plus « Dates »)', p1 && p2 && s1 === 'En pause (Options)' && s2 === 'Options', JSON.stringify([p1, s1, p2, s2]));
       await q.context().close(); q = await page('#voyages'); await voy('Tunisie');
       const t = await q.evaluate(() => { const li = [...document.querySelectorAll('ul.checks li:not(.is-done)')].find((x) => /passeports/i.test(x.textContent)); li.querySelector('.chk').click(); return li.querySelector('.chk-t').textContent; });
       await q.waitForTimeout(7500);
       const ck = await q.evaluate((tt) => ({todo: [...document.querySelectorAll('ul.checks li:not(.is-done) .chk-t')].map((x) => x.textContent).includes(tt), mem: localStorage.getItem('jarvis.voy.coches') || ''}), t);
-      ok('0.70.0 : voyage : une case cochée de « Ce qui attend » ne se décoche plus à la relecture du Canal', !ck.todo && ck.mem.includes(t), JSON.stringify(ck));
+      ok('0.73.0 : voyage : une case cochée de « Ce qui attend » ne se décoche plus à la relecture du Canal', !ck.todo && ck.mem.includes(t), JSON.stringify(ck));
       await q.context().close(); }
     /* page-3#10 : deux fins de pause dans la même page ouverte : la sonnette est proposée les deux fois */
     { const q = await page('#demandes');
@@ -1272,7 +1272,7 @@ srv.listen(0, async () => {
       await q.waitForTimeout(6000); const v1 = await q.evaluate(() => window.__G['Faits'].find((x) => x[1] === "Grok en pause jusqu'au")[2]);
       await fin(st(Date.now() - 3600000)); await q.waitForTimeout(2000); const a2 = await toasts();
       await q.evaluate(() => { const b = document.querySelector('#toasts .toast-undo'); if (b) b.click(); });
-      ok('0.70.0 : Grok repart deux fois dans la même page ouverte : la sonnette de reprise est proposée les deux fois', /Grok est reparti/.test(a1) && /^Reprise sonnée le/.test(v1) && /Grok est reparti/.test(a2), JSON.stringify([a1.slice(0, 90), v1, a2.slice(0, 90)]));
+      ok('0.73.0 : Grok repart deux fois dans la même page ouverte : la sonnette de reprise est proposée les deux fois', /Grok est reparti/.test(a1) && /^Reprise sonnée le/.test(v1) && /Grok est reparti/.test(a2), JSON.stringify([a1.slice(0, 90), v1, a2.slice(0, 90)]));
       await q.context().close(); }
     /* page-4#1 : une échéance que le Journal dit « pas encore soumise » n'est pas « faite » */
     { const q = await page('#agenda');
@@ -1282,14 +1282,14 @@ srv.listen(0, async () => {
         location.hash = '#voir-recent'; });
       await q.waitForTimeout(2500); await q.evaluate(() => { location.hash = '#agenda'; }); await q.waitForTimeout(1500);
       const rows = await q.evaluate(() => [...document.querySelectorAll('#view .dl-row, #view .agt-row')].map((x) => x.innerText.replace(/\s+/g, ' ')).filter((t) => /Timesheet Négatif/.test(t)));
-      ok('0.70.0 : Journal « Pas encore soumis » : l\'échéance reste à venir (plus « fait ✓ »)', rows.length > 0 && rows.every((t) => !/fait ✓/.test(t)), rows.join(' | ').slice(0, 160));
+      ok('0.73.0 : Journal « Pas encore soumis » : l\'échéance reste à venir (plus « fait ✓ »)', rows.length > 0 && rows.every((t) => !/fait ✓/.test(t)), rows.join(' | ').slice(0, 160));
       await q.context().close(); }
     /* page-4#3 : aucune lecture ne réussit (serveur sans iPhone relié) : l'accueil le dit et cesse d'écrire */
     { const ctx = await b.newContext({...devices['iPhone 15 Pro Max']}); await ctx.addInitScript(PAUSE_INIT);
       await ctx.addInitScript(() => { const si = window.setInterval, ci = window.clearInterval; window.__iv = new Set(); window.setInterval = function (f, ms, ...a) { const id = si.call(window, f, ms, ...a); if (ms === 34) window.__iv.add(id); return id; }; window.clearInterval = function (id) { window.__iv.delete(id); return ci.call(window, id); }; });
       const q = await ctx.newPage(); q.on('pageerror', (e) => errs.push('accueil sans lecture : ' + e.message)); await q.goto(base + '?serveur#accueil'); await q.waitForTimeout(6500);
       const r = await q.evaluate(() => ({n: window.__iv.size, tiles: [...document.querySelectorAll('.hud-ro')].map((x) => x.innerText.replace(/\s+/g, ' ')), say: (document.querySelector('.hud-say') || {}).textContent || ''}));
-      ok('0.70.0 : accueil sans aucune lecture réussie : « lecture impossible » (agenda, pour toi), la phrase le dit, plus de minuterie qui tourne', r.n === 0 && r.tiles.some((x) => /^AGENDA — lecture impossible/.test(x)) && r.tiles.some((x) => /^POUR TOI — lecture impossible/.test(x)) && /Je n’arrive pas à lire/.test(r.say), JSON.stringify(r).slice(0, 300));
+      ok('0.73.0 : accueil sans aucune lecture réussie : « lecture impossible » (agenda, pour toi), la phrase le dit, plus de minuterie qui tourne', r.n === 0 && r.tiles.some((x) => /^AGENDA — lecture impossible/.test(x)) && r.tiles.some((x) => /^POUR TOI — lecture impossible/.test(x)) && /Je n’arrive pas à lire/.test(r.say), JSON.stringify(r).slice(0, 300));
       await q.context().close(); }
     /* page-4#4 : le Canal arrive bien avant « À toi » : aucune alerte « Nouvelle demande » au lancement */
     { const ctx = await b.newContext({...devices['iPhone 15 Pro Max']}); await ctx.addInitScript(PAUSE_INIT);
@@ -1297,18 +1297,18 @@ srv.listen(0, async () => {
         return Object.assign({}, x, {watchTool: (server, tool, input, handler, opts) => { if (!/À toi/.test((input && input.range) || '')) return x.watchTool(server, tool, input, handler, opts); let stop = null, dead = false; const t = setTimeout(() => { if (!dead) stop = x.watchTool(server, tool, input, handler, opts); }, 1500); return () => { dead = true; clearTimeout(t); if (stop) stop(); }; }}); }}; }}); });
       const q = await ctx.newPage(); q.on('pageerror', (e) => errs.push('alertes au lancement : ' + e.message)); await q.goto(base + '#accueil'); await q.waitForTimeout(5500);
       const n = await q.evaluate(() => [...document.querySelectorAll('.alert-t')].map((x) => x.innerText.replace(/\s+/g, ' ')));
-      ok('0.70.0 : lancement avec « À toi » lu 1,5 s après le Canal : aucune alerte « Nouvelle demande » en rafale', n.length === 0, n.join(' | ').slice(0, 200));
+      ok('0.73.0 : lancement avec « À toi » lu 1,5 s après le Canal : aucune alerte « Nouvelle demande » en rafale', n.length === 0, n.join(' | ').slice(0, 200));
       await ctx.close(); }
     /* page-4#6, page-4#7, srv-a#9 : la discussion ouvre Papiers et Pour moi ; État des systèmes ; sonnette suivie du point final */
     { const q = await page('#accueil');
       const dis = async (t) => { if (await q.evaluate(() => document.getElementById('chat').hidden)) { await q.tap('.talk-slot .jv-btn'); await q.waitForTimeout(900); } await q.fill('#chat-in', t); await q.tap('#chat .chat-row .btn.main'); await q.waitForTimeout(1500); return q.evaluate(() => [location.hash, !!document.getElementById('pm-taches')]); };
       const h1 = await dis('Ouvre mes papiers'), h2 = await dis('Ouvre mes tâches');
-      ok('0.70.0 : « Ouvre mes papiers » mène à Papiers, « Ouvre mes tâches » à Pour moi (Mes tâches)', h1[0] === '#papiers' && h2[0] === '#demandes' && h2[1], JSON.stringify([h1, h2]));
+      ok('0.73.0 : « Ouvre mes papiers » mène à Papiers, « Ouvre mes tâches » à Pour moi (Mes tâches)', h1[0] === '#papiers' && h2[0] === '#demandes' && h2[1], JSON.stringify([h1, h2]));
       await q.evaluate(() => { const x = document.querySelector('#chat:not([hidden]) .chat-head .icon-btn'); if (x) x.click(); window.__G['Faits'].push(['Assistants', 'Sonnette Chronos', 'Ma sonnette : bots+chronos@mail.grokbot.com.', '', '']); location.hash = '#voir-recent'; }); await q.waitForTimeout(2500);
       await q.evaluate(() => { location.hash = '#reglages'; }); await q.waitForTimeout(1500);
       const t = await q.evaluate(() => document.getElementById('view').innerText.replace(/\s+/g, ' '));
-      ok('0.70.0 : État des systèmes : la voix nommée comme sur l\'iPhone (Contenu énoncé), plus « Read & Speak » ni « téléphone »', /Voix Voix de l'iPhone \(Réglages, Accessibilité, Contenu énoncé\)/.test(t) && !/Read & Speak|du téléphone/.test(t), (t.match(/Micro .{0,140}/) || [''])[0]);
-      ok('0.70.0 : sonnette écrite dans une phrase qui finit par un point : l\'adresse est reconnue (1 bot en direct)', /Sonnettes 1 bot en direct, les autres par Iris/.test(t), (t.match(/Sonnettes .{0,60}/) || [''])[0]);
+      ok('0.73.0 : État des systèmes : la voix nommée comme sur l\'iPhone (Contenu énoncé), plus « Read & Speak » ni « téléphone »', /Voix Voix de l'iPhone \(Réglages, Accessibilité, Contenu énoncé\)/.test(t) && !/Read & Speak|du téléphone/.test(t), (t.match(/Micro .{0,140}/) || [''])[0]);
+      ok('0.73.0 : sonnette écrite dans une phrase qui finit par un point : l\'adresse est reconnue (1 bot en direct)', /Sonnettes 1 bot en direct, les autres par Iris/.test(t), (t.match(/Sonnettes .{0,60}/) || [''])[0]);
       await q.context().close(); }
     /* page-4#10 : « Courrier à trier » compte tous les mails, pas les 8 affichés */
     { const q = await page('#demandes');
@@ -1316,7 +1316,7 @@ srv.listen(0, async () => {
       await q.waitForTimeout(2500);
       const r = await q.evaluate(() => ({sum: (document.querySelector('#pm-mail summary .aside') || {}).textContent || '', fils: (document.querySelector('#pm-mail .live-mail .panel-h .aside') || {}).textContent || '', li: document.querySelectorAll('#pm-mail li.tri').length}));
       const n1 = +(r.sum.match(/^(\d+) mails$/) || [])[1], n2 = +(r.fils.match(/^(\d+) fils/) || [])[1];
-      ok('0.70.0 : « Courrier à trier » annonce le même nombre que le panneau (plus de plafond à 8)', r.li === 8 && n1 > 8 && n1 === n2, JSON.stringify(r));
+      ok('0.73.0 : « Courrier à trier » annonce le même nombre que le panneau (plus de plafond à 8)', r.li === 8 && n1 > 8 && n1 === n2, JSON.stringify(r));
       await q.context().close(); }
     /* page-4#11 et page-4#12 : accords (« sa sonnette », « 1 terminée ») ; deux réponses d'Iris ensemble : un bandeau qui les compte */
     { const q = await page('#accueil');
@@ -1325,14 +1325,14 @@ srv.listen(0, async () => {
       await q.evaluate((rr) => { const c = window.__G['Canal']; rr.forEach((r, i) => { c[r - 1][5] = 'Fait'; c[r - 1][6] = i ? 'Quittance trouvée (exemple).' : 'Bail trouvé (exemple).'; }); document.querySelectorAll('#toasts .toast').forEach((t) => t.remove()); location.hash = '#voir-recent'; }, rows);
       await q.waitForTimeout(2500);
       const a = await q.evaluate(() => [...document.querySelectorAll('.alert-t:not(.out)')].map((t) => t.innerText.replace(/\s+/g, ' ')));
-      ok('0.70.0 : deux réponses d\'Iris dans la même relecture : un seul bandeau « Iris a répondu » qui dit « 2 réponses »', a.length === 1 && /Iris a répondu/.test(a[0]) && /2 réponses/.test(a[0]), a.join(' | ').slice(0, 200));
+      ok('0.73.0 : deux réponses d\'Iris dans la même relecture : un seul bandeau « Iris a répondu » qui dit « 2 réponses »', a.length === 1 && /Iris a répondu/.test(a[0]) && /2 réponses/.test(a[0]), a.join(' | ').slice(0, 200));
       await q.evaluate(() => { document.querySelectorAll('.alert-t').forEach((t) => t.remove()); const c = window.__G['Canal']; c.forEach((r, i) => { if (i && /^À faire/.test(r[5]) && !['Iris', 'Kairos'].includes(r[2])) r[5] = 'Fait'; }); location.hash = '#voir-recent'; }); await q.waitForTimeout(2500);
       await q.evaluate(() => { location.hash = '#equipe'; }); await q.waitForTimeout(1200); await q.evaluate(() => document.querySelector('.ux-seg [data-f="cout"]').click()); await q.waitForTimeout(800);
       const fq = await q.evaluate(() => { const pn = [...document.querySelectorAll('.panel')].find((x) => /^File d'attente des bots/.test((x.querySelector('h2') || {}).textContent || '')); return pn ? pn.innerText.replace(/\s+/g, ' ') : ''; });
       await q.evaluate(() => { const c = window.__G['Canal']; let one = false; c.forEach((r, i) => { if (!i || (r[1] !== 'Rabie' && r[2] !== 'Rabie')) return; if (!one && /^Fait/.test(r[5])) { one = true; return; } r[5] = 'Attend ton oui'; }); location.hash = '#voir-recent'; }); await q.waitForTimeout(2500);
       await q.evaluate(() => { location.hash = '#suivi'; }); await q.waitForTimeout(1500);
       const hc = await q.evaluate(() => ([...document.querySelectorAll('.aside')].find((x) => / en cours · \d+ terminées?$/.test(x.textContent)) || {}).textContent || '');
-      ok('0.70.0 : accords : « Kairos n\'a pas encore sa sonnette … qui lui relaie », « 1 terminée »', /Kairos n'a pas encore sa sonnette : un mail réveille Iris, qui lui relaie le mot « Canal »\./.test(fq) && / · 1 terminée$/.test(hc), JSON.stringify([(fq.match(/Kairos n'a.{0,90}/) || [''])[0], hc]));
+      ok('0.73.0 : accords : « Kairos n\'a pas encore sa sonnette … qui lui relaie », « 1 terminée »', /Kairos n'a pas encore sa sonnette : un mail réveille Iris, qui lui relaie le mot « Canal »\./.test(fq) && / · 1 terminée$/.test(hc), JSON.stringify([(fq.match(/Kairos n'a.{0,90}/) || [''])[0], hc]));
       await q.context().close(); }
     /* page-4#13 (décision du propriétaire) : un appui sur MÉTÉO redemande la position quand elle a plus de 3 h */
     { const ctx = await b.newContext({...devices['iPhone 15 Pro Max'], geolocation: {latitude: 43.3, longitude: 5.37}, permissions: ['geolocation']}); await ctx.addInitScript(PAUSE_INIT);
@@ -1342,9 +1342,9 @@ srv.listen(0, async () => {
       await q.evaluate(() => { delete window.__METEO; }); const n0 = urls.length;
       await q.evaluate(() => document.querySelector('.hud-ro.q-tr').click()); await q.waitForTimeout(2000);
       const r = await q.evaluate(() => { try { return JSON.parse(localStorage.getItem('jarvis.pos')); } catch (e) { return null; } }), got = urls.slice(n0);
-      ok('0.70.0 : MÉTÉO touchée avec une position de la veille : la position est redemandée et la météo relue au nouvel endroit', got.some((u) => /latitude=43\.3&longitude=5\.37/.test(u)) && r && r.lat === 43.3 && Date.now() - r.at < 120000, JSON.stringify({got: got.map((u) => u.slice(0, 80)), r}));
+      ok('0.73.0 : MÉTÉO touchée avec une position de la veille : la position est redemandée et la météo relue au nouvel endroit', got.some((u) => /latitude=43\.3&longitude=5\.37/.test(u)) && r && r.lat === 43.3 && Date.now() - r.at < 120000, JSON.stringify({got: got.map((u) => u.slice(0, 80)), r}));
       await ctx.close(); }
-    // 0.70.0 — C (décisions du 23/11/2026)
+    // 0.73.0 — C (décisions du 23/11/2026)
     /* srv-routes#3 « Retirer dans Réglages » : la liste des appareils reliés dans la carte « Serveur JARVIS » (serveur simulé : ses réponses
        sont écrites ici ; le vrai serveur a son banc, jarvis-os/server/tests/fiab-c.test.mjs). Noms et dates inventés. */
     { const ctx = await b.newContext({...devices['iPhone 15 Pro Max']}); await ctx.addInitScript(PAUSE_INIT);
@@ -1357,7 +1357,7 @@ srv.listen(0, async () => {
       const q = await ctx.newPage(); q.on('pageerror', (e) => errs.push('appareils : ' + e.message)); await q.goto(base + '?serveur#reglages'); await q.waitForTimeout(3500);
       const lis = () => q.evaluate(() => [...document.querySelectorAll('.set-card .app-it')].map((x) => ({t: x.innerText.replace(/\s+/g, ' ').trim(), btn: [...x.querySelectorAll('button')].map((y) => y.textContent.trim())})));
       const l0 = await lis(), carte = await q.evaluate(() => { const c = [...document.querySelectorAll('.set-card')].find((x) => /^Serveur JARVIS/.test(x.textContent)); return c ? c.innerText.replace(/\s+/g, ' ') : ''; });
-      ok('0.70.0 — C : Réglages, carte « Serveur JARVIS » : les appareils reliés (nom, « relié le … »), « Cet appareil » sans bouton sur le sien, « Retirer » sur l’autre ; « Délier cet iPhone » reste',
+      ok('0.73.0 — C : Réglages, carte « Serveur JARVIS » : les appareils reliés (nom, « relié le … »), « Cet appareil » sans bouton sur le sien, « Retirer » sur l’autre ; « Délier cet iPhone » reste',
         l0.length === 2 && /^JARVIS OS · iPhone · relié le 23 novembre( 2026)? à 14h05 Cet appareil$/.test(l0[0].t) && !l0[0].btn.length && /^JARVIS OS · iPad · relié le 22 novembre/.test(l0[1].t) && l0[1].btn.join() === 'Retirer' && /Délier cet iPhone/.test(carte), JSON.stringify([l0, carte]));
       await q.evaluate(() => [...document.querySelectorAll('.app-it')][1].querySelector('button').click()); await q.waitForTimeout(700);
       const conf = await q.evaluate(() => { const s = document.getElementById('sheet'); return s && !s.hidden ? s.innerText.replace(/\s+/g, ' ') : ''; }), avant = retraits.length;
@@ -1365,9 +1365,9 @@ srv.listen(0, async () => {
       const confTout = await q.evaluate(() => { const s = document.getElementById('sheet'); return s && !s.hidden ? s.innerText.replace(/\s+/g, ' ') : ''; });
       await q.evaluate(() => { const x = [...document.querySelectorAll('#sheet button')].find((y) => /Oui, retirer/.test(y.textContent)); if (x) x.click(); }); await q.waitForTimeout(1800);
       const l1 = await lis(), dit = await q.evaluate(() => [...document.querySelectorAll('.set-wrap .set-msg')].map((x) => x.textContent).join(' | '));
-      ok('0.70.0 — C : « Retirer » demande d’abord confirmation (« Retirer « JARVIS OS · iPad » ? », rien ne part avant), puis le retire et le dit ; la liste ne garde que cet appareil',
+      ok('0.73.0 — C : « Retirer » demande d’abord confirmation (« Retirer « JARVIS OS · iPad » ? », rien ne part avant), puis le retire et le dit ; la liste ne garde que cet appareil',
         /Retirer « JARVIS OS · iPad » \?/.test(conf) && /Oui, retirer/.test(conf) && avant === 0 && retraits.join() === 'bbbbbbbbbbbb' && /« JARVIS OS · iPad » est retiré/.test(dit) && l1.length === 1 && /Cet appareil$/.test(l1[0].t), JSON.stringify([conf.slice(0, 200), retraits, dit, l1]));
-      ok('0.70.0 — C : « Retirer » dit que la clé du raccourci « Jarvis » marche encore et renvoie à « Recréer la clé » (confirmation et message, le serveur ayant une clé)',
+      ok('0.73.0 — C : « Retirer » dit que la clé du raccourci « Jarvis » marche encore et renvoie à « Recréer la clé » (confirmation et message, le serveur ayant une clé)',
         /sa clé marche encore : recrée-la aussi \(carte « Siri et bouton Action », « Recréer la clé »\)/.test(confTout) && /S’il avait ton raccourci « Jarvis », recrée sa clé : carte « Siri et bouton Action », « Recréer la clé »/.test(dit), JSON.stringify([confTout.slice(0, 400), dit]));
       await q.screenshot({path: path.join(SH, 'reglages-appareils.png')});
       /* doc-ouverts#3 « Feuille Pendant ton absence » : de retour au premier plan, une notification de 20 minutes (envoyée pendant l'absence,
@@ -1381,15 +1381,15 @@ srv.listen(0, async () => {
       await fermer(); await q.clock.setFixedTime(new Date(H0)); await q.evaluate(() => { location.hash = '#reglages'; }); await q.waitForTimeout(600);
       await vis(true); await q.clock.setFixedTime(new Date(H0 + 25 * 60e3)); NOTIFS = [{id: 'n20', at: H0 + 5 * 60e3, title: 'Paiement refusé (essai)', body: 'Abonnement Exemple', url: '/#agenda'}];
       await vis(false); await q.waitForTimeout(2000); const r20 = await etatN();
-      ok('0.70.0 — C : notification de 20 minutes au retour : la feuille « Pendant ton absence » la propose, la page ne bouge pas toute seule', /pendant ton absence/i.test(r20.feuille) && /1 notification\b/.test(r20.feuille) && /Paiement refusé \(essai\)/.test(r20.feuille) && r20.hash === '#reglages' && vues.includes('n20'), JSON.stringify(r20));
+      ok('0.73.0 — C : notification de 20 minutes au retour : la feuille « Pendant ton absence » la propose, la page ne bouge pas toute seule', /pendant ton absence/i.test(r20.feuille) && /1 notification\b/.test(r20.feuille) && /Paiement refusé \(essai\)/.test(r20.feuille) && r20.hash === '#reglages' && vues.includes('n20'), JSON.stringify(r20));
       await q.evaluate(() => { const x = [...document.querySelectorAll('#sheet .notif-row')].find((y) => /Paiement refusé/.test(y.textContent)); if (x) x.click(); }); await q.waitForTimeout(1200);
       const r20b = await etatN();
-      ok('0.70.0 — C : un appui sur la notification de la feuille ouvre ce qu’elle annonce', r20b.hash === '#agenda' && !r20b.feuille, JSON.stringify(r20b));
+      ok('0.73.0 — C : un appui sur la notification de la feuille ouvre ce qu’elle annonce', r20b.hash === '#agenda' && !r20b.feuille, JSON.stringify(r20b));
       await fermer(); await q.evaluate(() => { location.hash = '#reglages'; }); await q.waitForTimeout(800);
       const H1 = H0 + 40 * 60e3; await q.clock.setFixedTime(new Date(H1)); await vis(true); await q.clock.setFixedTime(new Date(H1 + 10 * 60e3));
       NOTIFS = [{id: 'n5', at: H1 + 5 * 60e3, title: 'Rappel (essai)', body: '', url: '/#agenda'}, {id: 'n20', at: H0 + 5 * 60e3, title: 'Paiement refusé (essai)', body: '', url: '/#agenda', vue: H0 + 26 * 60e3}];
       await vis(false); await q.waitForTimeout(2000); const r5 = await etatN();
-      ok('0.70.0 — C : une seule notification de 5 minutes au retour : ouverte directement (comme avant), et dite', r5.hash === '#agenda' && !r5.feuille && /Ouvert depuis ta notification/.test(r5.toast), JSON.stringify(r5));
+      ok('0.73.0 — C : une seule notification de 5 minutes au retour : ouverte directement (comme avant), et dite', r5.hash === '#agenda' && !r5.feuille && /Ouvert depuis ta notification/.test(r5.toast), JSON.stringify(r5));
       await ctx.close(); }
     /* page#1 : l'app laissée ouverte la nuit (chargée le 24 à 23h50), deux notifications à 7h30 et 7h40, retour le 25 à 8h00, serveur lent
        (300 ms) : la feuille « Pendant ton absence » s'ouvre et la page ne se recharge pas avant (avant : rechargée à 0,6 s, tout était perdu) ;
@@ -1411,20 +1411,20 @@ srv.listen(0, async () => {
       await vis(true); await q.clock.setFixedTime(new Date(2026, 10, 25, 8, 0));
       NOTIFS = [{id: 'nn2', at: new Date(2026, 10, 25, 7, 40).getTime(), title: 'Kairos : prix en baisse (essai)', body: '', url: '/#achats'}, {id: 'nn1', at: new Date(2026, 10, 25, 7, 30).getTime(), title: 'Iris a répondu (essai)', body: '', url: '/#demandes'}];
       await vis(false); await q.waitForTimeout(2500); const n1 = await etatN();
-      ok('0.70.0 : app ouverte toute la nuit, deux notifications à 7h30 et 7h40, retour à 8h00 (serveur lent) : la feuille « Pendant ton absence » s’ouvre, sans rechargement de minuit avant',
+      ok('0.73.0 : app ouverte toute la nuit, deux notifications à 7h30 et 7h40, retour à 8h00 (serveur lent) : la feuille « Pendant ton absence » s’ouvre, sans rechargement de minuit avant',
         n1.mark === 1 && n1.hash === '#reglages' && /pendant ton absence/i.test(n1.feuille) && /2 notifications/.test(n1.feuille) && /Iris a répondu \(essai\)/.test(n1.feuille) && vues.includes('nn1') && vues.includes('nn2'), JSON.stringify([n1, vues]));
       await q.keyboard.press('Escape'); await q.waitForTimeout(500); await vis(true); await vis(false); await q.waitForTimeout(3500); const n2 = await etatN();
-      ok('0.70.0 : la feuille fermée, au retour suivant la page passe au nouveau jour (le 25)', n2.mark === 0 && /\b25\b/.test(n2.today), JSON.stringify(n2));
+      ok('0.73.0 : la feuille fermée, au retour suivant la page passe au nouveau jour (le 25)', n2.mark === 0 && /\b25\b/.test(n2.today), JSON.stringify(n2));
       await q.evaluate(() => { const x = [...document.querySelectorAll('.set-card button')].find((y) => /Délier cet iPhone/.test(y.textContent)); if (x) x.click(); }); await q.waitForTimeout(700);
       const avantF = (await etatN()).feuille, H = new Date(2026, 10, 25, 9, 0).getTime(), v0 = vues.length;
       await q.clock.setFixedTime(new Date(H)); await vis(true); await q.clock.setFixedTime(new Date(H + 40 * 60e3));
       NOTIFS = [{id: 'nb2', at: H + 30 * 60e3, title: 'Rappel (essai 2)', body: '', url: '/#agenda'}, {id: 'nb1', at: H + 20 * 60e3, title: 'Iris a répondu (essai 2)', body: '', url: '/#demandes'}];
       await vis(false); await q.waitForTimeout(2000); const p1 = await etatN();
-      ok('0.70.0 : une fiche ouverte avant l’absence (« Délier cet iPhone ? ») reste ; un bandeau « Pendant ton absence · 2 notifications » s’affiche à la place de la feuille, rien n’est encore marqué vu',
+      ok('0.73.0 : une fiche ouverte avant l’absence (« Délier cet iPhone ? ») reste ; un bandeau « Pendant ton absence · 2 notifications » s’affiche à la place de la feuille, rien n’est encore marqué vu',
         /Délier cet iPhone/.test(avantF) && /Délier cet iPhone/.test(p1.feuille) && /Pendant ton absence/.test(p1.toast) && /2 notifications : touche pour les voir/.test(p1.toast) && vues.length === v0, JSON.stringify([avantF.slice(0, 60), p1, vues.slice(v0)]));
       await q.evaluate(() => { const t = [...document.querySelectorAll('.alert-t')].find((x) => /Pendant ton absence/.test(x.textContent)), v = t && [...t.querySelectorAll('button')].find((y) => y.textContent.trim() === 'Voir'); if (v) v.click(); }); await q.waitForTimeout(900);
       const p2 = await etatN();
-      ok('0.70.0 : « Voir » sur ce bandeau montre la feuille « Pendant ton absence » ; elles sont marquées vues à ce moment-là', /pendant ton absence/i.test(p2.feuille) && /2 notifications/.test(p2.feuille) && /Rappel \(essai 2\)/.test(p2.feuille) && vues.slice(v0).sort().join() === 'nb1,nb2', JSON.stringify([p2, vues.slice(v0)]));
+      ok('0.73.0 : « Voir » sur ce bandeau montre la feuille « Pendant ton absence » ; elles sont marquées vues à ce moment-là', /pendant ton absence/i.test(p2.feuille) && /2 notifications/.test(p2.feuille) && /Rappel \(essai 2\)/.test(p2.feuille) && vues.slice(v0).sort().join() === 'nb1,nb2', JSON.stringify([p2, vues.slice(v0)]));
       await ctx.close(); }
     /* page-5#1 « Oui à la voix seulement » : en discussion écrite, un « oui » tapé n'exécute pas la proposition de Claude : il part à Claude, et le
        bouton de la carte reste la seule validation (en mains libres, le « oui » l'exécute toujours : banc-serveur.mjs, « voix : un ordre à un bot… ») */
@@ -1432,13 +1432,13 @@ srv.listen(0, async () => {
       const dis = async (t) => { if (await q.evaluate(() => document.getElementById('chat').hidden)) { await q.tap('.talk-slot .jv-btn'); await q.waitForTimeout(900); } await q.fill('#chat-in', t); await q.tap('#chat .chat-row .btn.main'); await q.waitForTimeout(1800); };
       const etat = () => q.evaluate(() => ({n: (window.__samples || []).length, dernier: ((window.__samples || []).slice(-1)[0] || {}).last || '', cartes: [...document.querySelectorAll('#chat .msg.proposal')].map((x) => x.innerText.replace(/\s+/g, ' ')), eux: [...document.querySelectorAll('#chat .msg.them')].map((x) => x.innerText.replace(/\s+/g, ' ')).slice(-2)}));
       await dis('Prépare un ordre pour Iris'); const e1 = await etat(); await dis('oui'); const e2 = await etat(), canal = await q.evaluate(() => (window.__calls || []).filter((c) => c.tool === 'append_values' && /Canal/.test((c.input && c.input.range) || '')).length);
-      ok('0.70.0 — C : discussion écrite : « Prépare un ordre pour Iris » puis « oui » tapé : la carte reste ouverte (« Envoyer à Iris »), rien n’est écrit dans le Canal, et le « oui » part à Claude',
+      ok('0.73.0 — C : discussion écrite : « Prépare un ordre pour Iris » puis « oui » tapé : la carte reste ouverte (« Envoyer à Iris »), rien n’est écrit dans le Canal, et le « oui » part à Claude',
         e1.cartes.some((c) => /Iris/.test(c) && /Envoyer à Iris/.test(c)) && e2.cartes.some((c) => /Envoyer à Iris/.test(c)) && !e2.cartes.some((c) => /Envoyé/.test(c)) && e2.n === e1.n + 1 && /\boui\b/i.test(e2.dernier) && !e2.eux.some((x) => /C’est parti/.test(x)) && canal === 0, JSON.stringify([e1.n, e2.n, e2.dernier.slice(-40), e2.cartes.slice(-1), e2.eux, canal]));
       await q.context().close(); }
     /* B3 (reste) : Équipe › Coût ne construit plus tout l'ancien Suivi (missions, relances, santé…) pour n'en garder que le coût */
     { const q = await page('#equipe'); await q.evaluate(() => document.querySelector('.ux-seg [data-f="cout"]').click()); await q.waitForTimeout(900);
       const t = await q.evaluate(() => [...document.querySelectorAll('#view .panel h2, #view section > header h2')].map((x) => x.textContent.trim()));
-      ok('0.70.0 — C : Équipe › Coût ne montre que le coût (Coût de la semaine, file d’attente des bots, Claude cette semaine)', t.length > 0 && t.every((x) => /^(Coût de la semaine|File d'attente des bots|Claude cette semaine)/.test(x)), JSON.stringify(t));
+      ok('0.73.0 — C : Équipe › Coût ne montre que le coût (Coût de la semaine, file d’attente des bots, Claude cette semaine)', t.length > 0 && t.every((x) => /^(Coût de la semaine|File d'attente des bots|Claude cette semaine)/.test(x)), JSON.stringify(t));
       await q.context().close(); }
     /* aucune rubrique n'affiche de texte cassé */
     const broken = [];

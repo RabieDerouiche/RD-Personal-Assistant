@@ -141,7 +141,7 @@ function play(url: string, g: number): Promise<boolean> {
     a.play().then(() => { started = true; }, () => end(false));
   });
 }
-/* 0.70.0 : les sons déjà préparés (les deux phrases suivantes) d'une lecture coupée sont rendus à la mémoire de l'iPhone ;
+/* 0.73.0 : les sons déjà préparés (les deux phrases suivantes) d'une lecture coupée sont rendus à la mémoire de l'iPhone ;
    rendre un son déjà joué (play() l'a rendu) ne fait rien */
 function rendre(urls: Array<Promise<string | null> | null | undefined>) {
   for (const p of urls) if (p) p.then((u) => { if (u) try { URL.revokeObjectURL(u); } catch { /* rien */ } }, () => { /* rien */ });
@@ -196,7 +196,7 @@ export function sayFlux(o: {clean?: (t: string) => string, onStart?: () => void}
   hush(); held = false;
   const g = ++gen, keepMic = !!conv, queue: string[] = [];
   let raw = '', off = 0, fin = false, began = false, wake: (() => void) | null = null;
-  const urls: Array<Promise<string | null> | undefined> = [];   /* 0.70.0 : gardés ici pour être rendus si la lecture est coupée */
+  const urls: Array<Promise<string | null> | undefined> = [];   /* 0.73.0 : gardés ici pour être rendus si la lecture est coupée */
   const clean = (t: string) => { try { return (o.clean ? o.clean(t) : t).replace(/\s+/g, ' ').trim(); } catch { return t.trim(); } };
   const cut = (final: boolean) => {
     const r = decoupe(raw, off, !queue.length, final); off = r.off;

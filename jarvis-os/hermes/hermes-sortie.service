@@ -1,0 +1,14 @@
+# JARVIS OS — règles réseau de l'utilisateur hermes (posé par install.sh). Hermes ne démarre pas sans elles.
+[Unit]
+Description=Règles réseau sortantes de l'utilisateur hermes (essai JARVIS OS)
+After=network-pre.target
+Before=hermes-gateway.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/sbin/nft -f /etc/hermes/sortie.nft
+ExecStop=/usr/sbin/nft delete table inet hermes_sortie
+
+[Install]
+WantedBy=multi-user.target

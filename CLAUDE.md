@@ -32,7 +32,7 @@ Si un ID ne répond plus, retrouve le fichier avec `search_files` par titre.
 
 ## Grok Bot en bref
 
-**Hermes n'existe plus** : arrêté et remplacé par Grok Bot. Ne le mentionne plus, ne lis plus `État Hermes`, n'écris plus dans `Notes de Claude/`, ne signale plus son absence.
+**L'ancien Hermes** (OpenRouter et Telegram, 28/10 au 03/11/2026) est arrêté et remplacé par Grok Bot : ne lis plus `État Hermes`, n'écris plus dans `Notes de Claude/`. **Hermes Agent revient en essai sur le serveur de JARVIS** (sa demande du 23/11/2026 : tester des routines, peut-être alléger ou remplacer Grok Bot, puis le relier à JARVIS) : lis `docs/hermes.md` avant d'y toucher (kit `jarvis-os/hermes/`, étape en cours, garde-fous, abonnement Claude par le plugin officiel, jamais l'OAuth intégré d'Hermes) et `docs/hermes-deroule.md` (sa demande du 23/11/2026 au soir : qui fait quoi entre JARVIS, Hermes, Grok Bot et Claude ; droits d'Hermes, toujours par les outils du serveur MCP de JARVIS ; routines « en double » puis bascule sur sa décision ; skills). Une routine de Grok Bot ne se retire qu'après comparaison et son oui.
 
 | Bot | Domaine |
 |---|---|
@@ -65,6 +65,7 @@ Si un ID ne répond plus, retrouve le fichier avec `search_files` par titre.
 - **Coût d'abord** : le poste le plus cher est la conversation (un chat Grok), pas la routine. Préfère une formule de Pilotage, une écriture directe de la page Jarvis ou un script sur l'ordinateur des bots à une lecture par un bot, et n'ajoute une routine que si rien d'autre ne convient.
 - Toute question au propriétaire se pose en **QCM** (outil de questions à choix), jamais dans le texte (rappel du 15/11/2026). En cas de doute sur une décision qui lui revient : QCM plutôt que de supposer.
 - **Teste toi-même** chaque correction ou amélioration de la page Jarvis avant de la lui montrer (banc d'essai `essais/jarvis/`).
+- **Serveur de JARVIS** : ne lui fais plus recopier de commande ni de sortie (sa demande du 23/11/2026). Confie la tâche à la session « Serveur JARVIS » (`send_message`, puis `list_events` pour le résultat ; méthode dans `docs/jarvis-os-reprise.md`) ; il y valide chaque commande. Jamais de secret par ce canal.
 - **Fusion dans main** (accord permanent du 13/11/2026, « oui, toujours ») : après chaque mise à jour de tes instructions (CLAUDE.md, `docs/`, skills), pousse ta branche, crée la demande de fusion vers `main` et fusionne-la sans redemander, pour qu'une nouvelle session parte à jour. Depuis le 15/11/2026 (« toutes les modifs doivent y être »), le banc d'essai (`essais/`) et le journal de la page Jarvis (`docs/journal-jarvis.md`) passent aussi par cet accord. Rien d'autre.
 - Les droits, clés et réglages côté Grok Bot (Connect apps, règles d'approbation, filtres Gmail) sont faits par le propriétaire, guidé par ses bots. Tu ne demandes jamais de clé ni de code.
 - **Filtres Gmail** : le propriétaire les modifie à la main (choix du 10/11/2026). Ne repropose pas de les automatiser. Par défaut, un nouvel expéditeur n'a pas de filtre : il est lu au lot du matin. Un filtre ne sert que pour un traitement à l'arrivée ; regroupe alors les changements pour une seule séance sur ordinateur.
@@ -101,5 +102,6 @@ Si un ID ne répond plus, retrouve le fichier avec `search_files` par titre.
 | CV, lettre de motivation, candidature | `cv` |
 | Analyse ponctuelle du budget ou d'un relevé, sur demande explicite | `finances` |
 | Remplir ou modifier le profil | `profil` |
+| Routine ou skill d'Hermes, comparaison d'une routine « en double », bascule | `hermes` |
 
 Si le Profil contient encore des `[à compléter]` utiles à la tâche, pose au maximum 3 questions, puis propose de les enregistrer (skill `profil`).

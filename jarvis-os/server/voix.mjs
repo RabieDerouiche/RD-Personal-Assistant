@@ -42,7 +42,7 @@ export function createEcoute({dir, py, helper, parakeetHelper, model, fakeHelper
     const h = {child, buf: '', waits: new Map(), dead: false, ready: false, err: ''};
     child.on('close', () => { h.dead = true; for (const w of h.waits.values()) w({ok: false, error: 'écoute arrêtée'}); h.waits.clear(); });
     child.on('error', () => { h.dead = true; });
-    child.stdin.on('error', () => { /* 0.70.0 : écoute déjà arrêtée (EPIPE) : le serveur ne doit pas tomber ; « close » rend les attentes */ });
+    child.stdin.on('error', () => { /* 0.73.0 : écoute déjà arrêtée (EPIPE) : le serveur ne doit pas tomber ; « close » rend les attentes */ });
     child.stderr.on('data', (d) => { h.err = (h.err + d).slice(-800); });
     child.stdout.on('data', (d) => {
       h.buf += d; let i;
@@ -63,7 +63,7 @@ export function createEcoute({dir, py, helper, parakeetHelper, model, fakeHelper
     fs.mkdirSync(tmpDir, {recursive: true}); fs.writeFileSync(f, wav);
     const t0 = Date.now();
     const r = await new Promise((resolve) => {
-      /* 0.70.0 : 30 s sans réponse : le programme est figé (ou débordé) ; il est relancé à la phrase suivante, s'il avait fini de charger
+      /* 0.73.0 : 30 s sans réponse : le programme est figé (ou débordé) ; il est relancé à la phrase suivante, s'il avait fini de charger
          son modèle (sinon il charge encore : on le laisse finir) */
       const timer = setTimeout(() => { h.waits.delete(id); if (h.ready) { try { h.child.kill('SIGKILL'); } catch { /* rien */ } if (H === h) H = null; } resolve({ok: false, error: 'trop long'}); }, delaiMs);
       h.waits.set(id, (m) => { clearTimeout(timer); resolve(m); });
@@ -93,7 +93,7 @@ export function createTour({dir, py, helper, fakeHelper, log = () => {}, delaiMs
     const h = {child, buf: '', waits: new Map(), dead: false, ready: false, lents: 0, err: ''};
     child.on('close', () => { h.dead = true; for (const w of h.waits.values()) w({ok: false, error: 'fin de phrase arrêtée'}); h.waits.clear(); });
     child.on('error', () => { h.dead = true; });
-    child.stdin.on('error', () => { /* 0.70.0 : programme déjà arrêté (EPIPE) : le serveur ne doit pas tomber ; « close » rend les attentes */ });
+    child.stdin.on('error', () => { /* 0.73.0 : programme déjà arrêté (EPIPE) : le serveur ne doit pas tomber ; « close » rend les attentes */ });
     child.stderr.on('data', (d) => { h.err = (h.err + d).slice(-800); });
     child.stdout.on('data', (d) => {
       h.buf += d; let i;
@@ -113,7 +113,7 @@ export function createTour({dir, py, helper, fakeHelper, log = () => {}, delaiMs
     const h = proc(), id = crypto.randomUUID(), f = path.join(tmpDir, 'tour-' + id + '.wav');
     fs.mkdirSync(tmpDir, {recursive: true}); fs.writeFileSync(f, wav);
     const r = await new Promise((resolve) => {
-      /* au-delà de 3 s, la phrase part comme avant ; 0.70.0 : deux fois de suite sans réponse (programme figé), il est relancé à la pause suivante */
+      /* au-delà de 3 s, la phrase part comme avant ; 0.73.0 : deux fois de suite sans réponse (programme figé), il est relancé à la pause suivante */
       const timer = setTimeout(() => { h.waits.delete(id); if (h.ready && ++h.lents >= 2) { try { h.child.kill('SIGKILL'); } catch { /* rien */ } if (H === h) H = null; } resolve({ok: false, error: 'trop long'}); }, delaiMs);
       h.waits.set(id, (m) => { clearTimeout(timer); resolve(m); });
       try { h.child.stdin.write(JSON.stringify({id, wav: f}) + '\n'); } catch { clearTimeout(timer); h.waits.delete(id); resolve({ok: false, error: 'fin de phrase injoignable'}); }
@@ -133,7 +133,7 @@ export function wavOk(b) { return Buffer.isBuffer(b) && b.length > 44 && b.lengt
 const BOTS = BOT_NOMS;
 const JOURS = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
 /* le jour visé par la phrase : 0 aujourd'hui, 1 demain… ; soir ; week-end (samedi et dimanche).
-   0.70.0 : « demain soir » est un soir ; « ce week-end » dit un dimanche, c'est aujourd'hui ; « lundi prochain » dit un lundi, c'est dans 7 jours */
+   0.73.0 : « demain soir » est un soir ; « ce week-end » dit un dimanche, c'est aujourd'hui ; « lundi prochain » dit un lundi, c'est dans 7 jours */
 export function quand(t, dow) {
   const l = nrm(t), prochain = /\bprochaine?\b/.test(l), q = {jour: 0, soir: /\b(soir|soiree|cette nuit)\b/.test(l), we: false, dit: "aujourd'hui"};
   if (/apres[- ]demain/.test(l)) return {...q, jour: 2, dit: 'après-demain'};
@@ -147,14 +147,14 @@ export function quand(t, dow) {
   if (j >= 0) { let n = (j - dow + 7) % 7; if (prochain && n === 0) n = 7; return {...q, jour: n, dit: n === 0 ? "aujourd'hui" : n === 1 ? 'demain' : n === 7 ? JOURS[j] + ' prochain' : JOURS[j]}; }
   return q;
 }
-/* 0.70.0 : une phrase qui demande d'agir (rappel, ajout, achat, message, réglage…) n'a jamais de réponse instantanée : Claude s'en occupe */
+/* 0.73.0 : une phrase qui demande d'agir (rappel, ajout, achat, message, réglage…) n'a jamais de réponse instantanée : Claude s'en occupe */
 const ORDRE = /^(rappelle|ajoute|rajoute|achete|commande|note|mets|envoie|ecris|cherche|trouve|reserve|baisse|monte|regle|allume|eteins|prepare|redige|fais|lance|supprime|enleve|retire|annule|deplace|programme|planifie|cree|demande|relance|previens|reponds)\b|^dis (a|au|aux)\b|\b(rappeler|ajouter|rajouter|noter|acheter|commander|reserver)\b/;
-/* 0.70.0 : l'heure et la date d'ici et de maintenant, demandées seules : pas « à quelle heure part… », « quel jour tombe… », l'heure d'une autre ville */
+/* 0.73.0 : l'heure et la date d'ici et de maintenant, demandées seules : pas « à quelle heure part… », « quel jour tombe… », l'heure d'une autre ville */
 const DEBUT = "^((et|alors|bon|dis|dis-moi|dis moi|donne-moi|donne moi|tu as|t'as|as-tu|tu sais|sais-tu|c'est quoi|tu peux me dire|peux-tu me dire|peux tu me dire) )?";
 const FIN = "( maintenant| en ce moment| exactement| deja| la| aujourd'hui| d'aujourd'hui| du jour)?$";
 const HEURE = new RegExp(DEBUT + "(quelle heure|quelle heure (est-il|est il|il est|c'est)|(il est|c'est) quelle heure|l'heure qu'il est|l'heure)" + FIN);
 const DATE = new RegExp(DEBUT + "(quel jour|quelle date|quelle est la date|(on est|nous sommes|c'est) quel jour|(on est|nous sommes) le combien|quel jour (on est|est-on|est on|sommes-nous|sommes nous|nous sommes|est-il|est il|c'est)|quelle date (on est|est-on|est on|sommes-nous|sommes nous|nous sommes|est-il|est il|c'est)|la date)" + FIN);
-/* ce que demande la phrase, si le serveur sait y répondre seul ; null sinon (Claude répond). 0.70.0 : une salutation (« Bonjour Jarvis, quelle heure
+/* ce que demande la phrase, si le serveur sait y répondre seul ; null sinon (Claude répond). 0.73.0 : une salutation (« Bonjour Jarvis, quelle heure
    est-il ? ») ou un « euh » devant n'empêchent pas la réponse instantanée */
 export function intention(text) {
   const l = nrm(text).replace(/[?!.,;]+/g, ' ').replace(/\s+/g, ' ').trim(), mots = l.split(' ').filter(Boolean).length;
@@ -218,7 +218,7 @@ export const heurePhrase = (t) => { const [H, M] = t.hm.split(':').map(Number); 
 export const datePhrase = (d) => 'Nous sommes le ' + new Intl.DateTimeFormat('fr-FR', {timeZone: 'Europe/Paris', weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'}).format(d) + '.';
 
 /* 0.22.1 : la diction de Pierre (Piper lit « 18 h 49 » « dix-huit ache », « 7° », « 30 % », « 18/11 » chiffre par chiffre) : écrit comme on le dit.
-   0.70.0 : « 7° et 9° » ne colle plus le mot suivant (on lisait « degréset »), « 7°. » est lu aussi, « 1° » et « -1° » font « degré » au singulier */
+   0.73.0 : « 7° et 9° » ne colle plus le mot suivant (on lisait « degréset »), « 7°. » est lu aussi, « 1° » et « -1° » font « degré » au singulier */
 const MOIS_DIT = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
 export const diction = (t) => String(t || '')
   .replace(/\bJ\.A\.R\.V\.I\.S\b\.?/g, 'Jarvis').replace(/\bJARVIS\b/g, 'Jarvis').replace(/\bJarvis\s+OS\b\.?/g, 'Jarvis O.S.')   /* 0.47.0 : son nom, J.A.R.V.I.S OS, se dit « Jarvis O.S. » (Google épelait les majuscules) */

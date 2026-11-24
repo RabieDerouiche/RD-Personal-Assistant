@@ -1,4 +1,4 @@
-/* Banc 0.70.0, lot C (décisions du 23/11/2026) : node jarvis-os/server/tests/fiab-c.test.mjs (aucun vrai Claude, aucun vrai Google, aucun coût).
+/* Banc 0.73.0, lot C (décisions du 23/11/2026) : node jarvis-os/server/tests/fiab-c.test.mjs (aucun vrai Claude, aucun vrai Google, aucun coût).
    « Retirer dans Réglages » : deux appareils reliés, la liste, le retrait de l'un depuis l'autre (401 pour le retiré, ses notifications retirées),
    se retirer soi-même refusé, un appareil inconnu. Puis le service worker de l'ancienne app (/ancienne/), exécuté hors navigateur.
    Noms d'appareils et adresses inventés. */

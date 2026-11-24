@@ -56,7 +56,7 @@ export function validSubscription(sub, allowHttp) {
   } catch { return false; }
 }
 
-/* 0.70.0 : délai max d'un envoi (10 s) : un service de notifications qui ne répond pas ne bloque plus le serveur 5 minutes par appareil */
+/* 0.73.0 : délai max d'un envoi (10 s) : un service de notifications qui ne répond pas ne bloque plus le serveur 5 minutes par appareil */
 export function createPush({S, save, log = () => {}, allowHttp = false, delaiMs = 10000}) {
   S.push = Object.assign({subs: [], prefs: {bots: true, rappels: true, heure: '08:00'}, sent: 0}, S.push || {});
   if (!S.push.vapid) { S.push.vapid = newVapid(); save(); }
@@ -69,7 +69,7 @@ export function createPush({S, save, log = () => {}, allowHttp = false, delaiMs 
     save(); return {ok: true, count: S.push.subs.length};
   }
   function unsubscribe(endpoint) { const n = S.push.subs.length; S.push.subs = S.push.subs.filter((x) => x.endpoint !== endpoint); save(); return {ok: true, removed: n - S.push.subs.length}; }
-  /* 0.70.0 : un appareil retiré (Réglages, « Retirer ») ne reçoit plus rien : ses abonnements partent avec lui (chacun porte l'empreinte courte
+  /* 0.73.0 : un appareil retiré (Réglages, « Retirer ») ne reçoit plus rien : ses abonnements partent avec lui (chacun porte l'empreinte courte
      de l'appareil qui l'a créé ; un abonnement d'avant cette marque, sans empreinte, reste) */
   function retirerAppareil(device) {
     const d = String(device || ''); if (!d) return 0;

@@ -54,7 +54,7 @@ export function createNotifier({S, save, push, read, linked, pause, now = () => 
   S.notify = Object.assign({canal: null, digest: '', resume: '', lastCanal: 0}, S.notify || {});
   const prefs = () => S.push.prefs || {};
   const ready = () => S.push.subs.length > 0 && linked();
-  /* 0.70.0 : la journée (ou la reprise) n'est marquée faite qu'après des lectures de Pilotage réussies ; une lecture ratée (Google 503,
+  /* 0.73.0 : la journée (ou la reprise) n'est marquée faite qu'après des lectures de Pilotage réussies ; une lecture ratée (Google 503,
      réseau) est réessayée 10 minutes plus tard, au lieu de perdre les rappels du jour. En mémoire seulement : un redémarrage réessaie tout de suite. */
   const REESSAI = 10 * 60000; let digestEssai = 0, resumeEssai = 0;
 

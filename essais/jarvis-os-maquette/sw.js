@@ -3,7 +3,7 @@
    0.27.0 (comme Panier, après son incident du 19/11/2026) : une nouvelle version de ce service ne prend JAMAIS la place de l'ancienne pendant
    qu'une page charge (plus de skipWaiting à l'installation) : elle attend que l'app passe à l'arrière-plan (message « active ») ou soit fermée.
    L'ancien service suffit entre-temps : le code vient d'abord du réseau. Une erreur 5xx (le serveur redémarre) retombe sur la copie gardée.
-   0.70.0 : une adresse avec « ?… » (une notification ouvre « /?n=<id>#… ») n'est plus gardée : chaque ouverture ajoutait une copie de la page
+   0.73.0 : une adresse avec « ?… » (une notification ouvre « /?n=<id>#… ») n'est plus gardée : chaque ouverture ajoutait une copie de la page
    (1,16 Mo), sans limite ; v4 efface celles déjà gardées. Ce service n'efface que ses propres caches (« jarvis-os-app-… »), plus jarvis-os-v3,
    périmé (l'ancienne app y gardait des réponses de /api/) ; jamais jarvis-os-v4 ni Panier, qui partagent le même stockage du domaine. */
 const CACHE = 'jarvis-os-app-v4';
@@ -31,7 +31,7 @@ self.addEventListener('notificationclick', (e) => {
   const url = new URL((e.notification.data && e.notification.data.url) || '/', self.registration.scope).href;
   e.waitUntil(self.clients.matchAll({type: 'window', includeUncontrolled: true}).then((cs) => {
     /* 18/11/2026 : l'app déjà ouverte reçoit l'adresse (« /#voir-<ligne du Canal> ») : elle relit Pilotage et ouvre la réponse.
-       0.70.0 : seulement une fenêtre sur la page de l'app (pas l'ancienne app, une maquette ou la page d'un proche, qui n'écoutent pas ce message) */
+       0.73.0 : seulement une fenêtre sur la page de l'app (pas l'ancienne app, une maquette ou la page d'un proche, qui n'écoutent pas ce message) */
     const racine = new URL(self.registration.scope).pathname;
     const app = (x) => { try { const p = new URL(x.url).pathname; return p === racine || p === racine + 'index.html'; } catch (er) { return false; } };
     const c = cs.find((x) => 'focus' in x && app(x));

@@ -1,0 +1,28 @@
+#!/usr/sbin/nft -f
+# JARVIS OS — ce que l'utilisateur hermes peut joindre sur le réseau (install.sh remplace @UID@).
+# Table à part : jamais de « flush ruleset », ufw garde toutes ses règles. Chargée par hermes-sortie.service.
+#
+# Sur la machine elle-même, Hermes ne joint que le DNS local et les ports éphémères (le relais local du
+# plugin entre Claude Code et Hermes) : ni JARVIS (8787), ni Panier (8790), ni l'administration de
+# Caddy (2019), ni SSH. Les adresses publiques du serveur restent joignables en HTTPS, comme depuis
+# Internet (pour relier JARVIS plus tard). Pas de réseau privé ni de métadonnées du fournisseur.
+
+table inet hermes_sortie
+delete table inet hermes_sortie
+
+table inet hermes_sortie {
+	chain sortie {
+		type filter hook output priority filter; policy accept;
+
+		meta skuid != @UID@ accept
+
+		meta l4proto { tcp, udp } th dport 53 accept
+		oifname "lo" ip daddr 127.0.0.0/8 tcp dport >= 32768 accept
+		oifname "lo" ip6 daddr ::1 tcp dport >= 32768 accept
+		oifname "lo" ip daddr != 127.0.0.0/8 tcp dport 443 accept
+		oifname "lo" counter reject
+
+		ip daddr { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 169.254.0.0/16, 100.64.0.0/10 } counter reject
+		ip6 daddr { fc00::/7, fe80::/10 } counter reject
+	}
+}

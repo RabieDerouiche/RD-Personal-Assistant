@@ -36,7 +36,7 @@ function moment(seg) {
 export function lirePhrase(phrase) {
   const p = String(phrase || '').replace(/\s+/g, ' ').trim().slice(0, 600);
   if (p.length < 6) return {erreur: 'Phrase trop courte.'};
-  const segs = p.split(/\s*(?:[,;]|:(?!\d))\s*/).filter(Boolean);   /* 0.70.0 : « à 7:30 » n'est pas coupé (deux-points suivi d'un chiffre = une heure) */
+  const segs = p.split(/\s*(?:[,;]|:(?!\d))\s*/).filter(Boolean);   /* 0.73.0 : « à 7:30 » n'est pas coupé (deux-points suivi d'un chiffre = une heure) */
   let best = -1, m0 = {heure: null, jours: null, jourDuMois: null};
   segs.forEach((s, i) => { const m = moment(s), score = (m.heure ? 1 : 0) + (m.jours || m.jourDuMois ? 2 : 0); if (score > 0 && (best < 0 || score > ((m0.heure ? 1 : 0) + (m0.jours || m0.jourDuMois ? 2 : 0)))) { best = i; m0 = m; } });
   let texte;
@@ -96,7 +96,7 @@ export function createRoutines({S, save, now, paris, lancer, log = () => {}}) {
     if (typeof o.actif === 'boolean' || o.heure || o.jours || o.jourDuMois) dejaPassee(r);
     save(); return r;
   }
-  /* 0.70.0 : créée, reprise ou déplacée à une heure déjà passée aujourd'hui : comptée comme faite pour aujourd'hui, comme l'annonce
+  /* 0.73.0 : créée, reprise ou déplacée à une heure déjà passée aujourd'hui : comptée comme faite pour aujourd'hui, comme l'annonce
      « prochaine » (avant, elle partait dans les 30 secondes) ; le rattrapage après un redémarrage du serveur ne change pas */
   function dejaPassee(r) { const t = paris(new Date(now())); if (due(r, t) && minutes(t.hm) > minutes(r.heure)) r.dernierJour = t.ymd; }
   function supprimer(id) { const n = R().length; S.routines = R().filter((x) => x.id !== id); save(); return S.routines.length < n; }

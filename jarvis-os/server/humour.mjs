@@ -35,7 +35,7 @@ const P = {
 };
 const dernier = {};
 /* la pique d'une réponse instantanée (genre : heure, date, meteo, agenda, pourmoi, bot ; hm : heure de Paris « HH:MM ») ;
-   0.70.0 : question = la phrase qu'il a dite : un sujet sérieux dans la question (« pour l'enterrement… », « aux urgences avec mon fils »)
+   0.73.0 : question = la phrase qu'il a dite : un sujet sérieux dans la question (« pour l'enterrement… », « aux urgences avec mon fils »)
    supprime aussi la pique, même si la réponse (l'heure, la météo) n'en dit rien */
 export function pique(genre, reponse, hm, alea = Math.random, question = '') {
   const r = String(reponse || '');

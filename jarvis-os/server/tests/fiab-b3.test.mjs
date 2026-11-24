@@ -1,4 +1,4 @@
-/* Banc 0.70.0, lot B3 : le pont de la page (essais/jarvis-os-maquette/jarvis-serveur.js) et son service worker (sw.js), exécutés hors navigateur
+/* Banc 0.73.0, lot B3 : le pont de la page (essais/jarvis-os-maquette/jarvis-serveur.js) et son service worker (sw.js), exécutés hors navigateur
    avec un faux fetch, un faux stockage et un faux « self ». Lancer : node jarvis-os/server/tests/fiab-b3.test.mjs (aucun réseau, aucun coût).
    Textes et montants inventés. */
 import fs from 'node:fs'; import path from 'node:path'; import vm from 'node:vm'; import {fileURLToPath} from 'node:url';

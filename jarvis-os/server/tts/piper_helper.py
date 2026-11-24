@@ -1,6 +1,6 @@
 """JARVIS OS : la voix du serveur (Piper, gratuite, sur le serveur). Garde la voix en mémoire et répond ligne à ligne :
 entrée {"id": ..., "text": ..., "out": chemin.wav}, sortie {"id": ..., "ok": true}. Lancé et gardé par server.mjs.
-0.70.0 : le son est écrit à côté (« .part ») puis renommé : une phrase ratée ou coupée en route ne laisse jamais un son
+0.73.0 : le son est écrit à côté (« .part ») puis renommé : une phrase ratée ou coupée en route ne laisse jamais un son
 tronqué sous son nom définitif (le serveur le resservirait ensuite à chaque fois)."""
 import json, os, sys, wave
 from piper import PiperVoice, SynthesisConfig

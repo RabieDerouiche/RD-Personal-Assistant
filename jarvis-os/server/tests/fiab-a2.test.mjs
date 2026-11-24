@@ -1,4 +1,4 @@
-/* Banc 0.70.0 (lot A2, routeur du serveur) : node tests/fiab-a2.test.mjs (aucun vrai Claude, aucun vrai Google, aucun coût).
+/* Banc 0.73.0 (lot A2, routeur du serveur) : node tests/fiab-a2.test.mjs (aucun vrai Claude, aucun vrai Google, aucun coût).
    Adresses mal formées, redirection /os/, bancs non servis, corps des requêtes (UTF-8, trop gros, null), cache des sons (vides, coupés,
    ménage), programme de la voix (bloqué, entrée fermée), messages vocaux d'une invitée (413, envois simultanés, échecs comptés),
    mission approuvée qui échoue, textes du guide et des outils MCP. Prénoms et textes inventés. */

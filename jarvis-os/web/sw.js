@@ -1,5 +1,5 @@
 /* Service worker : garde l'app pour l'ouvrir vite depuis l'écran d'accueil. Réseau d'abord, cache en secours. */
-/* 0.70.0 : cache v4 (l'ancien v3 gardait des réponses de /api/, effacé à l'activation) ; à l'activation, seuls ses propres anciens caches
+/* 0.73.0 : cache v4 (l'ancien v3 gardait des réponses de /api/, effacé à l'activation) ; à l'activation, seuls ses propres anciens caches
    (jarvis-os-v3…) sont effacés, jamais ceux de la nouvelle app (jarvis-os-app-…) ni de Panier ; les réponses de /api/ ne sont plus gardées */
 const CACHE = 'jarvis-os-v4';
 self.addEventListener('install', (e) => { e.waitUntil(caches.open(CACHE).then((c) => c.addAll(['./', './index.html', './manifest.webmanifest', './icon-180.png', './icon-192.png', './icon-512.png'])).then(() => self.skipWaiting())); });

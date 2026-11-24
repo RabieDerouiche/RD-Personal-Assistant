@@ -1,0 +1,76 @@
+# JARVIS OS — jarvis-coffre : le coffre dont la clé n'est jamais sur le disque (docs/hermes-deroule.md, « Le coffre en mémoire »).
+# Posé par install.sh dans /etc/systemd/system/ (root). Le code exécuté est la copie root de
+# /usr/local/lib/jarvis-coffre/, jamais un fichier du dépôt (qui appartient à jarvis).
+#
+# Au démarrage le coffre est TOUJOURS verrouillé : la clé n'existe qu'en mémoire, après « sudo jarvis-coffre ouvrir ».
+# Donc tout redémarrage (du serveur, ou de ce service après une panne : Restart=on-failure) le reverrouille, et il
+# faut recoller la phrase. C'est voulu : c'est ce qui rend une copie du disque inutile. Ne jamais ajouter ici de quoi
+# le rouvrir seul (fichier de phrase, variable d'environnement, LoadCredential).
+#
+# Utilisateur à part (jarvis-coffre, sans shell) ; groupe du service = jarvis-coffre-clients, pour que le dossier des
+# prises (0750) et service.sock (0660) soient joignables par ses membres (l'utilisateur jarvis), et par eux seuls.
+# admin.sock (0600) reste à l'utilisateur du service : seul root la joint (sudo jarvis-coffre …).
+
+[Unit]
+Description=jarvis-coffre (coffre des secrets de JARVIS OS, clé en mémoire seulement)
+Before=jarvis.service
+
+[Service]
+Type=simple
+User=jarvis-coffre
+Group=jarvis-coffre-clients
+ExecStart=/usr/bin/node /usr/local/lib/jarvis-coffre/coffre.mjs
+Environment="LANG=C.UTF-8"
+StateDirectory=jarvis-coffre
+StateDirectoryMode=0700
+RuntimeDirectory=jarvis-coffre
+RuntimeDirectoryMode=0750
+WorkingDirectory=/var/lib/jarvis-coffre
+Restart=on-failure
+RestartSec=5
+KillSignal=SIGTERM
+TimeoutStopSec=10
+StandardOutput=journal
+StandardError=journal
+
+# ---- La clé ne quitte pas la mémoire vive : ni échange sur disque, ni image mémoire en cas de plantage
+MemorySwapMax=0
+LimitCORE=0
+# scrypt prend 128 Mo le temps d'une ouverture (N=2^17) ; au repos, une cinquantaine de Mo
+MemoryMax=512M
+# le dernier à sacrifier si la mémoire manque : le tuer, c'est reverrouiller tout le serveur
+OOMScoreAdjust=-500
+TasksMax=64
+
+# ---- Enfermement (comme hermes-gateway.service, sans aucun réseau : les deux prises sont des fichiers)
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+PrivateNetwork=yes
+RestrictAddressFamilies=AF_UNIX
+IPAddressDeny=any
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+ProtectProc=invisible
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+RemoveIPC=yes
+KeyringMode=private
+UMask=0077
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged
+SystemCallErrorNumber=EPERM
+
+[Install]
+WantedBy=multi-user.target

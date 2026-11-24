@@ -1,4 +1,4 @@
-/* Banc de la 0.70.0, lot A1 (cœur du serveur) : node tests/fiab-a1.test.mjs (aucun vrai Claude, aucun vrai Google, aucun coût).
+/* Banc de la 0.73.0, lot A1 (cœur du serveur) : node tests/fiab-a1.test.mjs (aucun vrai Claude, aucun vrai Google, aucun coût).
    Chaque correction du lot a sa vérification : état abîmé, appairage, tâche d'un proche (formule, date, double écriture), relances, sonnette,
    Claude qui s'arrête (EPIPE), missions, rangement de la mémoire, tour, ordres aux bots, tâche Claude (Déploiement), agenda, MCP.
    Données inventées seulement. A1_SERVEUR=<fichier> lance un autre server.mjs (même dossier), pour voir le banc échouer sur l'ancien code. */

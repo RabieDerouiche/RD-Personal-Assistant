@@ -159,7 +159,7 @@
   .dict-note { margin: 0 0 8px; font-size: 13px; color: var(--muted); }
   .dict-note.is-ok { color: #7dd3fc; }
   .lire-toggle.is-on { border-color: rgba(56, 189, 248, .8) !important; color: #e0f2fe !important; box-shadow: 0 0 12px rgba(56, 189, 248, .25); }
-  /* barre du bas : 5 portes fixes (refonte UX 0.54.0) ; le menu « Tout » et les favoris n'existent plus (leur style est retiré en 0.70.0) */
+  /* barre du bas : 5 portes fixes (refonte UX 0.54.0) ; le menu « Tout » et les favoris n'existent plus (leur style est retiré en 0.73.0) */
   .fav-bar { position: fixed !important; left: 0 !important; right: 0 !important; bottom: 0 !important; top: auto !important; transform: none !important; width: auto !important; z-index: 50; display: block !important; padding: 0 8px max(6px, env(safe-area-inset-bottom, 0px)) !important; background: rgba(5, 8, 16, .98) !important; -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); border: 0 !important; border-top: 1px solid var(--line) !important; border-radius: 0 !important; box-shadow: none !important; }
   .fav-row { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); align-items: end; }
   .fav-bar .tab { position: relative; display: flex !important; flex-direction: column !important; align-items: center; gap: 3px !important; min-height: 50px !important; padding: 4px 2px !important; border: 0 !important; border-radius: 12px !important; background: none !important; color: var(--muted) !important; font: 500 11px var(--sans) !important; letter-spacing: 0 !important; }
@@ -1432,6 +1432,8 @@
   .voixg-etapes { margin: 8px 0; padding-left: 20px; display: grid; gap: 4px; font-size: 14px; } .voixg-sel { flex: 1; min-width: 0; }
   .voixg-qui { margin: 6px 0 2px; font-weight: 600; } .voixg-qui.is-bad, .voixg-err { color: var(--danger); } .voixg-err { margin: 4px 0; font-size: 13.5px; }
   .mcp-d { padding: 10px; margin: 8px 0; border-radius: 12px; border: 1px solid rgba(168, 85, 247, .5); background: rgba(168, 85, 247, .12); } .mcp-code { font: 700 18px/1 ui-monospace, monospace; letter-spacing: .2em; }
+  .mcp-jeton { flex-wrap: wrap; } .mcp-jeton.is-off > span:first-child { opacity: .6; } .mcp-form { margin: 8px 0; } .mcp-profil-dit { margin: 0; font-size: 13px; } .mcp-actes { margin-top: 10px; } .mcp-signe { display: flex; flex-direction: column; gap: 8px; } .mcp-signe[hidden] { display: none; }
+  .mcp-acte > span { display: grid; gap: 2px; } .mcp-acte-tx { font-size: 13.5px; } .mcp-jeton-neuf { overflow-wrap: anywhere; font: 12.5px var(--mono); }
   .mis-accord { margin: 8px 0; } .mis-par { font-size: 13px; margin: 4px 0; }
   .skill-it span { display: block; } .skill-it small { display: inline; }
   .mem-add { display: flex; gap: 8px; } .mem-in { flex: 1; min-width: 0; padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(56, 189, 248, .35); background: transparent; color: inherit; font: inherit; }
@@ -1949,7 +1951,7 @@ void main(){
  gl_FragColor=vec4(rgb,a);
 }`;
     let gl = null, cv = null, U = {}, ok = false;
-    /* 0.70.0 — B1 : iOS peut retirer le contexte WebGL d'une app en arrière-plan ; les sphères passent alors au dessin simple (flat),
+    /* 0.73.0 — B1 : iOS peut retirer le contexte WebGL d'une app en arrière-plan ; les sphères passent alors au dessin simple (flat),
        puis reprennent le globe quand le contexte revient (programme, tampon et uniformes refaits) */
     const init = () => {
       gl = cv.getContext('webgl', {premultipliedAlpha: true, preserveDrawingBuffer: true, antialias: false, alpha: true});
@@ -1992,7 +1994,7 @@ void main(){
   })();
 
   const CHARS = new Set();
-  window.__nSpheres = () => CHARS.size;   /* bancs (0.70.0) : les sphères gardées pour l'animation */
+  window.__nSpheres = () => CHARS.size;   /* bancs (0.73.0) : les sphères gardées pour l'animation */
   const POINTER = {x: 0, y: 0, t: -1e9};
   const ptr = (e) => { POINTER.x = e.clientX; POINTER.y = e.clientY; POINTER.t = performance.now(); };
   window.addEventListener('pointermove', ptr, {passive: true});
@@ -2023,7 +2025,7 @@ void main(){
     ch.talk = (sec) => { ch.talkUntil = clock + sec; wake(); };
     ch.bump = () => { ch.rx = 1; wake(); };
     ch.setFlip = () => {};
-    /* 0.70.0 — B1 : CHARS ne sert qu'à l'animation ; avec « Réduire les animations », elle ne tourne pas et ne le vidait jamais (sphères gardées en mémoire) */
+    /* 0.73.0 — B1 : CHARS ne sert qu'à l'animation ; avec « Réduire les animations », elle ne tourne pas et ne le vidait jamais (sphères gardées en mémoire) */
     ch.revive = () => { if (!reduced) CHARS.add(ch); wake(); };
     if (!reduced) CHARS.add(ch);
     tick(ch, clock + 0.01, 0);
@@ -2306,7 +2308,7 @@ void main(){
   const syncModes = () => { LIVE.forEach((arr, b) => { LIVE.set(b, arr.filter((c) => c.el.isConnected)); arr.forEach((c) => c.setMode(b === 'claude' ? 'veille' : modeOf(b))); }); if (SH.ch && SH.bot) SH.ch.setMode(modeOf(SH.bot)); };
   const busyFor = (b, ms) => { if (!BOT[b] || b === 'toi' || b === 'claude') return; S.busy[b] = (S.busy[b] || 0) + 1; refresh(); setTimeout(() => { S.busy[b] = Math.max(0, (S.busy[b] || 0) - 1); refresh(); }, ms); };
 
-  /* 0.70.0 — B1-page-1-2 : « aujourd'hui » (TODAY) est fixé au chargement. Une app restée ouverte passé minuit se recharge d'elle-même
+  /* 0.73.0 — B1-page-1-2 : « aujourd'hui » (TODAY) est fixé au chargement. Une app restée ouverte passé minuit se recharge d'elle-même
      sur le nouveau jour, dès que rien n'est en cours : ni feuille, discussion, recherche ou saisie ouverte, ni écriture « Dans 5 s »
      (avec « Annuler ») ou sonnette pas encore partie. Au retour dans l'app tout de suite ; restée au premier plan, après 45 s sans geste.
      Ni pendant la relecture des notifications du retour (« Pendant ton absence », ou celle qu'il a touchée), ni avec un texte tapé et pas
@@ -2336,7 +2338,7 @@ void main(){
   setInterval(() => { if (!JOUR.t) jourVu(false); }, 60000);
 
   function toast(title, text, fromBot, undo) {
-    if (undo) jourOccupe();   /* 0.70.0 — B1 : quelque chose peut encore partir (« Annuler » possible) */
+    if (undo) jourOccupe();   /* 0.73.0 — B1 : quelque chose peut encore partir (« Annuler » possible) */
     const box = $('toasts');
     /* 17/11/2026 (demande du propriétaire) : une notification se ferme d'un appui, d'un glissé vers le haut ou de sa croix, sans attendre */
     const bye = () => { if (t.classList.contains('out')) return; t.classList.add('out'); setTimeout(() => t.remove(), 320); };
@@ -2379,7 +2381,7 @@ void main(){
     if (DIR && DIR.after) DIR.after(e, ctx);
     /* en direct : l'écriture part après 5 secondes, le temps d'annuler */
     const job = LINK.on && LINK.queue ? LINK.queue(e, ctx, snap) : null;
-    if (job) jourOccupe();   /* 0.70.0 — B1 : pas de rechargement de jour avant que l'écriture soit partie */
+    if (job) jourOccupe();   /* 0.73.0 — B1 : pas de rechargement de jour avant que l'écriture soit partie */
     const said = LINK.on ? (job ? job.text : 'Rien à écrire dans Pilotage : affichage seulement.') : e.effect;
     let undone = false;
     const undo = () => {
@@ -2433,7 +2435,7 @@ void main(){
       out.push({label: "Me le rappeler s'il n'a pas répondu demain", go: () => finish({title: 'Relance prévue demain', effect: "Une tâche « Vérifier la réponse de " + BOT[o.bot].name + " » pour demain dans l'onglet Tâches ; Iris te la cite si la ligne du Canal est encore « À faire ».", mutate: () => S.taches.push({id: 't' + (++SEQ), title: 'Vérifier la réponse de ' + BOT[o.bot].name + ' : ' + (item && (item.title || item.name) || 'ton ordre'), n: 1}), work: false})});
     }
     if (type === 'echeance' && item && !S.echeances.some((x) => x.id === item.id) && /faite|réglé|renouvel/i.test(e.title) && (item.nature === 'fin' || /anniversaire|renouvel|assurance|abonnement|contrat|taxe/i.test(item.title))) {
-      /* 0.70.0 — B1 : le même jour l'an prochain ; une ligne neuve (sans le numéro de ligne, le statut ni le « fait par » de celle qu'on vient de clore) */
+      /* 0.73.0 — B1 : le même jour l'an prochain ; une ligne neuve (sans le numéro de ligne, le statut ni le « fait par » de celle qu'on vient de clore) */
       const d1 = day(item.n); d1.setFullYear(d1.getFullYear() + 1); const n2 = dayDiff(isoOf(d1));
       out.push({label: 'Prévoir la prochaine : ' + short(n2), go: () => finish({title: 'Échéance ajoutée', effect: "Une ligne « " + item.title + " » pour " + longDay(n2) + " dans l'onglet Échéances ; " + BOT[item.bot].name + ' te la rappelle à temps.', mutate: () => { const {_row, status, doneBy, live, ...rest} = item; S.echeances.push(Object.assign(rest, {id: 'e' + (++SEQ), n: n2, iso: isoOf(day(n2))})); }, bot: item.bot, say: "Notée pour l'an prochain.", work: false})});
     }
@@ -2469,7 +2471,7 @@ void main(){
     }
     if (c.type === 'echeance') {
       const n = it.n;
-      if (it.doneBy) return null;   /* 0.70.0 — B1 : déjà faite par le bot (son Journal) : la feuille le dit, pas de conseil contraire */
+      if (it.doneBy) return null;   /* 0.73.0 — B1 : déjà faite par le bot (son Journal) : la feuille le dit, pas de conseil contraire */
       if (it.nature === 'offre' && n >= 0 && n <= 5) return {act: A[0], text: "L'offre finit " + (n === 0 ? "aujourd'hui" : 'dans ' + n + ' j') + ' : décide maintenant ou laisse filer.'};
       if (it.nature === 'bot' || it.nature === 'suivi') return {act: A[0], text: 'Rien à faire pour toi : ' + who + " s'en occupe. Tu peux seulement suivre."};
       if (it.nature === 'moi' && n <= 3) return {act: main, text: n < 0 ? 'En retard : marque-la faite ou reporte-la.' : 'À faire ' + (n === 0 ? "aujourd'hui" : 'dans ' + n + ' j') + '.'};
@@ -2478,7 +2480,7 @@ void main(){
       return null;
     }
     if (c.type === 'dossier') {
-      if (it.noDate) return null;   /* 0.70.0 — B1 : « Dernier contact » vide dans Pilotage : pas de conseil sur une date inconnue */
+      if (it.noDate) return null;   /* 0.73.0 — B1 : « Dernier contact » vide dans Pilotage : pas de conseil sur une date inconnue */
       const w = it.since != null ? -it.since : 0;
       if (w >= 7) return {act: find(/^Relancer/), text: 'Sans nouvelles ' + deQui(it.who) + ' depuis ' + w + ' jours : une relance est logique.'};
       if (w <= 2) return {act: find(/Rappelle/), text: 'Contact récent (' + (w === 1 ? 'hier' : w ? 'il y a ' + w + ' j' : "aujourd'hui") + ') : laisse-leur le temps, je te le rappelle.'};
@@ -2624,7 +2626,7 @@ void main(){
 
   /* ---------- les actions, selon ce qui t'attend ---------- */
   const act = (label, o) => Object.assign({label}, o || {});
-  /* 0.70.0 — B1-page-1-2 : un bouton qui ouvre un lien (Drive, vendeur) l'ouvre vraiment, dans le même appui (iOS l'exige) ; seulement http(s) */
+  /* 0.73.0 — B1-page-1-2 : un bouton qui ouvre un lien (Drive, vendeur) l'ouvre vraiment, dans le même appui (iOS l'exige) ; seulement http(s) */
   const lienSur = (s) => { const m = String(s || '').match(/https?:\/\/[^\s|«»"'<>]+/i); return m ? m[0].replace(/[).,;:!?]+$/, '') : ''; };
   const lienOuvre = (u) => { u = lienSur(u); if (!u) return false; try { window.open(u, '_blank', 'noopener'); } catch (e) { /* lien non pris en charge */ } return true; };
   const lienMots = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length >= 4);
@@ -2735,7 +2737,7 @@ void main(){
     papier(q) {
       const soon = q.until != null && q.until <= 180;
       const list = [];
-      /* 0.70.0 — B1 : « Ouvrir » ouvre vraiment le lien Drive de l'onglet Papiers (avant : un simple message) */
+      /* 0.73.0 — B1 : « Ouvrir » ouvre vraiment le lien Drive de l'onglet Papiers (avant : un simple message) */
       if (q.file) list.push(act('Ouvrir', {tone: 'main', cost: 'free', go: () => lienOuvre(q.url) ? null : ({title: 'Document ouvert', effect: "Ouvre le fichier dans ton Drive, d'après le lien de l'onglet Papiers.", work: false})}));
       else list.push(act('Où est-il ?', {tone: 'main', pick: {kind: 'info', text: 'Rangé : ' + q.where + '.'}}));
       if (soon) list.push(ord('Préparer le renouvellement', 'hydra', 'Prépare le renouvellement de « ' + q.name + ' » : démarches, pièces, délais, lien de rendez-vous.', 'Je prépare le renouvellement.', 'Démarches et lien de rendez-vous prêts.', 'main2'));
@@ -2793,14 +2795,14 @@ void main(){
   };
 
   /* la configuration de la feuille pour chaque sorte d'élément */
-  /* 0.70.0 — B1 : une date passée se dit au passé (« C'est à toi de jouer, il y a 3 jours » devient « C'est à toi de jouer : en retard de 3 jours ») */
+  /* 0.73.0 — B1 : une date passée se dit au passé (« C'est à toi de jouer, il y a 3 jours » devient « C'est à toi de jouer : en retard de 3 jours ») */
   const NATSAY = (e) => (e.n < 0
     ? {moi: "C'est à toi de jouer : " + late(e.n) + '.', bot: "Je m'en occupe : c'était prévu " + rel(e.n) + '.', suivi: 'Je surveille. La relance était prévue ' + rel(e.n) + '.', offre: "L'offre s'est terminée " + rel(e.n) + '.', fin: 'Ça a expiré ' + rel(e.n) + ' : on prépare la suite ?', date: "C'était " + rel(e.n) + '.'}
     : {moi: "C'est à toi de jouer, " + rel(e.n) + '.', bot: "Je m'en occupe, " + rel(e.n) + '.', suivi: 'Je surveille. Sans nouvelle, je relance ' + rel(e.n) + '.', offre: "L'offre se termine " + rel(e.n) + '.', fin: 'Ça expire ' + rel(e.n) + ' : on prépare la suite ?', date: "C'est " + rel(e.n) + (e.n > 1 ? '. Je te préviens la veille.' : '.')})[e.nature];
   const SHEETCFG = {
     demande: (d) => ({bot: d.bot, kicker: BOT[d.bot].name + ' · ' + KIND[d.kind], title: d.title, say: d.ask, facts: [['Pourquoi', d.why], ['Où trouver', d.where], ['Sinon', d.ifnot], ['Détail', d.detail], ['Avant le', d.due != null ? longDay(d.due) : '']], actions: ACTIONS.demande(d)}),
     echeance: (e) => ({bot: e.bot, kicker: NATURE[e.nature] + ' · ' + e.domain, title: e.title, say: NATSAY(e), facts: [['Quand', longDay(e.n) + ' (' + late(e.n) + ')'], ['Suivi par', BOT[e.bot].name]], actions: ACTIONS.echeance(e)}),
-    /* 0.70.0 — B1 : « depuis hier », « depuis aujourd'hui » (avant : « depuis 1 jours », « depuis 0 jours ») ; sans date de dernier contact, rien d'inventé */
+    /* 0.73.0 — B1 : « depuis hier », « depuis aujourd'hui » (avant : « depuis 1 jours », « depuis 0 jours ») ; sans date de dernier contact, rien d'inventé */
     dossier: (k) => ({bot: k.bot, kicker: 'Dossier · en attente ' + deQui(k.who), title: k.title, say: "J'attends " + k.who + (k.noDate ? '.' : ' ' + depuisN(k.since) + '.'), facts: [['Prochaine étape', k.step], ['Dernier contact', k.noDate ? '' : longDay(k.since)]], actions: ACTIONS.dossier(k)}),
     prix: (p) => ({bot: 'unicorn', kicker: 'Prix suivi', title: p.name, say: p.now <= p.buy ? 'Il est à ' + eur(p.now) + ', sous ton seuil : c\'est le moment.' : p.now <= p.good ? 'Bon prix : ' + eur(p.now) + ', mais pas encore ton seuil.' : 'Il est à ' + eur(p.now) + '. Ton seuil : ' + eur(p.buy) + '.', facts: [['Prix public', eur(p.ref)], ['Aujourd\'hui', eur(p.now)], ['Tu achètes sous', eur(p.buy)], ['Chez', p.seller]], actions: ACTIONS.prix(p)}),
     papier: (q) => ({bot: 'hydra', kicker: 'Papier · ' + q.who, title: q.name, say: q.until == null ? 'Il ne périme pas.' : q.until < 0 ? 'Il est périmé.' : 'Valable jusqu\'au ' + fmt(day(q.until), {day: 'numeric', month: 'long', year: 'numeric'}) + '.', facts: [['Où', q.where], ['Sert pour', q.use]], actions: ACTIONS.papier(q)}),
@@ -3002,7 +3004,7 @@ void main(){
   const counts = () => { const c = {demande: 0, travail: 0, veille: 0}; BOTS.forEach((b) => { c[modeOf(b.id)]++; }); return c; };
   const pill = (b) => { const m = b === 'claude' ? 'veille' : modeOf(b); return h('span', {class: 'pill is-' + m, text: b === 'claude' ? 'Sur demande' : stateLabel(b)}); };
   const ageOf = (n) => n === 0 ? "aujourd'hui" : n === -1 ? 'hier' : n < 0 ? 'il y a ' + (-n) + ' jours' : 'dans ' + n + ' jours';
-  const depuisN = (n) => n === -1 ? 'depuis hier' : n < -1 ? 'depuis ' + (-n) + ' jours' : "depuis aujourd'hui";   /* 0.70.0 — B1 */
+  const depuisN = (n) => n === -1 ? 'depuis hier' : n < -1 ? 'depuis ' + (-n) + ' jours' : "depuis aujourd'hui";   /* 0.73.0 — B1 */
 
   /* ---------- Claude en direct (capacité « sample ») ---------- */
   let SAMPLE = null, SAMPLE_STATE = 'wait';
@@ -3402,7 +3404,7 @@ void main(){
           renderChat(); return 'Proposée à Rabie ; en attente de son bouton.'; }},
       {name: 'ajouter_echeance', description: "Propose d'ajouter une date à suivre dans l'onglet Échéances, avec le bot qui la suit. Rien n'est ajouté tant que Rabie n'a pas touché « Ajouter ».",
         inputSchema: {type: 'object', properties: {sujet: {type: 'string'}, date: {type: 'string', description: 'AAAA-MM-JJ'}, nature: {type: 'string', description: "À faire par moi, Un bot s'en occupe, Un bot suit, Offre, Fin de validité ou Date à retenir"}, bot: {type: 'string', description: 'Le bot qui la suit, Iris par défaut'}, remarque: {type: 'string', description: "Le contexte : objet exact, source, ce qu'il faut faire"}}, required: ['sujet', 'date', 'remarque']},
-        execute: (input) => { const t = String(input.sujet || '').trim(), iso = String(input.date || ''); if (!t || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) throw new Error('Sujet ou date invalide'); /* 0.70.0 — B1 : nature et bot comparés sans casse, accents ni apostrophe typographique ; les valeurs de Pilotage (« Offre ») comme les libellés de la page */
+        execute: (input) => { const t = String(input.sujet || '').trim(), iso = String(input.date || ''); if (!t || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) throw new Error('Sujet ou date invalide'); /* 0.73.0 — B1 : nature et bot comparés sans casse, accents ni apostrophe typographique ; les valeurs de Pilotage (« Offre ») comme les libellés de la page */
           const nz = (s) => String(s == null ? '' : s).normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[’`]/g, "'").trim().toLowerCase().replace('par moi', 'par toi');
           const raw = nz(input.bot || 'Iris'); const b = (BOTS.find((x) => x.id === raw || nz(x.name) === raw || nz(OLDNAME[x.id]) === raw) || {id: 'hydra'}).id; const labN = Object.keys(NAT).find((l) => nz(l) === nz(input.nature)); const nat = labN ? NAT[labN] : (Object.keys(NATURE).find((k) => nz(NATURE[k]) === nz(input.nature)) || 'moi'); const note = String(input.remarque || '').trim(), n = dayDiff(iso);
           T.msgs.splice(T.msgs.indexOf(out), 0, {kind: 'act', label: 'Échéance proposée · suivie par ' + BOT[b].name, text: t + ' · ' + longDay(n) + ' · ' + NATURE[nat] + (note ? ' — ' + note : ''), ok: 'Ajouter', state: 'open', fin: () => ({title: 'Échéance ajoutée', effect: "Une ligne « " + t + " » pour " + longDay(n) + " dans l'onglet Échéances (Nature : " + NATURE[nat] + ') ; ' + BOT[b].name + ' la suit.', mutate: () => S.echeances.push({id: 'e' + (++SEQ), iso, n, title: t, domain: nat === 'offre' ? 'Achats' : 'Famille', bot: b, nature: nat, note, rem: ''}), bot: b, say: 'Échéance notée.', work: false})});
@@ -3427,16 +3429,20 @@ void main(){
   /* 0.60.0 : la conversation à la voix (mains libres) : Claude agit et fait valider de vive voix, sans bouton */
   const voixOn = () => typeof MAINS === 'object' && !!MAINS.on;
   /* 0.63.0 (ses choix : « une réflexion solide et juste plutôt qu'une réponse rapide », « oui, partout ») : sur le serveur, la discussion
-     a Opus qui réfléchit (à la voix comme à l'écrit), sauf s'il choisit « Rapide » à l'écrit */
+     a Opus qui réfléchit (à la voix comme à l'écrit), sauf s'il choisit « Rapide » à l'écrit. 0.70.0 (son choix du 23/11/2026 : « je veux mimer
+     ce qu'on a depuis l'app Claude ») : à la voix, le serveur fait répondre Sonnet tout de suite, et Opus qui réfléchit s'il dit « réfléchis bien » */
   const chatTier = () => (!SRV_OS ? CHAT.tier : voixOn() ? 'voix' : CHAT.tier === 'quick' ? 'quick' : 'juste');
   /* une phrase qui demande d'agir part directement à Claude (pas de détour par les réponses instantanées) */
   const voixAction = (x) => /\b(ajoute[rz]?|note[rz]?|rappelle[rz]?|programme[rz]?|envoie[rz]?|dis a|demande a|previens|relance[rz]?|cree[rz]?|confie[rz]?|retiens|reporte[rz]?|decale[rz]?|deplace[rz]?|supprime[rz]?|annule[rz]?|coche[rz]?|termine[rz]?|j ai (fini|fait|appele|envoye|paye|regle)|c est fait|marque[rz]?|prepare[rz]?|organise[rz]?)\b/.test(lvLow(x).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' '));   /* 0.61.0 : au niveau de sendChat (déclarée plus bas, elle restait invisible pour lui) */
-  /* 0.63.0 (son choix : « je préfère une réflexion solide et juste qu'une réponse rapide, travaille sur la qualité ») : la justesse d'abord */
-  const VOIX_AGIR = "EN CONVERSATION À LA VOIX (Rabie te parle, mains libres) : il ne touche aucun bouton. La justesse compte plus que la vitesse : prends le temps de réfléchir avant de répondre. "
+  /* 0.63.0 (son choix : « je préfère une réflexion solide et juste qu'une réponse rapide, travaille sur la qualité ») : la justesse d'abord.
+     0.70.0 (son choix du 23/11/2026 : « je veux mimer ce qu'on a depuis l'app Claude ») : une conversation de vive voix, comme la voix de l'app Claude :
+     tu réponds tout de suite, court ; la justesse reste (rien de deviné), la longue réflexion seulement s'il la demande */
+  const VOIX_AGIR = "EN CONVERSATION À LA VOIX (Rabie te parle, mains libres) : il ne touche aucun bouton. C'est une conversation de vive voix, comme avec la voix de l'app Claude : réponds tout de suite, en une à trois phrases, l'essentiel d'abord ; il dira « dis-m'en plus » s'il veut le détail. "
     + "Vérifie dans ses données (agenda, tâches, demandes, Pilotage) avant d'affirmer ; ne devine jamais une date, un nom, un lieu ni un montant ; si une information manque ou si sa phrase peut se comprendre de deux façons, pose une seule question courte plutôt que de supposer. "
     + "Avant d'agir, comprends l'intention exacte et reformule l'objet précis (qui, quoi, quand) ; tiens compte de ce qui existe déjà (une tâche ou une échéance déjà là, un bot déjà sollicité) pour ne rien faire en double. "
     + "Une tâche, un souvenir, une relance, cocher ou reporter une tâche : fais-le aussitôt avec l'outil et dis-le en une phrase. Un ordre à un bot, une échéance, une routine, la tâche Claude, la mise à jour d'un dossier, supprimer une tâche : dis exactement ce qui partira, puis demande « Je l'envoie ? » (ou « Je la programme ? ») ; son oui l'exécute. "
-    + "Plusieurs demandes d'un coup : traite-les toutes. Réponses claires et complètes, sans remplissage : elles sont lues à voix haute. ";
+    + "Plusieurs demandes d'un coup : traite-les toutes. Réponses courtes et claires, sans remplissage ni liste lue en entier (les trois premiers éléments, puis « tu veux la suite ? ») : elles sont lues à voix haute. "
+    + "S'il te demande de réfléchir (« réfléchis bien », « à fond », « en profondeur »), prends le temps qu'il faut et réponds complètement. ";
   function voixRules(ctx) {
     return ctx.replace(/Après la réponse, ajoute toujours une dernière ligne qui commence par « Suite : »[^\n]*\n/, '').replace("ces outils ne font que proposer, Rabie confirme d'un bouton. ", 'à la voix, comme dit plus bas. ').replace('Rabie le confirmera d\'un bouton. ', 'il le confirme de vive voix. ').replace(/(Tu es Claude, le chef[^]*?tu répartis le travail\. )/, '$1' + VOIX_AGIR);
   }
@@ -3452,7 +3458,7 @@ void main(){
     const text = ta.value.trim();
     if (!text || CHAT.busy) return;
     const T = THREADS[CHAT.key];
-    const gen = CHAT.gen = (CHAT.gen || 0) + 1;   /* 0.70.0 — B1 : une question partie avant ne libère ni ne bloque la suivante */
+    const gen = CHAT.gen = (CHAT.gen || 0) + 1;   /* 0.73.0 — B1 : une question partie avant ne libère ni ne bloque la suivante */
     ta.value = '';
     if (CHAT.talk && CHAT.mode === 'claude' && typeof voxPrime === 'function' && !EAR.session) voxPrime();
     if (typeof dictSent === 'function') dictSent();
@@ -3527,7 +3533,7 @@ void main(){
     } catch (e) {
       out.wait = false;
       const keepTxt = e && e.text;
-      /* 0.70.0 — B1 : le message en français du serveur JARVIS (abonnement refusé, « claude auth login », iPhone pas relié, serveur injoignable)
+      /* 0.73.0 — B1 : le message en français du serveur JARVIS (abonnement refusé, « claude auth login », iPhone pas relié, serveur injoignable)
          est dit tel quel, au lieu de « Réponse interrompue » ; après une réponse partielle, il vient à la suite */
       const ERR_CHAT = {cancelled: 'Arrêté.', not_granted: "Tu n'as pas autorisé cette page à utiliser Claude.", sampling_disabled: "Claude n'est pas disponible pour ce compte.", rate_limited: 'Trop de questions d\'un coup : réessaie dans un moment.', refused: 'Je ne peux pas répondre à cette demande.'};
       const srvMsg = e && (e.code === 'tool_error' || e.code === 'server_not_connected') && typeof e.message === 'string' && e.message.trim() && !/^Réponse interrompue/i.test(e.message.trim()) ? e.message.trim() : '';
@@ -3536,7 +3542,7 @@ void main(){
       if (e && (e.code === 'not_granted' || e.code === 'sampling_disabled')) { SAMPLE = null; SAMPLE_STATE = 'none'; }
       if (fl && VOX.on === out) voxStop();   /* 0.31.0 : réponse coupée : la lecture s'arrête aussi */
     }
-    if (CHAT.gen !== gen) return;   /* 0.70.0 — B1 : une autre question est partie depuis (discussion rouverte) : elle garde « occupé » et « Arrêter » */
+    if (CHAT.gen !== gen) return;   /* 0.73.0 — B1 : une autre question est partie depuis (discussion rouverte) : elle garde « occupé » et « Arrêter » */
     CHAT.busy = false; CHAT.ctl = null;
     renderChat();
     if (typeof convAfter === 'function') convAfter();
@@ -3656,7 +3662,7 @@ void main(){
       .concat(S.evenements.filter((v) => evEnd(v) >= 0).map((v) => ({n: Math.max(0, v.n), label: v.title + (evMulti(v) ? " · jusqu'à " + short(evEnd(v)) : v.time ? ' · ' + v.time : ''), open: () => openItem('evenement', v)})));
     return items.sort((a, b) => a.n - b.n)[0];
   }
-  /* 0.70.0 — B1 : une ligne du Canal pour un destinataire qui n'est pas un bot connu (« Athena », « Tous ») ne fait plus planter la page du bot */
+  /* 0.73.0 — B1 : une ligne du Canal pour un destinataire qui n'est pas un bot connu (« Athena », « Tous ») ne fait plus planter la page du bot */
   const nomBot = (k) => BOT[k] ? BOT[k].name : String(k || 'un bot').replace(/^./, (c) => c.toUpperCase());
   const repDe = (l) => nomBot(l.to === 'rabie' ? l.from : l.to);
   const thread = (b, limit) => {
@@ -4012,7 +4018,7 @@ void main(){
   }
   const SEL = {achats: null, voyages: null, achFilter: 'tous'};
   const VIEWTITLE = {};
-  /* 0.70.0 — B1 : seule une vraie rubrique est une adresse (« #__proto__ », « #constructor » ou « #toString » mènent à l'accueil, sans planter) */
+  /* 0.73.0 — B1 : seule une vraie rubrique est une adresse (« #__proto__ », « #constructor » ou « #toString » mènent à l'accueil, sans planter) */
   const isView = (id) => typeof id === 'string' && Object.prototype.hasOwnProperty.call(VIEWS, id) && typeof VIEWS[id] === 'function';
   const TABS = [
     {id: 'accueil', label: 'Accueil', ic: 'pulse'}, {id: 'demandes', label: 'Demandes', ic: 'chat'}, {id: 'agenda', label: 'Agenda', ic: 'cal'},
@@ -4111,7 +4117,7 @@ void main(){
       it('achats', 'Achats', 'tag', 'Prix suivis, courbes, ajouter'), it('voyages', 'Voyages', 'plane', 'Projets, plans, options'),
       it('sorties', 'Sorties', 'map', 'Ce week-end, envies'), it('papiers', 'Papiers', 'doc', 'Chercher un document'),
       it('automatisations', 'Routines', 'clock', 'Équipe, filtre Routines'), it('equipe', 'Équipe', 'pulse', 'Tes bots et leurs passages'),
-      it('suivi', 'Demandes aux bots', 'folder', 'Équipe, filtre Demandes'), it('demandes', 'Pour moi', 'chat', 'Ce qui attend ta réponse')));   /* 0.70.0 : les noms d'aujourd'hui (Suivi et Automatisations sont des filtres d'Équipe depuis la 0.54.0) */
+      it('suivi', 'Demandes aux bots', 'folder', 'Équipe, filtre Demandes'), it('demandes', 'Pour moi', 'chat', 'Ce qui attend ta réponse')));   /* 0.73.0 : les noms d'aujourd'hui (Suivi et Automatisations sont des filtres d'Équipe depuis la 0.54.0) */
   };
   const JOURS = {dim: 0, lun: 1, mar: 2, mer: 3, jeu: 4, ven: 5, sam: 6};
   /* prochain passage d'après l'horaire écrit dans Routines (« Lun-ven 7h30 », « dim 18h », « le 24 », « chaque jour 8h44 »…) */
@@ -4295,7 +4301,7 @@ void main(){
     return /voiture|auto\b/.test(n) ? ['car', '#f87171'] : /logement|appart|immobil|maison/.test(n) ? ['home', '#34d399'] : /voyage/.test(n) ? ['plane', '#22d3ee'] : /famille|proches/.test(n) ? ['users', '#fb923c']
       : /trier|vrac/.test(n) ? ['inbox', '#94a3b8'] : /prive/.test(n) ? ['lock', '#d6b48a'] : /sante|medical/.test(n) ? ['pulse', '#f472b6'] : /travail|work|salaire/.test(n) ? ['brief', '#a78bfa'] : /impot|banque|credit/.test(n) ? ['lock', '#d6b48a'] : ['user', null]; };
   const PERSON_COLORS = ['#60a5fa', '#c084fc', '#f472b6', '#2dd4bf'];
-  /* 0.70.0 — B1-page-1-2 : une lecture en échec ne se relance plus seule à chaque affichage (avant : boucle sans fin, app gelée sans iPhone
+  /* 0.73.0 — B1-page-1-2 : une lecture en échec ne se relance plus seule à chaque affichage (avant : boucle sans fin, app gelée sans iPhone
      relié) ; « Réessayer » relance. Les lectures sont numérotées : une réponse arrivée en retard (privés après « Masquer ») est ignorée.
      L'arrivée de l'arbre pendant une recherche met la page à jour sur place, sans fermer le clavier. */
   function papLoad(force) {
@@ -4329,7 +4335,7 @@ void main(){
     (d.files || []).forEach((f) => { if (F[f.parent]) (files[f.parent] = files[f.parent] || []).push(f); });
     const path = (id) => { const out = []; for (let x = F[id]; x && x.parent && F[x.parent]; x = F[x.parent]) out.unshift(x.name); return out; };
     const count = (id) => (files[id] || []).length + (kids[id] || []).reduce((n, k) => n + count(k.id), 0);
-    /* 0.70.0 — B1 : la racine de chaque dossier ; les fichiers des papiers privés sont retirés de « all » (recherche de Papiers et recherche partout)
+    /* 0.73.0 — B1 : la racine de chaque dossier ; les fichiers des papiers privés sont retirés de « all » (recherche de Papiers et recherche partout)
        tant que Face ID ne les a pas déverrouillés */
     const racine = (id) => { let x = F[id], g = 0; while (x && x.parent && F[x.parent] && g++ < 500) x = F[x.parent]; return x ? x.root || '' : ''; };
     const tous = (d.files || []).filter((f) => F[f.parent]).map((f) => ({...f, path: path(f.parent), top: path(f.parent)[0] || '', prive: racine(f.parent) === 'prive'}));
@@ -4384,9 +4390,9 @@ void main(){
     };
     input.addEventListener('input', () => { PAPS.q = input.value; draw(); searchText(); quick.querySelectorAll('.chip').forEach((b) => b.classList.toggle('is-on', papNorm(b.textContent) === papNorm(PAPS.q))); });
     el.append(h('div', {class: 'pap-top'}, h('span', {class: 'pap-ic', html: icon('search', 18)}), input), quick, res, body);
-    const fill = () => {   /* 0.70.0 — B1 : refaite sur place quand l'arbre arrive pendant une recherche (papShow) */
+    const fill = () => {   /* 0.73.0 — B1 : refaite sur place quand l'arbre arrive pendant une recherche (papShow) */
     body.replaceChildren();
-    /* 0.70.0 — B1 : un dossier des papiers privés resté ouvert ne se rouvre pas sans Face ID */
+    /* 0.73.0 — B1 : un dossier des papiers privés resté ouvert ne se rouvre pas sans Face ID */
     if (PAPS.open && D && D.F[PAPS.open] && D.racine(PAPS.open) === 'prive' && !FACE.ok()) PAPS.open = null;
     if (PT.state === 'error' && !D) {
       body.append(h('div', {class: 'card pap-note'}, h('b', {text: PT.err === 'not_in_manifest' ? 'Ton serveur ne lit pas encore le Drive' : 'Drive illisible pour l’instant'}),
@@ -4421,7 +4427,7 @@ void main(){
       body.append(h('button', {type: 'button', class: 'link pap-priv', onclick: () => { PT.priv = !PT.priv; try { localStorage.setItem('jarvis.papiers.prive', PT.priv ? '1' : '0'); } catch (e) { /* rien */ } papLoad(true); renderView(true); }},
         h('span', {html: icon('lock', 14)}), PT.priv ? 'Masquer les papiers privés' : 'Afficher les papiers privés (banque, impôts, salaires)'));
       if (FACE.ready()) body.append(FACE.on()
-        ? h('p', {class: 'muted face-note'}, 'Face ID actif sur cet iPhone pour les papiers privés · ', h('button', {type: 'button', class: 'link', onclick: async () => {   /* 0.70.0 — B1 : retirer la protection demande d'abord Face ID */
+        ? h('p', {class: 'muted face-note'}, 'Face ID actif sur cet iPhone pour les papiers privés · ', h('button', {type: 'button', class: 'link', onclick: async () => {   /* 0.73.0 — B1 : retirer la protection demande d'abord Face ID */
           try { if (!(await FACE.unlock())) { toast('Face ID', 'Pas déverrouillé : la protection reste.', true); return; } } catch (e) { toast('Face ID', 'Pas déverrouillé : la protection reste.', true); return; }
           FACE.off(); toast('Face ID', 'Protection retirée : les papiers privés s’affichent sans Face ID sur cet iPhone.', true); renderView(true); }}, 'Retirer'))
         : h('button', {type: 'button', class: 'link face-set', onclick: async () => { try { await FACE.create(); toast('Face ID', 'Les papiers privés demanderont Face ID.', true); renderView(true); } catch (e) { toast('Face ID', 'Pas activé : ' + ((e && e.message) || e), true); } }}, h('span', {html: icon('lock', 14)}), 'Protéger les papiers privés par Face ID'));
@@ -4714,7 +4720,7 @@ void main(){
       out.push({x: xx, raw, date: due});
     }
     /* 0.51.0 : la facture du mois est arrivée : son vrai montant et son jour, à la place de l'habituel.
-       0.70.0 — B1 (comme le serveur, radar.mjs) : à UN seul prélèvement de son mois, le plus proche ; un prélèvement de fin de mois reporté
+       0.73.0 — B1 (comme le serveur, radar.mjs) : à UN seul prélèvement de son mois, le plus proche ; un prélèvement de fin de mois reporté
        au mois suivant (week-end, férié) en fait deux dans ce mois, et la facture remplaçait les deux (comptée deux fois). */
     if (x.prochain && x.prochain.date) {
       const pmo = String(x.prochain.date).slice(0, 7), [py, pm, pd] = String(x.prochain.date).split('-').map(Number), le = radD(py, pm - 1, pd);
@@ -4774,7 +4780,7 @@ void main(){
             'En plusieurs fois : ' + radEur(radActifs(d).reduce((t, p) => t + radC(p.reste), 0) / 100)) : null,
           h('span', {class: 'mchip', text: 'lu ' + radLu(d.maj)}))));
   }
-  /* 0.70.0 — B1 : les dépenses fixes encore en cours (une dépense finie hier ne compte ni dans la liste ni dans « Fixes (N) ») */
+  /* 0.73.0 — B1 : les dépenses fixes encore en cours (une dépense finie hier ne compte ni dans la liste ni dans « Fixes (N) ») */
   const radFxActives = (fx) => fx.filter((x) => !(x.fin && x.fin < radYmd(radAuj())));
   function radFixes(R, d) {
     const row = (o, done) => h('button', {type: 'button', class: 'hm-row rad-fx' + (done ? ' is-done' : '') + (o.x.ponctuel ? ' is-ponctuel' : ''), 'data-date': radYmd(o.date),
@@ -4869,7 +4875,7 @@ void main(){
       if (ry.value !== 'mensuel') it.mois = +mo.value;
       if (est.checked) it.estime = true;
       /* 0.51.0 : son début et la facture du mois déjà annoncée restent (ils viennent de ses mails) */
-      /* 0.70.0 — B1 : la liste est relue au moment d'enregistrer (le serveur a pu noter une facture ou une dépense pendant que la fiche était ouverte) */
+      /* 0.73.0 — B1 : la liste est relue au moment d'enregistrer (le serveur a pu noter une facture ou une dépense pendant que la fiche était ouverte) */
       const fx = radGet(RAD.data, 'fx', []).slice(), xv = x ? fx.find((y) => y.id === x.id) || x : null;
       if (x && x.debut) it.debut = x.debut; if (x && x.fin) it.fin = x.fin; if (x && x.variable && est.checked) it.variable = true; if (xv && xv.prochain && !prop) it.prochain = xv.prochain;
       /* 0.66.0 : ce qui vient de ses mails reste attaché (avant, une modification le perdait) ; le tableau du contrat, s'il le suit */
@@ -5106,7 +5112,7 @@ void main(){
       case 'achat': return {st, text: best.name + ' à ' + eur2(best.last.price) + ' chez ' + whereOf(best.last.where).name + ', sous ton seuil Achat (' + eur2(best.buy) + ')' + (best.last.when ? ', relevé ' + whenOf(best.last.when) : '') + '. Vérifie que le prix tient, puis achète toi-même. Déjà fait ? Dis-le pour arrêter les alertes.', main: /^Vérifier/, alt: /acheté/};
       case 'offre': return {st, text: "L'offre finit " + (offer.offer.until === 0 ? "aujourd'hui" : 'dans ' + offer.offer.until + ' j (' + short(offer.offer.until) + ')') + '. Ta condition : ' + (p0.cond || 'sous ton seuil') + '. Fais vérifier ce que vaut vraiment l\'offre avant.', main: /Ce que vaut/};
       case 'bon': return {st, text: 'Bon prix : ' + best.name + ' à ' + eur2(best.last.price) + ', pas encore sous ton seuil Achat (' + eur2(best.buy) + ').' + nextWindow(), main: /Vérifier/};
-      case 'attendre': return {st, text: ps.some((p) => p.buy > 0 || p.good > 0) ? 'Au-dessus de tes seuils : rien à faire, Kairos relève à chaque passage.' + nextWindow() : 'Seuils pas encore fixés : Kairos te les propose au prochain relevé.', main: /Vérifier/};   /* 0.70.0 — B1 */
+      case 'attendre': return {st, text: ps.some((p) => p.buy > 0 || p.good > 0) ? 'Au-dessus de tes seuils : rien à faire, Kairos relève à chaque passage.' + nextWindow() : 'Seuils pas encore fixés : Kairos te les propose au prochain relevé.', main: /Vérifier/};   /* 0.73.0 — B1 */
       case 'inconnu': return {st, text: 'Aucun prix relevé : premier relevé complet ' + S.nextReleve + '. Rien à faire de ton côté.' + (ps.length > 1 ? ' Astuce : garde une seule variante, tes alertes seront plus claires.' : ''), main: /Vérifier/};
       case 'pause': return {st, text: 'En pause' + (f.pauseTxt ? ' jusqu\'au ' + f.pauseTxt : '') + ' : Kairos ne le relève plus d\'ici là.', main: /Reprendre/};
       case 'achete': { const p = ps.find((x) => x.bought); return {st, text: 'Acheté ' + eur2(p.bought.price) + ' : ' + (p.ref - p.bought.price > 0 ? eur2(p.ref - p.bought.price) + ' de moins que le prix public.' : 'au prix public.'), main: null}; }
@@ -5115,7 +5121,7 @@ void main(){
   }
   /* la jauge : où se situe le dernier prix par rapport à tes seuils */
   function gauge(p) {
-    if (!(p.buy > 0) && !(p.good > 0)) return null;   /* 0.70.0 — B1 : pas de seuil fixé (« Achat ≤ 0,00 € ») : pas de jauge */
+    if (!(p.buy > 0) && !(p.good > 0)) return null;   /* 0.73.0 — B1 : pas de seuil fixé (« Achat ≤ 0,00 € ») : pas de jauge */
     const vals = [p.buy, p.good, p.ref].concat(p.last ? [p.last.price] : []);
     const lo = Math.min.apply(null, vals) * 0.9, hi = Math.max.apply(null, vals) * 1.03;
     const pos = (v) => Math.max(0, Math.min(100, ((v - lo) / (hi - lo)) * 100)).toFixed(1) + '%';
@@ -5203,7 +5209,7 @@ void main(){
         h('tbody', {}, pts.slice().reverse().map((q) => h('tr', {}, h('td', {text: ddmm(q.t)}), h('td', {text: eur2(q.v)}), h('td', {text: whereOf(q.where).name + (q.note ? ' · ' + q.note : '')}))))));
     return h('div', {class: 'pc-wrap'}, h('small', {class: 'pnow-k', text: 'Évolution du prix'}), box, sum, table);
   }
-  /* 0.70.0 — B1 : dates calculées (avant : écrites en dur, dont un Black Friday faux et déjà passé). Black Friday : lendemain du 4e jeudi
+  /* 0.73.0 — B1 : dates calculées (avant : écrites en dur, dont un Black Friday faux et déjà passé). Black Friday : lendemain du 4e jeudi
      de novembre ; soldes d'hiver : 2e mercredi de janvier, ou le 1er si le 2e tombe après le 12. Toujours la prochaine à venir. */
   const bfDe = (y) => { const d = new Date(y, 10, 1, 12); return new Date(y, 10, 1 + (4 - d.getDay() + 7) % 7 + 22, 12); };
   const soldesDe = (y) => { const w1 = 1 + (3 - new Date(y, 0, 1, 12).getDay() + 7) % 7; return new Date(y, 0, w1 + 7 > 12 ? w1 : w1 + 7, 12); };
@@ -5457,7 +5463,7 @@ void main(){
       + "\nRègles : français simple et concret. Aucun prix, aucune réservation, aucun horaire inventé. Si les dates ne sont pas fixées, propose un déroulé type. Adapte au nombre de voyageurs et à un jeune enfant si les données l'indiquent. Écris (probable) après ce qui peut changer (dates de fêtes, horaires, climat)."
       + "\nRéponds UNIQUEMENT par un objet JSON : {\"accroche\": \"une phrase qui donne envie\", \"temps_forts\": [{\"titre\": \"court\", \"detail\": \"une phrase\", \"icone\": \"un mot parmi plage, medina, musee, nature, fete, cuisine, famille, marche, monument\"}] (4 à 6), \"itineraire\": [{\"quand\": \"jour ou période, par exemple Sam 27/02 ou Jours 3-5\", \"titre\": \"court\", \"etapes\": [\"une action par ligne\"]}] (3 à 10 blocs), \"a_savoir\": [\"une phrase : papiers, santé, argent, transport, fêtes\"] (3 à 5)}";
   }
-  /* 0.70.0 : l'échec d'une demande à Claude dit en français (ni « tool_error », ni un message JSON en anglais) */
+  /* 0.73.0 : l'échec d'une demande à Claude dit en français (ni « tool_error », ni un message JSON en anglais) */
   function aiErr(e) {
     if (!e || e instanceof SyntaxError || e.code === 'réponse illisible' || (e instanceof Error && (e.message === 'format' || !e.code))) return 'réponse illisible';
     const m = String(e.message || '').trim();   /* le pont met parfois le code à la place du message (« tool_error ») : jamais affiché tel quel */
@@ -5499,7 +5505,7 @@ void main(){
   }
   /* climat : l'an dernier aux mêmes dates, à la première destination (Open-Meteo, archives) */
   function voyRange(v) {
-    /* 0.70.0 : « Fixées par … le 16/11/2026 : aller le … » : la date d'avant les deux-points n'est pas une date du voyage (« Départ fixé le 12/03/2027, … » en reste une).
+    /* 0.73.0 : « Fixées par … le 16/11/2026 : aller le … » : la date d'avant les deux-points n'est pas une date du voyage (« Départ fixé le 12/03/2027, … » en reste une).
        Une date sans année prend celle de la date datée qui la suit (« du 26/12 au 02/01/2027 » : 26/12/2026), sinon celle d'avant (« le 26/12/2026, retour le 02/01 ») */
     const t = String(v.when || '').replace(/\bfix\S*\s[^:;,.]*?\ble\s+\d{1,2}\/\d{1,2}(?:\/20\d\d)?\s*:/gi, ' '), ys = t.match(/\b(20\d\d)\b/), Y = ys ? +ys[1] : TODAY.getFullYear(), ds = [];
     const ms = [...t.matchAll(/\b(\d{1,2})\/(\d{1,2})(?:\/(20\d\d))?\b/g)].filter((m) => +m[2] >= 1 && +m[2] <= 12);
@@ -5518,7 +5524,7 @@ void main(){
     const a = ds[0], b = ds[ds.length - 1] - a > 864e5 ? ds[ds.length - 1] : new Date(a.getTime() + 6 * 864e5);
     return [a, new Date(Math.min(b.getTime(), a.getTime() + 21 * 864e5))];
   }
-  /* 0.70.0 : une case cochée de « Ce qui attend » reste cochée sur l'appareil tant qu'Ulysse n'a pas retiré le texte (Pilotage n'a pas de colonne pour elle) */
+  /* 0.73.0 : une case cochée de « Ce qui attend » reste cochée sur l'appareil tant qu'Ulysse n'a pas retiré le texte (Pilotage n'a pas de colonne pour elle) */
   const VOY_COCHES = 'jarvis.voy.coches';
   const vcGet = () => { try { return JSON.parse(localStorage.getItem(VOY_COCHES) || '{}') || {}; } catch (e) { return {}; } };
   const vcSet = (m) => { try { localStorage.setItem(VOY_COCHES, JSON.stringify(m)); } catch (e) { /* stockage indisponible : la page marche sans */ } };
@@ -5888,7 +5894,7 @@ void main(){
   };
   const lvExplain = (e, server) => {
     const srv = (e && e.server) || server || 'Le connecteur';
-    /* 0.70.0 — B1 : sur son serveur, les accès Google se règlent dans les Réglages de JARVIS, pas dans Claude ; le message français du serveur est repris */
+    /* 0.73.0 — B1 : sur son serveur, les accès Google se règlent dans les Réglages de JARVIS, pas dans Claude ; le message français du serveur est repris */
     if (SRV_OS && e) {
       if (e.code === 'needs_reauth') return 'Google est à reconnecter : Réglages de JARVIS, « Connecter Google »';
       if (e.code === 'not_granted') return srv + " n'est pas autorisé : reconnecte Google dans les Réglages de JARVIS (« Connecter Google »)";
@@ -5988,7 +5994,7 @@ void main(){
     if (faits) {
       const bell = faits.find((r) => lvLow(r['Fait']) === 'sonnette jarvis');
       /* JARVIS OS (18/11/2026) : la ligne « Sonnette Ulysse » contient une phrase autour de l'adresse ; l'adresse est extraite (sinon Ulysse passait pour sans sonnette) */
-      /* 0.70.0 (comme le serveur) : une adresse suivie du point final de la phrase (« … écris à x@mail.grokbot.com. ») est reconnue */
+      /* 0.73.0 (comme le serveur) : une adresse suivie du point final de la phrase (« … écris à x@mail.grokbot.com. ») est reconnue */
       const bellAddr = (v) => { const m = String(v || '').match(/[a-z0-9._+-]+@[a-z0-9-]+(?:\.[a-z0-9-]+)+/i); return m && LV.DOMAIN.test(m[0]) ? m[0] : ''; };
       LV.bell = bell ? bellAddr(bell['Valeur']) : '';
       /* la sonnette de chaque bot (Charte, section 7, 13/11/2026) : ligne « Sonnette <nom> » de l'onglet Faits */
@@ -6036,7 +6042,7 @@ void main(){
         const why = f.pourquoi || (k ? P2.body : '') || '';
         const d = {id: 'a:' + sub, live: true, bot: lvBot(r['Bot']), kind: oui ? 'oui' : P1.kind || P2.kind || lvGuessKind(body + ' ' + why), title: sub, ask: body, f, since: lvFrIso(r['Depuis le']) ? N(lvFrIso(r['Depuis le'])) : 0,
           due: f.avant && lvFrIso(f.avant) ? N(lvFrIso(f.avant)) : k && lvFrIso(k['Échéance']) ? N(lvFrIso(k['Échéance'])) : null, why, where: oui ? 'Le chat de ' + (r['Bot'] || 'Iris') + ' dans Grok Bot.' : (f.ou || ''), ifnot: f.si_non || '',
-          link: (/^https?:\/\//i.test(String(f.lien || '').trim()) ? String(f.lien).trim() : '') || (body.match(/https?:\/\/\S+/) || [])[0] || '', options: lvOptions(f.options, body),   /* 0.70.0 : jamais un « Lien : javascript:… » écrit par un bot */
+          link: (/^https?:\/\//i.test(String(f.lien || '').trim()) ? String(f.lien).trim() : '') || (body.match(/https?:\/\/\S+/) || [])[0] || '', options: lvOptions(f.options, body),   /* 0.73.0 : jamais un « Lien : javascript:… » écrit par un bot */
           src: k ? 'Dossier « ' + sub + ' » de Pilotage' : 'Canal de Pilotage, ligne du ' + (r['Depuis le'] || ''), ctx: []};
         if (d.kind === 'choix' && d.options.length < 2) d.kind = 'question';
         if (d.bot === 'toi') d.bot = 'hydra';
@@ -6089,7 +6095,7 @@ void main(){
       const STEP = {'idée': 0, 'dates': 1, 'options': 2, 'réservé': 3, 'prêt': 4};
       S.voyages = voy.filter((r) => r['Projet'] && !/^(abandon|pass)/.test(lvLow(r['Statut']))).map((r) => {
         const st = lvLow(r['Statut']), dates = r['Dates'] || '', bot = lvBot(r['Bot'] || 'Ulysse');
-        const ps = st.match(/^en pause\s*\(([^)]+)\)/), pst = ps ? ps[1].trim() : '';   /* 0.70.0 : « En pause (Réservé) » garde l'étape */
+        const ps = st.match(/^en pause\s*\(([^)]+)\)/), pst = ps ? ps[1].trim() : '';   /* 0.73.0 : « En pause (Réservé) » garde l'étape */
         const v = {id: 'v:' + r._row, _row: r._row, title: r['Projet'], dest: '', step: STEP[st] != null ? STEP[st] : STEP[pst] != null ? STEP[pst] : 1, paused: /^en pause/.test(st), bot: bot === 'toi' ? 'mermaid' : bot,
           who: r['Qui part'] || '', when: dates || 'à fixer', budget: lvPrice(r['Budget maximum TTC (€)']), recap: r['Récap (lien Drive)'] || '',
           legs: (r['Trajets'] || '').split(';').map((x) => x.trim()).filter(Boolean).map((x) => { const m = x.match(/^(.+?)\s*:\s*(.+?)(?:\s*\((.+)\))?$/); return m ? [m[1], m[2], m[3] || ''] : ['', x, '']; }),
@@ -6105,7 +6111,7 @@ void main(){
         if (/proposition/i.test(dates)) v.plan = {dates: [['', dates.replace(/^.*?proposition[^:]*:\s*/i, '')]], conges: '', why: dates.split(/proposition/i)[0].replace(/[.\s]+$/, '')};
         return v;
       });
-      vcApply(S.voyages);   /* 0.70.0 : les cases cochées sur l'appareil */
+      vcApply(S.voyages);   /* 0.73.0 : les cases cochées sur l'appareil */
     }
     /* sorties : une ligne par idée d'Ulysse ; les colonnes sont retrouvées par le début de leur nom */
     const sor = rows('sor');
@@ -6302,7 +6308,7 @@ void main(){
   }});
   const opAppendTask = (t) => ({label: 'la tâche « ' + t.title + ' » dans Tâches', src: 'tach', server: LV.SHEETS,
     run: () => lvCall(LV.SHEETS, 'append_values', {spreadsheetId: LV.SHEET, range: 'Tâches!A1', values: [[lvToday(), t.title, t.n != null ? lvFr(isoOf(day(t.n))) : '', 'À faire', 'Ajoutée depuis Jarvis']]})});
-  /* 0.70.0 : comme les autres cellules, après avoir vérifié que la ligne porte toujours cette tâche (tri, ligne supprimée par un bot) */
+  /* 0.73.0 : comme les autres cellules, après avoir vérifié que la ligne porte toujours cette tâche (tri, ligne supprimée par un bot) */
   const opTaskCell = (t, colName, val, label) => opCell('tach', 'Tâches', t, 'Tâche', t.title, colName, val, label);
   const opPresence = (iso, was, now) => ({label: now ? '« ' + CODE[now] + ' » dans l\'agenda Présence' : 'jour vidé dans l\'agenda Présence', src: 'pres', server: LV.CAL, run: () => {
     const ev = S.presenceEv[iso];
@@ -6374,7 +6380,7 @@ void main(){
       const o = old(v); if (!v._row || !o) return;
       const W = (val) => ops.push(opCell('voy', 'Voyages', v, 'Projet', v.title, 'Statut', val, '« ' + val + ' » pour « ' + v.title + ' » dans Voyages'));
       if (v.gone && !o.gone) W('Abandonné');
-      else if (!!v.paused !== !!o.paused) W(v.paused ? 'En pause (' + (STN[v.step] || 'Dates') + ')' : STN[v.step] || 'Dates');   /* 0.70.0 : l'étape survit à la pause */
+      else if (!!v.paused !== !!o.paused) W(v.paused ? 'En pause (' + (STN[v.step] || 'Dates') + ')' : STN[v.step] || 'Dates');   /* 0.73.0 : l'étape survit à la pause */
       else if (v.step !== o.step && STN[v.step]) W(STN[v.step]);
       (v.options || []).forEach((x) => {
         const ox = old(x); if (!x._row || !ox || ox.state === x.state) return;
@@ -6456,7 +6462,7 @@ void main(){
     const timer = setTimeout(async () => {
       sent = true;
       const done = [], fails = [];
-      /* 0.70.0 : un envoi de mail raté (op.gate) arrête tout : ni ligne « Brouillon envoyé », ni dossier « en attente », ni sonnette */
+      /* 0.73.0 : un envoi de mail raté (op.gate) arrête tout : ni ligne « Brouillon envoyé », ni dossier « en attente », ni sonnette */
       let gated = null;
       for (let i = 0; i < ops.length; i++) { const op = ops[i]; try { await op.run(); done.push(op.label); } catch (err) { fails.push(op.label + ' : ' + lvExplain(err, op.server)); if (op.sig) LV_RECENT.delete(op.sig); if (op.gate) { gated = op; ops.slice(i + 1).forEach((o) => { if (o.sig) LV_RECENT.delete(o.sig); }); if (op.onFail) try { op.onFail(); } catch (x) { /* rien */ } break; } } }
       const rings = Array.from(new Set(ops.filter((o) => o.ring && done.includes(o.label)).map((o) => o.ring)));
@@ -6518,12 +6524,12 @@ void main(){
   /* la réponse vaut tant que le bot n'a pas changé la demande (même texte) et au plus 3 jours */
   const repOf = (d) => lsGet(REP_LS, []).find((x) => x.id === d.id && x.ask === d.ask && Date.now() - x.at < 3 * 864e5) || null;
   const coteOf = (d) => coteInit() || COTE.items.find((x) => x.id === d.id && (!x.jusqu || x.jusqu > Date.now())) || null;
-  /* 0.70.0 : jour et mois sans année : l'année qui place la date le plus près d'aujourd'hui (« semaine du 28/12 » lue le 4 janvier = décembre passé) */
+  /* 0.73.0 : jour et mois sans année : l'année qui place la date le plus près d'aujourd'hui (« semaine du 28/12 » lue le 4 janvier = décembre passé) */
   const nearYear = (dd, mm) => { const y = TODAY.getFullYear(), gap = (c) => Math.abs(new Date(c, mm - 1, dd, 12) - TODAY); return [y - 1, y + 1].reduce((b, c) => gap(c) < gap(b) ? c : b, y); };
   function rappelOf(d) {
     if (!d || lsGet(RAPPEL_SORTIS, []).includes(d.id)) return null;
     const t = String(d.title) + ' ' + String(d.ask || ''), m = t.match(/(\d{1,2})(?:\/(\d{1,2}))?\s+au\s+\d{1,2}\/(\d{1,2})\/(\d{4})/), k = m ? null : t.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
-    /* 0.70.0 : « du 24/12 au 02/01/2027 » commence en 2026 */
+    /* 0.73.0 : « du 24/12 au 02/01/2027 » commence en 2026 */
     const iso = m ? (m[2] && +m[2] > +m[3] ? +m[4] - 1 : m[4]) + '-' + pad2(+(m[2] || m[3])) + '-' + pad2(+m[1]) : k ? k[3] + '-' + pad2(+k[2]) + '-' + pad2(+k[1]) : null;
     const e = iso && (S.echeances || []).find((x) => x.iso === iso && /fermeture|vacances|\bpont\b|crèche/i.test(x.title) && /mois|semaine|vendredi/i.test(x.rem || ''));
     if (!e) return null;
@@ -6625,7 +6631,7 @@ void main(){
     if (d.due != null && d.due < 0 && OFFRE.test([d.title, d.ask].join(' '))) return {whole: true, date: short(d.due), label: 'Expirée'};
     const m = String(d.ask || '').match(/([^.;|()]*?\b(?:terminée?s?|expirée?s?|finie?s?|close|échue|achevée?)\s+le\s+(\d{1,2})\/(\d{1,2})(?:\/(\d{4}))?)/i);
     if (!m || !OFFRE.test(m[1])) return null;
-    const dt = new Date(m[4] ? +m[4] : nearYear(+m[2], +m[3]), +m[3] - 1, +m[2], 12);   /* 0.70.0 : « terminée le 15/12 » lue en janvier */
+    const dt = new Date(m[4] ? +m[4] : nearYear(+m[2], +m[3]), +m[3] - 1, +m[2], 12);   /* 0.73.0 : « terminée le 15/12 » lue en janvier */
     return dt < TODAY ? {whole: false, date: pad2(+m[2]) + '/' + pad2(+m[3]), part: m[1].trim(), label: 'Expirée'} : null;
   }
   const EXP_ACK = 'jarvis.expirees.vues';
@@ -6875,7 +6881,7 @@ void main(){
     if (!cols.includes('Source')) vals.push('Jarvis');
     return lvCall(LV.SHEETS, 'append_values', {spreadsheetId: LV.SHEET, range: 'Faits!A1', values: [vals]});
   };
-  /* 0.70.0 : resumeBusy se relâche à la fin ; resumeDone retient la reprise déjà traitée (sonnée, annulée ou ratée) pour ne jamais la reproposer,
+  /* 0.73.0 : resumeBusy se relâche à la fin ; resumeDone retient la reprise déjà traitée (sonnée, annulée ou ratée) pour ne jamais la reproposer,
      mais une nouvelle fin de pause, dans la même page ouverte depuis des jours, est proposée à son tour */
   let resumeBusy = false, resumeDone = '';
   function resumeCheck() {
@@ -7025,7 +7031,7 @@ void main(){
     return r;
   }});
   const opDeleteDraft = (d) => ({label: 'le brouillon « ' + (d.subject || 'sans objet') + ' » supprimé de Gmail', sig: 'deldraft|' + d.draftId, src: 'drafts', server: LV.MAIL, run: async () => {
-    /* 0.70.0 : suppression refusée par Gmail : le brouillon caché par l'appui revient dans la liste */
+    /* 0.73.0 : suppression refusée par Gmail : le brouillon caché par l'appui revient dans la liste */
     let r; try { r = await lvCall(LV.MAIL, 'delete_draft', {draftId: d.draftId}); } catch (err) { V17.sentIds = V17.sentIds.filter((x) => x !== d.draftId); buildDrafts(); refresh(); throw err; }
     V17.sentIds.push(d.draftId); return r; }});
   const opSendMail = (m) => ({label: 'le mail « ' + m.subject + ' » à ' + m.to.join(', '), sig: 'mail|' + m.to.join(',') + '|' + m.subject, src: 'sent', server: LV.MAIL, run: () => { costCount('mails'); return lvCall(LV.MAIL, 'send_message', {to: m.to, subject: m.subject, body: m.body}); }});
@@ -7048,7 +7054,7 @@ void main(){
       effect: '« ' + subj + ' » part de ta boîte à ' + to + ', tel quel, pièces jointes comprises.' + (k ? ' Le dossier passe en attente de la réponse.' : '') + ' ' + who + ' reçoit une ligne dans le Canal et sa sonnette.',
       draftSend: dr || null, mailSend: tm || null, extraOps: ops, mutate: () => { if (d) drop('demandes', d.id); if (dr) { V17.sentIds.push(dr.draftId); buildDrafts(); } },
       onUndo: () => { if (dr) { V17.sentIds = V17.sentIds.filter((x) => x !== dr.draftId); buildDrafts(); } },
-      /* 0.70.0 : envoi refusé par Gmail (brouillon déjà parti, réseau) : le brouillon et la demande reviennent, rien n'est clos */
+      /* 0.73.0 : envoi refusé par Gmail (brouillon déjà parti, réseau) : le brouillon et la demande reviennent, rien n'est clos */
       onSendFail: () => { if (dr) { V17.sentIds = V17.sentIds.filter((x) => x !== dr.draftId); buildDrafts(); } if (d && d.live) { repUnmark(d); if (!(S.demandes || []).some((x) => x.id === d.id)) S.demandes = (S.demandes || []).concat([d]); } refresh(); }};
   }
   ACTIONS.draft = (d) => [
@@ -7120,7 +7126,7 @@ void main(){
     S.mailAfter.items = items;
   }
   const hideMail = (id) => { if (!id) return; lsSet(MAIL_HIDE, lsGet(MAIL_HIDE, []).concat([id]).slice(-400)); if (S.mailAfter) S.mailAfter.items = S.mailAfter.items.filter((x) => x.id !== id); };
-  /* 0.70.0 : « Annuler » fait revenir le mail (il n'est plus caché sur l'appareil) */
+  /* 0.73.0 : « Annuler » fait revenir le mail (il n'est plus caché sur l'appareil) */
   const showMail = (id) => { if (!id) return; lsSet(MAIL_HIDE, lsGet(MAIL_HIDE, []).filter((y) => y !== id)); rebuildMail(); };
   function mailToIris(x) {
     finish({title: 'Mail confié à Iris', bot: 'hydra', canalType: 'Mail à traiter', say: 'Je regarde ce mail.',
@@ -7139,14 +7145,14 @@ void main(){
     const tk = Object.keys(props).find((k) => /^thread/i.test(k)) || 'threadId', lk = Object.keys(props).find((k) => /label/i.test(k)) || 'labelIds';
     if (!x.id) throw {code: 'tool_error', message: "archivage indisponible ici : le mail est seulement retiré de Jarvis"};
     const input = {}; input[tk] = x.id; input[lk] = props[lk] && props[lk].type && props[lk].type !== 'array' ? 'INBOX' : ['INBOX'];
-    /* 0.70.0 : archivage refusé : le mail reste dans ta boîte, il revient donc aussi dans la liste */
+    /* 0.73.0 : archivage refusé : le mail reste dans ta boîte, il revient donc aussi dans la liste */
     try { return await lvCall(LV.MAIL, 'unlabel_thread', input); } catch (err) { showMail(x.id); refresh(); throw err; }
   }});
 
   /* ---------- tous les oui d'un même bot, en une seule phrase : un chat au lieu de plusieurs ---------- */
   /* 17/11/2026 (choix du propriétaire) : un « Oui » depuis JARVIS vaut son oui pour une routine strictement conforme à la fiche ou à la Charte
      (Charte, section 7) : pour ces demandes, une ligne « Réponse » dans le Canal et la sonnette remplacent la phrase à coller dans le chat */
-  /* 0.70.0 : jamais pour supprimer, retirer, arrêter, désactiver ou mettre en pause une routine (Charte, section 7) : ce oui-là se donne dans son chat */
+  /* 0.73.0 : jamais pour supprimer, retirer, arrêter, désactiver ou mettre en pause une routine (Charte, section 7) : ce oui-là se donne dans son chat */
   function isRoutineDem(d) { const t = [d.title, d.ask, d.f && d.f.phrase].join(' '); return d.kind === 'oui' && /routine/i.test(t) && !/supprim|retir|effac|d[ée]sactiv|arr[êe]t|\bpause\b/i.test(t); }
   /* JARVIS OS (18/11/2026, question du propriétaire « pourquoi dois-je encore donner mon oui dans Grok pour le CRA ? ») : depuis le 13/11 (Charte, section 7),
      son « Oui » depuis JARVIS vaut confirmation du CRA client de la semaine ; la page le proposait seulement pour les routines */
@@ -7184,7 +7190,7 @@ void main(){
   function craWeek(d) {
     const t = d.title + ' ' + d.ask + ' ' + Object.values(d.f || {}).join(' ');
     const m = t.match(/semaine du (\d{1,2})\/(\d{1,2})(?:\/(\d{4}))?/i);
-    const mon = m ? dayDiff((m[3] || nearYear(+m[1], +m[2])) + '-' + pad2(+m[2]) + '-' + pad2(+m[1])) : -((TODAY.getDay() + 6) % 7);   /* 0.70.0 : semaine sans année au Nouvel An */
+    const mon = m ? dayDiff((m[3] || nearYear(+m[1], +m[2])) + '-' + pad2(+m[2]) + '-' + pad2(+m[1])) : -((TODAY.getDay() + 6) % 7);   /* 0.73.0 : semaine sans année au Nouvel An */
     const grid = h('div', {class: 'week'});
     let bad = 0, empty = 0;
     for (let i = 0; i < 5; i++) {
@@ -7293,7 +7299,7 @@ void main(){
   const LP0 = lvPlan;
   lvPlan = function (e, ctx, snap) {
     const extra = [], send = [];
-    /* 0.70.0 : le mail part d'abord ; s'il échoue, la boucle de LINK.queue n'écrit rien d'autre (gate) */
+    /* 0.73.0 : le mail part d'abord ; s'il échoue, la boucle de LINK.queue n'écrit rien d'autre (gate) */
     if (e.draftSend) send.push(Object.assign(opSendDraft(e.draftSend), {gate: true, onFail: e.onSendFail || null}));
     if (e.draftDelete) extra.push(opDeleteDraft(e.draftDelete));
     /* clore un dossier : la page écrit « Fait » elle-même dans Dossiers, sans ligne pour Iris */
@@ -7542,11 +7548,11 @@ void main(){
      une échéance « Un bot s'en occupe / suit » que le bot a faite sans passer sa ligne à « Fait » est reconnue d'après son Journal
      ou sa ligne du Canal (mêmes mots, même date dans le titre, mot d'achèvement, à quelques jours de la date). Gratuit : rien n'est relu. */
   const ECH_FAIT = /\b(soumise?s?|faite?s?|envoyee?s?|payee?s?|terminee?s?|reglee?s?|validee?s?|approuvee?s?|deposee?s?|saisie?s?|transmise?s?|signee?s?|confirmee?s?)\b/;
-  /* 0.70.0 : « pas encore soumis », « non validé », « échec, non transmis », « rien envoyé » ne valent pas « fait » ; la fenêtre s'arrête à la ponctuation
+  /* 0.73.0 : « pas encore soumis », « non validé », « échec, non transmis », « rien envoyé » ne valent pas « fait » ; la fenêtre s'arrête à la ponctuation
      (« Pas de souci, soumis » reste fait ; « en attente de validation » aussi) */
   const ECH_NEG = /\b(pas|non|jamais|aucune?|rien|echec|impossible)\b[^.;,:!?]{0,25}?\b(soumi|fait|envoye|paye|termine|regle|valide|approuve|depose|saisi|transmi|signe|confirme)/;
   const ECH_VIDES = new Set(['semaine', 'mois', 'avant', 'apres', 'conge', 'conges', 'pour', 'avec', 'dans', 'jour', 'jours', 'prochain', 'prochaine']);
-  /* 0.70.0 : le Journal (jusqu'à 5000 lignes) est mis en forme une fois par lecture, plus une fois par échéance à chaque passage */
+  /* 0.73.0 : le Journal (jusqu'à 5000 lignes) est mis en forme une fois par lecture, plus une fois par échéance à chaque passage */
   const ECH_JR = {src: null, rows: []};
   function echJr() {
     const src = LV.t && LV.t.jour && LV.t.jour.rows;
@@ -8092,7 +8098,7 @@ void main(){
           l.reply ? h('div', {class: 'tl-reply'}, h('span', {class: 'pick-label', text: 'Réponse de ' + (l.from === 'rabie' ? who(l.to) : 'toi')}), h('p', {text: clip(l.reply, 360)})) : done(l) ? null : h('p', {class: 'muted', text: 'Pas encore de réponse.'}));
       }) : [emptyState(all.length ? 'Rien ne correspond.' : 'Aucune demande dans le Canal.')]));
       if (list.length > HIST.n) box.append(h('button', {type: 'button', class: 'link hist-more', onclick: () => { HIST.n += 12; draw(); }}, list.length - HIST.n === 1 ? 'Voir la suivante' : 'Voir les ' + Math.min(12, list.length - HIST.n) + ' suivantes'));
-      const nf = all.filter(done).length; count.textContent = all.filter((l) => !done(l)).length + ' en cours · ' + nf + (nf > 1 ? ' terminées' : ' terminée');   /* 0.70.0 : « 1 terminée » */
+      const nf = all.filter(done).length; count.textContent = all.filter((l) => !done(l)).length + ' en cours · ' + nf + (nf > 1 ? ' terminées' : ' terminée');   /* 0.73.0 : « 1 terminée » */
     };
     const id = 'hq-' + (++SEQ);
     const inp = h('input', {class: 'inp', id, type: 'search', placeholder: 'Chercher : un mot, un bot, un sujet', 'aria-label': "Chercher dans l'historique des demandes"});
@@ -8160,7 +8166,7 @@ void main(){
         « ouvre l'agenda » (ou demandes, achats, voyages, sorties, suivi, équipe, accueil), « c'est tout » pour finir la conversation.
      2. État des systèmes : ce qui marche et ce qui ne marche pas (Pilotage, agenda, Gmail, Claude, voix, micro, Grok, sonnettes, tâche Claude),
         en touchant la ligne d'état en haut, ou en bas de l'onglet Suivi.
-     0.70.0 : « ouvre mes papiers » mène à Papiers et « ouvre mes tâches » à Pour moi (Mes tâches) ; suivi et dossiers mènent à Équipe. */
+     0.73.0 : « ouvre mes papiers » mène à Papiers et « ouvre mes tâches » à Pour moi (Mes tâches) ; suivi et dossiers mènent à Équipe. */
   const CMD_TABS =[[/^(accueil|maison|d[ée]but)/, 'accueil', "l'accueil"], [/^demandes?/, 'demandes', 'les demandes'], [/^(agenda|calendrier|planning)/, 'agenda', "l'agenda"], [/^(achats?|prix)/, 'achats', 'les achats'], [/^(voyages?|vacances)/, 'voyages', 'les voyages'], [/^sorties?/, 'sorties', 'les sorties'], [/^papiers?/, 'papiers', 'tes papiers'], [/^t[aâ]ches?/, 'demandes', 'tes tâches'], [/^(suivi|dossiers?)/, 'suivi', "l'équipe"], [/^([ée]quipe|bots?)/, 'equipe', "l'équipe"]];
   function briefText() {
     const L = claudeBrief();
@@ -8215,7 +8221,7 @@ void main(){
     };
     conn('Pilotage', LV.SHEETS); conn('Agenda', LV.CAL); conn('Gmail', LV.MAIL);
     rows.push(['Claude dans la page', SAMPLE_STATE === 'ok' ? 'Disponible' : SAMPLE_STATE === 'wait' ? 'Connexion…' : 'Indisponible dans cette vue', SAMPLE_STATE === 'ok' ? 'ok' : SAMPLE_STATE === 'wait' ? 'wait' : 'bad']);
-    /* 0.70.0 : ce que la page utilise vraiment (JarvisVoice : écoute et voix du serveur, sinon celles de l'iPhone), l'ancienne chaîne en dernier recours */
+    /* 0.73.0 : ce que la page utilise vraiment (JarvisVoice : écoute et voix du serveur, sinon celles de l'iPhone), l'ancienne chaîne en dernier recours */
     const k = typeof earKind === 'function' ? earKind() : null, JV = JVX(); let dk = null, sk = null;
     try { dk = JV && JV.dictKind ? JV.dictKind() : null; sk = JV && JV.sayKind ? JV.sayKind() : null; } catch (e) { /* rien */ }
     const ecoute = EAR.on ? ', à l\'écoute' : '';
@@ -8259,7 +8265,7 @@ void main(){
     const load = async () => {
       const ms = await JS.missions();
       if (!ms) { list.replaceChildren(h('p', {class: 'muted', text: 'Ton serveur ne les connaît pas encore : « Mettre à jour le serveur » dans Réglages.'})); return; }
-      const ouverts = new Set([...list.querySelectorAll('.mis-it[open]')].map((d) => d.dataset.mission));   /* 0.70.0 : une fiche qu'il a dépliée le reste à la relecture */
+      const ouverts = new Set([...list.querySelectorAll('.mis-it[open]')].map((d) => d.dataset.mission));   /* 0.73.0 : une fiche qu'il a dépliée le reste à la relecture */
       list.replaceChildren(...(ms.length ? ms.map((m) => { const k = ST[m.status] || ST.envoyee; return h('details', Object.assign({class: 'mis-it', 'data-mission': m.id}, m.status === 'a_approuver' || ouverts.has(String(m.id)) ? {open: ''} : {}),
         h('summary', {}, h('span', {class: 'pill ' + k[1], text: k[0]}), h('span', {class: 'mis-t', text: (m.agentNom ? 'Ordre à ' + m.agentNom + ' : ' : '') + m.text}), h('small', {class: 'mis-d', text: fmt(new Date(m.done || m.at), {weekday: 'short', hour: '2-digit', minute: '2-digit'})})),
         m.essais > 1 ? h('p', {class: 'muted mis-rep', text: 'Reprise après un redémarrage du serveur.'}) : null,
@@ -8267,7 +8273,7 @@ void main(){
         m.etapes && m.etapes.length ? h('ol', {class: 'mis-etapes'}, m.etapes.map((e) => h('li', {class: e.s === 'fait' ? 'is-fait' : e.s === 'en cours' ? 'is-cours' : '', text: e.t}))) : null,   /* 0.33.0 */
         m.outil ? h('p', {class: 'muted mis-outil', text: 'À l’instant : ' + m.outil}) : null,
         m.result ? h('div', {class: 'mis-r', text: m.result}) : null, m.status === 'terminee' ? plutot(m) : null, m.result || ['a_approuver', 'refusee'].includes(m.status) ? null : h('p', {class: 'muted', text: m.status === 'attente' ? 'En attente : une autre mission passe avant.' : m.agentNom ? 'La ligne part dans le Canal pour ' + m.agentNom + ', avec sa sonnette.' : 'Claude y travaille : tu seras prévenu par une notification.'})); }) : [h('p', {class: 'muted', text: 'Aucune mission pour le moment.'})]));
-      /* 0.70.0 : relu toutes les 5 s tant qu'une mission tourne et que le panneau est à l'écran (avant : seulement si l'onglet valait « suivi »,
+      /* 0.73.0 : relu toutes les 5 s tant qu'une mission tourne et que le panneau est à l'écran (avant : seulement si l'onglet valait « suivi »,
          ce qui n'arrive plus depuis qu'Équipe montre ce panneau) ; pas pendant qu'il écrit « Non, plutôt… », ni app en arrière-plan */
       clearTimeout(timer);
       if (ms.some((m) => ['attente', 'envoyee'].includes(m.status))) { const tick = () => { if (!document.body.contains(list)) return; const ae = document.activeElement; if (document.hidden || (ae && list.contains(ae) && /^(TEXTAREA|INPUT|SELECT)$/.test(ae.tagName)) || list.querySelector('.mis-plutot[open]')) { timer = setTimeout(tick, 5000); return; } load(); }; timer = setTimeout(tick, 5000); }
@@ -8284,7 +8290,7 @@ void main(){
       inp, h('div', {class: 'row-actions'}, launch), out, list);
   }
   /* JARVIS OS 0.16.0 : santé du serveur dans « État des systèmes » (veilleur sans Claude, toutes les 10 minutes) */
-  let SANTE_DER = null, SANTE_AT = 0;   /* 0.70.0 : le dernier état lu, réaffiché tout de suite au rendu suivant ; relu au plus toutes les 30 s (le veilleur passe toutes les 10 min) */
+  let SANTE_DER = null, SANTE_AT = 0;   /* 0.73.0 : le dernier état lu, réaffiché tout de suite au rendu suivant ; relu au plus toutes les 30 s (le veilleur passe toutes les 10 min) */
   function santeBox() {
     const JS = window.JarvisServeur; if (!JS || !JS.sante || !JS.linked()) return null;
     const box = h('div', {class: 'sante-box'}, h('p', {class: 'muted', text: 'Lecture de l’état du serveur…'}));
@@ -8397,7 +8403,7 @@ void main(){
   const SOR_OS = SHEETCFG.ordre;
   SHEETCFG.ordre = (o) => { const c = SOR_OS(o); if (o.reply) c.say = o.reply; c.kicker = 'Ton ordre · ' + (o.status || 'À faire'); c.facts = [['Envoyé', o.date || rel(o.n)], ['Statut', o.status || 'À faire']]; return c; };
   function alertsCheck() {
-    if (!LV.mcp || !LV.t.canal || !LV.t.atoi) return;   /* 0.70.0 : la base se pose avec les deux onglets, comme lvNews (sinon rafale au lancement) */
+    if (!LV.mcp || !LV.t.canal || !LV.t.atoi) return;   /* 0.73.0 : la base se pose avec les deux onglets, comme lvNews (sinon rafale au lancement) */
     const now = {o: {}, d: new Set()};
     (S.ordres || []).forEach((o) => { now.o[o.id] = (o.status || '') + '|' + (o.reply || ''); });
     (S.demandes || []).forEach((d) => now.d.add(d.id));
@@ -8412,7 +8418,7 @@ void main(){
       else if (/^fait/i.test(o.status)) got.push([name + ' a fini', o.text, voirOrdre(o.id)]);
     });
     (S.demandes || []).forEach((d) => { if (!b.d.has(d.id)) got.push(['Nouvelle demande de ' + (BOT[d.bot] ? BOT[d.bot].name : 'un bot'), d.title + (d.ask ? ' : ' + d.ask : ''), voirDemande(d.id)]); });
-    /* 0.70.0 : deux réponses du même bot dans la même relecture font un seul bandeau qui les compte (même titre : il remplace toujours les bandeaux simples) */
+    /* 0.73.0 : deux réponses du même bot dans la même relecture font un seul bandeau qui les compte (même titre : il remplace toujours les bandeaux simples) */
     const par = new Map(); got.forEach((g) => { const x = par.get(g[0]); if (x) x.n++; else par.set(g[0], {t: g[0], x: g[1], op: g[2], n: 1}); });
     const many = (t, n) => / a répondu$/.test(t) ? n + ' réponses' : / attend ton oui$/.test(t) ? n + ' ordres attendent ton oui' : / a fini$/.test(t) ? n + ' ordres terminés' : n + ' nouvelles demandes';
     const lst = [...par.values()].map((g) => g.n > 1 ? [g.t, many(g.t, g.n) + ' · ' + g.x, () => go('demandes')] : [g.t, g.x, g.op]);
@@ -8542,7 +8548,7 @@ void main(){
   const CIEL = (c) => { c = +c; return c === 0 ? 'dégagé' : c === 1 ? 'plutôt dégagé' : c === 2 ? 'éclaircies' : c === 3 ? 'couvert' : c === 45 || c === 48 ? 'brouillard' : c >= 51 && c <= 57 ? 'bruine' : c >= 61 && c <= 67 ? 'pluie' : c >= 71 && c <= 77 ? 'neige' : c >= 80 && c <= 82 ? 'averses' : c >= 85 && c <= 86 ? 'averses de neige' : c >= 95 ? 'orage' : 'variable'; };
   const MET = {j: null, at: 0, busy: false};
   const metPos = () => { try { const x = JSON.parse(localStorage.getItem('jarvis.pos') || 'null'); return x && x.lat != null ? x : null; } catch (e) { return null; } };
-  /* 0.70.0 (décision du propriétaire) : un appui sur la tuile MÉTÉO redemande la position si elle a plus de 3 h ; ouvrir l'orbe ne la redemande pas.
+  /* 0.73.0 (décision du propriétaire) : un appui sur la tuile MÉTÉO redemande la position si elle a plus de 3 h ; ouvrir l'orbe ne la redemande pas.
      Position refusée : la position gardée sert de secours. */
   function metLoad(ask) {
     if (window.__METEO) { MET.j = window.__METEO; return; }
@@ -8642,7 +8648,7 @@ void main(){
     }).join('');
   }
   window.addEventListener('resize', () => { if (document.querySelector('.hud-core')) hudLines(); });
-  /* 0.70.0 : toutes les lectures ont échoué (Google à relier, iPhone hors réseau) : l'accueil le dit au lieu d'attendre sans fin */
+  /* 0.73.0 : toutes les lectures ont échoué (Google à relier, iPhone hors réseau) : l'accueil le dit au lieu d'attendre sans fin */
   function hudKo() {
     if (LV.gave && !LV.mcp) return true;
     const ks = Object.keys(LV_SOURCES);
@@ -8658,7 +8664,7 @@ void main(){
     const ro = (pos, act, k, b, sub, amb) => h('button', {type: 'button', class: 'hud-ro q-' + pos + (amb ? ' amb' : ''), 'data-k': k, onclick: act}, h('small', {text: k}), h('b', {text: b}), h('span', {text: sub}));
     const metB = ml ? (ml.match(/-?\d+°/) || [''])[0] || ml.split(' · ')[0] : '', metS = ml ? ml.replace(/^-?\d+° · /, '') : 'Afficher la météo';
     let argB = null, argS = '';
-    const argOn = typeof radOn === 'function' && radOn(), ko = SRV_OS && !SNAP && hudKo(), wait = SRV_OS && !SNAP && !ko;   /* 0.59.0 : données pas encore lues ; 0.70.0 : ou illisibles */
+    const argOn = typeof radOn === 'function' && radOn(), ko = SRV_OS && !SNAP && hudKo(), wait = SRV_OS && !SNAP && !ko;   /* 0.59.0 : données pas encore lues ; 0.73.0 : ou illisibles */
     if (argOn) { radLoad(); const R = RAD.data ? radReste(RAD.data) : null; if (R) { argB = radEur(R.tReste); argS = R.mois ? 'd’ici la fin du mois' : 'd’ici ta paie'; } }
     const deals = (S.ach || []).filter((f) => ['achat', 'bon'].includes(famState(f)));
     const core = h('div', {class: 'hud-core'}, HUD.g ? HUD.g.el : C('claude', 150).el, h('svg', {class: 'hud-lines', 'aria-hidden': 'true'}),
@@ -8934,7 +8940,7 @@ void main(){
     (S.voyages || []).forEach((v) => add('Voyages', 'plane', v.title, (v.who || '') + (v.when ? ' · ' + v.when : ''), v.dest, () => { go('voyages'); SEL.voyages = v.id; renderView(false); }));
     (S.papiers || []).forEach((q) => add('Papiers', 'doc', q.name, (q.who || '') + (q.untilTxt ? ' · valable jusqu’au ' + q.untilTxt : ''), q.use, () => { PAPS.q = q.name; PAPS.open = null; go('papiers'); }));
     try { if (PT.data && PT.data.all) PT.data.all.forEach((f) => add('Papiers', 'doc', f.name, 'Drive · ' + ((f.path || []).join(' › ') || 'Papiers'), '', () => { PAPS.q = f.name; PAPS.open = null; go('papiers'); })); } catch (e) { /* arbre du Drive pas encore lu */ }
-    /* 0.70.0 : « Mes tâches » vit dans Pour moi depuis la refonte UX (avant : Équipe › Demandes, où la tâche n'était pas) ; la liste entière, sur « Tout »,
+    /* 0.73.0 : « Mes tâches » vit dans Pour moi depuis la refonte UX (avant : Équipe › Demandes, où la tâche n'était pas) ; la liste entière, sur « Tout »,
        et la tâche touchée centrée et mise en évidence (comme une notification) */
     const versTache = (t) => () => { if (typeof FOCUS === 'object' && FOCUS) FOCUS.on = false; go('demandes');
       cibler(() => { const box = document.getElementById('pm-taches'); return box ? [...box.querySelectorAll('.card.item')].find((c) => ((c.querySelector('.item-title') || {}).textContent || '') === t.title) || box : null; }); };
@@ -8942,7 +8948,7 @@ void main(){
     (S.ordres || []).slice(0, 60).forEach((o) => add('Échanges avec les bots', 'send', 'Ton ordre à ' + lvName(o.bot), String(o.text || '').slice(0, 100), o.reply, () => { try { openItem('ordre', o); } catch (e) { go('equipe'); } }));
     (S.canal || []).filter((l) => l.reply && BOT[l.from === 'rabie' || l.from === 'claude' ? l.to : l.from]).slice(0, 80).forEach((l) => { const b = l.from === 'rabie' || l.from === 'claude' ? l.to : l.from; add('Échanges avec les bots', 'chat', 'Réponse de ' + lvName(b) + (l.date ? ' · ' + l.date : ''), String(l.reply).replace(/\s+/g, ' ').slice(0, 100), (l.msg || '') + ' ' + (l.subject || ''), () => { if (typeof voirLigne === 'function' && l._row) voirLigne(l._row); else go('equipe'); }); });
     [['accueil', 'Accueil'], ['demandes', 'Pour moi'], ['agenda', 'Agenda'], ['suivi', 'Équipe › Demandes', 'suivi'], ['achats', 'Achats'], ['voyages', 'Voyages'], ['sorties', 'Sorties'], ['argent', 'Argent', 'radar budget'], ['papiers', 'Papiers'], ['espaces', 'Espaces', 'rubriques'], ['equipe', 'Équipe', 'bots'], ['automatisations', 'Équipe › Routines', 'automatisations'], ['reglages', 'Réglages']]
-      .forEach(([id, label, ancien]) => { if (VIEWS[id]) add('Rubriques', 'folder', label, TITLES[id] || '', ancien || '', () => go(id)); });   /* 0.70.0 : Suivi et Automatisations sont des filtres d'Équipe ; leur ancien nom se cherche encore */
+      .forEach(([id, label, ancien]) => { if (VIEWS[id]) add('Rubriques', 'folder', label, TITLES[id] || '', ancien || '', () => go(id)); });   /* 0.73.0 : Suivi et Automatisations sont des filtres d'Équipe ; leur ancien nom se cherche encore */
     return out;
   }
   function gsFind(q) {
@@ -9126,7 +9132,7 @@ void main(){
   const BOT_NOT = /^(rabie|toi|claude|jarvis|pegasus|hermes|bot|tous)$/;
   const BOT_GEN = [[['#38bdf8', '#bae6fd', 'rgba(56,189,248,.13)'], ['#0c4a6e', '#38bdf8', '#e0f2fe', 10.1]], [['#fb923c', '#fed7aa', 'rgba(251,146,60,.13)'], ['#7c2d12', '#fb923c', '#ffedd5', 11.2]],
     [['#c084fc', '#e9d5ff', 'rgba(192,132,252,.13)'], ['#581c87', '#c084fc', '#f3e8ff', 12.3]], [['#a3e635', '#d9f99d', 'rgba(163,230,53,.13)'], ['#365314', '#a3e635', '#ecfccb', 13.4]]];
-  /* 0.70.0 : un nom écrit sans accent (« Athena ») désigne le même bot, comme côté serveur (bots.mjs compare sans accent) */
+  /* 0.73.0 : un nom écrit sans accent (« Athena ») désigne le même bot, comme côté serveur (bots.mjs compare sans accent) */
   Object.keys(NAME2ID).map((n) => [n, NAME2ID[n]]).concat(BOTS.map((b) => [lvLow(b.name), b.id]))
     .forEach(([n, id]) => { const k = n.normalize('NFD').replace(/[\u0300-\u036f]/g, ''); if (k && !NAME2ID[k] && !BOT[k]) NAME2ID[k] = id; });
   function botAdd(name) {
@@ -9292,7 +9298,7 @@ void main(){
   function teamStats() {
     const wait = (S.ordres || []).filter((o) => !/^(fait|annul)/i.test(o.status)).length, reps = recentReplies().length;
     let pass = null; try { if (LV.t.jour) pass = weekStats(weekStart(), nextReset()).passN; } catch (e) { pass = null; }
-    /* 0.70.0 : depuis la refonte UX, « Tes ordres » est sous le filtre Demandes, et le coût de la semaine sous le filtre Coût */
+    /* 0.73.0 : depuis la refonte UX, « Tes ordres » est sous le filtre Demandes, et le coût de la semaine sous le filtre Coût */
     const toOrd = () => { go('suivi'); setTimeout(() => { const p = Array.from(document.querySelectorAll('#dir .panel')).find((x) => /^Tes ordres/.test((x.querySelector('h2') || {}).textContent || '')); if (p) p.scrollIntoView({behavior: 'smooth', block: 'start'}); }, 80); };
     const toCout = () => { const b = document.querySelector('#view .ux-seg button[data-f="cout"]'); if (b) b.click(); else go('suivi'); };
     const items = [[wait, wait > 1 ? 'ordres en cours' : 'ordre en cours', 'hourglass', toOrd, wait ? 'is-amber' : ''], [reps, reps > 1 ? 'réponses en 3 jours' : 'réponse en 3 jours', 'chat', () => voirUrl('#voir-recent'), '']]
@@ -9973,7 +9979,7 @@ void main(){
         h('span', {class: 'hm-ic', html: icon('bolt', 17)}), h('span', {class: 'hm-tx'}, h('b', {text: x.title}), x.body ? h('small', {text: x.body.length > 140 ? x.body.slice(0, 137) + '…' : x.body}) : null, h('small', {class: 'muted', text: 'à ' + heureN(x.at)})))))});
   }
   /* chemin 3 : de retour au premier plan, les notifications envoyées pendant l'absence et pas encore vues.
-     0.70.0 (son choix du 23/11/2026, « Feuille Pendant ton absence ») : une seule de moins de 15 minutes (et aucune plus ancienne) s'ouvre
+     0.73.0 (son choix du 23/11/2026, « Feuille Pendant ton absence ») : une seule de moins de 15 minutes (et aucune plus ancienne) s'ouvre
      directement, comme avant ; au-delà (jusqu'à 24 h), ou à plusieurs, la feuille « Pendant ton absence » les liste et un appui ouvre la bonne :
      rien ne bouge sans son geste (avant : passé 15 minutes, rien ne s'ouvrait) */
   async function notifsRetour(depuis) {
@@ -9983,7 +9989,7 @@ void main(){
     const l = r.notifs.filter((x) => !x.vue && !NOTIF.faits.has(x.id) && x.at >= depuis && age(x) < 24 * 3600e3 && !/#recue=/.test(x.url));   /* une tâche reçue s'ouvre déjà seule au retour (avec sa voix) */
     if (!l.length) return;
     if (l.length === 1 && age(l[0]) < 15 * 60e3) { const x = l[0], av = TAB; ouvrirNotif(x.url, x.id); toast(x.title, 'Ouvert depuis ta notification.', true, () => go(av)); return; }
-    /* 0.70.0 : une fiche (peut-être avec un texte en cours) ou la discussion est ouverte : un bandeau à toucher, comme pour une tâche reçue ;
+    /* 0.73.0 : une fiche (peut-être avec un texte en cours) ou la discussion est ouverte : un bandeau à toucher, comme pour une tâche reçue ;
        elles ne sont marquées vues qu'une fois la feuille vraiment montrée */
     const sh = $('sheet');
     if ((sh && !sh.hidden) || CHAT.open) { alertShow('Pendant ton absence', l.length + (l.length > 1 ? ' notifications : touche pour les voir.' : ' notification : touche pour la voir.'), () => { if (CHAT.open) closeChat(); notifVue(l.map((x) => x.id)); notifsFeuille(l); }); return; }
@@ -9999,7 +10005,7 @@ void main(){
   }
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) { NOTIF.cache = Date.now(); return; }
-    /* 10 s : l'écart d'horloge entre l'iPhone et le serveur. 0.70.0 : JOUR.notif retient le rechargement de minuit (jourVu) jusqu'à la fin
+    /* 10 s : l'écart d'horloge entre l'iPhone et le serveur. 0.73.0 : JOUR.notif retient le rechargement de minuit (jourVu) jusqu'à la fin
        de cette relecture (10 s au plus, si le serveur ne répond pas) : sinon le matin, la page se rechargeait avant d'ouvrir ce qui est arrivé la nuit */
     const depuis = NOTIF.cache; NOTIF.cache = 0;
     if (depuis) { JOUR.notif = performance.now() + 10000; setTimeout(() => { notifsRetour(depuis - 10e3).then(() => { NOTIF.depuis = Date.now(); }).catch(() => {}).finally(() => { JOUR.notif = 0; }); }, 500); }
@@ -10076,43 +10082,95 @@ void main(){
     return card;
   }
   /* 0.39.0 (choix du 21/11/2026, « Serveur MCP ») : l'app Claude et Grok Bot reliés à JARVIS — l'adresse à donner, les demandes d'accès
-     à accorder (les mêmes 4 chiffres que sur la page de l'assistant), les assistants reliés (« Retirer »), un jeton fixe, les derniers accès */
+     à accorder (les mêmes 4 chiffres que sur la page de l'assistant), les assistants reliés (« Retirer »), un jeton fixe, les derniers accès.
+     0.71.0 (« exécutants reliés », 23/11/2026) : un jeton fixe par assistant, avec son nom et son profil (lecture, ou exécutant comme Hermes),
+     « Suspendre » / « Reprendre », « Retirer » (confirmé), et les derniers gestes des exécutants (ce qu'ils ont écrit).
+     0.72.0 (« profil veilleur », 23/11/2026) : un troisième profil, pour une routine qui lit le web (rien de privé ne lui est ouvert), et
+     « Signe comme » : le jeton écrit dans Pilotage sous le nom d'un exécutant (« Hermes Web » signe « Hermes ») */
+  const MCP_PROFILS = {lecture: 'Lecture et propositions', executant: 'Exécutant : lit Pilotage, Gmail et l’agenda, écrit dans Pilotage, prépare des brouillons, te notifie',
+    veilleur: 'Veilleur : lit l’onglet Sources, écrit sa ligne du Journal et de l’État, te notifie ; aucun accès à tes mails, ton agenda ni tes dossiers'};
+  const MCP_GESTES = {pilotage_ajouter: 'ligne ajoutée', pilotage_etat: 'onglet État', canal_repondre: 'réponse dans le Canal', gmail_brouillon: 'brouillon', jarvis_notifier: 'notification'};
   async function mcpCard(JS) {
     const card = h('section', {class: 'card set-card mcp-card', id: 'mcp-card'}, h('b', {text: 'Assistants reliés (MCP)'}));
     let st = await JS.mcp.etat();
     if (!st) { card.append(h('p', {class: 'muted', text: 'Ton serveur ne le connaît pas encore : touche « Mettre à jour le serveur » plus bas.'})); return card; }
-    const out = h('p', {class: 'set-msg'}), dem = h('div', {class: 'mcp-dem'}), rel = h('ul', {class: 'mem-list'}), jr = h('p', {class: 'muted mcp-jr'});
+    const out = h('p', {class: 'set-msg'}), dem = h('div', {class: 'mcp-dem'}), rel = h('ul', {class: 'mem-list'}), jr = h('p', {class: 'muted mcp-jr'}), gestes = h('div', {class: 'mcp-actes'});
+    const dire = (t, bad) => { out.classList.toggle('is-bad', !!bad); out.textContent = t; };
+    const neuf = Array.isArray(st.fixes);   /* un serveur d'avant la 0.71.0 ne connaît qu'un jeton fixe, sans profil */
+    const veille = (st.profils || []).includes('veilleur');   /* un serveur d'avant la 0.72.0 ne connaît pas le veilleur */
     const copier = (t) => h('button', {type: 'button', class: 'btn ghost sm', onclick: async () => { try { await navigator.clipboard.writeText(t); toast('Copié', t.length > 60 ? t.slice(0, 24) + '…' : t); } catch (e) { /* le texte reste affiché */ } }}, 'Copier');
     const maj = (r) => { if (r) { st = Object.assign({}, st, r); paint(); } return r; };
     const paint = () => {
       card.dataset.urgent = (st.demandes || []).length ? '1' : '';
       dem.replaceChildren(...(st.demandes || []).map((d) => h('div', {class: 'mcp-d'},
         h('p', {}, h('b', {text: d.nom}), document.createTextNode(' demande l’accès à JARVIS. Code : '), h('b', {class: 'mcp-code', text: d.chiffres}), document.createTextNode(' (le même doit s’afficher sur sa page).')),
-        d.retour ? h('p', {class: 'muted mcp-retour', text: 'Retour vers ' + d.retour}) : null,   /* 0.70.0 : l'hôte où l'accord renvoie (claude.ai pour l'app Claude) : un autre nom, il refuse */
-        h('div', {class: 'row-actions'}, h('button', {type: 'button', class: 'btn main sm', onclick: async () => { if (maj(await JS.mcp.decider(d.id, true))) out.textContent = d.nom + ' est relié à JARVIS.'; }}, 'Autoriser'),
-          h('button', {type: 'button', class: 'btn ghost sm', onclick: async () => { if (maj(await JS.mcp.decider(d.id, false))) out.textContent = 'Refusé.'; }}, 'Refuser')))));
+        d.retour ? h('p', {class: 'muted mcp-retour', text: 'Retour vers ' + d.retour}) : null,   /* 0.73.0 : l'hôte où l'accord renvoie (claude.ai pour l'app Claude) : un autre nom, il refuse */
+        h('div', {class: 'row-actions'}, h('button', {type: 'button', class: 'btn main sm', onclick: async () => { if (maj(await JS.mcp.decider(d.id, true))) dire(d.nom + ' est relié à JARVIS.'); }}, 'Autoriser'),
+          h('button', {type: 'button', class: 'btn ghost sm', onclick: async () => { if (maj(await JS.mcp.decider(d.id, false))) dire('Refusé.'); }}, 'Refuser')))));
       const items = (st.relies || []).map((c) => h('li', {class: 'mem-it'}, h('span', {text: c.nom + (c.vu ? ' · dernier accès ' + fmt(new Date(c.vu), {weekday: 'short', hour: '2-digit', minute: '2-digit'}) : '')}),
-        h('button', {type: 'button', class: 'btn ghost sm', onclick: async () => { if (maj(await JS.mcp.retirer(c.id))) out.textContent = c.nom + ' n’a plus accès à JARVIS.'; }}, 'Retirer')));
-      if (st.fixe) items.push(h('li', {class: 'mem-it'}, h('span', {text: 'Jeton fixe : ' + st.fixe.nom}), h('button', {type: 'button', class: 'btn ghost sm', onclick: async () => { if (maj(await JS.mcp.retirer('fixe'))) out.textContent = 'Jeton fixe retiré.'; }}, 'Retirer')));
+        h('button', {type: 'button', class: 'btn ghost sm', onclick: async () => { if (maj(await JS.mcp.retirer(c.id))) dire(c.nom + ' n’a plus accès à JARVIS.'); }}, 'Retirer')));
+      /* les jetons fixes : chacun son nom, son profil, « Suspendre » ou « Reprendre », « Retirer » (confirmé : le jeton ne se retrouve pas) */
+      (neuf ? st.fixes : st.fixe ? [{id: 'fixe', nom: st.fixe.nom, profil: 'lecture'}] : []).forEach((f) => items.push(h('li', {class: 'mem-it mcp-jeton' + (f.suspendu ? ' is-off' : ''), 'data-jeton': f.id},
+        h('span', {}, h('b', {text: f.nom}), h('small', {class: 'muted', text: ' · ' + (MCP_PROFILS[f.profil] || MCP_PROFILS.lecture) + (f.signe ? ' · signe comme ' + f.signe : '') + (f.suspendu ? ' · suspendu : ses appels sont refusés' : f.vu ? ' · dernier accès ' + fmt(new Date(f.vu), {weekday: 'short', hour: '2-digit', minute: '2-digit'}) : '')})),
+        h('span', {class: 'rout-act'},
+          neuf && JS.mcp.suspendre ? h('button', {type: 'button', class: 'btn ghost sm', onclick: async () => { const etait = !!f.suspendu; if (maj(await JS.mcp.suspendre(f.id, !etait))) dire(etait ? f.nom + ' a de nouveau accès à JARVIS.' : f.nom + ' est suspendu : JARVIS refuse ses appels jusqu’à « Reprendre ».'); else dire('Le serveur ne répond pas : rien n’est changé.', true); }}, f.suspendu ? 'Reprendre' : 'Suspendre') : null,
+          h('button', {type: 'button', class: 'btn ghost sm danger', onclick: () => confirmSheet({bot: 'claude', title: 'Retirer le jeton de ' + f.nom + ' ?', ok: 'Oui, retirer', cost: 'free', say: 'Son jeton ne marchera plus. Pour le relier de nouveau, il faudra créer un jeton et le lui redonner. Pour une pause, « Suspendre » suffit.', run: async () => { if (maj(await JS.mcp.retirer(f.id))) dire('Jeton de ' + f.nom + ' retiré.'); else dire('Le serveur ne répond pas : rien n’est retiré.', true); }})}, 'Retirer')))));
       rel.replaceChildren(...(items.length ? items : [h('li', {class: 'muted', text: 'Aucun assistant relié pour l’instant.'})]));
       const vus = (st.journal || []).filter((x) => x.genre === 'outil').slice(0, 3);
       jr.textContent = vus.length ? 'Derniers accès : ' + vus.map((x) => x.nom + ', ' + x.outil.replace(/^jarvis_/, '').replace(/_/g, ' ') + ' (' + fmt(new Date(x.at), {hour: '2-digit', minute: '2-digit'}) + ')').join(' · ') : '';
+      /* ce que les exécutants ont écrit (Pilotage, brouillons, notifications), le plus récent d'abord */
+      const actes = (st.actes || []).slice(0, 8), exe = (st.fixes || []).some((f) => f.profil === 'executant' || f.profil === 'veilleur');
+      gestes.replaceChildren(...(actes.length || exe ? [h('small', {class: 'pick-label', text: 'Derniers gestes des exécutants'}),
+        actes.length ? h('ul', {class: 'mem-list'}, actes.map((x) => h('li', {class: 'mem-it mcp-acte'}, h('span', {}, h('small', {class: 'muted', text: fmt(new Date(x.at), {day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'}) + ' · ' + x.nom + (x.jeton ? ' (jeton ' + x.jeton + ')' : '') + ' · ' + (MCP_GESTES[x.outil] || String(x.outil || '').replace(/_/g, ' '))}), h('span', {class: 'mcp-acte-tx', text: x.resume})))))
+          : h('p', {class: 'muted', text: 'Aucun pour l’instant : chaque ligne écrite dans Pilotage, chaque brouillon et chaque notification apparaîtra ici.'})] : []));
+      signes();
+    };
+    /* créer un jeton fixe : un nom, un profil ; le jeton est montré une seule fois */
+    const idn = 'mcp-' + (++SEQ), idp = 'mcp-' + (++SEQ), nomJ = h('input', {class: 'inp', id: idn, type: 'text', maxlength: '40', placeholder: 'ex. Hermes', autocomplete: 'off'});
+    const profJ = h('select', {class: 'inp', id: idp}, h('option', {value: 'lecture', text: 'Lecture et propositions'}), h('option', {value: 'executant', text: 'Exécutant'}), veille ? h('option', {value: 'veilleur', text: 'Veilleur'}) : null), profDit = h('p', {class: 'muted mcp-profil-dit', text: MCP_PROFILS.lecture + '.'});
+    /* 0.72.0 : « Signe comme », pour un veilleur : un des jetons exécutants (le premier par défaut), ou son propre nom ; caché tant qu'il n'y a aucun exécutant */
+    const ids = 'mcp-' + (++SEQ), signeJ = h('select', {class: 'inp', id: ids}), signeB = h('div', {class: 'mcp-signe', hidden: ''}, h('label', {for: ids, class: 'pick-label', text: 'Signe comme'}), signeJ);
+    function signes() {
+      const exes = (st.fixes || []).filter((f) => f.profil === 'executant').map((f) => f.nom), garde = signeJ.value, choisi = signeJ.dataset.choisi === '1';
+      signeJ.replaceChildren(...exes.map((n) => h('option', {value: n, text: n})), h('option', {value: '', text: 'Son propre nom'}));
+      signeJ.value = choisi && (garde === '' || exes.includes(garde)) ? garde : exes[0] || '';   /* son choix s'il tient encore, sinon le premier exécutant */
+      signeB.hidden = !(profJ.value === 'veilleur' && exes.length);
+    }
+    signeJ.addEventListener('change', () => { signeJ.dataset.choisi = '1'; });
+    profJ.addEventListener('change', () => {
+      profDit.textContent = profJ.value === 'executant' ? MCP_PROFILS.executant + '. Il n’envoie aucun mail, ne supprime rien, ne paie rien ; il signe de son nom ce qu’il écrit.'
+        : profJ.value === 'veilleur' ? MCP_PROFILS.veilleur + '. Pour une routine qui lit le web : une page piégée ne peut rien lui faire lire de privé.' : MCP_PROFILS.lecture + '.';
+      signes();
+    });
+    const creer = async (ev) => {
+      if (ev) ev.preventDefault(); const n = nomJ.value.trim(), pr = neuf ? profJ.value : 'lecture', sg = pr === 'veilleur' && !signeB.hidden ? signeJ.value : '';
+      if (pr !== 'lecture' && !n) { dire('Donne-lui un nom : il signe de ce nom ses lignes dans Pilotage.', true); nomJ.focus(); return; }
+      const r = await JS.mcp.jeton(n || 'Jeton fixe', pr, sg);
+      if (!r) { dire('Le serveur ne répond pas : aucun jeton créé.', true); return; }
+      if (r.error || !r.jeton) { dire(r.error || 'Aucun jeton créé.', true); return; }
+      const jeton = r.jeton; delete r.jeton; delete r.id; maj(r); nomJ.value = ''; out.classList.remove('is-bad');
+      out.replaceChildren(document.createTextNode('Jeton de ' + (n || 'Jeton fixe') + (sg ? ' (il signe « ' + sg + ' »)' : '') + ', montré une seule fois (en-tête « Authorization: Bearer … ») : '), h('code', {class: 'mcp-jeton-neuf', text: jeton}), copier(jeton));
     };
     card.append(h('p', {class: 'muted', text: 'L’app Claude (et Grok Bot) peut lire JARVIS (ta journée, tes missions, ce qu’il retient, la météo) et te proposer une mission ou un ordre à un bot : la proposition attend ton accord dans Équipe, filtre Demandes. Rien ne part sans toi.'}),
       h('div', {class: 'set-uri'}, h('small', {text: 'Adresse à donner (app Claude : Réglages, Connecteurs, « Ajouter un connecteur personnalisé ») :'}), h('code', {text: st.adresse}), copier(st.adresse)),
       dem, rel, jr,
-      h('details', {class: 'mcp-fixe'}, h('summary', {text: 'Jeton fixe, pour un client qui accepte un en-tête'}),
-        h('div', {class: 'row-actions'}, h('button', {type: 'button', class: 'btn sm', onclick: async () => { const r = maj(await JS.mcp.jeton('Jeton fixe')); if (r && r.jeton) out.replaceChildren(document.createTextNode('Jeton, montré une seule fois (en-tête « Authorization: Bearer … ») : '), h('code', {text: r.jeton}), copier(r.jeton)); }}, 'Créer un jeton fixe'))),
-      out);
+      h('details', {class: 'mcp-fixe'}, h('summary', {text: 'Jeton fixe, pour un assistant qui accepte un en-tête (Hermes, Grok Bot)'}),
+        h('form', {class: 'pick-form mcp-form', onsubmit: creer},
+          h('label', {for: idn, class: 'pick-label', text: 'Son nom'}), nomJ,
+          neuf ? [h('label', {for: idp, class: 'pick-label', text: 'Son profil'}), profJ, profDit, signeB] : null,
+          h('button', {type: 'submit', class: 'btn sm'}, 'Créer un jeton fixe')),
+        h('p', {class: 'muted', text: 'Le même nom remplace son jeton (l’ancien ne marche plus), sans toucher aux autres.'})),
+      out, gestes);
     paint();
     /* une demande d'accès arrive pendant que Réglages est ouvert : elle apparaît d'elle-même */
-    /* 0.70.0 : la relecture ne s'arrête plus pour de bon quand on quitte Réglages : elle attend (sans appel) tant que la carte est dans l'écran
+    const vuDe = (x) => JSON.stringify([x.demandes || [], (x.fixes || []).map((f) => [f.id, !!f.suspendu]), ((x.actes || [])[0] || {}).at || 0]);   /* 0.71.0 : un geste d'exécutant aussi */
+    /* 0.73.0 : la relecture ne s'arrête plus pour de bon quand on quitte Réglages : elle attend (sans appel) tant que la carte est dans l'écran
        gardé de Réglages, reprend dès qu'il est réaffiché, et ne s'arrête que si un nouveau rendu la remplace (10 s de grâce : rendu en cours) */
     let essais = 0;
     const tick = async () => {
       if (!(SETV.box && SETV.box.contains(card))) { if (++essais <= 10) setTimeout(tick, 1000); return; }
       essais = 0;
-      if (card.isConnected && !document.hidden) { const r = await JS.mcp.etat(); if (r && JSON.stringify(r.demandes || []) !== JSON.stringify(st.demandes || [])) { st = r; paint(); } }
+      if (card.isConnected && !document.hidden) { const r = await JS.mcp.etat(); if (r && vuDe(r) !== vuDe(st)) { st = r; paint(); } }
       setTimeout(tick, 3000);
     };
     setTimeout(tick, 3000);
@@ -10182,10 +10240,10 @@ void main(){
       if (!JS.linked()) {
         const code = h('input', {class: 'inp', type: 'text', placeholder: 'Code affiché par le serveur, ex. AB12-CD34', autocomplete: 'off', autocapitalize: 'characters'});
         parts.push(h('section', {class: 'card set-card'}, h('b', {text: 'Relier cet iPhone au serveur'}), h('p', {class: 'muted', text: "Sur le serveur, lance « sudo -iu jarvis node /opt/rd/jarvis-os/server/server.mjs pair » : il affiche un code valable 30 minutes. Si l'app JARVIS de ce serveur est déjà reliée sur ce téléphone, rien à faire."}), code,
-          h('button', {type: 'button', class: 'btn main', onclick: async (ev) => { const b = ev.currentTarget; if (!code.value.trim()) { draw(msg('Écris d’abord le code affiché par le serveur.', true)); return; } b.disabled = true; const r = await JS.pair(code.value); if (r.ok) location.reload(); else { b.disabled = false; draw(msg(r.error || 'Code refusé.', true)); } }}, 'Relier')));   /* 0.70.0 : un appui à la fois ; code vide ou serveur injoignable : un message */
+          h('button', {type: 'button', class: 'btn main', onclick: async (ev) => { const b = ev.currentTarget; if (!code.value.trim()) { draw(msg('Écris d’abord le code affiché par le serveur.', true)); return; } b.disabled = true; const r = await JS.pair(code.value); if (r.ok) location.reload(); else { b.disabled = false; draw(msg(r.error || 'Code refusé.', true)); } }}, 'Relier')));   /* 0.73.0 : un appui à la fois ; code vide ou serveur injoignable : un message */
         swap(parts); return;
       }
-      /* 0.70.0 (son choix du 23/11/2026, « Retirer dans Réglages ») : les appareils reliés à son serveur, dans cette même carte ; « Retirer » coupe
+      /* 0.73.0 (son choix du 23/11/2026, « Retirer dans Réglages ») : les appareils reliés à son serveur, dans cette même carte ; « Retirer » coupe
          un autre appareil (téléphone perdu, ancienne installation) ; celui-ci ne se retire pas lui-même (le serveur le refuse aussi) */
       const apps = JS.appareils ? await JS.appareils.liste() : null;
       const relieLe = (t) => { if (!t) return ''; const d = new Date(t); return 'relié le ' + fmt(d, {day: 'numeric', month: 'long'}) + (d.getFullYear() !== new Date().getFullYear() ? ' ' + d.getFullYear() : '') + ' à ' + pad2(d.getHours()) + 'h' + pad2(d.getMinutes()); };
@@ -10277,7 +10335,7 @@ void main(){
       el.append(segBar(f, [['bots', 'Bots'], ['dem', 'Demandes'], ['rout', 'Routines'], ['cout', 'Coût']], (k) => { EQF.f = k; const sc = $('scroller'); renderView(true); if (sc) sc.scrollTop = 0; eqHash(); }));
       if (f === 'bots') { harvest(V_EQ).filter((n) => !ORD.test(h2Of(n))).forEach((n) => el.append(n)); return; }
       if (f === 'rout') { V_AUTO(el); return; }
-      /* 0.70.0 : le coût seul, construit directement, dans l'ordre de l'ancien Suivi (avant : tout Suivi était construit, missions, relances,
+      /* 0.73.0 : le coût seul, construit directement, dans l'ordre de l'ancien Suivi (avant : tout Suivi était construit, missions, relances,
          santé du serveur et leurs lectures comprises, pour n'en garder que ces trois panneaux) */
       if (f === 'cout') { [LINK.on && LV.t.jour ? costPanel() : null, queuePanel(), consoPanel()].filter((n) => n && COUT.test(h2Of(n))).forEach((n) => el.append(n)); return; }
       const parts = harvest(V_SUIVI).filter((n) => !SYS.test(h2Of(n)) && !TACHES.test(h2Of(n)) && !PAPL.test(h2Of(n)));
@@ -10292,11 +10350,11 @@ void main(){
     VIEWS.suivi = alias('dem'); VIEWS.automatisations = alias('rout');
     const GO_UX = go;
     go = function (id, keep) { if (id === 'suivi' || id === 'automatisations') { EQF.f = id === 'suivi' ? 'dem' : 'rout'; id = 'equipe'; } if (id === 'demandes') PMF.f = 'tout'; const r = GO_UX(id, keep); if (id === 'equipe') eqHash(); return r; };   /* Pour moi s'ouvre toujours sur « Tout » (les liens #voir-… y mènent à une section) */
-    /* 0.70.0 : une notification ou « Voir » qui mène à une section de Pour moi, déjà ouvert sur un filtre : la liste entière revient (avant : la section restait cachée) */
+    /* 0.73.0 : une notification ou « Voir » qui mène à une section de Pour moi, déjà ouvert sur un filtre : la liste entière revient (avant : la section restait cachée) */
     const VU_UX = voirUrl;
     voirUrl = function (hash) { if (/^#voir-(recent|cote|courrier)\b/.test(String(hash || '')) && PMF.f !== 'tout') { PMF.f = 'tout'; if (TAB === 'demandes') renderView(); } return VU_UX(hash); };
     /* Réglages : l'état des systèmes (venu de Suivi) en bas */
-    VIEWS.reglages = (el) => { V_REG(el); const p = h('section', {class: 'panel'}, h('header', {class: 'panel-h'}, h('h2', {text: 'État des systèmes'}), h('span', {class: 'aside', text: 'v' + VERSION})), sysBox()); const sb = santeBox(); if (sb) p.append(sb); el.append(p); };   /* 0.70.0 : le même panneau, sans reconstruire Suivi */
+    VIEWS.reglages = (el) => { V_REG(el); const p = h('section', {class: 'panel'}, h('header', {class: 'panel-h'}, h('h2', {text: 'État des systèmes'}), h('span', {class: 'aside', text: 'v' + VERSION})), sysBox()); const sb = santeBox(); if (sb) p.append(sb); el.append(p); };   /* 0.73.0 : le même panneau, sans reconstruire Suivi */
     /* Pour moi : Tout, Décider, À faire, Infos ; « Mes tâches » (venues de Suivi) dans À faire */
     const PM = {decider: ['pm-dec'], faire: ['pm-todo', 'pm-proj', 'pm-mail', 'pm-taches', 'pm-wait'], infos: ['pm-rep']};
     const PM_ITEM = {'pm-rep': '.pm-list > .pm-rep', 'pm-wait': '.cote-it', 'pm-mail': 'li.tri', 'pm-taches': '.card.item, .rec-it'};   /* un élément montré : une carte (par défaut), une réponse (pas le lien « Les N réponses »), une carte de côté, un mail, une tâche */
@@ -10305,7 +10363,7 @@ void main(){
       V_DEM(el);
       if (typeof FOCUS === 'object' && FOCUS && FOCUS.on) return;
       if ((S.taches || []).some((t) => t.status !== 'Fait')) { const tt = h('div', {class: 'stack'}); try { SCREEN.taches(tt); el.append(h('section', {class: 'panel pm-sec', id: 'pm-taches'}, h('header', {class: 'panel-h'}, h('h2', {text: 'Mes tâches'})), tt)); } catch (e) { /* rien */ } }
-      /* 0.70.0 (son choix) : le chiffre d'un filtre compte exactement ce que ce filtre montre (cartes, tâches, mails, cartes de côté) */
+      /* 0.73.0 (son choix) : le chiffre d'un filtre compte exactement ce que ce filtre montre (cartes, tâches, mails, cartes de côté) */
       const n = (ids) => ids.reduce((s, id) => { const x = el.querySelector('#' + id); return s + (x ? x.querySelectorAll(PM_ITEM[id] || '.pm-list > *').length : 0); }, 0);
       const f = PMF.f, bar = segBar(f, [['tout', 'Tout'], ['decider', 'Décider', n(PM.decider)], ['faire', 'À faire', n(PM.faire)], ['infos', 'Infos', n(PM.infos)]], (k) => { PMF.f = k; renderView(true); });
       const start = el.querySelector('#fc-start'); if (start && start.parentNode === el) start.after(bar); else el.prepend(bar);
@@ -10697,7 +10755,7 @@ void main(){
     const V_NON = new Set('non nan annule annuler tout ca laisse tomber stop pas maintenant attends oublie surtout merci finalement plutot rien'.split(' '));
     const C_NON = new Set('non nan annule annuler laisse stop attends oublie rien'.split(' '));
     const OUI = {test: (t) => MOTS(t, V_OUI, C_OUI) && !/\b(non|pas)\b/.test(nrmT(t))}, NON = {test: (t) => MOTS(t, V_NON, C_NON)};
-    /* 0.70.0 (son choix du 23/11/2026, « Oui à la voix seulement ») : seules comptent les propositions annoncées à voix haute (m.oral, posé en
+    /* 0.73.0 (son choix du 23/11/2026, « Oui à la voix seulement ») : seules comptent les propositions annoncées à voix haute (m.oral, posé en
        conversation à la voix) ; à l'écrit, un « oui » ou un « non » part à Claude et le bouton de la carte reste la seule validation */
     const voixPending = (T) => { let i = T.msgs.length - 2; while (i >= 0 && T.msgs[i].who !== 'toi') i--; return T.msgs.filter((m, k) => k > i && (m.kind === 'act' || m.kind === 'proposal') && m.state === 'open' && m.oral && Date.now() - (m.at || 0) < 10 * 60000); };
     const LC1 = localCmd;

@@ -101,7 +101,7 @@
   const lire = (k) => { try { return localStorage.getItem(k) || ''; } catch (e) { return ''; } };
   const ecrire = (k, v) => { try { localStorage.setItem(k, v); } catch (e) { /* rien */ } };
   /* le lien d'invitation : #cle=…&pour=… ; la clé est gardée dans ce téléphone.
-     0.70.0 (son choix du 23/11/2026, « Clé gardée après # ») : elle reste aussi dans l'adresse, après « # » (cette partie n'est jamais envoyée au
+     0.73.0 (son choix du 23/11/2026, « Clé gardée après # ») : elle reste aussi dans l'adresse, après « # » (cette partie n'est jamais envoyée au
      serveur), et y est remise quand elle vient du téléphone : l'icône posée sur l'écran d'accueil (stockage à part sur iPhone) l'emporte ainsi,
      et Safari qui efface le stockage d'un site peu visité ne la perd plus */
   const h = new URLSearchParams(location.hash.slice(1)), duLien = h.get('cle') || '';
@@ -134,7 +134,7 @@
   $('form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const texte = $('texte').value.trim(); if (texte.length < 2) { $('msg').classList.add('erreur'); $('msg').textContent = 'Écris d’abord la tâche.'; $('texte').focus(); return; }
-    /* 0.70.0 : « Envoyer » ne part qu'une fois par envoi (un second appui sur un réseau lent créait la même tâche deux fois) */
+    /* 0.73.0 : « Envoyer » ne part qu'une fois par envoi (un second appui sur un réseau lent créait la même tâche deux fois) */
     const b = $('form').querySelector('button[type=submit]'); if (b.disabled) return; b.disabled = true;
     $('msg').classList.remove('erreur'); $('msg').textContent = 'Envoi…';
     try {

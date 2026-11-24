@@ -1,4 +1,4 @@
-/* Banc du lot de fiabilité « voix et notifications » (0.70.0) : node tests/fiab-a6.test.mjs (aucun Claude, aucun vrai Google, aucun coût).
+/* Banc du lot de fiabilité « voix et notifications » (0.73.0) : node tests/fiab-a6.test.mjs (aucun Claude, aucun vrai Google, aucun coût).
    Rappels du matin réessayés, réponses instantanées qui ne détournent plus une demande, pique muette sur une question grave, diction des
    degrés, jours visés (« demain soir », « lundi prochain »), son de Piper jamais tronqué, écoute figée relancée, sauvegarde sans boucle,
    envois sans délai infini, titre de la notification de santé. Exemples inventés seulement. */

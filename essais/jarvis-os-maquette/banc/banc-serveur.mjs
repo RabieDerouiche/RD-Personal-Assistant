@@ -35,9 +35,9 @@ try {
   ok('retour de Google : page « relié »', /Google est relié/.test(await p.textContent('body')), (await p.textContent('body')).slice(0, 80));
   await p.goto(BASE + '/?serveur#reglages'); await p.waitForTimeout(2500);
   ok('Réglages : compte Google affiché', await p.evaluate(() => /proprietaire@example\.org/.test(document.querySelector('.set-wrap').textContent)));
-  /* 0.70.0 — lot C (« Retirer dans Réglages ») : la carte « Serveur JARVIS » liste les appareils reliés ; celui-ci, nommé par son genre, sans bouton */
+  /* 0.73.0 — lot C (« Retirer dans Réglages ») : la carte « Serveur JARVIS » liste les appareils reliés ; celui-ci, nommé par son genre, sans bouton */
   { const ap = await p.evaluate(() => [...document.querySelectorAll('.set-card .app-it')].map((x) => ({t: x.innerText.replace(/\s+/g, ' ').trim(), btn: x.querySelectorAll('button').length})));
-    ok('Réglages (0.70.0) : appareils reliés : « JARVIS OS · iPhone · relié le … », « Cet appareil », sans « Retirer » sur le sien', ap.length === 1 && /^JARVIS OS · iPhone · relié le \d{1,2} \S+ à \d\dh\d\d Cet appareil$/.test(ap[0].t) && ap[0].btn === 0, JSON.stringify(ap)); }
+    ok('Réglages (0.73.0) : appareils reliés : « JARVIS OS · iPhone · relié le … », « Cet appareil », sans « Retirer » sur le sien', ap.length === 1 && /^JARVIS OS · iPhone · relié le \d{1,2} \S+ à \d\dh\d\d Cet appareil$/.test(ap[0].t) && ap[0].btn === 0, JSON.stringify(ap)); }
   /* 0.32.0 : l'écoute du serveur est Whisper (faux moteur du banc) : Réglages le dit et propose de passer à Parakeet */
   { const e = await p.evaluate(() => ({txt: document.querySelector('.set-wrap').textContent, btn: (document.getElementById('set-ecoute') || {}).textContent || ''}));
     ok('Réglages : écoute du serveur nommée (Whisper) et « Passer à Parakeet » proposé', /écoute Whisper prête/.test(e.txt) && /Passer à Parakeet/.test(e.btn) && /conversation continue/.test(e.txt) && /L’orbe/.test(e.txt), e.btn); }
@@ -117,9 +117,9 @@ try {
     const a0 = await qi.evaluate(() => ({titre: document.getElementById('titre').textContent, adresse: location.href, gardee: !!localStorage.getItem('jarvis.invite.cle'), siri: document.getElementById('adest').textContent, audio: !document.getElementById('siri-audio').hidden, dictee: !!document.getElementById('nomrac') && document.body.innerText.includes('Dicter le texte'), large: document.documentElement.scrollWidth <= innerWidth + 1}));
     await qi.fill('#texte', 'Acheter des couches pour demain'); await qi.click('#form button[type=submit]'); await qi.waitForTimeout(1500);
     const a1 = await qi.evaluate(() => ({msg: document.getElementById('msg').textContent, liste: [...document.querySelectorAll('#liste li')].map((x) => x.innerText.replace(/\s+/g, ' ').trim())}));
-    /* 0.70.0 (son choix du 23/11/2026, « Clé gardée après # ») : la clé reste après « # » (jamais envoyé au serveur), pour l'icône d'écran d'accueil */
+    /* 0.73.0 (son choix du 23/11/2026, « Clé gardée après # ») : la clé reste après « # » (jamais envoyé au serveur), pour l'icône d'écran d'accueil */
     const cleLien = new URL(iv.lien).hash.match(/cle=([^&]+)/)[1];
-    ok('invité : sa page s’ouvre par le lien (clé gardée dans son téléphone, et dans l’adresse après « # » depuis la 0.70.0), dit « Une tâche pour Sami », et d’abord « Dis Siri, envoie un message audio à Sami » (0.67, plus de dictée écrite) ; une tâche envoyée revient « C’est noté … pour demain » et s’affiche « À faire »',
+    ok('invité : sa page s’ouvre par le lien (clé gardée dans son téléphone, et dans l’adresse après « # » depuis la 0.73.0), dit « Une tâche pour Sami », et d’abord « Dis Siri, envoie un message audio à Sami » (0.67, plus de dictée écrite) ; une tâche envoyée revient « C’est noté … pour demain » et s’affiche « À faire »',
       a0.titre === 'Une tâche pour Sami' && new URL(a0.adresse).hash === '#cle=' + cleLien + '&pour=Sami' && !new URL(a0.adresse).search && a0.gardee && a0.siri === 'Sami' && a0.audio && !a0.dictee && a0.large
       && a1.msg === 'C’est noté : « Acheter des couches pour demain », pour demain.' && a1.liste.length === 1 && /Acheter des couches pour demain/.test(a1.liste[0]) && /À faire/.test(a1.liste[0]), JSON.stringify([a0, a1]));
     await qi.screenshot({path: SH + 'invite.png'});
@@ -127,14 +127,14 @@ try {
     const vus = []; qi.on('request', (r) => vus.push(r.url()));
     await qi.goto(BASE + '/invite/'); await qi.waitForTimeout(1500);
     const a2 = await qi.evaluate(() => ({adresse: location.href, titre: document.getElementById('titre').textContent, formulaire: !document.getElementById('envoi').hidden, sansCle: !document.getElementById('sans-cle').hidden, liste: document.querySelectorAll('#liste li').length}));
-    ok('invité (0.70.0) : rouverte sans clé dans l’adresse, la clé gardée y est remise après « # » (avec « pour ») ; la page marche ; aucune requête ne porte la clé dans son adresse',
+    ok('invité (0.73.0) : rouverte sans clé dans l’adresse, la clé gardée y est remise après « # » (avec « pour ») ; la page marche ; aucune requête ne porte la clé dans son adresse',
       new URL(a2.adresse).hash === '#cle=' + cleLien + '&pour=Sami' && a2.titre === 'Une tâche pour Sami' && a2.formulaire && !a2.sansCle && a2.liste === 1 && !vus.some((u) => u.includes(cleLien)), JSON.stringify([a2, vus.filter((u) => u.includes(cleLien))]));
     await ci.close();
     /* une icône posée sur l'écran d'accueil a un stockage vide : l'adresse seule (avec la clé après « # ») suffit */
     { const cv = await b.newContext({...devices['iPhone 15 Pro Max']}), qv = await cv.newPage(); qv.on('pageerror', (e) => errs.push('invité, icône : ' + e.message));
       await qv.goto(a2.adresse); await qv.waitForTimeout(1500);
       const a3 = await qv.evaluate(() => ({formulaire: !document.getElementById('envoi').hidden, titre: document.getElementById('titre').textContent, liste: document.querySelectorAll('#liste li').length}));
-      ok('invité (0.70.0) : l’adresse gardée par l’icône d’écran d’accueil ouvre sa page sans rien dans le stockage (formulaire, « pour Sami », ses tâches)', a3.formulaire && a3.titre === 'Une tâche pour Sami' && a3.liste === 1, JSON.stringify(a3));
+      ok('invité (0.73.0) : l’adresse gardée par l’icône d’écran d’accueil ouvre sa page sans rien dans le stockage (formulaire, « pour Sami », ses tâches)', a3.formulaire && a3.titre === 'Une tâche pour Sami' && a3.liste === 1, JSON.stringify(a3));
       await cv.close(); } }
   /* 0.64.0 (ses choix du 22/11/2026) : son message vocal, enregistré sur sa page (micro de test de Chromium), arrive dans JARVIS : sa voix joue
      d'elle-même, la fiche propose « C’est fait », « Dans 5 min », « Dans 15 min » ; elle voit « Faite ✓ » (prénoms inventés) */
@@ -250,7 +250,7 @@ try {
     await q.goto(BASE + '/?serveur#reglages'); await q.waitForTimeout(3500);
     const c1 = await q.evaluate(() => { const c = document.getElementById('mcp-card'); return c ? {txt: c.textContent, urgent: c.dataset.urgent === '1'} : null; });
     ok('MCP : une demande d\'accès apparaît dans Réglages (en tête), avec les mêmes 4 chiffres que la page de l\'assistant', !!c1 && c1.txt.includes('Claude demande l’accès à JARVIS') && !!chiffres && c1.txt.includes(chiffres) && c1.urgent, JSON.stringify([chiffres, c1 && c1.txt.slice(0, 300)]));
-    // 0.70.0 — A5-mcp-memoire : l'app reçoit l'adresse où l'assistant sera renvoyé (un faux « Claude » renvoie ailleurs que claude.ai)
+    // 0.73.0 — A5-mcp-memoire : l'app reçoit l'adresse où l'assistant sera renvoyé (un faux « Claude » renvoie ailleurs que claude.ai)
     { const em = await fetch(BASE + '/api/mcp', {headers: {authorization: 'Bearer ' + tk}}).then((x) => x.json());
       ok('MCP 0.70 : la demande en attente dit où l’assistant sera renvoyé (claude.ai), avec ses 4 chiffres', (em.demandes || []).length === 1 && em.demandes[0].retour === 'claude.ai' && em.demandes[0].chiffres === chiffres, JSON.stringify(em.demandes));
       const rv = await q.evaluate(() => [...document.querySelectorAll('#mcp-card .mcp-d .mcp-retour')].map((x) => x.textContent));
@@ -277,6 +277,42 @@ try {
       const m1 = await q.evaluate((id) => { const d = document.querySelector('.mis-it[data-mission="' + id + '"]'); return {hash: location.hash, search: location.search, ouverte: !!d && d.open}; }, mid);
       ok('notifications 0.69 : « /?n=…#voir-mission-<id> » ouvre Équipe sur la mission, sa fiche dépliée ; l’identifiant quitte l’adresse, « ?serveur » reste', !!mid && m1.hash === '#suivi' && m1.ouverte && m1.search === '?serveur', JSON.stringify([mid, m1])); }
     await q.goto(BASE + '/?serveur#reglages'); await q.waitForTimeout(3000); await q.evaluate(() => { const c = document.getElementById('mcp-card'); if (c) c.scrollIntoView(); }); await q.screenshot({path: SH + 'mcp-reglages.png'});
+    /* 0.71.0 : « exécutants reliés » — Réglages crée un jeton fixe par assistant (son nom, son profil), le suspend, le reprend, le retire (confirmé) ;
+       ce qu'un exécutant écrit apparaît sous « Derniers gestes des exécutants » */
+    { const carte = () => q.evaluate(() => ({lignes: [...document.querySelectorAll('#mcp-card .mcp-jeton')].map((x) => x.textContent), msg: document.querySelector('#mcp-card .set-msg').textContent, bad: document.querySelector('#mcp-card .set-msg').classList.contains('is-bad'), gestes: (document.querySelector('#mcp-card .mcp-actes') || {}).textContent || ''}));
+      const creer = async (nom, profil) => { await q.evaluate(() => { document.querySelector('#mcp-card .mcp-fixe').open = true; }); await q.fill('#mcp-card .mcp-form input', nom); await q.selectOption('#mcp-card .mcp-form select', profil); await q.waitForTimeout(150);
+        await q.evaluate(() => document.querySelector('#mcp-card .mcp-form button[type=submit]').click()); await q.waitForTimeout(1200); return q.evaluate(() => (document.querySelector('#mcp-card .mcp-jeton-neuf') || {}).textContent || ''); };
+      const bouton = (nom, re) => q.evaluate(([n, r]) => { const li = [...document.querySelectorAll('#mcp-card .mcp-jeton')].find((x) => x.querySelector('b').textContent === n), b = li && [...li.querySelectorAll('button')].find((x) => new RegExp(r).test(x.textContent)); if (b) b.click(); return !!b; }, [nom, re]);
+      const appel = (jeton, name, args) => fetch(BASE + '/mcp', {method: 'POST', headers: {'content-type': 'application/json', authorization: 'Bearer ' + jeton}, body: JSON.stringify({jsonrpc: '2.0', id: 1, method: 'tools/call', params: {name, arguments: args}})}).then(async (x) => ({status: x.status, j: await x.json().catch(() => ({}))}));
+      const refus = await creer('Iris', 'executant'), c0 = await carte();
+      const jl = await creer('Grok Bot', 'lecture'), jh = await creer('Hermes', 'executant'), dit = await q.evaluate(() => document.querySelector('#mcp-card .mcp-profil-dit').textContent), c1 = await carte();
+      ok('exécutants 0.71 : Réglages crée un jeton fixe par assistant (nom, profil), montré une seule fois ; la liste dit le nom et le profil de chacun ; un exécutant au nom d\'un bot est refusé', refus === '' && c0.bad && /déjà pris/.test(c0.msg) && c0.lignes.length === 0 && /^jvf_/.test(jl) && /^jvf_/.test(jh) && jl !== jh && /^Exécutant : lit Pilotage, Gmail et l’agenda, écrit dans Pilotage, prépare des brouillons, te notifie\./.test(dit) && /Jeton de Hermes, montré une seule fois/.test(c1.msg) && !c1.bad && c1.lignes.length === 2
+        && c1.lignes.some((x) => /^Grok Bot · Lecture et propositions/.test(x) && /SuspendreRetirer$/.test(x)) && c1.lignes.some((x) => /^Hermes · Exécutant : lit Pilotage, Gmail et l’agenda, écrit dans Pilotage, prépare des brouillons, te notifie/.test(x)) && /Derniers gestes des exécutants/.test(c1.gestes) && /Aucun pour l’instant/.test(c1.gestes), JSON.stringify([refus, c0.msg, dit, c1]));
+      FG.onglets = {'État': [['Bot', 'Dernier passage', "Ce que j'ai fait", 'Prochain passage', 'Dernier tour de Gmail']]};
+      const g1 = await appel(jh, 'pilotage_etat', {fait: 'Courrier du matin lu, un brouillon préparé'}), g2 = await appel(jl, 'pilotage_etat', {fait: 'Un jeton en lecture ne peut pas'}); await q.waitForTimeout(4500); const c2 = await carte();
+      ok('exécutants 0.71 : ce qu\'Hermes écrit (sa ligne de l\'onglet État) apparaît de lui-même sous « Derniers gestes des exécutants » ; le jeton en lecture n\'a pas cet outil', g1.status === 200 && g1.j.result && !g1.j.result.isError && (FG.onglets['État'][1] || [])[0] === 'Hermes' && !!g2.j.error && FG.onglets['État'].length === 2 && /Hermes · onglet État/.test(c2.gestes) && /État : Courrier du matin lu, un brouillon préparé/.test(c2.gestes) && /dernier accès/.test(c2.lignes.find((x) => /^Hermes/.test(x)) || ''), JSON.stringify([g1.j, g2.j, c2]));
+      await bouton('Hermes', '^Suspendre$'); await q.waitForTimeout(1000); const c3 = await carte(), s1 = await appel(jh, 'pilotage_etat', {fait: 'Pendant la suspension'}), s2 = await appel(jl, 'jarvis_memoire', {});
+      await bouton('Hermes', '^Reprendre$'); await q.waitForTimeout(1000); const c4 = await carte(), s3 = await appel(jh, 'pilotage_lire', {onglet: 'État'});
+      ok('exécutants 0.71 : « Suspendre » ferme Hermes (403) sans toucher à l\'autre jeton, la ligne le dit ; « Reprendre » le rouvre', /Hermes est suspendu/.test(c3.msg) && c3.lignes.some((x) => /^Hermes .*suspendu : ses appels sont refusés.*Reprendre/.test(x)) && s1.status === 403 && s2.status === 200 && /a de nouveau accès/.test(c4.msg) && c4.lignes.some((x) => /^Hermes .*SuspendreRetirer$/.test(x)) && s3.status === 200 && /L2 \| Bot: Hermes/.test(s3.j.result.content[0].text), JSON.stringify([c3, s1.status, s2.status, c4.msg, s3.status]));
+      /* 0.72.0 : « profil veilleur » — Réglages propose le troisième profil et « Signe comme » (un des exécutants, le premier par défaut) ;
+         ce que « Hermes Web » écrit est signé « Hermes » ; il n'a ni Gmail, ni le Canal, ni un autre onglet que Sources */
+      { const signe = () => q.evaluate(() => { const b = document.querySelector('#mcp-card .mcp-signe'), s = b.querySelector('select'); return {cache: b.hidden, vu: b.offsetParent !== null, choix: [...s.options].map((o) => o.textContent), valeur: s.value, profils: [...document.querySelector('#mcp-card .mcp-form > select').options].map((o) => o.textContent), dit: document.querySelector('#mcp-card .mcp-profil-dit').textContent}; });
+        await q.evaluate(() => { document.querySelector('#mcp-card .mcp-fixe').open = true; }); await q.fill('#mcp-card .mcp-form input', 'Hermes Web'); const v0 = await signe();
+        await q.selectOption('#mcp-card .mcp-form > select', 'veilleur'); await q.waitForTimeout(150); const v1 = await signe(); await q.evaluate(() => document.querySelector('#mcp-card .mcp-signe').scrollIntoView({block: 'center'})); await q.screenshot({path: SH + 'mcp-veilleur.png'});
+        await q.evaluate(() => document.querySelector('#mcp-card .mcp-form button[type=submit]').click()); await q.waitForTimeout(1200); const jv = await q.evaluate(() => (document.querySelector('#mcp-card .mcp-jeton-neuf') || {}).textContent || ''), cv1 = await carte();
+        ok('veilleur 0.72 : Réglages propose le profil « Veilleur » (aucun accès aux mails, à l\'agenda ni aux dossiers) et, pour lui seul, « Signe comme » parmi les exécutants (le premier par défaut) ; la liste dit « signe comme Hermes »', v0.cache && !v0.vu && v0.profils.join() === 'Lecture et propositions,Exécutant,Veilleur' && !v1.cache && v1.vu && v1.choix.join() === 'Hermes,Son propre nom' && v1.valeur === 'Hermes' && /^Veilleur : lit l’onglet Sources, écrit sa ligne du Journal et de l’État, te notifie ; aucun accès à tes mails, ton agenda ni tes dossiers\./.test(v1.dit)
+          && /^jvf_/.test(jv) && jv !== jh && /Jeton de Hermes Web \(il signe « Hermes »\), montré une seule fois/.test(cv1.msg) && !cv1.bad && cv1.lignes.length === 3 && cv1.lignes.some((x) => /^Hermes Web · Veilleur : lit l’onglet Sources, écrit sa ligne du Journal et de l’État, te notifie ; aucun accès à tes mails, ton agenda ni tes dossiers · signe comme Hermes/.test(x) && /SuspendreRetirer$/.test(x)) && !cv1.lignes.some((x) => /^(Hermes|Grok Bot) · .*signe comme/.test(x)), JSON.stringify([v0, v1, cv1]));
+        const w1 = await appel(jv, 'pilotage_etat', {fait: 'Veille IA et .NET du lundi faite'}), w2 = await appel(jv, 'gmail_chercher', {requete: 'in:inbox'}), w3 = await appel(jv, 'canal_repondre', {ligne: 2, reponse: 'Essai du banc'}), w4 = await appel(jv, 'pilotage_lire', {onglet: 'État'}); await q.waitForTimeout(4500); const cv2 = await carte();
+        await bouton('Hermes Web', '^Retirer$'); await q.waitForTimeout(700); await q.evaluate(() => [...document.querySelectorAll('#sheet .sheet-actions .btn')].find((x) => /^Oui, retirer/.test(x.textContent)).click()); await q.waitForTimeout(1500); const cv3 = await carte(), w5 = await appel(jv, 'pilotage_etat', {fait: 'Après le retrait'}), w6 = await appel(jh, 'pilotage_lire', {onglet: 'État'});
+        ok('veilleur 0.72 : ce que « Hermes Web » écrit est signé « Hermes » (la ligne d\'Hermes dans l\'État, aucune autre) et apparaît dans les gestes avec son jeton ; ni Gmail, ni Canal, ni un autre onglet que Sources ; « Retirer » le coupe seul', w1.status === 200 && w1.j.result && !w1.j.result.isError && FG.onglets['État'].length === 2 && FG.onglets['État'][1][0] === 'Hermes' && FG.onglets['État'][1][2] === 'Veille IA et .NET du lundi faite' && /Outil inconnu/.test((w2.j.error || {}).message || '') && /Outil inconnu/.test((w3.j.error || {}).message || '') && w4.j.result.isError === true && /Onglet inconnu : État\. Onglets lisibles : Sources\./.test(w4.j.result.content[0].text)
+          && /Hermes \(jeton Hermes Web\) · onglet État/.test(cv2.gestes) && /État : Veille IA et \.NET du lundi faite/.test(cv2.gestes) && /Jeton de Hermes Web retiré/.test(cv3.msg) && cv3.lignes.length === 2 && !cv3.lignes.some((x) => /^Hermes Web/.test(x)) && w5.status === 401 && w6.status === 200, JSON.stringify([w1.j, w2.j, w3.j, w4.j, cv2.gestes, cv3, w5.status, w6.status])); }
+      await q.evaluate(() => document.getElementById('mcp-card').scrollIntoView()); await q.screenshot({path: SH + 'mcp-executants.png'});
+      await bouton('Hermes', '^Retirer$'); await q.waitForTimeout(700); const feuille = await q.evaluate(() => { const s = document.getElementById('sheet'); return s ? s.textContent : ''; }), c5 = await carte();
+      await q.evaluate(() => [...document.querySelectorAll('#sheet .sheet-actions .btn')].find((x) => /^Oui, retirer/.test(x.textContent)).click()); await q.waitForTimeout(1500); const c6 = await carte(), s4 = await appel(jh, 'jarvis_memoire', {}), s5 = await appel(jl, 'jarvis_memoire', {});
+      ok('exécutants 0.71 : « Retirer » demande confirmation (rien n\'est retiré avant), puis coupe ce jeton-là seulement ; ses gestes restent affichés', /Retirer le jeton de Hermes \?/.test(feuille) && c5.lignes.length === 2 && c6.lignes.length === 1 && /^Grok Bot/.test(c6.lignes[0]) && /Jeton de Hermes retiré/.test(c6.msg) && s4.status === 401 && s5.status === 200 && /Hermes · onglet État/.test(c6.gestes), JSON.stringify([feuille.slice(0, 160), c5.lignes.length, c6, s4.status, s5.status]));
+      const em = await fetch(BASE + '/api/mcp', {headers: {authorization: 'Bearer ' + tk}}).then((x) => x.json());
+      for (const f of em.fixes || []) await fetch(BASE + '/api/mcp/retirer', {method: 'POST', headers: {'content-type': 'application/json', authorization: 'Bearer ' + tk}, body: JSON.stringify({id: f.id})});
+      FG.onglets = null; }
     for (const x of ms.filter((y) => /box/.test(y.text))) await fetch(BASE + '/api/missions/' + x.id, {method: 'DELETE', headers: {authorization: 'Bearer ' + tk}});   /* le banc suivant attend « Aucune mission » */
     /* 0.40.0 : la voix Google — la clé collée dans Réglages (jamais relue), le choix Pierre ou Google, la liste des voix, puis la lecture par Google */
     await q.goto(BASE + '/?serveur#reglages'); await q.waitForTimeout(3500);
@@ -615,7 +651,7 @@ try {
       ok('voix : reporter une tâche se fait aussitôt ; la supprimer attend un « oui vas-y merci » ; une tâche introuvable est dite, rien n’est coché', e6.cartes.some((c) => /Tâche à reporter/i.test(c) && /C'est parti/.test(c)) && e7.cartes.some((c) => /Tâche à supprimer/i.test(c) && /Supprimer/.test(c)) && e8.cartes.some((c) => /Tâche à supprimer/i.test(c) && /C'est parti/.test(c)) && e8.eux.some((x) => /tâche supprimée/.test(x)) && e9.eux.some((x) => /Je ne trouve pas la tâche « Repeindre la lune »/.test(x)), JSON.stringify([e6.cartes.slice(-1), e7.cartes.slice(-1), e8, e9.eux])); }
     await v.tap('#chat .mains-fin').catch(() => {});
     await v.close(); }
-  // 0.70.0 — A6-voix
+  // 0.73.0 — A6-voix
   /* mains libres : une phrase finie pendant que la précédente s'écrit encore (écoute lente) ne l'annule plus : les deux partent ensemble,
      dans l'ordre ; une lecture coupée (au fil de la réponse, ou « Écouter ») rend à l'iPhone les sons déjà préparés */
   { const w = await ctx.newPage(); w.on('pageerror', (e) => errs.push('A6-voix : ' + e.message));
@@ -635,7 +671,7 @@ try {
     await w.evaluate(() => window.__talk(1800)); await w.waitForTimeout(4300);   /* 1re phrase (« pas finie » pour Smart Turn) : elle part après 1,6 s de silence */
     await w.evaluate(() => window.__talk(1800)); await w.waitForTimeout(9500);   /* 2e phrase, finie avant que la 1re soit écrite */
     const moi = await w.evaluate(() => [...document.querySelectorAll('#chat .msg.me')].map((x) => x.textContent));
-    ok('mains libres (0.70.0) : une phrase finie pendant que la précédente s’écrit encore ne l’annule plus : les deux partent ensemble, dans l’ordre, en une seule question', moi.length === n0 + 1 && (moi[n0].match(/raconte lentement ta journée/gi) || []).length === 2 && samples.length === 1, JSON.stringify([moi.slice(n0), samples.length, lents]));
+    ok('mains libres (0.73.0) : une phrase finie pendant que la précédente s’écrit encore ne l’annule plus : les deux partent ensemble, dans l’ordre, en une seule question', moi.length === n0 + 1 && (moi[n0].match(/raconte lentement ta journée/gi) || []).length === 2 && samples.length === 1, JSON.stringify([moi.slice(n0), samples.length, lents]));
     await w.tap('#chat .mains-fin').catch(() => {}); await w.waitForTimeout(500);
     const urls = await w.evaluate(async () => {
       const V = window.JarvisVoice, made = [], freed = new Set(), c0 = URL.createObjectURL, r0 = URL.revokeObjectURL, delai = (ms) => new Promise((z) => setTimeout(z, ms));
@@ -648,7 +684,7 @@ try {
       URL.createObjectURL = c0; URL.revokeObjectURL = r0;
       return {kind, made: made.length, rendus: made.filter((u) => freed.has(u)).length};
     });
-    ok('voix (0.70.0) : une lecture coupée (au fil de la réponse, ou « Écouter ») rend à l’iPhone tous les sons déjà préparés', urls.kind === 'serveur' && urls.made === 6 && urls.rendus === urls.made, JSON.stringify(urls));
+    ok('voix (0.73.0) : une lecture coupée (au fil de la réponse, ou « Écouter ») rend à l’iPhone tous les sons déjà préparés', urls.kind === 'serveur' && urls.made === 6 && urls.rendus === urls.made, JSON.stringify(urls));
     await w.close(); }
   /* 0.33.0 : l'activité en direct — une mission lancée apparaît sur l'accueil (« En ce moment ») avec son plan et ce qu'elle fait, et sur l'orbe (pastille) ;
      elle en part une fois finie ; Suivi montre ses étapes */
@@ -668,7 +704,7 @@ try {
     const a3 = await q.evaluate(() => { const it = [...document.querySelectorAll('#missions .mis-it')].find((x) => /budget des vacances/.test(x.textContent)); if (it) it.open = true; return it ? {etapes: it.querySelectorAll('.mis-etapes li').length, outil: (it.querySelector('.mis-outil') || {}).textContent || '', txt: it.textContent.slice(0, 160)} : null; });
     ok('missions : Suivi montre le plan de la mission en cours et ce qu\'elle fait à l\'instant', a3 && a3.etapes === 3 && /À l’instant : Recherche web/.test(a3.outil), JSON.stringify(a3));
     await q.close(); }
-  // 0.70.0 — B3-page-5-pont
+  // 0.73.0 — B3-page-5-pont
   /* missions relues toutes les 5 s pendant qu'une tourne (Équipe › Demandes), fiche dépliée gardée ; Réglages sans rebâtir Suivi ;
      la carte « Assistants reliés » relue au retour dans Réglages (missions servies par le banc, inventées) */
   { const q = await ctx.newPage(); q.on('pageerror', (e) => errs.push('0.70 : ' + e.message));

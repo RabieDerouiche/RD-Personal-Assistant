@@ -39,7 +39,7 @@ export class Ecoute {
   private ctx: AudioContext | null = null; private stream: MediaStream | null = null; private node: ScriptProcessorNode | null = null; private src: MediaStreamAudioSourceNode | null = null;
   private floor = -58; private inSpeech = false; private voiced = 0; private silence = 0; private speechMs = 0; private totalMs = 0;
   private chunks: Float32Array[] = []; private pre: Float32Array[] = []; private preLen = 0; private barge = false;
-  /* 0.70.0 : les phrases en cours d'écriture (Whisper ou Parakeet), livrées dans l'ordre ; une phrase finie pendant que la précédente
+  /* 0.73.0 : les phrases en cours d'écriture (Whisper ou Parakeet), livrées dans l'ordre ; une phrase finie pendant que la précédente
      s'écrit encore ne l'annule plus : elles partent ensemble, la première d'abord */
   private sends = new Set<AbortController>(); private queue: Promise<void> = Promise.resolve(); private held = ''; private heldBarge = false;
   /* ce que fait JARVIS : « speaking » (il parle : seuil plus haut, contre son écho), « thinking » (il réfléchit), « idle » */
@@ -155,7 +155,7 @@ export class Ecoute {
   }
   private done(t: string, wasBarge: boolean) {
     this.reset(); this.tick();
-    this.livrer(new AbortController(), Promise.resolve(String(t || '')), wasBarge);   /* 0.70.0 : après une phrase encore en cours d'écriture */
+    this.livrer(new AbortController(), Promise.resolve(String(t || '')), wasBarge);   /* 0.73.0 : après une phrase encore en cours d'écriture */
   }
   /* 0.25.0 (dictée d'une question) : « j'ai fini » d'un appui : la phrase en cours part tout de suite ; faux s'il n'a encore rien dit */
   flush(): boolean { if (!this.inSpeech || !this.stream) return false; this.finish(this.sr); return true; }
@@ -166,7 +166,7 @@ export class Ecoute {
     const ctl = new AbortController();
     this.tick();   /* 0.22.1 : un petit son discret : « je t'ai entendu » */
     this.o.onState('transcribing');
-    /* 0.70.0 : 40 s au plus (le serveur abandonne à 30 s) : une écoute qui ne répond plus ne retient pas les phrases suivantes */
+    /* 0.73.0 : 40 s au plus (le serveur abandonne à 30 s) : une écoute qui ne répond plus ne retient pas les phrases suivantes */
     const minuteur = window.setTimeout(() => ctl.abort(), 40000);
     const p = this.o.stt(toWav16k(chunks, sr), ctl.signal).then((t) => t, () => null).finally(() => clearTimeout(minuteur));
     this.livrer(ctl, p, wasBarge);

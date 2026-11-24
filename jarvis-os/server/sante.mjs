@@ -21,7 +21,7 @@ export function createSante({S, save, push, checks, now = () => Date.now()}) {
     S.sante.at = t; save();
     if (found.length && S.push && S.push.subs.length) {
       const body = found.map(([, it]) => it.nom + ' : ' + it.detail).join('\n');
-      /* 0.70.0 : seule la première lettre passe en minuscule (« JARVIS : accès Google », pas « accès google ») */
+      /* 0.73.0 : seule la première lettre passe en minuscule (« JARVIS : accès Google », pas « accès google ») */
       const n0 = String(found[0][1].nom || '');
       await push.send({title: found.length === 1 ? 'JARVIS : ' + n0.charAt(0).toLowerCase() + n0.slice(1) : 'JARVIS : ' + found.length + ' choses à réparer', body, url: '/#voir-sante', tag: 'sante'}, {urgency: 'high'});
       found.forEach(([, it]) => { it.notifiedAt = t; }); save();

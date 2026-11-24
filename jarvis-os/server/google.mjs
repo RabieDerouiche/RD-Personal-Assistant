@@ -51,7 +51,7 @@ export const sansBalises = (html) => String(html || '').replace(/<(style|script|
   .replace(/<br\s*\/?>/gi, '\n').replace(/<\/(p|div|tr|li|h[1-6]|table)>/gi, '\n').replace(/<\/t[dh]>/gi, ' | ').replace(/<[^>]+>/g, '')
   .replace(/&#x([0-9a-f]+);/gi, (_, x) => point(parseInt(x, 16))).replace(/&#(\d+);/g, (_, d) => point(+d)).replace(/&([a-z]+);/gi, (m, n) => ENT[n] || ENT[n.toLowerCase()] || m)
   .replace(/[ \t\u00a0]+/g, ' ').replace(/ *\n[ \n]*/g, '\n').trim();
-/* 0.70.0 : le corps d'une partie dans son jeu de caractères (en-tête Content-Type). Avant, tout était lu en UTF-8 : une facture en ISO-8859-1
+/* 0.73.0 : le corps d'une partie dans son jeu de caractères (en-tête Content-Type). Avant, tout était lu en UTF-8 : une facture en ISO-8859-1
    ou windows-1252 perdait ses « é » et ses « € » (le Radar n'y trouvait plus le montant). Un corps déjà en UTF-8 valide reste lu en UTF-8. */
 function corpsDe(part) {
   const b = Buffer.from(String(part.body.data || '').replace(/-/g, '+').replace(/_/g, '/'), 'base64');
@@ -92,10 +92,20 @@ function mailMsg(m, withBody) {
   if (withBody) { o.plaintextBody = textOf(m.payload); o.attachments = piecesDe(m.payload); }
   return o;
 }
-const encWord = (s) => /^[\x20-\x7e]*$/.test(s) ? s : '=?UTF-8?B?' + Buffer.from(s, 'utf8').toString('base64') + '?=';
-function rawMail({to, cc, subject, body}) {
+/* un objet hors ASCII : mots encodés UTF-8 (RFC 2047). 0.71.0 : un objet long est coupé en mots de 45 octets au plus, jamais au milieu
+   d'un caractère, chacun sur sa ligne repliée (un mot encodé ne dépasse pas 75 caractères) */
+const encWord = (s) => {
+  if (/^[\x20-\x7e]*$/.test(s)) return s;
+  const mots = []; let lot = '';
+  for (const c of s) { if (lot && Buffer.byteLength(lot + c, 'utf8') > 45) { mots.push(lot); lot = ''; } lot += c; }
+  if (lot) mots.push(lot);
+  return mots.map((m) => '=?UTF-8?B?' + Buffer.from(m, 'utf8').toString('base64') + '?=').join('\r\n ');
+};
+const uneLigne = (v) => String(v || '').replace(/[\r\n]+/g, ' ').trim();
+function rawMail({to, cc, subject, body, inReplyTo, references}) {
   const L = ['To: ' + [].concat(to || []).join(', ')];
   if (cc && [].concat(cc).length) L.push('Cc: ' + [].concat(cc).join(', '));
+  if (inReplyTo) L.push('In-Reply-To: ' + uneLigne(inReplyTo), 'References: ' + uneLigne((references ? references + ' ' : '') + inReplyTo));   /* 0.71.0 : un brouillon de réponse reste dans son fil */
   L.push('Subject: ' + encWord(String(subject || '')), 'MIME-Version: 1.0', 'Content-Type: text/plain; charset=UTF-8', 'Content-Transfer-Encoding: base64', '', Buffer.from(String(body || ''), 'utf8').toString('base64'));
   return b64u(L.join('\r\n'));
 }
@@ -106,7 +116,7 @@ export function createGoogle({S, save, log = () => {}}) {
   const G = S.google;
   const pending = new Map();   /* state OAuth → {redirect, at} : 10 minutes, usage unique */
   let access = {token: '', exp: 0};
-  /* 0.70.0 : chaque appel à Google a un délai (30 s) ; avant, une connexion muette figeait une lecture de Pilotage ou une action de la page
+  /* 0.73.0 : chaque appel à Google a un délai (30 s) ; avant, une connexion muette figeait une lecture de Pilotage ou une action de la page
      au moins 5 minutes. La lecture du corps compte dans le délai : elle ne passe plus pour une réponse vide. */
   const DELAI = +process.env.JARVIS_GOOGLE_DELAI_MS || 30000;
   const estDelai = (e) => !!e && (e.name === 'TimeoutError' || e.name === 'AbortError');
@@ -162,7 +172,7 @@ export function createGoogle({S, save, log = () => {}}) {
     if (t) { try { await gfetch(URLS.revoke, {method: 'POST', headers: {'content-type': 'application/x-www-form-urlencoded'}, body: new URLSearchParams({token: t})}); } catch { /* rien */ } }
     return {ok: true};
   }
-  /* 0.70.0 : un seul renouvellement du jeton à la fois, partagé par les appels qui tombent ensemble (les tics de 60 s) ; un renouvellement
+  /* 0.73.0 : un seul renouvellement du jeton à la fois, partagé par les appels qui tombent ensemble (les tics de 60 s) ; un renouvellement
      lancé avec l'accès d'avant (compte changé ou délié entre-temps) n'écrase plus le nouveau, ni ne l'efface s'il est refusé */
   let enCours = null;
   async function token() {
@@ -216,7 +226,7 @@ export function createGoogle({S, save, log = () => {}}) {
       list_events: async (i) => {
         const q = new URLSearchParams({singleEvents: 'true', orderBy: i.orderBy === 'updated' ? 'updated' : 'startTime', maxResults: String(Math.min(+i.pageSize || 250, 2500)), timeZone: TZ});
         if (i.startTime) q.set('timeMin', rfc(i.startTime)); if (i.endTime) q.set('timeMax', rfc(i.endTime)); if (i.query) q.set('q', i.query);
-        /* 0.70.0 : les pages suivantes aussi (2 500 événements au plus) : au-delà d'une page, les derniers mois manquaient sans avertissement,
+        /* 0.73.0 : les pages suivantes aussi (2 500 événements au plus) : au-delà d'une page, les derniers mois manquaient sans avertissement,
            et Google peut couper une page plus tôt */
         const items = []; let page = '', j0 = null;
         do {
@@ -249,7 +259,9 @@ export function createGoogle({S, save, log = () => {}}) {
         }
         return api('PATCH', base + '?sendUpdates=none', b);
       },
-      delete_event: (i) => api('DELETE', `${URLS.cal}/calendars/${enc(i.calendarId || 'primary')}/events/${enc(i.eventId)}?sendUpdates=none`)
+      delete_event: (i) => api('DELETE', `${URLS.cal}/calendars/${enc(i.calendarId || 'primary')}/events/${enc(i.eventId)}?sendUpdates=none`),
+      /* 0.71.0 : ses agendas (lecture seule), pour en choisir un par son nom */
+      list_calendars: async () => { const j = await api('GET', `${URLS.cal}/users/me/calendarList?maxResults=250`); return {calendars: (j.items || []).map((c) => ({id: c.id, summary: c.summaryOverride || c.summary || '', primary: !!c.primary, accessRole: c.accessRole || ''}))}; }
     },
     Gmail: {
       search_threads: async (i) => {
@@ -272,6 +284,16 @@ export function createGoogle({S, save, log = () => {}}) {
         return {drafts};
       },
       send_message: (i) => i.draftId ? api('POST', `${URLS.gmail}/users/me/drafts/send`, {id: i.draftId}) : api('POST', `${URLS.gmail}/users/me/messages/send`, {raw: rawMail(i)}),
+      /* 0.71.0 : un brouillon (jamais un envoi). Avec threadId, il répond dans ce fil : identifiant du dernier message lu pour In-Reply-To */
+      create_draft: async (i) => {
+        let suite = {};
+        if (i.threadId) {
+          try { const x = await api('GET', `${URLS.gmail}/users/me/threads/${enc(i.threadId)}?format=metadata&metadataHeaders=Message-ID&metadataHeaders=References`), d = (x.messages || []).slice(-1)[0];
+            if (d && hdr(d, 'Message-ID')) suite = {inReplyTo: hdr(d, 'Message-ID'), references: hdr(d, 'References')}; } catch { /* sans ces en-têtes, Gmail range quand même le brouillon dans le fil */ }
+        }
+        const x = await api('POST', `${URLS.gmail}/users/me/drafts`, {message: {raw: rawMail({...i, ...suite}), ...(i.threadId ? {threadId: String(i.threadId)} : {})}}), m = x.message || {};
+        return {id: x.id || '', messageId: m.id || '', threadId: m.threadId || '', viewUrl: m.id ? 'https://mail.google.com/mail/#drafts?compose=' + m.id : ''};
+      },
       delete_draft: (i) => api('DELETE', `${URLS.gmail}/users/me/drafts/${enc(i.draftId)}`),
       unlabel_thread: (i) => api('POST', `${URLS.gmail}/users/me/threads/${enc(i.threadId)}/modify`, {removeLabelIds: [].concat(i.labelIds || [])})
     },
@@ -294,7 +316,7 @@ export function createGoogle({S, save, log = () => {}}) {
         if (term.length < 3) return {files: []};
         const key = JSON.stringify(i.roots || []), c = SEARCH_CACHE.get(key), frais = c && Date.now() - c.at < 600000;
         const tree = frais ? c.tree : await T['Google Drive'].folder_tree({roots: i.roots, foldersOnly: true});
-        if (!frais) SEARCH_CACHE.set(key, {at: Date.now(), tree});   /* 0.70.0 : relue au bout de 10 minutes, même si les recherches se suivent */
+        if (!frais) SEARCH_CACHE.set(key, {at: Date.now(), tree});   /* 0.73.0 : relue au bout de 10 minutes, même si les recherches se suivent */
         const inTree = new Set([...tree.roots.map((r) => r.id), ...tree.folders.map((f) => f.id)].filter(Boolean));
         const qs = (v) => "'" + String(v).replace(/\\/g, '\\\\').replace(/'/g, "\\'") + "'";
         /* la requête porte sur les seuls dossiers demandés (par lots de 30), pages suivies : un mot fréquent ailleurs dans le Drive ne cache pas les papiers */

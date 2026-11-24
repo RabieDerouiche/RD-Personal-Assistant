@@ -1,4 +1,4 @@
-/* Banc 0.70.0 (lot A5 : garde-fou, mémoire, serveur MCP, routines, discussion en flux) : node tests/fiab-a5.test.mjs
+/* Banc 0.73.0 (lot A5 : garde-fou, mémoire, serveur MCP, routines, discussion en flux) : node tests/fiab-a5.test.mjs
    Aucun vrai Claude, aucun vrai Google, aucun coût. Adresses, montants et noms inventés. */
 import {spawn} from 'node:child_process';
 import crypto from 'node:crypto'; import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path'; import {fileURLToPath} from 'node:url';
