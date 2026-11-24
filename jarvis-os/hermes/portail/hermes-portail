@@ -114,6 +114,9 @@ cle() {   # 0 : la clé est en mémoire vive ; sinon dit pourquoi (3 coffre verr
   esac
 }
 
+# Un passage : la question, puis l'arrêt propre de la passerelle qu'Hermes a lancée pour lui. Tuée par un signal, elle
+# se note « en marche » et le passage suivant l'attend jusqu'à l'échéance (« Gateway starting: deadline », vu au banc).
+PASSAGE='"$0" chat -Q --oneshot --max-turns 25 -s portail --query-file "$1"; rc=$?; "$0" gateway stop >/dev/null 2>&1; exit $rc'
 lancer_agent() {   # lancer_agent <fichier de consigne> <fichier de sortie> : un passage sans personne, enfermé
   local consigne=$1 sortie=$2 rc
   if [ "$SYSTEMD" = 1 ]; then
@@ -127,12 +130,12 @@ lancer_agent() {   # lancer_agent <fichier de consigne> <fichier de sortie> : un
       -p ProtectClock=yes -p ProtectHostname=yes -p ProtectProc=invisible -p RestrictSUIDSGID=yes -p RestrictRealtime=yes \
       -p LockPersonality=yes -p UMask=0077 -p IPAddressDeny="link-local multicast" \
       $(printf -- '-E %q ' "${ENVIRONNEMENT[@]}" PATH="$(chemin_hermes)") \
-      "$H/.local/bin/hermes" chat -Q --oneshot --max-turns 25 -s portail --query-file "$consigne" > "$sortie" 2>&1
+      /bin/sh -c "$PASSAGE" "$H/.local/bin/hermes" "$consigne" > "$sortie" 2>&1
     rc=$?
   else   # banc : pas de systemd
-    comme_portail timeout 600 "$H/.local/bin/hermes" chat -Q --oneshot --max-turns 25 -s portail --query-file "$consigne" > "$sortie" 2>&1
+    comme_portail timeout 600 /bin/sh -c "$PASSAGE" "$H/.local/bin/hermes" "$consigne" > "$sortie" 2>&1
     rc=$?
-    pkill -u "$U" 2>/dev/null   # sous systemd, la fin de l'unité arrête tout ce qu'Hermes a laissé derrière lui ; ici, à la main
+    sleep 1; pkill -u "$U" 2>/dev/null   # sous systemd, la fin de l'unité arrête ce qui reste (le pilote du navigateur) ; ici, à la main
   fi
   return $rc
 }

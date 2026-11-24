@@ -48,6 +48,10 @@ du Hermes principal. Au banc (sans systemd), cela suffisait à faire échouer ch
 l'unité cherchée porte une empreinte du chemin, n'existe nulle part, et Hermes lance sa propre passerelle, le temps
 du passage. Ne remets pas ce dossier à `~/.hermes`.
 
+Même cause, autre effet (certain, banc) : cette passerelle passagère, tuée par un signal à la fin du passage, se note
+« en marche » et fait attendre le passage suivant jusqu'à l'échéance. La commande l'arrête donc proprement
+(`hermes gateway stop`) après chaque passage, avant la fin de l'unité.
+
 ## La clé en mémoire
 
 - Le coffre d'Hermes est `/home/hermes-portail/hermes/vault/vault.json.enc` (chiffré, sur le disque) et `vault.key`. (certain, code et
