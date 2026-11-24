@@ -35,6 +35,9 @@ try {
   ok('retour de Google : page « relié »', /Google est relié/.test(await p.textContent('body')), (await p.textContent('body')).slice(0, 80));
   await p.goto(BASE + '/?serveur#reglages'); await p.waitForTimeout(2500);
   ok('Réglages : compte Google affiché', await p.evaluate(() => /proprietaire@example\.org/.test(document.querySelector('.set-wrap').textContent)));
+  /* 0.73.0 — lot C (« Retirer dans Réglages ») : la carte « Serveur JARVIS » liste les appareils reliés ; celui-ci, nommé par son genre, sans bouton */
+  { const ap = await p.evaluate(() => [...document.querySelectorAll('.set-card .app-it')].map((x) => ({t: x.innerText.replace(/\s+/g, ' ').trim(), btn: x.querySelectorAll('button').length})));
+    ok('Réglages (0.73.0) : appareils reliés : « JARVIS OS · iPhone · relié le … », « Cet appareil », sans « Retirer » sur le sien', ap.length === 1 && /^JARVIS OS · iPhone · relié le \d{1,2} \S+ à \d\dh\d\d Cet appareil$/.test(ap[0].t) && ap[0].btn === 0, JSON.stringify(ap)); }
   /* 0.32.0 : l'écoute du serveur est Whisper (faux moteur du banc) : Réglages le dit et propose de passer à Parakeet */
   { const e = await p.evaluate(() => ({txt: document.querySelector('.set-wrap').textContent, btn: (document.getElementById('set-ecoute') || {}).textContent || ''}));
     ok('Réglages : écoute du serveur nommée (Whisper) et « Passer à Parakeet » proposé', /écoute Whisper prête/.test(e.txt) && /Passer à Parakeet/.test(e.btn) && /conversation continue/.test(e.txt) && /L’orbe/.test(e.txt), e.btn); }
@@ -114,10 +117,25 @@ try {
     const a0 = await qi.evaluate(() => ({titre: document.getElementById('titre').textContent, adresse: location.href, gardee: !!localStorage.getItem('jarvis.invite.cle'), siri: document.getElementById('adest').textContent, audio: !document.getElementById('siri-audio').hidden, dictee: !!document.getElementById('nomrac') && document.body.innerText.includes('Dicter le texte'), large: document.documentElement.scrollWidth <= innerWidth + 1}));
     await qi.fill('#texte', 'Acheter des couches pour demain'); await qi.click('#form button[type=submit]'); await qi.waitForTimeout(1500);
     const a1 = await qi.evaluate(() => ({msg: document.getElementById('msg').textContent, liste: [...document.querySelectorAll('#liste li')].map((x) => x.innerText.replace(/\s+/g, ' ').trim())}));
-    ok('invité : sa page s’ouvre par le lien (clé gardée dans son téléphone, retirée de l’adresse), dit « Une tâche pour Sami », et d’abord « Dis Siri, envoie un message audio à Sami » (0.67, plus de dictée écrite) ; une tâche envoyée revient « C’est noté … pour demain » et s’affiche « À faire »',
-      a0.titre === 'Une tâche pour Sami' && !/cle=/.test(a0.adresse) && a0.gardee && a0.siri === 'Sami' && a0.audio && !a0.dictee && a0.large
+    /* 0.73.0 (son choix du 23/11/2026, « Clé gardée après # ») : la clé reste après « # » (jamais envoyé au serveur), pour l'icône d'écran d'accueil */
+    const cleLien = new URL(iv.lien).hash.match(/cle=([^&]+)/)[1];
+    ok('invité : sa page s’ouvre par le lien (clé gardée dans son téléphone, et dans l’adresse après « # » depuis la 0.73.0), dit « Une tâche pour Sami », et d’abord « Dis Siri, envoie un message audio à Sami » (0.67, plus de dictée écrite) ; une tâche envoyée revient « C’est noté … pour demain » et s’affiche « À faire »',
+      a0.titre === 'Une tâche pour Sami' && new URL(a0.adresse).hash === '#cle=' + cleLien + '&pour=Sami' && !new URL(a0.adresse).search && a0.gardee && a0.siri === 'Sami' && a0.audio && !a0.dictee && a0.large
       && a1.msg === 'C’est noté : « Acheter des couches pour demain », pour demain.' && a1.liste.length === 1 && /Acheter des couches pour demain/.test(a1.liste[0]) && /À faire/.test(a1.liste[0]), JSON.stringify([a0, a1]));
-    await qi.screenshot({path: SH + 'invite.png'}); await ci.close(); }
+    await qi.screenshot({path: SH + 'invite.png'});
+    /* rouverte sans rien après « # » (une icône d'avant, un favori) : la clé du téléphone est remise dans l'adresse, la page marche */
+    const vus = []; qi.on('request', (r) => vus.push(r.url()));
+    await qi.goto(BASE + '/invite/'); await qi.waitForTimeout(1500);
+    const a2 = await qi.evaluate(() => ({adresse: location.href, titre: document.getElementById('titre').textContent, formulaire: !document.getElementById('envoi').hidden, sansCle: !document.getElementById('sans-cle').hidden, liste: document.querySelectorAll('#liste li').length}));
+    ok('invité (0.73.0) : rouverte sans clé dans l’adresse, la clé gardée y est remise après « # » (avec « pour ») ; la page marche ; aucune requête ne porte la clé dans son adresse',
+      new URL(a2.adresse).hash === '#cle=' + cleLien + '&pour=Sami' && a2.titre === 'Une tâche pour Sami' && a2.formulaire && !a2.sansCle && a2.liste === 1 && !vus.some((u) => u.includes(cleLien)), JSON.stringify([a2, vus.filter((u) => u.includes(cleLien))]));
+    await ci.close();
+    /* une icône posée sur l'écran d'accueil a un stockage vide : l'adresse seule (avec la clé après « # ») suffit */
+    { const cv = await b.newContext({...devices['iPhone 15 Pro Max']}), qv = await cv.newPage(); qv.on('pageerror', (e) => errs.push('invité, icône : ' + e.message));
+      await qv.goto(a2.adresse); await qv.waitForTimeout(1500);
+      const a3 = await qv.evaluate(() => ({formulaire: !document.getElementById('envoi').hidden, titre: document.getElementById('titre').textContent, liste: document.querySelectorAll('#liste li').length}));
+      ok('invité (0.73.0) : l’adresse gardée par l’icône d’écran d’accueil ouvre sa page sans rien dans le stockage (formulaire, « pour Sami », ses tâches)', a3.formulaire && a3.titre === 'Une tâche pour Sami' && a3.liste === 1, JSON.stringify(a3));
+      await cv.close(); } }
   /* 0.64.0 (ses choix du 22/11/2026) : son message vocal, enregistré sur sa page (micro de test de Chromium), arrive dans JARVIS : sa voix joue
      d'elle-même, la fiche propose « C’est fait », « Dans 5 min », « Dans 15 min » ; elle voit « Faite ✓ » (prénoms inventés) */
   { const tk = await p.evaluate(() => JSON.parse(localStorage.getItem('jarvis.settings')).serverToken), AH = {authorization: 'Bearer ' + tk, 'content-type': 'application/json'};
@@ -232,6 +250,11 @@ try {
     await q.goto(BASE + '/?serveur#reglages'); await q.waitForTimeout(3500);
     const c1 = await q.evaluate(() => { const c = document.getElementById('mcp-card'); return c ? {txt: c.textContent, urgent: c.dataset.urgent === '1'} : null; });
     ok('MCP : une demande d\'accès apparaît dans Réglages (en tête), avec les mêmes 4 chiffres que la page de l\'assistant', !!c1 && c1.txt.includes('Claude demande l’accès à JARVIS') && !!chiffres && c1.txt.includes(chiffres) && c1.urgent, JSON.stringify([chiffres, c1 && c1.txt.slice(0, 300)]));
+    // 0.73.0 — A5-mcp-memoire : l'app reçoit l'adresse où l'assistant sera renvoyé (un faux « Claude » renvoie ailleurs que claude.ai)
+    { const em = await fetch(BASE + '/api/mcp', {headers: {authorization: 'Bearer ' + tk}}).then((x) => x.json());
+      ok('MCP 0.70 : la demande en attente dit où l’assistant sera renvoyé (claude.ai), avec ses 4 chiffres', (em.demandes || []).length === 1 && em.demandes[0].retour === 'claude.ai' && em.demandes[0].chiffres === chiffres, JSON.stringify(em.demandes));
+      const rv = await q.evaluate(() => [...document.querySelectorAll('#mcp-card .mcp-d .mcp-retour')].map((x) => x.textContent));
+      ok('MCP 0.70 (lot C) : dans Réglages, la demande affiche son retour en une ligne, l’hôte seulement : « Retour vers claude.ai »', rv.length === 1 && rv[0] === 'Retour vers claude.ai', JSON.stringify(rv)); }
     await q.evaluate(() => document.querySelector('#mcp-card .mcp-d .btn.main').click()); await q.waitForTimeout(1200);
     const att = await fetch(BASE + '/oauth/attente/' + aid).then((x) => x.json()), c2 = await q.evaluate(() => document.getElementById('mcp-card').textContent);
     ok('MCP : « Autoriser » dans JARVIS renvoie l\'assistant à sa page avec un code', att.statut === 'accordee' && /code=/.test(att.redirect || '') && /Claude est relié à JARVIS/.test(c2), JSON.stringify([att.statut, c2.slice(-120)]));
@@ -628,6 +651,41 @@ try {
       ok('voix : reporter une tâche se fait aussitôt ; la supprimer attend un « oui vas-y merci » ; une tâche introuvable est dite, rien n’est coché', e6.cartes.some((c) => /Tâche à reporter/i.test(c) && /C'est parti/.test(c)) && e7.cartes.some((c) => /Tâche à supprimer/i.test(c) && /Supprimer/.test(c)) && e8.cartes.some((c) => /Tâche à supprimer/i.test(c) && /C'est parti/.test(c)) && e8.eux.some((x) => /tâche supprimée/.test(x)) && e9.eux.some((x) => /Je ne trouve pas la tâche « Repeindre la lune »/.test(x)), JSON.stringify([e6.cartes.slice(-1), e7.cartes.slice(-1), e8, e9.eux])); }
     await v.tap('#chat .mains-fin').catch(() => {});
     await v.close(); }
+  // 0.73.0 — A6-voix
+  /* mains libres : une phrase finie pendant que la précédente s'écrit encore (écoute lente) ne l'annule plus : les deux partent ensemble,
+     dans l'ordre ; une lecture coupée (au fil de la réponse, ou « Écouter ») rend à l'iPhone les sons déjà préparés */
+  { const w = await ctx.newPage(); w.on('pageerror', (e) => errs.push('A6-voix : ' + e.message));
+    const samples = []; let lents = 0;
+    await w.route('**/api/stt', async (route) => { const r = route.request(); if (!r.headers()['x-tour'] && lents++ === 0) await new Promise((z) => setTimeout(z, 6000)); route.continue().catch(() => {}); });   /* la 1re phrase s'écrit lentement */
+    w.on('request', (r) => { if (/\/api\/sample$/.test(r.url())) samples.push(r.url()); });
+    await w.addInitScript(() => {
+      try { const s0 = JSON.parse(localStorage.getItem('jarvis.settings') || '{}'); s0.orbe = 'conversation'; localStorage.setItem('jarvis.settings', JSON.stringify(s0)); } catch (e) { /* rien */ }
+      const AC = window.AudioContext || window.webkitAudioContext; const ac = new AC(), osc = ac.createOscillator(), g = ac.createGain(), dest = ac.createMediaStreamDestination();
+      g.gain.value = 0; osc.frequency.value = 220; osc.connect(g); g.connect(dest); osc.start();
+      window.__talk = (ms) => { ac.resume(); const t0 = ac.currentTime + 0.02; g.gain.setValueAtTime(0.6, t0); g.gain.setValueAtTime(0, t0 + ms / 1000); };
+      navigator.mediaDevices.getUserMedia = async () => { await ac.resume(); return dest.stream.clone(); };
+    });
+    await w.goto(BASE + '/?serveur#accueil'); await w.waitForTimeout(3000);
+    await w.tap('.talk-slot .jv-btn'); await w.waitForTimeout(1500);
+    const n0 = await w.evaluate(() => document.querySelectorAll('#chat .msg.me').length);
+    await w.evaluate(() => window.__talk(1800)); await w.waitForTimeout(4300);   /* 1re phrase (« pas finie » pour Smart Turn) : elle part après 1,6 s de silence */
+    await w.evaluate(() => window.__talk(1800)); await w.waitForTimeout(9500);   /* 2e phrase, finie avant que la 1re soit écrite */
+    const moi = await w.evaluate(() => [...document.querySelectorAll('#chat .msg.me')].map((x) => x.textContent));
+    ok('mains libres (0.73.0) : une phrase finie pendant que la précédente s’écrit encore ne l’annule plus : les deux partent ensemble, dans l’ordre, en une seule question', moi.length === n0 + 1 && (moi[n0].match(/raconte lentement ta journée/gi) || []).length === 2 && samples.length === 1, JSON.stringify([moi.slice(n0), samples.length, lents]));
+    await w.tap('#chat .mains-fin').catch(() => {}); await w.waitForTimeout(500);
+    const urls = await w.evaluate(async () => {
+      const V = window.JarvisVoice, made = [], freed = new Set(), c0 = URL.createObjectURL, r0 = URL.revokeObjectURL, delai = (ms) => new Promise((z) => setTimeout(z, ms));
+      URL.createObjectURL = (b) => { const u = c0.call(URL, b); made.push(u); return u; }; URL.revokeObjectURL = (u) => { freed.add(u); return r0.call(URL, u); };
+      const texte = 'Première phrase assez longue pour partir seule à la voix. Deuxième phrase, elle aussi assez longue pour être préparée. Troisième phrase, préparée pendant que la première se lit.';
+      const kind = V.sayKind(), fl = V.sayFlux({onStart: () => V.hush()}); fl.push(texte); fl.end();   /* coupée dès qu'elle commence : les trois sons sont déjà demandés */
+      await Promise.race([fl.done, delai(4000)]);
+      const p = V.say(texte); V.hush(); await Promise.race([p, delai(4000)]);
+      await delai(2500);   /* les sons préparés arrivent après la coupure */
+      URL.createObjectURL = c0; URL.revokeObjectURL = r0;
+      return {kind, made: made.length, rendus: made.filter((u) => freed.has(u)).length};
+    });
+    ok('voix (0.73.0) : une lecture coupée (au fil de la réponse, ou « Écouter ») rend à l’iPhone tous les sons déjà préparés', urls.kind === 'serveur' && urls.made === 6 && urls.rendus === urls.made, JSON.stringify(urls));
+    await w.close(); }
   /* 0.33.0 : l'activité en direct — une mission lancée apparaît sur l'accueil (« En ce moment ») avec son plan et ce qu'elle fait, et sur l'orbe (pastille) ;
      elle en part une fois finie ; Suivi montre ses étapes */
   { const q = await ctx.newPage(); q.on('pageerror', (e) => errs.push('activité : ' + e.message));
@@ -645,6 +703,33 @@ try {
     await q.evaluate(() => { const b = document.querySelector('#missions'); if (b) b.scrollIntoView(); }); await q.waitForTimeout(1400);
     const a3 = await q.evaluate(() => { const it = [...document.querySelectorAll('#missions .mis-it')].find((x) => /budget des vacances/.test(x.textContent)); if (it) it.open = true; return it ? {etapes: it.querySelectorAll('.mis-etapes li').length, outil: (it.querySelector('.mis-outil') || {}).textContent || '', txt: it.textContent.slice(0, 160)} : null; });
     ok('missions : Suivi montre le plan de la mission en cours et ce qu\'elle fait à l\'instant', a3 && a3.etapes === 3 && /À l’instant : Recherche web/.test(a3.outil), JSON.stringify(a3));
+    await q.close(); }
+  // 0.73.0 — B3-page-5-pont
+  /* missions relues toutes les 5 s pendant qu'une tourne (Équipe › Demandes), fiche dépliée gardée ; Réglages sans rebâtir Suivi ;
+     la carte « Assistants reliés » relue au retour dans Réglages (missions servies par le banc, inventées) */
+  { const q = await ctx.newPage(); q.on('pageerror', (e) => errs.push('0.70 : ' + e.message));
+    let lus = 0; const at0 = Date.now();
+    await q.route('**/api/missions', (route) => { if (route.request().method() !== 'GET') return route.continue(); lus++;
+      return route.fulfill({status: 200, contentType: 'application/json', body: JSON.stringify({missions: [{id: 'm-b3-cours', status: 'envoyee', text: 'Mission d’essai qui tourne', at: at0, etapes: [{t: 'Lire', s: 'fait'}, {t: 'Comparer', s: 'en cours'}], outil: 'Recherche web n° ' + lus},
+        {id: 'm-b3-fini', status: 'terminee', text: 'Mission d’essai finie', at: at0 - 60000, done: at0 - 30000, result: 'Compte rendu d’essai.'}]})}); });
+    await q.goto(BASE + '/?serveur#suivi'); await q.waitForTimeout(2500);
+    await q.evaluate(() => { const d = document.querySelector('.mis-it[data-mission="m-b3-fini"]'); if (d) { d.open = true; d.querySelector('summary').focus(); } });   /* ouverte au doigt : le titre garde le focus */
+    const n0 = lus; await q.waitForTimeout(11000);
+    const mi = await q.evaluate(() => ({outil: (document.querySelector('.mis-it[data-mission="m-b3-cours"] .mis-outil') || {}).textContent || '', fini: !!(document.querySelector('.mis-it[data-mission="m-b3-fini"]') || {}).open}));
+    ok('0.70 : missions : pendant qu’une mission tourne, Équipe › Demandes relit ses étapes toutes les 5 s (avant : figées) ; une fiche dépliée le reste', lus - n0 >= 2 && +((mi.outil.match(/(\d+)$/) || [])[1] || 0) > n0 && mi.fini, JSON.stringify({n0, lus, mi}));
+    await q.close(); }
+  { const q = await ctx.newPage(); q.on('pageerror', (e) => errs.push('0.70 : ' + e.message));
+    const vus = {}; q.on('request', (r) => { try { const u = new URL(r.url()); if (r.method() === 'GET' && /^\/api\/(missions|relances|conso|sante|mcp)$/.test(u.pathname)) vus[u.pathname] = (vus[u.pathname] || 0) + 1; } catch (e) { /* rien */ } });
+    await q.goto(BASE + '/?serveur#reglages'); await q.waitForTimeout(4000);
+    const lecture = [], s0 = vus['/api/sante'] || 0;
+    for (let i = 0; i < 3; i++) { lecture.push(await q.evaluate(() => { window.__uxRerender(); const s = document.querySelector('.sante-box'); return s ? s.textContent : ''; })); await q.waitForTimeout(500); }
+    const sys = await q.evaluate(() => [...document.querySelectorAll('#view .panel h2')].filter((x) => /^État des systèmes/.test(x.textContent)).length);
+    ok('0.70 : Réglages : « État des systèmes » (et la santé du serveur) sans rebâtir Suivi : aucune lecture des missions, relances ni consommation, la santé relue au plus toutes les 30 s, plus de « Lecture de l’état du serveur… » à chaque rafraîchissement', sys === 1 && (vus['/api/sante'] || 0) - s0 === 0 && !vus['/api/missions'] && !vus['/api/relances'] && !vus['/api/conso'] && lecture.every((t) => /Ton serveur/.test(t) && !/Lecture de l’état du serveur/.test(t)), JSON.stringify({sys, s0, vus, lecture: lecture.map((t) => t.slice(0, 50))}));
+    const txt = await q.evaluate(() => (document.getElementById('mcp-card') || {}).textContent || '');
+    await q.evaluate(() => document.querySelector('.tab[data-tab="agenda"]').click()); await q.waitForTimeout(500); const a0 = vus['/api/mcp'] || 0; await q.waitForTimeout(3500); const a1 = vus['/api/mcp'] || 0;
+    await q.evaluate(() => document.querySelector('.tab[data-tab="espaces"]').click()); await q.waitForTimeout(700); await q.evaluate(() => document.querySelector('.esp-row[data-go="reglages"]').click()); await q.waitForTimeout(300);
+    const m0 = vus['/api/mcp'] || 0; await q.waitForTimeout(9000); const m1 = vus['/api/mcp'] || 0;
+    ok('0.70 : Réglages : revenu d’une autre rubrique, la carte « Assistants reliés » se relit de nouveau (aucun appel pendant qu’elle n’est pas à l’écran) ; elle renvoie à « Équipe, filtre Demandes », plus à Suivi', a1 === a0 && m1 - m0 >= 2 && /attend ton accord dans Équipe, filtre Demandes/.test(txt) && !/dans Suivi/.test(txt), JSON.stringify({a0, a1, m0, m1, txt: txt.slice(0, 200)}));
     await q.close(); }
   /* 0.24.0 : chercher un produit à partir d'une idée, par le serveur (faux Claude) */
   { await p.goto(BASE + '/?serveur#achats'); await p.waitForTimeout(3500);

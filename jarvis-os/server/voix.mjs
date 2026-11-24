@@ -31,7 +31,7 @@ export function choixEcoute(dir, env = process.env) {
   } catch { /* marque illisible : Whisper */ }
   return {moteur: 'whisper'};
 }
-export function createEcoute({dir, py, helper, parakeetHelper, model, fakeHelper, log = () => {}}) {
+export function createEcoute({dir, py, helper, parakeetHelper, model, fakeHelper, log = () => {}, delaiMs = 30000}) {
   const ready = () => !!fakeHelper || (fs.existsSync(py) && (fs.existsSync(path.join(dir, 'ok')) || choixEcoute(dir).moteur === 'parakeet'));
   let H = null;
   function proc() {
@@ -42,6 +42,7 @@ export function createEcoute({dir, py, helper, parakeetHelper, model, fakeHelper
     const h = {child, buf: '', waits: new Map(), dead: false, ready: false, err: ''};
     child.on('close', () => { h.dead = true; for (const w of h.waits.values()) w({ok: false, error: 'écoute arrêtée'}); h.waits.clear(); });
     child.on('error', () => { h.dead = true; });
+    child.stdin.on('error', () => { /* 0.73.0 : écoute déjà arrêtée (EPIPE) : le serveur ne doit pas tomber ; « close » rend les attentes */ });
     child.stderr.on('data', (d) => { h.err = (h.err + d).slice(-800); });
     child.stdout.on('data', (d) => {
       h.buf += d; let i;
@@ -62,7 +63,9 @@ export function createEcoute({dir, py, helper, parakeetHelper, model, fakeHelper
     fs.mkdirSync(tmpDir, {recursive: true}); fs.writeFileSync(f, wav);
     const t0 = Date.now();
     const r = await new Promise((resolve) => {
-      const timer = setTimeout(() => { h.waits.delete(id); resolve({ok: false, error: 'trop long'}); }, 30000);
+      /* 0.73.0 : 30 s sans réponse : le programme est figé (ou débordé) ; il est relancé à la phrase suivante, s'il avait fini de charger
+         son modèle (sinon il charge encore : on le laisse finir) */
+      const timer = setTimeout(() => { h.waits.delete(id); if (h.ready) { try { h.child.kill('SIGKILL'); } catch { /* rien */ } if (H === h) H = null; } resolve({ok: false, error: 'trop long'}); }, delaiMs);
       h.waits.set(id, (m) => { clearTimeout(timer); resolve(m); });
       try { h.child.stdin.write(JSON.stringify({id, wav: f, prompt: VOCAB}) + '\n'); } catch { clearTimeout(timer); h.waits.delete(id); resolve({ok: false, error: 'écoute injoignable'}); }
     });
@@ -80,23 +83,25 @@ export function createEcoute({dir, py, helper, parakeetHelper, model, fakeHelper
 /* 0.36.0 : la fin de phrase reconnue à la voix (Smart Turn v3.2, stt/tour_helper.py), installée par install/ecoute.sh (marque tour/ok).
    Un petit programme Python garde le modèle (8,7 Mo) en mémoire ; verdict(wav) → {ok, p} (probabilité que la phrase soit finie).
    JARVIS_TOUR_HELPER : faux modèle du banc. */
-export function createTour({dir, py, helper, fakeHelper, log = () => {}}) {
+export function createTour({dir, py, helper, fakeHelper, log = () => {}, delaiMs = 3000}) {
   const model = path.join(dir, 'tour', 'smart-turn-v3.2-cpu.onnx');
   const ready = () => !!fakeHelper || (fs.existsSync(py) && fs.existsSync(path.join(dir, 'tour', 'ok')) && fs.existsSync(model));
   let H = null;
   function proc() {
     if (H && !H.dead) return H;
     const child = fakeHelper ? spawn(process.execPath, [fakeHelper], {stdio: ['pipe', 'pipe', 'pipe']}) : spawn(py, [helper, model], {stdio: ['pipe', 'pipe', 'pipe'], env: {...process.env, JARVIS_TOUR_THREADS: process.env.JARVIS_TOUR_THREADS || '1'}});
-    const h = {child, buf: '', waits: new Map(), dead: false, err: ''};
+    const h = {child, buf: '', waits: new Map(), dead: false, ready: false, lents: 0, err: ''};
     child.on('close', () => { h.dead = true; for (const w of h.waits.values()) w({ok: false, error: 'fin de phrase arrêtée'}); h.waits.clear(); });
     child.on('error', () => { h.dead = true; });
+    child.stdin.on('error', () => { /* 0.73.0 : programme déjà arrêté (EPIPE) : le serveur ne doit pas tomber ; « close » rend les attentes */ });
     child.stderr.on('data', (d) => { h.err = (h.err + d).slice(-800); });
     child.stdout.on('data', (d) => {
       h.buf += d; let i;
       while ((i = h.buf.indexOf('\n')) >= 0) {
         const line = h.buf.slice(0, i); h.buf = h.buf.slice(i + 1);
         let m; try { m = JSON.parse(line); } catch { continue; }
-        if (m.ready) continue;
+        if (m.ready) { h.ready = true; continue; }
+        h.lents = 0;
         const w = h.waits.get(m.id); if (w) { h.waits.delete(m.id); w(m); }
       }
     });
@@ -108,7 +113,8 @@ export function createTour({dir, py, helper, fakeHelper, log = () => {}}) {
     const h = proc(), id = crypto.randomUUID(), f = path.join(tmpDir, 'tour-' + id + '.wav');
     fs.mkdirSync(tmpDir, {recursive: true}); fs.writeFileSync(f, wav);
     const r = await new Promise((resolve) => {
-      const timer = setTimeout(() => { h.waits.delete(id); resolve({ok: false, error: 'trop long'}); }, 3000);   /* au-delà, la phrase part comme avant */
+      /* au-delà de 3 s, la phrase part comme avant ; 0.73.0 : deux fois de suite sans réponse (programme figé), il est relancé à la pause suivante */
+      const timer = setTimeout(() => { h.waits.delete(id); if (h.ready && ++h.lents >= 2) { try { h.child.kill('SIGKILL'); } catch { /* rien */ } if (H === h) H = null; } resolve({ok: false, error: 'trop long'}); }, delaiMs);
       h.waits.set(id, (m) => { clearTimeout(timer); resolve(m); });
       try { h.child.stdin.write(JSON.stringify({id, wav: f}) + '\n'); } catch { clearTimeout(timer); h.waits.delete(id); resolve({ok: false, error: 'fin de phrase injoignable'}); }
     });
@@ -126,26 +132,40 @@ export function wavOk(b) { return Buffer.isBuffer(b) && b.length > 44 && b.lengt
 /* ---------- 2. les réponses instantanées ---------- */
 const BOTS = BOT_NOMS;
 const JOURS = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
-/* le jour visé par la phrase : 0 aujourd'hui, 1 demain… ; soir ; week-end (samedi et dimanche) */
+/* le jour visé par la phrase : 0 aujourd'hui, 1 demain… ; soir ; week-end (samedi et dimanche).
+   0.73.0 : « demain soir » est un soir ; « ce week-end » dit un dimanche, c'est aujourd'hui ; « lundi prochain » dit un lundi, c'est dans 7 jours */
 export function quand(t, dow) {
-  const l = nrm(t), q = {jour: 0, soir: /\b(ce soir|cette nuit)\b/.test(l), we: false, dit: "aujourd'hui"};
+  const l = nrm(t), prochain = /\bprochaine?\b/.test(l), q = {jour: 0, soir: /\b(soir|soiree|cette nuit)\b/.test(l), we: false, dit: "aujourd'hui"};
   if (/apres[- ]demain/.test(l)) return {...q, jour: 2, dit: 'après-demain'};
   if (/\bdemain\b/.test(l)) return {...q, jour: 1, dit: 'demain'};
-  if (/\b(ce |le )?week[- ]?end\b/.test(l)) { const n = (6 - dow + 7) % 7; return {...q, jour: n, we: true, dit: 'ce week-end'}; }
+  if (/\b(ce |le )?week[- ]?end\b/.test(l)) {
+    if (dow === 0 && !prochain) return q;
+    let n = (6 - dow + 7) % 7; if (prochain && n === 0) n = 7;
+    return {...q, jour: n, we: true, dit: prochain ? 'le week-end prochain' : 'ce week-end'};
+  }
   const j = JOURS.findIndex((x) => new RegExp('\\b' + x + '\\b').test(l));
-  if (j >= 0) { const n = (j - dow + 7) % 7; return {...q, jour: n, dit: n === 0 ? "aujourd'hui" : n === 1 ? 'demain' : JOURS[j]}; }
+  if (j >= 0) { let n = (j - dow + 7) % 7; if (prochain && n === 0) n = 7; return {...q, jour: n, dit: n === 0 ? "aujourd'hui" : n === 1 ? 'demain' : n === 7 ? JOURS[j] + ' prochain' : JOURS[j]}; }
   return q;
 }
-/* ce que demande la phrase, si le serveur sait y répondre seul ; null sinon (Claude répond) */
+/* 0.73.0 : une phrase qui demande d'agir (rappel, ajout, achat, message, réglage…) n'a jamais de réponse instantanée : Claude s'en occupe */
+const ORDRE = /^(rappelle|ajoute|rajoute|achete|commande|note|mets|envoie|ecris|cherche|trouve|reserve|baisse|monte|regle|allume|eteins|prepare|redige|fais|lance|supprime|enleve|retire|annule|deplace|programme|planifie|cree|demande|relance|previens|reponds)\b|^dis (a|au|aux)\b|\b(rappeler|ajouter|rajouter|noter|acheter|commander|reserver)\b/;
+/* 0.73.0 : l'heure et la date d'ici et de maintenant, demandées seules : pas « à quelle heure part… », « quel jour tombe… », l'heure d'une autre ville */
+const DEBUT = "^((et|alors|bon|dis|dis-moi|dis moi|donne-moi|donne moi|tu as|t'as|as-tu|tu sais|sais-tu|c'est quoi|tu peux me dire|peux-tu me dire|peux tu me dire) )?";
+const FIN = "( maintenant| en ce moment| exactement| deja| la| aujourd'hui| d'aujourd'hui| du jour)?$";
+const HEURE = new RegExp(DEBUT + "(quelle heure|quelle heure (est-il|est il|il est|c'est)|(il est|c'est) quelle heure|l'heure qu'il est|l'heure)" + FIN);
+const DATE = new RegExp(DEBUT + "(quel jour|quelle date|quelle est la date|(on est|nous sommes|c'est) quel jour|(on est|nous sommes) le combien|quel jour (on est|est-on|est on|sommes-nous|sommes nous|nous sommes|est-il|est il|c'est)|quelle date (on est|est-on|est on|sommes-nous|sommes nous|nous sommes|est-il|est il|c'est)|la date)" + FIN);
+/* ce que demande la phrase, si le serveur sait y répondre seul ; null sinon (Claude répond). 0.73.0 : une salutation (« Bonjour Jarvis, quelle heure
+   est-il ? ») ou un « euh » devant n'empêchent pas la réponse instantanée */
 export function intention(text) {
   const l = nrm(text).replace(/[?!.,;]+/g, ' ').replace(/\s+/g, ' ').trim(), mots = l.split(' ').filter(Boolean).length;
-  if (!l) return null;
-  const court = mots <= 14;
-  if (court && /\b(quelle heure|l'heure qu'il est|il est quelle heure)\b/.test(l)) return {kind: 'heure'};
-  if (court && /\b(quel jour|quelle date|on est le combien|la date d'aujourd'hui|on est quel jour)\b/.test(l) && !/\b(rendez|agenda|meteo)/.test(l)) return {kind: 'date'};
-  if (!/\b(notes? de frais|frais de|les frais)\b/.test(l) && /\b(meteo|quel temps|temps fait|il fait (beau|froid|chaud|frais|combien|quel)|fera(-t-il)? (beau|froid|chaud)|va (t'il |t il |-t-il )?pleuvoir|pleuvoir|pluie|parapluie|neige|neiger|temperature|degres|manteau|veste|frais dehors|du frais|fait frais|fait froid|soleil)\b/.test(l)) return {kind: 'meteo', court};
-  if (court && /\b(mon agenda|mes rendez-vous|mes rendez vous|mon planning|mon programme|qu'est-ce que j'ai|qu'est ce que j'ai|j'ai quoi|ai-je quelque chose|j'ai des rendez)\b/.test(l)) return {kind: 'agenda'};
-  if (court && /\b(qu'est-ce qui m'attend|qu'est ce qui m'attend|mes demandes|pour moi|ce que je dois faire|qu'est-ce que je dois faire|qu'est ce que je dois faire|ce qui m'attend|a faire pour moi)\b/.test(l)) return {kind: 'pourmoi'};
+  if (!l || ORDRE.test(l)) return null;
+  const court = mots <= 14, passe = /\b(hier|avant-hier)\b/.test(l), seul = l.replace(/\b(jarvis|bonjour|bonsoir|salut|coucou|hello|hey|he|eh|euh|ok|okay|oui|stp|svp|s'il te plait|s'il vous plait|merci)\b/g, ' ').replace(/\s+/g, ' ').trim();
+  if (court && HEURE.test(seul)) return {kind: 'heure'};
+  if (court && DATE.test(seul)) return {kind: 'date'};
+  if (!passe && !/\b(notes? de frais|frais de|les frais)\b/.test(l) && !/\b(liste|courses|panier|chauffage|thermostat|radiateur|clim|climatisation|four|frigo|congelateur|bain|piscine)\b/.test(l) && /\b(meteo|quel temps|temps fait|il fait (beau|froid|chaud|frais|combien|quel)|fera(-t-il)? (beau|froid|chaud)|va (t'il |t il |-t-il )?pleuvoir|pleuvoir|pluie|parapluie|neige|neiger|temperature|degres|manteau|veste|frais dehors|du frais|fait frais|fait froid|soleil)\b/.test(l)) return {kind: 'meteo', court};
+  if (court && !passe && /\b(mon agenda|mes rendez-vous|mes rendez vous|mon planning|mon programme|qu'est-ce que j'ai|qu'est ce que j'ai|j'ai quoi|ai-je quelque chose|j'ai des rendez)\b/.test(l)
+    && !/\b(oublie|perdu|rate|loupe|manque|mange|bu|dit|ecrit|envoye|recu|gagne|paye|depense|vu|lu|appris|casse|fait (de|du|des|avec|a)|mal|malade|fievre|liste|courses|panier)\b/.test(l)) return {kind: 'agenda'};
+  if (court && /\b(qu'est-ce qui m'attend|qu'est ce qui m'attend|mes demandes|quoi de neuf pour moi|rien pour moi|quelque chose pour moi|ce que je dois faire|qu'est-ce que je dois faire|qu'est ce que je dois faire|ce qui m'attend|a faire pour moi)\b/.test(l)) return {kind: 'pourmoi'};
   const b = Object.keys(BOTS).find((k) => new RegExp('\\b' + k + '\\b').test(l));
   if (court && b && /\b(ou en est|des nouvelles|a repondu|a fini|qu'a fait|qu'est-ce que fait|quoi de neuf (chez|avec|du cote))\b/.test(l)) return {kind: 'bot', bot: b};
   return null;
@@ -197,7 +217,8 @@ export function meteoUrl(base, lat, lon) {
 export const heurePhrase = (t) => { const [H, M] = t.hm.split(':').map(Number); return 'Il est ' + H + ' h' + (M ? ' ' + String(M).padStart(2, '0') : '') + '.'; };
 export const datePhrase = (d) => 'Nous sommes le ' + new Intl.DateTimeFormat('fr-FR', {timeZone: 'Europe/Paris', weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'}).format(d) + '.';
 
-/* 0.22.1 : la diction de Pierre (Piper lit « 18 h 49 » « dix-huit ache », « 7° », « 30 % », « 18/11 » chiffre par chiffre) : écrit comme on le dit */
+/* 0.22.1 : la diction de Pierre (Piper lit « 18 h 49 » « dix-huit ache », « 7° », « 30 % », « 18/11 » chiffre par chiffre) : écrit comme on le dit.
+   0.73.0 : « 7° et 9° » ne colle plus le mot suivant (on lisait « degréset »), « 7°. » est lu aussi, « 1° » et « -1° » font « degré » au singulier */
 const MOIS_DIT = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
 export const diction = (t) => String(t || '')
   .replace(/\bJ\.A\.R\.V\.I\.S\b\.?/g, 'Jarvis').replace(/\bJARVIS\b/g, 'Jarvis').replace(/\bJarvis\s+OS\b\.?/g, 'Jarvis O.S.')   /* 0.47.0 : son nom, J.A.R.V.I.S OS, se dit « Jarvis O.S. » (Google épelait les majuscules) */
@@ -206,6 +227,6 @@ export const diction = (t) => String(t || '')
   .replace(/\b(\d{1,2})\s*h\b(?![\wÀ-ÿ'])/g, (m, H) => H + (+H > 1 ? ' heures' : ' heure'))
   .replace(/\b(\d{1,2})\/(\d{1,2})\/(\d{4})\b/g, (m, d, mo, y) => (+mo >= 1 && +mo <= 12 ? (+d === 1 ? '1er' : +d) + ' ' + MOIS_DIT[+mo - 1] + ' ' + y : m))
   .replace(/\b(\d{1,2})\/(\d{1,2})\b/g, (m, d, mo) => (+mo >= 1 && +mo <= 12 && +d <= 31 ? (+d === 1 ? '1er' : +d) + ' ' + MOIS_DIT[+mo - 1] : m))
-  .replace(/(\d)\s*°\s*C?\b/g, '$1 degrés').replace(/(\d)\s*%/g, '$1 pour cent').replace(/(\d)\s*€/g, '$1 euros')
+  .replace(/(-?\d+)\s*°(?:\s*C(?![A-Za-zÀ-ÿ]))?/g, (m, d) => d + (Math.abs(+d) >= 2 ? ' degrés' : ' degré')).replace(/(\d)\s*%/g, '$1 pour cent').replace(/(\d)\s*€/g, '$1 euros')
   .replace(/\bJ-(\d+)\b/g, 'dans $1 jours').replace(/\bRDV\b/gi, 'rendez-vous').replace(/(\d)\s*km\b/g, '$1 kilomètres').replace(/(\d)\s*min\b/g, '$1 minutes')
   .replace(/(\d)[\s\u202f\u00a0](?=\d{3}\b)/g, '$1').replace(/[«»"]/g, ' ').replace(/\s*;\s*/g, '. ').replace(/\s+([.,:!?])/g, '$1').replace(/\s{2,}/g, ' ').trim();

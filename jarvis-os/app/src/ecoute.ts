@@ -38,7 +38,10 @@ export function toWav16k(chunks: Float32Array[], sr: number): Blob {
 export class Ecoute {
   private ctx: AudioContext | null = null; private stream: MediaStream | null = null; private node: ScriptProcessorNode | null = null; private src: MediaStreamAudioSourceNode | null = null;
   private floor = -58; private inSpeech = false; private voiced = 0; private silence = 0; private speechMs = 0; private totalMs = 0;
-  private chunks: Float32Array[] = []; private pre: Float32Array[] = []; private preLen = 0; private barge = false; private sending: AbortController | null = null;
+  private chunks: Float32Array[] = []; private pre: Float32Array[] = []; private preLen = 0; private barge = false;
+  /* 0.73.0 : les phrases en cours d'écriture (Whisper ou Parakeet), livrées dans l'ordre ; une phrase finie pendant que la précédente
+     s'écrit encore ne l'annule plus : elles partent ensemble, la première d'abord */
+  private sends = new Set<AbortController>(); private queue: Promise<void> = Promise.resolve(); private held = ''; private heldBarge = false;
   /* ce que fait JARVIS : « speaking » (il parle : seuil plus haut, contre son écho), « thinking » (il réfléchit), « idle » */
   busy: 'idle' | 'speaking' | 'thinking' = 'idle';
   paused = false;
@@ -87,7 +90,18 @@ export class Ecoute {
   /* 0.25.0 (dictée d'une question) : micro fermé et contexte audio rendu ; l'iPhone n'en accorde que quelques-uns à une page */
   close() { this.stop(); try { if (this.ctx) this.ctx.close().catch(() => {}); } catch { /* rien */ } this.ctx = null; }
   pause(p: boolean) { this.paused = p; this.reset(); this.o.onState(p ? 'paused' : 'listening'); }
-  cancelSend() { if (this.sending) { this.sending.abort(); this.sending = null; } }
+  cancelSend() { this.sends.forEach((c) => c.abort()); this.sends.clear(); this.queue = Promise.resolve(); this.held = ''; this.heldBarge = false; }
+  /* une phrase à livrer (texte à venir) : après celles d'avant ; si une autre s'écrit encore, elle l'attend et part avec elle */
+  private livrer(ctl: AbortController, p: Promise<string | null>, wasBarge: boolean) {
+    this.sends.add(ctl);
+    this.queue = this.queue.then(() => p).then((t) => {
+      if (!this.sends.delete(ctl)) return;   /* annulée par stop() ou close() */
+      const text = (this.held + ' ' + String(t || '')).trim(), barge = this.heldBarge || wasBarge; this.held = ''; this.heldBarge = false;
+      if (this.sends.size) { this.held = text; this.heldBarge = barge; return; }
+      if (!text) { if (barge) this.o.onBargeCancel(); this.o.onState('listening'); return; }
+      this.o.onUtterance(text);
+    }).catch(() => { /* une erreur de la page ne bloque pas les phrases suivantes */ });
+  }
   private tick() {
     const c = this.ctx; if (!c) return;
     try { const o = c.createOscillator(), g = c.createGain(); o.type = 'sine'; o.frequency.value = 1180; g.gain.setValueAtTime(0.0001, c.currentTime); g.gain.exponentialRampToValueAtTime(0.06, c.currentTime + 0.012); g.gain.exponentialRampToValueAtTime(0.0001, c.currentTime + 0.09); o.connect(g).connect(c.destination); o.start(); o.stop(c.currentTime + 0.1); } catch { /* rien */ }
@@ -141,9 +155,7 @@ export class Ecoute {
   }
   private done(t: string, wasBarge: boolean) {
     this.reset(); this.tick();
-    const text = String(t || '').trim();
-    if (!text) { if (wasBarge) this.o.onBargeCancel(); this.o.onState('listening'); return; }
-    this.o.onUtterance(text);
+    this.livrer(new AbortController(), Promise.resolve(String(t || '')), wasBarge);   /* 0.73.0 : après une phrase encore en cours d'écriture */
   }
   /* 0.25.0 (dictée d'une question) : « j'ai fini » d'un appui : la phrase en cours part tout de suite ; faux s'il n'a encore rien dit */
   flush(): boolean { if (!this.inSpeech || !this.stream) return false; this.finish(this.sr); return true; }
@@ -151,14 +163,12 @@ export class Ecoute {
     const chunks = this.chunks, wasBarge = this.barge, speech = this.speechMs;
     this.reset();
     if (speech < 260) { if (wasBarge) this.o.onBargeCancel(); this.o.onState('listening'); return; }   /* un clic, une toux */
-    const ctl = new AbortController(); this.cancelSend(); this.sending = ctl;
+    const ctl = new AbortController();
     this.tick();   /* 0.22.1 : un petit son discret : « je t'ai entendu » */
     this.o.onState('transcribing');
-    this.o.stt(toWav16k(chunks, sr), ctl.signal).then((t) => {
-      if (this.sending !== ctl) return; this.sending = null;
-      const text = String(t || '').trim();
-      if (!text) { if (wasBarge) this.o.onBargeCancel(); this.o.onState('listening'); return; }
-      this.o.onUtterance(text);
-    }, () => { if (this.sending !== ctl) return; this.sending = null; if (wasBarge) this.o.onBargeCancel(); this.o.onState('listening'); });
+    /* 0.73.0 : 40 s au plus (le serveur abandonne à 30 s) : une écoute qui ne répond plus ne retient pas les phrases suivantes */
+    const minuteur = window.setTimeout(() => ctl.abort(), 40000);
+    const p = this.o.stt(toWav16k(chunks, sr), ctl.signal).then((t) => t, () => null).finally(() => clearTimeout(minuteur));
+    this.livrer(ctl, p, wasBarge);
   }
 }

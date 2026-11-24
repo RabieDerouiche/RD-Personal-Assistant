@@ -56,7 +56,8 @@ export function validSubscription(sub, allowHttp) {
   } catch { return false; }
 }
 
-export function createPush({S, save, log = () => {}, allowHttp = false}) {
+/* 0.73.0 : délai max d'un envoi (10 s) : un service de notifications qui ne répond pas ne bloque plus le serveur 5 minutes par appareil */
+export function createPush({S, save, log = () => {}, allowHttp = false, delaiMs = 10000}) {
   S.push = Object.assign({subs: [], prefs: {bots: true, rappels: true, heure: '08:00'}, sent: 0}, S.push || {});
   if (!S.push.vapid) { S.push.vapid = newVapid(); save(); }
   const publicKey = () => S.push.vapid.publicKey;
@@ -68,6 +69,14 @@ export function createPush({S, save, log = () => {}, allowHttp = false}) {
     save(); return {ok: true, count: S.push.subs.length};
   }
   function unsubscribe(endpoint) { const n = S.push.subs.length; S.push.subs = S.push.subs.filter((x) => x.endpoint !== endpoint); save(); return {ok: true, removed: n - S.push.subs.length}; }
+  /* 0.73.0 : un appareil retiré (Réglages, « Retirer ») ne reçoit plus rien : ses abonnements partent avec lui (chacun porte l'empreinte courte
+     de l'appareil qui l'a créé ; un abonnement d'avant cette marque, sans empreinte, reste) */
+  function retirerAppareil(device) {
+    const d = String(device || ''); if (!d) return 0;
+    const n = S.push.subs.length; S.push.subs = S.push.subs.filter((x) => x.device !== d);
+    if (S.push.subs.length !== n) save();
+    return n - S.push.subs.length;
+  }
   /* 0.69.0 (son retour du 23/11/2026 : « quand on clique sur une notification, elle rouvre Jarvis sur la page déjà ouverte, pas sur l'alerte ») :
      avec le format déclaratif, l'iPhone ouvre lui-même l'adresse de la notification, sans passer par le service worker ; l'app déjà ouverte revient
      au premier plan sans changer d'adresse. Chaque notification a donc un identifiant, mis dans son adresse (« /?n=<id>#voir-… ») et gardé dans la
@@ -88,19 +97,19 @@ export function createPush({S, save, log = () => {}, allowHttp = false}) {
         const body = encrypt({payload, p256dh: s.keys.p256dh, auth: s.keys.auth});
         /* 17/11/2026 : Apple refusait chaque envoi (400 BadWebPushTopic) à cause de l'en-tête Topic : il n'est plus envoyé (facultatif ; le « tag » de la notification
            suffit à remplacer la précédente). « Urgency: normal » est la valeur par défaut et a déjà été refusé par Apple (WebKit 247128) : seule « high » est envoyée. */
-        const r = await fetch(s.endpoint, {method: 'POST', body, headers: {'content-encoding': 'aes128gcm', 'content-type': 'application/octet-stream', ttl: String(opts.ttl || 86400),
+        const r = await fetch(s.endpoint, {method: 'POST', body, signal: AbortSignal.timeout(delaiMs), headers: {'content-encoding': 'aes128gcm', 'content-type': 'application/octet-stream', ttl: String(opts.ttl || 86400),
           ...(opts.urgency && opts.urgency !== 'normal' ? {urgency: opts.urgency} : {}), authorization: vapidAuth({endpoint: s.endpoint, vapid: S.push.vapid, subject: S.push.subject || 'https://jarvis.invalid'})}});
         if (r.status === 404 || r.status === 410) unsubscribe(s.endpoint);
         const ok = r.status >= 200 && r.status < 300;
         /* raison donnée par le service (Apple : {"reason":"BadJwtToken"} …), gardée pour la montrer dans Réglages */
         let reason = ''; if (!ok) { try { const t = (await r.text()).slice(0, 300); try { reason = String(JSON.parse(t).reason || t); } catch { reason = t; } } catch { reason = ''; } }
         out.push({status: r.status, ok, service: new URL(s.endpoint).hostname, ...(reason ? {reason: reason.replace(/\s+/g, ' ').trim().slice(0, 160)} : {})});
-      } catch (e) { out.push({status: 0, ok: false, service: (() => { try { return new URL(s.endpoint).hostname; } catch { return ''; } })(), error: (String(e && e.message || e) + (e && e.cause ? ' (' + (e.cause.code || e.cause.message || e.cause) + ')' : '')).slice(0, 160)}); }
+      } catch (e) { out.push({status: 0, ok: false, service: (() => { try { return new URL(s.endpoint).hostname; } catch { return ''; } })(), error: (e && (e.name === 'TimeoutError' || e.name === 'AbortError') ? 'pas de réponse en ' + String(delaiMs / 1000).replace('.', ',') + ' s' : String(e && e.message || e) + (e && e.cause ? ' (' + (e.cause.code || e.cause.message || e.cause) + ')' : '')).slice(0, 160)}); }
     }
     const bad = out.find((x) => !x.ok), detail = bad ? (bad.status ? bad.status + (bad.reason ? ' ' + bad.reason : '') : 'réseau : ' + (bad.error || '?')) + (bad.service ? ' (' + bad.service + ')' : '') : '';
     S.push.sent = (S.push.sent || 0) + out.filter((x) => x.ok).length; S.push.last = {at: Date.now(), title: msg.title, ok: out.filter((x) => x.ok).length, total: out.length, ...(detail ? {detail} : {})}; save();
     log('notification « ' + msg.title + ' » : ' + out.filter((x) => x.ok).length + '/' + out.length + (detail ? ' · refus : ' + detail : ''));
     return out;
   }
-  return {publicKey, subscribe, unsubscribe, send, vues, notifs: () => S.notifs, status: () => ({publicKey: publicKey(), count: S.push.subs.length, prefs: S.push.prefs, last: S.push.last || null})};
+  return {publicKey, subscribe, unsubscribe, retirerAppareil, send, vues, notifs: () => S.notifs, status: () => ({publicKey: publicKey(), count: S.push.subs.length, prefs: S.push.prefs, last: S.push.last || null})};
 }

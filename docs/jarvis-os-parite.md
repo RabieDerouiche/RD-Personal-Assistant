@@ -36,7 +36,7 @@ Refonte UX (0.54.0, 22/11/2026) : navigation à 5 portes ; Suivi et Automatisati
 - [ ] Ce week-end, Tes envies, Déjà faites ; statuts Proposée, Faite, Supprimée (ne lui plaît pas), Retirée
 
 **Suivi (« Dossiers, papiers, tâches »)**
-- [ ] Dossiers en attente (sans les références), Mes tâches, Papiers, Déposer un document, Coût de la semaine (passages, ordres, demandes via chat, consignes ; semaine courante et précédente, remise à zéro le mardi à 12h)
+- [ ] Dossiers en attente (sans les références), Mes tâches, Papiers, Déposer un document, Coût de la semaine (passages, ordres, demandes via chat, consignes ; semaine courante et précédente, remise à zéro le mardi à 12h47 : ligne « Reset Grok » de Faits, sinon 12h47 par défaut, `resetRule`)
 
 **Équipe (« Les bots »)**
 - [ ] Chaque bot : sphère, silhouette, emblème, routines, Ses passages, Fil avec le bot, Temps forts, commandes rapides (exemples par bot), ordres
@@ -60,9 +60,9 @@ Refonte UX (0.54.0, 22/11/2026) : navigation à 5 portes ; Suivi et Automatisati
 
 - [x] Après le comparatif avec les AI OS (21/11/2026) : Claude instantané (0.30.0), mains libres et lecture au fil de la réponse (0.31.0), écoute Parakeet (0.32.0), activité en direct, routeur et secours, missions en parallèle (0.33.0), réponses illustrées (0.34.0) ; bancs maquette et bout en bout
 
-- [ ] Automatisations en suivi de livraison (dates, étapes, prochain passage)
-- [ ] Achats : ajout et retrait faciles, courbe des prix par objet
-- [ ] Papiers : recherche, regroupement, catégories (voiture, lui, épouse, fille, appartement et immobilier, entourage de la fille)
+- [x] Automatisations en suivi de livraison (dates, étapes, prochain passage) : 16/11/2026 ; depuis la 0.54.0 dans Équipe, filtre Routines ; banc maquette : `#automatisations` (frises de suivi de livraison), « automatisations : frise »
+- [x] Achats : ajout et retrait faciles, courbe des prix par objet : 16/11/2026 ; banc maquette : mini-courbes, « Suivre un produit », « Ne plus suivre », courbe complète de la fiche
+- [x] Papiers : recherche, regroupement, catégories (voiture, lui, épouse, fille, appartement et immobilier, entourage de la fille) : 16/11/2026 ; banc maquette : tuiles par personne et par thème, recherche instantanée et dans le texte des documents
 - [x] Voix (0.25.0, choix QCM du 19/11/2026) : la conversation continue est retirée ; l'orbe ouvre la discussion avec Claude, le micro dicte une question dans le champ, « Lecture » lit les réponses (banc maquette et bout en bout) ; 0.31.0 (choix du 21/11/2026) : mains libres sur ce même Claude (micro ouvert, réponse lue dès sa première phrase, coupure à la voix, « c'est tout »), la dictée restant au choix
 - [x] Recherche partout (loupe de l'en-tête) et « Pour moi » une par une (0.25.0)
 - [x] Agenda : événement sur plusieurs jours (« Jusqu'au », affiché sur chaque jour ; 0.28.0)
