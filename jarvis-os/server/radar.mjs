@@ -70,6 +70,32 @@ export function resteA(fixes, rev, t, mode, ponctuels = []) {
   const liste = fixes.flatMap((f) => occurrences(f, t, fin)).concat(pc).sort((p, q) => p.le - q.le || cents(q.f.montant) - cents(p.f.montant));
   return {fin, liste, total: liste.reduce((s, o) => s + cents(o.f.montant), 0) / 100};
 }
+/* 0.80.0 (sa demande du 24/11/2026) : les dépenses courantes, pas fixes mais qui reviennent chaque mois (courses, essence, femme de ménage,
+   coiffeur…). Trois façons de compter ce qui reste à dépenser d'un jour (compris) à un autre (compris) :
+   - « enveloppe » : un budget par mois, chaque semaine du mois en consomme un quart (du 1 au 7, du 8 au 14, du 15 au 21, du 22 à la fin) ;
+     un quart compte tant que sa semaine n'est pas finie (« s'il reste deux semaines, il reste la moitié ») ;
+   - « semaine » : un montant par passage, un jour de la semaine (0 = dimanche) : autant de fois que ce jour revient ;
+   - « mois » : une fois par mois, à un jour donné, ou sans jour : alors elle compte ce mois-ci tant qu'il ne l'a pas dite faite (`faits`). */
+export const QUARTS = [[1, 7], [8, 14], [15, 21], [22, 31]];
+export function courantes(liste, a, b) {
+  return (liste || []).map((c) => {
+    const m = cents(c.montant); let total = 0, n = 0;
+    if (c.mode === 'semaine') { for (let x = a, k = 0; x <= b && k < 400; x = plus(x, 1), k++) if (x.getUTCDay() === (parseInt(c.jour, 10) || 0)) n++; total = n * m; }
+    else for (let k = 0; k < 14; k++) {
+      const p = J(a.getUTCFullYear(), a.getUTCMonth() + k, 1), Y = p.getUTCFullYear(), M = p.getUTCMonth(); if (p > b) break;
+      if (c.mode === 'mois') {
+        if ((c.faits || []).includes(ymd(p).slice(0, 7))) continue;
+        const j = parseInt(c.jour, 10);
+        if (j >= 1) { const d = J(Y, M, Math.min(j, dim(Y, M))); if (d >= a && d <= b) { n++; total += m; } }
+        else if (k === 0) { n++; total += m; }
+      } else {
+        const q = Math.floor(m / 4);
+        QUARTS.forEach(([d1, d2], i) => { const deb = J(Y, M, d1), fin = J(Y, M, i === 3 ? dim(Y, M) : d2); if (fin >= a && deb <= b) { n++; total += i === 3 ? m - 3 * q : q; } });
+      }
+    }
+    return {c, n, montant: total / 100};
+  });
+}
 export const eur = (n) => Number(n).toLocaleString('fr-FR', {minimumFractionDigits: 2, maximumFractionDigits: 2}).replace(/ /g, ' ') + ' €';
 export const jourCourt = (x) => new Intl.DateTimeFormat('fr-FR', {timeZone: 'UTC', weekday: 'short'}).format(x) + ' ' + String(x.getUTCDate()).padStart(2, '0') + '/' + String(x.getUTCMonth() + 1).padStart(2, '0');
 const MOIS_L = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
@@ -429,7 +455,7 @@ export function createRadar({file, gmail, claude = async () => ({ok: false, erro
   /* 0.68.0 : plans (paiements en plusieurs fois), plansRetires (ceux qu'il a dits « plus à payer »), alertesVues (« Vu », gardé ici et plus
      seulement dans un iPhone), traitees (ses réponses aux alertes, pour « Annuler »), refusNoms (le nom de ce qu'il a écarté), claudeLus (ce que
      Claude a déjà lu, pour qu'une relecture ne lui renvoie pas les mêmes mails) */
-  const R = Object.assign({fixes: [], revenus: null, notif: {veille: true, seuil: 20, echec: true}, propositions: [], refus: [], releves: [], alertes: [], avenir: [], ponctuels: [], mandats: [], finis: [], gardes: {}, vus: [], fils: {}, scan: null, jours: {}, maj: null,
+  const R = Object.assign({fixes: [], courantes: [], revenus: null, notif: {veille: true, seuil: 20, echec: true}, propositions: [], refus: [], releves: [], alertes: [], avenir: [], ponctuels: [], mandats: [], finis: [], gardes: {}, vus: [], fils: {}, scan: null, jours: {}, maj: null,
     plans: {}, plansRetires: [], alertesVues: {}, traitees: [], refusNoms: {}, claudeLus: {}}, lireFichier());
   /* 0.73.0 : les mails « nouvelle mensualité » déjà appliqués à une dépense fixe (gardés hors de oublier()) : « Tout relire » ne les réapplique pas,
      sa correction à la main reste. Un fichier d'avant les retrouve dans les alertes encore gardées. */
@@ -486,12 +512,27 @@ export function createRadar({file, gmail, claude = async () => ({ok: false, erro
     if (o.paliers && f.contrat && typeof f.contrat === 'object') o.contrat = {objet: TXT(f.contrat.objet, 140), date: TXT(f.contrat.date, 10), ...(/^https:\/\/mail\.google\.com\//.test(String(f.contrat.url || '')) ? {url: TXT(f.contrat.url, 200)} : {})};
     return o;
   };
+  /* 0.80.0 : une dépense courante saisie par lui (rien ne vient de ses mails) */
+  const propreC = (c, i) => {
+    if (!c || typeof c !== 'object') return null;
+    const service = TXT(c.service, 80), montant = Math.round((+String(c.montant).replace(',', '.')) * 100) / 100, mode = ['enveloppe', 'semaine', 'mois'].includes(c.mode) ? c.mode : null;
+    if (!service || !mode || !(montant > 0 && montant < 100000)) return null;
+    const o = {id: /^[a-z0-9]{3,40}$/.test(String(c.id || '')) ? c.id : 'dc' + now().toString(36) + i, service, type: /^[a-z]{2,20}$/.test(String(c.type || '')) ? c.type : 'autre', mode, montant};
+    const j = parseInt(c.jour, 10);
+    if (mode === 'semaine') { if (!(j >= 0 && j <= 6)) return null; o.jour = j; }
+    if (mode === 'mois') { if (j >= 1 && j <= 31) o.jour = j; o.faits = [...new Set((Array.isArray(c.faits) ? c.faits : []).filter((x) => /^\d{4}-\d{2}$/.test(x)))].sort().slice(-6); }
+    return o;
+  };
   function regler(cle, v) {
     if (cle === 'fixes') {
       if (!Array.isArray(v) || v.length > 200) return {ok: false, error: 'Liste illisible.'}; const l = v.map(propre); if (l.some((x) => !x)) return {ok: false, error: 'Une dépense est incomplète (nom, montant, jour de 1 à 31).'};
       /* 0.54.0 : une dépense lue dans ses mails qu'il retire ne lui est plus proposée (0.68.0 : sauf s'il la repropose, depuis « Écartées ») */
       for (const f of R.fixes) if (f.source === 'mail' && cleDe(f) && !l.some((x) => x.id === f.id)) ecarter(cleDe(f), f.service);
       R.fixes = l;
+    }
+    else if (cle === 'courantes') {
+      if (!Array.isArray(v) || v.length > 60) return {ok: false, error: 'Liste illisible.'}; const l = v.map(propreC); if (l.some((x) => !x)) return {ok: false, error: 'Une dépense courante est incomplète (nom, montant, façon de compter).'};
+      R.courantes = l;
     }
     else if (cle === 'revenus') {
       if (!v || !(v.jour === 'dernier' || (parseInt(v.jour, 10) >= 1 && parseInt(v.jour, 10) <= 31))) return {ok: false, error: 'Jour de paie illisible.'};
@@ -1043,9 +1084,9 @@ export function createRadar({file, gmail, claude = async () => ({ok: false, erro
     /* 0.73.0 : pendant une relecture, ce qu'il voyait avant (R.avant) ne compte plus un paiement qu'il a dit « plus à payer » depuis */
     const ret = new Set(R.plansRetires || []), pc = vue().ponctuels.filter((x) => !(x.plan && ret.has(x.plan))), dem = plus(auj(), 1), l = resteA(R.fixes, rev(), dem, 'mois', pc).liste.filter((o) => ymd(o.le) === ymd(dem) && cents(o.f.montant) >= cents(R.notif.seuil || 0));
     if (!l.length) return null;
-    const r = resteA(R.fixes, rev(), dem, 'paie', pc);
+    const r = resteA(R.fixes, rev(), dem, 'paie', pc), rc = courantes(R.courantes, dem, r.fin).reduce((t, x) => t + cents(x.montant), 0) / 100;   /* 0.80.0 : avec ce qui reste de ses dépenses courantes */
     const msg = {title: 'Demain : ' + (l.length === 1 ? l[0].f.service : l.length + ' prélèvements'), url: '/#voir-radar-veille', tag: 'radar-veille-' + ymd(dem),
-      body: l.map((o) => o.f.service + ' : ' + (o.f.estime ? 'environ ' : '') + eur(o.f.montant)).join('\n') + '\nReste à payer d’ici ta paie ' + (rev().des ? '(au plus tard le ' : 'du ') + jourCourt(r.fin) + (rev().des ? ')' : '') + ' : ' + eur(r.total) + '.'};
+      body: l.map((o) => o.f.service + ' : ' + (o.f.estime ? 'environ ' : '') + eur(o.f.montant)).join('\n') + '\nReste à payer d’ici ta paie ' + (rev().des ? '(au plus tard le ' : 'du ') + jourCourt(r.fin) + (rev().des ? ')' : '') + ' : ' + eur(r.total + rc) + (rc ? ' (dont ' + eur(rc) + ' de dépenses courantes)' : '') + '.'};
     await push(msg).catch(() => {});
     return msg;
   }
@@ -1095,7 +1136,7 @@ export function createRadar({file, gmail, claude = async () => ({ok: false, erro
     const t = auj(), t0 = ymd(t), V = vue(), vus = R.alertesVues || {}, retires = new Set(R.plansRetires || []);
     const plans = Object.values(V.plans || {}).map((p) => planVu(p, t0, retires));
     const rang = (p) => (p.retire ? 2 : p.prochaine ? 0 : 1);
-    return {maj: R.maj, google: !!gmail.lie(), fixes: R.fixes, revenus: rev(), notif: R.notif, propositions: V.propositions, ponctuels: V.ponctuels.filter((v) => v.date >= t0 && !(v.plan && retires.has(v.plan))).sort((a, b) => (a.date < b.date ? -1 : 1)),
+    return {maj: R.maj, google: !!gmail.lie(), fixes: R.fixes, courantes: R.courantes || [], revenus: rev(), notif: R.notif, propositions: V.propositions, ponctuels: V.ponctuels.filter((v) => v.date >= t0 && !(v.plan && retires.has(v.plan))).sort((a, b) => (a.date < b.date ? -1 : 1)),
       scan: R.scan ? {enCours: !!R.scan.enCours, mois: R.scan.mois, total: R.scan.total, lus: R.scan.lus, fini: R.scan.fini, erreur: R.scan.erreur, pause: R.scan.pause || '', ...(R.scan.complet ? {complet: true} : {}), ...(R.scan.bilan ? {bilan: R.scan.bilan} : {})} : null,
       relecture: enRelecture(),
       /* 0.73.0 : ni les échéances d'un paiement « plus à payer » (pendant une relecture, R.avant les gardait) */

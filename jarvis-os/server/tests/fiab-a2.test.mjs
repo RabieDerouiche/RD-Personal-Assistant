@@ -82,7 +82,7 @@ try {
   /* ---------- adresses mal formées : plus d'arrêt du serveur, 400 au lieu de 500 ---------- */
   { const r1 = await brut('GET', '//'), r2 = await brut('GET', '//%'), r3 = await brut('GET', '//['), vivant = await sante();
     ok('adresse « // » (et « //% », « //[ ») : 400 « Adresse invalide. », le serveur reste debout (elle l’arrêtait)', [r1, r2, r3].every((r) => r.status === 400 && /Adresse invalide/.test(r.texte)) && vivant, JSON.stringify([r1.status, r2.status, r3.status, vivant, mort]));
-    const m1 = await call('/%E0%A4%A'), m2 = await call('/ancienne/%00x'), m3 = await call('/maquettes/ux/%00x');
+    const m1 = await call('/%E0%A4%A'), m2 = await call('/ancienne/%00x'), m3 = await call('/maquettes/banc/%00x');
     ok('adresse mal encodée : 400 (pas 500) ; un caractère nul : 400, ou 404 dans les maquettes', m1.status === 400 && /Adresse invalide/.test(m1.body && m1.body.error) && m2.status === 400 && m3.status === 404, JSON.stringify([m1.status, m1.body, m2.status, m3.status])); }
 
   /* ---------- /os/ : jamais vers un autre site ---------- */

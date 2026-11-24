@@ -9778,9 +9778,11 @@ void main(){
     return card;
   }
   const SETV = {box: null, at: 0, html: '', force: false};   /* dernier rendu de Réglages (voir VIEWS.reglages) */
-  const REG_ONGLETS = [['general', 'Général'], ['securite', 'Sécurité'], ['liens', 'Connexions'], ['voix', 'Voix'], ['alertes', 'Alertes'], ['memoire', 'Mémoire'], ['tout', 'Tout']];
+  const REG_ONGLETS = [['general', 'Général'], ['securite', 'Sécurité'], ['liens', 'Connexions'], ['voix', 'Voix'], ['alertes', 'Alertes'], ['memoire', 'Mémoire']];
   const REG_RANGE = [[/^(Verrou de l’app|Coffre)/, 'securite'], [/^(Accès Google|Assistants reliés|Tâches envoyées par un proche|Siri et bouton)/, 'liens'], [/^(Voix|Tour de Claude)/, 'voix'], [/^Notifications/, 'alertes'], [/^(Ce que JARVIS retient|Skills)/, 'memoire']];
-  const regVoit = (o) => { const k = regOnglet(); return k === 'tout' || !o || o === k; };
+  /* 0.79.0 (son choix du 24/11/2026) : plus d'onglet « Tout ». Le banc de bout en bout lit encore la page entière : « jarvis.banc.reglages » */
+  const REG_ENTIER = (() => { try { return localStorage.getItem('jarvis.banc.reglages') === 'entier'; } catch (e) { return false; } })();
+  const regVoit = (o) => REG_ENTIER || !o || o === regOnglet();
   function regOnglet(k) {   /* sans argument : l'onglet courant ; avec : le choisit, le retient et montre ses cartes */
     if (k === undefined) { if (!SETV.onglet) { let v = ''; try { v = localStorage.getItem('jarvis.reglages.onglet') || ''; } catch (e) { v = ''; } SETV.onglet = REG_ONGLETS.some(([x]) => x === v) ? v : 'general'; } return SETV.onglet; }
     if (!REG_ONGLETS.some(([x]) => x === k)) return SETV.onglet;
@@ -9966,10 +9968,11 @@ void main(){
     if (s === '#voir-relances') { vers('#suivi'); go('suivi'); cibler(() => document.getElementById('relances')); return true; }
     if (s === '#voir-sante') { vers('#reglages'); go('reglages'); if (!regVoit('general')) regOnglet('general'); cibler(() => panneauNomme(/^État des systèmes/)); return true; }
     if (s === '#voir-brief') { vers(''); go('accueil'); cibler(() => { const b = document.getElementById('brief-card'); return b && !b.hidden ? b : null; }); return true; }
+    if (s === '#voir-taches') { vers('#demandes'); go('demandes'); cibler(() => panneauNomme(/^Mes tâches/)); return true; }   /* 0.79.0 : le rappel d'une tâche (du jour ou en retard) ouvre « Mes tâches », dans Pour moi */
     if (s === '#voir-echeances') { vers('#agenda'); go('agenda'); cibler(() => panneauNomme(/^Dates clés/)); return true; }   /* les rappels du jour : échéances et papiers, dans « Dates clés » */
     if ((m = s.match(/^#voir-reglages-(\w+)$/))) {   /* Réglages : la carte concernée (mémoire, voix, assistants reliés, notifications) */
       const id = {memoire: 'mem-card', voix: 'voixg-card', mcp: 'mcp-card', notifs: 'notif-card'}[m[1]]; vers('#reglages'); go('reglages');
-      if (id) cibler(() => document.getElementById(id), (e) => { if (e.dataset.onglet && !regVoit(e.dataset.onglet)) regOnglet(e.dataset.onglet); });   /* 0.78.0 : son onglet d'abord, sauf si elle se voit déjà (onglet « Tout ») */
+      if (id) cibler(() => document.getElementById(id), (e) => { if (e.dataset.onglet && !regVoit(e.dataset.onglet)) regOnglet(e.dataset.onglet); });   /* 0.78.0 : son onglet d'abord, sauf si elle se voit déjà */
       return true;
     }
     return VOIRURL_NOTIF(hash);
@@ -10414,8 +10417,7 @@ void main(){
         h('p', {class: 'muted', text: st ? 'Serveur ' + st.version + (st.commit ? ' (' + String(st.commit).slice(0, 7) + ')' : '') + ' · Claude ' + (st.claude && st.claude.loggedIn ? 'connecté' : 'non connecté') + ' · voix du serveur ' + (st.tts ? 'prête' : 'absente') + ' · écoute ' + (st.ecouteMoteur && st.ecouteMoteur.moteur === 'parakeet' ? 'Parakeet (' + (st.ecouteMoteur.variante || 'int8') + ')' : 'Whisper') + ' ' + (st.ecoute ? 'prête' : st.ecouteInstall === 'running' ? 'en cours d’installation' : 'absente') + (st.ecoute ? ' · fin de phrase ' + (st.finDeTour ? 'Smart Turn' : '0,7 s de silence') : '') : 'État du serveur indisponible.'}),
         /* 0.27.0 : la mise à jour est proposée toute seule à l'ouverture de l'app ; ce bouton force la vérification et suit le même chemin */
         h('button', {type: 'button', class: 'btn main', id: 'set-maj', onclick: async () => { upd.textContent = 'Vérification…'; upd.classList.remove('is-bad'); let m = ''; try { m = await window.JarvisMaj.check(true); } catch (e) { m = 'Vérification impossible.'; } upd.textContent = m; upd.classList.toggle('is-bad', /injoignable|impossible|pas pu|pas relié/.test(m)); }}, 'Mettre à jour le serveur'), upd,
-        h('p', {class: 'muted', text: 'Une nouvelle version est proposée toute seule à l’ouverture de JARVIS ; ce bouton force la vérification.'}),
-        h('a', {class: 'link', href: '/ancienne/', text: 'Ancienne app (réglages avancés, diagnostic)'})));
+        h('p', {class: 'muted', text: 'Une nouvelle version est proposée toute seule à l’ouverture de JARVIS ; ce bouton force la vérification.'}),));
       /* 0.78.0 : la voix et l'écoute ont leur carte, rangée sous l'onglet « Voix » */
       const updV = h('p', {class: 'set-msg'});
       parts.push(h('section', {class: 'card set-card'}, h('b', {text: 'Voix et écoute'}),
@@ -10433,7 +10435,7 @@ void main(){
         updV));
       /* 0.78.0 (son retour du 24/11/2026 : « le menu Réglages devient trop long et on s'y perd ») : des onglets. Chaque carte est rangée d'après
          son titre (une carte inconnue va dans « Général ») ; l'onglet choisi est retenu sur cet iPhone ; un point signale une carte qui attend
-         (demande d'accès d'un assistant, coffre verrouillé). « Tout » garde l'ancienne page entière. */
+         (demande d'accès d'un assistant, coffre verrouillé). */
       for (const c of parts) { if (c.tagName !== 'SECTION') continue; const t = ((c.querySelector('b') || {}).textContent || '').trim(), o = REG_RANGE.find(([re]) => re.test(t)); c.dataset.onglet = o ? o[1] : 'general'; }
       const attend = new Set(parts.filter((c) => c.dataset && (c.dataset.urgent === '1' || c.dataset.etat === 'verrouille' || c.dataset.etat === 'bloque')).map((c) => c.dataset.onglet));
       const barre = h('div', {class: 'set-tabs', role: 'tablist', 'aria-label': 'Réglages'}, REG_ONGLETS.map(([k, l]) => h('button', {type: 'button', role: 'tab', 'data-o': k, 'aria-selected': String(regOnglet() === k), onclick: () => regOnglet(k)}, l, attend.has(k) ? h('i', {class: 'set-tab-pt', 'aria-label': 'à voir'}) : null)));

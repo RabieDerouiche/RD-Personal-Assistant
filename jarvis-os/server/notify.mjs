@@ -1,6 +1,7 @@
 /* JARVIS OS — ce que le serveur surveille pour prévenir le propriétaire (notifications), sans bot ni Claude :
    1. un bot a répondu dans le Canal, ou lui demande quelque chose (Canal relu toutes les 2 minutes) ;
    2. les rappels du matin (onglet Échéances : aujourd'hui, demain, dans 7 jours ; onglet Papiers : fin de validité à 90, 30, 7 jours et le jour même) ;
+      depuis la 0.79.0 : ses tâches du jour (onglet Tâches, « Pour le ») et tout ce qui est en retard, le matin puis le soir à 19 h, tant que ce n'est pas fait ;
    3. Grok est reparti après une pause : combien de lignes attendent les bots (la sonnette reste un geste de l'app, avec ses 5 s pour annuler).
    Rien n'est lu s'il n'y a aucun appareil abonné ou si Google n'est pas relié. Lecture seule de Pilotage : le serveur n'écrit rien ici. */
 import {BOT_IDS} from './bots.mjs';
@@ -56,7 +57,7 @@ export function createNotifier({S, save, push, read, linked, pause, now = () => 
   const ready = () => S.push.subs.length > 0 && linked();
   /* 0.73.0 : la journée (ou la reprise) n'est marquée faite qu'après des lectures de Pilotage réussies ; une lecture ratée (Google 503,
      réseau) est réessayée 10 minutes plus tard, au lieu de perdre les rappels du jour. En mémoire seulement : un redémarrage réessaie tout de suite. */
-  const REESSAI = 10 * 60000; let digestEssai = 0, resumeEssai = 0;
+  const REESSAI = 10 * 60000; let digestEssai = 0, resumeEssai = 0, soirEssai = 0;
 
   /* 1. le Canal : réponses des bots aux lignes du propriétaire ou de Claude, et nouvelles demandes des bots pour lui */
   function canalEvents(rows) {
@@ -98,6 +99,24 @@ export function createNotifier({S, save, push, read, linked, pause, now = () => 
     return {events: events.length, sent: true};
   }
 
+  /* 0.79.0 (sa demande du 24/11/2026 : « une tâche que JARVIS garde, me rappelle, et continue de me rappeler si son échéance passe » ; QCM :
+     « matin et soir »). Ce qui est à faire aujourd'hui et ce qui est en retard, lu dans Pilotage sans bot ni Claude : ses tâches (onglet
+     Tâches, colonne « Pour le ») et ses échéances, tant que leur statut n'est ni « Fait » ni « Annulé ». Une tâche en retard est rappelée
+     tant qu'il ne l'a pas cochée ou reportée ; une échéance, pendant 60 jours (une ligne oubliée ne sonne pas à vie). Une tâche sans date
+     n'est jamais rappelée : rien ne dit quand. */
+  const TARD_MAX = 60;
+  async function aFaire(t, ech) {
+    const jour = [], retard = [], tac = await read('Tâches!A1:E500');
+    const ce = cols(ech), iD = ce('date'), iS = ce('sujet'), iSt = ce('statut');
+    if (iD >= 0 && iS >= 0) ech.slice(1).forEach((r) => { const n = daysTo(r[iD], t), x = String(r[iS] || '').trim(); if (n == null || !x || !OPEN(iSt >= 0 ? r[iSt] : '')) return; if (n === 0) jour.push({x, genre: 'echeance'}); else if (n < 0 && n >= -TARD_MAX) retard.push({n, x, genre: 'echeance'}); });
+    const ct = cols(tac), jT = ct('tache'), jP = ct('pour le'), jS = ct('statut');
+    if (jT >= 0 && jP >= 0) tac.slice(1).forEach((r) => { const n = daysTo(r[jP], t), x = String(r[jT] || '').trim(); if (n == null || !x || !OPEN(jS >= 0 ? r[jS] : '')) return; if (n === 0) jour.push({x, genre: 'tache'}); else if (n < 0) retard.push({n, x, genre: 'tache'}); });
+    retard.sort((a, b) => a.n - b.n);   /* le plus ancien d'abord */
+    return {jour, retard};
+  }
+  const tard = (r) => 'En retard (' + (-r.n) + ' j) : ' + r.x;
+  const corps = (l) => l.slice(0, 5).join('\n') + (l.length > 5 ? '\n… et ' + (l.length - 5) + ' autres' : '');
+
   /* 2. les rappels du matin, une fois par jour à l'heure choisie */
   async function checkDigest(force) {
     const t = paris(new Date(now()));
@@ -114,10 +133,30 @@ export function createNotifier({S, save, push, read, linked, pause, now = () => 
     if (iD >= 0 && iS >= 0 && iR >= 0) ech.slice(1).forEach((r) => { const n = daysTo(r[iD], t); if (n == null || n <= 1 || n === 7 || !OPEN(iSt >= 0 ? r[iSt] : '')) return; if (paliers(r[iR], r[iD]).includes(t.ymd)) lines.push({n, t: (n % 7 === 0 && n <= 56 ? 'Dans ' + n / 7 + ' semaine' + (n > 7 ? 's' : '') : n >= 28 && n <= 31 ? 'Dans 1 mois' : when(n)) + ' : ' + String(r[iS]).trim()}); });
     const cp = cols(pap), iDoc = cp('document'), iV = cp("valable jusqu'au"), iP = cp('personne');
     if (iDoc >= 0 && iV >= 0) pap.slice(1).forEach((r) => { const n = daysTo(r[iV], t); if ([0, 7, 30, 90].includes(n)) lines.push({n, t: String(r[iDoc]).trim() + (iP >= 0 && r[iP] ? ' (' + String(r[iP]).trim() + ')' : '') + (n === 0 ? " : dernier jour de validité aujourd'hui" : ' : expire dans ' + n + ' jours')}); });
+    /* 0.79.0 : ses tâches du jour, et tout ce qui est en retard (tâches et échéances), en tête */
+    const af = await aFaire(t, ech);
+    for (const j of af.jour) if (j.genre === 'tache') lines.push({n: 0, t: "Aujourd'hui : " + j.x, tache: true});
+    for (const r of af.retard) lines.push({n: r.n, t: tard(r), tache: r.genre === 'tache'});
     if (!lines.length) return {lines: 0, sent: false};
     lines.sort((a, b) => a.n - b.n);
-    await push.send({title: lines.length === 1 ? 'Rappel du jour' : lines.length + ' rappels du jour', body: lines.slice(0, 5).map((x) => x.t).join('\n') + (lines.length > 5 ? '\n… et ' + (lines.length - 5) + ' autres' : ''), url: '/#voir-echeances', tag: 'rappels'});
+    await push.send({title: lines.length === 1 ? 'Rappel du jour' : lines.length + ' rappels du jour', body: corps(lines.map((x) => x.t)), url: lines.some((x) => x.tache) ? '/#voir-taches' : '/#voir-echeances', tag: 'rappels'});
     return {lines: lines.length, sent: true};
+  }
+
+  /* 2 bis. le rappel du soir (0.79.0), à 19 h (réglage « heureSoir »), jamais après 22 h : ce qui est en retard et ce qui restait à faire
+     aujourd'hui. Rien à dire : pas de notification. */
+  async function checkSoir(force) {
+    const t = paris(new Date(now()));
+    if (!force && (S.notify.soir === t.ymd || t.hm < (prefs().heureSoir || '19:00') || now() - soirEssai < REESSAI)) return null;
+    if (!force && t.hm >= '22:00') { S.notify.soir = t.ymd; save(); return {lines: 0, sent: false}; }
+    soirEssai = now();
+    if (prefs().rappels === false) { S.notify.soir = t.ymd; save(); return {lines: 0, sent: false}; }
+    const af = await aFaire(t, await read("'Échéances'!A1:H1000"));
+    S.notify.soir = t.ymd; save();
+    const l = [...af.retard.map(tard), ...af.jour.map((j) => "Encore aujourd'hui : " + j.x)];
+    if (!l.length) return {lines: 0, sent: false};
+    await push.send({title: l.length === 1 ? 'Encore à faire' : l.length + ' choses encore à faire', body: corps(l), url: [...af.retard, ...af.jour].some((x) => x.genre === 'tache') ? '/#voir-taches' : '/#voir-echeances', tag: 'rappels-soir'});
+    return {lines: l.length, sent: true};
   }
 
   /* 3. fin de la pause de Grok (ligne « Grok en pause jusqu'au » de l'onglet Faits, sinon la date des réglages du serveur) : combien de lignes attendent les bots */
@@ -138,7 +177,7 @@ export function createNotifier({S, save, push, read, linked, pause, now = () => 
   async function tick(what = {}) {
     if (!ready()) return {skipped: true};
     const out = {};
-    for (const [k, fn] of [['resume', checkResume], ['canal', checkCanal], ['digest', checkDigest]]) {
+    for (const [k, fn] of [['resume', checkResume], ['canal', checkCanal], ['digest', checkDigest], ['soir', checkSoir]]) {
       if (what.only && what.only !== k) continue;
       try { out[k] = await fn(!!what.force); } catch (e) { out[k] = {error: String(e && e.message || e).slice(0, 160)}; }
     }

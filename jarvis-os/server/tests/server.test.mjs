@@ -10,6 +10,10 @@ import {routeur, routeurVoix} from '../flux.mjs';
 import {createMcp} from '../mcp.mjs';
 const FG = await startFakeGoogle();
 const DATA = fs.mkdtempSync(path.join(os.tmpdir(), 'jarvis-'));
+/* 0.79.0 : plus aucune maquette dans le dépôt ; celle du banc (inventée) vit ici, annoncée par JARVIS_MAQUETTES */
+const ESSAIS_BANC = path.join(DATA, 'essais-du-banc'); fs.mkdirSync(path.join(ESSAIS_BANC, 'maquette-banc', 'photos'), {recursive: true});
+fs.writeFileSync(path.join(ESSAIS_BANC, 'maquette-banc', 'index.html'), '<!doctype html><html><body>Maquette du banc</body></html>'); fs.writeFileSync(path.join(ESSAIS_BANC, 'maquette-banc', 'globe.js'), '/* script */');
+fs.writeFileSync(path.join(ESSAIS_BANC, 'maquette-banc', 'photos', 'a.jpg'), Buffer.from([0xff, 0xd8, 0xff, 0xd9])); fs.writeFileSync(path.join(ESSAIS_BANC, 'maquette-banc', 'banc.cjs'), '/* banc */');
 /* 0.22.0 : faux Open-Meteo (prévisions de 8 jours à partir d'aujourd'hui, heure de Paris) */
 const METEO_REQ = [];
 const MET = http.createServer((q, r) => { METEO_REQ.push(q.url); const t = paris(new Date()), days = [...Array(8)].map((_, i) => new Date(Date.UTC(t.y, t.m - 1, t.d + i)).toISOString().slice(0, 10)), hours = [];
@@ -40,7 +44,7 @@ const GSRV = http.createServer(async (q, res) => { let b = ''; for await (const 
   send(404, {}); });
 await new Promise((z) => GSRV.listen(0, '127.0.0.1', z)); const GURL = 'http://127.0.0.1:' + GSRV.address().port;
 const PORT = 18000 + Math.floor(Math.random() * 1000), BASE = 'http://127.0.0.1:' + PORT;
-const env = {...process.env, JARVIS_HUMOUR: '0' /* réponses exactes : la pique a son propre banc (humour.test.mjs) */, JARVIS_PUSH_ALLOW_HTTP: '1', JARVIS_NOTIFY_TICK_MS: '3600000', JARVIS_SANTE_TICK_MS: '3600000', JARVIS_PAUSE_CACHE_MS: '0', JARVIS_PAPIERS_ID: 'pap', JARVIS_BELL_DEDUP_MS: '0', JARVIS_GOOGLE_FAKE: FG.url, PORT: String(PORT), JARVIS_DATA: DATA, CLAUDE_BIN: path.join(HERE, 'fake-claude.mjs'), ANTHROPIC_API_KEY: 'sk-ant-faux-pour-le-test', ANTHROPIC_BASE_URL: 'https://exemple.invalid', JARVIS_ORIGINS: 'https://rabiederouiche.github.io', JARVIS_REPO: os.tmpdir(), JARVIS_OS_DIR: path.join(HERE, '..', '..', '..', 'essais', 'jarvis-os-maquette'), JARVIS_TTS_HELPER: path.join(HERE, 'fake-tts.mjs'), JARVIS_VOICE_MODEL: path.join(HERE, 'fake-tts.mjs'), JARVIS_VOICE_SCRIPT: path.join(DATA, 'fausse-install.sh')};
+const env = {...process.env, JARVIS_HUMOUR: '0' /* réponses exactes : la pique a son propre banc (humour.test.mjs) */, JARVIS_ESSAIS: ESSAIS_BANC, JARVIS_MAQUETTES: JSON.stringify({banc: {dossier: 'maquette-banc', titre: 'Maquette du banc'}, 'pas bon': {dossier: '../..', titre: 'x'}}), JARVIS_PUSH_ALLOW_HTTP: '1', JARVIS_NOTIFY_TICK_MS: '3600000', JARVIS_SANTE_TICK_MS: '3600000', JARVIS_PAUSE_CACHE_MS: '0', JARVIS_PAPIERS_ID: 'pap', JARVIS_BELL_DEDUP_MS: '0', JARVIS_GOOGLE_FAKE: FG.url, PORT: String(PORT), JARVIS_DATA: DATA, CLAUDE_BIN: path.join(HERE, 'fake-claude.mjs'), ANTHROPIC_API_KEY: 'sk-ant-faux-pour-le-test', ANTHROPIC_BASE_URL: 'https://exemple.invalid', JARVIS_ORIGINS: 'https://rabiederouiche.github.io', JARVIS_REPO: os.tmpdir(), JARVIS_OS_DIR: path.join(HERE, '..', '..', '..', 'essais', 'jarvis-os-maquette'), JARVIS_TTS_HELPER: path.join(HERE, 'fake-tts.mjs'), JARVIS_VOICE_MODEL: path.join(HERE, 'fake-tts.mjs'), JARVIS_VOICE_SCRIPT: path.join(DATA, 'fausse-install.sh')};
 Object.assign(env, {JARVIS_STEAM_URL: VB, JARVIS_STT_HELPER: path.join(HERE, 'fake-stt.mjs'), JARVIS_TOUR_HELPER: path.join(HERE, 'fake-tour.mjs'), JARVIS_PREP_MEM: '1', JARVIS_RD_RACINE: 'rda', JARVIS_VOIX_GOOGLE_URL: GURL, JARVIS_VOIX_GOOGLE_PLAFOND: '220', JARVIS_ROUTINES_MS: '400', JARVIS_METEO_URL: 'http://127.0.0.1:' + MET.address().port + '/v1/forecast', JARVIS_ECOUTE_SCRIPT: path.join(DATA, 'fausse-install.sh'),
   /* 0.64.0 : message vocal (faux convertisseur à la place de PyAV, pas de ffmpeg) et rappels toutes les 0,7 s au lieu de 5 min */
   JARVIS_AUDIO_PY: process.execPath, JARVIS_AUDIO_HELPER: path.join(HERE, 'fake-audio.mjs'), JARVIS_FFMPEG: '', JARVIS_RAPPEL_MS: '700', JARVIS_RAPPEL_TICK_MS: '150', JARVIS_TACHES_CACHE_MS: '0'});
@@ -368,6 +372,22 @@ try {
       FG.sheet['Papiers!A1:G300'] = [['Document', 'Personne', 'Où il est', "Valable jusqu'au", 'Sert pour', 'Mis à jour le', 'Remarque'], ['Passeport', 'Lui', 'Drive', fr(30), 'voyage', '', ''], ['Carte', 'Lui', 'Drive', 'sans date', '', '', '']];
       n0 = got.length; r = await check('digest');
       ok('notifications : rappels du jour (aujourd\'hui, dans 7 jours, palier « 2 semaines avant » de la colonne Rappels, papier à 30 jours ; rien de fait, ni à 3 jours, ni hors palier)', got.length === n0 + 1 && last().title === '4 rappels du jour' && /Aujourd'hui : Rendez-vous notaire/.test(last().body) && /Dans 7 jours : Fin de la promo/.test(last().body) && /Dans 2 semaines : Fermeture de la crèche \(essai\)/.test(last().body) && /Passeport \(Lui\) : expire dans 30 jours/.test(last().body) && !/Déjà fait|Pas aujourd|Pas ce palier/.test(last().body), JSON.stringify(last()));
+      /* 0.79.0 : ses tâches et ce qui est en retard, le matin puis le soir, tant que ce n'est pas fait (exemples inventés) */
+      { const ech0 = FG.sheet["'Échéances'!A1:H1000"];
+        FG.sheet["'Échéances'!A1:H1000"] = [ech0[0], [fr(-2), 'Renvoyer le formulaire', '', '', 'À venir', 'Iris', '', ''], [fr(-3), 'Déjà réglé', '', '', 'Fait', 'Iris', '', ''], [fr(-90), 'Très vieille ligne', '', '', 'À venir', 'Iris', '', ''], [fr(0), 'Rendez-vous notaire', 'Logement', '', 'À venir', 'Iris', '', '']];
+        FG.sheet['Papiers!A1:G300'] = [FG.sheet['Papiers!A1:G300'][0]];
+        FG.sheet['Tâches!A1:E500'] = [['Ajoutée le', 'Tâche', 'Pour le', 'Statut', 'Remarque'], [fr(-9), 'Appeler le plombier', fr(-5), 'À faire', ''], [fr(-1), 'Acheter des piles', fr(0), 'À faire', ''], [fr(-1), 'Poster la lettre', fr(-1), 'Fait', ''], [fr(-1), 'Ranger le garage', '', 'À faire', ''], [fr(-1), 'Réserver le train', fr(4), 'À faire', '']];
+        n0 = got.length; r = await check('digest'); const matin = last();
+        ok('notifications 0.79 : le matin, la tâche du jour et ce qui est en retard (tâche de 5 jours, échéance de 2 jours), le plus ancien en tête ; rien pour ce qui est fait, sans date, à venir, ni pour une échéance ouverte depuis plus de 60 jours ; elle ouvre « Mes tâches »',
+          got.length === n0 + 1 && matin.title === '4 rappels du jour' && matin.body.split('\n').join(' | ') === "En retard (5 j) : Appeler le plombier | En retard (2 j) : Renvoyer le formulaire | Aujourd'hui : Rendez-vous notaire | Aujourd'hui : Acheter des piles" && sansN(matin.navigate) === '/#voir-taches', JSON.stringify(matin));
+        n0 = got.length; r = await check('soir'); const soir = last();
+        ok('notifications 0.79 : le soir, les mêmes retards et ce qui restait à faire aujourd\'hui (échéance et tâche)',
+          got.length === n0 + 1 && soir.title === '4 choses encore à faire' && soir.body.split('\n').join(' | ') === "En retard (5 j) : Appeler le plombier | En retard (2 j) : Renvoyer le formulaire | Encore aujourd'hui : Rendez-vous notaire | Encore aujourd'hui : Acheter des piles", JSON.stringify(soir));
+        /* il coche la tâche en retard, reporte l'échéance, fait celle du jour : plus rien le soir */
+        FG.sheet['Tâches!A1:E500'][1][3] = 'Fait'; FG.sheet['Tâches!A1:E500'][2][3] = 'Fait'; FG.sheet["'Échéances'!A1:H1000"][1][0] = fr(6); FG.sheet["'Échéances'!A1:H1000"][4][4] = 'Fait';
+        n0 = got.length; r = await check('soir');
+        ok('notifications 0.79 : tout coché ou reporté, le soir ne dit plus rien', got.length === n0 && r.body.soir && r.body.soir.sent === false, JSON.stringify(r.body));
+        FG.sheet["'Échéances'!A1:H1000"] = ech0; delete FG.sheet['Tâches!A1:E500']; }
       FG.sheet['Canal!A1:H3000'].push(['17/11/2026', 'Rabie', 'Kairos', 'Ordre', 'Suis la carte', 'À faire', '', '']);
       await G('/api/config', {grokPauseUntil: new Date(Date.now() - 60000).toISOString()}); n0 = got.length; r = await check('resume');
       ok('notifications : Grok est reparti (réglage du serveur, sans ligne dans Faits), lignes en attente comptées (la sonnette reste un geste de l\'app)', got.length === n0 + 1 && last().title === 'Grok est reparti' && /1 ligne attend tes bots \(Kairos 1\)/.test(last().body) && !FG.calls.some((c) => c.path.endsWith('/messages/send') && c.at > Date.now() - 5000), last().body);
@@ -1004,18 +1024,21 @@ try {
       ok('Claude instantané : état dans /api/status (questions, reprises, préparées, dernier délai)', st.body.page && st.body.page.questions >= 6 && st.body.page.reprises >= 2 && st.body.page.preparees >= 1 && st.body.page.dernier && st.body.page.dernier.premier != null, JSON.stringify(st.body.page)); }
     let os1 = await fetch(BASE + '/os/?x=1', {redirect: 'manual'}); ok('ancienne adresse /os/ renvoie à la racine', os1.status === 301 && os1.headers.get('location') === '/?x=1');
     os1 = await fetch(BASE + '/'); const ht = await os1.text(); ok('nouvelle app à la racine (choix des données au chargement, installable)', os1.status === 200 && /jarvis-serveur\.js/.test(ht) && /manifest\.webmanifest/.test(ht));
-    os1 = await fetch(BASE + '/ancienne/'); ok('ancienne app à /ancienne/', os1.status === 200 && /assets\/index-/.test(await os1.text()));
+    { const a1 = await fetch(BASE + '/ancienne/', {redirect: 'manual'}), a2 = await fetch(BASE + '/ancienne', {redirect: 'manual'}), a3 = await fetch(BASE + '/ancienne/assets/index.js'), a4 = await fetch(BASE + '/assets/index.js');
+      ok('0.79.0 : l\'ancienne app est retirée : /ancienne/ renvoie à l\'app, plus rien n\'y est servi (ni ses scripts à la racine)', a1.status === 301 && a1.headers.get('location') === '/' && a2.status === 301 && a3.status === 404 && a4.status === 404 && fs.readdirSync(path.join(HERE, '..', '..', 'web')).join() === 'confidentialite.html', [a1.status, a2.status, a3.status, a4.status].join()); }
     os1 = await fetch(BASE + '/sw.js'); ok('service worker de la nouvelle app à la racine', os1.status === 200 && /jarvis-os-app/.test(await os1.text()));
     { const pc = await fetch(BASE + '/confidentialite.html'); ok('règles de confidentialité publiques (déclarées à Google)', pc.status === 200 && /règles de confidentialité/.test(await pc.text())); }
     /* 0.53.0 : les maquettes (données inventées) servies par le serveur, le dépôt passant en privé */
-    { const l = await fetch(BASE + '/maquettes/'), lt = await l.text(), rd = await fetch(BASE + '/maquettes/ux', {redirect: 'manual'});
-      const ux = await fetch(BASE + '/maquettes/ux/'), uxt = await ux.text(), js = await fetch(BASE + '/maquettes/ux/globe.js'), ph = fs.readdirSync(path.join(HERE, '..', '..', '..', 'essais', 'jarvis-os-ux', 'photos')).find((f) => /\.jpg$/.test(f));
-      const img = await fetch(BASE + '/maquettes/ux/photos/' + ph), banc = await fetch(BASE + '/maquettes/ux/banc.cjs'), fuite = await fetch(BASE + '/maquettes/ux/..%2F..%2Fjarvis-os%2Fserver%2Fserver.mjs'), inc = await fetch(BASE + '/maquettes/inconnue/');
-      ok('maquettes : la liste, puis la refonte UX à /maquettes/ux/ (page, script, photo), non indexée ; le banc, un chemin qui remonte et une maquette inconnue sont refusés',
-        l.status === 200 && /Refonte UX de JARVIS/.test(lt) && /href="\/maquettes\/ux\/"/.test(lt) && rd.status === 301 && rd.headers.get('location') === '/maquettes/ux/'
+    { const l = await fetch(BASE + '/maquettes/'), lt = await l.text(), rd = await fetch(BASE + '/maquettes/banc', {redirect: 'manual'});
+      const ux = await fetch(BASE + '/maquettes/banc/'), uxt = await ux.text(), js = await fetch(BASE + '/maquettes/banc/globe.js');
+      const img = await fetch(BASE + '/maquettes/banc/photos/a.jpg'), banc = await fetch(BASE + '/maquettes/banc/banc.cjs'), fuite = await fetch(BASE + '/maquettes/banc/..%2F..%2Fstate.json'), inc = await fetch(BASE + '/maquettes/inconnue/');
+      const retirees = [(await fetch(BASE + '/maquettes/ux/')).status, (await fetch(BASE + '/maquettes/passkey/')).status];
+      ok('maquettes : la liste, puis une maquette à /maquettes/<nom>/ (page, script, photo), non indexée ; le banc, un chemin qui remonte, une maquette inconnue et un nom mal formé sont refusés ; 0.79.0 : la refonte UX et l\'essai de la passkey sont retirés (404, plus dans la liste, dossiers supprimés)',
+        l.status === 200 && /Maquette du banc/.test(lt) && /href="\/maquettes\/banc\/"/.test(lt) && !/pas bon|Refonte UX|passkey/i.test(lt) && rd.status === 301 && rd.headers.get('location') === '/maquettes/banc/'
         && ux.status === 200 && /<html/i.test(uxt) && ux.headers.get('x-robots-tag') === 'noindex' && js.status === 200 && /javascript/.test(js.headers.get('content-type') || '')
-        && img.status === 200 && img.headers.get('content-type') === 'image/jpeg' && banc.status === 404 && fuite.status === 404 && inc.status === 404,
-        JSON.stringify([l.status, rd.status, rd.headers.get('location'), ux.status, js.status, img.status, banc.status, fuite.status, inc.status])); }
+        && img.status === 200 && img.headers.get('content-type') === 'image/jpeg' && banc.status === 404 && fuite.status === 404 && inc.status === 404 && retirees.join() === '404,404'
+        && !fs.existsSync(path.join(HERE, '..', '..', '..', 'essais', 'jarvis-os-ux')) && !fs.existsSync(path.join(HERE, '..', '..', '..', 'essais', 'passkey-essai')),
+        JSON.stringify([l.status, rd.status, rd.headers.get('location'), ux.status, js.status, img.status, banc.status, fuite.status, inc.status, retirees])); }
     os1 = await fetch(BASE + '/os/jarvis-serveur.js'); ok('pont vers le serveur servi', os1.status === 200 && /api\/tool/.test(await os1.text())); }
   const pre = await fetch(BASE + '/api/chat', {method: 'OPTIONS', headers: {origin: 'https://rabiederouiche.github.io', 'access-control-request-method': 'POST'}});
   ok('CORS : app GitHub Pages acceptée', pre.headers.get('access-control-allow-origin') === 'https://rabiederouiche.github.io');

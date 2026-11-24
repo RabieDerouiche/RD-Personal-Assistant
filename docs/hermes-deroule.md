@@ -387,7 +387,7 @@ Fait dans le dépôt le 24/11/2026 (pas encore sur le serveur : le coffre n'y es
   défaut, réglable ; avant : 5 min sans demande). 0.77.0 : écran d'accueil pendant Face ID. 0.78.0, son retour (« 5 min, c'est
   trop court ») : délais jusqu'à 4 h, et **le délai d'absence devient la seule règle** (l'app relancée dans le délai ne
   redemande rien), ce qui remplace « Face ID à chaque ouverture ». La feuille « Use Passkey » est
-  celle d'iOS : une app web ne peut pas l'enlever (à vérifier par lui : « Exiger Face ID » d'iOS sur l'icône). La page d'essai `/maquettes/passkey/` ne sert plus
+  celle d'iOS : une app web ne peut pas l'enlever (à vérifier par lui : « Exiger Face ID » d'iOS sur l'icône). La page d'essai `/maquettes/passkey/` est retirée (0.79.0) : elle ne servait plus
   (son essai du 24/11 à midi, dans Chrome : toujours aucune clé « prf » ; le point 4 n'a pas été fait).
 - Reste à construire : le bouton d'arrêt d'urgence, la notification « coffre verrouillé » après un redémarrage,
   l'accès Google dans le coffre ; et, pour les couches, la question à boutons (ne dépend pas de lui) puis le geste
