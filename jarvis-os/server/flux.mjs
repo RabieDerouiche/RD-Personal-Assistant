@@ -83,6 +83,7 @@ export function createFlux({bin, env, settings, cwd, conso, models, friendly, da
         if (!line) continue;
         let ev; try { ev = JSON.parse(line); } catch { continue; }
         const t = p.t; if (!t) continue;
+        if (t.arme && !t.rep) t.arme();   /* 0.73.0 : Claude écrit ou réfléchit encore : le délai repart */
         if (ev.type === 'stream_event') {
           const e = ev.event || {};
           if (e.type === 'message_start' && e.message && e.message.model && !String(e.message.model).includes(model)) t.secours = true;   /* un autre modèle a répondu */
@@ -117,7 +118,11 @@ export function createFlux({bin, env, settings, cwd, conso, models, friendly, da
     avant.then(() => {
       if (p.mort) { const r = {ok: false, error: friendly(p.err || "Claude s'est arrêté.")}; ok1(r); ok2(r); return; }
       const t = {texte: '', premier: 0, debut: now(), arret: '', kind: o.kind || 'page', onDelta: o.onDelta, rep: false, ok1, ok2};
-      t.minuterie = setTimeout(() => { tuer(p); finTour(p, {ok: false, error: 'Claude a mis trop de temps à répondre.'}); }, timeoutMs);
+      /* 0.73.0 : délai d'inactivité (chaque morceau reçu le repousse), plafonné à 3 fois ce délai depuis la question : une longue
+         réponse d'Opus qui s'écrit n'est plus coupée à 2 minutes, un Claude muet l'est toujours */
+      const expire = () => { tuer(p); finTour(p, {ok: false, error: 'Claude a mis trop de temps à répondre.'}); };
+      t.arme = () => { clearTimeout(t.minuterie); t.minuterie = setTimeout(expire, Math.max(0, Math.min(timeoutMs, t.debut + 3 * timeoutMs - now()))); };
+      t.arme();
       p.t = t; p.vu = now();
       try { p.child.stdin.write(JSON.stringify({type: 'user', message: {role: 'user', content: blocs.map((text) => ({type: 'text', text}))}, parent_tool_use_id: null}) + '\n'); }
       catch { finTour(p, {ok: false, error: "Claude n'a pas pu recevoir la demande."}); }

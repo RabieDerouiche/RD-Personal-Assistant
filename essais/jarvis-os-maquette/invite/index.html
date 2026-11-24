@@ -29,6 +29,7 @@
   .rang > div { flex: 1 1 160px; }
   button { font: inherit; font-weight: 600; line-height: 1; border: 0; border-radius: 12px; padding: 14px 18px; background: var(--accent); color: #fff; cursor: pointer; }
   @media (prefers-color-scheme: dark) { button { color: #0b1020; } }
+  button:disabled { opacity: .6; cursor: default; }
   button.discret { background: transparent; color: var(--accent); border: 1px solid var(--ligne); padding: 10px 14px; font-size: 15px; }
   .msg { min-height: 1.4em; margin: 10px 0 0; }
   .msg.erreur { color: #d64545; }
@@ -99,10 +100,14 @@
   const $ = (id) => document.getElementById(id);
   const lire = (k) => { try { return localStorage.getItem(k) || ''; } catch (e) { return ''; } };
   const ecrire = (k, v) => { try { localStorage.setItem(k, v); } catch (e) { /* rien */ } };
-  /* le lien d'invitation : #cle=…&pour=… ; la clé est gardée dans ce téléphone, puis retirée de l'adresse */
-  const h = new URLSearchParams(location.hash.slice(1));
-  if (h.get('cle')) { ecrire('jarvis.invite.cle', h.get('cle')); if (h.get('pour')) ecrire('jarvis.invite.pour', h.get('pour')); history.replaceState(null, '', location.pathname); }
-  const cle = lire('jarvis.invite.cle'), pour = lire('jarvis.invite.pour');
+  /* le lien d'invitation : #cle=…&pour=… ; la clé est gardée dans ce téléphone.
+     0.73.0 (son choix du 23/11/2026, « Clé gardée après # ») : elle reste aussi dans l'adresse, après « # » (cette partie n'est jamais envoyée au
+     serveur), et y est remise quand elle vient du téléphone : l'icône posée sur l'écran d'accueil (stockage à part sur iPhone) l'emporte ainsi,
+     et Safari qui efface le stockage d'un site peu visité ne la perd plus */
+  const h = new URLSearchParams(location.hash.slice(1)), duLien = h.get('cle') || '';
+  if (duLien) { ecrire('jarvis.invite.cle', duLien); ecrire('jarvis.invite.pour', h.get('pour') || ''); }
+  const cle = duLien || lire('jarvis.invite.cle'), pour = duLien ? h.get('pour') || '' : lire('jarvis.invite.pour');
+  if (cle) { try { history.replaceState(null, '', location.pathname + '#cle=' + encodeURIComponent(cle) + (pour ? '&pour=' + encodeURIComponent(pour) : '')); } catch (e) { /* rien */ } }
   if (!cle) { $('sans-cle').hidden = false; return; }
   ['siri-audio', 'envoi', 'vocal', 'liste-c', 'siri-vocal'].forEach((id) => { $(id).hidden = false; });
   if (pour) { $('titre').textContent = 'Une tâche pour ' + pour; $('adest').textContent = pour;
@@ -128,13 +133,16 @@
   }
   $('form').addEventListener('submit', async (e) => {
     e.preventDefault();
-    const texte = $('texte').value.trim(); if (texte.length < 2) { $('texte').focus(); return; }
+    const texte = $('texte').value.trim(); if (texte.length < 2) { $('msg').classList.add('erreur'); $('msg').textContent = 'Écris d’abord la tâche.'; $('texte').focus(); return; }
+    /* 0.73.0 : « Envoyer » ne part qu'une fois par envoi (un second appui sur un réseau lent créait la même tâche deux fois) */
+    const b = $('form').querySelector('button[type=submit]'); if (b.disabled) return; b.disabled = true;
     $('msg').classList.remove('erreur'); $('msg').textContent = 'Envoi…';
     try {
       const r = await fetch('/api/invite/tache', {method: 'POST', headers: hdr, body: JSON.stringify({texte, ...($('pour').value ? {pour: $('pour').value} : {})})});
       $('msg').textContent = await r.text(); $('msg').classList.toggle('erreur', !r.ok);
       if (r.ok) { $('texte').value = ''; $('pour').value = ''; charger(); }
     } catch (err) { $('msg').textContent = 'Le serveur ne répond pas : réessaie dans un moment.'; $('msg').classList.add('erreur'); }
+    finally { b.disabled = false; }
   });
   /* 0.64.0 : le message vocal depuis cette page : le micro, enregistré en WAV 16 kHz (ce que l'écoute du serveur lit), 90 secondes au plus */
   const REC = {flux: null, ctx: null, src: null, proc: null, morceaux: [], t0: 0, minuteur: 0};

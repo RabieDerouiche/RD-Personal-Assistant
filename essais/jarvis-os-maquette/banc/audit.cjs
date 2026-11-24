@@ -28,7 +28,7 @@ const CHECK = () => {
   const vis = (e) => { if (!e.getClientRects().length) return false; const s = getComputedStyle(e); return s.visibility !== 'hidden' && s.display !== 'none'; };
   const name = (e) => e.tagName.toLowerCase() + (e.id ? '#' + e.id : '') + (typeof e.className === 'string' && e.className.trim() ? '.' + e.className.trim().split(/\s+/).slice(0, 3).join('.') : '');
   const txt = (e) => (e.innerText || e.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 70);
-  const layers = [...document.querySelectorAll('#scroller, #sheet:not([hidden]), #chat:not([hidden]), #app:not([hidden]), .all-sheet:not([hidden]), #gsearch:not([hidden]), #toasts')].filter(vis);
+  const layers = [...document.querySelectorAll('#scroller, #sheet:not([hidden]), #chat:not([hidden]), #app:not([hidden]), #gsearch:not([hidden]), #toasts')].filter(vis);
   /* texte cassé */
   const all = document.body.innerText;
   const re = /\[object \w+\]|\bundefined\b|\bNaN\b|\bnull\b|Invalid Date|\$\{|function \(|=>/g; let m;
@@ -88,7 +88,7 @@ const CANDS = (scope) => {
   window.__cands = uniq; return out;
 };
 const SNAP = () => { const g = (s) => { const e = document.querySelector(s); return e ? (e.hidden ? '' : (e.innerText || '').replace(/\d{1,2}:\d{2}/g, '')) : ''; };
-  return JSON.stringify([location.hash, g('#view'), g('#sheet'), g('#chat'), g('#app'), g('#toasts'), g('.all-sheet'), document.querySelector('.jv-turn') ? document.querySelectorAll('.jv-turn').length : 0, document.querySelector('[class*="jv-"][class*="open"], .jv-overlay:not([hidden])') ? 1 : 0, (window.__fx || []).length, [...document.querySelectorAll('details')].map((d) => d.open ? 1 : 0).join(''), [...document.querySelectorAll('[aria-pressed], [aria-expanded], [aria-current], [aria-selected]')].map((x) => (x.getAttribute('aria-pressed') || '') + (x.getAttribute('aria-expanded') || '') + (x.getAttribute('aria-current') || '') + (x.getAttribute('aria-selected') || '')).join(''), document.activeElement && /INPUT|TEXTAREA/.test(document.activeElement.tagName) ? 'focus' : '', document.documentElement.className, document.body.className, (document.getElementById('scroller') || {}).scrollTop]); };
+  return JSON.stringify([location.hash, g('#view'), g('#sheet'), g('#chat'), g('#app'), g('#toasts'), document.querySelector('.jv-turn') ? document.querySelectorAll('.jv-turn').length : 0, document.querySelector('[class*="jv-"][class*="open"], .jv-overlay:not([hidden])') ? 1 : 0, (window.__fx || []).length, [...document.querySelectorAll('details')].map((d) => d.open ? 1 : 0).join(''), [...document.querySelectorAll('[aria-pressed], [aria-expanded], [aria-current], [aria-selected]')].map((x) => (x.getAttribute('aria-pressed') || '') + (x.getAttribute('aria-expanded') || '') + (x.getAttribute('aria-current') || '') + (x.getAttribute('aria-selected') || '')).join(''), document.activeElement && /INPUT|TEXTAREA/.test(document.activeElement.tagName) ? 'focus' : '', document.documentElement.className, document.body.className, (document.getElementById('scroller') || {}).scrollTop]); };
 
 /* les écrans : nom, adresse, gestes pour y arriver, portée des boutons */
 const SCREENS = [
