@@ -1,0 +1,8 @@
+# JARVIS OS — hôtes que le Hermes « portail » peut joindre (une ligne par hôte ; « .exemple.com » : avec ses
+# sous-domaines). Fichier à root, relu à chaque demande. Les hôtes du portail s'ajoutent par :
+#   sudo hermes-portail domaines ajouter <hôte>
+# Ce qui suit est ce qu'il faut à Claude Code (connexion de l'abonnement et réponses du modèle).
+api.anthropic.com
+platform.claude.com
+console.anthropic.com
+claude.ai

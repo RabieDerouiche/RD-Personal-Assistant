@@ -1,0 +1,101 @@
+# JARVIS OS — politique du Hermes « portail » (essai des portails, décidé le 24/11/2026 ; docs/hermes-portail.md).
+#
+# install.sh copie ce fichier dans /etc/hermes-portail/config.yaml (root, 0644) : la « portée gérée » d'Hermes.
+# Ce Hermes-là est un autre utilisateur du serveur (hermes-portail), sans lien avec JARVIS : ni mails, ni agenda,
+# ni Pilotage, ni Telegram, ni routine. Il n'a que son navigateur et son coffre d'identifiants, pour se connecter
+# à un portail. Le navigateur d'Hermes 0.23.3 n'existe que si l'outil terminal est permis (il exécute du Python
+# écrit par le modèle) : c'est pourquoi tout ce que cet utilisateur peut joindre passe par le relais filtrant
+# (filtre.py, sortie.nft) et pourquoi il est enfermé à part.
+
+timezone: "Europe/Paris"
+
+model:
+  provider: "claude-subscription-directsdk-experimental"
+  default: "sonnet"          # une marche à suivre écrite : Sonnet suffit et use moins le forfait
+
+agent:
+  max_turns: 30
+  disabled_toolsets:
+    - web
+    - file
+    - code_execution
+    - computer_use
+    - vision
+    - video
+    - image_gen
+    - video_gen
+    - x_search
+    - tts
+    - stt
+    - kanban
+    - context_engine
+    - connections
+    - delegation
+    - cronjob
+    - project
+    - catalog
+    - desktop_ui
+    - a2a
+    - memory
+    - session_search
+    - todo
+    - clarify
+
+platform_toolsets:
+  cli: [browser, terminal, skills]
+  telegram: [no_mcp]
+  cron: [no_mcp]
+
+browser:
+  headed: false
+  user_data_dir: "navigateur"            # sous son HERMES_HOME : la session du portail y reste d'un passage à l'autre
+  chromium_args: ["--proxy-server=http://127.0.0.1:@RELAIS@"]
+
+vault:
+  key_storage: file                      # le « fichier » est un lien vers la mémoire vive (/run/hermes-portail-cle)
+  onepassword:
+    enabled: false
+  bitwarden:
+    enabled: false
+
+cron:
+  allow_agent_scheduling: false
+
+skills:
+  write_approval: true
+  inline_shell: false
+
+approvals:
+  mode: manual
+  cron_mode: deny
+  single_query_mode: deny
+  unattended_mode: deny
+
+auth:
+  adopt_external_logins: false
+
+updates:
+  check: false
+
+security:
+  redact_secrets: true
+  allow_lazy_installs: false
+
+telemetry:
+  shared_metrics:
+    enabled: false
+
+compression:
+  threshold_tokens: 60000
+
+auxiliary:
+  background_review:
+    enabled: false
+
+plugins:
+  entries:
+    claude-subscription-directsdk-experimental:
+      settings:
+        extra_usage: stop
+        max_concurrent: 1
+        claude_code_telemetry: false

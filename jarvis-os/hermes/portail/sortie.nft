@@ -1,0 +1,24 @@
+#!/usr/sbin/nft -f
+# JARVIS OS — ce que l'utilisateur hermes-portail peut joindre (install.sh remplace @UID@ et @RELAIS@).
+# Table à part : jamais de « flush ruleset », ufw garde ses règles. Chargée par hermes-portail-sortie.service.
+#
+# Une seule sortie : le relais filtrant local (filtre.py), qui ne laisse passer que les hôtes de
+# /etc/hermes-portail/domaines. Plus les ports éphémères de la machine, pour ses propres pièces (le navigateur
+# qu'il pilote, le relais du plugin de Claude). Rien d'autre : ni DNS, ni Internet en direct, ni JARVIS (8787),
+# ni Panier, ni Caddy, ni SSH, ni réseau privé.
+
+table inet hermes_portail_sortie
+delete table inet hermes_portail_sortie
+
+table inet hermes_portail_sortie {
+	chain sortie {
+		type filter hook output priority filter; policy accept;
+
+		meta skuid != @UID@ accept
+
+		oifname "lo" ip daddr 127.0.0.0/8 tcp dport @RELAIS@ accept
+		oifname "lo" ip daddr 127.0.0.0/8 tcp dport >= 32768 accept
+		oifname "lo" ip6 daddr ::1 tcp dport >= 32768 accept
+		counter reject
+	}
+}

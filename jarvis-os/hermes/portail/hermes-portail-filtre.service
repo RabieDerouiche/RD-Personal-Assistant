@@ -1,0 +1,41 @@
+# JARVIS OS — le relais filtrant du Hermes « portail » (docs/hermes-portail.md). Posé par install.sh.
+# Seule sortie réseau de l'utilisateur hermes-portail : il ne laisse passer que les hôtes de
+# /etc/hermes-portail/domaines (root). Il tourne sous son propre utilisateur, enfermé, sans rien lire d'autre.
+[Unit]
+Description=Relais filtrant du Hermes portail (JARVIS OS)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+DynamicUser=yes
+ExecStart=/usr/bin/python3 -I /usr/local/lib/hermes-portail/filtre.py --port @RELAIS@ --domaines /etc/hermes-portail/domaines
+Restart=always
+RestartSec=3
+MemoryMax=128M
+TasksMax=64
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+ProtectProc=invisible
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+IPAddressDeny=link-local multicast
+
+[Install]
+WantedBy=multi-user.target

@@ -84,7 +84,7 @@ class Modele(BaseHTTPRequestHandler):
         texte, appel = reponse_scenario(corps.get("messages") or [])
         if appel:   # le faux modèle demande un outil (scénario « APPELLE: {...} » écrit par le banc)
             message = {"role": "assistant", "content": None, "tool_calls": [
-                {"id": "appel1", "type": "function", "function": {"name": appel["nom"], "arguments": json.dumps(appel.get("args") or {})}}]}
+                {"id": "appel%d" % (1 + sum(1 for x in (corps.get("messages") or []) if x.get("role") == "tool")), "type": "function", "function": {"name": appel["nom"], "arguments": json.dumps(appel.get("args") or {})}}]}
             fin, delta = "tool_calls", {"role": "assistant", "tool_calls": [dict(message["tool_calls"][0], index=0)]}
         else:
             message, fin, delta = {"role": "assistant", "content": texte}, "stop", {"role": "assistant", "content": texte}
@@ -115,9 +115,22 @@ def reponse_scenario(messages):
     """Réponse fixe ; « APPELLE: {"nom": ..., "args": ...} » dans le dernier message de l'utilisateur fait
     demander cet outil au faux modèle ; après le résultat de l'outil, il le recopie dans sa réponse."""
     dernier = messages[-1] if messages else {}
-    if dernier.get("role") == "tool":
+    if dernier.get("role") == "tool" and not any("SUITE:" in texte_de(m.get("content")) for m in messages if m.get("role") == "user"):
         return "Résultat de l'outil : " + texte_de(dernier.get("content"))[:400], None
     texte = texte_de(dernier.get("content"))
+    # « SUITE: [{"nom": ..., "args": ...}, ...] » dans le message de l'utilisateur : le faux modèle demande ces outils
+    # l'un après l'autre (un par résultat reçu), puis recopie tous les résultats dans sa réponse.
+    for m in messages:
+        t = texte_de(m.get("content")) if m.get("role") == "user" else ""
+        if "SUITE:" in t:
+            try:
+                suite = json.loads(t.split("SUITE:", 1)[1].strip())
+            except ValueError:
+                break
+            resultats = [texte_de(x.get("content")) for x in messages if x.get("role") == "tool"]
+            if len(resultats) < len(suite):
+                return None, suite[len(resultats)]
+            return "Résultats : " + " ||| ".join(r[:1500] for r in resultats), None
     if "APPELLE:" in texte:
         try:
             return None, json.loads(texte.split("APPELLE:", 1)[1].strip())
