@@ -264,7 +264,10 @@
   const lire = (e) => { if (!e) return; drapeau(e.actif); if (typeof e.delai === 'number') delaiConnu = e.delai; if (!e.actif) cacherVerrou(); else if (!e.ouvert) montrerVerrou(); };
   const verifierVerrou = () => verrou.etat().then(lire);
   if (token() && typeof document !== 'undefined') {   /* seulement dans une page (un banc charge ce fichier sans elle) */
-    if (drapeau() && !mem()) { montrerVerrou(); req('/api/verrou/verrouiller', {}).catch(() => null).then(verifierVerrou); }   /* l'app vient d'être lancée : Face ID */
+    /* 0.78.0 (son retour du 24/11/2026 : « 5 min, c'est trop court ») : une seule règle, le délai d'absence. L'app relancée ne redemande Face ID
+       que si elle est restée fermée plus longtemps que le délai : le serveur le sait (elle l'a prévenu en quittant l'écran) et le dit ici.
+       Verrouillée, ses demandes reviennent en 423 et l'écran se pose aussitôt. */
+    if (drapeau()) req('/api/verrou/retour', {}).then((r) => { const e = r.j && typeof r.j.actif === 'boolean' ? r.j : null; if (e && e.actif && e.ouvert) mem(true); lire(e); }).catch(() => null);
     else verifierVerrou();
     setInterval(() => { if (visible() && drapeau() && !ecran) verifierVerrou(); }, 30000);   /* signe de vie de l'app à l'écran ; à l'arrière-plan, plus rien ne part */
     document.addEventListener('visibilitychange', () => {

@@ -9778,6 +9778,23 @@ void main(){
     return card;
   }
   const SETV = {box: null, at: 0, html: '', force: false};   /* dernier rendu de Réglages (voir VIEWS.reglages) */
+  const REG_ONGLETS = [['general', 'Général'], ['securite', 'Sécurité'], ['liens', 'Connexions'], ['voix', 'Voix'], ['alertes', 'Alertes'], ['memoire', 'Mémoire'], ['tout', 'Tout']];
+  const REG_RANGE = [[/^(Verrou de l’app|Coffre)/, 'securite'], [/^(Accès Google|Assistants reliés|Tâches envoyées par un proche|Siri et bouton)/, 'liens'], [/^(Voix|Tour de Claude)/, 'voix'], [/^Notifications/, 'alertes'], [/^(Ce que JARVIS retient|Skills)/, 'memoire']];
+  const regVoit = (o) => { const k = regOnglet(); return k === 'tout' || !o || o === k; };
+  function regOnglet(k) {   /* sans argument : l'onglet courant ; avec : le choisit, le retient et montre ses cartes */
+    if (k === undefined) { if (!SETV.onglet) { let v = ''; try { v = localStorage.getItem('jarvis.reglages.onglet') || ''; } catch (e) { v = ''; } SETV.onglet = REG_ONGLETS.some(([x]) => x === v) ? v : 'general'; } return SETV.onglet; }
+    if (!REG_ONGLETS.some(([x]) => x === k)) return SETV.onglet;
+    const change = SETV.onglet !== k; SETV.onglet = k; try { localStorage.setItem('jarvis.reglages.onglet', k); } catch (e) { /* rien */ }
+    const racine = SETV.box && SETV.box.parentNode; if (!racine) return k;
+    racine.querySelectorAll('[data-onglet]').forEach((c) => { c.hidden = !regVoit(c.dataset.onglet); });
+    racine.querySelectorAll('.set-tabs [role=tab]').forEach((b) => { const oui = b.dataset.o === k; b.setAttribute('aria-selected', String(oui)); if (oui && change) { try { b.scrollIntoView({inline: 'center', block: 'nearest'}); } catch (e) { /* rien */ } } });
+    if (change) { const sc = document.getElementById('scroller'); if (sc) sc.scrollTop = 0; }
+    return k;
+  }
+  document.head.append(h('style', {text: '.set-tabs{position:sticky;top:calc(var(--top-h, 64px) + 4px);z-index:5;display:flex;gap:6px;overflow-x:auto;padding:5px;margin:0 0 2px;border-radius:14px;background:rgba(4,10,28,.92);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);border:1px solid var(--line-2, rgba(255,255,255,.12));scrollbar-width:none;-webkit-overflow-scrolling:touch}.set-tabs::-webkit-scrollbar{display:none}'
+    + '.set-tabs button{position:relative;flex:0 0 auto;min-height:40px;padding:0 15px;border:0;border-radius:10px;background:none;color:var(--muted);font:600 14px var(--sans);white-space:nowrap;cursor:pointer}'
+    + '.set-tabs button[aria-selected="true"]{color:#031022;background:linear-gradient(90deg,rgb(var(--c2)),rgb(var(--c1)))}'
+    + '.set-tab-pt{position:absolute;top:6px;right:5px;width:8px;height:8px;border-radius:50%;background:#fbbf24}'}));
   const VIEWS_RELOAD_SIRI = () => { SETV.force = true; if (TAB === 'reglages') renderView(true); };
   /* JARVIS OS 0.14.0 : carte « Sauvegarde de Pilotage » : la copie de la nuit, et ce qui a changé d'une copie à l'autre (valeurs avant et après) */
   /* 0.37.0 (choix du 21/11/2026, « Mémoire durable ») : ce que JARVIS retient de toi, et ton Profil (lu dans Drive, sans les finances) */
@@ -9947,12 +9964,12 @@ void main(){
       return true;
     }
     if (s === '#voir-relances') { vers('#suivi'); go('suivi'); cibler(() => document.getElementById('relances')); return true; }
-    if (s === '#voir-sante') { vers('#reglages'); go('reglages'); cibler(() => panneauNomme(/^État des systèmes/)); return true; }
+    if (s === '#voir-sante') { vers('#reglages'); go('reglages'); if (!regVoit('general')) regOnglet('general'); cibler(() => panneauNomme(/^État des systèmes/)); return true; }
     if (s === '#voir-brief') { vers(''); go('accueil'); cibler(() => { const b = document.getElementById('brief-card'); return b && !b.hidden ? b : null; }); return true; }
     if (s === '#voir-echeances') { vers('#agenda'); go('agenda'); cibler(() => panneauNomme(/^Dates clés/)); return true; }   /* les rappels du jour : échéances et papiers, dans « Dates clés » */
     if ((m = s.match(/^#voir-reglages-(\w+)$/))) {   /* Réglages : la carte concernée (mémoire, voix, assistants reliés, notifications) */
       const id = {memoire: 'mem-card', voix: 'voixg-card', mcp: 'mcp-card', notifs: 'notif-card'}[m[1]]; vers('#reglages'); go('reglages');
-      if (id) cibler(() => document.getElementById(id));
+      if (id) cibler(() => document.getElementById(id), (e) => { if (e.dataset.onglet && !regVoit(e.dataset.onglet)) regOnglet(e.dataset.onglet); });   /* 0.78.0 : son onglet d'abord, sauf si elle se voit déjà (onglet « Tout ») */
       return true;
     }
     return VOIRURL_NOTIF(hash);
@@ -10160,7 +10177,7 @@ void main(){
     const ajouter = geste(async () => { dire(''); if (!(await prouver())) return; const c = await JS.verrou.creer('Passkey de JARVIS ' + (st.cles.length + 1)); if (!prendre(c)) { dire((c && c.error) || 'Le serveur ne répond pas.', true); return; } if (await prouver()) dire('Passkey ajoutée et prouvée.'); else dire('Passkey créée mais pas prouvée : elle sera oubliée dans 10 minutes.', true); });
     const eteindre = geste(async () => { dire(''); if (!(await prouver())) return; const r = await JS.verrou.desactiver(); if (prendre(r)) dire('Verrou désactivé : le jeton de l’appareil suffit de nouveau.'); else dire((r && r.error) || 'Le serveur ne répond pas.', true); });
     /* 0.76.0 : après combien de temps hors de l'app Face ID est redemandé (son retour du 24/11/2026) */
-    const DELAI_DIT = {0: 'dès que tu la quittes', 60: 'après 1 min hors de l’app', 120: 'après 2 min hors de l’app', 300: 'après 5 min hors de l’app'}, DELAI_BOUTON = {0: 'Tout de suite', 60: '1 min', 120: '2 min', 300: '5 min'};
+    const DELAI_DIT = {0: 'dès que tu la quittes', 60: 'après 1 min hors de l’app', 120: 'après 2 min hors de l’app', 300: 'après 5 min hors de l’app', 900: 'après 15 min hors de l’app', 3600: 'après 1 h hors de l’app', 14400: 'après 4 h hors de l’app'}, DELAI_BOUTON = {0: 'Tout de suite', 60: '1 min', 120: '2 min', 300: '5 min', 900: '15 min', 3600: '1 h', 14400: '4 h'};
     const regler = (n) => geste(async () => { dire(''); if (n === st.delai) return; if (!(await prouver())) return; const r = await JS.verrou.delai(n); if (prendre(r)) dire('Réglé : Face ID redemandé ' + DELAI_DIT[n] + '.'); else dire((r && r.error) || 'Le serveur ne répond pas.', true); });
     const retirer = (k) => geste(async () => { dire(''); if (!(await prouver())) return; const r = await JS.verrou.retirer(k.id); if (prendre(r)) dire('Passkey retirée.'); else dire((r && r.error) || 'Le serveur ne répond pas.', true); });
     const paint = () => {
@@ -10170,13 +10187,13 @@ void main(){
       if (!st.actif) {
         etat.textContent = 'Désactivé : le jeton gardé par l’app suffit pour ouvrir JARVIS.' + (n ? ' ' + pk + ' déjà enregistrée' + (n > 1 ? 's' : '') + '.' : '');
         zone.replaceChildren(h('button', {type: 'button', class: 'btn main sm', onclick: activer}, n ? 'Activer (Face ID)' : 'Activer avec une passkey (Face ID)'),
-          h('p', {class: 'muted set-small', text: 'Ton gestionnaire de mots de passe garde la passkey ; Face ID la présente à chaque ouverture de l’app, et quand tu y reviens après plus d’une minute (réglable). Tous les appareils reliés devront la présenter. Rien n’est activé si l’essai échoue. Hors du verrou : le Raccourci Siri, les invitations et les assistants reliés, qui ont leurs propres clés. Secours si la passkey est perdue : sur le serveur, « node server.mjs verrou --retirer ».'}));
+          h('p', {class: 'muted set-small', text: 'Ton gestionnaire de mots de passe garde la passkey ; Face ID la présente quand tu reviens dans l’app après plus d’une minute (réglable, de « tout de suite » à 4 h). Tous les appareils reliés devront la présenter. Rien n’est activé si l’essai échoue. Hors du verrou : le Raccourci Siri, les invitations et les assistants reliés, qui ont leurs propres clés. Secours si la passkey est perdue : sur le serveur, « node server.mjs verrou --retirer ».'}));
         return;
       }
-      etat.textContent = 'Activé · ' + pk + '. Face ID à chaque ouverture de l’app, et ' + (DELAI_DIT[st.delai] || 'après une absence') + '.';
+      etat.textContent = 'Activé · ' + pk + '. Face ID redemandé ' + (DELAI_DIT[st.delai] || 'après une absence') + (st.delai >= 900 ? ' : pendant ce temps, qui tient ton iPhone déverrouillé ouvre JARVIS.' : '.');
       zone.replaceChildren(
         (st.delais || []).length ? h('div', {class: 'verrou-delai'}, h('small', {class: 'pick-label', text: 'Redemander Face ID'}),
-          h('div', {class: 'seg set-seg', role: 'group'}, st.delais.map((n) => h('button', {type: 'button', 'aria-pressed': String(n === st.delai), onclick: regler(n)}, DELAI_BOUTON[n] || n + ' s')))) : null,
+          h('div', {class: 'seg set-seg', role: 'group'}, [...new Set([...st.delais, st.delai])].sort((x, y) => x - y).map((n) => h('button', {type: 'button', 'aria-pressed': String(n === st.delai), onclick: regler(n)}, DELAI_BOUTON[n] || n + ' s')))) : null,
         h('ul', {class: 'mem-list'}, st.cles.map((k) => h('li', {class: 'mem-it'}, h('span', {}, h('b', {text: k.nom}), h('small', {class: 'muted', text: ' · créée le ' + fmt(new Date(k.at), {day: 'numeric', month: 'short'})})),
           n > 1 ? h('button', {type: 'button', class: 'btn ghost sm danger', onclick: retirer(k)}, 'Retirer') : null))),
         h('div', {class: 'row-actions'},
@@ -10398,6 +10415,10 @@ void main(){
         /* 0.27.0 : la mise à jour est proposée toute seule à l'ouverture de l'app ; ce bouton force la vérification et suit le même chemin */
         h('button', {type: 'button', class: 'btn main', id: 'set-maj', onclick: async () => { upd.textContent = 'Vérification…'; upd.classList.remove('is-bad'); let m = ''; try { m = await window.JarvisMaj.check(true); } catch (e) { m = 'Vérification impossible.'; } upd.textContent = m; upd.classList.toggle('is-bad', /injoignable|impossible|pas pu|pas relié/.test(m)); }}, 'Mettre à jour le serveur'), upd,
         h('p', {class: 'muted', text: 'Une nouvelle version est proposée toute seule à l’ouverture de JARVIS ; ce bouton force la vérification.'}),
+        h('a', {class: 'link', href: '/ancienne/', text: 'Ancienne app (réglages avancés, diagnostic)'})));
+      /* 0.78.0 : la voix et l'écoute ont leur carte, rangée sous l'onglet « Voix » */
+      const updV = h('p', {class: 'set-msg'});
+      parts.push(h('section', {class: 'card set-card'}, h('b', {text: 'Voix et écoute'}),
         h('small', {class: 'pick-label', text: 'Voix de JARVIS'}), seg('voiceEngine', [['serveur', 'Ton serveur (Pierre ou Google)'], ['iphone', "Voix de l'iPhone"]], 'serveur'),
         /* 0.25.0 (choix QCM du 19/11/2026, « un seul Claude ») : plus de conversation continue ; l'orbe ouvre la discussion avec Claude et le micro
            écoute une question (Whisper du serveur, sinon l'iPhone), écrite dans le champ avant l'envoi */
@@ -10407,10 +10428,19 @@ void main(){
         /* 0.32.0 : Parakeet (NVIDIA) écoute à la place de Whisper une fois installé : 2 à 2,5 fois moins de mots faux, une phrase écrite
            en 0,2 à 0,3 s au lieu de 1,6 s (mesure du 21/11/2026) ; « Passer à Parakeet » quand Whisper est déjà là */
         /* 0.36.0 : la fin de phrase reconnue à la voix (Smart Turn) s'installe avec l'écoute : « Installer la fin de phrase » si elle manque */
-        st && (!st.ecoute || (st.ecouteMoteur && st.ecouteMoteur.moteur === 'whisper') || (st.finDeTour === false)) ? h('button', {type: 'button', class: 'btn sm', id: 'set-ecoute', onclick: async (ev) => { const b = ev.currentTarget; b.disabled = true; const r = await JS.ecouteInstall(); upd.textContent = r ? "Installation de l'écoute lancée (5 à 15 minutes : environ 1 Go à télécharger). Reviens ici ensuite." : 'Installation impossible : serveur injoignable.'; const poll = async () => { const e = await JS.ecouteEtat(); if (!e || e.state === 'running') { setTimeout(poll, 8000); return; } upd.textContent = e.state === 'done' ? (/Parakeet installé/.test(String(e.tail || '')) ? 'Parakeet installé : c\'est lui qui t\'écoute maintenant.' : 'Écoute installée (Whisper).') + (/Fin de phrase installée/.test(String(e.tail || '')) ? ' Fin de phrase reconnue à la voix (Smart Turn).' : '') : "L'installation a échoué : " + String(e.tail || '').slice(-200); upd.classList.toggle('is-bad', e.state !== 'done'); }; setTimeout(poll, 8000); }}, !st.ecoute ? "Installer l'écoute" : st.ecouteMoteur && st.ecouteMoteur.moteur === 'whisper' ? 'Passer à Parakeet (plus juste, plus rapide)' : 'Installer la fin de phrase (Smart Turn)') : null,
-        st && !st.tts ? h('button', {type: 'button', class: 'btn sm', onclick: async () => { const r = await JS.voiceInstall(); upd.textContent = r ? 'Installation de la voix : ' + r.state + '. Reviens dans quelques minutes.' : 'Installation impossible.'; }}, 'Installer la voix Pierre') : null,
-        h('a', {class: 'link', href: '/ancienne/', text: 'Ancienne app (réglages avancés, diagnostic)'})));
-      swap(parts);
+        st && (!st.ecoute || (st.ecouteMoteur && st.ecouteMoteur.moteur === 'whisper') || (st.finDeTour === false)) ? h('button', {type: 'button', class: 'btn sm', id: 'set-ecoute', onclick: async (ev) => { const b = ev.currentTarget; b.disabled = true; const r = await JS.ecouteInstall(); updV.textContent = r ? "Installation de l'écoute lancée (5 à 15 minutes : environ 1 Go à télécharger). Reviens ici ensuite." : 'Installation impossible : serveur injoignable.'; const poll = async () => { const e = await JS.ecouteEtat(); if (!e || e.state === 'running') { setTimeout(poll, 8000); return; } updV.textContent = e.state === 'done' ? (/Parakeet installé/.test(String(e.tail || '')) ? 'Parakeet installé : c\'est lui qui t\'écoute maintenant.' : 'Écoute installée (Whisper).') + (/Fin de phrase installée/.test(String(e.tail || '')) ? ' Fin de phrase reconnue à la voix (Smart Turn).' : '') : "L'installation a échoué : " + String(e.tail || '').slice(-200); updV.classList.toggle('is-bad', e.state !== 'done'); }; setTimeout(poll, 8000); }}, !st.ecoute ? "Installer l'écoute" : st.ecouteMoteur && st.ecouteMoteur.moteur === 'whisper' ? 'Passer à Parakeet (plus juste, plus rapide)' : 'Installer la fin de phrase (Smart Turn)') : null,
+        st && !st.tts ? h('button', {type: 'button', class: 'btn sm', onclick: async () => { const r = await JS.voiceInstall(); updV.textContent = r ? 'Installation de la voix : ' + r.state + '. Reviens dans quelques minutes.' : 'Installation impossible.'; }}, 'Installer la voix Pierre') : null,
+        updV));
+      /* 0.78.0 (son retour du 24/11/2026 : « le menu Réglages devient trop long et on s'y perd ») : des onglets. Chaque carte est rangée d'après
+         son titre (une carte inconnue va dans « Général ») ; l'onglet choisi est retenu sur cet iPhone ; un point signale une carte qui attend
+         (demande d'accès d'un assistant, coffre verrouillé). « Tout » garde l'ancienne page entière. */
+      for (const c of parts) { if (c.tagName !== 'SECTION') continue; const t = ((c.querySelector('b') || {}).textContent || '').trim(), o = REG_RANGE.find(([re]) => re.test(t)); c.dataset.onglet = o ? o[1] : 'general'; }
+      const attend = new Set(parts.filter((c) => c.dataset && (c.dataset.urgent === '1' || c.dataset.etat === 'verrouille' || c.dataset.etat === 'bloque')).map((c) => c.dataset.onglet));
+      const barre = h('div', {class: 'set-tabs', role: 'tablist', 'aria-label': 'Réglages'}, REG_ONGLETS.map(([k, l]) => h('button', {type: 'button', role: 'tab', 'data-o': k, 'aria-selected': String(regOnglet() === k), onclick: () => regOnglet(k)}, l, attend.has(k) ? h('i', {class: 'set-tab-pt', 'aria-label': 'à voir'}) : null)));
+      const notes = parts.filter((c) => c.tagName !== 'SECTION'), cartes = parts.filter((c) => c.tagName === 'SECTION');
+      for (const c of cartes) c.hidden = !regVoit(c.dataset.onglet);
+      swap([...notes, barre, ...cartes]);
+      regOnglet(regOnglet());
     };
     draw(/[?&#]google=ok/.test(location.href) ? msg('Google est relié.') : null);
   };
@@ -10454,7 +10484,7 @@ void main(){
     const VU_UX = voirUrl;
     voirUrl = function (hash) { if (/^#voir-(recent|cote|courrier)\b/.test(String(hash || '')) && PMF.f !== 'tout') { PMF.f = 'tout'; if (TAB === 'demandes') renderView(); } return VU_UX(hash); };
     /* Réglages : l'état des systèmes (venu de Suivi) en bas */
-    VIEWS.reglages = (el) => { V_REG(el); const p = h('section', {class: 'panel'}, h('header', {class: 'panel-h'}, h('h2', {text: 'État des systèmes'}), h('span', {class: 'aside', text: 'v' + VERSION})), sysBox()); const sb = santeBox(); if (sb) p.append(sb); el.append(p); };   /* 0.73.0 : le même panneau, sans reconstruire Suivi */
+    VIEWS.reglages = (el) => { V_REG(el); const p = h('section', {class: 'panel', 'data-onglet': 'general'}, h('header', {class: 'panel-h'}, h('h2', {text: 'État des systèmes'}), h('span', {class: 'aside', text: 'v' + VERSION})), sysBox()); const sb = santeBox(); if (sb) p.append(sb); p.hidden = !regVoit('general'); el.append(p); };   /* 0.73.0 : le même panneau, sans reconstruire Suivi */
     /* Pour moi : Tout, Décider, À faire, Infos ; « Mes tâches » (venues de Suivi) dans À faire */
     const PM = {decider: ['pm-dec'], faire: ['pm-todo', 'pm-proj', 'pm-mail', 'pm-taches', 'pm-wait'], infos: ['pm-rep']};
     const PM_ITEM = {'pm-rep': '.pm-list > .pm-rep', 'pm-wait': '.cote-it', 'pm-mail': 'li.tri', 'pm-taches': '.card.item, .rec-it'};   /* un élément montré : une carte (par défaut), une réponse (pas le lien « Les N réponses »), une carte de côté, un mail, une tâche */

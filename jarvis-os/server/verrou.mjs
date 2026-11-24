@@ -44,10 +44,12 @@ function cleDeCose(m) {
   return null;
 }
 
-export const DELAIS = [0, 60, 120, 300];   /* secondes d'absence tolérées avant de redemander Face ID ; 0 : dès qu'il quitte l'app */
+/* secondes d'absence tolérées avant de redemander Face ID ; 0 : dès qu'il quitte l'app. 0.78.0 (son retour du 24/11/2026 : « 5 min, c'est trop
+   court ») : jusqu'à 4 heures ; 120 reste accepté (réglage d'avant) sans être proposé. */
+export const DELAIS = [0, 60, 300, 900, 3600, 14400], DELAIS_ADMIS = [...DELAIS, 120];
 export function createVerrou({S, save, now, journal = () => {}, inactif = 0, duree = 12 * 3600e3, frais = 2 * 60e3}) {
   if (!S.verrou || typeof S.verrou !== 'object' || Array.isArray(S.verrou)) S.verrou = {actif: false, cles: []};
-  const V = S.verrou; if (!Array.isArray(V.cles)) V.cles = []; V.actif = V.actif === true; if (!DELAIS.includes(V.delai)) V.delai = 60;
+  const V = S.verrou; if (!Array.isArray(V.cles)) V.cles = []; V.actif = V.actif === true; if (!DELAIS_ADMIS.includes(V.delai)) V.delai = 60;
   /* 0.76.0 (son retour du 24/11/2026 : « je reviens 2 minutes après, il devrait me la redemander ») : l'app dit au serveur quand elle passe
      à l'arrière-plan ; au-delà de `delai` secondes d'absence l'ouverture tombe, ICI, que l'app le veuille ou non. Le filet si ce signal se
      perd : plus aucune demande pendant le délai + 1 minute (2 minutes au moins ; l'app à l'écran donne signe de vie toutes les 30 s). */
@@ -91,7 +93,7 @@ export function createVerrou({S, save, now, journal = () => {}, inactif = 0, dur
     /* l'app passe à l'arrière-plan (le compte de l'absence commence, une seule fois) ; elle revient (dans les temps : le compte s'efface) */
     cacher(appareil) { const x = ouvertures.get(appareil); if (x && x.cache == null) x.cache = now(); },
     retour(appareil) { const x = o(appareil); if (!x) return false; x.cache = null; x.vu = now(); return true; },
-    regler(appareil, delai) { if (!recente(appareil) || !DELAIS.includes(delai)) return false; if (V.delai !== delai) { V.delai = delai; save(); journal('verrou : Face ID redemandé après ' + delai + ' s d’absence'); } return true; },
+    regler(appareil, delai) { if (!recente(appareil) || !DELAIS_ADMIS.includes(delai)) return false; if (V.delai !== delai) { V.delai = delai; save(); journal('verrou : Face ID redemandé après ' + delai + ' s d’absence'); } return true; },
     /* créer une passkey : les options pour navigator.credentials.create */
     optionsCreer(appareil, rpId) {
       if (V.cles.length >= CLES_MAX) return null;
