@@ -384,7 +384,9 @@ Fait dans le dépôt le 24/11/2026 (pas encore sur le serveur : le coffre n'y es
   Hors du verrou : Raccourci Siri, invitations, assistants MCP. Banc : `node jarvis-os/server/tests/verrou.test.mjs`
   (41). **Activé par lui le 24/11/2026 sur son iPhone : la passkey NordPass marche dans l'app de l'écran d'accueil.**
   0.76.0, son retour : Face ID part tout seul (bouton en secours), reverrouillage au retour après une absence (1 min par
-  défaut, réglable ; avant : 5 min sans demande). 0.77.0 : écran d'accueil pendant Face ID. La feuille « Use Passkey » est
+  défaut, réglable ; avant : 5 min sans demande). 0.77.0 : écran d'accueil pendant Face ID. 0.78.0, son retour (« 5 min, c'est
+  trop court ») : délais jusqu'à 4 h, et **le délai d'absence devient la seule règle** (l'app relancée dans le délai ne
+  redemande rien), ce qui remplace « Face ID à chaque ouverture ». La feuille « Use Passkey » est
   celle d'iOS : une app web ne peut pas l'enlever (à vérifier par lui : « Exiger Face ID » d'iOS sur l'icône). La page d'essai `/maquettes/passkey/` ne sert plus
   (son essai du 24/11 à midi, dans Chrome : toujours aucune clé « prf » ; le point 4 n'a pas été fait).
 - Reste à construire : le bouton d'arrêt d'urgence, la notification « coffre verrouillé » après un redémarrage,
