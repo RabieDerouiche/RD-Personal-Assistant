@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="fr">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="robots" content="noindex">
+<title>Essai passkey</title>
+<!-- JARVIS OS — essai du 24/11/2026 : l'iPhone du propriétaire peut-il servir de clé au coffre du serveur ?
+     Tout se passe dans la page : rien n'est envoyé au serveur, rien n'est gardé. La passkey créée ici s'appelle
+     « JARVIS essai » : elle ne sert à rien d'autre et se supprime ensuite dans Réglages, Mots de passe.
+     Ce qu'on veut savoir : l'extension « prf » de WebAuthn rend-elle une clé de 32 octets, la même à chaque
+     Face ID, dans Safari et dans une app de l'écran d'accueil (docs/hermes-deroule.md, « La passkey »). -->
+<body style="margin:0;min-height:100vh;background:#02040e;color:#e6f2ff;font:17px/1.5 system-ui,sans-serif;padding:24px;box-sizing:border-box">
+<main style="max-width:460px;margin:auto">
+  <h1 style="font-size:22px">Essai : ton iPhone comme clé du coffre</h1>
+  <p>Deux boutons, dans l'ordre. Rien n'est envoyé au serveur.</p>
+  <p><button id="creer" style="font:inherit;padding:12px 18px;border-radius:999px;border:0;background:#3b82f6;color:#fff">1. Créer la passkey d'essai</button></p>
+  <p><button id="cle" disabled style="font:inherit;padding:12px 18px;border-radius:999px;border:0;background:#3b82f6;color:#fff;opacity:.5">2. Demander la clé (Face ID)</button></p>
+  <p><button id="encore" disabled style="font:inherit;padding:12px 18px;border-radius:999px;border:0;background:#334155;color:#fff;opacity:.5">3. La redemander (doit être la même)</button></p>
+  <pre id="sortie" style="white-space:pre-wrap;background:#0b1224;border-radius:12px;padding:14px;font:14px/1.5 ui-monospace,monospace"></pre>
+  <p style="opacity:.75;font-size:15px">Copie le cadre ci-dessus et colle-le à Claude. Il ne contient aucun secret : seulement oui ou non, et une empreinte de 8 caractères.</p>
+</main>
+<script>
+(function () {
+  var out = document.getElementById('sortie'), L = [];
+  function dire(t) { L.push(t); out.textContent = L.join('\n'); }
+  function hex(b) { return Array.prototype.map.call(new Uint8Array(b), function (x) { return ('0' + x.toString(16)).slice(-2); }).join(''); }
+  function alea(n) { var a = new Uint8Array(n); crypto.getRandomValues(a); return a; }
+  function empreinte(b) { return crypto.subtle.digest('SHA-256', b).then(function (h) { return hex(h).slice(0, 8); }); }
+  var sel = new TextEncoder().encode('jarvis-coffre : essai du sel fixe'), ident = null, premiere = null;
+  var debout = (window.navigator.standalone === true) || window.matchMedia('(display-mode: standalone)').matches;
+  dire('Essai passkey · ' + new Date().toISOString().slice(0, 16).replace('T', ' ') + ' UTC');
+  dire('Ouvert comme : ' + (debout ? 'app de l’écran d’accueil' : 'page du navigateur'));
+  dire('Appareil : ' + (/iPhone/.test(navigator.userAgent) ? 'iPhone' : /iPad/.test(navigator.userAgent) ? 'iPad' : 'autre') + ' · ' + ((navigator.userAgent.match(/Version\/([\d.]+)/) || [])[1] ? 'Safari ' + navigator.userAgent.match(/Version\/([\d.]+)/)[1] : 'navigateur non reconnu'));
+  dire('WebAuthn : ' + (window.PublicKeyCredential ? 'oui' : 'NON'));
+  if (!window.PublicKeyCredential) return;
+  function activer(id) { var b = document.getElementById(id); b.disabled = false; b.style.opacity = 1; }
+  document.getElementById('creer').onclick = function () {
+    navigator.credentials.create({publicKey: {
+      challenge: alea(32), rp: {name: 'JARVIS essai', id: location.hostname},
+      user: {id: alea(16), name: 'jarvis-essai', displayName: 'JARVIS essai'},
+      pubKeyCredParams: [{type: 'public-key', alg: -7}, {type: 'public-key', alg: -257}],
+      authenticatorSelection: {residentKey: 'required', userVerification: 'required'},
+      extensions: {prf: {}}, timeout: 120000
+    }}).then(function (c) {
+      ident = c.rawId;
+      var ext = c.getClientExtensionResults ? c.getClientExtensionResults() : {};
+      dire('1. Passkey créée : oui · gardée par : ' + (c.authenticatorAttachment || 'non dit'));
+      dire('   Clé annoncée à la création (prf.enabled) : ' + (ext.prf ? String(ext.prf.enabled) : 'non dit'));
+      activer('cle');
+    }).catch(function (e) { dire('1. Passkey créée : NON (' + (e.name || 'erreur') + ')'); });
+  };
+  function demander(n) {
+    return navigator.credentials.get({publicKey: {
+      challenge: alea(32), rpId: location.hostname, userVerification: 'required', timeout: 120000,
+      allowCredentials: ident ? [{type: 'public-key', id: ident}] : [],
+      extensions: {prf: {eval: {first: sel}}}
+    }}).then(function (a) {
+      var ext = a.getClientExtensionResults ? a.getClientExtensionResults() : {}, r = ext.prf && ext.prf.results && ext.prf.results.first;
+      if (!r) { dire(n + '. Clé rendue : NON (Face ID réussi, mais aucune clé : l’iPhone ou le gestionnaire de mots de passe ne sait pas le faire ici)'); return null; }
+      return empreinte(r).then(function (e) { dire(n + '. Clé rendue : oui, ' + new Uint8Array(r).length + ' octets · empreinte ' + e); return e; });
+    }).catch(function (e) { dire(n + '. Clé rendue : NON (' + (e.name || 'erreur') + ')'); return null; });
+  }
+  document.getElementById('cle').onclick = function () { demander(2).then(function (e) { premiere = e; if (e) activer('encore'); }); };
+  document.getElementById('encore').onclick = function () {
+    demander(3).then(function (e) { if (e) dire('   Même clé les deux fois : ' + (e === premiere ? 'OUI : ton iPhone peut servir de clé' : 'NON : inutilisable comme clé')); });
+  };
+})();
+</script>
+</body>
+</html>
