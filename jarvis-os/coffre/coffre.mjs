@@ -11,7 +11,21 @@
  *   admin.sock   (0600, l'utilisateur du service ; root passe toujours) : creer, ouvrir, fermer, mettre, retirer,
  *                changer-phrase, etat. Aucune commande ne rend une valeur.
  *   service.sock (0660, groupe des clients : le serveur de JARVIS) : etat, lire (portée « service » seulement),
- *                ecrire (noms « jarvis-… », portée « service » imposée), fermer. Rien d'autre.
+ *                ecrire (noms « jarvis-… », portée « service » imposée), fermer, cle-ouverture, ouvrir-scelle. Rien d'autre.
+ *
+ * Ouverture scellée (décision du 24/11/2026 : après un redémarrage, il ouvre le coffre depuis l'app JARVIS ; Termius
+ * reste le secours). La page scelle la phrase pour ce processus SEUL ; le serveur de JARVIS, relais sans confiance, ne
+ * fait que passer le paquet par service.sock. Au démarrage : une paire ECDH P-256, en mémoire seulement, neuve à chaque
+ * lancement. `cle-ouverture` (publique : permise sur les deux prises) rend {cle, defi, expire} : la clé publique (point
+ * brut non compressé) et un défi de 32 octets, à usage unique, valable 2 minutes, 8 en attente au plus (le plus ancien
+ * tombe). `ouvrir-scelle {epk, iv, ct}` : secret = ECDH(epk de la page, clé du coffre) ; clé = HKDF-SHA256(secret,
+ * sel = le défi, info = « jarvis-coffre ouverture v1 », 32 octets) ; ct = AES-256-GCM (iv de 12 octets, étiquette à la
+ * fin, AAD = la même info) du JSON UTF-8 {"phrase":"…","defi":"…"} ; tout en base64url sans « = ». Le service essaie
+ * la clé de chaque défi en attente, exige le même défi dans le clair, le consomme, puis passe par le MÊME `ouvrir` et
+ * le MÊME frein que la prise d'administration. Tout échec rend la même erreur (code « ouverture ») ; un sceau invalide
+ * coûte le plus ancien défi en attente, et au-delà de 10 par minute plus aucun paquet n'est étudié.
+ * Ce que ça ne couvre pas : la page et la clé publique arrivent par le serveur de JARVIS ; s'il est activement
+ * compromis (autre page, autre clé), il lit la phrase. Le sceau protège du relais passif (journaux, mémoire, Caddy).
  * Un secret de portée « guichet » n'est rendu par aucune commande : seul avecSecret(), dans ce processus, le prête
  * le temps d'un appel (pour les futurs « gestes » d'une liste fermée ; aucun n'existe ici).
  *
@@ -31,12 +45,22 @@ const MAX_VALEUR = 32 * 1024;              // octets (UTF-8) : tient dans une de
 const PHRASE_MIN = 20, PHRASE_MAX = 1024;
 const N_DEFAUT = 2 ** 17, N_MIN = 2 ** 10, N_MAX = 2 ** 18;   // au-delà : 256 Mo et plus par essai, refusé (fichier trafiqué ?)
 const ESSAIS_MAX = 5, FENETRE = 10 * 60_000, FREIN_DEFAUT = 2000;
+const INFO_OUVERTURE = Buffer.from('jarvis-coffre ouverture v1');   // info de HKDF et AAD du paquet scellé
+const DEFI_VIE = 2 * 60_000, DEFIS_MAX = 8, SCEAUX_MAX = 10, SCEAUX_FENETRE = 60_000, CT_MAX = 4096 + 16;
 const BLOC = 64;                           // une valeur est complétée à un multiple de 64 octets : le fichier ne dit pas sa longueur
 const AAD_CLE = Buffer.from('jarvis-coffre:v1:cle');
 const aadSecret = (nom, portee) => Buffer.from('jarvis-coffre:v1:secret\0' + nom + '\0' + portee);
 const b64 = (b) => b.toString('base64');
 const octets = (s, n) => typeof s === 'string' && s.length < 4 * MAX_DEMANDE && /^[A-Za-z0-9+/]*={0,2}$/.test(s)
   && (n == null ? s.length > 0 : Buffer.from(s, 'base64').length === n);
+const b64u = (b) => b.toString('base64url');
+/* base64url strict → tampon, ou null (autre type, autre alphabet, longueur hors bornes) */
+const deB64u = (s, min, max = min) => {
+  if (typeof s !== 'string' || s.length > 2 * max + 4 || !/^[A-Za-z0-9_-]+$/.test(s)) return null;
+  const b = Buffer.from(s, 'base64url');
+  if (b.length < min || b.length > max) { b.fill(0); return null; }
+  return b;
+};
 const puissanceDe2 = (n) => Number.isInteger(n) && n >= N_MIN && n <= N_MAX && (n & (n - 1)) === 0;
 
 /* Un refus est une réponse normale ({ok:false}) ; toute autre erreur devient « erreur interne », sans son message. */
@@ -82,6 +106,9 @@ export function creerCoffre({fichier, N = N_DEFAUT, frein = FREIN_DEFAUT, mainte
   if (!puissanceDe2(N)) throw new Error('N de scrypt invalide (puissance de 2, de 2^10 à 2^18)');
   let K = null, doc = null, depuis = null;     // K et doc : en mémoire seulement, entre ouvrir et fermer
   let echecs = [], bloqueJusqu = 0, generation = 0;
+  const paire = crypto.createECDH('prime256v1'); paire.generateKeys();   // ouverture scellée : jamais exportée, jamais écrite
+  const defis = new Map();                     // défi (base64url) → {octets, expire} ; ordre d'arrivée
+  let sceauxInvalides = [];
   let file = Promise.resolve();                // creer, ouvrir, changer-phrase : un seul à la fois, frein compris
   const enFile = (f) => { const p = file.then(f, f); file = p.then(() => {}, () => {}); return p; };
   const horodate = () => new Date(maintenant()).toISOString().slice(0, 19) + 'Z';
@@ -287,6 +314,46 @@ export function creerCoffre({fichier, N = N_DEFAUT, frein = FREIN_DEFAUT, mainte
       journal('secret « ' + nom + ' » ' + (remplace ? 'remplacé' : 'ajouté') + ' par la prise service');
       return {nom, portee: 'service', remplace};
     },
+    /* Publique (rien de secret) : la clé pour sceller et un défi neuf. */
+    cleOuverture() {
+      const t = maintenant();
+      for (const [d, x] of defis) if (x.expire <= t) defis.delete(d);
+      while (defis.size >= DEFIS_MAX) defis.delete(defis.keys().next().value);
+      const octets = crypto.randomBytes(32), defi = b64u(octets), expire = t + DEFI_VIE;
+      defis.set(defi, {octets, expire});
+      return {cle: b64u(paire.getPublicKey()), defi, expire};
+    },
+    /* Le paquet scellé par la page (sceller.mjs). Une seule réponse à tout échec ; le journal, lui, dit lequel. */
+    async ouvrirScelle(epk, iv, ct) {
+      const non = () => refus('ouverture', 'ouverture refusée');
+      const t = maintenant();
+      for (const [d, x] of defis) if (x.expire <= t) defis.delete(d);
+      sceauxInvalides = sceauxInvalides.filter((x) => t - x < SCEAUX_FENETRE);
+      if (sceauxInvalides.length >= SCEAUX_MAX) non();   // plus rien n'est étudié avant la fin de la minute
+      let phrase = null, defi = null;
+      const e = deB64u(epk, 65), v = deB64u(iv, 12), c = deB64u(ct, 17, CT_MAX);
+      let secret = null;
+      try {
+        if (e && e[0] === 4 && v && c) secret = paire.computeSecret(e);   // lève si le point n'est pas sur la courbe
+        for (const [d, x] of secret ? defis : []) {
+          const cle = Buffer.from(crypto.hkdfSync('sha256', secret, x.octets, INFO_OUVERTURE, 32));
+          let clair = null;
+          try { clair = desceller(cle, {iv: b64(v), ct: b64(c.subarray(0, c.length - 16)), tag: b64(c.subarray(c.length - 16))}, INFO_OUVERTURE); } catch {} finally { cle.fill(0); }
+          if (!clair) continue;
+          try { const j = JSON.parse(clair.toString('utf8')); if (j && typeof j === 'object' && typeof j.phrase === 'string' && j.defi === d) { phrase = j.phrase; defi = d; } } catch {} finally { clair.fill(0); }
+          break;   // une seule clé ouvre ce chiffré : inutile d'essayer les autres
+        }
+      } catch {} finally { if (secret) secret.fill(0); for (const b of [e, v, c]) if (b) b.fill(0); }
+      if (defi === null) {
+        sceauxInvalides.push(t);
+        if (defis.size) defis.delete(defis.keys().next().value);
+        journal('ouverture scellée refusée : sceau invalide, rejoué ou défi expiré' + (sceauxInvalides.length >= SCEAUX_MAX ? ' ; ' + SCEAUX_MAX + ' en une minute, plus aucun paquet étudié pendant une minute' : ''));
+        non();
+      }
+      defis.delete(defi);   // usage unique, que la phrase soit bonne ou non
+      try { return await coffre.ouvrir(phrase); }
+      catch (err) { if (err instanceof Refus) non(); throw err; }
+    },
     /* Dans ce processus seulement : prête la valeur d'un secret « guichet » à fn, dans un tampon effacé au retour.
      * fn ne doit ni le garder, ni le convertir en chaîne plus longtemps que nécessaire, ni l'écrire. */
     async avecSecret(nom, fn) {
@@ -321,12 +388,15 @@ export function creerCoffre({fichier, N = N_DEFAUT, frein = FREIN_DEFAUT, mainte
     ['mettre', (d) => coffre.mettre(d.nom, d.portee, d.valeur)],
     ['retirer', (d) => coffre.retirer(d.nom)],
     ['changer-phrase', (d) => coffre.changerPhrase(d.ancienne, d.nouvelle)],
+    ['cle-ouverture', () => coffre.cleOuverture()],
   ]);
   const SERVICE = new Map([
     ['etat', () => coffre.etat()],
     ['lire', (d) => coffre.lire(d.nom)],
     ['ecrire', (d) => coffre.ecrire(d.nom, d.valeur)],
     ['fermer', () => coffre.fermer()],
+    ['cle-ouverture', () => coffre.cleOuverture()],
+    ['ouvrir-scelle', (d) => coffre.ouvrirScelle(d.epk, d.iv, d.ct)],
   ]);
   return coffre;
 }
@@ -440,7 +510,7 @@ async function principal(argv, env) {
   if (frein < FREIN_DEFAUT) journal('ATTENTION : frein raccourci (' + frein + ' ms) : réglage de banc, jamais sur le serveur');
   if (typeof process.getuid === 'function' && process.getuid() === 0) journal('lancé en root : prévu pour l’utilisateur jarvis-coffre (banc ?)');
   let e0; try { e0 = coffre.etat(); } catch { e0 = null; }
-  journal(e0 ? (e0.existe ? 'démarré : coffre verrouillé, ' + e0.secrets.length + ' secret(s) ; en attente de « sudo jarvis-coffre ouvrir »' : 'démarré : aucun coffre encore (sudo jarvis-coffre creer)')
+  journal(e0 ? (e0.existe ? 'démarré : coffre verrouillé, ' + e0.secrets.length + ' secret(s) ; en attente de l’ouverture (app JARVIS, ou sudo jarvis-coffre ouvrir)' : 'démarré : aucun coffre encore (sudo jarvis-coffre creer)')
     : 'démarré : fichier du coffre illisible (' + o.fichier + ')');
 }
 let lanceDirectement = false;

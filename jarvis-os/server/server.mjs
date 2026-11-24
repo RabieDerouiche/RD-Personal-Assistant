@@ -75,8 +75,44 @@ function load() {
     return {};
   }
 }
+/* ---------- arrêt d'urgence (install/urgence.sh) : `node server.mjs urgence --etat | --vider`, sans lancer le serveur ----------
+   --etat compte, sans rien changer. --vider, service arrêté (un serveur en marche réécrirait son état par-dessus), retire tout ce qui
+   ouvre JARVIS de l'extérieur : appareils reliés (les sessions de l'app) et leurs abonnements aux notifications, clé du Raccourci Siri,
+   code d'appairage en attente, assistants MCP (clients OAuth, jetons d'accès et de renouvellement, jetons fixes), l'accès Google gardé
+   par le serveur (son jeton ; l'identifiant et le secret du client restent) et les invitations. Une ligne JSON de comptes, jamais un
+   jeton ; après --vider, `reste` est le recompte de l'état relu sur le disque (0 attendu, sinon code 1). L'accord donné à JARVIS reste à retirer dans son compte Google : le serveur ne peut pas.
+   state.json est lu ici, pas par load() : illisible ou abîmé, rien n'est touché ni copié. */
+if (process.argv[2] === 'urgence') {
+  const mode = process.argv[3];
+  if ((mode !== '--etat' && mode !== '--vider') || process.argv.length !== 4) { console.error('Usage : node server.mjs urgence --etat | --vider   (--vider : service arrêté)'); process.exit(2); }
+  let E = {}, absent = false;
+  try { E = JSON.parse(fs.readFileSync(FILE, 'utf8')); if (!E || typeof E !== 'object' || Array.isArray(E)) throw new Error('forme'); }
+  catch (e) { if (e.code === 'ENOENT') { E = {}; absent = true; } else { console.error('[jarvis] urgence : state.json illisible ou abîmé (' + (e.code || 'JSON') + ') : rien n’a été changé.'); process.exit(1); } }
+  const liste = (x) => (Array.isArray(x) ? x : []);
+  const compter = (X) => { const M = X.mcp && typeof X.mcp === 'object' ? X.mcp : null, jetons = liste(M && M.jetons); return {
+    appareils: liste(X.tokens).length, notifications: liste(X.push && X.push.subs).length, raccourci: X.raccourci ? 1 : 0, appairage: fs.existsSync(PAIR) ? 1 : 0,
+    google: X.google && X.google.refresh ? 1 : 0, invitations: liste(X.invites).length,
+    mcp_clients: M && M.clients && typeof M.clients === 'object' ? Object.keys(M.clients).length : 0, mcp_jetons: jetons.filter((j) => !j || j.type !== 'fixe').length, mcp_fixes: jetons.filter((j) => j && j.type === 'fixe').length}; };
+  const n = compter(E), sortie = {mode: mode.slice(2), ...n};
+  if (mode === '--vider') {
+    const M = E.mcp && typeof E.mcp === 'object' ? E.mcp : null;
+    E.tokens = []; E.raccourci = null; if (E.push && typeof E.push === 'object') E.push.subs = []; if (M) { M.clients = {}; M.jetons = []; }
+    /* « coquille vide » (sa demande du 24/11/2026) : l'accès Google gardé par le serveur et les invitations partent aussi ; l'identifiant et le
+       secret du client Google restent, pour que « Reconnecter » suffise au retour (sans son accord sur l'écran de Google, ils n'ouvrent rien) */
+    if (E.google && typeof E.google === 'object') { for (const k of ['refresh', 'account', 'linkedAt', 'missing']) delete E.google[k]; }
+    if (Array.isArray(E.invites)) E.invites = [];
+    if (!absent) { const tmp = FILE + '.tmp'; fs.writeFileSync(tmp, JSON.stringify(E), {mode: 0o600}); fs.chmodSync(tmp, 0o600); fs.renameSync(tmp, FILE); }
+    try { fs.unlinkSync(PAIR); } catch { /* aucun code en attente */ }
+    /* la preuve : l'état est relu sur le disque et recompté ; `reste` doit valoir 0 */
+    let relu = {}; if (!absent) { try { relu = JSON.parse(fs.readFileSync(FILE, 'utf8')); } catch { relu = null; } }
+    sortie.reste = relu ? Object.values(compter(relu)).reduce((a, b) => a + b, 0) : -1;
+  }
+  console.log(JSON.stringify(sortie));
+  if (sortie.reste) process.exit(1);
+  process.exit(0);
+}
 /* réserve Grok épuisée le 13/11/2026, remise à zéro le mardi 17/11 à 12h : pas de sonnette avant */
-const S = Object.assign({tokens: [], msgs: [], missions: [], session: null, usage: {chats: 0, missions: 0}, config: {grokPauseUntil: ''}}, load());
+const S =Object.assign({tokens: [], msgs: [], missions: [], session: null, usage: {chats: 0, missions: 0}, config: {grokPauseUntil: ''}}, load());
 /* 0.73.0 : un rangement de la mémoire coupé par un redémarrage (mise à jour, panne) ne bloque plus les suivants */
 if (S.memRange && S.memRange.enCours) S.memRange.enCours = false;
 function save() {
