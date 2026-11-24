@@ -13,7 +13,7 @@ set -uo pipefail
 [ "$(id -u)" = 0 ] || { echo "En root."; exit 1; }
 [ -e /run/systemd/system ] && { echo "Systemd tourne ici : ce n'est pas un conteneur de banc. Arrêt."; exit 1; }
 ICI=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd); RACINE=$(cd "$ICI/../.." && pwd); KIT=$RACINE/jarvis-os/hermes/portail
-T=/tmp/hermes-portail-banc; U=hermes-portail; H=/home/$U; HH=$H/.hermes; RAM=/run/hermes-portail-cle
+T=/tmp/hermes-portail-banc; U=hermes-portail; H=/home/$U; HH=$H/hermes; RAM=/run/hermes-portail-cle
 PM=40080; PP=40090; PC=40443; RELAIS=8891   # faux modèle, faux portail, cible du relais ; ports éphémères permis par sortie.nft
 MDP='Banc-essai-0000'; PHRASE='phrase-du-banc-inventee-0123456789'
 ok=0; ko=0
@@ -104,6 +104,9 @@ verif "jarvis-coffre garde la clé (secret « hermes-portail-cle », portée ser
 verif "etat : coffre ouvert, clé en mémoire, identifiant listé sans mot de passe" bash -c "bash /usr/local/sbin/hermes-portail etat > $T/etat.log 2>&1; grep -q 'jarvis-coffre : ouvert' $T/etat.log && grep -q 'en mémoire vive' $T/etat.log && grep -q 'vault_' $T/etat.log && ! grep -q '$MDP' $T/etat.log"
 
 echo "== Essai : connexion au faux portail par le coffre, en lecture seule"
+# Comme sur le serveur : l'unité du Hermes principal existe sur la machine. Le Hermes portail ne doit ni la chercher
+# ni s'y accrocher (son dossier n'est pas ~/.hermes : docs/hermes-portail.md).
+[ -e /etc/systemd/system/hermes-gateway.service ] || { printf '[Unit]\nDescription=faux Hermes principal (banc)\n' > /etc/systemd/system/hermes-gateway.service; FAUSSE_UNITE=1; }
 suite() { cat > $T/consigne.txt <<FIN
 Essai du banc. SUITE: [
  {"nom": "browser_exec", "args": {"code": "# Ouverture du faux portail\nnew_tab('http://127.0.0.1:$PP/tableau')\nwait_for_load()\nprint(page_info())"}},
@@ -118,7 +121,7 @@ FIN
 }
 suite; : > $T/traces/portail.jsonl
 bash /usr/local/sbin/hermes-portail essai "http://127.0.0.1:$PP/tableau" --consigne-fichier $T/consigne.txt > $T/essai1.log 2>&1; rc=$?
-verif "essai : code 0" [ $rc = 0 ]
+verif "essai : code 0, alors que l'unité du Hermes principal est présente sur la machine" bash -c "[ $rc = 0 ] && [ -e /etc/systemd/system/hermes-gateway.service ]"
 verif "le faux portail a reçu une connexion réussie (bon identifiant, mot de passe de la bonne longueur)" grep -q '"evenement": "connexion", "reussie": true, "identifiant_recu": "banc@exemple.test", "longueur_mot_de_passe": '${#MDP} $T/traces/portail.jsonl
 verif "Hermes a lu le tableau de bord et ouvert le formulaire" bash -c "grep -q '\"evenement\": \"tableau\"' $T/traces/portail.jsonl && grep -q '\"evenement\": \"formulaire\"' $T/traces/portail.jsonl && grep -q 'libelle,montant,date,soumettre' $T/essai1.log"
 verif "rien n'a été soumis" bash -c "! grep -q SOUMISSION $T/traces/portail.jsonl"
@@ -172,6 +175,7 @@ bash /usr/local/sbin/hermes-portail oublier --tout > $T/oublier.log 2>&1
 verif "oublier --tout : identifiants, clé, session et secret de jarvis-coffre effacés" bash -c "[ ! -e $HH/vault/vault.json.enc ] && [ ! -e $RAM/vault.key ] && [ ! -d $HH/navigateur ] && ! /usr/local/sbin/jarvis-coffre etat | grep -q 'hermes-portail-cle'"
 
 arreter; nft delete table inet hermes_portail_sortie 2>/dev/null
+[ "${FAUSSE_UNITE:-0}" = 1 ] && rm -f /etc/systemd/system/hermes-gateway.service
 echo
 echo "Banc du Hermes portail : $ok vérifications passées, $ko en échec."
 [ $ko = 0 ]

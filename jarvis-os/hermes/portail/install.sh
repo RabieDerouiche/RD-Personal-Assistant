@@ -15,7 +15,7 @@ eval "$(grep -E '^(HERMES_VERSION|HERMES_COMMIT|HERMES_INSTALLEUR_SHA256|PLUGIN_
 : "${HERMES_COMMIT:?versions illisibles dans ../install.sh}" "${HERMES_INSTALLEUR_SHA256:?}" "${PLUGIN_ID:?}" "${PLUGIN_COMMIT:?}" "${CLAUDE_CODE_VERSION:?}"
 U=hermes-portail
 H=/home/$U
-HH=$H/.hermes
+HH=$H/hermes               # pas ~/.hermes : Hermes cherche alors une unité « hermes-gateway » au nom nu, celle du Hermes principal
 CC=$H/.local/lib/claude-code
 ETC=/etc/hermes-portail
 LIB=/usr/local/lib/hermes-portail

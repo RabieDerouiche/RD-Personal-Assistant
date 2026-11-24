@@ -20,7 +20,7 @@ set -uo pipefail
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 U=hermes-portail
 H=/home/$U
-HH=$H/.hermes
+HH=$H/hermes               # pas ~/.hermes : Hermes cherche alors une unité « hermes-gateway » au nom nu, celle du Hermes principal
 ETC=/etc/hermes-portail
 LIB=/usr/local/lib/hermes-portail
 VAR=/var/lib/hermes-portail

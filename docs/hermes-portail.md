@@ -39,9 +39,18 @@ clé et l'identifiant. Trois barrières, aucune ne dépend du modèle :
 3. **Le mot de passe ne passe jamais par le modèle** : `browser_vault` le remplit dans la page, seulement sur le
    site exact enregistré (vérifié au banc : absent de tout ce que le modèle reçoit).
 
+## Son dossier n'est pas `~/.hermes`
+
+(certain, code et banc) Tout appel d'Hermes s'assure d'abord qu'une passerelle tourne. Si son dossier est le
+`~/.hermes` de l'utilisateur, il cherche une unité systemd nommée `hermes-gateway.service`, et la trouve : c'est celle
+du Hermes principal. Au banc (sans systemd), cela suffisait à faire échouer chaque essai dès que les deux Hermes
+étaient installés (« Gateway inaccessible »). Avec un autre dossier (`/home/hermes-portail/hermes`), le nom de
+l'unité cherchée porte une empreinte du chemin, n'existe nulle part, et Hermes lance sa propre passerelle, le temps
+du passage. Ne remets pas ce dossier à `~/.hermes`.
+
 ## La clé en mémoire
 
-- Le coffre d'Hermes est `~/.hermes/vault/vault.json.enc` (chiffré, sur le disque) et `vault.key`. (certain, code et
+- Le coffre d'Hermes est `/home/hermes-portail/hermes/vault/vault.json.enc` (chiffré, sur le disque) et `vault.key`. (certain, code et
   banc) Hermes relit la clé à chaque usage, suit un lien symbolique, et refuse d'ouvrir **sans jamais écraser** si
   la clé manque.
 - `vault.key` est donc un **lien** vers `/run/hermes-portail-cle/vault.key`, un dossier `ramfs` : en mémoire vive,
@@ -55,7 +64,7 @@ clé et l'identifiant. Trois barrières, aucune ne dépend du modèle :
 - Pendant un passage : mémoire sans échange (`MemorySwapMax=0`), pas d'image mémoire (`LimitCORE=0`).
 - Limites, dites à lui : root sur le serveur allumé, coffre ouvert, lit la mémoire ; l'utilisateur `jarvis` peut
   lire la clé dans jarvis-coffre (portée « service ») mais pas le coffre chiffré d'Hermes, qu'il ne voit pas ; la
-  **session** du portail (cookies du navigateur, `~/.hermes/navigateur`) est sur le disque tant qu'elle vit.
+  **session** du portail (cookies du navigateur, `/home/hermes-portail/hermes/navigateur`) est sur le disque tant qu'elle vit.
 
 ## La session du portail
 
