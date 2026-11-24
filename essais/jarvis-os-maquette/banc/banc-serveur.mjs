@@ -27,7 +27,7 @@ await p.route(FG.url + '/auth**', (route) => { const u = new URL(route.request()
 try {
   await p.goto(BASE + '/?serveur#reglages'); await p.waitForTimeout(2500);
   ok('mode serveur choisi', await p.evaluate(() => window.__JARVIS_MODE === 'serveur' && !!window.JarvisServeur));
-  await p.fill('.set-card input', code); await p.tap('.set-card .btn.main'); await p.waitForTimeout(2500);
+  await p.fill('#porte-code', code); await p.tap('#porte-relier'); await p.waitForTimeout(4500);   /* 0.82.0 : un appareil pas relié ne voit que la porte ; relié, la page se recharge */
   ok('iPhone relié par code', await p.evaluate(() => window.JarvisServeur.linked() && /relié à/.test(document.querySelector('.set-wrap').textContent)));
   await p.screenshot({path: SH + 'set-1.png'});
   const inputs = await p.$$('.set-card input'); await inputs[0].fill(FG.client.id); await inputs[1].fill(FG.client.secret);

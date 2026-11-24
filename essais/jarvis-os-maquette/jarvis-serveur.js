@@ -22,6 +22,7 @@
     catch (e) { throw new Error('Serveur JARVIS injoignable'); }
     let j = {}; try { j = await r.json(); } catch (e) { j = {}; }
     if (r.status === 423 && j && j.verrou) montrerVerrou();   /* 0.75.0 : le serveur est verrouillé pour cet appareil */
+    if (r.status === 401 && j && j.error === 'Appareil non relié.') montrerPorte();   /* 0.82.0 : jeton absent, retiré ou périmé : la porte, pas l'app vide */
     return {status: r.status, j};
   };
   const fail = (code, server, message) => { throw {code, server, message: message || code}; };
@@ -212,6 +213,69 @@
   }
   let autoRedit = false;
   const autoVerrou = () => { if (ecran && !autoFait && !enPreuve && visible()) { autoFait = true; setTimeout(() => ouvrirVerrou(true), 350); } };
+  /* le style des deux écrans d'accueil (verrou, porte d'un appareil pas relié) */
+  function styleAccueil() {
+    if (!document.getElementById('verrou-style')) {
+      const st = document.createElement('style'); st.id = 'verrou-style';
+      st.textContent = '#verrou-ecran{position:fixed;inset:0;z-index:2147483647;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:calc(env(safe-area-inset-top,0px) + 30px) 28px calc(env(safe-area-inset-bottom,0px) + 34px);background:radial-gradient(120% 80% at 50% 36%,#0c1d3a 0%,#070b16 48%,#04060c 100%);color:#e6edf7;font:500 16px/1.5 var(--sans,system-ui,-apple-system,sans-serif);text-align:center;overflow:hidden}'
+        + '#verrou-ecran .vx-marque{font:600 15px var(--logo,var(--display,system-ui,sans-serif));letter-spacing:.44em;text-indent:.44em;color:#9ecbff}'
+        + '#verrou-ecran .vx-centre{display:flex;flex-direction:column;align-items:center;gap:20px}'
+        + '#verrou-ecran .vx-orbe{position:relative;width:min(54vw,230px);aspect-ratio:1;display:grid;place-items:center}'
+        + '#verrou-ecran .vx-orbe::before{content:"";position:absolute;inset:-10%;border-radius:50%;background:radial-gradient(circle,rgba(56,189,248,.30),rgba(56,189,248,0) 64%)}'
+        + '#verrou-ecran .vx-orbe img{position:relative;width:100%;height:100%;border-radius:50%;object-fit:cover;-webkit-mask-image:radial-gradient(circle,#000 54%,transparent 70%);mask-image:radial-gradient(circle,#000 54%,transparent 70%);animation:vx-souffle 4.6s ease-in-out infinite}'
+        + '#verrou-ecran .vx-orbe::after{content:"";position:absolute;inset:6%;border-radius:50%;border:2px solid transparent;border-top-color:#38bdf8;border-right-color:rgba(168,85,247,.75);opacity:0;transition:opacity .3s}'
+        + '#verrou-ecran[data-etat=scan] .vx-orbe::after{opacity:1;animation:vx-tour 1.15s linear infinite}'
+        + '#verrou-ecran .vx-salut{margin:0;font:700 31px/1.15 var(--display,system-ui,sans-serif)}'
+        + '#verrou-ecran .vx-date{margin:0;color:#9fb0c8;font-size:15px}'
+        + '#verrou-ecran .vx-etat{margin:6px 0 0;min-height:1.5em;color:#7dd3fc;font-size:14px;letter-spacing:.03em}'
+        + '#verrou-ecran .vx-bas{display:flex;flex-direction:column;align-items:center;gap:10px;min-height:104px;width:100%}'
+        + '#verrou-ouvrir{appearance:none;-webkit-appearance:none;border:0;border-radius:999px;width:min(100%,320px);padding:15px 26px;font:600 16px var(--sans,system-ui,sans-serif);color:#fff;background:linear-gradient(90deg,#0ea5e9,#a855f7);cursor:pointer;transition:opacity .25s}'
+        + '#verrou-ecran[data-etat=scan] #verrou-ouvrir{opacity:0;pointer-events:none}'
+        + '#verrou-ecran [role=status]{margin:0;min-height:1.5em;font-size:14px;color:#fca5a5}'
+        + '@keyframes vx-souffle{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}@keyframes vx-tour{to{transform:rotate(360deg)}}'
+        + '@media (prefers-reduced-motion:reduce){#verrou-ecran .vx-orbe img,#verrou-ecran[data-etat=scan] .vx-orbe::after{animation:none}}';
+      st.textContent = st.textContent.replace(/#verrou-ecran/g, ':is(#verrou-ecran,#porte-ecran)').replace(/#verrou-ouvrir/g, ':is(#verrou-ouvrir,#porte-relier)')
+        + '#porte-ecran form{display:flex;flex-direction:column;align-items:center;gap:10px;width:100%}'
+        + '#porte-code{width:min(100%,320px);box-sizing:border-box;padding:14px 16px;border-radius:14px;border:1px solid rgba(125,211,252,.35);background:rgba(10,16,32,.85);color:#e6edf7;font:600 20px var(--sans,system-ui,sans-serif);letter-spacing:.14em;text-align:center;text-transform:uppercase}'
+        + '#porte-code::placeholder{font-weight:500;font-size:15px;letter-spacing:.02em;text-transform:none;color:#7f8ea8}'
+        + '#porte-ecran .vx-note{margin:0;max-width:26em;color:#9fb0c8;font-size:13px}#porte-ecran .vx-bas{min-height:190px}';
+      document.head.append(st);
+    }
+  }
+  /* 0.82.0 (son constat du 24/11/2026 sur son iPad, jamais relié : « ça m'affiche la page d'accueil… il me dit bonjour… ») : un appareil pas
+     relié ne voit plus l'app, vide mais entière. Il voit cet écran, le même que celui du verrou, qui demande le code d'appairage donné par le
+     serveur (30 minutes, une fois). Relié, la page se recharge : le verrou par passkey prend alors le relais s'il est actif. */
+  let porte = null;
+  function montrerPorte() {
+    if (typeof document === 'undefined') return;
+    const poser = () => {
+      if (porte || !document.body) return;
+      styleAccueil(); cacherVerrou();
+      const el = (t, cls, txt) => { const x = document.createElement(t); if (cls) x.className = cls; if (txt) x.textContent = txt; return x; };
+      const fond = el('div'); fond.id = 'porte-ecran'; fond.dataset.etat = 'attente'; fond.setAttribute('role', 'dialog'); fond.setAttribute('aria-modal', 'true'); fond.setAttribute('aria-label', 'Cet appareil n’est pas relié à JARVIS');
+      const d = new Date(), hh = d.getHours(), salut = hh >= 5 && hh < 12 ? 'Bonjour.' : hh >= 12 && hh < 18 ? 'Bon après-midi.' : 'Bonsoir.';
+      let quand = ''; try { quand = d.toLocaleDateString('fr-FR', {weekday: 'long', day: 'numeric', month: 'long'}) + ' · ' + d.toLocaleTimeString('fr-FR', {hour: '2-digit', minute: '2-digit'}); } catch (e) { quand = ''; }
+      const orbe = el('div', 'vx-orbe'), img = el('img'); img.alt = ''; img.src = BASE + '/icon-512.png'; img.addEventListener('error', () => { img.style.visibility = 'hidden'; }); orbe.append(img);
+      const code = el('input'); code.id = 'porte-code'; code.type = 'text'; code.maxLength = 12; code.placeholder = 'Code à 8 caractères'; code.setAttribute('autocomplete', 'off'); code.setAttribute('autocapitalize', 'characters'); code.setAttribute('autocorrect', 'off'); code.spellcheck = false; code.setAttribute('aria-label', 'Code donné par ton serveur');
+      const btn = el('button', '', 'Relier cet appareil'); btn.type = 'submit'; btn.id = 'porte-relier';
+      const msg = el('p'); msg.setAttribute('role', 'status');
+      const form = el('form'); form.setAttribute('autocomplete', 'off');
+      form.addEventListener('submit', async (ev) => {
+        ev.preventDefault();
+        if (!code.value.trim()) { msg.textContent = 'Tape le code donné par ton serveur.'; code.focus(); return; }
+        btn.disabled = true; msg.textContent = '';
+        const r = await window.JarvisServeur.pair(code.value);
+        if (r && r.ok) { location.reload(); return; }
+        btn.disabled = false; msg.textContent = (r && r.error) || 'Code refusé.';
+      });
+      form.append(code, btn, msg, el('p', 'vx-note', 'Le code se demande à ton serveur : il sert une fois, pendant 30 minutes.'));
+      const centre = el('div', 'vx-centre'); centre.append(orbe, el('h1', 'vx-salut', salut), el('p', 'vx-date', quand), el('p', 'vx-etat', 'Cet appareil n’est pas relié à JARVIS'));
+      const bas = el('div', 'vx-bas'); bas.append(form);
+      fond.append(el('div', 'vx-marque', 'J.A.R.V.I.S'), centre, bas);
+      document.body.append(fond); porte = fond;
+    };
+    if (document.body) poser(); else document.addEventListener('DOMContentLoaded', poser);
+  }
   function montrerVerrou() {
     drapeau(true);
     if (typeof document === 'undefined') return;
@@ -221,27 +285,7 @@
       /* 0.77.0 (son retour du 24/11/2026 : « refais un bon écran d'accueil le temps de se connecter en Face ID ») : l'orbe de JARVIS qui
          respire, un anneau qui tourne pendant la vérification, le salut de l'heure et la date ; le bouton n'apparaît que si Face ID n'a
          pas ouvert tout seul. Rien de personnel sur cet écran : il se voit avant toute preuve. */
-      if (!document.getElementById('verrou-style')) {
-        const st = document.createElement('style'); st.id = 'verrou-style';
-        st.textContent = '#verrou-ecran{position:fixed;inset:0;z-index:2147483647;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:calc(env(safe-area-inset-top,0px) + 30px) 28px calc(env(safe-area-inset-bottom,0px) + 34px);background:radial-gradient(120% 80% at 50% 36%,#0c1d3a 0%,#070b16 48%,#04060c 100%);color:#e6edf7;font:500 16px/1.5 var(--sans,system-ui,-apple-system,sans-serif);text-align:center;overflow:hidden}'
-          + '#verrou-ecran .vx-marque{font:600 15px var(--logo,var(--display,system-ui,sans-serif));letter-spacing:.44em;text-indent:.44em;color:#9ecbff}'
-          + '#verrou-ecran .vx-centre{display:flex;flex-direction:column;align-items:center;gap:20px}'
-          + '#verrou-ecran .vx-orbe{position:relative;width:min(54vw,230px);aspect-ratio:1;display:grid;place-items:center}'
-          + '#verrou-ecran .vx-orbe::before{content:"";position:absolute;inset:-10%;border-radius:50%;background:radial-gradient(circle,rgba(56,189,248,.30),rgba(56,189,248,0) 64%)}'
-          + '#verrou-ecran .vx-orbe img{position:relative;width:100%;height:100%;border-radius:50%;object-fit:cover;-webkit-mask-image:radial-gradient(circle,#000 54%,transparent 70%);mask-image:radial-gradient(circle,#000 54%,transparent 70%);animation:vx-souffle 4.6s ease-in-out infinite}'
-          + '#verrou-ecran .vx-orbe::after{content:"";position:absolute;inset:6%;border-radius:50%;border:2px solid transparent;border-top-color:#38bdf8;border-right-color:rgba(168,85,247,.75);opacity:0;transition:opacity .3s}'
-          + '#verrou-ecran[data-etat=scan] .vx-orbe::after{opacity:1;animation:vx-tour 1.15s linear infinite}'
-          + '#verrou-ecran .vx-salut{margin:0;font:700 31px/1.15 var(--display,system-ui,sans-serif)}'
-          + '#verrou-ecran .vx-date{margin:0;color:#9fb0c8;font-size:15px}'
-          + '#verrou-ecran .vx-etat{margin:6px 0 0;min-height:1.5em;color:#7dd3fc;font-size:14px;letter-spacing:.03em}'
-          + '#verrou-ecran .vx-bas{display:flex;flex-direction:column;align-items:center;gap:10px;min-height:104px;width:100%}'
-          + '#verrou-ouvrir{appearance:none;-webkit-appearance:none;border:0;border-radius:999px;width:min(100%,320px);padding:15px 26px;font:600 16px var(--sans,system-ui,sans-serif);color:#fff;background:linear-gradient(90deg,#0ea5e9,#a855f7);cursor:pointer;transition:opacity .25s}'
-          + '#verrou-ecran[data-etat=scan] #verrou-ouvrir{opacity:0;pointer-events:none}'
-          + '#verrou-ecran [role=status]{margin:0;min-height:1.5em;font-size:14px;color:#fca5a5}'
-          + '@keyframes vx-souffle{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}@keyframes vx-tour{to{transform:rotate(360deg)}}'
-          + '@media (prefers-reduced-motion:reduce){#verrou-ecran .vx-orbe img,#verrou-ecran[data-etat=scan] .vx-orbe::after{animation:none}}';
-        document.head.append(st);
-      }
+      styleAccueil();
       const el = (t, cls, txt) => { const x = document.createElement(t); if (cls) x.className = cls; if (txt) x.textContent = txt; return x; };
       const fond = el('div'); fond.id = 'verrou-ecran'; fond.setAttribute('role', 'dialog'); fond.setAttribute('aria-modal', 'true'); fond.setAttribute('aria-label', 'JARVIS est verrouillé');
       const d = new Date(), h = d.getHours(), salut = h >= 5 && h < 12 ? 'Bonjour.' : h >= 12 && h < 18 ? 'Bon après-midi.' : 'Bonsoir.';
@@ -263,6 +307,7 @@
   /* ce que dit le serveur fait foi : verrou éteint (retiré dans Termius) → l'écran part ; actif et fermé pour cet appareil → l'écran vient */
   const lire = (e) => { if (!e) return; drapeau(e.actif); if (typeof e.delai === 'number') delaiConnu = e.delai; if (!e.actif) cacherVerrou(); else if (!e.ouvert) montrerVerrou(); };
   const verifierVerrou = () => verrou.etat().then(lire);
+  if (!token()) montrerPorte();   /* 0.82.0 : jamais relié (ou délié) : rien de l'app ne se voit */
   if (token() && typeof document !== 'undefined') {   /* seulement dans une page (un banc charge ce fichier sans elle) */
     /* 0.78.0 (son retour du 24/11/2026 : « 5 min, c'est trop court ») : une seule règle, le délai d'absence. L'app relancée ne redemande Face ID
        que si elle est restée fermée plus longtemps que le délai : le serveur le sait (elle l'a prévenu en quittant l'écran) et le dit ici.

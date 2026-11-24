@@ -32,7 +32,7 @@ import {createCoffreLien} from './coffre-lien.mjs';   /* 0.74.0 : le coffre en m
 import {createVerrou} from './verrou.mjs';   /* 0.75.0 : le verrou de l'app par passkey */
 const ACT = createActivite();   /* 0.33.0 : ce que fait Claude à l'instant */
 
-const VERSION = '0.81.1';
+const VERSION = '0.82.0';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PORT = +(process.env.PORT || 8787);
 const HOST = process.env.HOST || '127.0.0.1';
@@ -45,8 +45,8 @@ const OS_DIR = process.env.JARVIS_OS_DIR || path.join(REPO, 'essais', 'jarvis-os
    privé (GitHub Pages ne les publierait plus). /maquettes/ : la liste ; /maquettes/<nom>/ : le dossier essais/<dossier>/ du dépôt, à jour
    après chaque « Mettre à jour ». Une nouvelle maquette = une entrée ici (son dossier entre dans MAJ_CHEMINS). */
 /* 0.79.0 (son choix du 24/11/2026 : « supprime tout ce qui est reliquat ») : la maquette de la refonte UX (appliquée depuis la 0.54.0) et la page
-   d'essai de la passkey sont retirées ; la liste est vide jusqu'à la prochaine maquette. JARVIS_MAQUETTES (JSON {nom: {dossier, titre}}) : pour le banc. */
-const MAQUETTES = (() => { const m = {}; try { for (const [k, v] of Object.entries(JSON.parse(process.env.JARVIS_MAQUETTES || '{}'))) if (/^[a-z0-9-]+$/.test(k) && v && /^[a-z0-9-]+$/.test(v.dossier || '')) m[k] = {dossier: v.dossier, titre: String(v.titre || k).replace(/[<>&"]/g, '')}; } catch { /* liste vide */ } return m; })();
+   d'essai de la passkey sont retirées. 0.82.0 : la maquette de l'affichage iPad (sa demande du 24/11/2026). JARVIS_MAQUETTES (JSON {nom: {dossier, titre}}) : pour le banc. */
+const MAQUETTES = (() => { const m = {ipad: {dossier: 'jarvis-ipad', titre: 'JARVIS sur iPad : menu sur le côté, colonnes, liste et détail (24/11/2026)'}}; try { for (const [k, v] of Object.entries(JSON.parse(process.env.JARVIS_MAQUETTES || '{}'))) if (/^[a-z0-9-]+$/.test(k) && v && /^[a-z0-9-]+$/.test(v.dossier || '')) m[k] = {dossier: v.dossier, titre: String(v.titre || k).replace(/[<>&"]/g, '')}; } catch { /* liste vide */ } return m; })();
 const ESSAIS = process.env.JARVIS_ESSAIS || path.dirname(OS_DIR);   /* le dossier essais/ du dépôt (celui de la nouvelle app) */
 const ORIGINS = (process.env.JARVIS_ORIGINS || 'https://rabiederouiche.github.io').split(',').map((s) => s.trim()).filter(Boolean);
 const AGENTS = ['claude', 'jarvis', ...BOT_IDS];
