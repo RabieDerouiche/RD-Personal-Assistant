@@ -1,11 +1,14 @@
 /* Banc de jarvis-coffre : node jarvis-os/coffre/tests/coffre.test.mjs
  * Lance le vrai service (coffre.mjs) dans un dossier temporaire, avec ses deux prises, et un coffre « dans le
  * processus » pour l'horloge, les fichiers trafiqués et avecSecret. Données inventées, aucun réseau, scrypt
- * raccourci (COFFRE_SCRYPT_N). Environ 15 secondes : le frein de 2 secondes est mesuré pour de vrai.
+ * raccourci (COFFRE_SCRYPT_N). Environ 20 secondes : le frein de 2 secondes est mesuré pour de vrai.
+ * L'ouverture scellée est jouée avec le module de la page (sceller.mjs, WebCrypto) et, à part, avec node:crypto.
  * En root, il vérifie en plus qui peut joindre quelle prise (utilisateur « nobody »). */
 import fs from 'node:fs'; import net from 'node:net'; import os from 'node:os'; import path from 'node:path';
 import {spawn, spawnSync} from 'node:child_process'; import {fileURLToPath} from 'node:url';
+import crypto from 'node:crypto';
 import {creerCoffre, Refus} from '../coffre.mjs';
+import {scellerPhrase} from '../sceller.mjs';
 
 const ICI = path.dirname(fileURLToPath(import.meta.url)), DEMON = path.join(ICI, '..', 'coffre.mjs');
 let ok = 0, ko = 0;
@@ -315,7 +318,122 @@ try {
   verif('scrypt au coût réel (N=2^17 par défaut, écrit dans le fichier) : crée, refuse la mauvaise phrase, ouvre (' + duree + ' ms par dérivation ici)', JSON.parse(fs.readFileSync(path.join(dossier, 'reel.json'), 'utf8')).kdf.N === 131072 && faux === 'phrase' && vrai === 'ok' && duree > 20, [faux, vrai, duree].join());
   R.fermer();
 
-  /* ---------- 9. Rien de secret nulle part ---------- */
+  /* ---------- 9. Ouverture scellée par la prise de service ---------- */
+  console.log('Ouverture scellée (service S, frein réel de 2 s) :');
+  const INFO = 'jarvis-coffre ouverture v1', deU = (x) => Buffer.from(x, 'base64url');
+  /* le même paquet, écrit avec node:crypto d'après le protocole (sans les espaces de fin) ; les options le faussent */
+  function scellerNode(phrase, cle, defi, {dedans = defi, aad = INFO, info = INFO} = {}) {
+    const e = crypto.createECDH('prime256v1'); e.generateKeys();
+    const k = Buffer.from(crypto.hkdfSync('sha256', e.computeSecret(deU(cle)), deU(defi), Buffer.from(info), 32));
+    const iv = crypto.randomBytes(12), c = crypto.createCipheriv('aes-256-gcm', k, iv); c.setAAD(Buffer.from(aad));
+    const ct = Buffer.concat([c.update(JSON.stringify({phrase, defi: dedans})), c.final(), c.getAuthTag()]);
+    return {epk: e.getPublicKey().toString('base64url'), iv: iv.toString('base64url'), ct: ct.toString('base64url')};
+  }
+  const tordre = (x, i = 5) => { const b = deU(x); b[i % b.length] ^= 1; return b.toString('base64url'); };
+  const refusOuverture = [];   // toutes les réponses de refus d'ouvrir-scelle : elles doivent être identiques
+  const scelle = async (d, paquet) => { const x = await appel(d.service, {commande: 'ouvrir-scelle', ...paquet}); if (!x.ok) refusOuverture.push(x.code + '|' + x.erreur); return x; };
+  const defiDe = async (d) => appel(d.service, {commande: 'cle-ouverture'});
+  const ouvertS = async (d) => (await appel(d.service, {commande: 'etat'})).ouvert;
+  const S1 = await lancer('s');
+  await appel(S1.admin, {commande: 'creer', phrase: PHRASE}); await appel(S1.admin, {commande: 'mettre', nom: 'jarvis-google', portee: 'service', valeur: V_SERVICE});
+  await appel(S1.admin, {commande: 'mettre', nom: 'couches', portee: 'guichet', valeur: V_GUICHET}); await appel(S1.admin, {commande: 'fermer'});
+  const kA = await appel(S1.admin, {commande: 'cle-ouverture'}); let k = await defiDe(S1);
+  verif('cle-ouverture : publique, permise sur les deux prises ; clé P-256 brute (65 octets, non compressée), défi de 32 octets valable 2 minutes ; même clé, défis différents',
+    kA.ok && k.ok && k.cle === kA.cle && k.defi !== kA.defi && deU(k.cle).length === 65 && deU(k.cle)[0] === 4 && deU(k.defi).length === 32 && /^[A-Za-z0-9_-]+$/.test(k.cle + k.defi)
+    && k.expire - Date.now() > 110_000 && k.expire - Date.now() <= 120_000 && Object.keys(k).sort().join() === 'cle,defi,expire,ms,ok', JSON.stringify(k));
+  const p1 = await scellerPhrase(PHRASE, k.cle, k.defi);
+  verif('sceller.mjs (WebCrypto) : paquet {epk, iv, ct} en base64url, clair complété à 256 octets ; la phrase n’y est sous aucune forme', Object.keys(p1).sort().join() === 'ct,epk,iv'
+    && deU(p1.epk).length === 65 && deU(p1.iv).length === 12 && deU(p1.ct).length === 256 + 16 && /^[A-Za-z0-9_-]+$/.test(p1.epk + p1.iv + p1.ct) && contient(JSON.stringify(p1)).length === 0, JSON.stringify(p1).length);
+  r = await appel(S1.admin, {commande: 'ouvrir-scelle', ...p1});
+  verif('ouvrir-scelle n’existe pas sur admin.sock (et n’y consomme rien)', refuse(r, 'inconnue') && !(await ouvertS(S1)), JSON.stringify(r));
+  r = await scelle(S1, p1);
+  const ls = await appel(S1.service, {commande: 'lire', nom: 'jarvis-google'});
+  verif('ouvrir-scelle : le paquet de la page ouvre le coffre, sans attente ; lire rend le secret « service », jamais le « guichet »', r.ok === true && r.ms < 1500 && (await ouvertS(S1)) && ls.valeur === V_SERVICE
+    && refuse(await appel(S1.service, {commande: 'lire', nom: 'couches'}), 'portee'), JSON.stringify(r));
+  await appel(S1.service, {commande: 'fermer'});
+  r = await scelle(S1, p1);
+  verif('le même paquet rejoué : refusé (défi à usage unique), coffre resté verrouillé', refuse(r, 'ouverture') && r.ms < 1000 && !(await ouvertS(S1)), JSON.stringify(r));
+  const tordus = [];
+  for (const champ of ['epk', 'iv', 'ct']) { k = await defiDe(S1); const p = await scellerPhrase(PHRASE, k.cle, k.defi); tordus.push(await scelle(S1, {...p, [champ]: tordre(p[champ])})); }
+  k = await defiDe(S1); const autreCle = crypto.createECDH('prime256v1'); autreCle.generateKeys();
+  tordus.push(await scelle(S1, {...(await scellerPhrase(PHRASE, k.cle, k.defi)), epk: autreCle.getPublicKey().toString('base64url')}));   // un autre point, valide
+  k = await defiDe(S1); const pBon = await scellerPhrase(PHRASE, k.cle, k.defi);
+  for (const faux of [{...pBon, epk: Buffer.concat([Buffer.from([4]), Buffer.alloc(64)]).toString('base64url')}, {...pBon, epk: autreCle.getPublicKey('base64url', 'compressed')}, {...pBon, ct: pBon.ct + '='},
+    {...pBon, ct: 'A'.repeat(8000)}, {...pBon, ct: Buffer.alloc(16).toString('base64url')}]) tordus.push(await scelle(S1, faux));
+  const etudies = (S1.sortie.match(/sceau invalide/g) || []).length;   // un paquet étudié puis refusé laisse une ligne ; un paquet non étudié, aucune
+  verif('epk, iv ou ct modifiés d’un bit, autre clé, point hors courbe ou compressé, ct trop long, trop court ou hors alphabet (' + tordus.length + ' paquets) : tous étudiés et refusés, service debout, coffre verrouillé',
+    tordus.length === 9 && etudies === 10 && tordus.every((x) => refuse(x, 'ouverture') && x.ms < 1000) && S1.proc.exitCode === null && !(await ouvertS(S1)), etudies + ' ' + JSON.stringify(tordus.filter((x) => !refuse(x, 'ouverture'))));
+  /* 10 sceaux invalides en quelques secondes (le rejeu et ces 9) : ce service n'étudie plus rien pendant une minute */
+  k = await defiDe(S1); r = await scelle(S1, await scellerPhrase(PHRASE, k.cle, k.defi));
+  verif('après 10 sceaux invalides en une minute : même un bon paquet n’est plus étudié (et le secours par admin.sock ouvre toujours)', refuse(r, 'ouverture') && !(await ouvertS(S1)) && (S1.sortie.match(/sceau invalide/g) || []).length === 10
+    && (await appel(S1.admin, {commande: 'ouvrir', phrase: PHRASE})).ok === true && /plus aucun paquet étudié/.test(S1.sortie), JSON.stringify(r));
+  /* redémarrage : paire de clés neuve ; un paquet scellé pour l'ancien processus ne vaut plus rien */
+  k = await defiDe(S1); const pVieux = await scellerPhrase(PHRASE, k.cle, k.defi), cleS1 = k.cle;
+  await S1.arreter('SIGTERM');
+  const S2 = await lancer('s');
+  k = await defiDe(S2); r = await scelle(S2, pVieux);
+  const pCroise = await scellerPhrase(PHRASE, cleS1, k.defi), r2s = await scelle(S2, pCroise);   // l'ancienne clé, un défi du nouveau processus
+  verif('après un redémarrage : clé publique neuve ; un paquet scellé pour l’autre processus est refusé, même avec un défi courant', k.cle !== cleS1 && refuse(r, 'ouverture') && refuse(r2s, 'ouverture') && !(await ouvertS(S2)), JSON.stringify([r, r2s]));
+  k = await defiDe(S2); r = await scelle(S2, await scellerPhrase(FAUSSE, k.cle, k.defi));
+  verif('mauvaise phrase bien scellée : refusée, freinée 2 secondes comme sur admin.sock, même réponse qu’un sceau invalide', refuse(r, 'ouverture') && r.ms >= 1900 && !(await ouvertS(S2)) && /phrase refusée \(1 essai/.test(S2.sortie), r.ms + ' ms ' + JSON.stringify(r));
+  k = await defiDe(S2); const k2 = await defiDe(S2);
+  const rD = await scelle(S2, scellerNode(PHRASE, k.cle, k.defi, {dedans: k2.defi})), rA = await scelle(S2, scellerNode(PHRASE, k2.cle, k2.defi, {aad: 'autre usage'}));
+  k = await defiDe(S2); const rI = await scelle(S2, scellerNode(PHRASE, k.cle, k.defi, {info: 'jarvis-coffre ouverture v2'}));
+  verif('paquet écrit avec node:crypto : défi du clair différent de celui de la clé, autre AAD ou autre info de HKDF → refusés', refuse(rD, 'ouverture') && refuse(rA, 'ouverture') && refuse(rI, 'ouverture') && !(await ouvertS(S2)));
+  k = await defiDe(S2); r = await scelle(S2, scellerNode(PHRASE, k.cle, k.defi));
+  verif('paquet écrit avec node:crypto d’après le protocole (sans espaces de fin) : ouvre aussi ; le compteur d’échecs repart de zéro', r.ok === true && (await ouvertS(S2)) && (await appel(S2.service, {commande: 'lire', nom: 'jarvis-google'})).valeur === V_SERVICE, JSON.stringify(r));
+  k = await defiDe(S2); r = await scelle(S2, await scellerPhrase(FAUSSE, k.cle, k.defi));
+  verif('coffre déjà ouvert : un paquet valide répond « déjà » sans étudier la phrase (comme ouvrir), et ne ferme rien', r.ok === true && r.deja === true && r.ms < 1000 && (await ouvertS(S2)), JSON.stringify(r));
+  for (const c of [{commande: 'creer', phrase: PHRASE2}, {commande: 'ouvrir', phrase: PHRASE}, {commande: 'mettre', nom: 'jarvis-x', portee: 'service', valeur: 'v'}, {commande: 'changer-phrase', ancienne: PHRASE, nouvelle: PHRASE2}, {commande: 'retirer', nom: 'couches'}])
+    refusOuverture.push(refuse(await appel(S2.service, c), 'interdit') ? 'ouverture|ouverture refusée' : 'service.sock a accepté ' + c.commande);
+  verif('service.sock n’a gagné que cle-ouverture et ouvrir-scelle : creer, ouvrir, mettre, changer-phrase, retirer toujours refusés', refusOuverture.slice(-5).every((x) => x === 'ouverture|ouverture refusée'), refusOuverture.slice(-5).join());
+  await S2.arreter('SIGTERM');
+
+  console.log('Ouverture scellée (service C, frein raccourci) :');
+  const Cs = await lancer('c', {COFFRE_FREIN_MS: '40'});
+  await appel(Cs.admin, {commande: 'creer', phrase: PHRASE}); await appel(Cs.admin, {commande: 'fermer'});
+  const mixtes = [];
+  for (let i = 0; i < 3; i++) { k = await defiDe(Cs); mixtes.push(await scelle(Cs, await scellerPhrase(FAUSSE + i, k.cle, k.defi))); }
+  for (let i = 0; i < 2; i++) mixtes.push(await appel(Cs.admin, {commande: 'ouvrir', phrase: FAUSSE + i}));
+  k = await defiDe(Cs); r = await scelle(Cs, await scellerPhrase(PHRASE, k.cle, k.defi));
+  const rAdm = await appel(Cs.admin, {commande: 'ouvrir', phrase: PHRASE});
+  verif('frein commun aux deux chemins : 3 mauvaises phrases scellées + 2 par admin.sock → coffre bloqué 10 minutes, la bonne phrase est refusée des deux côtés',
+    mixtes.slice(0, 3).every((x) => refuse(x, 'ouverture')) && mixtes.slice(3).every((x) => refuse(x, 'phrase')) && refuse(r, 'ouverture') && refuse(rAdm, 'bloque')
+    && (await appel(Cs.admin, {commande: 'etat'})).bloque > 590 && !(await ouvertS(Cs)) && /coffre bloqué 10 minutes/.test(Cs.sortie), JSON.stringify([r, rAdm]));
+  verif('tous les refus d’ouvrir-scelle (' + refusOuverture.length + ') portent la même réponse : sceau, rejeu, phrase et blocage ne se distinguent pas', refusOuverture.length >= 25 && new Set(refusOuverture).size === 1, [...new Set(refusOuverture)].join(' / '));
+  await Cs.arreter('SIGTERM');
+
+  console.log('Ouverture scellée, dans le processus (horloge du banc) :');
+  { const O = neuf(path.join(dossier, 'ouverture.json')), avantO = lignes.length;
+    const cleO = async () => O.traiter('service', {commande: 'cle-ouverture'}), ouvreO = async (p) => { const x = await O.traiter('service', {commande: 'ouvrir-scelle', ...p}); return x.ok ? 'ok' : x.code; };
+    let kO = await cleO(); const pSans = await scellerPhrase(PHRASE, kO.cle, kO.defi);
+    verif('aucun coffre encore : ouvrir-scelle refuse comme le reste', await ouvreO(pSans) === 'ouverture' && O.etat().existe === false);
+    await O.creer(PHRASE); O.fermer();
+    kO = await cleO(); const pTard = await scellerPhrase(PHRASE, kO.cle, kO.defi), fin = kO.expire;
+    t = fin;   // à l'instant de l'expiration, le défi n'existe plus
+    const tard = await ouvreO(pTard);
+    t += 61_000; kO = await cleO(); const pJuste = await scellerPhrase(PHRASE, kO.cle, kO.defi); t = kO.expire - 1;
+    verif('défi expiré (2 minutes) : refusé ; à une milliseconde de la fin : accepté', kO.expire - (fin + 61_000) === 120_000 && tard === 'ouverture' && await ouvreO(pJuste) === 'ok' && O.etat().ouvert === true, tard); O.fermer();
+    t += 61_000; const neufDefis = []; for (let i = 0; i < 9; i++) neufDefis.push(await cleO());
+    const p0 = await scellerPhrase(PHRASE, neufDefis[0].cle, neufDefis[0].defi), pb = await scellerPhrase(PHRASE, neufDefis[1].cle, neufDefis[1].defi), p8 = await scellerPhrase(PHRASE, neufDefis[8].cle, neufDefis[8].defi);
+    const d0 = await ouvreO(p0), d1 = await ouvreO(pb), d8 = await ouvreO(p8);
+    verif('8 défis en attente au plus : le 9e fait tomber le 1er ; un sceau invalide coûte le plus ancien défi restant (le 2e) ; le 9e ouvre', new Set(neufDefis.map((x) => x.defi)).size === 9 && d0 === 'ouverture' && d1 === 'ouverture' && d8 === 'ok', [d0, d1, d8].join()); O.fermer();
+    t += 61_000; const dix = []; for (let i = 0; i < 10; i++) dix.push(await ouvreO({epk: 'AAAA', iv: 'AAAA', ct: 'AAAA'}));
+    kO = await cleO(); const pLimite = await scellerPhrase(PHRASE, kO.cle, kO.defi), pendant = await ouvreO(pLimite);
+    t += 60_001;
+    verif('10 sceaux invalides en une minute : le 11e paquet, bon, n’est pas étudié (ni son défi consommé) ; une minute plus tard il ouvre', dix.every((x) => x === 'ouverture') && pendant === 'ouverture' && O.etat().ouvert === false && await ouvreO(pLimite) === 'ok', pendant); O.fermer();
+    t += 61_000; kO = await cleO();
+    const longue = await ouvreO(scellerNode('é'.repeat(600), kO.cle, kO.defi)), enorme = await ouvreO(scellerNode('x'.repeat(5000), kO.cle, kO.defi));
+    verif('phrase scellée de plus de 1024 octets, ou paquet de plus de 4 Kio : refusés sans exception', longue === 'ouverture' && enorme === 'ouverture' && O.etat().ouvert === false, longue + ' ' + enorme);
+    t += 61_000; kO = await cleO(); const pForme = await scellerPhrase(PHRASE, kO.cle, kO.defi), avantF = lignes.filter((l) => /sceau invalide/.test(l)).length, formes5 = [];
+    for (const faux of [{}, {epk: pForme.epk, iv: pForme.iv}, {...pForme, ct: 42}, {...pForme, epk: ['a']}, {...pForme, iv: ''}]) formes5.push(await ouvreO(faux));
+    verif('champs absents, vides ou d’un autre type : étudiés, refusés, sans exception', formes5.every((x) => x === 'ouverture') && lignes.filter((l) => /sceau invalide/.test(l)).length - avantF === 5 && O.etat().ouvert === false, formes5.join());
+    const journalO = lignes.slice(avantO).join('\n');
+    verif('journal de l’ouverture scellée : il dit « sceau invalide » ou « phrase refusée », jamais une phrase, un défi ni un paquet', /sceau invalide/.test(journalO) && /coffre ouvert/.test(journalO) && contient(journalO).length === 0
+      && ![...neufDefis.map((x) => x.defi), p8.ct, p8.epk, pLimite.ct].some((x) => journalO.includes(x)));
+  }
+
+  /* ---------- 10. Rien de secret nulle part ---------- */
   console.log('Fuites :');
   const sorties = demons.map((d) => d.sortie).join('\n');
   verif('sorties des services (' + demons.length + ' lancements) : ni phrase ni valeur, sous aucune forme', contient(sorties).length === 0 && /coffre ouvert/.test(sorties), contient(sorties).length);

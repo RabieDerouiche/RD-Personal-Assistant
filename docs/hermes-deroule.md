@@ -354,3 +354,26 @@ Ce qui est possible et ce qui ne l'est pas (dit à lui) :
   ID), scellée dans la page pour le coffre seul ; Termius reste le secours. La page d'essai gagne un point 4
   (remplissage d'un mot de passe, à essayer aussi depuis l'écran d'accueil).
 
+Fait dans le dépôt le 24/11/2026 (pas encore sur le serveur : le coffre n'y est pas installé) :
+- **Ouverture scellée** (`jarvis-os/coffre/coffre.mjs`, `sceller.mjs` pour la page) : `cle-ouverture` rend une clé
+  publique (neuve à chaque lancement du service) et un défi à usage unique de 2 minutes ; la page scelle la phrase
+  avec (ECDH P-256, HKDF, AES-256-GCM, clair complété à 256 octets) ; `ouvrir-scelle`, sur la prise de service
+  seulement, passe par la même ouverture et le même frein que Termius. Toute erreur rend la même réponse.
+  **Limite, à lui dire telle quelle** : la page et la clé arrivent par le serveur de JARVIS ; s'il est activement
+  compromis (autre page, autre clé), il lit la phrase. Le sceau protège du relais passif (journaux, mémoire, Caddy).
+  L'utilisateur `jarvis` peut aussi faire échouer une ouverture (frein partagé) : Termius reste alors le secours.
+- **Arrêt d'urgence** `jarvis-os/server/install/urgence.sh` (`installer` en pose la copie root
+  `/usr/local/sbin/jarvis-urgence`) : `etat` (lecture seule), `verrouiller` (coffre fermé, JARVIS relancé, Hermes
+  arrêté sans que la garde du forfait le relance), `coquille [--oui]` (en plus : Hermes retiré du démarrage ;
+  `node server.mjs urgence --vider` retire appareils, abonnements aux notifications, clé du Raccourci, code
+  d'appairage, clients et jetons MCP, **le jeton Google gardé par le serveur** (l'identifiant et le secret du client
+  restent, pour « Reconnecter ») et **les invitations**, puis relit l'état sur le disque et le recompte, 0 attendu ;
+  Claude Code déconnecté pour `jarvis` et `hermes` ; `/etc/hermes/jarvis.env` effacé ; JARVIS relancé, vide).
+  Reste à sa main, dit par le script : retirer l'accès de JARVIS dans son compte Google (une copie du jeton prise
+  avant resterait valable), révoquer le jeton Telegram chez @BotFather, changer la phrase du coffre si elle a pu être
+  vue, la clé de la voix Google (synthèse vocale seulement) si le disque a pu être lu.
+  Non essayé hors banc : vrai systemd, `runuser`, sortie réelle de `claude auth logout`.
+- Reste à construire : la carte « Coffre » de Réglages (état, champ de la phrase rempli par NordPass, « Verrouiller »),
+  les routes `/api/coffre/…` du serveur, le verrou de l'app par la passkey, le bouton d'arrêt d'urgence, puis
+  l'accès Google dans le coffre.
+

@@ -1050,6 +1050,45 @@ try {
     await lance2(); const h1 = (await c2('/api/health')).body, m3 = await c2('/api/maj?force=1', {headers: A2}), u2 = await c2('/api/update', {method: 'POST', headers: A2});
     ok('mise à jour : relancé, le serveur répond avec la nouvelle empreinte, garde l\'appareil relié et ne propose plus rien ; un second appareil ne redémarre rien', h1.commit && h1.commit !== h0.commit && h1.commit === g(SRC, 'rev-parse', '--short', 'HEAD') && h1.paired === true && m3.status === 200 && m3.body.dispo === false && u2.body.ok && u2.body.changed === false, JSON.stringify([h0.commit, h1, m3.body, u2.body]));
     s2.kill(); fs.rmSync(R, {recursive: true, force: true}); }
+  /* arrêt d'urgence (install/urgence.sh) : `node server.mjs urgence --etat | --vider`, service arrêté. Un troisième serveur, relancé
+     ensuite comme le fait systemd : plus aucun appareil, assistant MCP, clé de Raccourci ni code d'appairage ; le reste de l'état est gardé. */
+  { const D3 = fs.mkdtempSync(path.join(os.tmpdir(), 'jarvis-urgence-')), P3 = PORT + 1002, B3 = 'http://127.0.0.1:' + P3, env3 = {...env, PORT: String(P3), JARVIS_DATA: D3}, F3 = path.join(D3, 'state.json'), SRV = path.join(HERE, '..', 'server.mjs');
+    const appairer = () => execFileSync(process.execPath, [SRV, 'pair'], {env: env3}).toString().match(/: ([A-Z0-9]{4}-[A-Z0-9]{4})/)[1];
+    const cli = (...a) => { try { return {code: 0, out: execFileSync(process.execPath, [SRV, 'urgence', ...a], {env: env3, stdio: ['ignore', 'pipe', 'pipe']}).toString()}; } catch (e) { return {code: e.status, out: String(e.stdout || '') + String(e.stderr || '')}; } };
+    let s3; const lance3 = async () => { s3 = spawn(process.execPath, [SRV], {env: env3, stdio: ['ignore', 'pipe', 'pipe']}); await new Promise((z) => s3.stdout.once('data', z)); }, arrete3 = () => new Promise((z) => { s3.once('exit', z); s3.kill('SIGKILL'); });
+    const c3 = async (u, o = {}) => { const x = await fetch(B3 + u, {...o, headers: {'content-type': 'application/json', ...(o.headers || {})}}); return {status: x.status, body: await x.json().catch(() => null)}; };
+    const mcp3 = (t) => c3('/mcp', {method: 'POST', headers: {authorization: 'Bearer ' + t}, body: JSON.stringify({jsonrpc: '2.0', id: 1, method: 'tools/list', params: {}})}).then((x) => x.status);
+    const rac3 = (k) => fetch(B3 + '/api/raccourci/vocal', {headers: {authorization: 'Bearer ' + k}}).then((x) => x.status);
+    const code3 = appairer(); await lance3();
+    const T3 = (await c3('/api/pair', {method: 'POST', body: JSON.stringify({code: code3, device: 'iPhone urgence'})})).body.token, A3 = {authorization: 'Bearer ' + T3};
+    const TF = (await c3('/api/mcp/jeton', {method: 'POST', headers: A3, body: JSON.stringify({nom: 'Essai urgence', profil: 'executant'})})).body.jeton, RK = (await c3('/api/raccourci/cle', {method: 'POST', headers: A3})).body.cle;
+    await c3('/oauth/register', {method: 'POST', body: JSON.stringify({redirect_uris: ['https://claude.ai/api/mcp/auth_callback'], client_name: 'Claude', token_endpoint_auth_method: 'none'})});
+    const avantArret = [(await c3('/api/state', {headers: A3})).status, await mcp3(TF), await rac3(RK)];
+    await arrete3(); appairer();   /* un code d'appairage en attente : il doit partir aussi */
+    { const j = JSON.parse(fs.readFileSync(F3, 'utf8'));   /* un accès Google gardé par le serveur et deux invitations : la « coquille vide » les retire aussi */
+      j.google = {...(j.google || {}), clientId: 'client-du-banc', clientSecret: 'secret-du-banc', refresh: 'jeton-google-du-banc', account: 'essai@exemple.fr', linkedAt: 1};
+      j.invites = [{id: 'i1', nom: 'Invité un', hash: 'a'.repeat(64)}, {id: 'i2', nom: 'Invité deux', hash: 'b'.repeat(64)}];
+      fs.writeFileSync(F3, JSON.stringify(j), {mode: 0o600}); }
+    const sha3 = (x) => crypto.createHash('sha256').update(x).digest('hex'), brut0 = fs.readFileSync(F3, 'utf8'), j0 = JSON.parse(brut0), m0 = fs.statSync(F3).mtimeMs;
+    const e1 = cli('--etat'), n1 = JSON.parse(e1.out);
+    ok('urgence --etat : une ligne JSON de comptes (1 appareil, 1 client et 1 jeton fixe MCP, la clé du Raccourci, un code en attente, l\'accès Google, 2 invitations), rien n\'est changé, aucun jeton affiché',
+      avantArret.join() === '200,200,404' && e1.code === 0 && e1.out.trim().split('\n').length === 1 && n1.mode === 'etat' && n1.appareils === 1 && n1.mcp_clients === 1 && n1.mcp_fixes === 1 && n1.raccourci === 1 && n1.appairage === 1 && n1.google === 1 && n1.invitations === 2 && !('reste' in n1) && !e1.out.includes('jeton-google-du-banc')
+      && fs.readFileSync(F3, 'utf8') === brut0 && fs.statSync(F3).mtimeMs === m0 && fs.existsSync(path.join(D3, 'pairing.json')) && brut0.includes(sha3(T3)) && brut0.includes(sha3(TF)), avantArret.join() + ' ' + e1.out);
+    const v1 = cli('--vider'), nv = JSON.parse(v1.out), brut1 = fs.readFileSync(F3, 'utf8'), j1 = JSON.parse(brut1), e2 = JSON.parse(cli('--etat').out);
+    ok('urgence --vider : appareils, assistants MCP (clients et jetons), clé du Raccourci, code d\'appairage, accès Google (le client reste) et invitations retirés ; state.json réécrit en 0600 sans fichier voisin, le reste gardé ; recompte relu sur le disque à 0 ; ni jeton ni empreinte dans la sortie',
+      v1.code === 0 && nv.mode === 'vider' && nv.appareils === 1 && nv.mcp_fixes === 1 && nv.mcp_clients === 1 && j1.tokens.length === 0 && j1.mcp.jetons.length === 0 && Object.keys(j1.mcp.clients).length === 0 && j1.raccourci === null
+      && [T3, TF, RK].every((x) => !brut1.includes(sha3(x)) && !(e1.out + v1.out).includes(x) && !(e1.out + v1.out).includes(sha3(x))) && (fs.statSync(F3).mode & 0o777) === 0o600 && !fs.existsSync(F3 + '.tmp') && !fs.existsSync(path.join(D3, 'pairing.json'))
+      && Object.keys(j1).sort().join() === Object.keys(j0).sort().join() && JSON.stringify(j1.push.vapid) === JSON.stringify(j0.push.vapid) && JSON.stringify(j1.usage) === JSON.stringify(j0.usage)
+      && nv.google === 1 && nv.invitations === 2 && nv.reste === 0 && !brut1.includes('jeton-google-du-banc') && !('refresh' in j1.google) && !('account' in j1.google) && j1.google.clientId === 'client-du-banc' && j1.google.clientSecret === 'secret-du-banc' && j1.invites.length === 0
+      && !v1.out.includes('jeton-google-du-banc') && !v1.out.includes('secret-du-banc')
+      && e2.appareils + e2.mcp_clients + e2.mcp_jetons + e2.mcp_fixes + e2.raccourci + e2.appairage + e2.notifications + e2.google + e2.invitations === 0, v1.out + JSON.stringify(e2));
+    await lance3();
+    const apres = [(await c3('/api/state', {headers: A3})).status, await mcp3(TF), await rac3(RK), (await c3('/api/pair', {method: 'POST', body: JSON.stringify({code: code3})})).status], h3 = (await c3('/api/health')).body;
+    ok('urgence : serveur relancé, l\'ancien jeton de l\'appareil, l\'ancien jeton MCP et l\'ancienne clé du Raccourci sont refusés (401), plus aucun appareil relié', apres.join() === '401,401,401,401' && h3.paired === false, apres.join() + ' ' + JSON.stringify(h3));
+    await arrete3(); fs.writeFileSync(F3, '{pas du json', {mode: 0o600});
+    const ab = cli('--vider'), us = [cli(), cli('--tout'), cli('--vider', '--etat')];
+    ok('urgence : state.json abîmé → refus sans y toucher ni le copier (code 1) ; mode absent, inconnu ou en trop → mode d\'emploi (code 2)', ab.code === 1 && fs.readFileSync(F3, 'utf8') === '{pas du json' && !fs.readdirSync(D3).some((f) => /corrompu|\.tmp/.test(f)) && us.every((x) => x.code === 2 && /Usage/.test(x.out)), JSON.stringify([ab, us.map((x) => x.code)]));
+    fs.rmSync(D3, {recursive: true, force: true}); }
 } catch (e) { ok('exception', false, e.stack); }
 srv.kill(); FG.close(); fs.rmSync(DATA, {recursive: true, force: true});
 console.log(results.join('\n')); console.log(fails ? fails + ' échec(s)' : 'Tout passe (' + results.length + ' vérifications).');
