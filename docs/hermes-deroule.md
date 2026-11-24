@@ -347,4 +347,10 @@ Ce qui est possible et ce qui ne l'est pas (dit à lui) :
    son compte.
 3. Verrou de l'app : une session par ouverture, ouverte par la passkey.
 4. Puis seulement : l'accès Google de JARVIS dans le coffre, « Reconnecter », le geste des couches.
+- 24/11/2026, son essai sur l'iPhone (passkey gardée dans **NordPass**, page ouverte dans un navigateur) : passkey
+  créée, Face ID réussi, **aucune clé rendue** (pas de « prf » avec NordPass). Son choix (QCM) : **tout dans
+  NordPass**. Donc : la passkey de NordPass ouvre l'app JARVIS à chaque fois (simple preuve d'identité, vérifiée par
+  le serveur) ; le coffre s'ouvre, après un redémarrage, par la **phrase que NordPass remplit dans JARVIS** (Face
+  ID), scellée dans la page pour le coffre seul ; Termius reste le secours. La page d'essai gagne un point 4
+  (remplissage d'un mot de passe, à essayer aussi depuis l'écran d'accueil).
 

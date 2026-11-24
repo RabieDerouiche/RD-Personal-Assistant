@@ -17,6 +17,13 @@
   <p><button id="creer" style="font:inherit;padding:12px 18px;border-radius:999px;border:0;background:#3b82f6;color:#fff">1. Créer la passkey d'essai</button></p>
   <p><button id="cle" disabled style="font:inherit;padding:12px 18px;border-radius:999px;border:0;background:#3b82f6;color:#fff;opacity:.5">2. Demander la clé (Face ID)</button></p>
   <p><button id="encore" disabled style="font:inherit;padding:12px 18px;border-radius:999px;border:0;background:#334155;color:#fff;opacity:.5">3. La redemander (doit être la même)</button></p>
+  <h2 style="font-size:18px;margin-top:28px">4. Remplissage par ton gestionnaire de mots de passe</h2>
+  <p style="font-size:15px;opacity:.85">Touche le champ, choisis un élément dans NordPass (n'importe lequel : la touche clé au-dessus du clavier ouvre la liste), puis « Vérifier ». Rien n'est affiché ni envoyé : seulement le nombre de caractères.</p>
+  <form id="rempli" autocomplete="on" style="display:grid;gap:10px">
+    <input name="username" autocomplete="username" placeholder="Identifiant" style="font:inherit;padding:10px;border-radius:10px;border:0">
+    <input name="password" type="password" autocomplete="current-password" placeholder="Mot de passe" style="font:inherit;padding:10px;border-radius:10px;border:0">
+    <button type="submit" style="font:inherit;padding:12px 18px;border-radius:999px;border:0;background:#3b82f6;color:#fff">Vérifier</button>
+  </form>
   <pre id="sortie" style="white-space:pre-wrap;background:#0b1224;border-radius:12px;padding:14px;font:14px/1.5 ui-monospace,monospace"></pre>
   <p style="opacity:.75;font-size:15px">Copie le cadre ci-dessus et colle-le à Claude. Il ne contient aucun secret : seulement oui ou non, et une empreinte de 8 caractères.</p>
 </main>
@@ -62,6 +69,12 @@
     }).catch(function (e) { dire(n + '. Clé rendue : NON (' + (e.name || 'erreur') + ')'); return null; });
   }
   document.getElementById('cle').onclick = function () { demander(2).then(function (e) { premiere = e; if (e) activer('encore'); }); };
+  document.getElementById('rempli').onsubmit = function (ev) {
+    ev.preventDefault();
+    var f = ev.target, n = f.password.value.length, u = f.username.value.length;
+    dire('4. Mot de passe rempli : ' + (n ? 'oui, ' + n + ' caractères' : 'NON (champ vide)') + ' · identifiant : ' + (u ? 'oui' : 'non'));
+    f.password.value = ''; f.username.value = '';
+  };
   document.getElementById('encore').onclick = function () {
     demander(3).then(function (e) { if (e) dire('   Même clé les deux fois : ' + (e === premiere ? 'OUI : ton iPhone peut servir de clé' : 'NON : inutilisable comme clé')); });
   };
