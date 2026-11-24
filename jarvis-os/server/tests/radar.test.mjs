@@ -1,6 +1,6 @@
 /* Banc du Radar : node tests/radar.test.mjs (aucun vrai Google, aucun vrai Claude, aucun coût). Mails et montants inventés. */
 import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path';
-import {J, ymd, feries, occurrences, paies, resteA, trouverMontant, trouverDate, genre, avantApres, lireMail, regrouper, nomService, categorie, montantDe, createRadar, domaine, montantPdf, rythmeDe, sansPub, prelevementsPdf, calendrierPdf, montantPalier} from '../radar.mjs';
+import {J, ymd, feries, occurrences, paies, resteA, trouverMontant, trouverDate, genre, avantApres, lireMail, regrouper, nomService, categorie, montantDe, createRadar, domaine, montantPdf, rythmeDe, sansPub, prelevementsPdf, calendrierPdf, montantPalier, courantes} from '../radar.mjs';
 import {textOf} from '../google.mjs';
 import {texteDePdf} from '../pdf.mjs';
 import zlib from 'node:zlib';
@@ -537,6 +537,28 @@ try {
     const brut = JSON.parse(fs.readFileSync(f3, 'utf8')).plans;
     ok('Radar 0.77 : au démarrage, trois plans enregistrés pour un seul achat (100, 75 et 50 €) n\'en font plus qu\'un, ses échéances payées gardées ; un autre achat chez le même marchand (4 × 45 €) reste',
       Object.keys(brut).sort().join() === 'plA,plD' && brut.plA.echeances.length === 4 && brut.plA.echeances.every((e) => e.payee) && Rc.etat().plans.filter((p) => p.service === 'ATELIER EXEMPLE').length === 2, JSON.stringify(Object.keys(brut)));
+  }
+  /* 0.80.0 : les dépenses courantes (montants inventés) : ce qui reste à dépenser selon la façon de compter */
+  { const D = (j, m = 10) => J(2026, m, j), fin = J(2026, 10, 30), de = (c, a, b = fin) => courantes([c], a, b)[0];
+    const env = {service: 'Courses', mode: 'enveloppe', montant: 400}, r = [1, 7, 8, 14, 15, 16, 21, 22, 30].map((j) => de(env, D(j)).montant);
+    ok('Radar 0.80 : un budget de 400 € par mois, un quart par semaine : tout le 1er et le 7, les trois quarts du 8 au 14, la moitié du 15 au 21 (« il reste deux semaines »), un quart du 22 à la fin',
+      r.join() === '400,400,300,300,200,200,200,100,100', r.join());
+    const p1 = de(env, D(16), D(28)).montant, p2 = de(env, D(25), J(2026, 11, 5)).montant, p3 = de({...env, montant: 100.03}, D(1)).montant;
+    ok('Radar 0.80 : jusqu\'à une paie le 28 : la moitié (la dernière semaine a commencé avant) ; du 25 novembre au 5 décembre : le dernier quart et le premier du mois suivant ; les centimes ne se perdent pas',
+      p1 === 200 && p2 === 200 && p3 === 100.03, [p1, p2, p3].join());
+    const men = {service: 'Ménage', mode: 'semaine', montant: 50, jour: 4}, s1 = de(men, D(1)), s2 = de(men, D(20)), s3 = de(men, D(27));
+    ok('Radar 0.80 : 50 € chaque jeudi : 4 passages du 1er au 30 novembre 2026, 1 seul à partir du 20 (le 26), plus aucun le 27', s1.n === 4 && s1.montant === 200 && s2.n === 1 && s2.montant === 50 && s3.n === 0 && s3.montant === 0, JSON.stringify([s1.n, s2.n, s3.n]));
+    const coif = {service: 'Coiffeur', mode: 'mois', montant: 30, jour: 12}, bou = {service: 'Boucherie', mode: 'mois', montant: 120, faits: []};
+    const m = [de(coif, D(10)).montant, de(coif, D(13)).montant, de(coif, D(13), J(2026, 11, 15)).montant, de(bou, D(29)).montant, de({...bou, faits: ['2026-11']}, D(3)).montant, de(bou, D(29), J(2026, 11, 5)).montant];
+    ok('Radar 0.80 : une fois par mois : avec un jour, elle compte jusqu\'à ce jour (puis au mois suivant si la période y va) ; sans jour, elle compte ce mois-ci jusqu\'au bout, plus du tout une fois dite faite, et pas pour le mois d\'après',
+      m.join() === '30,0,30,120,0,120', m.join());
+    const fc = path.join(DIR, 'radar80.json'), Rc = createRadar({file: fc, gmail: {lie: () => true, chercher: async () => ({threads: []}), fil: async () => ({messages: []})}, claude: async () => ({ok: true, text: '[]'}), now: () => Date.parse('2026-11-16T09:00:00Z'), moisDepart: 1});
+    const set = (valeur) => Rc.traiter('POST', '/api/radar/set', async () => ({cle: 'courantes', valeur}));
+    const bon = await set([{service: 'Courses', type: 'courses', mode: 'enveloppe', montant: '400'}, {service: 'Ménage', type: 'menage', mode: 'semaine', montant: 50, jour: 4}, {service: 'Boucherie', type: 'boucherie', mode: 'mois', montant: 120, faits: ['2026-11', 'n\'importe quoi']}]);
+    const mauvais = [await set([{service: '', mode: 'enveloppe', montant: 10}]), await set([{service: 'X', mode: 'autre', montant: 10}]), await set([{service: 'X', mode: 'semaine', montant: 10}]), await set([{service: 'X', mode: 'mois', montant: 0}]), await set('rien')].map((x) => x.status);
+    const lu = JSON.parse(fs.readFileSync(fc, 'utf8')).courantes;
+    ok('Radar 0.80 : la liste s\'enregistre (identifiant donné, jour et « fait ce mois-ci » nettoyés), une ligne incomplète est refusée sans rien changer (nom vide, façon inconnue, jour manquant, montant nul)',
+      bon.status === 200 && bon.body.courantes.length === 3 && bon.body.courantes.every((c) => /^dc/.test(c.id)) && bon.body.courantes[2].faits.join() === '2026-11' && mauvais.join() === '400,400,400,400,400' && lu.length === 3 && lu[1].jour === 4, JSON.stringify([bon.status, mauvais]));
   }
   /* la mémoire de JARVIS (lue par le serveur MCP, que Grok Bot peut joindre) refuse les chiffres d'un crédit */
   ok('Mémoire : refuse les chiffres d’un crédit (règle du 12/11/2026), garde le reste', interdit('Ma mensualité de crédit immobilier est de 1150 €') && interdit('Il reste 180 000 € à rembourser sur le prêt immobilier') && !interdit("J'ai un crédit immobilier à la banque") && !interdit('Je suis prêt à 8h'));
