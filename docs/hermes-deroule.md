@@ -240,3 +240,29 @@ sur des mails à heure fixe sans la réserve Grok, et les boucles « repérer, d
 **Sa décision (QCM du 24/11/2026) : « Rien avant la comparaison ».** On termine le scénario des couches, la Veille
 du matin reste en double, et rien d'autre n'est ajouté à Hermes avant la comparaison (à partir du 07/12/2026, à
 sa demande). Ne repropose pas ces sujets d'ici là.
+
+## Le coffre (sa question du 24/11/2026 : « c'est pas en clair j'espère »)
+
+La première version de `portail-couches.sh` gardait l'adresse et le mot de passe en clair dans le dossier de JARVIS
+(0600). Deux défauts : en clair, et lisible par le Claude des missions de JARVIS (même utilisateur, hors de la
+liste des fichiers que son garde-fou lui interdit). Refait avant toute saisie :
+
+- **Chiffré dès la saisie** par systemd (`systemd-creds encrypt`, AES-256-GCM) dans `/etc/jarvis-portail/couches.cred`
+  (root, 0600, dossier 0700). Le clair ne touche jamais le disque. La clé est celle de la machine
+  (`/var/lib/systemd/credential.secret`, root 0400), plus la puce TPM s'il y en a une.
+- **Ouvert en mémoire pour un seul programme** : une copie root de la sonde (`/usr/local/lib/jarvis-portail/`, jamais un
+  fichier du dépôt), lancée par `systemd-run` sous l'utilisateur `jarvis-portail` (sans shell), enfermée
+  (`LoadCredentialEncrypted`, `ProtectSystem=strict`, `ProtectHome`, 3 minutes au plus).
+- **Personne d'autre** : ni le serveur de JARVIS, ni son Claude, ni Hermes, ni Claude Code, ni la session du serveur
+  ne lisent le coffre. Le geste « changer la date » sera un guichet de la même forme : JARVIS demande un geste
+  d'une liste fermée, un programme root-enfermé l'exécute avec le coffre ouvert.
+- **Limites** (dites à lui) : root sur le serveur peut déchiffrer ; une copie de tout le disque emporte la clé avec
+  le coffre (pas de TPM sur le VPS, à confirmer par `--essai`) ; au moment de la connexion le mot de passe est en
+  clair en mémoire, forcément. Un coffre externe (Bitwarden, 1Password) déplacerait le problème : il faut un jeton
+  sur le serveur pour l'ouvrir ; son seul gain est de pouvoir le révoquer à distance. Conseil : un mot de passe
+  propre à ce site.
+- `--essai` vérifie le coffre sur une machine sans saisie ni vrai secret (pour la session « Serveur JARVIS ») ;
+  `--retirer` efface tout. Banc : `sudo bash jarvis-os/server/tests/portail-coffre.test.sh` (10 vérifications).
+  Non vérifiable au banc : le lancement par `systemd-run` (pas de systemd dans le conteneur) : c'est `--essai`
+  sur le serveur qui le prouve.
+
