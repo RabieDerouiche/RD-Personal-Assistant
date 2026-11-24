@@ -1209,6 +1209,7 @@
   .trip-hero small { color: var(--dim); font-size: 11.5px; }
   .mchips { display: flex; flex-wrap: wrap; gap: 6px; }
   .mchip { padding: 3px 10px; border-radius: 999px; background: var(--glass-2); border: 1px solid var(--line); font-size: 12px; line-height: 18px; }
+  .nw { white-space: nowrap; }
   /* 0.80.0 : dépenses courantes du Radar (cas tout prêts, précision sous le total) */
   .rad-cr-cas { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 4px; } .rad-cr-cas .mchip { min-height: 36px; padding: 6px 13px; font-size: 13.5px; color: var(--fg); cursor: pointer; }
   .rad-cr-cas .mchip.is-on { color: #031022; background: linear-gradient(90deg, rgb(var(--c2)), rgb(var(--c1))); border-color: transparent; font-weight: 600; }
@@ -4481,6 +4482,9 @@ void main(){
   const radWhen = (n) => (n === 0 ? "aujourd'hui" : n === 1 ? 'demain' : n < 0 ? 'il y a ' + (-n) + ' j' : 'dans ' + n + ' j');
   const radDate = (iso) => { const d = new Date(String(iso).slice(0, 10) + 'T12:00:00'); return pad2(d.getDate()) + '/' + pad2(d.getMonth() + 1); };
   const radPct = (a, b) => (a && b ? Math.round((a - b) / b * 100) : null);
+  /* 0.81.1 (sa capture du 24/11/2026 : « 15,17 » en fin de ligne, « € » à la suivante) : dans une phrase, chaque montant devient un bloc qui ne se
+     coupe pas. Le texte reste le même, caractère pour caractère. */
+  const radNw = (t) => String(t == null ? '' : t).split(/(\d[\d\u00a0\u202f ]*(?:,\d+)?\s€)/).map((x, i) => (i % 2 ? h('span', {class: 'nw', text: x}) : x)).filter((x) => x !== '');
   const radLu = (iso) => { if (!iso) return 'jamais'; const d = new Date(iso), n = Math.round((new Date(d.getFullYear(), d.getMonth(), d.getDate()) - new Date(TODAY.getFullYear(), TODAY.getMonth(), TODAY.getDate())) / 864e5);
     return (n === 0 ? "aujourd'hui" : n === -1 ? 'hier' : 'le ' + radDate(iso)) + ' à ' + d.getHours() + 'h' + pad2(d.getMinutes()); };
   const RAD_T = {renouvellement: 'Renouvellement', fin: 'Fin de contrat', hausse: 'Hausse', essai: 'Fin d’essai', echeance: 'Échéance'};
@@ -4667,10 +4671,10 @@ void main(){
   function radMois(m) {
     const max = Math.max(1, ...m.postes.map((p) => p.montant || 0)), pc = radPct(m.total, m.precedent), complet = m.totalCourantes != null, ev = m.evolution || [], evMax = Math.max(1, ...ev.map((e) => e.total || 0));
     return h('div', {class: 'stack rad-mois'},
-      h('p', {class: 'lead', text: (m.libelle ? 'En ' + m.libelle + ' : ' : '') + radEur(m.total) + (m.precedent ? ', contre ' + radEur(m.precedent) + (m.precedentLibelle ? ' en ' + m.precedentLibelle : ' le mois précédent') + (pc == null ? '' : ' (' + (pc > 0 ? '+' : '') + pc + ' %)') : '') + '.'}),
-      complet && m.totalCourantes ? h('p', {class: 'muted rad-mois-dont', text: 'Soit ' + radEur(m.totalFixes) + ' de prélèvements et environ ' + radEur(m.totalCourantes) + ' de dépenses courantes (estimé).' + (m.reel ? ' Tu as noté ' + radEur(m.reel) + ' de dépenses courantes ce mois-ci.' : '')}) : null,
+      h('p', {class: 'lead'}, radNw((m.libelle ? 'En ' + m.libelle + ' : ' : '') + radEur(m.total) + (m.precedent ? ', contre ' + radEur(m.precedent) + (m.precedentLibelle ? ' en ' + m.precedentLibelle : ' le mois précédent') + (pc == null ? '' : ' (' + (pc > 0 ? '+' : '') + pc + ' %)') : '') + '.')),
+      complet && m.totalCourantes ? h('p', {class: 'muted rad-mois-dont'}, radNw('Soit ' + radEur(m.totalFixes) + ' de prélèvements et environ ' + radEur(m.totalCourantes) + ' de dépenses courantes (estimé).' + (m.reel ? ' Tu as noté ' + radEur(m.reel) + ' de dépenses courantes ce mois-ci.' : ''))) : null,
       complet ? (m.paie ? h('section', {class: 'card rad-vivre' + (m.resteAVivre < 0 ? ' is-bad' : '')}, h('small', {class: 'rad-k', text: 'Reste à vivre ce mois-ci'}), h('b', {class: 'rad-big', text: radEur(m.resteAVivre)}),
-          h('p', {class: 'muted', text: 'Ta paie de ' + radEur(m.paie) + ', moins ' + radEur(m.total) + ' de dépenses prévues (' + Math.round(m.total / m.paie * 100) + ' % de ta paie).' + (m.resteAVivre < 0 ? ' Tes dépenses prévues dépassent ta paie.' : '')}),
+          h('p', {class: 'muted'}, radNw('Ta paie de ' + radEur(m.paie) + ', moins ' + radEur(m.total) + ' de dépenses prévues (' + Math.round(m.total / m.paie * 100) + '\u00a0% de ta paie).' + (m.resteAVivre < 0 ? ' Tes dépenses prévues dépassent ta paie.' : ''))),
           h('button', {type: 'button', class: 'btn ghost sm', onclick: radPaieSheet}, 'Changer le montant de ma paie'))
         : h('section', {class: 'card rad-vivre is-vide'}, h('small', {class: 'rad-k', text: 'Reste à vivre'}), h('p', {class: 'muted', text: 'Donne le montant de ta paie : JARVIS te dira ce qu’il te reste une fois tout payé. Il reste sur ton serveur.'}),
           h('button', {type: 'button', class: 'btn sm main', onclick: radPaieSheet}, 'Donner le montant de ma paie'))) : null,
@@ -4812,12 +4816,12 @@ void main(){
     const corps = h('div', {class: 'rad-cr-suivi'});
     const peindre = () => {
       const c = cur(), v = radCourantSuivi(c, t), pc = v.budget ? Math.min(100, Math.round(v.note / v.budget * 100)) : 0, trop = v.note > v.budget + 0.005;
-      corps.replaceChildren(
-        h('p', {class: 'rad-cr-etat', text: v.notes.length ? 'Ce mois-ci : ' + radEur(v.note) + ' notés sur ' + radEur(v.budget) + (trop ? ', budget dépassé de ' + radEur(v.note - v.budget) + '.' : ' (' + pc + ' %).') : 'Ce mois-ci : rien de noté. Budget du mois : ' + radEur(v.budget) + '.'}),
+      corps.replaceChildren(...[   /* 0.81.1 : un élément absent passé tel quel à replaceChildren s'affichait « null » (sa capture du 24/11/2026) */
+        h('p', {class: 'rad-cr-etat'}, radNw( v.notes.length ? 'Ce mois-ci : ' + radEur(v.note) + ' notés sur ' + radEur(v.budget) + (trop ? ', budget dépassé de ' + radEur(v.note - v.budget) + '.' : ' (' + pc + ' %).') : 'Ce mois-ci : rien de noté. ' + (c.mode === 'mois' ? 'Prévu' : 'Budget du mois') + ' : ' + radEur(v.budget) + '.')),
         h('div', {class: 'rad-bar-t' + (trop ? ' is-trop' : ''), role: 'img', 'aria-label': pc + ' % du budget du mois noté'}, h('i', {style: 'width:' + Math.max(2, pc) + '%'})),
-        radCourantRythme(v) ? h('p', {class: 'muted rad-cr-rythme', text: radCourantRythme(v)}) : null,
+        radCourantRythme(v) ? h('p', {class: 'muted rad-cr-rythme'}, radNw(radCourantRythme(v))) : null,
         v.notes.length ? h('ul', {class: 'rad-hist-l rad-cr-notes'}, v.notes.map((r) => h('li', {}, h('span', {text: radDate(r.d) + ' : ' + radEur(r.m)}),
-          h('button', {type: 'button', class: 'btn ghost sm', 'aria-label': 'Retirer la note du ' + radDate(r.d), onclick: () => { let fait = false; ecrire((cur().reels || []).filter((y) => { if (!fait && y.d === r.d && radC(y.m) === radC(r.m)) { fait = true; return false; } return true; })); peindre(); }}, 'Retirer')))) : null);
+          h('button', {type: 'button', class: 'btn ghost sm', 'aria-label': 'Retirer la note du ' + radDate(r.d), onclick: () => { let fait = false; ecrire((cur().reels || []).filter((y) => { if (!fait && y.d === r.d && radC(y.m) === radC(r.m)) { fait = true; return false; } return true; })); peindre(); }}, 'Retirer')))) : null].filter(Boolean));
     };
     const noter = (ev) => {
       ev.preventDefault();
@@ -4826,7 +4830,7 @@ void main(){
       ecrire((cur().reels || []).concat([{d, m: radC(m) / 100}])); mt.value = ''; peindre(); toast('Noté', x.service + ' : ' + radEur(m) + ' le ' + radDate(d) + '.');
     };
     peindre();
-    openSheet({kicker: 'Radar · dépense courante', title: x.service, actions: [], say: radCourantRegle(cur()) + '. Note ce que tu dépenses : JARVIS te dit où tu en es du budget, et ce qu’il te reste à dépenser ne dépasse jamais ce qui n’est pas encore parti.',
+    openSheet({kicker: 'Radar · dépense courante', title: x.service, actions: [], say: ((r) => r.charAt(0).toUpperCase() + r.slice(1))(radCourantRegle(cur())) + '. ' + (cur().mode === 'mois' ? 'Note-la quand c’est fait : elle ne comptera plus ce mois-ci.' : cur().mode === 'semaine' ? 'Note ce que tu paies : tu vois ce que le mois t’a coûté.' : 'Note ce que tu dépenses : tu vois où tu en es du budget, et ce qu’il reste à dépenser ne dépasse jamais ce qui n’est pas encore parti.'),
       extra: () => h('div', {class: 'stack rad-cr-fiche'}, corps,
         h('form', {class: 'pick-form rad-form rad-cr-noter', onsubmit: noter},
           h('div', {class: 'two'}, h('div', {class: 'field'}, h('label', {for: ids[0], class: 'pick-label', text: 'Je viens de dépenser (€)'}), mt), h('div', {class: 'field'}, h('label', {for: ids[1], class: 'pick-label', text: 'Le'}), jr)),
@@ -4834,12 +4838,12 @@ void main(){
         h('button', {type: 'button', class: 'btn ghost rad-cr-modif', onclick: () => { closeSheet(true); radCourantEdit(cur()); }}, 'Modifier ou retirer cette dépense courante')   /* fermée tout de suite : la fermeture en douceur (260 ms) refermerait le formulaire */)});
   }
   function radCourantPanel(R) {
-    return h('section', {class: 'panel rad-courantes'}, h('header', {class: 'panel-h'}, h('h2', {text: 'Dépenses courantes (' + R.cr.length + ')'}), h('span', {class: 'aside', text: R.cr.length ? 'reste environ ' + radEur(R.tCourant) : 'courses, essence, ménage…'})),
+    return h('section', {class: 'panel rad-courantes'}, h('header', {class: 'panel-h'}, h('h2', {text: 'Dépenses courantes (' + R.cr.length + ')'}), R.cr.length ? h('span', {class: 'aside nw', text: '≈ ' + radEur(R.tCourant)}) : null),
       R.cr.length ? R.courant.map((o) => { const v = radCourantSuivi(o.c, R.t); return h('button', {type: 'button', class: 'hm-row rad-fx rad-cr', 'data-id': o.c.id, onclick: () => radCourantFiche(o.c)},
-        h('span', {class: 'hm-tx'}, h('b', {text: o.c.service}), h('small', {text: radCourantRegle(o.c) + ' · ' + radCourantDit(o, R.t) + (v.notes.length ? ' · ' + radEur(v.note) + ' notés ce mois-ci' : '')})),
-        h('span', {class: 'rad-yr', text: '≈ ' + radEur(o.montant)})); })
+        h('span', {class: 'hm-tx'}, h('b', {text: o.c.service}), h('small', {}, radNw(radCourantRegle(o.c) + ' · ' + radCourantDit(o, R.t) + (v.notes.length ? ' · ' + radEur(v.note) + ' notés ce mois-ci' : '')))),
+        h('span', {class: 'rad-yr nw', text: '≈ ' + radEur(o.montant)})); })
         : h('p', {class: 'muted', text: 'Ce qui revient chaque mois sans être un prélèvement : courses, essence, femme de ménage, coiffeur… Ajoute-les pour savoir ce qu’il te reste à dépenser.'}),
-      R.cr.length ? h('p', {class: 'muted rad-cr-tot', text: 'En tout, environ ' + radEur(R.cr.reduce((t, c) => t + radCourantMois(c), 0)) + ' par mois. Estimé : rien n’est lu dans tes comptes.'}) : null,
+      R.cr.length ? h('p', {class: 'muted rad-cr-tot'}, radNw('Reste environ ' + radEur(R.tCourant) + ' d’ici là, sur environ ' + radEur(R.cr.reduce((t, c) => t + radCourantMois(c), 0)) + ' par mois. Estimé : rien n’est lu dans tes comptes.')) : null,
       h('div', {class: 'row-actions'}, btn('Ajouter une dépense courante', () => radCourantEdit(null), 'sm main', 'plus')));
   }
   const RAD_HOL = {};
@@ -4916,11 +4920,11 @@ void main(){
       h('div', {class: 'rad-hero-tx'},
         h('small', {class: 'rad-k', text: R.mois ? 'Reste à payer d’ici la fin du mois (' + radJour(R.fin) + ')' : 'Reste à payer d’ici ta paie ' + radPaieFin(R)}),
         h('b', {class: 'rad-big', text: radEur(R.tTout)}),
-        R.tCourant ? h('small', {class: 'rad-k rad-dont', text: 'dont environ ' + radEur(R.tCourant) + ' de dépenses courantes (courses, essence…) et ' + radEur(R.tReste) + ' de prélèvements'}) : null,
-        h('p', {class: R.fx.length ? '' : 'rad-vide', text: !R.fx.length ? 'Rien de validé pour l’instant : ce total ne compte que tes dépenses fixes validées. ' + ((d.propositions || []).length ? 'Valide plus bas celles trouvées dans tes mails, et ajoute les autres (crédit, mutuelle…).' : 'Ajoute-les plus bas (crédit, mutuelle, abonnements…).')
-          : nx ? R.reste.length + (R.reste.length > 1 ? ' prélèvements' : ' prélèvement') + ' · prochain : ' + nx.x.service + ', ' + radQuand(nx.date, R.t) + ', ' + (nx.x.estime ? 'environ ' : '') + radEur(nx.x.montant) : 'Plus aucun prélèvement fixe d’ici là.'}),
+        R.tCourant ? h('small', {class: 'rad-k rad-dont'}, radNw('dont environ ' + radEur(R.tCourant) + ' de dépenses courantes (courses, essence…) et ' + radEur(R.tReste) + ' de prélèvements')) : null,
+        h('p', {class: R.fx.length ? '' : 'rad-vide'}, radNw(!R.fx.length ? 'Rien de validé pour l’instant : ce total ne compte que tes dépenses fixes validées. ' + ((d.propositions || []).length ? 'Valide plus bas celles trouvées dans tes mails, et ajoute les autres (crédit, mutuelle…).' : 'Ajoute-les plus bas (crédit, mutuelle, abonnements…).')
+          : nx ? R.reste.length + (R.reste.length > 1 ? ' prélèvements' : ' prélèvement') + ' · prochain : ' + nx.x.service + ', ' + radQuand(nx.date, R.t) + ', ' + (nx.x.estime ? 'environ ' : '') + radEur(nx.x.montant) : 'Plus aucun prélèvement fixe d’ici là.')),
         h('div', {class: 'rad-prog', role: 'img', 'aria-label': pc + ' % des dépenses fixes de la période déjà prélevées'}, h('i', {style: 'width:' + pc + '%'})),
-        h('small', {class: 'rad-prog-l', text: 'Déjà prélevé ' + (R.mois || !R.P.prev ? 'depuis le 1er ' + RAD_MOIS[R.t.getMonth()] : 'depuis ta paie du ' + radJour(R.P.prev)) + ' : ' + radEur(R.tDeja)}),
+        h('small', {class: 'rad-prog-l'}, radNw('Déjà prélevé ' + (R.mois || !R.P.prev ? 'depuis le 1er ' + RAD_MOIS[R.t.getMonth()] : 'depuis ta paie du ' + radJour(R.P.prev)) + ' : ' + radEur(R.tDeja))),
         R.rev.defaut ? h('button', {type: 'button', class: 'mchip is-amber rad-paie-defaut', onclick: radPaieSheet}, 'Paie supposée le 28 : règle-la') : null,
         h('div', {class: 'seg rad-to', role: 'group', 'aria-label': 'Jusqu’à quand'}, [['paie', 'Jusqu’à ma paie'], ['mois', 'Jusqu’à la fin du mois']].map(([k, l]) =>
           h('button', {type: 'button', 'aria-pressed': String((R.mois ? 'mois' : 'paie') === k), onclick: () => { RAD_FX.jusqua = k; radFxSave(); renderView(true); }}, l))),
@@ -10352,7 +10356,7 @@ void main(){
         return;
       }
       etat.textContent = 'Activé · ' + pk + '. Face ID redemandé ' + (DELAI_DIT[st.delai] || 'après une absence') + (st.delai >= 900 ? ' : pendant ce temps, qui tient ton iPhone déverrouillé ouvre JARVIS.' : '.');
-      zone.replaceChildren(
+      zone.replaceChildren(...[
         (st.delais || []).length ? h('div', {class: 'verrou-delai'}, h('small', {class: 'pick-label', text: 'Redemander Face ID'}),
           h('div', {class: 'seg set-seg', role: 'group'}, [...new Set([...st.delais, st.delai])].sort((x, y) => x - y).map((n) => h('button', {type: 'button', 'aria-pressed': String(n === st.delai), onclick: regler(n)}, DELAI_BOUTON[n] || n + ' s')))) : null,
         h('ul', {class: 'mem-list'}, st.cles.map((k) => h('li', {class: 'mem-it'}, h('span', {}, h('b', {text: k.nom}), h('small', {class: 'muted', text: ' · créée le ' + fmt(new Date(k.at), {day: 'numeric', month: 'short'})})),
@@ -10360,7 +10364,7 @@ void main(){
         h('div', {class: 'row-actions'},
           h('button', {type: 'button', class: 'btn ghost sm', onclick: geste(async () => { await JS.verrou.verrouiller(); })}, 'Verrouiller maintenant'),
           h('button', {type: 'button', class: 'btn ghost sm', onclick: ajouter}, 'Ajouter une passkey'),
-          h('button', {type: 'button', class: 'btn ghost sm danger', onclick: eteindre}, 'Désactiver')));
+          h('button', {type: 'button', class: 'btn ghost sm danger', onclick: eteindre}, 'Désactiver'))].filter(Boolean));
     };
     card.append(etat, zone, out);
     paint();

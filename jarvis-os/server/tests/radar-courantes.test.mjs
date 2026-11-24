@@ -78,6 +78,17 @@ try {
   ok('fiche d\'un budget : rien de noté au départ ; 350 € notés sur 400 € : « 350,00 € notés sur 400,00 € (88 %) », l\'écart au rythme est dit, la note est sur le serveur ; ce qui reste à dépenser ne dépasse plus les 50 € non dépensés',
     /rien de noté\. Budget du mois : 400,00 €/.test(vide) && note1.includes('350,00 € notés sur 400,00 € (88 %)') && /rythme du budget à ce jour/.test(rythme) && srv1.length === 1 && srv1[0].m === 350
     && t5.includes('350,00 € notés ce mois-ci') && t5.includes('≈ ' + eur(plafond)) && await gros() === eur(plafond), [note1, rythme, t5, await gros()].join(' | '));
+  /* 0.81.1 (ses captures du 24/11/2026) : rien d'absent ne s'affiche (« nullnull » sous la barre), et un montant ne se coupe pas avant son « € » */
+  await ouvrir('Boucherie'); const ficheB = plat(await fiche.textContent()), enfantsB = await fiche.locator('.rad-cr-suivi').evaluate((e) => [...e.childNodes].map((n) => n.nodeType === 3 ? 'texte:' + n.textContent : n.tagName).join());
+  await p.waitForFunction(() => /fait/.test((document.querySelector('.sheet-say') || {}).textContent || ''), null, {timeout: 15000}).catch(() => {});   /* la phrase d'accueil s'écrit lettre à lettre */
+  const accueilB = plat(await p.locator('.sheet-say').textContent()); await fermer();
+  await ouvrir('Courses'); const ficheC = plat(await fiche.textContent()), blocs = await fiche.locator('.rad-cr-etat .nw').allTextContents(); await fermer();
+  const coupes = await p.evaluate(() => [...document.querySelectorAll('.rad-hero p, .rad-hero .rad-dont, .rad-courantes small, .rad-cr-tot')].filter((e) => /\d\s€/.test(e.textContent)).map((e) => [...e.childNodes].filter((n) => n.nodeType === 3 && /\d\s€/.test(n.textContent)).length).reduce((a, b) => a + b, 0));
+  ok('aucun « null » ni « undefined » affiché dans une fiche (dépense notée ou non) : seuls de vrais éléments sous la barre ; la phrase d\'accueil d\'une dépense « une fois par mois » commence par une majuscule et parle de la cocher',
+    !/null|undefined/.test(ficheB + ficheC) && enfantsB === 'P,DIV' && /Une fois par mois\. Note-la quand c’est fait/.test(accueilB), JSON.stringify([enfantsB, accueilB.slice(0, 260)]));
+  ok('un montant et son « € » sont dans un même bloc insécable (fiche, grande carte, lignes et total du panneau) : plus de « € » seul à la ligne',
+    blocs.length === 2 && blocs.every((x) => /\d\s€$/.test(x)) && coupes === 0 && await p.evaluate(() => getComputedStyle(document.querySelector('.rad-courantes .nw')).whiteSpace) === 'nowrap', JSON.stringify([blocs, coupes]));
+  ok('le titre « Dépenses courantes » tient sur une ligne (l\'à-côté est raccourci à « ≈ montant »)', await p.evaluate(() => { const h2 = document.querySelector('.rad-courantes .panel-h h2'), a = document.querySelector('.rad-courantes .panel-h .aside'); return h2.getClientRects().length === 1 && /^≈\s/.test(a.textContent) && h2.getBoundingClientRect().height < 40; }));
   /* le mois complet, le reste à vivre, six mois */
   await seg('Le mois');
   const m1 = plat(await p.locator('.rad-mois').textContent());
