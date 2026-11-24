@@ -313,3 +313,38 @@ enfermé, ni disque, ni échange, ni image mémoire) ; `--garder` (coffre de sys
   branché : l'accès Google de JARVIS (prochaine étape : `google.mjs` lit et écrit ses jetons dans le coffre,
   JARVIS notifie « coffre verrouillé », puis « Reconnecter ») ; le geste des couches par le guichet.
 
+## La passkey, le verrou de l'app et l'arrêt d'urgence (ses réponses du 24/11/2026, QCM)
+
+Son idée : lier le coffre à son iPhone par une passkey (Face ID), sans qu'un iPhone volé donne tout.
+
+| Question | Son choix |
+|---|---|
+| Clés du coffre | **iPhone (passkey, Face ID) pour tous les jours + phrase de secours** gardée dans NordPass (iPhone perdu, adresse du serveur changée : une passkey est liée à une adresse) |
+| Durée d'ouverture | **Jusqu'au redémarrage**, à condition que **Claude garde la main** : sur sa demande, tout invalider et tout déconnecter, JARVIS devient « une coquille vide » |
+| App JARVIS | **Face ID à chaque ouverture** (même passkey) : un iPhone volé déjà déverrouillé n'ouvre plus JARVIS |
+
+Ce qui est possible et ce qui ne l'est pas (dit à lui) :
+- La passkey ne sert de clé que si elle rend un secret (extension « prf » de WebAuthn) : (Likely) oui sur iOS 18.4 et
+  plus avec une passkey gardée par Mots de passe d'Apple ; incertain avec un autre gestionnaire (NordPass) et dans
+  une app de l'écran d'accueil. **À prouver sur son iPhone** : page `https://<serveur>/maquettes/passkey/`
+  (`essais/passkey-essai/`, tout dans la page, rien d'envoyé ni de gardé ; essayée au banc avec une clé simulée).
+  Repli si « prf » manque : la phrase remplie par le gestionnaire de mots de passe (Face ID) dans un champ de JARVIS.
+- « Au lieu de la mémoire, sur l'iPhone » : non. Un secret utilisable sans lui vit forcément dans la mémoire du
+  serveur ; l'iPhone ne peut pas répondre en arrière-plan. L'iPhone est la clé, pas le coffre.
+- iPhone volé : la passkey exige Face ID ; avec « Protection en cas de vol de l'appareil » (Réglages, Face ID et code),
+  plus de repli sur le code de l'iPhone (certain, aide d'Apple ; réglage « Toujours » pour que ce soit vrai aussi chez lui).
+
+À construire, dans l'ordre :
+1. Deux emplacements de clé dans `jarvis-coffre` : la phrase (fait) et la passkey. Le secret de la passkey est scellé
+   dans la page pour le coffre seul (JARVIS ne fait que passer le paquet) ; l'ajout d'une passkey exige le coffre
+   ouvert et un code affiché dans Termius.
+2. **Arrêt d'urgence** `jarvis-urgence` (root ; lançable par la session « Serveur JARVIS » sur demande à Claude, par un
+   bouton de JARVIS, ou dans Termius) : niveau 1 « verrouiller » (coffre fermé, JARVIS relancé pour vider sa
+   mémoire, Hermes arrêté) ; niveau 2 « coquille vide » (en plus : tous les appareils et toutes les sessions de l'app
+   retirés, tous les jetons MCP révoqués, Claude Code déconnecté pour JARVIS et pour Hermes). Limite dite : Claude
+   n'agit que si la session du serveur répond et qu'il valide la commande depuis un appareil de confiance ;
+   sinon Termius ou la console de l'hébergeur. À faire par lui en plus, côté Google : retirer l'accès de JARVIS dans
+   son compte.
+3. Verrou de l'app : une session par ouverture, ouverte par la passkey.
+4. Puis seulement : l'accès Google de JARVIS dans le coffre, « Reconnecter », le geste des couches.
+

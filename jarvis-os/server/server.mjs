@@ -42,7 +42,7 @@ const OS_DIR = process.env.JARVIS_OS_DIR || path.join(REPO, 'essais', 'jarvis-os
 /* 0.53.0 (son choix du 22/11/2026 : « Sur ton serveur ») : les maquettes, faites de données inventées, sont servies ici, le dépôt passant en
    privé (GitHub Pages ne les publierait plus). /maquettes/ : la liste ; /maquettes/<nom>/ : le dossier essais/<dossier>/ du dépôt, à jour
    après chaque « Mettre à jour ». Une nouvelle maquette = une entrée ici (son dossier entre dans MAJ_CHEMINS). */
-const MAQUETTES = {ux: {dossier: 'jarvis-os-ux', titre: 'Refonte UX de JARVIS'}};
+const MAQUETTES = {ux: {dossier: 'jarvis-os-ux', titre: 'Refonte UX de JARVIS'}, passkey: {dossier: 'passkey-essai', titre: 'Essai : ton iPhone comme clé du coffre (passkey, Face ID)'}};
 const ESSAIS = process.env.JARVIS_ESSAIS || path.dirname(OS_DIR);   /* le dossier essais/ du dépôt (celui de la nouvelle app) */
 const ORIGINS = (process.env.JARVIS_ORIGINS || 'https://rabiederouiche.github.io').split(',').map((s) => s.trim()).filter(Boolean);
 const AGENTS = ['claude', 'jarvis', ...BOT_IDS];
