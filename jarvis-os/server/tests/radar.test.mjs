@@ -560,6 +560,30 @@ try {
     ok('Radar 0.80 : la liste s\'enregistre (identifiant donné, jour et « fait ce mois-ci » nettoyés), une ligne incomplète est refusée sans rien changer (nom vide, façon inconnue, jour manquant, montant nul)',
       bon.status === 200 && bon.body.courantes.length === 3 && bon.body.courantes.every((c) => /^dc/.test(c.id)) && bon.body.courantes[2].faits.join() === '2026-11' && mauvais.join() === '400,400,400,400,400' && lu.length === 3 && lu[1].jour === 4, JSON.stringify([bon.status, mauvais]));
   }
+  /* 0.81.0 : suivi du réel, reste à vivre, le mois complet, six mois (montants inventés) */
+  { const D = (j) => J(2026, 10, j), fin = J(2026, 10, 30), de = (c, a, b = fin) => courantes([c], a, b)[0].montant;
+    const env = {service: 'Courses', type: 'courses', mode: 'enveloppe', montant: 400};
+    const r = [de({...env, reels: [{d: '2026-11-03', m: 350}]}, D(16)), de({...env, reels: [{d: '2026-11-03', m: 20}]}, D(16)), de({...env, reels: [{d: '2026-11-03', m: 500}]}, D(16)), de({...env, reels: [{d: '2026-10-20', m: 390}]}, D(16)),
+      de({service: 'Boucherie', mode: 'mois', montant: 120, reels: [{d: '2026-11-08', m: 95}]}, D(16)), de({service: 'Boucherie', mode: 'mois', montant: 120, reels: [{d: '2026-10-08', m: 95}]}, D(16))];
+    ok('Radar 0.81 : ce qu\'il a noté borne ce qui reste d\'un budget (350 € notés sur 400 : 50 au lieu de 200 ; 20 € notés : toujours 200 ; 500 € : 0), les notes d\'un autre mois ne comptent pas ; une dépense « une fois par mois » notée ce mois-ci est faite',
+      r.join() === '50,200,0,200,0,120', r.join());
+    let quand = Date.parse('2026-11-16T09:00:00Z');
+    const fc = path.join(DIR, 'radar81.json'), Rm = createRadar({file: fc, gmail: {lie: () => true, chercher: async () => ({threads: []}), fil: async () => ({messages: []})}, claude: async () => ({ok: true, text: '[]'}), now: () => quand, moisDepart: 1});
+    const set = (cle, valeur) => Rm.traiter('POST', '/api/radar/set', async () => ({cle, valeur}));
+    await set('fixes', [{service: 'Loyer exemple', cat: 'Logement', montant: 100, jour: 10, rythme: 'mensuel'}]);
+    const sc = await set('courantes', [{...env, reels: [{d: '2026-11-03', m: 60.5}, {d: '2026-11-10', m: '39,50'}, {d: 'pas une date', m: 5}, {d: '2025-01-01', m: 5}, {d: '2026-11-12', m: -3}]}, {service: 'Ménage', type: 'menage', mode: 'semaine', montant: 50, jour: 4}, {service: 'Boucherie', type: 'boucherie', mode: 'mois', montant: 120}]);
+    const sr = await set('revenus', {jour: 28, avance: true, montant: '3000'}), m = sr.body.mois, ev = m.evolution;
+    ok('Radar 0.81 : les notes s\'enregistrent nettoyées (date valable, moins de 13 mois, montant positif) ; le montant de la paie aussi, facultatif',
+      sc.status === 200 && sc.body.courantes[0].reels.length === 2 && sc.body.courantes[0].reels[1].m === 39.5 && sr.body.revenus.montant === 3000 && !('montant' in (await set('revenus', {jour: 28, montant: 'abc'})).body.revenus) && (await set('revenus', {jour: 28, avance: true, montant: 3000})).status === 200, JSON.stringify(sc.body.courantes[0].reels));
+    ok('Radar 0.81 : le mois complet : prélèvements 100 € + dépenses courantes 720 € (400 + 4 jeudis à 50 + 120) = 820 € ; postes « Alimentation » 520 € et « Maison » 200 € marqués estimés ; 100 € notés dépensés ; reste à vivre 3 000 − 820 = 2 180 €',
+      m.totalFixes === 100 && m.totalCourantes === 720 && m.total === 820 && m.reel === 100 && m.paie === 3000 && m.resteAVivre === 2180 && m.postes.find((x) => x.label === 'Alimentation').montant === 520 && m.postes.find((x) => x.label === 'Alimentation').courant === true
+      && /Courses, Boucherie · estimé/.test(m.postes.find((x) => x.label === 'Alimentation').note) && m.postes.find((x) => x.label === 'Maison').montant === 200 && m.postes.find((x) => x.label === 'Logement').montant === 100, JSON.stringify([m.totalFixes, m.totalCourantes, m.total, m.reel, m.resteAVivre, m.postes.map((x) => [x.label, x.montant])]));
+    ok('Radar 0.81 : six mois : novembre 2026 en dernier (100 + 720), les mois d\'avant la saisie n\'ont que leurs prélèvements (dépenses courantes inconnues)',
+      ev.length === 6 && ev[5].mois === '2026-11' && ev[5].fixes === 100 && ev[5].courantes === 720 && ev[5].total === 820 && ev[5].reel === 100 && ev[4].mois === '2026-10' && ev[4].courantes === null && ev[4].total === 100 && ev[0].mois === '2026-06', JSON.stringify(ev.map((x) => [x.mois, x.fixes, x.courantes])));
+    quand = Date.parse('2026-12-03T09:00:00Z'); const dec = Rm.etat().mois, garde = JSON.parse(fs.readFileSync(fc, 'utf8')).evolution;
+    ok('Radar 0.81 : un mois plus tard, novembre garde le total de ses dépenses courantes (720 €, retenu au fil de l\'eau) et sert de comparaison ; décembre a 5 jeudis',
+      dec.evolution[4].mois === '2026-11' && dec.evolution[4].courantes === 720 && dec.precedent === 820 && dec.totalCourantes === 770 && garde['2026-11'] === 720 && garde['2026-12'] === 770, JSON.stringify([dec.evolution[4], dec.totalCourantes, garde]));
+  }
   /* la mémoire de JARVIS (lue par le serveur MCP, que Grok Bot peut joindre) refuse les chiffres d'un crédit */
   ok('Mémoire : refuse les chiffres d’un crédit (règle du 12/11/2026), garde le reste', interdit('Ma mensualité de crédit immobilier est de 1150 €') && interdit('Il reste 180 000 € à rembourser sur le prêt immobilier') && !interdit("J'ai un crédit immobilier à la banque") && !interdit('Je suis prêt à 8h'));
 } catch (e) { ok('exception', false, e.stack); }
