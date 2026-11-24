@@ -32,7 +32,7 @@ import {createCoffreLien} from './coffre-lien.mjs';   /* 0.74.0 : le coffre en m
 import {createVerrou} from './verrou.mjs';   /* 0.75.0 : le verrou de l'app par passkey */
 const ACT = createActivite();   /* 0.33.0 : ce que fait Claude à l'instant */
 
-const VERSION = '0.75.0';
+const VERSION = '0.76.0';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PORT = +(process.env.PORT || 8787);
 const HOST = process.env.HOST || '127.0.0.1';
@@ -139,7 +139,7 @@ function save() {
 
 /* ---------- accès Google direct (Pilotage, agenda, Gmail) : voir google.mjs ---------- */
 const GG = createGoogle({S, save});
-const VERROU = createVerrou({S, save, now, journal: (t) => console.log('[jarvis] ' + t), inactif: +(process.env.JARVIS_VERROU_INACTIF_MS || 300000), frais: +(process.env.JARVIS_VERROU_FRAIS_MS || 120000)});   /* 0.75.0 */
+const VERROU = createVerrou({S, save, now, journal: (t) => console.log('[jarvis] ' + t), inactif: +(process.env.JARVIS_VERROU_INACTIF_MS || 0), frais: +(process.env.JARVIS_VERROU_FRAIS_MS || 120000)});   /* 0.75.0 */
 const publicBase = (req) => (req.headers['x-forwarded-proto'] || (req.socket.encrypted ? 'https' : 'http')).split(',')[0].trim() + '://' + req.headers.host;
 const googleRedirect = (req) => publicBase(req) + '/api/google/callback';
 const escHtml = (t) => String(t).replace(/[&<>"]/g, (c) => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
@@ -2025,6 +2025,9 @@ const server = http.createServer(async (req, res) => {
         const u = new URL(mcpBase(req)), origine = u.origin, rpId = u.hostname, etat = (code = 200, plus = {}) => json(res, code, {...VERROU.etat(d), ...plus});
         if (p === '/api/verrou' && req.method === 'GET') { VERROU.passe(d); return etat(); }
         if (p === '/api/verrou/verrouiller' && req.method === 'POST') { req.resume(); VERROU.verrouiller(d); return etat(); }
+        /* 0.76.0 : l'app passe à l'arrière-plan, puis revient ; au-delà du délai réglé, l'ouverture est tombée */
+        if (p === '/api/verrou/cache' && req.method === 'POST') { req.resume(); VERROU.cacher(d); return etat(); }
+        if (p === '/api/verrou/retour' && req.method === 'POST') { req.resume(); VERROU.retour(d); return etat(); }
         if (p === '/api/verrou/defi' && req.method === 'GET') { const o = VERROU.optionsOuvrir(d, rpId); return o ? json(res, 200, o) : json(res, 404, {error: 'Aucune passkey enregistrée.'}); }
         if (p === '/api/verrou/ouvrir' && req.method === 'POST') { const b = await readBody(req, 16000); return VERROU.ouvrir(d, b, origine, rpId) ? etat() : etat(403, {error: 'Preuve refusée.'}); }
         if (!VERROU.passe(d)) return etat(423, {error: 'JARVIS est verrouillé.', verrou: true});
@@ -2034,6 +2037,7 @@ const server = http.createServer(async (req, res) => {
         if (p === '/api/verrou/creer' && req.method === 'POST') { const b = await readBody(req, 40000), r = VERROU.creer(d, b, origine, rpId); return r ? etat(200, {cree: r.id}) : etat(400, {error: 'Passkey refusée (défi expiré, autre adresse, Face ID manquant ou type de clé inconnu).'}); }
         if (p === '/api/verrou/activer' && req.method === 'POST') { req.resume(); return VERROU.activer(d) ? etat() : etat(403, {error: 'Prouve d’abord ta passkey (Face ID).'}); }
         if (p === '/api/verrou/desactiver' && req.method === 'POST') { req.resume(); return VERROU.desactiver(d) ? etat() : etat(403, {error: 'Prouve d’abord ta passkey (Face ID).'}); }
+        if (p === '/api/verrou/delai' && req.method === 'POST') { const b = await readBody(req); return VERROU.regler(d, b.delai) ? etat() : etat(403, {error: 'Prouve d’abord ta passkey (Face ID).'}); }
         if (p === '/api/verrou/retirer' && req.method === 'POST') { const b = await readBody(req); return VERROU.retirer(d, String(b.id || '')) ? etat() : etat(403, {error: 'Refusé : prouve d’abord ta passkey ; la dernière passkey d’un verrou actif ne se retire pas.'}); }
         return json(res, 404, {error: 'Inconnu.'});
       }

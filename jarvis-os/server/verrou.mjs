@@ -2,9 +2,9 @@
  *
  * Un iPhone volé déjà déverrouillé ne doit plus ouvrir JARVIS : le jeton de l'appareil (gardé par l'app) ne suffit plus. Verrou actif,
  * chaque appareil relié doit prouver une passkey (Face ID, WebAuthn) pour obtenir une « ouverture », gardée ICI, en mémoire seulement,
- * liée à cet appareil : rien de plus n'est confié à l'app, donc rien de plus ne peut lui être volé. L'ouverture tombe après `inactif`
- * (5 min sans aucune demande : l'app passée à l'arrière-plan), après `duree` (12 h), quand l'app se relance (elle demande elle-même à
- * être verrouillée) et à chaque redémarrage du serveur.
+ * liée à cet appareil : rien de plus n'est confié à l'app, donc rien de plus ne peut lui être volé. L'ouverture tombe quand l'app est
+ * restée à l'arrière-plan plus que le délai réglé (1 minute par défaut ; 0, 1, 2 ou 5 minutes), après `duree` (12 h), quand l'app se
+ * relance (elle demande elle-même à être verrouillée) et à chaque redémarrage du serveur.
  *
  * La passkey n'est ici qu'une preuve d'identité (aucun secret n'en sort : NordPass ne rend pas de clé « prf », son essai du 24/11/2026).
  * Vérifié à chaque preuve : le défi (à usage unique, 2 minutes, lié à l'appareil et au geste), l'origine de la page, l'empreinte du
@@ -44,9 +44,14 @@ function cleDeCose(m) {
   return null;
 }
 
-export function createVerrou({S, save, now, journal = () => {}, inactif = 5 * 60e3, duree = 12 * 3600e3, frais = 2 * 60e3}) {
+export const DELAIS = [0, 60, 120, 300];   /* secondes d'absence tolérées avant de redemander Face ID ; 0 : dès qu'il quitte l'app */
+export function createVerrou({S, save, now, journal = () => {}, inactif = 0, duree = 12 * 3600e3, frais = 2 * 60e3}) {
   if (!S.verrou || typeof S.verrou !== 'object' || Array.isArray(S.verrou)) S.verrou = {actif: false, cles: []};
-  const V = S.verrou; if (!Array.isArray(V.cles)) V.cles = []; V.actif = V.actif === true;
+  const V = S.verrou; if (!Array.isArray(V.cles)) V.cles = []; V.actif = V.actif === true; if (!DELAIS.includes(V.delai)) V.delai = 60;
+  /* 0.76.0 (son retour du 24/11/2026 : « je reviens 2 minutes après, il devrait me la redemander ») : l'app dit au serveur quand elle passe
+     à l'arrière-plan ; au-delà de `delai` secondes d'absence l'ouverture tombe, ICI, que l'app le veuille ou non. Le filet si ce signal se
+     perd : plus aucune demande pendant le délai + 1 minute (2 minutes au moins ; l'app à l'écran donne signe de vie toutes les 30 s). */
+  const silence = () => inactif || Math.max(120e3, V.delai * 1000 + 60e3);
   const DEFI_VIE = 2 * 60e3, DEFIS_MAX = 16, CLES_MAX = 8, ATTENTE = 10 * 60e3;
   const defis = new Map();        /* défi → {exp, geste, appareil} */
   const ouvertures = new Map();   /* appareil (empreinte de son jeton) → {depuis, vu, preuve} ; jamais sur le disque */
@@ -68,7 +73,7 @@ export function createVerrou({S, save, now, journal = () => {}, inactif = 5 * 60
   const authOk = (ad, rpId) => ad.length >= 37 && crypto.timingSafeEqual(ad.subarray(0, 32), sha256(rpId)) && (ad[32] & 0x05) === 0x05;
   const o = (appareil) => {
     const x = ouvertures.get(appareil); if (!x) return null;
-    const t = now(); if (t - x.vu > inactif || t - x.depuis > duree) { ouvertures.delete(appareil); return null; }
+    const t = now(); if (t - x.vu > silence() || t - x.depuis > duree || (x.cache != null && t - x.cache >= V.delai * 1000)) { ouvertures.delete(appareil); return null; }
     return x;
   };
   const recente = (appareil) => { const x = o(appareil); return !!x && now() - x.preuve <= frais; };
@@ -79,10 +84,14 @@ export function createVerrou({S, save, now, journal = () => {}, inactif = 5 * 60
     passe(appareil) { if (!V.actif) return true; const x = o(appareil); if (!x) return false; x.vu = now(); return true; },
     etat(appareil) {
       const x = o(appareil);
-      return {actif: V.actif, ouvert: !V.actif || !!x, recente: recente(appareil), inactif: Math.round(inactif / 60e3),
+      return {actif: V.actif, ouvert: !V.actif || !!x, recente: recente(appareil), delai: V.delai, delais: DELAIS,
         cles: confirmees().map((k) => ({id: court(k.id), nom: k.nom, at: k.at, vu: k.vu || 0}))};
     },
     verrouiller(appareil) { ouvertures.delete(appareil); },
+    /* l'app passe à l'arrière-plan (le compte de l'absence commence, une seule fois) ; elle revient (dans les temps : le compte s'efface) */
+    cacher(appareil) { const x = ouvertures.get(appareil); if (x && x.cache == null) x.cache = now(); },
+    retour(appareil) { const x = o(appareil); if (!x) return false; x.cache = null; x.vu = now(); return true; },
+    regler(appareil, delai) { if (!recente(appareil) || !DELAIS.includes(delai)) return false; if (V.delai !== delai) { V.delai = delai; save(); journal('verrou : Face ID redemandé après ' + delai + ' s d’absence'); } return true; },
     /* créer une passkey : les options pour navigator.credentials.create */
     optionsCreer(appareil, rpId) {
       if (V.cles.length >= CLES_MAX) return null;

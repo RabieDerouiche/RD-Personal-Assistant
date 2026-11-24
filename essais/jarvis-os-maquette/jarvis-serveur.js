@@ -165,9 +165,10 @@
     async prouver() {
       let o; try { o = await req('/api/verrou/defi'); } catch (e) { return {error: INJ}; }
       if (o.status !== 200 || !o.j.challenge) return {error: (o.j && o.j.error) || INDISPO};
-      let c;
+      let c; enPreuve = true; preuves++;
       try { c = await navigator.credentials.get({publicKey: {challenge: deB(o.j.challenge), rpId: o.j.rpId, allowCredentials: o.j.allowCredentials.map((x) => ({type: 'public-key', id: deB(x.id)})), userVerification: 'required', timeout: o.j.timeout}}); }
-      catch (e) { return {error: refusPasskey(e)}; }
+      catch (e) { return {error: refusPasskey(e), refus: true}; }
+      finally { enPreuve = false; }
       if (!c || !c.response) return {error: 'La passkey n’a pas répondu sur cet appareil.'};
       let r; try { r = await req('/api/verrou/ouvrir', {id: enB(c.rawId), clientData: enB(c.response.clientDataJSON), authData: enB(c.response.authenticatorData), signature: enB(c.response.signature)}); } catch (e) { return {error: INJ}; }
       if (r.status !== 200) return {error: (r.j && r.j.error) || 'Preuve refusée.'};
@@ -186,13 +187,33 @@
     },
     activer: () => req('/api/verrou/activer', {}).then((r) => { if (r.status === 200) { drapeau(true); return r.j; } return {error: (r.j && r.j.error) || 'Refusé.'}; }).catch(() => ({error: INJ})),
     desactiver: () => req('/api/verrou/desactiver', {}).then((r) => { if (r.status === 200) { drapeau(false); return r.j; } return {error: (r.j && r.j.error) || 'Refusé.'}; }).catch(() => ({error: INJ})),
+    delai: (n) => req('/api/verrou/delai', {delai: n}).then((r) => { if (r.status === 200) { delaiConnu = r.j.delai; return r.j; } return {error: (r.j && r.j.error) || 'Refusé.'}; }).catch(() => ({error: INJ})),
     retirer: (id) => req('/api/verrou/retirer', {id}).then((r) => (r.status === 200 ? r.j : {error: (r.j && r.j.error) || 'Refusé.'})).catch(() => ({error: INJ})),
-    verrouiller: () => req('/api/verrou/verrouiller', {}).then(() => { mem(false); montrerVerrou(); return true; }).catch(() => false)
+    verrouiller: () => req('/api/verrou/verrouiller', {}).then(() => { mem(false); preuves = 0; autoFait = true; montrerVerrou(); return true; }).catch(() => false)   /* verrouillé à la main : Face ID ne repart pas tout seul */
   };
-  let ecran = null;
+  /* 0.76.0 (son retour du 24/11/2026) : Face ID part tout seul dès que l'écran de verrou paraît (Safari peut l'interdire sans un toucher :
+     le bouton reste alors le secours, sans message), et l'app se reverrouille quand il revient après plus que le délai réglé (1 minute
+     par défaut). Le serveur tient le même compte : la page le prévient quand elle passe à l'arrière-plan. Safari accorde une demande de
+     passkey sans toucher par chargement de page : si celle de cette page a déjà servi, la page se recharge avant de poser l'écran. */
+  let ecran = null, enPreuve = false, preuves = 0, autoFait = false, cacheLe = 0, delaiConnu = 60;
+  const visible = () => document.visibilityState !== 'hidden';
+  async function ouvrirVerrou(auto) {
+    if (!ecran || enPreuve) return;
+    const btn = ecran.querySelector('#verrou-ouvrir'), msg = ecran.querySelector('[role=status]');
+    if (!verrou.possible()) { if (!auto) msg.textContent = 'Cet appareil ne sait pas présenter de passkey ici.'; return; }
+    btn.disabled = true; msg.textContent = '';
+    const t0 = Date.now(), r = await verrou.prouver();
+    if (r && !r.error) { location.reload(); return; }
+    btn.disabled = false;
+    if (!auto) msg.textContent = (r && r.error) || 'Le serveur ne répond pas.';
+    else if (r && r.refus && Date.now() - t0 < 900 && !autoRedit && visible()) { autoRedit = true; setTimeout(() => ouvrirVerrou(true), 900); }   /* refus immédiat (page pas encore au premier plan) : un second essai */
+  }
+  let autoRedit = false;
+  const autoVerrou = () => { if (ecran && !autoFait && !enPreuve && visible()) { autoFait = true; setTimeout(() => ouvrirVerrou(true), 350); } };
   function montrerVerrou() {
     drapeau(true);
     if (typeof document === 'undefined') return;
+    if (!ecran && preuves > 0 && visible()) { mem(false); location.reload(); return; }   /* une page neuve : sa demande sans toucher est intacte */
     const poser = () => {
       if (ecran || !document.body) return;
       const el = (t, css, txt) => { const x = document.createElement(t); x.style.cssText = css; if (txt) x.textContent = txt; return x; };
@@ -201,26 +222,34 @@
       const msg = el('p', 'margin:0;min-height:1.5em;font-size:14px;color:#fca5a5'); msg.setAttribute('role', 'status');
       const btn = el('button', 'appearance:none;border:0;border-radius:999px;padding:14px 26px;font:600 16px system-ui,-apple-system,sans-serif;color:#fff;background:linear-gradient(90deg,#0ea5e9,#a855f7);cursor:pointer', 'Déverrouiller');
       btn.type = 'button'; btn.id = 'verrou-ouvrir';
-      btn.addEventListener('click', async () => {
-        if (!verrou.possible()) { msg.textContent = 'Cet appareil ne sait pas présenter de passkey ici.'; return; }
-        btn.disabled = true; msg.textContent = '';
-        const r = await verrou.prouver();
-        if (r && !r.error) { location.reload(); return; }
-        btn.disabled = false; msg.textContent = (r && r.error) || 'Le serveur ne répond pas.';
-      });
-      fond.append(el('h1', 'margin:0;font:700 24px system-ui,-apple-system,sans-serif', 'JARVIS est verrouillé'), el('p', 'margin:0;max-width:26em;color:#9fb0c8', 'Ta passkey l’ouvre (Face ID).'), btn, msg);
-      document.body.append(fond); ecran = fond; try { btn.focus(); } catch (e) { /* rien */ }
+      btn.addEventListener('click', () => ouvrirVerrou(false));
+      fond.append(el('h1', 'margin:0;font:700 24px system-ui,-apple-system,sans-serif', 'JARVIS est verrouillé'), el('p', 'margin:0;max-width:26em;color:#9fb0c8', 'Face ID l’ouvre.'), btn, msg);
+      document.body.append(fond); ecran = fond; mem(false); try { btn.focus(); } catch (e) { /* rien */ }
+      autoVerrou();
     };
     if (document.body) poser(); else document.addEventListener('DOMContentLoaded', poser);
   }
   const cacherVerrou = () => { if (ecran) { ecran.remove(); ecran = null; } };
   /* ce que dit le serveur fait foi : verrou éteint (retiré dans Termius) → l'écran part ; actif et fermé pour cet appareil → l'écran vient */
-  const verifierVerrou = () => verrou.etat().then((e) => { if (!e) return; drapeau(e.actif); if (!e.actif) cacherVerrou(); else if (!e.ouvert) { mem(false); montrerVerrou(); } });
+  const lire = (e) => { if (!e) return; drapeau(e.actif); if (typeof e.delai === 'number') delaiConnu = e.delai; if (!e.actif) cacherVerrou(); else if (!e.ouvert) montrerVerrou(); };
+  const verifierVerrou = () => verrou.etat().then(lire);
   if (token() && typeof document !== 'undefined') {   /* seulement dans une page (un banc charge ce fichier sans elle) */
     if (drapeau() && !mem()) { montrerVerrou(); req('/api/verrou/verrouiller', {}).catch(() => null).then(verifierVerrou); }   /* l'app vient d'être lancée : Face ID */
     else verifierVerrou();
-    setInterval(() => { if (!document.hidden && drapeau() && !ecran) verifierVerrou(); }, 60000);   /* l'app à l'écran reste ouverte ; à l'arrière-plan, plus rien ne part */
-    document.addEventListener('visibilitychange', () => { if (!document.hidden && drapeau()) verifierVerrou(); });
+    setInterval(() => { if (visible() && drapeau() && !ecran) verifierVerrou(); }, 30000);   /* signe de vie de l'app à l'écran ; à l'arrière-plan, plus rien ne part */
+    document.addEventListener('visibilitychange', () => {
+      if (!token() || !drapeau() || enPreuve) return;   /* la feuille de Face ID elle-même ne compte pas comme une absence */
+      if (!visible()) {
+        if (ecran || cacheLe) return;
+        cacheLe = Date.now();
+        try { fetch(BASE + '/api/verrou/cache', {method: 'POST', keepalive: true, headers: {'content-type': 'application/json', authorization: 'Bearer ' + token()}, body: '{}'}).catch(() => null); } catch (e) { /* rien */ }
+        return;
+      }
+      if (ecran) { autoFait = false; autoRedit = false; autoVerrou(); return; }
+      const absent = cacheLe ? Date.now() - cacheLe : 0; cacheLe = 0;
+      if (absent >= delaiConnu * 1000 && absent > 0) { montrerVerrou(); req('/api/verrou/verrouiller', {}).catch(() => null); return; }
+      req('/api/verrou/retour', {}).then((r) => lire(r.j && typeof r.j.actif === 'boolean' ? r.j : null)).catch(() => null);
+    });
   }
   window.JarvisServeur = {
     base: BASE,
