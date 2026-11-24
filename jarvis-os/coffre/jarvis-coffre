@@ -1,0 +1,127 @@
+#!/bin/bash
+# jarvis-coffre — la commande du coffre en mémoire (docs/hermes-deroule.md, « Le coffre en mémoire »).
+# Posée par install.sh dans /usr/local/sbin/jarvis-coffre (root). À lancer dans Termius, en SSH :
+#
+#   sudo jarvis-coffre etat                      (ouvert ou verrouillé, noms des secrets, jamais leur valeur)
+#   sudo jarvis-coffre creer                     (une seule fois : choisit la phrase, demandée deux fois)
+#   sudo jarvis-coffre ouvrir                    (après chaque redémarrage du serveur : colle la phrase)
+#   sudo jarvis-coffre fermer                    (efface la clé de la mémoire : tout attend la prochaine ouverture)
+#   sudo jarvis-coffre mettre <nom> [--portee service|guichet] [--depuis-entree]
+#   sudo jarvis-coffre retirer <nom>
+#   sudo jarvis-coffre changer-phrase
+#
+# La phrase et les valeurs se saisissent ICI, sans affichage (ou se collent depuis le gestionnaire de mots de
+# passe), jamais dans une conversation, jamais en argument, jamais dans une variable d'environnement. Elles vont
+# au service par un tube (printf est une commande interne de bash : rien n'apparaît dans la liste des processus),
+# puis par la prise d'administration, que root seul peut joindre. Rien n'est écrit sur le disque par cette commande.
+# Portée d'un secret : « guichet » (par défaut : jamais rendu, à personne) ou « service » (rendu au serveur de JARVIS).
+# Aucun réglage par l'environnement : les trois chemins ci-dessous sont fixes (le banc en fait une copie modifiée).
+set +x
+set -uo pipefail
+PATH=/usr/sbin:/usr/bin:/sbin:/bin
+LIB=/usr/local/lib/jarvis-coffre
+PRISE=/run/jarvis-coffre/admin.sock
+NODE=/usr/bin/node
+NOM='^[a-z0-9][a-z0-9-]{1,40}$'
+
+usage() { sed -n '5,11p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,3\}//'; exit "${1:-1}"; }
+[ "$(id -u)" = 0 ] || { echo "À lancer en root : sudo jarvis-coffre ${1:-etat}"; exit 1; }
+[ -x "$NODE" ] || { echo "Node introuvable ($NODE)."; exit 1; }
+# Le client reçoit la phrase : seule une copie à root, que personne d'autre ne peut modifier, est exécutée.
+[ -f "$LIB/client.mjs" ] && [ -z "$(find "$LIB" -maxdepth 1 \( -perm /022 -o ! -user 0 \) -print -quit)" ] \
+  || { echo "Client du coffre absent, ou modifiable par un autre que root ($LIB) : relance install.sh."; exit 1; }
+client() { "$NODE" "$LIB/client.mjs" --prise "$PRISE" "$@"; }
+terminal() { [ -t 0 ] || { echo "À lancer dans un vrai terminal (Termius) : cette commande demande une saisie."; exit 1; }; }
+saisir() {   # saisir <variable> <invite> : une ligne, sans affichage, espaces gardés
+  local S_LU=""
+  IFS= read -r -s -p "$2 (rien ne s'affiche) : " S_LU || { echo; echo "Saisie interrompue. Rien n'a été fait."; exit 1; }
+  echo >&2
+  printf -v "$1" '%s' "$S_LU"
+}
+sonde() { client sonde; SONDE=$?; [ $SONDE != 2 ] || { client etat; exit 2; }; [ $SONDE != 1 ] || { client etat; exit 1; }; }
+phrase_neuve() {   # phrase_neuve <variable> : demandée deux fois ; le service revérifie
+  local S_UN="" S_DEUX=""
+  saisir S_UN "Nouvelle phrase du coffre, 20 caractères au moins"
+  saisir S_DEUX "La même, une seconde fois"
+  [ "$S_UN" = "$S_DEUX" ] || { echo "Les deux saisies diffèrent. Rien n'a été fait."; exit 1; }
+  [ "${#S_UN}" -ge 20 ] || { echo "Phrase trop courte (20 caractères au moins). Rien n'a été fait."; exit 1; }
+  printf -v "$1" '%s' "$S_UN"
+}
+
+commande=${1:-}; [ $# -gt 0 ] && shift
+case "$commande" in
+  etat)
+    [ $# = 0 ] || usage
+    client etat ;;
+  creer)
+    [ $# = 0 ] || usage
+    terminal; sonde
+    [ $SONDE = 4 ] || { echo "Un coffre existe déjà : rien n'a été changé. (Nouvelle phrase : sudo jarvis-coffre changer-phrase)"; exit 1; }
+    echo "Création du coffre. Sa phrase n'est écrite nulle part sur ce serveur : sans elle, le coffre est perdu."
+    echo "Prépare-la d'abord dans ton gestionnaire de mots de passe (une phrase générée, longue), puis colle-la ici."
+    S_PHRASE=""; phrase_neuve S_PHRASE
+    printf '%s\n' "$S_PHRASE" | client creer; rc=$?
+    unset S_PHRASE
+    [ $rc = 0 ] && echo "Garde cette phrase dans ton gestionnaire de mots de passe : elle sera demandée après chaque redémarrage du serveur (sudo jarvis-coffre ouvrir)."
+    exit $rc ;;
+  ouvrir)
+    [ $# = 0 ] || usage
+    terminal; sonde
+    [ $SONDE = 4 ] && { echo "Aucun coffre encore : sudo jarvis-coffre creer"; exit 1; }
+    [ $SONDE = 0 ] && { echo "Coffre déjà ouvert."; exit 0; }
+    S_PHRASE=""; saisir S_PHRASE "Phrase du coffre"
+    S_PHRASE="${S_PHRASE#"${S_PHRASE%%[![:space:]]*}"}"; S_PHRASE="${S_PHRASE%"${S_PHRASE##*[![:space:]]}"}"   # un collage laisse parfois une espace aux bords
+    [ -n "$S_PHRASE" ] || { echo "Phrase vide. Rien n'a été fait."; exit 1; }
+    printf '%s\n' "$S_PHRASE" | client ouvrir; rc=$?
+    unset S_PHRASE
+    exit $rc ;;
+  fermer)
+    [ $# = 0 ] || usage
+    client fermer ;;
+  mettre)
+    nom=""; portee=guichet; entree=0
+    while [ $# -gt 0 ]; do
+      case "$1" in
+        --portee) [ $# -ge 2 ] || usage; portee=$2; shift 2 ;;
+        --portee=*) portee=${1#--portee=}; shift ;;
+        --depuis-entree) entree=1; shift ;;
+        -*) usage ;;
+        *) [ -z "$nom" ] || { echo "Un seul nom, et jamais la valeur en argument (elle resterait visible dans la liste des processus)."; exit 1; }; nom=$1; shift ;;
+      esac
+    done
+    [[ "$nom" =~ $NOM ]] || { echo "Nom refusé : minuscules, chiffres et tirets, 2 à 41 caractères (exemple : jarvis-google)."; exit 1; }
+    [ "$portee" = service ] || [ "$portee" = guichet ] || { echo "Portée inconnue : service ou guichet."; exit 1; }
+    if [ $entree = 1 ]; then   # pour un script : la valeur arrive sur l'entrée et va droit au client, sans passer par bash
+      [ -t 0 ] && { echo "--depuis-entree attend la valeur sur l'entrée (un tube), pas au clavier."; exit 1; }
+      exec "$NODE" "$LIB/client.mjs" --prise "$PRISE" mettre "$nom" "$portee"
+    fi
+    terminal; sonde
+    [ $SONDE = 0 ] || { echo "Coffre verrouillé ou pas encore créé : sudo jarvis-coffre ouvrir (rien n'a été demandé)."; exit 1; }
+    S_VALEUR=""; S_ENCORE=""
+    saisir S_VALEUR "Valeur du secret « $nom » (portée $portee)"
+    saisir S_ENCORE "La même, une seconde fois"
+    [ "$S_VALEUR" = "$S_ENCORE" ] || { echo "Les deux saisies diffèrent. Rien n'a été fait."; exit 1; }
+    [ -n "$S_VALEUR" ] || { echo "Valeur vide. Rien n'a été fait."; exit 1; }
+    # un terminal coupe une ligne saisie à 4095 caractères, sans le dire : les deux saisies seraient coupées pareil
+    [ "${#S_VALEUR}" -lt 4000 ] || { echo "Valeur trop longue pour une saisie au terminal : passe-la par un tube (--depuis-entree). Rien n'a été fait."; exit 1; }
+    printf '%s' "$S_VALEUR" | client mettre "$nom" "$portee"; rc=$?
+    unset S_VALEUR S_ENCORE
+    exit $rc ;;
+  retirer)
+    [ $# = 1 ] || usage
+    [[ "$1" =~ $NOM ]] || { echo "Nom refusé."; exit 1; }
+    client retirer "$1" ;;
+  changer-phrase)
+    [ $# = 0 ] || usage
+    terminal; sonde
+    [ $SONDE = 4 ] && { echo "Aucun coffre encore : sudo jarvis-coffre creer"; exit 1; }
+    echo "Changement de phrase : la clé du coffre est renouvelée et tous les secrets sont rechiffrés."
+    S_ANCIENNE=""; saisir S_ANCIENNE "Phrase actuelle"
+    S_PHRASE=""; phrase_neuve S_PHRASE
+    printf '%s\n%s\n' "$S_ANCIENNE" "$S_PHRASE" | client changer-phrase; rc=$?
+    unset S_ANCIENNE S_PHRASE
+    [ $rc = 0 ] && echo "Mets la nouvelle phrase dans ton gestionnaire de mots de passe maintenant : l'ancienne n'ouvre plus rien."
+    exit $rc ;;
+  ""|-h|--help|aide) usage 0 ;;
+  *) echo "Commande inconnue : $commande"; usage ;;
+esac

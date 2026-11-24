@@ -303,4 +303,13 @@ Limite qui reste, dite à lui : quelqu'un qui prend la main en root sur le serve
 En attendant : `portail-couches.sh` ne garde **plus rien** par défaut (identifiants passés par un tube au programme
 enfermé, ni disque, ni échange, ni image mémoire) ; `--garder` (coffre de systemd) reste pour mémoire. Banc :
 `sudo bash jarvis-os/server/tests/portail-coffre.test.sh` (13 vérifications).
+- 24/11/2026 : **`jarvis-coffre` écrit** (`jarvis-os/coffre/` : service `coffre.mjs`, commande `jarvis-coffre`, unité, `install.sh`,
+  `README.md`). Sur le disque : la clé enveloppée par scrypt (N=2^17) et chaque secret en AES-256-GCM lié à son
+  nom et à sa portée ; en mémoire après `ouvrir` seulement. Deux prises : `admin.sock` (root : créer, ouvrir,
+  fermer, mettre, retirer, changer la phrase) et `service.sock` (groupe `jarvis-coffre-clients`, où `install.sh`
+  met `jarvis` : état, lire un secret « service », écrire un secret `jarvis-…`, fermer). Un secret « guichet »
+  n'est rendu par aucune commande. Bancs relancés par Claude : 75 et 30, tout passe ; `install.sh` passé au banc
+  (sans systemd). **Non vérifié** : l'unité sous un vrai systemd (seulement `systemd-analyze`). Pas encore
+  branché : l'accès Google de JARVIS (prochaine étape : `google.mjs` lit et écrit ses jetons dans le coffre,
+  JARVIS notifie « coffre verrouillé », puis « Reconnecter ») ; le geste des couches par le guichet.
 
