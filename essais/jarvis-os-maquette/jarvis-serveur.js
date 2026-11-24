@@ -197,16 +197,18 @@
      passkey sans toucher par chargement de page : si celle de cette page a déjà servi, la page se recharge avant de poser l'écran. */
   let ecran = null, enPreuve = false, preuves = 0, autoFait = false, cacheLe = 0, delaiConnu = 60;
   const visible = () => document.visibilityState !== 'hidden';
+  const etatEcran = (e) => { if (!ecran) return; ecran.dataset.etat = e; ecran.querySelector('.vx-etat').textContent = e === 'scan' ? 'Vérification de ton identité…' : 'JARVIS est verrouillé'; };
   async function ouvrirVerrou(auto) {
     if (!ecran || enPreuve) return;
     const btn = ecran.querySelector('#verrou-ouvrir'), msg = ecran.querySelector('[role=status]');
-    if (!verrou.possible()) { if (!auto) msg.textContent = 'Cet appareil ne sait pas présenter de passkey ici.'; return; }
-    btn.disabled = true; msg.textContent = '';
+    if (!verrou.possible()) { etatEcran('attente'); if (!auto) msg.textContent = 'Cet appareil ne sait pas présenter de passkey ici.'; return; }
+    btn.disabled = true; msg.textContent = ''; etatEcran('scan');
     const t0 = Date.now(), r = await verrou.prouver();
-    if (r && !r.error) { location.reload(); return; }
+    if (r && !r.error) { ecran.querySelector('.vx-etat').textContent = 'Bienvenue.'; location.reload(); return; }
     btn.disabled = false;
+    if (auto && r && r.refus && Date.now() - t0 < 900 && !autoRedit && visible()) { autoRedit = true; setTimeout(() => ouvrirVerrou(true), 900); return; }   /* refus immédiat (page pas encore au premier plan) : un second essai */
+    etatEcran('attente');
     if (!auto) msg.textContent = (r && r.error) || 'Le serveur ne répond pas.';
-    else if (r && r.refus && Date.now() - t0 < 900 && !autoRedit && visible()) { autoRedit = true; setTimeout(() => ouvrirVerrou(true), 900); }   /* refus immédiat (page pas encore au premier plan) : un second essai */
   }
   let autoRedit = false;
   const autoVerrou = () => { if (ecran && !autoFait && !enPreuve && visible()) { autoFait = true; setTimeout(() => ouvrirVerrou(true), 350); } };
@@ -216,15 +218,43 @@
     if (!ecran && preuves > 0 && visible()) { mem(false); location.reload(); return; }   /* une page neuve : sa demande sans toucher est intacte */
     const poser = () => {
       if (ecran || !document.body) return;
-      const el = (t, css, txt) => { const x = document.createElement(t); x.style.cssText = css; if (txt) x.textContent = txt; return x; };
-      const fond = el('div', 'position:fixed;inset:0;z-index:2147483647;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:32px;background:#05070d;color:#e6edf7;font:500 16px/1.5 system-ui,-apple-system,sans-serif;text-align:center');
-      fond.id = 'verrou-ecran'; fond.setAttribute('role', 'dialog'); fond.setAttribute('aria-modal', 'true'); fond.setAttribute('aria-label', 'JARVIS est verrouillé');
-      const msg = el('p', 'margin:0;min-height:1.5em;font-size:14px;color:#fca5a5'); msg.setAttribute('role', 'status');
-      const btn = el('button', 'appearance:none;border:0;border-radius:999px;padding:14px 26px;font:600 16px system-ui,-apple-system,sans-serif;color:#fff;background:linear-gradient(90deg,#0ea5e9,#a855f7);cursor:pointer', 'Déverrouiller');
-      btn.type = 'button'; btn.id = 'verrou-ouvrir';
+      /* 0.77.0 (son retour du 24/11/2026 : « refais un bon écran d'accueil le temps de se connecter en Face ID ») : l'orbe de JARVIS qui
+         respire, un anneau qui tourne pendant la vérification, le salut de l'heure et la date ; le bouton n'apparaît que si Face ID n'a
+         pas ouvert tout seul. Rien de personnel sur cet écran : il se voit avant toute preuve. */
+      if (!document.getElementById('verrou-style')) {
+        const st = document.createElement('style'); st.id = 'verrou-style';
+        st.textContent = '#verrou-ecran{position:fixed;inset:0;z-index:2147483647;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:calc(env(safe-area-inset-top,0px) + 30px) 28px calc(env(safe-area-inset-bottom,0px) + 34px);background:radial-gradient(120% 80% at 50% 36%,#0c1d3a 0%,#070b16 48%,#04060c 100%);color:#e6edf7;font:500 16px/1.5 var(--sans,system-ui,-apple-system,sans-serif);text-align:center;overflow:hidden}'
+          + '#verrou-ecran .vx-marque{font:600 15px var(--logo,var(--display,system-ui,sans-serif));letter-spacing:.44em;text-indent:.44em;color:#9ecbff}'
+          + '#verrou-ecran .vx-centre{display:flex;flex-direction:column;align-items:center;gap:20px}'
+          + '#verrou-ecran .vx-orbe{position:relative;width:min(54vw,230px);aspect-ratio:1;display:grid;place-items:center}'
+          + '#verrou-ecran .vx-orbe::before{content:"";position:absolute;inset:-10%;border-radius:50%;background:radial-gradient(circle,rgba(56,189,248,.30),rgba(56,189,248,0) 64%)}'
+          + '#verrou-ecran .vx-orbe img{position:relative;width:100%;height:100%;border-radius:50%;object-fit:cover;-webkit-mask-image:radial-gradient(circle,#000 54%,transparent 70%);mask-image:radial-gradient(circle,#000 54%,transparent 70%);animation:vx-souffle 4.6s ease-in-out infinite}'
+          + '#verrou-ecran .vx-orbe::after{content:"";position:absolute;inset:6%;border-radius:50%;border:2px solid transparent;border-top-color:#38bdf8;border-right-color:rgba(168,85,247,.75);opacity:0;transition:opacity .3s}'
+          + '#verrou-ecran[data-etat=scan] .vx-orbe::after{opacity:1;animation:vx-tour 1.15s linear infinite}'
+          + '#verrou-ecran .vx-salut{margin:0;font:700 31px/1.15 var(--display,system-ui,sans-serif)}'
+          + '#verrou-ecran .vx-date{margin:0;color:#9fb0c8;font-size:15px}'
+          + '#verrou-ecran .vx-etat{margin:6px 0 0;min-height:1.5em;color:#7dd3fc;font-size:14px;letter-spacing:.03em}'
+          + '#verrou-ecran .vx-bas{display:flex;flex-direction:column;align-items:center;gap:10px;min-height:104px;width:100%}'
+          + '#verrou-ouvrir{appearance:none;-webkit-appearance:none;border:0;border-radius:999px;width:min(100%,320px);padding:15px 26px;font:600 16px var(--sans,system-ui,sans-serif);color:#fff;background:linear-gradient(90deg,#0ea5e9,#a855f7);cursor:pointer;transition:opacity .25s}'
+          + '#verrou-ecran[data-etat=scan] #verrou-ouvrir{opacity:0;pointer-events:none}'
+          + '#verrou-ecran [role=status]{margin:0;min-height:1.5em;font-size:14px;color:#fca5a5}'
+          + '@keyframes vx-souffle{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}@keyframes vx-tour{to{transform:rotate(360deg)}}'
+          + '@media (prefers-reduced-motion:reduce){#verrou-ecran .vx-orbe img,#verrou-ecran[data-etat=scan] .vx-orbe::after{animation:none}}';
+        document.head.append(st);
+      }
+      const el = (t, cls, txt) => { const x = document.createElement(t); if (cls) x.className = cls; if (txt) x.textContent = txt; return x; };
+      const fond = el('div'); fond.id = 'verrou-ecran'; fond.setAttribute('role', 'dialog'); fond.setAttribute('aria-modal', 'true'); fond.setAttribute('aria-label', 'JARVIS est verrouillé');
+      const d = new Date(), h = d.getHours(), salut = h >= 5 && h < 12 ? 'Bonjour.' : h >= 12 && h < 18 ? 'Bon après-midi.' : 'Bonsoir.';
+      let quand = ''; try { quand = d.toLocaleDateString('fr-FR', {weekday: 'long', day: 'numeric', month: 'long'}) + ' · ' + d.toLocaleTimeString('fr-FR', {hour: '2-digit', minute: '2-digit'}); } catch (e) { quand = ''; }
+      const orbe = el('div', 'vx-orbe'), img = el('img'); img.alt = ''; img.src = BASE + '/icon-512.png'; img.addEventListener('error', () => { img.style.visibility = 'hidden'; }); orbe.append(img);
+      const msg = el('p'); msg.setAttribute('role', 'status');
+      const btn = el('button', '', 'Déverrouiller'); btn.type = 'button'; btn.id = 'verrou-ouvrir';
       btn.addEventListener('click', () => ouvrirVerrou(false));
-      fond.append(el('h1', 'margin:0;font:700 24px system-ui,-apple-system,sans-serif', 'JARVIS est verrouillé'), el('p', 'margin:0;max-width:26em;color:#9fb0c8', 'Face ID l’ouvre.'), btn, msg);
-      document.body.append(fond); ecran = fond; mem(false); try { btn.focus(); } catch (e) { /* rien */ }
+      const centre = el('div', 'vx-centre'); centre.append(orbe, el('h1', 'vx-salut', salut), el('p', 'vx-date', quand), el('p', 'vx-etat'));
+      const bas = el('div', 'vx-bas'); bas.append(btn, msg);
+      fond.append(el('div', 'vx-marque', 'J.A.R.V.I.S'), centre, bas);
+      document.body.append(fond); ecran = fond; mem(false);
+      etatEcran(!autoFait && visible() && verrou.possible() ? 'scan' : 'attente');
       autoVerrou();
     };
     if (document.body) poser(); else document.addEventListener('DOMContentLoaded', poser);

@@ -510,6 +510,34 @@ try {
     R6b.traiter('GET', '/api/radar', null); await new Promise((z) => setTimeout(z, 10)); const v1 = R6b.etat(); ouvre6(); await R6b.attendre(); const v2 = R6b.etat();
     ok('Radar 0.68 : une lecture de 0.66/0.67 est refaite avec les nouvelles règles ; pendant ce temps, ses propositions et ses échéances restent affichées, sans les 3 « Plus de facture » fausses', R6b.brut().version === 7 && v0.relecture && v0.propositions.length === 1 && v0.ponctuels.length === 1
       && v0.alertes.length === 1 && v0.alertes[0].type === 'echec' && v1.scan.enCours && v1.scan.complet && !v2.relecture && v2.scan.fini && v2.fixes.length === 1, JSON.stringify([v0.alertes, v1.scan, v2.scan])); }
+  /* 0.77.0 : le rappel de PayPal redonne « votre prochain échéancier » (les échéances restantes) : ce n'est pas un autre achat. Montants inventés. */
+  { const fil = (id, objet, texte, date) => ({id, messages: [{id: 'm' + id, threadId: id, sender: 'service@paypal.fr', addressDisplayNames: [{displayName: 'PayPal', emailAddress: 'service@paypal.fr'}], subject: objet, plaintextBody: texte, date, labelIds: []}]});
+    const rappel = (id, prochaine, solde, suite, date) => fil(id, "L'échéance de votre Paiement en 4X approche", '| Votre prochaine échéance de 25,00 € EUR sera due le ' + prochaine + '. Nous débiterons automatiquement votre carte. |\n| Montant du paiement |\n| 25,00 € EUR |\n| Date d\'échéance |\n| ' + prochaine + ' |\n| Marchand |\n| ATELIER EXEMPLE |\n| Solde actuel |\n| ' + solde + ' € EUR |\n' + (suite ? '| Pour rappel, voici votre prochain échéancier de paiement. |\n| ' + suite + ' |\n' : '') + '| Ces montants n\'incluent pas les paiements manqués. |', date);
+    const plan = fil('pa', 'Votre Paiement en 4X est prêt', "| Votre achat de 100,00 € EUR auprès de ATELIER EXEMPLE a été divisé en 4 échéances. |\n| * 25,00 € EUR dus aujourd'hui * 25,00 € EUR le 26 août 2026 * 25,00 € EUR le 25 septembre 2026 * 25,00 € EUR le 24 octobre 2026 |", '2026-07-27T09:05:00Z');
+    const r1 = rappel('ra', '26 août 2026', '75,00', '* 25,00 € EUR le 25 septembre 2026 * 25,00 € EUR le 24 octobre 2026', '2026-08-22T23:34:00Z'), r2 = rappel('rb', '25 septembre 2026', '50,00', '* 25,00 € EUR le 24 octobre 2026', '2026-09-21T23:30:00Z'), r3 = rappel('rc', '24 octobre 2026', '25,00', '', '2026-10-20T23:30:00Z');
+    const boite = (liste) => { const F = Object.fromEntries(liste.map((t) => [t.id, t])); return {lie: () => true, chercher: async (q) => { const m = q.match(/after:(\d{4})\/(\d{2})/); return {threads: m ? Object.values(F).filter((t) => t.messages[0].date.startsWith(m[1] + '-' + m[2])).map((t) => ({id: t.id})) : []}; }, fil: async (id) => F[id]}; };
+    const muet = async () => ({ok: true, text: '[]'});
+    const f1 = path.join(DIR, 'radar77a.json'), Ra = createRadar({file: f1, gmail: boite([plan, r1, r2, r3]), claude: muet, now: () => Date.parse('2026-11-24T09:00:00Z'), moisDepart: 5});
+    await Ra.traiter('GET', '/api/radar', null); await Ra.attendre();
+    const pa = Ra.etat().plans.filter((p) => p.service === 'ATELIER EXEMPLE');
+    ok('Radar 0.77 : un achat en 4 fois et ses trois rappels (qui redonnent les 3, puis 2 échéances restantes) font UN plan de 100 €, 4 échéances, pas trois achats de 100, 75 et 50 €',
+      pa.length === 1 && pa[0].total === 100 && pa[0].echeances.length === 4 && pa[0].fois === 4, JSON.stringify(pa.map((p) => [p.total, p.echeances.length])));
+    /* les rappels lus avant le plan (le plan arrive en dernier) : même résultat */
+    const f2 = path.join(DIR, 'radar77b.json'), tard = {...plan, messages: [{...plan.messages[0], date: '2026-11-20T09:05:00Z', plaintextBody: plan.messages[0].plaintextBody.replace("dus aujourd'hui", 'le 27 juillet 2026')}]};
+    const Rb = createRadar({file: f2, gmail: boite([r1, r2, tard]), claude: muet, now: () => Date.parse('2026-11-24T09:00:00Z'), moisDepart: 5});
+    await Rb.traiter('GET', '/api/radar', null); await Rb.attendre();
+    const pb = Rb.etat().plans.filter((p) => p.service === 'ATELIER EXEMPLE');
+    ok('Radar 0.77 : les rappels lus avant le mail du plan le rejoignent quand il arrive (un seul plan de 4 échéances)', pb.length === 1 && pb[0].echeances.length === 4 && pb[0].total === 100, JSON.stringify(pb.map((p) => [p.total, p.echeances.length, p.partiel])));
+    /* les doublons déjà enregistrés par une version d'avant s'en vont au démarrage ; deux vrais achats chez le même marchand restent deux */
+    const e4 = [['2026-07-27', true], ['2026-08-26', true], ['2026-09-25', true], ['2026-10-24', true]].map(([date, payee]) => ({date, montant: 25, payee})), p0 = {cle: 'paypal:atelier exemple', dom: 'paypal.fr', service: 'ATELIER EXEMPLE', via: 'PayPal', fil: '', objet: '', fois: 4, date: '2026-07-27', maj: '2026-10-24'};
+    const f3 = path.join(DIR, 'radar77c.json');
+    fs.writeFileSync(f3, JSON.stringify({version: 7, scan: {fini: true}, plans: {plA: {...p0, id: 'plA', total: 100, echeances: e4}, plB: {...p0, id: 'plB', total: 75, echeances: e4.slice(1).map((e) => ({...e, payee: false}))}, plC: {...p0, id: 'plC', total: 50, echeances: e4.slice(2).map((e) => ({date: e.date, montant: 25}))},
+      plD: {...p0, id: 'plD', total: 180, echeances: [['2026-08-02'], ['2026-09-02'], ['2026-10-02'], ['2026-11-02']].map(([date]) => ({date, montant: 45}))}}}));
+    const Rc = createRadar({file: f3, gmail: boite([]), claude: muet, now: () => Date.parse('2026-11-24T09:00:00Z'), moisDepart: 1});
+    const brut = JSON.parse(fs.readFileSync(f3, 'utf8')).plans;
+    ok('Radar 0.77 : au démarrage, trois plans enregistrés pour un seul achat (100, 75 et 50 €) n\'en font plus qu\'un, ses échéances payées gardées ; un autre achat chez le même marchand (4 × 45 €) reste',
+      Object.keys(brut).sort().join() === 'plA,plD' && brut.plA.echeances.length === 4 && brut.plA.echeances.every((e) => e.payee) && Rc.etat().plans.filter((p) => p.service === 'ATELIER EXEMPLE').length === 2, JSON.stringify(Object.keys(brut)));
+  }
   /* la mémoire de JARVIS (lue par le serveur MCP, que Grok Bot peut joindre) refuse les chiffres d'un crédit */
   ok('Mémoire : refuse les chiffres d’un crédit (règle du 12/11/2026), garde le reste', interdit('Ma mensualité de crédit immobilier est de 1150 €') && interdit('Il reste 180 000 € à rembourser sur le prêt immobilier') && !interdit("J'ai un crédit immobilier à la banque") && !interdit('Je suis prêt à 8h'));
 } catch (e) { ok('exception', false, e.stack); }

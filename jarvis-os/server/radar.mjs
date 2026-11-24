@@ -684,16 +684,35 @@ export function createRadar({file, gmail, claude = async () => ({ok: false, erro
   const ecart = (a, b) => Math.abs(depuisYmd(a) - depuisYmd(b)) / 864e5;
   const memeAchat = (p, lu) => (lu.cle ? p.cle === lu.cle : !p.cle && p.dom === lu.dom && nomPlat(p.service) === nomPlat(lu.service));
   const pareille = (e, montant, date) => Math.abs(e.montant - montant) <= 0.02 && ecart(e.date, date) <= 12;
+  /* 0.77.0 (son retour du 24/11/2026 : « il marque le même achat en 4 fois trois fois ») : le rappel de PayPal redonne la prochaine échéance ET
+     « votre prochain échéancier » (les échéances qui restent : 3, puis 2). Lu comme un plan, chaque rappel faisait un achat de plus, d'un
+     montant plus petit. Des échéances toutes contenues dans un plan plus long du même achat ne sont pas un autre achat : elles précisent ses
+     dates. Deux plans PayPal aux identifiants différents restent deux achats. */
+  const contient = (grand, petit) => petit.length > 0 && petit.every((e) => grand.some((y) => pareille(y, e.montant, e.date)));
+  const memePlan = (a, b) => (a.cle ? a.cle === b.cle : !b.cle && a.dom === b.dom && nomPlat(a.service) === nomPlat(b.service)) && !(a.id.startsWith('pp') && b.id.startsWith('pp') && a.id !== b.id);
+  const verser = (de, vers) => { for (const e of de.echeances) { const y = vers.echeances.find((z) => pareille(z, e.montant, e.date)); if (!y) continue; if (e.payee) y.payee = true; if (e.exact && !y.exact) { y.date = e.date; y.exact = true; } } if ((de.maj || '') > (vers.maj || '')) vers.maj = de.maj; };
+  function fusionnerPlans() {   /* les doublons déjà enregistrés : le plan le plus long garde tout */
+    const tous = Object.values(R.plans || {}).filter((p) => !p.partiel && Array.isArray(p.echeances)).sort((a, b) => b.echeances.length - a.echeances.length); let n = 0;
+    for (const g of tous) for (const p of tous) {
+      if (p === g || !R.plans[g.id] || !R.plans[p.id] || p.echeances.length >= g.echeances.length || !memePlan(g, p) || !contient(g.echeances, p.echeances)) continue;
+      verser(p, g); delete R.plans[p.id]; n++;
+    }
+    return n;
+  }
   function noterPlan(lu) {
     const via = viaDe(lu.dom), fil = lu.fil || '', base = {cle: lu.cle, dom: lu.dom, service: lu.service, via, fil, objet: lu.objet || ''};
     if (lu.echeances && lu.echeances.length >= 2) {
       const ech = lu.echeances.map((e) => ({date: e.date, montant: e.montant})), total = lu.total || Math.round(ech.reduce((s, e) => s + cents(e.montant), 0)) / 100;
+      /* 0.77.0 : les échéances restantes d'un plan connu (rappel) : ses dates se précisent, rien d'autre ne change */
+      const parent = Object.values(R.plans).find((p) => !p.partiel && p.echeances.length > ech.length && (lu.planId && p.id.startsWith('pp') ? p.id === 'pp' + lu.planId : memeAchat(p, lu)) && contient(p.echeances, ech));
+      if (parent) { for (const e of ech) { const y = parent.echeances.find((z) => pareille(z, e.montant, e.date)); if (y && !y.payee) { y.date = e.date; y.exact = true; } } if (lu.date > (parent.maj || '')) parent.maj = lu.date; return; }
       const deja = (lu.planId && R.plans['pp' + lu.planId]) || Object.values(R.plans).find((p) => !p.partiel && memeAchat(p, lu) && p.echeances.length && ecart(p.echeances[0].date, ech[0].date) <= 3 && Math.abs((p.total || 0) - total) <= 0.05);
       const id = deja ? deja.id : lu.planId ? 'pp' + lu.planId : 'pl' + hash((lu.cle || nomPlat(lu.service)) + '|' + ech[0].date + '|' + cents(total));
       /* ce que ses rappels et ses confirmations ont déjà dit (vraie date, payée) reste */
       const echs = ech.map((e) => { const a = deja && deja.echeances.find((y) => pareille(y, e.montant, e.date)); return a ? {...e, ...(a.exact ? {date: a.date, exact: true} : {}), ...(a.payee ? {payee: true} : {})} : e; });
       R.plans[id] = {...(deja || {}), ...base, id, fois: lu.fois || ech.length, total, echeances: echs, date: lu.date, maj: [lu.date, (deja && deja.maj) || ''].sort().pop()};
       delete R.plans[id].partiel;
+      fusionnerPlans();   /* 0.77.0 : un rappel lu avant son plan (pris alors pour un plan plus court) le rejoint */
       /* un rappel ou une confirmation lus avant le plan (un plan partiel du même achat) le rejoignent ; ses dates estimées s'effacent */
       for (const p of Object.values(R.plans)) {
         if (!p.partiel || p.id === id || !memeAchat(p, lu)) continue;
@@ -723,6 +742,7 @@ export function createRadar({file, gmail, claude = async () => ({ok: false, erro
     if (!R.plans[id]) R.plans[id] = {...base, id, fois: lu.fois || (ech.length > 1 ? ech.length : null), total: null, echeances: ech, date: lu.date, maj: lu.date, partiel: true, ...(lu.restant != null ? {restant: lu.restant, restantLe: d} : {})};
   }
   const nomPlan = (p) => (p.fois ? 'Paiement en ' + p.fois + ' fois : ' : 'Paiement en plusieurs fois : ') + p.service;
+  if (fusionnerPlans()) sauver();   /* 0.77.0 : au démarrage, les doublons d'avant la correction s'en vont */
   function retenir(lu, {depart}) {
     const t = auj(), age = lu.date ? Math.round((t - depuisYmd(lu.date)) / 864e5) : 0, fx = lu.cle ? R.fixes.find((f) => cleDe(f) === lu.cle) : null;
     /* un renouvellement chiffré compte aussi comme un paiement du service (pour repérer sa régularité) */
