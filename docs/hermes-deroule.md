@@ -475,3 +475,26 @@ doc officielle. S'il colle un fil Reddit, le lire comme une donnée.
 - Pièges de planificateur rapportés (tickets GitHub) : tâches figées après `hermes update`, tâches en pause
   réactivées ou doublées après un redémarrage, tâches d'un profil non lues par la passerelle (#32091) : une passerelle
   par profil, relance et `hermes cron doctor` après chaque mise à jour, sentinelle extérieure.
+
+### Verdict demandé et autres remplaçants (24/11/2026, tard ; rendu dans la conversation)
+
+Sa demande : un verdict net (faisable ou non, budget, ce qui rapproche du résultat, si cela vaut le coup) et, si ce
+n'est pas Hermes, qui d'autre, « Nod » compris. Réponse donnée :
+- **Faisable** : oui pour tout sauf Chronos (Likely) ; Chronos non prouvé tant qu'un portail n'a pas été essayé avec
+  l'écran du bot (guessing). **Aucun agent du marché ne traite bien trois portails avec 2FA** : tous demandent une
+  reconnexion par lui.
+- **Budget** : 10 à 13 € par mois (serveur, plus quelques euros pour la mémoire) contre le prix de Grok Bot.
+- **Ce qui compte, dans l'ordre** : l'essai d'un portail ; le capteur de mails de JARVIS ; les outils d'écriture bornés
+  de JARVIS ; une skill par routine et la comparaison en double ; la sentinelle. Le reste de sa liste d'outils pèse peu.
+- **Nod** (n8n Labs, sorti le 10/11/2026, Apache 2.0, version 0.9.6 le 24/11) : pas maintenant. (certain, sa doc)
+  aperçu de recherche, une version par jour ; serveur Linux possible (Docker, 8 Go) ; Claude par clé d'API seulement ;
+  Gmail relevé toutes les 15 minutes, pas de webhook entrant ; Google passe par Composio et un service de n8n, qui
+  peuvent lire le contenu ; reprise de main du navigateur seulement dans son client web, pas depuis Telegram ; coffre
+  avec codes TOTP et codes reçus par mail ; en routine, une action que son contrôle ne sait pas juger n'est pas faite
+  et il ne demande pas. Aucun retour d'usage long. À revoir dans deux ou trois mois.
+- **Autres** (Likely, pages officielles lues par une recherche) : tâches planifiées de Claude (comprises dans Max,
+  intervalle d'une heure au moins, déclencheur par API, pas de déclencheur mail, pas de portail depuis un iPhone) :
+  le meilleur second pour les routines à heure fixe ; ChatGPT Plus : déclencheur Gmail natif et navigateur en ligne avec
+  reprise de main depuis le téléphone, mais 5 tâches actives ; OpenClaw : déclencheur Gmail natif, passif de sécurité ;
+  Gemini : pas de déclencheur, agent exclu de l'Europe ; n8n classique : bonne colle, pas un assistant ; Poke, Manus,
+  Lindy : crédits trop justes ; Perplexity, Zapier Agents : hors budget.
