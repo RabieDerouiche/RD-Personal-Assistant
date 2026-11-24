@@ -392,3 +392,58 @@ Fait dans le dépôt le 24/11/2026 (pas encore sur le serveur : le coffre n'y es
 - Reste à construire : le bouton d'arrêt d'urgence, la notification « coffre verrouillé » après un redémarrage,
   l'accès Google dans le coffre ; et, pour les couches, la question à boutons (ne dépend pas de lui) puis le geste
   (après sa sonde).
+
+## Remplacement complet : le setup étudié (sa demande du 24/11/2026 au soir)
+
+Sa demande : « le setup parfait » pour qu'Hermes remplace Grok Bot en entier, toutes routines comprises, pour moins
+cher que l'abonnement Grok Bot, avec son propre VPS, une mémoire, les skills et outils nécessaires ; le modèle peut
+rester Claude Max. **Étude seulement : rien n'est commandé, installé ni changé.** Version pour lui : Google Doc
+« Hermes à la place de Grok Bot : le setup complet (24-11-2026) », dossier `Grok Bot/`
+(`1hUzesa57kJAM2hulrO0QBBHEPxerMTGzy1CvwRZDka0`). Deux de ses décisions du 23 et du 24/11 seraient renversées
+(« Chronos reste chez Grok Bot », « rien avant la comparaison ») : elles ne changent que sur son accord, par QCM.
+
+Faits vérifiés le 24/11/2026 (pages officielles, relus par deux recherches) :
+- (certain) Hermes **0.23.4** (24/11, 1 122 commits depuis la 0.23.3, pas de section « breaking »). Le kit reste figé en 0.23.3.
+- (certain) **Écran du bot** (« Bot Screen », `user-guide/features/bot-screen`) : par profil, un bureau Xvnc et Xfce
+  avec un Chromium au profil permanent, vu par noVNC (page web d'Hermes, en HTTPS ou par tunnel) ; « Take over » pour
+  la connexion, le 2FA ou un CAPTCHA, puis « Hand back » : le bot garde la session. Exige Computer Use ; 1,1 à 1,5 Go
+  par écran, « 8 Go confortable ». Les profils sous le même utilisateur Linux partagent tout (doc) : un utilisateur
+  par profil. C'est la pièce qui manquait pour les portails de Chronos, sans mot de passe gardé sur le serveur.
+- (certain) **Webhooks** : `POST :8644/webhooks/<route>`, secret obligatoire (HMAC), par route `prompt`, `script`
+  (peut taire l'événement), `skills`, `toolsets`, `deliver`, `cron_job`. Rien de natif pour Gmail ou l'agenda Google.
+- (certain) **Planificateur** : modèle, outils et skills par tâche ; `--no-agent --script` (sans IA) ; script de
+  pré-contrôle dont la dernière ligne `{"wakeAgent": false}` évite l'appel au modèle ; un rattrapage après un arrêt.
+- (certain) **Mémoire** : un seul fournisseur externe actif ; Holographic est local (SQLite et FTS5), sans service
+  ni clé ; Honcho, Mem0, Hindsight demandent une base, une clé ou un embedder.
+- (certain) **Secours de modèle** (`fallback_providers`) : sur 429, 5xx, 401/403, 404 ; une tâche épinglée sur un
+  modèle n'en change jamais ; **un refus pour limite de forfait du plugin Claude ne déclenche pas le secours**.
+- (certain) **Crédits d'API inclus dans Max** : 100 $ par mois, clé d'une organisation Console liée, sans report ;
+  épuisés, les requêtes s'arrêtent, rien n'est facturé ; à réclamer après 7 jours d'abonnement. Voie « préférée »
+  d'Anthropic pour un outil tiers. Prix : Sonnet 5.5 2 $ / 10 $ (cache lu 0,10 $), Haiku 5.5 0,10 $ / 0,50 $.
+- (certain) **OVH VPS-2** (gamme « VPS 2027 » : 4 cœurs, 8 Go, 75 Go, sauvegarde quotidienne) : 8,65 € TTC par mois
+  sur 12 mois, 10,19 € sans engagement. Hetzner : commandes fermées (« currently unavailable »).
+- (certain) Toujours pas d'app iPhone officielle d'Hermes ; fils (« topics ») dans une discussion privée Telegram.
+
+Montage proposé (détail dans le Google Doc) :
+- **Serveur à part** (VPS-2), relié à JARVIS par un réseau privé ; Hermes toujours sans jeton Google.
+- **Trois profils par droits, pas sept bots** : Secrétaire (Iris, Argus, Canal : mails et Pilotage, ni web ni
+  navigateur), Veilleur (Athéna, Ulysse, Kairos, Plutus : web, jamais les mails), Portails (Chronos : navigateur
+  limité aux portails, écran du bot). Un utilisateur Linux et des règles réseau par profil ; les noms des bots restent
+  comme rôles (signature dans Pilotage, fils Telegram).
+- **Capteurs sans IA dans JARVIS** : arrivée d'un mail (relevé de Gmail, onglet Expéditeurs) et ligne du Canal, qui
+  réveillent Hermes par webhook (plus d'alias, plus de filtres Gmail à la main, plus de sonnettes par mail) ;
+  supervision par scripts ; sentinelle extérieure par routine.
+- **Modèle** : routines sur les crédits d'API (Sonnet ; Haiku pour le tri à l'arrivée), discussion sur le forfait par
+  le plugin. (guessing) 25 à 45 $ de crédits par mois, à mesurer.
+- **Mémoire** : Pilotage pour les faits, mémoire intégrée par profil, Holographic pour le long terme.
+- 25 routines de Grok Bot deviennent 16 routines d'Hermes (4 par webhook) et 3 capteurs ; supprimées : Semaine à
+  venir (non lue), la note de frais de l'abonnement Grok, les six sonnettes ; Supervision en scripts.
+- **Coût** : 8,65 à 10,19 € par mois en plus de l'existant. Seul risque sur le budget : un portail qui refuse un
+  navigateur venu d'un serveur (guessing) ; parade gratuite, sortir par sa connexion de la maison.
+- **Preuve** : par routine, trois passages en double au niveau ; pour les portails, essai à blanc jusqu'au dernier
+  écran (on ne soumet pas deux fois). Un cycle mensuel complet de Chronos : pas de résiliation de Grok Bot avant fin
+  janvier 2027 au plus tôt. **Premier essai à faire : l'écran du bot sur un portail**, car c'est lui qui décide.
+
+À construire s'il dit oui : dans JARVIS, le capteur Gmail, le réveil par webhook, un profil de jeton « portails », les
+outils d'écriture bornés (Dossiers, Échéances, Prix, Relevés, Sorties, Voyages, Papiers), les décisions à boutons ;
+dans le kit, les profils, la clé d'API, les webhooks, l'écran du bot, une skill par routine depuis les fiches.
