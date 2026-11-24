@@ -1328,6 +1328,63 @@ srv.listen(0, async () => {
       const r = await q.evaluate(() => { try { return JSON.parse(localStorage.getItem('jarvis.pos')); } catch (e) { return null; } }), got = urls.slice(n0);
       ok('0.70.0 : MÉTÉO touchée avec une position de la veille : la position est redemandée et la météo relue au nouvel endroit', got.some((u) => /latitude=43\.3&longitude=5\.37/.test(u)) && r && r.lat === 43.3 && Date.now() - r.at < 120000, JSON.stringify({got: got.map((u) => u.slice(0, 80)), r}));
       await ctx.close(); }
+    // 0.70.0 — C (décisions du 23/11/2026)
+    /* srv-routes#3 « Retirer dans Réglages » : la liste des appareils reliés dans la carte « Serveur JARVIS » (serveur simulé : ses réponses
+       sont écrites ici ; le vrai serveur a son banc, jarvis-os/server/tests/fiab-c.test.mjs). Noms et dates inventés. */
+    { const ctx = await b.newContext({...devices['iPhone 15 Pro Max']}); await ctx.addInitScript(PAUSE_INIT);
+      await ctx.addInitScript(() => { try { localStorage.setItem('jarvis.settings', JSON.stringify({serverToken: 'jeton-essai'})); } catch (e) { /* rien */ } });
+      const T = new Date(2026, 10, 23, 14, 5).getTime(), AP = [{id: 'aaaaaaaaaaaa', nom: 'JARVIS OS · iPhone', at: T, moi: true}, {id: 'bbbbbbbbbbbb', nom: 'JARVIS OS · iPad', at: T - 864e5, moi: false}], retraits = [];
+      await ctx.route(base + 'api/**', async (r) => { const u = new URL(r.request().url()), j = (s, o) => r.fulfill({status: s, contentType: 'application/json', body: JSON.stringify(o)});
+        if (u.pathname === '/api/appareils') return j(200, {appareils: AP});
+        if (u.pathname === '/api/appareils/retirer') { const bd = JSON.parse(r.request().postData() || '{}'); retraits.push(bd.id); const i = AP.findIndex((x) => x.id === bd.id); const n = AP[i].nom; AP.splice(i, 1); return j(200, {ok: true, nom: n, notifications: 1, appareils: AP}); }
+        return j(404, {error: 'Adresse inconnue du serveur.'}); });
+      const q = await ctx.newPage(); q.on('pageerror', (e) => errs.push('appareils : ' + e.message)); await q.goto(base + '?serveur#reglages'); await q.waitForTimeout(3500);
+      const lis = () => q.evaluate(() => [...document.querySelectorAll('.set-card .app-it')].map((x) => ({t: x.innerText.replace(/\s+/g, ' ').trim(), btn: [...x.querySelectorAll('button')].map((y) => y.textContent.trim())})));
+      const l0 = await lis(), carte = await q.evaluate(() => { const c = [...document.querySelectorAll('.set-card')].find((x) => /^Serveur JARVIS/.test(x.textContent)); return c ? c.innerText.replace(/\s+/g, ' ') : ''; });
+      ok('0.70.0 — C : Réglages, carte « Serveur JARVIS » : les appareils reliés (nom, « relié le … »), « Cet appareil » sans bouton sur le sien, « Retirer » sur l’autre ; « Délier cet iPhone » reste',
+        l0.length === 2 && /^JARVIS OS · iPhone · relié le 23 novembre( 2026)? à 14h05 Cet appareil$/.test(l0[0].t) && !l0[0].btn.length && /^JARVIS OS · iPad · relié le 22 novembre/.test(l0[1].t) && l0[1].btn.join() === 'Retirer' && /Délier cet iPhone/.test(carte), JSON.stringify([l0, carte]));
+      await q.evaluate(() => [...document.querySelectorAll('.app-it')][1].querySelector('button').click()); await q.waitForTimeout(700);
+      const conf = await q.evaluate(() => { const s = document.getElementById('sheet'); return s && !s.hidden ? s.innerText.replace(/\s+/g, ' ') : ''; }), avant = retraits.length;
+      await q.evaluate(() => { const x = [...document.querySelectorAll('#sheet button')].find((y) => /Oui, retirer/.test(y.textContent)); if (x) x.click(); }); await q.waitForTimeout(1800);
+      const l1 = await lis(), dit = await q.evaluate(() => [...document.querySelectorAll('.set-wrap .set-msg')].map((x) => x.textContent).join(' | '));
+      ok('0.70.0 — C : « Retirer » demande d’abord confirmation (« Retirer « JARVIS OS · iPad » ? », rien ne part avant), puis le retire et le dit ; la liste ne garde que cet appareil',
+        /Retirer « JARVIS OS · iPad » \?/.test(conf) && /Oui, retirer/.test(conf) && avant === 0 && retraits.join() === 'bbbbbbbbbbbb' && /« JARVIS OS · iPad » est retiré/.test(dit) && l1.length === 1 && /Cet appareil$/.test(l1[0].t), JSON.stringify([conf.slice(0, 200), retraits, dit, l1]));
+      await q.screenshot({path: path.join(SH, 'reglages-appareils.png')});
+      /* doc-ouverts#3 « Feuille Pendant ton absence » : de retour au premier plan, une notification de 20 minutes (envoyée pendant l'absence,
+         pas encore vue) est proposée dans la feuille, rien ne bouge sans son geste ; une seule de 5 minutes s'ouvre directement, comme avant */
+      const vis = (hd) => q.evaluate((x) => { Object.defineProperty(document, 'hidden', {configurable: true, get: () => x}); Object.defineProperty(document, 'visibilityState', {configurable: true, get: () => (x ? 'hidden' : 'visible')}); document.dispatchEvent(new Event('visibilitychange')); }, hd);
+      let NOTIFS = [], vues = [];
+      await ctx.route(base + 'api/notifs**', async (r) => { const u = new URL(r.request().url()); if (u.pathname === '/api/notifs/vue') { vues.push(...(JSON.parse(r.request().postData() || '{}').ids || [])); return r.fulfill({status: 200, contentType: 'application/json', body: '{"ok":true}'}); } return r.fulfill({status: 200, contentType: 'application/json', body: JSON.stringify({notifs: NOTIFS})}); });
+      const etatN = () => q.evaluate(() => { const s = document.getElementById('sheet'); return {hash: location.hash, feuille: s && !s.hidden ? s.innerText.replace(/\s+/g, ' ') : '', toast: [...document.querySelectorAll('.toast')].map((x) => x.innerText.replace(/\s+/g, ' ')).join(' | ')}; });
+      const fermer = () => q.evaluate(() => { const s = document.getElementById('sheet'), f = s && [...s.querySelectorAll('button')].find((x) => /Fermer/.test(x.textContent)); if (f) f.click(); document.querySelectorAll('.toast').forEach((t) => t.remove()); });
+      const H0 = new Date(2026, 10, 24, 10, 0).getTime();
+      await fermer(); await q.clock.setFixedTime(new Date(H0)); await q.evaluate(() => { location.hash = '#reglages'; }); await q.waitForTimeout(600);
+      await vis(true); await q.clock.setFixedTime(new Date(H0 + 25 * 60e3)); NOTIFS = [{id: 'n20', at: H0 + 5 * 60e3, title: 'Paiement refusé (essai)', body: 'Abonnement Exemple', url: '/#agenda'}];
+      await vis(false); await q.waitForTimeout(2000); const r20 = await etatN();
+      ok('0.70.0 — C : notification de 20 minutes au retour : la feuille « Pendant ton absence » la propose, la page ne bouge pas toute seule', /pendant ton absence/i.test(r20.feuille) && /1 notification\b/.test(r20.feuille) && /Paiement refusé \(essai\)/.test(r20.feuille) && r20.hash === '#reglages' && vues.includes('n20'), JSON.stringify(r20));
+      await q.evaluate(() => { const x = [...document.querySelectorAll('#sheet .notif-row')].find((y) => /Paiement refusé/.test(y.textContent)); if (x) x.click(); }); await q.waitForTimeout(1200);
+      const r20b = await etatN();
+      ok('0.70.0 — C : un appui sur la notification de la feuille ouvre ce qu’elle annonce', r20b.hash === '#agenda' && !r20b.feuille, JSON.stringify(r20b));
+      await fermer(); await q.evaluate(() => { location.hash = '#reglages'; }); await q.waitForTimeout(800);
+      const H1 = H0 + 40 * 60e3; await q.clock.setFixedTime(new Date(H1)); await vis(true); await q.clock.setFixedTime(new Date(H1 + 10 * 60e3));
+      NOTIFS = [{id: 'n5', at: H1 + 5 * 60e3, title: 'Rappel (essai)', body: '', url: '/#agenda'}, {id: 'n20', at: H0 + 5 * 60e3, title: 'Paiement refusé (essai)', body: '', url: '/#agenda', vue: H0 + 26 * 60e3}];
+      await vis(false); await q.waitForTimeout(2000); const r5 = await etatN();
+      ok('0.70.0 — C : une seule notification de 5 minutes au retour : ouverte directement (comme avant), et dite', r5.hash === '#agenda' && !r5.feuille && /Ouvert depuis ta notification/.test(r5.toast), JSON.stringify(r5));
+      await ctx.close(); }
+    /* page-5#1 « Oui à la voix seulement » : en discussion écrite, un « oui » tapé n'exécute pas la proposition de Claude : il part à Claude, et le
+       bouton de la carte reste la seule validation (en mains libres, le « oui » l'exécute toujours : banc-serveur.mjs, « voix : un ordre à un bot… ») */
+    { const q = await page('#accueil');
+      const dis = async (t) => { if (await q.evaluate(() => document.getElementById('chat').hidden)) { await q.tap('.talk-slot .jv-btn'); await q.waitForTimeout(900); } await q.fill('#chat-in', t); await q.tap('#chat .chat-row .btn.main'); await q.waitForTimeout(1800); };
+      const etat = () => q.evaluate(() => ({n: (window.__samples || []).length, dernier: ((window.__samples || []).slice(-1)[0] || {}).last || '', cartes: [...document.querySelectorAll('#chat .msg.proposal')].map((x) => x.innerText.replace(/\s+/g, ' ')), eux: [...document.querySelectorAll('#chat .msg.them')].map((x) => x.innerText.replace(/\s+/g, ' ')).slice(-2)}));
+      await dis('Prépare un ordre pour Iris'); const e1 = await etat(); await dis('oui'); const e2 = await etat(), canal = await q.evaluate(() => (window.__calls || []).filter((c) => c.tool === 'append_values' && /Canal/.test((c.input && c.input.range) || '')).length);
+      ok('0.70.0 — C : discussion écrite : « Prépare un ordre pour Iris » puis « oui » tapé : la carte reste ouverte (« Envoyer à Iris »), rien n’est écrit dans le Canal, et le « oui » part à Claude',
+        e1.cartes.some((c) => /Iris/.test(c) && /Envoyer à Iris/.test(c)) && e2.cartes.some((c) => /Envoyer à Iris/.test(c)) && !e2.cartes.some((c) => /Envoyé/.test(c)) && e2.n === e1.n + 1 && /\boui\b/i.test(e2.dernier) && !e2.eux.some((x) => /C’est parti/.test(x)) && canal === 0, JSON.stringify([e1.n, e2.n, e2.dernier.slice(-40), e2.cartes.slice(-1), e2.eux, canal]));
+      await q.context().close(); }
+    /* B3 (reste) : Équipe › Coût ne construit plus tout l'ancien Suivi (missions, relances, santé…) pour n'en garder que le coût */
+    { const q = await page('#equipe'); await q.evaluate(() => document.querySelector('.ux-seg [data-f="cout"]').click()); await q.waitForTimeout(900);
+      const t = await q.evaluate(() => [...document.querySelectorAll('#view .panel h2, #view section > header h2')].map((x) => x.textContent.trim()));
+      ok('0.70.0 — C : Équipe › Coût ne montre que le coût (Coût de la semaine, file d’attente des bots, Claude cette semaine)', t.length > 0 && t.every((x) => /^(Coût de la semaine|File d'attente des bots|Claude cette semaine)/.test(x)), JSON.stringify(t));
+      await q.context().close(); }
     /* aucune rubrique n'affiche de texte cassé */
     const broken = [];
     for (const t of ['accueil', 'demandes', 'agenda', 'suivi', 'achats', 'voyages', 'sorties', 'papiers', 'argent', 'equipe', 'automatisations', 'reglages']) {

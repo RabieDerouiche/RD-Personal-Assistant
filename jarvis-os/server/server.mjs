@@ -125,6 +125,8 @@ function pair(code, device) {
 }
 const authed = (req) => { const m = /^Bearer (.+)$/.exec(req.headers.authorization || ''); if (!m) return false; const h = sha(m[1]); return S.tokens.some((t) => t.hash === h); };
 const deviceOf = (req) => { const m = /^Bearer (.+)$/.exec(req.headers.authorization || ''); const t = m && S.tokens.find((x) => x.hash === sha(m[1])); return t ? t.hash.slice(0, 12) : ''; };
+/* 0.70.0 : la liste des appareils reliés pour Réglages : empreinte courte (comme deviceOf), nom donné à l'appairage, date, et celui qui demande */
+const appareilsListe = (req) => { const moi = deviceOf(req); return S.tokens.map((t) => ({id: t.hash.slice(0, 12), nom: String(t.device || 'Appareil'), at: +t.at || 0, moi: t.hash.slice(0, 12) === moi})); };
 
 /* ---------- 0.62.0 (son choix du 22/11/2026) : un proche (sa femme) envoie une tâche à JARVIS depuis son iPhone, « Dis Siri, tâche pour… » ----------
    Sa clé n'ouvre que deux adresses : ajouter une tâche, voir le statut des siennes. Rien d'autre de JARVIS (mails, agenda, Radar, mémoire) ne lui est
@@ -1195,6 +1197,7 @@ const GUIDE_JARVIS = `\n\n[JARVIS OS ${VERSION} : ce que tu es et ce que tu sais
 - Automatisations de l'iPhone : Réglages, « Siri et bouton Action », « Automatisations » (actions brief, agenda, demain, pourmoi, meteo).
 - Assistants reliés (app Claude, Grok Bot) : Réglages, « Assistants reliés (MCP) » ; leurs propositions dans Espaces, Équipe, filtre Demandes, « Missions de Claude » (« À approuver »).
 - Argent (Radar) : Espaces, tuile « Argent » : ses dépenses fixes, sa paie, le reste à payer, ses paiements en plusieurs fois (« En plusieurs fois » dans « Fixes », un achat par ligne ; « Plus à payer » pour un achat annulé ou remboursé), ce que ses mails annoncent (« À venir », « Alertes » : une alerte vue va dans « Déjà vues », « Remettre » la rend ; une réponse Retirer ou Garder se défait dans « Tes réponses », « Annuler » ; ce qu'il a écarté revient avec « Reproposer », sous « Écartées » en bas de « Fixes ») ; « Tout relire (13 mois) » relit ses mails (0.68.0). Ses chiffres ne te sont jamais donnés (rien de bancaire dans tes consignes) : pour une question d'argent, renvoie-le à cette rubrique, sans rien inventer.
+- Appareils reliés (téléphone perdu, ancienne installation) : Réglages, carte « Serveur JARVIS », « Retirer » sur l'appareil à couper, depuis un autre appareil relié (un appareil ne se retire pas lui-même).
 - Notifications : Réglages, « Notifications ». Mise à jour : proposée à l'ouverture, ou Réglages, carte « JARVIS », « Mettre à jour le serveur ».
 L'état du moment (voix, compteurs, écoute, mémoire, routines, assistants) arrive avec chaque question dans la ligne [JARVIS …] : réponds à partir d'elle, sans dire que tu ne peux pas vérifier. Pour un réglage : son état, puis les étapes exactes. Un changement du code de JARVIS se demande dans sa session de développement (Claude Code) : ne le confie jamais à la tâche Claude du serveur.]`;
 const nbFr = (n) => Number(n || 0).toLocaleString('fr-FR');
@@ -1843,6 +1846,19 @@ const server = http.createServer(async (req, res) => {
       /* 0.69.0 : les dernières notifications et ce qu'elles annoncent : l'app ramenée au premier plan par l'une d'elles l'ouvre (l'iPhone ne change pas son adresse) */
       if (p === '/api/notifs' && req.method === 'GET') return json(res, 200, {notifs: PUSH.notifs().slice(0, 20)});
       if (p === '/api/notifs/vue' && req.method === 'POST') { const b = await readBody(req); return json(res, 200, PUSH.vues(Array.isArray(b.ids) ? b.ids.slice(0, 40) : [String(b.id || '')])); }
+      /* 0.70.0 (son choix du 23/11/2026, « Retirer dans Réglages ») : les appareils reliés (un jeton chacun, sans fin de validité) et le retrait
+         de l'un d'eux (téléphone perdu, ancienne installation). L'appareil qui demande ne se retire pas lui-même ; le retiré reçoit 401 ensuite,
+         et ses notifications partent avec lui */
+      if (p === '/api/appareils' && req.method === 'GET') return json(res, 200, {appareils: appareilsListe(req)});
+      if (p === '/api/appareils/retirer' && req.method === 'POST') {
+        const b = await readBody(req), id = String(b.id || '').trim(), moi = deviceOf(req);
+        if (id && id === moi) return json(res, 400, {error: 'Cet appareil ne peut pas se retirer lui-même : retire-le depuis un autre appareil relié.', appareils: appareilsListe(req)});
+        const t = /^[0-9a-f]{12}$/.test(id) ? S.tokens.find((x) => x.hash.slice(0, 12) === id) : null;
+        if (!t) return json(res, 404, {error: 'Appareil introuvable : il a peut-être déjà été retiré.', appareils: appareilsListe(req)});
+        S.tokens = S.tokens.filter((x) => x !== t); save();
+        const notifications = PUSH.retirerAppareil(id);
+        return json(res, 200, {ok: true, nom: t.device || 'Appareil', notifications, appareils: appareilsListe(req)});
+      }
       if (p === '/api/sauvegarde') return json(res, 200, {...SAV.status(), changements: SAV.diff()});
       /* missions (0.15.0) : lancer, suivre ; tour de Claude : réglage, dernier tour, tour immédiat */
       if (p === '/api/mission' && req.method === 'POST') { const b = await readBody(req); const t = String(b.texte || '').trim(); if (t.length < 4) return json(res, 400, {error: 'Mission vide.'}); if (b.parent && !S.missions.some((x) => x.id === b.parent && x.agent === 'claude')) return json(res, 404, {error: 'Mission d’origine introuvable.'}); const m = newMission(t, b.parent); return json(res, 200, {ok: true, id: m.id}); }

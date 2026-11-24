@@ -100,10 +100,14 @@
   const $ = (id) => document.getElementById(id);
   const lire = (k) => { try { return localStorage.getItem(k) || ''; } catch (e) { return ''; } };
   const ecrire = (k, v) => { try { localStorage.setItem(k, v); } catch (e) { /* rien */ } };
-  /* le lien d'invitation : #cle=…&pour=… ; la clé est gardée dans ce téléphone, puis retirée de l'adresse */
-  const h = new URLSearchParams(location.hash.slice(1));
-  if (h.get('cle')) { ecrire('jarvis.invite.cle', h.get('cle')); if (h.get('pour')) ecrire('jarvis.invite.pour', h.get('pour')); history.replaceState(null, '', location.pathname); }
-  const cle = lire('jarvis.invite.cle'), pour = lire('jarvis.invite.pour');
+  /* le lien d'invitation : #cle=…&pour=… ; la clé est gardée dans ce téléphone.
+     0.70.0 (son choix du 23/11/2026, « Clé gardée après # ») : elle reste aussi dans l'adresse, après « # » (cette partie n'est jamais envoyée au
+     serveur), et y est remise quand elle vient du téléphone : l'icône posée sur l'écran d'accueil (stockage à part sur iPhone) l'emporte ainsi,
+     et Safari qui efface le stockage d'un site peu visité ne la perd plus */
+  const h = new URLSearchParams(location.hash.slice(1)), duLien = h.get('cle') || '';
+  if (duLien) { ecrire('jarvis.invite.cle', duLien); ecrire('jarvis.invite.pour', h.get('pour') || ''); }
+  const cle = duLien || lire('jarvis.invite.cle'), pour = duLien ? h.get('pour') || '' : lire('jarvis.invite.pour');
+  if (cle) { try { history.replaceState(null, '', location.pathname + '#cle=' + encodeURIComponent(cle) + (pour ? '&pour=' + encodeURIComponent(pour) : '')); } catch (e) { /* rien */ } }
   if (!cle) { $('sans-cle').hidden = false; return; }
   ['siri-audio', 'envoi', 'vocal', 'liste-c', 'siri-vocal'].forEach((id) => { $(id).hidden = false; });
   if (pour) { $('titre').textContent = 'Une tâche pour ' + pour; $('adest').textContent = pour;

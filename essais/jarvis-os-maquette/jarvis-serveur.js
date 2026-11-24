@@ -151,7 +151,10 @@
     linked: () => !!token(),
     async pair(code) {
       let r;   /* 0.70.0 : hors réseau, « Relier » le dit (avant : rien ne s'affichait) */
-      try { r = await fetch(BASE + '/api/pair', {method: 'POST', headers: {'content-type': 'application/json'}, body: JSON.stringify({code: String(code || '').trim(), device: 'JARVIS OS'})}); }
+      /* 0.70.0 : le genre d'appareil dans son nom (« JARVIS OS · iPhone »), pour les reconnaître dans la liste des appareils reliés */
+      const nav = typeof navigator !== 'undefined' ? navigator : {}, ua = String(nav.userAgent || '');
+      const genre = /iPad/.test(ua) || (/Macintosh/.test(ua) && nav.maxTouchPoints > 1) ? 'iPad' : /iPhone/.test(ua) ? 'iPhone' : /Android/.test(ua) ? 'Android' : /Macintosh/.test(ua) ? 'Mac' : /Windows/.test(ua) ? 'PC' : '';
+      try { r = await fetch(BASE + '/api/pair', {method: 'POST', headers: {'content-type': 'application/json'}, body: JSON.stringify({code: String(code || '').trim(), device: 'JARVIS OS' + (genre ? ' · ' + genre : '')})}); }
       catch (e) { return {ok: false, error: INJ}; }
       const j = await r.json().catch(() => ({}));
       if (!r.ok || !j.token) return {ok: false, error: j.error || (r.status >= 500 ? INDISPO : 'Code refusé.')};
@@ -160,6 +163,11 @@
       return {ok: true};
     },
     unpair() { const s = settings(); s.serverToken = ''; try { localStorage.setItem(KEY, JSON.stringify(s)); } catch (e) { /* rien */ } },
+    /* 0.70.0 : les appareils reliés (carte « Serveur JARVIS » de Réglages) et le retrait d'un autre appareil ; null : serveur trop ancien ou injoignable */
+    appareils: {
+      liste: () => req('/api/appareils').then((r) => (r.status === 200 && r.j && Array.isArray(r.j.appareils) ? r.j.appareils : null)).catch(() => null),
+      retirer: (id) => req('/api/appareils/retirer', {id}).then((r) => (r.status === 200 ? r.j : {ok: false, error: (r.j && r.j.error) || (r.status >= 500 ? INDISPO : 'Retrait refusé.'), appareils: r.j && r.j.appareils})).catch(() => ({ok: false, error: INJ}))
+    },
     google: () => req('/api/google').then((r) => (r.status === 200 ? r.j : null)).catch(() => null),
     /* 0.70.0 : serveur injoignable ou en train de redémarrer : un message, jamais un appui sans effet */
     googleConfig: (clientId, clientSecret) => req('/api/google/config', {clientId, clientSecret}).then(repOk).catch(() => ({ok: false, error: INJ})),

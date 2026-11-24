@@ -69,6 +69,14 @@ export function createPush({S, save, log = () => {}, allowHttp = false, delaiMs 
     save(); return {ok: true, count: S.push.subs.length};
   }
   function unsubscribe(endpoint) { const n = S.push.subs.length; S.push.subs = S.push.subs.filter((x) => x.endpoint !== endpoint); save(); return {ok: true, removed: n - S.push.subs.length}; }
+  /* 0.70.0 : un appareil retiré (Réglages, « Retirer ») ne reçoit plus rien : ses abonnements partent avec lui (chacun porte l'empreinte courte
+     de l'appareil qui l'a créé ; un abonnement d'avant cette marque, sans empreinte, reste) */
+  function retirerAppareil(device) {
+    const d = String(device || ''); if (!d) return 0;
+    const n = S.push.subs.length; S.push.subs = S.push.subs.filter((x) => x.device !== d);
+    if (S.push.subs.length !== n) save();
+    return n - S.push.subs.length;
+  }
   /* 0.69.0 (son retour du 23/11/2026 : « quand on clique sur une notification, elle rouvre Jarvis sur la page déjà ouverte, pas sur l'alerte ») :
      avec le format déclaratif, l'iPhone ouvre lui-même l'adresse de la notification, sans passer par le service worker ; l'app déjà ouverte revient
      au premier plan sans changer d'adresse. Chaque notification a donc un identifiant, mis dans son adresse (« /?n=<id>#voir-… ») et gardé dans la
@@ -103,5 +111,5 @@ export function createPush({S, save, log = () => {}, allowHttp = false, delaiMs 
     log('notification « ' + msg.title + ' » : ' + out.filter((x) => x.ok).length + '/' + out.length + (detail ? ' · refus : ' + detail : ''));
     return out;
   }
-  return {publicKey, subscribe, unsubscribe, send, vues, notifs: () => S.notifs, status: () => ({publicKey: publicKey(), count: S.push.subs.length, prefs: S.push.prefs, last: S.push.last || null})};
+  return {publicKey, subscribe, unsubscribe, retirerAppareil, send, vues, notifs: () => S.notifs, status: () => ({publicKey: publicKey(), count: S.push.subs.length, prefs: S.push.prefs, last: S.push.last || null})};
 }

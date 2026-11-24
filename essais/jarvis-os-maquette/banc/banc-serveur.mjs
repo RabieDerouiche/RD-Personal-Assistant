@@ -35,6 +35,9 @@ try {
   ok('retour de Google : page « relié »', /Google est relié/.test(await p.textContent('body')), (await p.textContent('body')).slice(0, 80));
   await p.goto(BASE + '/?serveur#reglages'); await p.waitForTimeout(2500);
   ok('Réglages : compte Google affiché', await p.evaluate(() => /proprietaire@example\.org/.test(document.querySelector('.set-wrap').textContent)));
+  /* 0.70.0 — lot C (« Retirer dans Réglages ») : la carte « Serveur JARVIS » liste les appareils reliés ; celui-ci, nommé par son genre, sans bouton */
+  { const ap = await p.evaluate(() => [...document.querySelectorAll('.set-card .app-it')].map((x) => ({t: x.innerText.replace(/\s+/g, ' ').trim(), btn: x.querySelectorAll('button').length})));
+    ok('Réglages (0.70.0) : appareils reliés : « JARVIS OS · iPhone · relié le … », « Cet appareil », sans « Retirer » sur le sien', ap.length === 1 && /^JARVIS OS · iPhone · relié le \d{1,2} \S+ à \d\dh\d\d Cet appareil$/.test(ap[0].t) && ap[0].btn === 0, JSON.stringify(ap)); }
   /* 0.32.0 : l'écoute du serveur est Whisper (faux moteur du banc) : Réglages le dit et propose de passer à Parakeet */
   { const e = await p.evaluate(() => ({txt: document.querySelector('.set-wrap').textContent, btn: (document.getElementById('set-ecoute') || {}).textContent || ''}));
     ok('Réglages : écoute du serveur nommée (Whisper) et « Passer à Parakeet » proposé', /écoute Whisper prête/.test(e.txt) && /Passer à Parakeet/.test(e.btn) && /conversation continue/.test(e.txt) && /L’orbe/.test(e.txt), e.btn); }
@@ -114,10 +117,25 @@ try {
     const a0 = await qi.evaluate(() => ({titre: document.getElementById('titre').textContent, adresse: location.href, gardee: !!localStorage.getItem('jarvis.invite.cle'), siri: document.getElementById('adest').textContent, audio: !document.getElementById('siri-audio').hidden, dictee: !!document.getElementById('nomrac') && document.body.innerText.includes('Dicter le texte'), large: document.documentElement.scrollWidth <= innerWidth + 1}));
     await qi.fill('#texte', 'Acheter des couches pour demain'); await qi.click('#form button[type=submit]'); await qi.waitForTimeout(1500);
     const a1 = await qi.evaluate(() => ({msg: document.getElementById('msg').textContent, liste: [...document.querySelectorAll('#liste li')].map((x) => x.innerText.replace(/\s+/g, ' ').trim())}));
-    ok('invité : sa page s’ouvre par le lien (clé gardée dans son téléphone, retirée de l’adresse), dit « Une tâche pour Sami », et d’abord « Dis Siri, envoie un message audio à Sami » (0.67, plus de dictée écrite) ; une tâche envoyée revient « C’est noté … pour demain » et s’affiche « À faire »',
-      a0.titre === 'Une tâche pour Sami' && !/cle=/.test(a0.adresse) && a0.gardee && a0.siri === 'Sami' && a0.audio && !a0.dictee && a0.large
+    /* 0.70.0 (son choix du 23/11/2026, « Clé gardée après # ») : la clé reste après « # » (jamais envoyé au serveur), pour l'icône d'écran d'accueil */
+    const cleLien = new URL(iv.lien).hash.match(/cle=([^&]+)/)[1];
+    ok('invité : sa page s’ouvre par le lien (clé gardée dans son téléphone, et dans l’adresse après « # » depuis la 0.70.0), dit « Une tâche pour Sami », et d’abord « Dis Siri, envoie un message audio à Sami » (0.67, plus de dictée écrite) ; une tâche envoyée revient « C’est noté … pour demain » et s’affiche « À faire »',
+      a0.titre === 'Une tâche pour Sami' && new URL(a0.adresse).hash === '#cle=' + cleLien + '&pour=Sami' && !new URL(a0.adresse).search && a0.gardee && a0.siri === 'Sami' && a0.audio && !a0.dictee && a0.large
       && a1.msg === 'C’est noté : « Acheter des couches pour demain », pour demain.' && a1.liste.length === 1 && /Acheter des couches pour demain/.test(a1.liste[0]) && /À faire/.test(a1.liste[0]), JSON.stringify([a0, a1]));
-    await qi.screenshot({path: SH + 'invite.png'}); await ci.close(); }
+    await qi.screenshot({path: SH + 'invite.png'});
+    /* rouverte sans rien après « # » (une icône d'avant, un favori) : la clé du téléphone est remise dans l'adresse, la page marche */
+    const vus = []; qi.on('request', (r) => vus.push(r.url()));
+    await qi.goto(BASE + '/invite/'); await qi.waitForTimeout(1500);
+    const a2 = await qi.evaluate(() => ({adresse: location.href, titre: document.getElementById('titre').textContent, formulaire: !document.getElementById('envoi').hidden, sansCle: !document.getElementById('sans-cle').hidden, liste: document.querySelectorAll('#liste li').length}));
+    ok('invité (0.70.0) : rouverte sans clé dans l’adresse, la clé gardée y est remise après « # » (avec « pour ») ; la page marche ; aucune requête ne porte la clé dans son adresse',
+      new URL(a2.adresse).hash === '#cle=' + cleLien + '&pour=Sami' && a2.titre === 'Une tâche pour Sami' && a2.formulaire && !a2.sansCle && a2.liste === 1 && !vus.some((u) => u.includes(cleLien)), JSON.stringify([a2, vus.filter((u) => u.includes(cleLien))]));
+    await ci.close();
+    /* une icône posée sur l'écran d'accueil a un stockage vide : l'adresse seule (avec la clé après « # ») suffit */
+    { const cv = await b.newContext({...devices['iPhone 15 Pro Max']}), qv = await cv.newPage(); qv.on('pageerror', (e) => errs.push('invité, icône : ' + e.message));
+      await qv.goto(a2.adresse); await qv.waitForTimeout(1500);
+      const a3 = await qv.evaluate(() => ({formulaire: !document.getElementById('envoi').hidden, titre: document.getElementById('titre').textContent, liste: document.querySelectorAll('#liste li').length}));
+      ok('invité (0.70.0) : l’adresse gardée par l’icône d’écran d’accueil ouvre sa page sans rien dans le stockage (formulaire, « pour Sami », ses tâches)', a3.formulaire && a3.titre === 'Une tâche pour Sami' && a3.liste === 1, JSON.stringify(a3));
+      await cv.close(); } }
   /* 0.64.0 (ses choix du 22/11/2026) : son message vocal, enregistré sur sa page (micro de test de Chromium), arrive dans JARVIS : sa voix joue
      d'elle-même, la fiche propose « C’est fait », « Dans 5 min », « Dans 15 min » ; elle voit « Faite ✓ » (prénoms inventés) */
   { const tk = await p.evaluate(() => JSON.parse(localStorage.getItem('jarvis.settings')).serverToken), AH = {authorization: 'Bearer ' + tk, 'content-type': 'application/json'};
@@ -234,7 +252,9 @@ try {
     ok('MCP : une demande d\'accès apparaît dans Réglages (en tête), avec les mêmes 4 chiffres que la page de l\'assistant', !!c1 && c1.txt.includes('Claude demande l’accès à JARVIS') && !!chiffres && c1.txt.includes(chiffres) && c1.urgent, JSON.stringify([chiffres, c1 && c1.txt.slice(0, 300)]));
     // 0.70.0 — A5-mcp-memoire : l'app reçoit l'adresse où l'assistant sera renvoyé (un faux « Claude » renvoie ailleurs que claude.ai)
     { const em = await fetch(BASE + '/api/mcp', {headers: {authorization: 'Bearer ' + tk}}).then((x) => x.json());
-      ok('MCP 0.70 : la demande en attente dit où l’assistant sera renvoyé (claude.ai), avec ses 4 chiffres', (em.demandes || []).length === 1 && em.demandes[0].retour === 'claude.ai' && em.demandes[0].chiffres === chiffres, JSON.stringify(em.demandes)); }
+      ok('MCP 0.70 : la demande en attente dit où l’assistant sera renvoyé (claude.ai), avec ses 4 chiffres', (em.demandes || []).length === 1 && em.demandes[0].retour === 'claude.ai' && em.demandes[0].chiffres === chiffres, JSON.stringify(em.demandes));
+      const rv = await q.evaluate(() => [...document.querySelectorAll('#mcp-card .mcp-d .mcp-retour')].map((x) => x.textContent));
+      ok('MCP 0.70 (lot C) : dans Réglages, la demande affiche son retour en une ligne, l’hôte seulement : « Retour vers claude.ai »', rv.length === 1 && rv[0] === 'Retour vers claude.ai', JSON.stringify(rv)); }
     await q.evaluate(() => document.querySelector('#mcp-card .mcp-d .btn.main').click()); await q.waitForTimeout(1200);
     const att = await fetch(BASE + '/oauth/attente/' + aid).then((x) => x.json()), c2 = await q.evaluate(() => document.getElementById('mcp-card').textContent);
     ok('MCP : « Autoriser » dans JARVIS renvoie l\'assistant à sa page avec un code', att.statut === 'accordee' && /code=/.test(att.redirect || '') && /Claude est relié à JARVIS/.test(c2), JSON.stringify([att.statut, c2.slice(-120)]));

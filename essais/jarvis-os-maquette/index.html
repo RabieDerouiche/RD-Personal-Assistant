@@ -4104,8 +4104,8 @@ void main(){
     el.append(h('div', {class: 'menu-grid'},
       it('achats', 'Achats', 'tag', 'Prix suivis, courbes, ajouter'), it('voyages', 'Voyages', 'plane', 'Projets, plans, options'),
       it('sorties', 'Sorties', 'map', 'Ce week-end, envies'), it('papiers', 'Papiers', 'doc', 'Chercher un document'),
-      it('automatisations', 'Automatisations', 'clock', 'Suivi de chaque routine'), it('equipe', 'Équipe', 'pulse', 'Tes bots et leurs passages'),
-      it('suivi', 'Suivi', 'folder', 'Dossiers, tâches, coût'), it('demandes', 'Demandes', 'chat', 'Ce qui attend ta réponse')));
+      it('automatisations', 'Routines', 'clock', 'Équipe, filtre Routines'), it('equipe', 'Équipe', 'pulse', 'Tes bots et leurs passages'),
+      it('suivi', 'Demandes aux bots', 'folder', 'Équipe, filtre Demandes'), it('demandes', 'Pour moi', 'chat', 'Ce qui attend ta réponse')));   /* 0.70.0 : les noms d'aujourd'hui (Suivi et Automatisations sont des filtres d'Équipe depuis la 0.54.0) */
   };
   const JOURS = {dim: 0, lun: 1, mar: 2, mer: 3, jeu: 4, ven: 5, sam: 6};
   /* prochain passage d'après l'horaire écrit dans Routines (« Lun-ven 7h30 », « dim 18h », « le 24 », « chaque jour 8h44 »…) */
@@ -4146,7 +4146,7 @@ void main(){
           btn('Brief maintenant', async () => { const t = await JS.brief.maintenant(); if (t) { out.textContent = t.texte; const v = JVX(); if (v && v.say) try { v.say(t.texte); } catch (e) { /* rien */ } } })));
       const ms = rs.filter((x) => x.genre === 'mission');
       list.replaceChildren(...(ms.length ? ms.map((r) => h('li', {class: 'mem-it rout-it' + (r.actif ? '' : ' is-off')}, h('span', {}, h('b', {text: r.quand.charAt(0).toUpperCase() + r.quand.slice(1)}), h('small', {class: 'muted', text: ' · ' + r.texte + (r.actif ? (r.prochaine ? ' · prochaine : ' + r.prochaine : '') : ' · en pause') + (r.source === 'claude' ? ' · proposée par Claude' : '')})),
-        h('span', {class: 'rout-act'}, btn(r.actif ? 'Pause' : 'Reprendre', async () => dessine(await JS.routines.modifier(r.id, {actif: !r.actif}))), btn('Maintenant', async () => { await JS.routines.maintenant(r.id); out.textContent = 'Lancée : tu seras prévenu quand c’est prêt (Suivi).'; }), btn('Supprimer', async () => dessine(await JS.routines.supprimer(r.id))))))
+        h('span', {class: 'rout-act'}, btn(r.actif ? 'Pause' : 'Reprendre', async () => dessine(await JS.routines.modifier(r.id, {actif: !r.actif}))), btn('Maintenant', async () => { await JS.routines.maintenant(r.id); out.textContent = 'Lancée : tu seras prévenu quand c’est prêt (Équipe, filtre Demandes, Missions de Claude).'; }), btn('Supprimer', async () => dessine(await JS.routines.supprimer(r.id))))))
         : [h('li', {class: 'muted', text: 'Aucune routine. Écris-en une ci-dessus, ou demande-la à Claude dans la discussion.'})]));
     };
     const lire = async () => { const t = inp.value.trim(); if (t.length < 6) { apercu.replaceChildren(); return; } const l = await JS.routines.lire(t); if (!l) return;
@@ -6494,7 +6494,7 @@ void main(){
       const f = d.f || {}, demande = {titre: d.title, bot: who, demande: d.ask, pourquoi: d.why || '', conseil: f.conseil || '', deja: f.deja || '', depuis: isoOf(day(d.since || 0))};
       if (!can) { toast('Revérification (maquette)', 'Sur ton serveur, Claude cherche dans ' + ouTxt + ' pour « ' + d.title + ' », puis écrit à ' + who + ' et la sonne (1 passage), trouvé ou non. Rien de nouveau : il revérifie dans 2 jours. Tu reçois le résultat en notification.', true); return null; }
       JS.verifier(ou, demande).then((r) => toast(r && r.ok ? (r.deja ? 'Déjà en cours' : 'Claude revérifie ' + ouTxt) : 'Revérification refusée',
-        r && r.ok ? '« ' + d.title + ' » : résultat en notification. ' + who + ' est prévenue et sonnée dans tous les cas (1 passage). Rien de nouveau : 2e vérification dans 2 jours. Suivi : Missions de Claude.' : (r && r.error) || 'Serveur injoignable.', true));
+        r && r.ok ? '« ' + d.title + ' » : résultat en notification. ' + who + ' est prévenue et sonnée dans tous les cas (1 passage). Rien de nouveau : 2e vérification dans 2 jours. À suivre dans Équipe, filtre Demandes (Missions de Claude).' : (r && r.error) || 'Serveur injoignable.', true));
       return null;
     }});
   }
@@ -9962,17 +9962,21 @@ void main(){
   { const n = new URLSearchParams(location.search).get('n'); if (n) { NOTIF.ouverte = n; notifVue([n]); const q = location.search.replace(/([?&])n=[^&]*(&|$)/, (m, a, b) => (b ? a : '')).replace(/^&/, '?'); try { history.replaceState(null, '', location.pathname + q + location.hash); } catch (e) { /* rien */ } } }
   const heureN = (ms) => { const d = new Date(ms); return pad2(d.getHours()) + 'h' + pad2(d.getMinutes()); };
   function notifsFeuille(l) {
-    openSheet({kicker: 'Pendant ton absence', title: l.length + ' notifications', actions: [], say: 'Touche celle que tu veux ouvrir : tu arrives sur ce qu’elle annonce.',
+    openSheet({kicker: 'Pendant ton absence', title: l.length + ' notification' + (l.length > 1 ? 's' : ''), actions: [], say: 'Touche celle que tu veux ouvrir : tu arrives sur ce qu’elle annonce.',
       extra: () => h('div', {class: 'stack'}, l.map((x) => h('button', {type: 'button', class: 'hm-row notif-row', onclick: () => { closeSheet(); ouvrirNotif(x.url, x.id); }},
         h('span', {class: 'hm-ic', html: icon('bolt', 17)}), h('span', {class: 'hm-tx'}, h('b', {text: x.title}), x.body ? h('small', {text: x.body.length > 140 ? x.body.slice(0, 137) + '…' : x.body}) : null, h('small', {class: 'muted', text: 'à ' + heureN(x.at)})))))});
   }
-  /* chemin 3 : de retour au premier plan, les notifications envoyées pendant l'absence (moins de 15 minutes, pas encore vues) */
+  /* chemin 3 : de retour au premier plan, les notifications envoyées pendant l'absence et pas encore vues.
+     0.70.0 (son choix du 23/11/2026, « Feuille Pendant ton absence ») : une seule de moins de 15 minutes (et aucune plus ancienne) s'ouvre
+     directement, comme avant ; au-delà (jusqu'à 24 h), ou à plusieurs, la feuille « Pendant ton absence » les liste et un appui ouvre la bonne :
+     rien ne bouge sans son geste (avant : passé 15 minutes, rien ne s'ouvrait) */
   async function notifsRetour(depuis) {
     const JS = notifAPI(); if (!JS) return;
     const r = await JS.notifs().catch(() => null); if (!r || !Array.isArray(r.notifs)) return;
-    const l = r.notifs.filter((x) => !x.vue && !NOTIF.faits.has(x.id) && x.at >= depuis && Date.now() - x.at < 15 * 60e3 && !/#recue=/.test(x.url));   /* une tâche reçue s'ouvre déjà seule au retour (avec sa voix) */
+    const age = (x) => Date.now() - x.at;
+    const l = r.notifs.filter((x) => !x.vue && !NOTIF.faits.has(x.id) && x.at >= depuis && age(x) < 24 * 3600e3 && !/#recue=/.test(x.url));   /* une tâche reçue s'ouvre déjà seule au retour (avec sa voix) */
     if (!l.length) return;
-    if (l.length === 1) { const x = l[0], av = TAB; ouvrirNotif(x.url, x.id); toast(x.title, 'Ouvert depuis ta notification.', true, () => go(av)); return; }
+    if (l.length === 1 && age(l[0]) < 15 * 60e3) { const x = l[0], av = TAB; ouvrirNotif(x.url, x.id); toast(x.title, 'Ouvert depuis ta notification.', true, () => go(av)); return; }
     notifVue(l.map((x) => x.id)); notifsFeuille(l);
   }
   /* dans l'app ouverte : une notification qui arrive s'affiche aussi en bandeau (sauf celles du Canal : la page les annonce déjà), avec « Voir » */
@@ -10071,6 +10075,7 @@ void main(){
       card.dataset.urgent = (st.demandes || []).length ? '1' : '';
       dem.replaceChildren(...(st.demandes || []).map((d) => h('div', {class: 'mcp-d'},
         h('p', {}, h('b', {text: d.nom}), document.createTextNode(' demande l’accès à JARVIS. Code : '), h('b', {class: 'mcp-code', text: d.chiffres}), document.createTextNode(' (le même doit s’afficher sur sa page).')),
+        d.retour ? h('p', {class: 'muted mcp-retour', text: 'Retour vers ' + d.retour}) : null,   /* 0.70.0 : l'hôte où l'accord renvoie (claude.ai pour l'app Claude) : un autre nom, il refuse */
         h('div', {class: 'row-actions'}, h('button', {type: 'button', class: 'btn main sm', onclick: async () => { if (maj(await JS.mcp.decider(d.id, true))) out.textContent = d.nom + ' est relié à JARVIS.'; }}, 'Autoriser'),
           h('button', {type: 'button', class: 'btn ghost sm', onclick: async () => { if (maj(await JS.mcp.decider(d.id, false))) out.textContent = 'Refusé.'; }}, 'Refuser')))));
       const items = (st.relies || []).map((c) => h('li', {class: 'mem-it'}, h('span', {text: c.nom + (c.vu ? ' · dernier accès ' + fmt(new Date(c.vu), {weekday: 'short', hour: '2-digit', minute: '2-digit'}) : '')}),
@@ -10167,7 +10172,17 @@ void main(){
           h('button', {type: 'button', class: 'btn main', onclick: async (ev) => { const b = ev.currentTarget; if (!code.value.trim()) { draw(msg('Écris d’abord le code affiché par le serveur.', true)); return; } b.disabled = true; const r = await JS.pair(code.value); if (r.ok) location.reload(); else { b.disabled = false; draw(msg(r.error || 'Code refusé.', true)); } }}, 'Relier')));   /* 0.70.0 : un appui à la fois ; code vide ou serveur injoignable : un message */
         swap(parts); return;
       }
-      parts.push(h('section', {class: 'card set-card'}, h('b', {text: 'Serveur JARVIS'}), h('p', {class: 'muted', text: 'Cet iPhone est relié à ' + JS.base + '.'}),
+      /* 0.70.0 (son choix du 23/11/2026, « Retirer dans Réglages ») : les appareils reliés à son serveur, dans cette même carte ; « Retirer » coupe
+         un autre appareil (téléphone perdu, ancienne installation) ; celui-ci ne se retire pas lui-même (le serveur le refuse aussi) */
+      const apps = JS.appareils ? await JS.appareils.liste() : null;
+      const relieLe = (t) => { if (!t) return ''; const d = new Date(t); return 'relié le ' + fmt(d, {day: 'numeric', month: 'long'}) + (d.getFullYear() !== new Date().getFullYear() ? ' ' + d.getFullYear() : '') + ' à ' + pad2(d.getHours()) + 'h' + pad2(d.getMinutes()); };
+      const appList = apps && apps.length ? h('ul', {class: 'mem-list app-list'}, apps.map((a) => h('li', {class: 'mem-it app-it', 'data-appareil': a.id},
+        h('span', {}, h('b', {text: a.nom}), h('small', {class: 'muted', text: relieLe(a.at) ? ' · ' + relieLe(a.at) : ''})),
+        a.moi ? h('small', {class: 'muted app-moi', text: 'Cet appareil'})
+          : h('button', {type: 'button', class: 'btn ghost sm', onclick: () => confirmSheet({bot: 'claude', title: 'Retirer « ' + a.nom + ' » ?', ok: 'Oui, retirer', cost: 'free',
+            say: 'Cet appareil ne pourra plus rien ouvrir sur ton serveur (mails, agenda, Pilotage) et ne recevra plus tes notifications. Pour le relier de nouveau, il faudra un nouveau code.', facts: relieLe(a.at) ? [['Appareil', a.nom + ', ' + relieLe(a.at)]] : [],
+            run: async () => { const r = await JS.appareils.retirer(a.id); draw(r && r.ok ? msg('« ' + a.nom + ' » est retiré : il ne peut plus rien ouvrir sur ton serveur.') : msg((r && r.error) || 'Retrait impossible.', true)); }})}, 'Retirer')))) : null;
+      parts.push(h('section', {class: 'card set-card'}, h('b', {text: 'Serveur JARVIS'}), h('p', {class: 'muted', text: 'Cet iPhone est relié à ' + JS.base + '.'}), appList,
         h('button', {type: 'button', class: 'btn sm ghost danger', onclick: () => confirmSheet({bot: 'claude', title: 'Délier cet iPhone ?', ok: 'Oui, délier', cost: 'free', say: 'Il faudra un nouveau code pour le relier.', run: () => { JS.unpair(); location.reload(); }})}, 'Délier cet iPhone')));
       /* 2. l'accès Google */
       const g = await JS.google();
@@ -10249,8 +10264,10 @@ void main(){
       el.append(segBar(f, [['bots', 'Bots'], ['dem', 'Demandes'], ['rout', 'Routines'], ['cout', 'Coût']], (k) => { EQF.f = k; const sc = $('scroller'); renderView(true); if (sc) sc.scrollTop = 0; eqHash(); }));
       if (f === 'bots') { harvest(V_EQ).filter((n) => !ORD.test(h2Of(n))).forEach((n) => el.append(n)); return; }
       if (f === 'rout') { V_AUTO(el); return; }
+      /* 0.70.0 : le coût seul, construit directement, dans l'ordre de l'ancien Suivi (avant : tout Suivi était construit, missions, relances,
+         santé du serveur et leurs lectures comprises, pour n'en garder que ces trois panneaux) */
+      if (f === 'cout') { [LINK.on && LV.t.jour ? costPanel() : null, queuePanel(), consoPanel()].filter((n) => n && COUT.test(h2Of(n))).forEach((n) => el.append(n)); return; }
       const parts = harvest(V_SUIVI).filter((n) => !SYS.test(h2Of(n)) && !TACHES.test(h2Of(n)) && !PAPL.test(h2Of(n)));
-      if (f === 'cout') { parts.filter((n) => COUT.test(h2Of(n))).forEach((n) => el.append(n)); return; }
       parts.filter((n) => !COUT.test(h2Of(n))).forEach((n) => el.append(n));
       harvest(V_EQ).filter((n) => ORD.test(h2Of(n))).forEach((n) => el.append(n));   /* tes ordres : ce que tu as demandé */
     };
@@ -10608,7 +10625,8 @@ void main(){
     /* ================= 0.60.0 : la voix qui agit (sa demande du 22/11/2026 : « améliore la gestion des tâches par les conversations vocales,
        pas besoin d'appui de bouton, il demande la validation oralement si besoin ; il doit être plus sharp, pas grave si ça consomme plus »).
        En conversation à la voix : une tâche, un souvenir, une relance sont faits aussitôt ; un ordre à un bot, une échéance, une routine,
-       la tâche Claude, un dossier attendent son « oui » dit à voix haute (ou tapé), qui les exécute sans repasser par Claude ; « non » les annule.
+       la tâche Claude, un dossier attendent son « oui » dit à voix haute (ou tapé pendant la conversation à la voix), qui les exécute sans repasser
+       par Claude ; « non » les annule.
        Seules comptent les propositions de la dernière réponse (un « oui » à une autre question n'exécute rien de plus ancien). */
     const VOIX_DIRECT = {ajouter_tache: 1, retenir: 1, programmer_relance: 1, terminer_tache: 1, reporter_tache: 1};
     const VOIX_FAIT = {preparer_ordre: (m) => 'ordre envoyé à ' + BOT[m.bot].name, ajouter_echeance: () => 'échéance ajoutée', confier_tache_claude: () => 'tâche Claude lancée', programmer_routine: () => 'routine programmée',
@@ -10666,7 +10684,9 @@ void main(){
     const V_NON = new Set('non nan annule annuler tout ca laisse tomber stop pas maintenant attends oublie surtout merci finalement plutot rien'.split(' '));
     const C_NON = new Set('non nan annule annuler laisse stop attends oublie rien'.split(' '));
     const OUI = {test: (t) => MOTS(t, V_OUI, C_OUI) && !/\b(non|pas)\b/.test(nrmT(t))}, NON = {test: (t) => MOTS(t, V_NON, C_NON)};
-    const voixPending = (T) => { let i = T.msgs.length - 2; while (i >= 0 && T.msgs[i].who !== 'toi') i--; return T.msgs.filter((m, k) => k > i && (m.kind === 'act' || m.kind === 'proposal') && m.state === 'open' && Date.now() - (m.at || 0) < 10 * 60000); };
+    /* 0.70.0 (son choix du 23/11/2026, « Oui à la voix seulement ») : seules comptent les propositions annoncées à voix haute (m.oral, posé en
+       conversation à la voix) ; à l'écrit, un « oui » ou un « non » part à Claude et le bouton de la carte reste la seule validation */
+    const voixPending = (T) => { let i = T.msgs.length - 2; while (i >= 0 && T.msgs[i].who !== 'toi') i--; return T.msgs.filter((m, k) => k > i && (m.kind === 'act' || m.kind === 'proposal') && m.state === 'open' && m.oral && Date.now() - (m.at || 0) < 10 * 60000); };
     const LC1 = localCmd;
     localCmd = function (raw, T) {
       if (CHAT.mode === 'claude' && T && T.msgs) {
