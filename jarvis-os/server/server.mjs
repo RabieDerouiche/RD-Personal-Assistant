@@ -28,9 +28,10 @@ import {createActivite, outilNom} from './activite.mjs';
 import {createRadar} from './radar.mjs';
 import {pique, PERSO_ORAL} from './humour.mjs';   /* 21/11/2026 : sa personnalité à l'oral (« sarcastique assumé ») */
 import {createAudio, typeSon, silence} from './audio.mjs';   /* 0.64.0 : le message vocal d'un proche, mis au format de l'écoute */
+import {createCoffreLien} from './coffre-lien.mjs';   /* 0.74.0 : le coffre en mémoire, ouvert depuis l'app */
 const ACT = createActivite();   /* 0.33.0 : ce que fait Claude à l'instant */
 
-const VERSION = '0.73.0';
+const VERSION = '0.74.0';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PORT = +(process.env.PORT || 8787);
 const HOST = process.env.HOST || '127.0.0.1';
@@ -1464,6 +1465,7 @@ function etatJarvisLigne() {
 }
 const mcpEtat = (req) => ({...JMCP.etat(), adresse: mcpBase(req) + '/mcp', journal: MCP_JOURNAL.slice(0, 10), actes: (S.mcp.actes || []).slice(-30).reverse()});
 const mcpBase = (req) => (process.env.JARVIS_PUBLIC_URL || publicBase(req)).replace(/\/+$/, '');
+const COFFRE = createCoffreLien({prise: process.env.JARVIS_COFFRE_PRISE || '/run/jarvis-coffre/service.sock'});   /* 0.74.0 */
 const JMCP = createMcp({S, save, now, version: VERSION, base: mcpBase, outils: MCP_OUTILS, journal: mcpJournal, avant: exeAvant,
   prevenir: ({titre, texte}) => { if (S.push && S.push.subs.length) PUSH.send({title: titre, body: texte, url: '/#voir-reglages-mcp', tag: 'mcp-acces'}, {urgency: 'high'}).catch(() => {}); }});
 
@@ -1858,7 +1860,7 @@ async function tts(text) {
 }
 
 /* ---------- HTTP ---------- */
-const TYPES = {'.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.json': 'application/json', '.webmanifest': 'application/manifest+json',
+const TYPES = {'.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.json': 'application/json', '.webmanifest': 'application/manifest+json',
   '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.svg': 'image/svg+xml', '.webp': 'image/webp', '.woff2': 'font/woff2', '.md': 'text/plain; charset=utf-8'};
 function cors(req, res) {
   const o = req.headers.origin;
@@ -2038,6 +2040,17 @@ const server = http.createServer(async (req, res) => {
       /* 0.39.0 : le serveur MCP — demandes d'accès à accorder, assistants reliés, jeton fixe, adresse à donner, derniers accès */
       /* 0.71.0 : plusieurs jetons fixes (nom, profil « lecture » ou « executant »), « Suspendre », et les derniers gestes des exécutants */
       /* 0.72.0 : profil « veilleur », et `signe` (le nom d'un jeton exécutant, sous lequel ce jeton-ci écrit dans Pilotage) */
+      /* 0.74.0 : le coffre en mémoire (jarvis-coffre). L'app lit son état, l'ouvre par la phrase scellée dans la page pour le coffre seul
+         (ce serveur ne fait que passer le paquet : il ne voit pas la phrase, ne garde et ne journalise rien), et le verrouille.
+         Réservé à un appareil relié (ni invité, ni assistant MCP, ni Raccourci). Une seule réponse à tout refus d'ouverture. */
+      if (p === '/api/coffre' && req.method === 'GET') return json(res, 200, await COFFRE.etat());
+      if (p === '/api/coffre/cle' && req.method === 'GET') { const k = await COFFRE.cle(); return k ? json(res, 200, k) : json(res, 503, {error: 'Le coffre ne répond pas.'}); }
+      if (p === '/api/coffre/ouvrir' && req.method === 'POST') {
+        const r = await COFFRE.ouvrir(await readBody(req, 8000)), e = await COFFRE.etat();
+        if (r.ok) return json(res, 200, e);
+        return json(res, r.absent ? 503 : r.forme ? 400 : 403, {...e, error: r.absent ? 'Le coffre ne répond pas.' : e.bloque ? 'Trop d’essais : le coffre est bloqué encore ' + Math.ceil(e.bloque / 60) + ' min.' : 'Ouverture refusée.'});
+      }
+      if (p === '/api/coffre/fermer' && req.method === 'POST') { req.resume(); const f = await COFFRE.fermer(); return json(res, f ? 200 : 503, await COFFRE.etat()); }
       if (p === '/api/mcp' && req.method === 'GET') return json(res, 200, mcpEtat(req));
       if (p === '/api/mcp/decider' && req.method === 'POST') { const b = await readBody(req); return json(res, JMCP.decider(b.id, b.oui === true) ? 200 : 404, mcpEtat(req)); }
       if (p === '/api/mcp/retirer' && req.method === 'POST') { const b = await readBody(req); return json(res, JMCP.retirer(b.id) ? 200 : 404, mcpEtat(req)); }

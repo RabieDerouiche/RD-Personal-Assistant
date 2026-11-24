@@ -10090,6 +10090,53 @@ void main(){
   const MCP_PROFILS = {lecture: 'Lecture et propositions', executant: 'Exécutant : lit Pilotage, Gmail et l’agenda, écrit dans Pilotage, prépare des brouillons, te notifie',
     veilleur: 'Veilleur : lit l’onglet Sources, écrit sa ligne du Journal et de l’État, te notifie ; aucun accès à tes mails, ton agenda ni tes dossiers'};
   const MCP_GESTES = {pilotage_ajouter: 'ligne ajoutée', pilotage_etat: 'onglet État', canal_repondre: 'réponse dans le Canal', gmail_brouillon: 'brouillon', jarvis_notifier: 'notification'};
+  /* 0.74.0 (24/11/2026, son choix « Tout dans NordPass ») : le coffre en mémoire du serveur. Après un redémarrage il est verrouillé : son
+     gestionnaire de mots de passe (Face ID) remplit la phrase ici, la page la scelle pour le coffre seul et le serveur ne fait que passer
+     le paquet. Le champ est vidé dès l'envoi ; la phrase ne va dans aucun réglage, aucun stockage, aucune adresse. Carte absente tant que
+     le coffre n'est pas installé sur le serveur. */
+  async function coffreCard(JS) {
+    let st = await JS.coffre.etat();
+    if (!st || !st.installe) return null;
+    const card = h('section', {class: 'card set-card coffre-card', id: 'coffre-card'}, h('b', {text: 'Coffre'}));
+    const etat = h('p', {class: 'coffre-etat'}), out = h('p', {class: 'set-msg'}), zone = h('div', {class: 'coffre-zone'});
+    const dire = (t, bad) => { out.classList.toggle('is-bad', !!bad); out.textContent = t; };
+    const idu = 'coffre-' + (++SEQ), idp = 'coffre-' + (++SEQ);
+    const nomJ = h('input', {class: 'inp', id: idu, name: 'username', type: 'text', autocomplete: 'username', value: 'Coffre JARVIS', readonly: ''});
+    const phJ = h('input', {class: 'inp', id: idp, name: 'password', type: 'password', autocomplete: 'current-password', placeholder: 'Phrase du coffre', autocapitalize: 'off', autocorrect: 'off', spellcheck: 'false'});
+    const btnO = h('button', {type: 'submit', class: 'btn main sm'}, 'Ouvrir le coffre');
+    const ouvrir = async (ev) => {
+      ev.preventDefault();
+      const phrase = phJ.value; phJ.value = '';
+      if (!phrase) { dire('Laisse ton gestionnaire de mots de passe remplir la phrase, ou colle-la.', true); return; }
+      btnO.disabled = true; dire('Ouverture… (quelques secondes)');
+      const r = await JS.coffre.ouvrir(phrase);
+      btnO.disabled = false;
+      if (r && typeof r.installe === 'boolean') st = r;
+      if (r && r.ouvert && !r.error) dire('Coffre ouvert : la clé est en mémoire jusqu’au prochain redémarrage du serveur.'); else dire((r && r.error) || 'Le serveur ne répond pas.', true);
+      paint();
+    };
+    const form = h('form', {class: 'pick-form coffre-form', autocomplete: 'on', onsubmit: ouvrir},
+      h('label', {for: idu, class: 'pick-label', text: 'Fiche de ton gestionnaire de mots de passe'}), nomJ,
+      h('label', {for: idp, class: 'pick-label', text: 'Phrase'}), phJ, btnO);
+    const btnF = h('button', {type: 'button', class: 'btn ghost sm danger', onclick: async () => {
+      btnF.disabled = true; const r = await JS.coffre.fermer(); btnF.disabled = false;
+      if (r) { st = r; dire(r.ouvert ? 'Le coffre n’a pas pu être verrouillé.' : 'Coffre verrouillé : sa clé est effacée de la mémoire.', !!r.ouvert); paint(); } else dire('Le serveur ne répond pas.', true);
+    }}, 'Verrouiller');
+    const paint = () => {
+      const n = st.secrets || 0, sec = n + ' secret' + (n > 1 ? 's' : '');
+      let quand = ''; if (st.ouvert && st.depuis) { const d = new Date(st.depuis); quand = isNaN(d) ? '' : ' depuis le ' + fmt(d, {day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'}); }
+      card.dataset.etat = !st.installe ? 'absent' : !st.existe ? 'vide' : st.ouvert ? 'ouvert' : st.bloque ? 'bloque' : 'verrouille';
+      if (!st.installe) { etat.textContent = 'Le coffre ne répond plus sur le serveur.'; zone.replaceChildren(); return; }
+      if (!st.existe) { etat.textContent = 'Installé, mais aucun coffre n’est encore créé : dans Termius, « sudo jarvis-coffre creer ».'; zone.replaceChildren(); return; }
+      if (st.ouvert) { etat.textContent = 'Ouvert' + quand + ' · ' + sec + '. Un redémarrage du serveur le referme.'; zone.replaceChildren(btnF); return; }
+      if (st.bloque) { etat.textContent = 'Verrouillé · trop d’essais ratés : bloqué encore ' + Math.ceil(st.bloque / 60) + ' min.'; zone.replaceChildren(); return; }
+      etat.textContent = 'Verrouillé · ' + sec + '. Ce qui a besoin d’un secret attend son ouverture.';
+      zone.replaceChildren(form, h('p', {class: 'muted set-small', text: 'La phrase est chiffrée dans cette page pour le coffre seul ; le serveur de JARVIS ne fait que la transmettre. Secours : Termius, « sudo jarvis-coffre ouvrir ».'}));
+    };
+    card.append(etat, zone, out);
+    paint();
+    return card;
+  }
   async function mcpCard(JS) {
     const card = h('section', {class: 'card set-card mcp-card', id: 'mcp-card'}, h('b', {text: 'Assistants reliés (MCP)'}));
     let st = await JS.mcp.etat();
@@ -10287,6 +10334,7 @@ void main(){
       if (JS.tour) parts.push(await tourCard(JS)); /* JARVIS OS 0.15.0 : tour de Claude */
       if (JS.sauvegarde) parts.push(await savCard(JS)); /* JARVIS OS 0.14.0 : sauvegarde de Pilotage */
       if (JS.mcp) { const mc = await mcpCard(JS); if (mc.dataset.urgent) parts.unshift(mc); else parts.push(mc); } /* JARVIS OS 0.39.0 : assistants reliés (en tête si une demande attend) */
+      if (JS.coffre) { const cc = await coffreCard(JS); if (cc) { if (cc.dataset.etat === 'verrouille' || cc.dataset.etat === 'bloque') parts.unshift(cc); else parts.push(cc); } } /* JARVIS OS 0.74.0 : le coffre (en tête s'il attend son ouverture) */
       if (JS.voixGoogle) parts.push(await voixCard(JS)); /* JARVIS OS 0.40.0 : la voix Google, plafonnée */
       if (JS.memoire) parts.push(await memoireCard(JS)); /* JARVIS OS 0.37.0 : la mémoire durable */
       if (JS.skills) parts.push(await skillsCard(JS)); /* JARVIS OS 0.38.0 : les skills des missions */

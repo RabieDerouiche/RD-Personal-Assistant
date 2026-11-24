@@ -391,7 +391,7 @@ export function creerCoffre({fichier, N = N_DEFAUT, frein = FREIN_DEFAUT, mainte
     ['cle-ouverture', () => coffre.cleOuverture()],
   ]);
   const SERVICE = new Map([
-    ['etat', () => coffre.etat()],
+    ['etat', () => ({...coffre.etat(), bloque: coffre.blocage()})],   // le blocage aussi : l'app dit « bloqué encore N min »
     ['lire', (d) => coffre.lire(d.nom)],
     ['ecrire', (d) => coffre.ecrire(d.nom, d.valeur)],
     ['fermer', () => coffre.fermer()],
