@@ -11,8 +11,8 @@ set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
 
 ICI=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-eval "$(grep -E '^(HERMES_VERSION|HERMES_COMMIT|HERMES_INSTALLEUR_SHA256|PLUGIN_CATALOGUE|PLUGIN_ID|CLAUDE_CODE_VERSION)=[A-Za-z0-9._-]+( |$)' "$ICI/../install.sh" | sed 's/ .*//')"
-: "${HERMES_COMMIT:?versions illisibles dans ../install.sh}" "${HERMES_INSTALLEUR_SHA256:?}" "${PLUGIN_ID:?}" "${CLAUDE_CODE_VERSION:?}"
+eval "$(grep -E '^(HERMES_VERSION|HERMES_COMMIT|HERMES_INSTALLEUR_SHA256|PLUGIN_CATALOGUE|PLUGIN_COMMIT|PLUGIN_ID|CLAUDE_CODE_VERSION)=[A-Za-z0-9._-]+( |$)' "$ICI/../install.sh" | sed 's/ .*//')"
+: "${HERMES_COMMIT:?versions illisibles dans ../install.sh}" "${HERMES_INSTALLEUR_SHA256:?}" "${PLUGIN_ID:?}" "${PLUGIN_COMMIT:?}" "${CLAUDE_CODE_VERSION:?}"
 U=hermes-portail
 H=/home/$U
 HH=$H/.hermes
@@ -76,7 +76,7 @@ ls -d "$HH"/tools/chromium-* >/dev/null 2>&1 || comme hermes pm install chromium
 ls -d "$HH"/tools/chromium-* >/dev/null 2>&1 && echo "Navigateur : $(basename "$(ls -d "$HH"/tools/chromium-* | tail -1)")" || { echo "Navigateur d'Hermes absent : arrêt."; exit 1; }
 
 dire "Plugin de l'abonnement Claude et Claude Code $CLAUDE_CODE_VERSION (les siens, séparés des autres)"
-[ -d "$HH/plugins/$PLUGIN_ID" ] || comme hermes plugins install "$PLUGIN_CATALOGUE" | tail -2
+[ -d "$HH/plugins/$PLUGIN_ID" ] || comme hermes plugins install "$PLUGIN_CATALOGUE" --ref "$PLUGIN_COMMIT" | tail -2
 comme hermes plugins enable "$PLUGIN_ID" | tail -1
 if [ "$(comme "$CC/node_modules/.bin/claude" --version 2>/dev/null | cut -d' ' -f1)" != "$CLAUDE_CODE_VERSION" ]; then
   comme mkdir -p "$CC"

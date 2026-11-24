@@ -115,4 +115,4 @@ Pas prouvé, à voir sur le vrai serveur :
 
 ## État
 
-- 24/11/2026 : kit écrit, banc 55 sur 55 (deux fois, dont une depuis zéro). Rien sur le serveur encore.
+- 24/11/2026 : kit écrit, banc 55 puis 56 sur 56 depuis zéro (le plugin de l'abonnement est imposé à la version du Hermes principal : le catalogue avait avancé le jour même, `docs/hermes.md`). Rien sur le serveur encore.

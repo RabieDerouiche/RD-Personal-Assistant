@@ -16,6 +16,7 @@ HERMES_VERSION=v0.23.3
 HERMES_COMMIT=caafe5389ae585ef77387a962aee05b1bcf17029            # tag v0.23.3 (19/11/2026)
 HERMES_INSTALLEUR_SHA256=c73dad4dcf7c9ecadb98578e28cc763d23d7be3fa1b513545319038795493214   # scripts/install.sh à ce commit
 PLUGIN_CATALOGUE=claude-subscription-directsdk                     # catalogue d'Hermes v0.23.3 : commit 72eb3b8, v0.4.0
+PLUGIN_COMMIT=72eb3b87215e98d11cecfb26ca95b86be73b32de           # imposé à l'installation : le catalogue a avancé le 24/11/2026 (610da68), une installation neuve le suivait
 PLUGIN_ID=claude-subscription-directsdk-experimental
 CLAUDE_CODE_VERSION=2.1.330
 SEUIL_FORFAIT=85                                                   # garde du forfait partagé (son choix du 23/11/2026)
@@ -83,7 +84,7 @@ dire "Telegram (installé maintenant : rien ne s'installe ensuite pendant que le
 comme_hermes hermes pm install --extra messaging | tail -1
 
 dire "Plugin de l'abonnement Claude ($PLUGIN_CATALOGUE, épinglé par le catalogue d'Hermes)"
-[ -d "$HH/plugins/$PLUGIN_ID" ] || comme_hermes hermes plugins install "$PLUGIN_CATALOGUE" | tail -2
+[ -d "$HH/plugins/$PLUGIN_ID" ] || comme_hermes hermes plugins install "$PLUGIN_CATALOGUE" --ref "$PLUGIN_COMMIT" | tail -2
 comme_hermes hermes plugins enable "$PLUGIN_ID" | tail -1
 
 dire "Claude Code $CLAUDE_CODE_VERSION pour $U (séparé de celui de JARVIS)"
