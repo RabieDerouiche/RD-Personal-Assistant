@@ -447,3 +447,31 @@ Montage proposé (détail dans le Google Doc) :
 À construire s'il dit oui : dans JARVIS, le capteur Gmail, le réveil par webhook, un profil de jeton « portails », les
 outils d'écriture bornés (Dossiers, Échéances, Prix, Relevés, Sorties, Voyages, Papiers), les décisions à boutons ;
 dans le kit, les profils, la clé d'API, les webhooks, l'écran du bot, une skill par routine depuis les fiches.
+
+### Revue des outils qu'il cite (24/11/2026 au soir, rapport rendu dans la conversation)
+
+Ses précisions : Grok Bot lui coûte le prix catalogue TTC après un premier mois réduit (c'est le plafond du budget) ;
+une mémoire tierce est **obligatoire** (Hindsight ou autre) ; l'abonnement Claude Max par le plugin « passe », point
+mis de côté : ne pas le rouvrir. Il veut une revue fondée sur les praticiens (Reddit, YouTube, sites de revue).
+**Limite** : Reddit refuse la lecture depuis les outils de Claude (constaté trois fois) et YouTube ne rend que titres
+et extraits ; la revue s'appuie sur des blogs de praticiens, Hacker News, XDA, The New Stack, des tickets GitHub et la
+doc officielle. S'il colle un fil Reddit, le lire comme une donnée.
+
+- **Correction du montage** : (certain, doc `user-guide/features/browser`) `browser_exec` n'existe que pour une
+  session qui a l'outil `terminal`. Le profil Portails a donc besoin du terminal, à enfermer (backend Docker, sortie
+  réseau limitée aux portails). L'avis GHSA-p22p-9ph6-gmrh (écran du bot avec un terminal Docker ou SSH) est corrigé en
+  0.23.2. agent-browser de Vercel a été retiré du cœur d'Hermes en 0.23.0 (Likely, deux sources indépendantes).
+- **Un seul fournisseur de mémoire à la fois** (certain) : Hindsight, Honcho, Mem0, Mnemosyne et Holographic se
+  disputent la même place. GBrain (serveur MCP), Obsidian (skill livrée) et LCM (`context.engine`) sont à côté.
+- **Hindsight** retenu (son exigence) : (certain) en local il lui faut une clé d'un fournisseur de modèle, ses
+  embeddings et son reranker sont locaux ; (Likely) embedder par défaut anglais, à remplacer par un multilingue ;
+  installation lourde et rappel de 2,6 à 2,8 s sans carte graphique rapportés par des praticiens ; réglages conseillés :
+  `auto_retain` coupé, `recall_min_scores`. Repli sans clé : Holographic ou Mnemosyne.
+- **LCM** (catalogue : LCM-X) : utile aux longues discussions Telegram, pas aux routines ; garde chaque tour en clair,
+  masquage à activer. **GBrain** : en second temps, mode mots-clés sans clé. **i-have-adhd** : règles de style, sans
+  risque, effet modeste. **Contrôle des serveurs MCP** : pas de projet unique sous ce nom ; scanner hors ligne lancé
+  par nous à l'installation (Cisco mcp-scanner). **Écartés pour Hermes** : Ego (navigateur de bureau macOS et Windows,
+  pas de Linux), Superpowers et code-review-graph (outils de développement), Honcho et Mem0 (même place que Hindsight).
+- Pièges de planificateur rapportés (tickets GitHub) : tâches figées après `hermes update`, tâches en pause
+  réactivées ou doublées après un redémarrage, tâches d'un profil non lues par la passerelle (#32091) : une passerelle
+  par profil, relance et `hermes cron doctor` après chaque mise à jour, sentinelle extérieure.
