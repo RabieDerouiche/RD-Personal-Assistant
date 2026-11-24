@@ -559,8 +559,9 @@ export function createRadar({file, gmail, claude = async () => ({ok: false, erro
     /* 0.66.0 : les montants de son contrat (un par mois) remplacent son montant fixe ; « Garder » : son montant reste, plus de question */
     if (a.type === 'calendrier') {
       const c = a.calendrier || {};
+      /* 0.70.0 : une fin plus proche (« Retirer » après une résiliation) n'est pas repoussée à celle du contrat */
       if (f && action === 'appliquer' && Array.isArray(c.paliers) && c.paliers.length) {
-        Object.assign(f, {paliers: c.paliers, rythme: 'mensuel', ...(c.jour ? {jour: c.jour} : {}), ...(c.debut ? {debut: c.debut} : {}), ...(c.fin ? {fin: c.fin} : {}), ...(c.contrat ? {contrat: c.contrat} : {})});
+        Object.assign(f, {paliers: c.paliers, rythme: 'mensuel', ...(c.jour ? {jour: c.jour} : {}), ...(c.debut ? {debut: c.debut} : {}), ...(c.fin && !(f.fin && f.fin < c.fin) ? {fin: c.fin} : {}), ...(c.contrat ? {contrat: c.contrat} : {})});
         delete f.mois; delete f.estime; delete f.variable; f.montant = montantPalier(f.paliers, t0.slice(0, 7)) ?? f.montant;
       }
       if (f && action !== 'appliquer') { R.gardes = {...R.gardes, ['c' + f.id]: c.fin || true}; trace.garde = 'c' + f.id; }
@@ -871,10 +872,10 @@ export function createRadar({file, gmail, claude = async () => ({ok: false, erro
       const a = {id, date: i >= 0 ? R.alertes[i].date : t0, type: 'silence', titre: 'Plus de facture', service: f.service, montant: f.montant, fixe: f.id, dernier: der, texte: 'Dernière facture le ' + jourCourt(depuisYmd(der)) + '. Toujours d’actualité ?'};
       if (i >= 0) R.alertes[i] = a; else R.alertes.push(a);
     }
-    /* 0.70.0 : une alerte liée à une dépense reste tant qu'elle vaut pour elle : « Montants de ton contrat » tant que la dépense court (avant :
-       effacée dès que la dépense avait une fin, même en 2045) ; « Résiliation » tant que la dépense va plus loin que la fin annoncée ;
-       « Plus de facture » pour une dépense sans fin, comme avant */
-    const vaut = (a, f) => (a.type === 'calendrier' ? !(f.fin && f.fin < t0) : a.type === 'resiliation' ? !(f.fin && f.fin <= (a.fin || a.date)) : !f.fin);
+    /* 0.70.0 : une alerte liée à une dépense reste tant qu'elle vaut pour elle : « Montants de ton contrat » tant que la dépense court jusqu'à la
+       fin du contrat (avant : effacée dès que la dépense avait une fin, même en 2045 ; arrêtée plus tôt, après une résiliation « Retirer » :
+       effacée) ; « Résiliation » tant que la dépense va plus loin que la fin annoncée ; « Plus de facture » pour une dépense sans fin, comme avant */
+    const vaut = (a, f) => (a.type === 'calendrier' ? !(f.fin && (f.fin < t0 || (a.calendrier && a.calendrier.fin && f.fin < a.calendrier.fin))) : a.type === 'resiliation' ? !(f.fin && f.fin <= (a.fin || a.date)) : !f.fin);
     R.alertes = R.alertes.filter((a) => !a.fixe || R.fixes.some((f) => f.id === a.fixe && vaut(a, f)));
     R.maj = new Date(now()).toISOString();
   }

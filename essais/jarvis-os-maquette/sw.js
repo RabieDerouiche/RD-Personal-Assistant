@@ -4,13 +4,13 @@
    qu'une page charge (plus de skipWaiting à l'installation) : elle attend que l'app passe à l'arrière-plan (message « active ») ou soit fermée.
    L'ancien service suffit entre-temps : le code vient d'abord du réseau. Une erreur 5xx (le serveur redémarre) retombe sur la copie gardée.
    0.70.0 : une adresse avec « ?… » (une notification ouvre « /?n=<id>#… ») n'est plus gardée : chaque ouverture ajoutait une copie de la page
-   (1,16 Mo), sans limite ; v4 efface celles déjà gardées. Ce service n'efface que ses propres caches (« jarvis-os-app-… ») : plus ceux de
-   l'ancienne app ou de Panier, qui partagent le même stockage du domaine. */
+   (1,16 Mo), sans limite ; v4 efface celles déjà gardées. Ce service n'efface que ses propres caches (« jarvis-os-app-… »), plus jarvis-os-v3,
+   périmé (l'ancienne app y gardait des réponses de /api/) ; jamais jarvis-os-v4 ni Panier, qui partagent le même stockage du domaine. */
 const CACHE = 'jarvis-os-app-v4';
 const CORE = ['./', './index.html', './jarvis-voix.js', './jarvis-serveur.js', './manifest.webmanifest', './icon-180.png', './icon-192.png', './icon-512.png'];
 self.addEventListener('install', (e) => { e.waitUntil(caches.open(CACHE).then((c) => Promise.all(CORE.map((u) => c.add(u).catch(() => null))))); });
 self.addEventListener('message', (e) => { if (e.data && e.data.type === 'active') self.skipWaiting(); });   /* l'app est à l'arrière-plan : la relève peut se faire */
-self.addEventListener('activate', (e) => { e.waitUntil(caches.keys().then((ks) => Promise.all(ks.filter((k) => k.startsWith('jarvis-os-app-') && k !== CACHE).map((k) => caches.delete(k)))).then(() => self.clients.claim())); });
+self.addEventListener('activate', (e) => { e.waitUntil(caches.keys().then((ks) => Promise.all(ks.filter((k) => (k.startsWith('jarvis-os-app-') && k !== CACHE) || k === 'jarvis-os-v3').map((k) => caches.delete(k)))).then(() => self.clients.claim())); });
 self.addEventListener('fetch', (e) => {
   const u = new URL(e.request.url);
   if (e.request.method !== 'GET' || u.origin !== location.origin || u.pathname.startsWith('/api/') || u.pathname.startsWith('/ancienne/') || u.pathname.startsWith('/courses') || u.pathname.startsWith('/maquettes') || u.pathname.startsWith('/invite')) return;   /* /maquettes : les maquettes servies par le serveur (0.53.0) ; /invite : la page d'un proche (0.62.0) ; /courses : l'app Panier, qui a son propre service */

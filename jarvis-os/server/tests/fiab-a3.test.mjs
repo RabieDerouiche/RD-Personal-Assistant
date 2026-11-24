@@ -103,7 +103,27 @@ try {
     R2.regler('fixes', [{id: 'fe', service: 'Énergie Exemple', cat: 'Logement', montant: 85, jour: 15, rythme: 'mensuel', source: 'mail', dom: 'energie-exemple.fr', cle: 'energie-exemple.fr', debut: '2026-09-15', fin: '2027-08-15'}]);
     await R2.traiter('GET', '/api/radar', null); await R2.attendre();
     const ae = R2.etat().alertes.find((a) => a.type === 'resiliation');
-    ok('A3 radar#4 : une mensualisation d’énergie acceptée (fin en août 2027) et sa résiliation au 15/12/2026 : alerte « Résiliation » avec « Retirer »', !!ae && ae.fixe === 'fe' && ae.fin === '2026-12-15', JSON.stringify(R2.etat().alertes)); }
+    ok('A3 radar#4 : une mensualisation d’énergie acceptée (fin en août 2027) et sa résiliation au 15/12/2026 : alerte « Résiliation » avec « Retirer »', !!ae && ae.fixe === 'fe' && ae.fin === '2026-12-15', JSON.stringify(R2.etat().alertes));
+    /* la même assurance saisie à la main, tableau jamais appliqué : il change d'assureur, « Retirer » sur la résiliation (fin le 15/12/2026) */
+    const resilie = async (nom) => {
+      const F3 = {tct: F.tct}, R3 = createRadar({file: path.join(DIR, nom), gmail: fauxGmail(F3, (q) => (/^has:attachment/.test(q) ? ['tct'] : SUJET(q) && (/newer_than:3d/.test(q) || MOIS(q, '2026-11')) ? ['trs'] : [])), now: () => Date.parse('2026-11-23T09:00:00Z'), moisDepart: 1});
+      R3.regler('fixes', [{id: 'fas', service: 'Assurance de prêt', cat: 'Assurances', montant: 31.2, jour: 5, rythme: 'mensuel', fin: '2045-05-05', cle: 'courtier-exemple.fr', dom: 'courtier-exemple.fr'}]);
+      await R3.traiter('GET', '/api/radar', null); await R3.attendre();
+      F3.trs = T(res); await R3.lireMaintenant();
+      const ac = R3.etat().alertes.find((a) => a.type === 'calendrier'), arz = R3.etat().alertes.find((a) => a.type === 'resiliation');
+      const st = arz ? (await R3.traiter('POST', '/api/radar/alerte', async () => ({id: arz.id, action: 'retirer'}))).status : 0;
+      return {R3, ac, st};
+    };
+    { const {R3, ac, st} = await resilie('r6b.json');
+      await R3.lireMaintenant(); const matin = R3.etat().alertes.filter((a) => a.type === 'calendrier').length;
+      await R3.traiter('POST', '/api/radar/lire', async () => ({})); await R3.attendre();
+      const e3 = R3.etat(), f3 = R3.brut().fixes[0];
+      ok('A3 radar#4 : tableau jamais appliqué, puis « Retirer » sur la résiliation : « Montants de ton contrat » disparaît à la lecture du matin et après « Tout relire », la fin reste au 15/12/2026 (avant : l’alerte restait, « Appliquer » remettait la dépense jusqu’au bout du contrat)',
+        !!ac && st === 200 && matin === 0 && !!e3.scan.fini && !e3.alertes.some((a) => a.type === 'calendrier') && f3.fin === '2026-12-15', JSON.stringify([!!ac, st, matin, f3.fin, e3.alertes.map((a) => a.type)])); }
+    { const {R3, ac, st} = await resilie('r6c.json');
+      const ap3 = ac ? (await R3.traiter('POST', '/api/radar/alerte', async () => ({id: ac.id, action: 'appliquer'}))).status : 0, f3 = R3.brut().fixes[0];
+      ok('A3 radar#4 : « Appliquer » touché juste après ce « Retirer » (avant la relecture suivante) : les montants du tableau, mais la fin reste au 15/12/2026 (avant : repoussée au 05/12/2027)',
+        !!ac && st === 200 && ap3 === 200 && f3.fin === '2026-12-15' && (f3.paliers || []).length === 3, JSON.stringify([!!ac, st, ap3, f3])); } }
 
   /* ---------- radar#5 : « Tout relire » ne défait pas sa correction d'une mensualité ---------- */
   { const F = {tk1: T(M('mk1', 'credit@banque-exemple.fr', 'Banque Exemple', 'Évolution de votre prêt', 'Bonjour, votre nouvelle mensualité s’élèvera à 812,34 € à partir du mois prochain.', '2026-10-01T08:00:00Z'))};

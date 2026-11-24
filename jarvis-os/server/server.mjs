@@ -29,7 +29,7 @@ import {pique, PERSO_ORAL} from './humour.mjs';   /* 21/11/2026 : sa personnalit
 import {createAudio, typeSon, silence} from './audio.mjs';   /* 0.64.0 : le message vocal d'un proche, mis au format de l'écoute */
 const ACT = createActivite();   /* 0.33.0 : ce que fait Claude à l'instant */
 
-const VERSION = '0.69.0';
+const VERSION = '0.70.0';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PORT = +(process.env.PORT || 8787);
 const HOST = process.env.HOST || '127.0.0.1';
@@ -331,7 +331,7 @@ function guardSettings(mode) {
   const f = path.join(DATA, 'guard-' + mode + '.json');
   /* 0.16.0 : le garde-fou voit aussi les outils de fichiers, et Claude Code refuse lui-même les chemins secrets (deux protections indépendantes) */
   const abs = (p) => '//' + path.resolve(p).replace(/^\/+/, ''), H = os.homedir();
-  const secrets = [abs(DATA) + '/*.json', abs(DATA) + '/*.json.tmp', abs(DATA) + '/sauvegardes/**', abs(H) + '/.claude/**', abs(H) + '/.claude.json', abs(H) + '/.ssh/**', abs(H) + '/.config/**', abs(H) + '/.gnupg/**', '//proc/**', '//etc/**'];
+  const secrets = [abs(DATA) + '/*.json', abs(DATA) + '/*.json.tmp', abs(DATA) + '/*.corrompu-*', abs(DATA) + '/sauvegardes/**', abs(H) + '/.claude/**', abs(H) + '/.claude.json', abs(H) + '/.ssh/**', abs(H) + '/.config/**', abs(H) + '/.gnupg/**', '//proc/**', '//etc/**'];
   const txt = JSON.stringify({permissions: {deny: secrets.flatMap((x) => ['Read(' + x + ')', 'Edit(' + x + ')'])},
     hooks: {PreToolUse: [{matcher: 'mcp__.*|Read|Glob|Grep|LS|Edit|MultiEdit|Write|NotebookEdit|NotebookRead', hooks: [{type: 'command', command: process.execPath + ' ' + JSON.stringify(GUARD) + ' ' + mode}]}]}});
   /* 0.70.0 : réécrit seulement s'il a changé (ou disparu), et d'un coup (fichier à côté, puis renommé) : un Claude qui démarre pendant
@@ -1197,7 +1197,7 @@ const GUIDE_JARVIS = `\n\n[JARVIS OS ${VERSION} : ce que tu es et ce que tu sais
 - Automatisations de l'iPhone : Réglages, « Siri et bouton Action », « Automatisations » (actions brief, agenda, demain, pourmoi, meteo).
 - Assistants reliés (app Claude, Grok Bot) : Réglages, « Assistants reliés (MCP) » ; leurs propositions dans Espaces, Équipe, filtre Demandes, « Missions de Claude » (« À approuver »).
 - Argent (Radar) : Espaces, tuile « Argent » : ses dépenses fixes, sa paie, le reste à payer, ses paiements en plusieurs fois (« En plusieurs fois » dans « Fixes », un achat par ligne ; « Plus à payer » pour un achat annulé ou remboursé), ce que ses mails annoncent (« À venir », « Alertes » : une alerte vue va dans « Déjà vues », « Remettre » la rend ; une réponse Retirer ou Garder se défait dans « Tes réponses », « Annuler » ; ce qu'il a écarté revient avec « Reproposer », sous « Écartées » en bas de « Fixes ») ; « Tout relire (13 mois) » relit ses mails (0.68.0). Ses chiffres ne te sont jamais donnés (rien de bancaire dans tes consignes) : pour une question d'argent, renvoie-le à cette rubrique, sans rien inventer.
-- Appareils reliés (téléphone perdu, ancienne installation) : Réglages, carte « Serveur JARVIS », « Retirer » sur l'appareil à couper, depuis un autre appareil relié (un appareil ne se retire pas lui-même).
+- Appareils reliés (téléphone perdu, ancienne installation) : Réglages, carte « Serveur JARVIS », « Retirer » sur l'appareil à couper, depuis un autre appareil relié (un appareil ne se retire pas lui-même) ; s'il avait le raccourci « Jarvis », recrée aussi sa clé : Réglages, carte « Siri et bouton Action », « Recréer la clé » (l'ancienne ne marche plus).
 - Notifications : Réglages, « Notifications ». Mise à jour : proposée à l'ouverture, ou Réglages, carte « JARVIS », « Mettre à jour le serveur ».
 L'état du moment (voix, compteurs, écoute, mémoire, routines, assistants) arrive avec chaque question dans la ligne [JARVIS …] : réponds à partir d'elle, sans dire que tu ne peux pas vérifier. Pour un réglage : son état, puis les étapes exactes. Un changement du code de JARVIS se demande dans sa session de développement (Claude Code) : ne le confie jamais à la tâche Claude du serveur.]`;
 const nbFr = (n) => Number(n || 0).toLocaleString('fr-FR');
@@ -1857,7 +1857,13 @@ const server = http.createServer(async (req, res) => {
         if (!t) return json(res, 404, {error: 'Appareil introuvable : il a peut-être déjà été retiré.', appareils: appareilsListe(req)});
         S.tokens = S.tokens.filter((x) => x !== t); save();
         const notifications = PUSH.retirerAppareil(id);
-        return json(res, 200, {ok: true, nom: t.device || 'Appareil', notifications, appareils: appareilsListe(req)});
+        return json(res, 200, {ok: true, nom: t.device || 'Appareil', notifications, raccourci: !!S.raccourci, appareils: appareilsListe(req)});
+      }
+      /* 0.70.0 : « Délier cet iPhone » retire aussi sa clé du serveur (avant : effacée sur le téléphone seulement, elle restait valable) */
+      if (p === '/api/appareils/delier' && req.method === 'POST') {
+        const moi = deviceOf(req), t = moi ? S.tokens.find((x) => x.hash.slice(0, 12) === moi) : null;
+        if (t) { S.tokens = S.tokens.filter((x) => x !== t); save(); }
+        return json(res, 200, {ok: true, notifications: moi ? PUSH.retirerAppareil(moi) : 0});
       }
       if (p === '/api/sauvegarde') return json(res, 200, {...SAV.status(), changements: SAV.diff()});
       /* missions (0.15.0) : lancer, suivre ; tour de Claude : réglage, dernier tour, tour immédiat */

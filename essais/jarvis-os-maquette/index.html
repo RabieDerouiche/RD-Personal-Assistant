@@ -2308,17 +2308,23 @@ void main(){
 
   /* 0.70.0 — B1-page-1-2 : « aujourd'hui » (TODAY) est fixé au chargement. Une app restée ouverte passé minuit se recharge d'elle-même
      sur le nouveau jour, dès que rien n'est en cours : ni feuille, discussion, recherche ou saisie ouverte, ni écriture « Dans 5 s »
-     (avec « Annuler ») ou sonnette pas encore partie. Au retour dans l'app tout de suite ; restée au premier plan, après 45 s sans geste. */
-  const JOUR = {occupe: 0, cache: 0, geste: 0, t: 0};
+     (avec « Annuler ») ou sonnette pas encore partie. Au retour dans l'app tout de suite ; restée au premier plan, après 45 s sans geste.
+     Ni pendant la relecture des notifications du retour (« Pendant ton absence », ou celle qu'il a touchée), ni avec un texte tapé et pas
+     encore envoyé ou enregistré, même hors du champ (brouillon de la discussion fermée, champs de Réglages) : il attend, comme avant. */
+  const JOUR = {occupe: 0, cache: 0, geste: 0, t: 0, notif: 0};
   const jourOccupe = () => { JOUR.occupe = Math.max(JOUR.occupe, performance.now() + 25000); };   /* 5 s d'attente, puis le temps d'écrire */
   function jourVu(auRetour) {
     clearTimeout(JOUR.t); JOUR.t = 0;
     if (document.hidden || isoOf(new Date()) === isoOf(TODAY)) return;
     const now = performance.now(), attend = JOUR.occupe - now, ae = document.activeElement;
     let libre = attend <= 0 && (auRetour || now - JOUR.geste > 45000) && !(ae && (/^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName) || ae.isContentEditable) && ae.getClientRects().length);
-    try { if (libre) libre = majLibre() && !LV_BELL.set.size && !CHAT.busy; } catch (e) { libre = false; }
+    try {
+      if (libre) libre = majLibre() && !LV_BELL.set.size && !CHAT.busy && !(performance.now() < JOUR.notif) && VOIR.row == null
+        && !($('chat-in') && $('chat-in').value.trim()) && ![$('view'), SETV.box].filter(Boolean).some((r) => Array.from(r.querySelectorAll('input, textarea')).some((x) => !/^(checkbox|radio|hidden|button|submit)$/.test(x.type) && x.value !== x.defaultValue));
+    } catch (e) { libre = false; }
     if (libre) { location.reload(); return; }
-    JOUR.t = setTimeout(() => jourVu(auRetour && attend > 0), attend > 0 ? attend + 500 : 15000);
+    const notif = performance.now() < JOUR.notif;   /* la relecture des notifications du retour : on réessaie bientôt, toujours « au retour » */
+    JOUR.t = setTimeout(() => jourVu(auRetour && (attend > 0 || notif)), attend > 0 ? attend + 500 : notif ? 400 : 15000);
   }
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) { JOUR.cache = performance.now(); clearTimeout(JOUR.t); JOUR.t = 0; return; }
@@ -9977,6 +9983,10 @@ void main(){
     const l = r.notifs.filter((x) => !x.vue && !NOTIF.faits.has(x.id) && x.at >= depuis && age(x) < 24 * 3600e3 && !/#recue=/.test(x.url));   /* une tâche reçue s'ouvre déjà seule au retour (avec sa voix) */
     if (!l.length) return;
     if (l.length === 1 && age(l[0]) < 15 * 60e3) { const x = l[0], av = TAB; ouvrirNotif(x.url, x.id); toast(x.title, 'Ouvert depuis ta notification.', true, () => go(av)); return; }
+    /* 0.70.0 : une fiche (peut-être avec un texte en cours) ou la discussion est ouverte : un bandeau à toucher, comme pour une tâche reçue ;
+       elles ne sont marquées vues qu'une fois la feuille vraiment montrée */
+    const sh = $('sheet');
+    if ((sh && !sh.hidden) || CHAT.open) { alertShow('Pendant ton absence', l.length + (l.length > 1 ? ' notifications : touche pour les voir.' : ' notification : touche pour la voir.'), () => { if (CHAT.open) closeChat(); notifVue(l.map((x) => x.id)); notifsFeuille(l); }); return; }
     notifVue(l.map((x) => x.id)); notifsFeuille(l);
   }
   /* dans l'app ouverte : une notification qui arrive s'affiche aussi en bandeau (sauf celles du Canal : la page les annonce déjà), avec « Voir » */
@@ -9989,7 +9999,10 @@ void main(){
   }
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) { NOTIF.cache = Date.now(); return; }
-    const depuis = NOTIF.cache; NOTIF.cache = 0; if (depuis) setTimeout(() => { notifsRetour(depuis - 10e3).then(() => { NOTIF.depuis = Date.now(); }).catch(() => {}); }, 500);   /* 10 s : l'écart d'horloge entre l'iPhone et le serveur */
+    /* 10 s : l'écart d'horloge entre l'iPhone et le serveur. 0.70.0 : JOUR.notif retient le rechargement de minuit (jourVu) jusqu'à la fin
+       de cette relecture (10 s au plus, si le serveur ne répond pas) : sinon le matin, la page se rechargeait avant d'ouvrir ce qui est arrivé la nuit */
+    const depuis = NOTIF.cache; NOTIF.cache = 0;
+    if (depuis) { JOUR.notif = performance.now() + 10000; setTimeout(() => { notifsRetour(depuis - 10e3).then(() => { NOTIF.depuis = Date.now(); }).catch(() => {}).finally(() => { JOUR.notif = 0; }); }, 500); }
   });
   setInterval(() => { notifsSurveiller().catch(() => {}); }, 30000);
   window.addEventListener('jv-notifs', () => { notifsSurveiller().catch(() => {}); });   /* bancs : sans attendre les 30 s */
@@ -10180,10 +10193,10 @@ void main(){
         h('span', {}, h('b', {text: a.nom}), h('small', {class: 'muted', text: relieLe(a.at) ? ' · ' + relieLe(a.at) : ''})),
         a.moi ? h('small', {class: 'muted app-moi', text: 'Cet appareil'})
           : h('button', {type: 'button', class: 'btn ghost sm', onclick: () => confirmSheet({bot: 'claude', title: 'Retirer « ' + a.nom + ' » ?', ok: 'Oui, retirer', cost: 'free',
-            say: 'Cet appareil ne pourra plus rien ouvrir sur ton serveur (mails, agenda, Pilotage) et ne recevra plus tes notifications. Pour le relier de nouveau, il faudra un nouveau code.', facts: relieLe(a.at) ? [['Appareil', a.nom + ', ' + relieLe(a.at)]] : [],
-            run: async () => { const r = await JS.appareils.retirer(a.id); draw(r && r.ok ? msg('« ' + a.nom + ' » est retiré : il ne peut plus rien ouvrir sur ton serveur.') : msg((r && r.error) || 'Retrait impossible.', true)); }})}, 'Retirer')))) : null;
+            say: 'Cet appareil ne pourra plus ouvrir l’app de ton serveur (mails, agenda, Pilotage) et ne recevra plus tes notifications. Pour le relier de nouveau, il faudra un nouveau code. S’il a ton raccourci « Jarvis » (Siri, bouton Action), sa clé marche encore : recrée-la aussi (carte « Siri et bouton Action », « Recréer la clé »).', facts: relieLe(a.at) ? [['Appareil', a.nom + ', ' + relieLe(a.at)]] : [],
+            run: async () => { const r = await JS.appareils.retirer(a.id); draw(r && r.ok ? msg('« ' + a.nom + ' » est retiré : il ne peut plus ouvrir l’app de ton serveur.' + (r.raccourci ? ' S’il avait ton raccourci « Jarvis », recrée sa clé : carte « Siri et bouton Action », « Recréer la clé ».' : '')) : msg((r && r.error) || 'Retrait impossible.', true)); }})}, 'Retirer')))) : null;
       parts.push(h('section', {class: 'card set-card'}, h('b', {text: 'Serveur JARVIS'}), h('p', {class: 'muted', text: 'Cet iPhone est relié à ' + JS.base + '.'}), appList,
-        h('button', {type: 'button', class: 'btn sm ghost danger', onclick: () => confirmSheet({bot: 'claude', title: 'Délier cet iPhone ?', ok: 'Oui, délier', cost: 'free', say: 'Il faudra un nouveau code pour le relier.', run: () => { JS.unpair(); location.reload(); }})}, 'Délier cet iPhone')));
+        h('button', {type: 'button', class: 'btn sm ghost danger', onclick: () => confirmSheet({bot: 'claude', title: 'Délier cet iPhone ?', ok: 'Oui, délier', cost: 'free', say: 'Il faudra un nouveau code pour le relier.', run: () => { Promise.resolve(JS.unpair()).catch(() => null).then(() => location.reload()); }})}, 'Délier cet iPhone')));
       /* 2. l'accès Google */
       const g = await JS.google();
       if (!g) { parts.push(msg('Serveur injoignable ou version trop ancienne : mets-le à jour depuis l’app JARVIS (Réglages, Mettre à jour).', true)); swap(parts); return; }
@@ -10719,7 +10732,7 @@ void main(){
       + '.bf-t{font-size:14.5px;line-height:1.45;color:var(--muted)}.bf-tip{justify-self:start;font-size:13px;padding:4px 10px;border-radius:999px;color:#e0f2fe;background:color-mix(in srgb,var(--bf) 18%,transparent);border:1px solid color-mix(in srgb,var(--bf) 45%,transparent)}'
       + '.bf-l{list-style:none;margin:2px 0 0;padding:0;display:grid;gap:6px}.bf-l li{font-size:14.5px;line-height:1.4;color:var(--fg);padding:8px 10px;border-radius:12px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06)}'
       + '.bf-l em{font-style:normal;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;margin-right:8px;padding:2px 7px;border-radius:6px;color:#111;background:var(--bf)}'
-      + '.bf-go{justify-self:start;background:none;border:0;padding:2px 0;color:var(--bf);font-weight:600;font-size:13.5px;cursor:pointer}'}));
+      + '.bf-go{justify-self:start;background:none;border:0;padding:2px 0;color:var(--bf);cursor:pointer}'}));
     document.head.append(h('style', {id: 'ux-cartes', text: 'html.theme-holo{--k1:10,11,16;--k2:24,26,36;--k3:17,19,27;--k5:6,7,11;--k6:14,15,22;--k7:26,28,40;--k8:19,21,30;--k9:11,12,18;--k10:40,43,58;--k11:6,7,11;--k12:3,3,6;--bg:#05060a;--bg-2:#0a0b11;--sheet:rgba(12,13,19,.97);--glass:rgba(255,255,255,.045);--glass-2:rgba(255,255,255,.07);--glass-3:rgba(255,255,255,.12);--line:rgba(255,255,255,.09);--line-2:rgba(255,255,255,.18);--fg:#eef1f7;--muted:#a3acbf;--dim:#6e778b}html.theme-holo body::after{background:radial-gradient(1px 1px at 8% 14%,rgba(255,255,255,.5),transparent 60%),radial-gradient(1px 1px at 34% 6%,rgba(255,255,255,.35),transparent 60%),radial-gradient(1.5px 1.5px at 72% 22%,rgba(255,255,255,.45),transparent 60%),radial-gradient(1px 1px at 91% 9%,rgba(255,255,255,.4),transparent 60%),radial-gradient(1px 1px at 18% 48%,rgba(255,255,255,.3),transparent 60%),radial-gradient(1px 1px at 46% 72%,rgba(255,255,255,.3),transparent 60%),radial-gradient(860px 520px at 50% -12%,color-mix(in srgb,var(--pg) 22%,transparent),transparent 62%),radial-gradient(640px 520px at 112% 84%,rgba(168,85,247,.16),transparent 62%),radial-gradient(560px 480px at -12% 62%,rgba(236,72,153,.08),transparent 62%),#05060a}.ux-sky i{background:radial-gradient(42% 30% at 30% 20%,color-mix(in srgb,var(--pg) 13%,transparent),transparent 70%),radial-gradient(36% 26% at 75% 65%,rgba(168,85,247,.10),transparent 70%)}html.theme-holo .top{border-bottom-color:color-mix(in srgb,var(--pg) 28%,transparent);box-shadow:0 1px 0 color-mix(in srgb,var(--pg) 10%,transparent)}.ux-seg{background:rgba(12,13,19,.92)!important;border-color:rgba(255,255,255,.08)!important}html.theme-holo :is(.glass,.card,.unit,.kpi,.key,.mate,.hero,.feed,.canal-row,.tl,.routines,.intent-row,.brief-card,.auto,.pap,.menu-tile,.esp-tile,.esp-row,.hud-ro,.tf,.rad-hero,.shop-hero,.trip-hero){--tint:var(--bc,var(--pg));--cbg:radial-gradient(130% 90% at 0% 0%,color-mix(in srgb,var(--tint) 30%,transparent),transparent 60%) padding-box,radial-gradient(90% 70% at 100% 100%,color-mix(in srgb,var(--tint) 9%,transparent),transparent 60%) padding-box,linear-gradient(180deg,#15171f,#0b0c12) padding-box;background:var(--cbg),linear-gradient(160deg,color-mix(in srgb,var(--tint) 68%,transparent),rgba(255,255,255,.08) 44%,rgba(255,255,255,.03)) border-box!important;border:1px solid transparent!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.07),0 14px 34px rgba(0,0,0,.5),0 0 28px color-mix(in srgb,var(--tint) 13%,transparent)!important}html.theme-holo :is(.esp-tile,.esp-row)[data-go="achats"]{--tint:#fb7185}html.theme-holo :is(.esp-tile,.esp-row)[data-go="voyages"]{--tint:#2dd4bf}html.theme-holo :is(.esp-tile,.esp-row)[data-go="sorties"]{--tint:#f472b6}html.theme-holo :is(.esp-tile,.esp-row)[data-go="argent"]{--tint:#34d399}html.theme-holo :is(.esp-tile,.esp-row)[data-go="papiers"]{--tint:#c084fc}html.theme-holo :is(.esp-tile,.esp-row)[data-go="equipe"]{--tint:#818cf8}html.theme-holo :is(.esp-tile,.esp-row)[data-go="reglages"]{--tint:#94a3b8}html.theme-holo :is(.esp-tile,.esp-row)[data-go="agenda"]{--tint:#60a5fa}html.theme-holo .hud-ro.q-tl{--tint:#60a5fa}html.theme-holo .hud-ro.q-tr{--tint:#38bdf8}html.theme-holo .hud-ro.q-bl{--tint:#a78bfa}html.theme-holo .hud-ro.q-br{--tint:#34d399}html.theme-holo .hud-ro[data-k="BONS PRIX"]{--tint:#fb7185}html.theme-holo :is(.glass,.card,.unit,.kpi,.key,.mate,.hero,.feed,.canal-row,.tl,.routines,.intent-row,.brief-card,.auto,.pap,.menu-tile,.esp-tile,.esp-row,.hud-ro,.tf,.rad-hero,.shop-hero,.trip-hero):is(.amb,.is-amber,.is-today,[data-mode="demande"]){--tint:#fbbf24}html.theme-holo :is(.hero,.shop-hero,.rad-hero,.trip-hero,.brief-card){background:var(--cbg),conic-gradient(from 210deg,#22d3ee,#a855f7,#f472b6,#fbbf24,#34d399,#22d3ee) border-box!important;border:1.5px solid transparent!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 16px 40px rgba(0,0,0,.55),0 0 30px rgba(168,85,247,.18),0 0 18px rgba(34,211,238,.12)!important}.ux-neon::before{background:conic-gradient(from 0deg,transparent 0 38%,rgba(34,211,238,.2) 46%,#67e8f9 56%,#c084fc 66%,#f472b6 75%,#fde68a 84%,transparent 95%)!important}:is(.amb,.is-amber,.is-today,[data-mode="demande"])>.ux-neon::before{background:conic-gradient(from 0deg,transparent 0 45%,rgba(251,191,36,.2) 55%,#fde68a 70%,#fbbf24 80%,transparent 95%)!important}.ux-shine::after{background:linear-gradient(90deg,transparent,rgba(255,255,255,.72),transparent)!important;box-shadow:0 0 10px color-mix(in srgb,var(--tint,var(--pg)) 70%,transparent)!important}.ux-lit{background:radial-gradient(160px circle at var(--lx,50%) var(--ly,50%),rgba(255,255,255,.22),color-mix(in srgb,var(--tint,var(--pg)) 14%,transparent) 40%,transparent 70%)!important}html.theme-holo .panel-h h2::before{background:linear-gradient(var(--pg),color-mix(in srgb,var(--pg) 45%,#a855f7));box-shadow:0 0 10px color-mix(in srgb,var(--pg) 70%,transparent)}.ux-floor i{background-image:linear-gradient(color-mix(in srgb,var(--pg) 28%,transparent) 1px,transparent 1px),linear-gradient(90deg,color-mix(in srgb,var(--pg) 28%,transparent) 1px,transparent 1px)!important}.fav-row .tab[aria-current="page"]::before{background:radial-gradient(circle,color-mix(in srgb,var(--pg) 30%,transparent),transparent 65%)!important}'}));
   }
 

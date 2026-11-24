@@ -162,7 +162,11 @@
       try { localStorage.setItem(KEY, JSON.stringify(s)); } catch (e) { return {ok: false, error: 'Stockage du téléphone indisponible.'}; }
       return {ok: true};
     },
-    unpair() { const s = settings(); s.serverToken = ''; try { localStorage.setItem(KEY, JSON.stringify(s)); } catch (e) { /* rien */ } },
+    /* 0.70.0 : la clé est d'abord retirée du serveur (4 s au plus, hors réseau tant pis), puis effacée du téléphone */
+    async unpair() {
+      if (token()) await Promise.race([req('/api/appareils/delier', {}).catch(() => null), new Promise((r) => setTimeout(r, 4000))]);
+      const s = settings(); s.serverToken = ''; try { localStorage.setItem(KEY, JSON.stringify(s)); } catch (e) { /* rien */ }
+    },
     /* 0.70.0 : les appareils reliés (carte « Serveur JARVIS » de Réglages) et le retrait d'un autre appareil ; null : serveur trop ancien ou injoignable */
     appareils: {
       liste: () => req('/api/appareils').then((r) => (r.status === 200 && r.j && Array.isArray(r.j.appareils) ? r.j.appareils : null)).catch(() => null),

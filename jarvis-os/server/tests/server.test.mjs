@@ -670,6 +670,7 @@ try {
       n0 = got.length; r = await G('/api/sante/maintenant', {}); ok('santé : retour à la normale noté, sans notification', it('google').ok === true && got.length === n0, JSON.stringify(r.body.items));
       const gs = JSON.parse(fs.readFileSync(path.join(DATA, 'guard-mission.json'), 'utf8'));
       ok('missions : Claude Code refuse les chemins secrets (état du serveur, ~/.claude, /proc) et le garde-fou voit les outils de fichiers', /Read/.test(gs.hooks.PreToolUse[0].matcher) && gs.permissions.deny.includes('Read(//' + path.resolve(DATA).replace(/^\/+/, '') + '/*.json)') && gs.permissions.deny.some((x) => /^Read\(\/\/.*\/\.claude\/\*\*\)$/.test(x)) && gs.permissions.deny.includes('Read(//proc/**)'), JSON.stringify(gs.permissions.deny.slice(0, 4)));
+      ok('0.70.0 : la copie d’un state.json abîmé (state.json.corrompu-<ms>) est aussi refusée à Claude Code (lecture et écriture)', ['Read', 'Edit'].every((v) => gs.permissions.deny.includes(v + '(//' + path.resolve(DATA).replace(/^\/+/, '') + '/*.corrompu-*)')), JSON.stringify(gs.permissions.deny.filter((x) => /corrompu/.test(x))));
       await G('/api/push/unsubscribe', {endpoint: ep}); PS.close(); }
     r = await G('/api/google/unlink', {}); g = await G('/api/google'); ok('déconnexion : jeton révoqué chez Google', r.body.ok && !g.body.linked && FG.revoked === 'RT1'); }
   { let sp = await call('/api/sample', {method: 'POST', headers: A, body: JSON.stringify({input: [{role: 'user', content: 'Explique en clair'}], tier: 'quick'})});

@@ -85,8 +85,8 @@ try {
     const charger = async (url, mode) => { let rendu = null; H.fetch({request: {method: 'GET', url, mode: mode || 'navigate', clone: () => ({})}, respondWith: (p) => { rendu = p; }}); return rendu ? {r: await rendu} : null; };
     return {H, journal, attendre, charger};
   }
-  { const S = sw({caches: ['jarvis-os-app-v3', 'jarvis-os-app-v4', 'jarvis-os-v3', 'panier-v2']}); await S.attendre('install'); const avant = S.journal.skips; await S.attendre('activate');
-    ok('service worker : à l’activation, il n’efface que ses propres anciens caches (jarvis-os-app-v3), ni l’ancienne app ni Panier', S.journal.effaces.join() === 'jarvis-os-app-v3' && avant === 0, JSON.stringify(S.journal)); }
+  { const S = sw({caches: ['jarvis-os-app-v3', 'jarvis-os-app-v4', 'jarvis-os-v3', 'jarvis-os-v4', 'panier-v2']}); await S.attendre('install'); const avant = S.journal.skips; await S.attendre('activate');
+    ok('service worker : à l’activation, il n’efface que ses propres anciens caches (jarvis-os-app-v3) et le cache périmé jarvis-os-v3 de l’ancienne app (réponses de /api/), ni jarvis-os-v4 ni Panier', S.journal.effaces.join() === 'jarvis-os-app-v3,jarvis-os-v3' && avant === 0, JSON.stringify(S.journal)); }
   { const S = sw(); await S.attendre('install'); const a = S.journal.skips; S.H.message({data: {type: 'active'}});
     ok('service worker : jamais de relève à l’installation (seulement sur « active », app à l’arrière-plan)', a === 0 && S.journal.skips === 1, JSON.stringify(S.journal)); }
   { const S = sw(); await S.charger('https://jarvis.essai/?n=a1b2c3'); await S.charger('https://jarvis.essai/?n=d4e5f6#voir-brief'); await S.charger('https://jarvis.essai/'); await S.charger('https://jarvis.essai/jarvis-serveur.js', 'no-cors');

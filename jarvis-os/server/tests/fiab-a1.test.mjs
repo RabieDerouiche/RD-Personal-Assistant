@@ -299,7 +299,9 @@ try {
     ok('ordre à un bot pendant une pause de Grok : ligne écrite, sonnette gardée, puis envoyée à la reprise (une seule)', m2 && m2.status === 'terminee' && /Sonnette gardée pour la reprise de Grok/.test(m2.result) && garde.includes('Kairos') && rv.body.sonnettes && rv.body.sonnettes.sonnees === 1 && b2.length === 1 && /To: exemple\+kairos@mail\.grokbot\.com/i.test(mailTxt(b2[0])), JSON.stringify([m2 && m2.result, garde, rv.body, b2.length]));
     /* sans Gmail chez Claude : la sonnette part par l'accès Google du serveur */
     await SC.stop(); SC = await demarrer({data: SC.data, flags: ['sans-gmail'], env: {TZ}});
-    const e1 = envois().length, k3 = await ordre(), m3 = k3 && await approuver(k3.id), b3 = envois().slice(e1);
+    /* la mission passe « terminée » dès la réponse de Claude ; la sonnette du serveur suit (lecture de Faits, envoi) : on l'attend */
+    const e1 = envois().length, k3 = await ordre(), m3a = k3 && await approuver(k3.id);
+    const m3 = m3a && ((await until(async () => { const x = await mission(SC, k3.id); return x && /Sonnette/.test(x.result || '') ? x : null; }, 5000)) || m3a), b3 = envois().slice(e1);
     ok('ordre à un bot sans Gmail chez Claude : la sonnette part quand même, par l’accès Google du serveur', m3 && m3.status === 'terminee' && /Sonnette : sonnette envoyée/.test(m3.result) && b3.length === 1 && /To: exemple\+kairos@mail\.grokbot\.com/i.test(mailTxt(b3[0])), JSON.stringify([m3 && m3.result, b3.length]));
     await SC.stop(); }
 

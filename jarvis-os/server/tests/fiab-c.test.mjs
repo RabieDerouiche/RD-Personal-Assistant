@@ -59,8 +59,10 @@ try {
   ok('se retirer soi-même : 400 avec une phrase claire, rien n’est retiré', soi.status === 400 && /ne peut pas se retirer lui-même/.test(soi.body && soi.body.error) && etat().tokens.length === 2 && (await call('/api/status', {headers: B})).status === 200, JSON.stringify(soi));
   ok('appareil inconnu (ou id vide) : 404 « Appareil introuvable », rien n’est retiré', inconnu.status === 404 && /Appareil introuvable/.test(inconnu.body && inconnu.body.error) && vide.status === 404 && etat().tokens.length === 2, JSON.stringify([inconnu, vide]));
 
-  /* ---------- retirer le premier depuis le second ---------- */
+  /* ---------- retirer le premier depuis le second (une clé de raccourci existe : la réponse le signale) ---------- */
+  const cle = await call('/api/raccourci/cle', {method: 'POST', headers: B, body: '{}'});
   const ret = await call('/api/appareils/retirer', {method: 'POST', headers: B, body: JSON.stringify({id: ia && ia.id})});
+  ok('retrait avec une clé de raccourci en place : la réponse dit « raccourci » (la page renvoie alors à « Recréer la clé »)', cle.status === 200 && !!(cle.body && cle.body.cle) && ret.body && ret.body.raccourci === true, JSON.stringify([cle.status, ret.body && ret.body.raccourci]));
   const stA = await call('/api/status', {headers: A}), stB = await call('/api/status', {headers: B}), toolA = await call('/api/tool', {method: 'POST', headers: A, body: JSON.stringify({server: 'Gmail', tool: 'search_threads', input: {}})});
   ok('retrait du premier depuis le second : 200 ; ensuite le premier reçoit 401 sur /api/status (et /api/tool), le second 200',
     ret.status === 200 && ret.body.ok === true && ret.body.nom === 'JARVIS OS · iPad essai' && stA.status === 401 && toolA.status === 401 && stB.status === 200 && ret.body.appareils.length === 1 && ret.body.appareils[0].moi === true, JSON.stringify([ret, stA.status, toolA.status, stB.status]));
@@ -68,6 +70,16 @@ try {
   ok('retrait : le jeton sort de l’état gardé ; les notifications du retiré partent avec lui, celles du second restent', e1.tokens.length === 1 && ret.body.notifications === 1 && subs1.join() === 'b' && (await call('/api/push', {headers: B})).body.count === 1, JSON.stringify([ret.body, subs1]));
   const encore = await call('/api/appareils/retirer', {method: 'POST', headers: A, body: JSON.stringify({id: ib && ib.id})});
   ok('le retiré ne peut plus rien retirer (401)', encore.status === 401 && etat().tokens.length === 1, JSON.stringify(encore));
+
+  /* ---------- « Délier cet iPhone » : la clé sort aussi du serveur ---------- */
+  const pc = await call('/api/pair', {method: 'POST', body: JSON.stringify({code: nouveauCode(), device: 'JARVIS OS · Mac essai'})}), C = {authorization: 'Bearer ' + (pc.body && pc.body.token)};
+  await call('/api/push/subscribe', {method: 'POST', headers: C, body: JSON.stringify({subscription: abonnement('c')})});
+  const avantC = etat().tokens.length, del = await call('/api/appareils/delier', {method: 'POST', headers: C, body: '{}'});
+  const stC = await call('/api/status', {headers: C}), stB2 = await call('/api/status', {headers: B}), subsC = etat().push.subs.map((x) => x.endpoint.split('-').pop());
+  ok('« Délier cet iPhone » : sa clé sort du serveur (401 ensuite) et ses notifications avec elle ; les autres appareils restent reliés',
+    pc.status === 200 && avantC === 2 && del.status === 200 && del.body.notifications === 1 && stC.status === 401 && stB2.status === 200 && etat().tokens.length === 1 && subsC.join() === 'b', JSON.stringify([pc.status, avantC, del, stC.status, stB2.status, subsC]));
+  const delSans = await call('/api/appareils/delier', {method: 'POST', body: '{}'});
+  ok('délier sans clé : 401, rien ne change', delSans.status === 401 && etat().tokens.length === 1, JSON.stringify(delSans));
 } catch (e) { ok('exception', false, e && e.stack); }
 try { srv.kill(); } catch { /* rien */ }
 

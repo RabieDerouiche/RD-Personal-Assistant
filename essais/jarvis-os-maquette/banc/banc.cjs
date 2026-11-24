@@ -193,12 +193,14 @@ srv.listen(0, async () => {
       const aPass = await q.evaluate(() => { const s = [...document.querySelectorAll('#view .stats .stat')].find((x) => /passages? cette semaine/.test(x.textContent)); if (s) s.click(); return !!s; }); await q.waitForTimeout(800);
       const sp = await q.evaluate(() => ({f: document.querySelector('.ux-seg [aria-pressed="true"]').dataset.f, cout: [...document.querySelectorAll('#view h2')].some((x) => /Coût de la semaine/.test(x.textContent))}));
       ok('0.70 : Équipe : « ordres en cours » ouvre Demandes sur « Tes ordres » ; « passages cette semaine » ouvre le filtre Coût', so.f === 'dem' && so.hash === '#suivi' && so.dans && aPass && sp.f === 'cout' && sp.cout, JSON.stringify([so, aPass, sp]));
-      /* brief : « Voir dans Pour moi › » en gras, à sa taille ; plus de style du menu « Tout » ; l'indicateur de la barre sous l'onglet allumé */
-      const st = await q.evaluate(() => { const bt = document.createElement('button'); bt.className = 'bf-go'; bt.textContent = 'Voir dans Pour moi ›'; document.body.append(bt); const c = getComputedStyle(bt), f = c.fontWeight + ' ' + c.fontSize; bt.remove();
+      /* brief : « Voir dans Pour moi › » garde la police de son parent, comme avant (son ancien style de police, mal écrit, était ignoré : pas de
+         changement visuel sans son accord) ; plus de style du menu « Tout » ; l'indicateur de la barre sous l'onglet allumé */
+      const st = await q.evaluate(() => { const bt = document.createElement('button'); bt.className = 'bf-go'; bt.textContent = 'Voir dans Pour moi ›'; document.body.append(bt); const c = getComputedStyle(bt), bc = getComputedStyle(document.body), f = c.fontWeight + ' ' + c.fontSize, fb = bc.fontWeight + ' ' + bc.fontSize; bt.remove();
+        let propre = 0; for (const sh of document.styleSheets) { try { for (const r of sh.cssRules) if (r.selectorText === '.bf-go' && !r.style.fontWeight && !r.style.fontSize && !r.style.font) propre++; } catch (e) { /* feuille externe */ } }
         let mort = 0; for (const sh of document.styleSheets) { try { for (const r of sh.cssRules) if (/all-sheet|all-panel|all-grid|all-close|fav-handle|fav-pick|is-elsewhere/.test(r.cssText)) mort++; } catch (e) { /* feuille externe */ } }
         const ind = document.querySelector('.fav-ind'), t = document.querySelector('.fav-row .tab[aria-current="page"]'), ri = ind && ind.getBoundingClientRect(), rt2 = t && t.getBoundingClientRect();
-        return {f, mort, ind: !!ri && !!rt2 && Math.abs((ri.left + ri.width / 2) - (rt2.left + rt2.width / 2)) < 12 && getComputedStyle(ind).opacity === '1'}; });
-      ok('0.70 : brief : « Voir dans Pour moi › » en gras 13,5 px (le style était ignoré) ; le style mort du menu « Tout » est retiré, la barre garde son indicateur', st.f === '600 13.5px' && st.mort === 0 && st.ind, JSON.stringify(st));
+        return {f, fb, propre, mort, ind: !!ri && !!rt2 && Math.abs((ri.left + ri.width / 2) - (rt2.left + rt2.width / 2)) < 12 && getComputedStyle(ind).opacity === '1'}; });
+      ok('0.70 : brief : « Voir dans Pour moi › » garde la police héritée, comme avant (pas de gras ni de 13,5 px) ; le style mort du menu « Tout » est retiré, la barre garde son indicateur', st.f === st.fb && st.propre === 1 && st.mort === 0 && st.ind, JSON.stringify(st));
       await q.context().close();
       /* un filtre vide le dit en une phrase (ici : aucune réponse de bot ces 3 derniers jours) */
       q = await ctxF(() => { let g; Object.defineProperty(window, '__G', {configurable: true, get: () => g, set: (v) => { (v['Canal'] || []).forEach((r, i) => { if (i) r[6] = ''; }); g = v; }}); });
@@ -629,6 +631,20 @@ srv.listen(0, async () => {
         const w2 = await q.evaluate(() => ({mark: window.__b1jour || 0, ecrit: (window.__calls || []).some((c) => c.tool === 'update_values' && /^'?Échéances'?!/.test(c.input.range || '') && /"Fait"/.test(JSON.stringify(c.input.values)))}));
         await q.waitForTimeout(23000); const w3 = await jour();
         ok('0.70.0 — B1 : une écriture « Dans 5 s » encore en attente au changement de jour : la page attend qu’elle soit partie (statut « Fait » écrit), puis se recharge sur le nouveau jour', w1.mark === 2 && w2.mark === 2 && w2.ecrit && w3.mark === 0 && /\b25\b/.test(w3.today) && /nov/.test(w3.today), JSON.stringify([w1, w2, w3]));
+        await ctx.close(); }
+      /* page#3 : une question tapée dans la discussion, puis la discussion fermée sans l'envoyer (le brouillon est gardé hors du champ) :
+         passé minuit, le retour ne recharge pas la page et le texte reste ; une fois vidé, le retour suivant passe au nouveau jour */
+      { const ctx = await b.newContext({...devices['iPhone 15 Pro Max']}); await ctx.addInitScript(PAUSE_INIT); const q = await ctx.newPage(); q.on('pageerror', (e) => errs.push('B1 brouillon : ' + e.message));
+        await q.clock.setFixedTime(new Date('2026-11-23T23:50:00')); await q.goto(base + '#accueil'); await q.waitForTimeout(3000);
+        await q.evaluate(() => { window.__b1jour = 3; });
+        await q.tap('.talk-slot .jv-btn'); await q.waitForTimeout(900); await q.fill('#chat-in', 'Une longue question pour Claude, pas encore envoyée (essai)'); await q.keyboard.press('Escape'); await q.waitForTimeout(600);
+        const ferme = await q.evaluate(() => document.getElementById('chat').hidden);
+        await vis(q, true); await q.clock.setFixedTime(new Date('2026-11-24T08:00:00')); await vis(q, false); await q.waitForTimeout(2500);
+        const d1 = await q.evaluate(() => ({mark: window.__b1jour || 0, brouillon: (document.getElementById('chat-in') || {}).value || ''}));
+        await q.evaluate(() => { const c = document.getElementById('chat-in'); if (c) c.value = ''; }); await vis(q, true); await vis(q, false); await q.waitForTimeout(3500);
+        const d2 = await q.evaluate(() => ({mark: window.__b1jour || 0, hud: (document.querySelector('.hud-date') || {}).textContent || ''}));
+        ok('0.70.0 — B1 : un brouillon laissé dans la discussion fermée, passé minuit : pas de rechargement au retour, le texte reste ; vidé, la page passe au nouveau jour au retour suivant',
+          ferme && d1.mark === 3 && /longue question/.test(d1.brouillon) && d2.mark === 0 && /mardi 24 novembre/i.test(d2.hud), JSON.stringify([ferme, d1, d2]));
         await ctx.close(); }
       /* échéances, dossiers, liens, page d'un bot, Achats, Papiers, adresses : sur les données d'exemple en direct, plus quelques lignes inventées */
       { const q = await page('#agenda'); const e0 = errs.length;
@@ -1336,7 +1352,7 @@ srv.listen(0, async () => {
       const T = new Date(2026, 10, 23, 14, 5).getTime(), AP = [{id: 'aaaaaaaaaaaa', nom: 'JARVIS OS · iPhone', at: T, moi: true}, {id: 'bbbbbbbbbbbb', nom: 'JARVIS OS · iPad', at: T - 864e5, moi: false}], retraits = [];
       await ctx.route(base + 'api/**', async (r) => { const u = new URL(r.request().url()), j = (s, o) => r.fulfill({status: s, contentType: 'application/json', body: JSON.stringify(o)});
         if (u.pathname === '/api/appareils') return j(200, {appareils: AP});
-        if (u.pathname === '/api/appareils/retirer') { const bd = JSON.parse(r.request().postData() || '{}'); retraits.push(bd.id); const i = AP.findIndex((x) => x.id === bd.id); const n = AP[i].nom; AP.splice(i, 1); return j(200, {ok: true, nom: n, notifications: 1, appareils: AP}); }
+        if (u.pathname === '/api/appareils/retirer') { const bd = JSON.parse(r.request().postData() || '{}'); retraits.push(bd.id); const i = AP.findIndex((x) => x.id === bd.id); const n = AP[i].nom; AP.splice(i, 1); return j(200, {ok: true, nom: n, notifications: 1, raccourci: true, appareils: AP}); }
         return j(404, {error: 'Adresse inconnue du serveur.'}); });
       const q = await ctx.newPage(); q.on('pageerror', (e) => errs.push('appareils : ' + e.message)); await q.goto(base + '?serveur#reglages'); await q.waitForTimeout(3500);
       const lis = () => q.evaluate(() => [...document.querySelectorAll('.set-card .app-it')].map((x) => ({t: x.innerText.replace(/\s+/g, ' ').trim(), btn: [...x.querySelectorAll('button')].map((y) => y.textContent.trim())})));
@@ -1345,10 +1361,14 @@ srv.listen(0, async () => {
         l0.length === 2 && /^JARVIS OS · iPhone · relié le 23 novembre( 2026)? à 14h05 Cet appareil$/.test(l0[0].t) && !l0[0].btn.length && /^JARVIS OS · iPad · relié le 22 novembre/.test(l0[1].t) && l0[1].btn.join() === 'Retirer' && /Délier cet iPhone/.test(carte), JSON.stringify([l0, carte]));
       await q.evaluate(() => [...document.querySelectorAll('.app-it')][1].querySelector('button').click()); await q.waitForTimeout(700);
       const conf = await q.evaluate(() => { const s = document.getElementById('sheet'); return s && !s.hidden ? s.innerText.replace(/\s+/g, ' ') : ''; }), avant = retraits.length;
+      await q.waitForFunction(() => /« Recréer la clé »\)\./.test(document.getElementById('sheet').innerText), null, {timeout: 6000}).catch(() => null);   /* la phrase s'écrit peu à peu (environ 2 s) */
+      const confTout = await q.evaluate(() => { const s = document.getElementById('sheet'); return s && !s.hidden ? s.innerText.replace(/\s+/g, ' ') : ''; });
       await q.evaluate(() => { const x = [...document.querySelectorAll('#sheet button')].find((y) => /Oui, retirer/.test(y.textContent)); if (x) x.click(); }); await q.waitForTimeout(1800);
       const l1 = await lis(), dit = await q.evaluate(() => [...document.querySelectorAll('.set-wrap .set-msg')].map((x) => x.textContent).join(' | '));
       ok('0.70.0 — C : « Retirer » demande d’abord confirmation (« Retirer « JARVIS OS · iPad » ? », rien ne part avant), puis le retire et le dit ; la liste ne garde que cet appareil',
         /Retirer « JARVIS OS · iPad » \?/.test(conf) && /Oui, retirer/.test(conf) && avant === 0 && retraits.join() === 'bbbbbbbbbbbb' && /« JARVIS OS · iPad » est retiré/.test(dit) && l1.length === 1 && /Cet appareil$/.test(l1[0].t), JSON.stringify([conf.slice(0, 200), retraits, dit, l1]));
+      ok('0.70.0 — C : « Retirer » dit que la clé du raccourci « Jarvis » marche encore et renvoie à « Recréer la clé » (confirmation et message, le serveur ayant une clé)',
+        /sa clé marche encore : recrée-la aussi \(carte « Siri et bouton Action », « Recréer la clé »\)/.test(confTout) && /S’il avait ton raccourci « Jarvis », recrée sa clé : carte « Siri et bouton Action », « Recréer la clé »/.test(dit), JSON.stringify([confTout.slice(0, 400), dit]));
       await q.screenshot({path: path.join(SH, 'reglages-appareils.png')});
       /* doc-ouverts#3 « Feuille Pendant ton absence » : de retour au premier plan, une notification de 20 minutes (envoyée pendant l'absence,
          pas encore vue) est proposée dans la feuille, rien ne bouge sans son geste ; une seule de 5 minutes s'ouvre directement, comme avant */
@@ -1370,6 +1390,41 @@ srv.listen(0, async () => {
       NOTIFS = [{id: 'n5', at: H1 + 5 * 60e3, title: 'Rappel (essai)', body: '', url: '/#agenda'}, {id: 'n20', at: H0 + 5 * 60e3, title: 'Paiement refusé (essai)', body: '', url: '/#agenda', vue: H0 + 26 * 60e3}];
       await vis(false); await q.waitForTimeout(2000); const r5 = await etatN();
       ok('0.70.0 — C : une seule notification de 5 minutes au retour : ouverte directement (comme avant), et dite', r5.hash === '#agenda' && !r5.feuille && /Ouvert depuis ta notification/.test(r5.toast), JSON.stringify(r5));
+      await ctx.close(); }
+    /* page#1 : l'app laissée ouverte la nuit (chargée le 24 à 23h50), deux notifications à 7h30 et 7h40, retour le 25 à 8h00, serveur lent
+       (300 ms) : la feuille « Pendant ton absence » s'ouvre et la page ne se recharge pas avant (avant : rechargée à 0,6 s, tout était perdu) ;
+       fermée, le retour suivant passe au nouveau jour. page#2 : une fiche ouverte avant l'absence n'est pas remplacée : un bandeau à toucher,
+       et les notifications ne sont marquées vues qu'une fois la feuille montrée. Titres inventés. */
+    { const ctx = await b.newContext({...devices['iPhone 15 Pro Max']}); await ctx.addInitScript(PAUSE_INIT);
+      await ctx.addInitScript(() => { try { localStorage.setItem('jarvis.settings', JSON.stringify({serverToken: 'jeton-essai'})); } catch (e) { /* rien */ } });
+      let NOTIFS = []; const vues = [];
+      await ctx.route(base + 'api/**', async (r) => { const u = new URL(r.request().url()), j = (st, o) => r.fulfill({status: st, contentType: 'application/json', body: JSON.stringify(o)});
+        if (u.pathname === '/api/notifs/vue') { vues.push(...(JSON.parse(r.request().postData() || '{}').ids || [])); return j(200, {ok: true}); }
+        if (u.pathname === '/api/notifs') { await new Promise((z) => setTimeout(z, 300)); return j(200, {notifs: NOTIFS}); }
+        if (u.pathname === '/api/appareils') return j(200, {appareils: [{id: 'aaaaaaaaaaaa', nom: 'JARVIS OS · iPhone', at: new Date(2026, 10, 20, 9, 0).getTime(), moi: true}]});
+        return j(404, {error: 'Adresse inconnue du serveur.'}); });
+      const q = await ctx.newPage(); q.on('pageerror', (e) => errs.push('nuit : ' + e.message));
+      const vis = (hd) => q.evaluate((x) => { Object.defineProperty(document, 'hidden', {configurable: true, get: () => x}); Object.defineProperty(document, 'visibilityState', {configurable: true, get: () => (x ? 'hidden' : 'visible')}); document.dispatchEvent(new Event('visibilitychange')); }, hd);
+      const etatN = () => q.evaluate(() => { const s = document.getElementById('sheet'); return {mark: window.__nuit || 0, hash: location.hash, feuille: s && !s.hidden ? s.innerText.replace(/\s+/g, ' ') : '', toast: [...document.querySelectorAll('.toast')].map((x) => x.innerText.replace(/\s+/g, ' ')).join(' | '), today: document.getElementById('today').textContent}; });
+      await q.clock.setFixedTime(new Date(2026, 10, 24, 23, 50)); await q.goto(base + '?serveur#reglages'); await q.waitForTimeout(3500);
+      await q.evaluate(() => { window.__nuit = 1; });
+      await vis(true); await q.clock.setFixedTime(new Date(2026, 10, 25, 8, 0));
+      NOTIFS = [{id: 'nn2', at: new Date(2026, 10, 25, 7, 40).getTime(), title: 'Kairos : prix en baisse (essai)', body: '', url: '/#achats'}, {id: 'nn1', at: new Date(2026, 10, 25, 7, 30).getTime(), title: 'Iris a répondu (essai)', body: '', url: '/#demandes'}];
+      await vis(false); await q.waitForTimeout(2500); const n1 = await etatN();
+      ok('0.70.0 : app ouverte toute la nuit, deux notifications à 7h30 et 7h40, retour à 8h00 (serveur lent) : la feuille « Pendant ton absence » s’ouvre, sans rechargement de minuit avant',
+        n1.mark === 1 && n1.hash === '#reglages' && /pendant ton absence/i.test(n1.feuille) && /2 notifications/.test(n1.feuille) && /Iris a répondu \(essai\)/.test(n1.feuille) && vues.includes('nn1') && vues.includes('nn2'), JSON.stringify([n1, vues]));
+      await q.keyboard.press('Escape'); await q.waitForTimeout(500); await vis(true); await vis(false); await q.waitForTimeout(3500); const n2 = await etatN();
+      ok('0.70.0 : la feuille fermée, au retour suivant la page passe au nouveau jour (le 25)', n2.mark === 0 && /\b25\b/.test(n2.today), JSON.stringify(n2));
+      await q.evaluate(() => { const x = [...document.querySelectorAll('.set-card button')].find((y) => /Délier cet iPhone/.test(y.textContent)); if (x) x.click(); }); await q.waitForTimeout(700);
+      const avantF = (await etatN()).feuille, H = new Date(2026, 10, 25, 9, 0).getTime(), v0 = vues.length;
+      await q.clock.setFixedTime(new Date(H)); await vis(true); await q.clock.setFixedTime(new Date(H + 40 * 60e3));
+      NOTIFS = [{id: 'nb2', at: H + 30 * 60e3, title: 'Rappel (essai 2)', body: '', url: '/#agenda'}, {id: 'nb1', at: H + 20 * 60e3, title: 'Iris a répondu (essai 2)', body: '', url: '/#demandes'}];
+      await vis(false); await q.waitForTimeout(2000); const p1 = await etatN();
+      ok('0.70.0 : une fiche ouverte avant l’absence (« Délier cet iPhone ? ») reste ; un bandeau « Pendant ton absence · 2 notifications » s’affiche à la place de la feuille, rien n’est encore marqué vu',
+        /Délier cet iPhone/.test(avantF) && /Délier cet iPhone/.test(p1.feuille) && /Pendant ton absence/.test(p1.toast) && /2 notifications : touche pour les voir/.test(p1.toast) && vues.length === v0, JSON.stringify([avantF.slice(0, 60), p1, vues.slice(v0)]));
+      await q.evaluate(() => { const t = [...document.querySelectorAll('.alert-t')].find((x) => /Pendant ton absence/.test(x.textContent)), v = t && [...t.querySelectorAll('button')].find((y) => y.textContent.trim() === 'Voir'); if (v) v.click(); }); await q.waitForTimeout(900);
+      const p2 = await etatN();
+      ok('0.70.0 : « Voir » sur ce bandeau montre la feuille « Pendant ton absence » ; elles sont marquées vues à ce moment-là', /pendant ton absence/i.test(p2.feuille) && /2 notifications/.test(p2.feuille) && /Rappel \(essai 2\)/.test(p2.feuille) && vues.slice(v0).sort().join() === 'nb1,nb2', JSON.stringify([p2, vues.slice(v0)]));
       await ctx.close(); }
     /* page-5#1 « Oui à la voix seulement » : en discussion écrite, un « oui » tapé n'exécute pas la proposition de Claude : il part à Claude, et le
        bouton de la carte reste la seule validation (en mains libres, le « oui » l'exécute toujours : banc-serveur.mjs, « voix : un ordre à un bot… ») */

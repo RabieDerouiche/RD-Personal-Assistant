@@ -154,11 +154,12 @@ const DEBUT = "^((et|alors|bon|dis|dis-moi|dis moi|donne-moi|donne moi|tu as|t'a
 const FIN = "( maintenant| en ce moment| exactement| deja| la| aujourd'hui| d'aujourd'hui| du jour)?$";
 const HEURE = new RegExp(DEBUT + "(quelle heure|quelle heure (est-il|est il|il est|c'est)|(il est|c'est) quelle heure|l'heure qu'il est|l'heure)" + FIN);
 const DATE = new RegExp(DEBUT + "(quel jour|quelle date|quelle est la date|(on est|nous sommes|c'est) quel jour|(on est|nous sommes) le combien|quel jour (on est|est-on|est on|sommes-nous|sommes nous|nous sommes|est-il|est il|c'est)|quelle date (on est|est-on|est on|sommes-nous|sommes nous|nous sommes|est-il|est il|c'est)|la date)" + FIN);
-/* ce que demande la phrase, si le serveur sait y répondre seul ; null sinon (Claude répond) */
+/* ce que demande la phrase, si le serveur sait y répondre seul ; null sinon (Claude répond). 0.70.0 : une salutation (« Bonjour Jarvis, quelle heure
+   est-il ? ») ou un « euh » devant n'empêchent pas la réponse instantanée */
 export function intention(text) {
   const l = nrm(text).replace(/[?!.,;]+/g, ' ').replace(/\s+/g, ' ').trim(), mots = l.split(' ').filter(Boolean).length;
   if (!l || ORDRE.test(l)) return null;
-  const court = mots <= 14, passe = /\b(hier|avant-hier)\b/.test(l), seul = l.replace(/\b(jarvis|stp|svp|s'il te plait|s'il vous plait|merci)\b/g, ' ').replace(/\s+/g, ' ').trim();
+  const court = mots <= 14, passe = /\b(hier|avant-hier)\b/.test(l), seul = l.replace(/\b(jarvis|bonjour|bonsoir|salut|coucou|hello|hey|he|eh|euh|ok|okay|oui|stp|svp|s'il te plait|s'il vous plait|merci)\b/g, ' ').replace(/\s+/g, ' ').trim();
   if (court && HEURE.test(seul)) return {kind: 'heure'};
   if (court && DATE.test(seul)) return {kind: 'date'};
   if (!passe && !/\b(notes? de frais|frais de|les frais)\b/.test(l) && !/\b(liste|courses|panier|chauffage|thermostat|radiateur|clim|climatisation|four|frigo|congelateur|bain|piscine)\b/.test(l) && /\b(meteo|quel temps|temps fait|il fait (beau|froid|chaud|frais|combien|quel)|fera(-t-il)? (beau|froid|chaud)|va (t'il |t il |-t-il )?pleuvoir|pleuvoir|pluie|parapluie|neige|neiger|temperature|degres|manteau|veste|frais dehors|du frais|fait frais|fait froid|soleil)\b/.test(l)) return {kind: 'meteo', court};

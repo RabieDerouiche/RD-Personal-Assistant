@@ -45,7 +45,11 @@ try {
     const bons = [['Quelle heure est-il ?', 'heure'], ['Il est quelle heure ?', 'heure'], ['Quelle heure est-il, Jarvis ?', 'heure'], ['Tu as l’heure ?', 'heure'], ['On est quel jour ?', 'date'], ['Quel jour sommes-nous ?', 'date'], ["C'est quel jour aujourd'hui ?", 'date'], ['Il fait frais dehors ?', 'meteo'], ['Et demain, il va pleuvoir ?', 'meteo'], ['Je prends un parapluie demain ?', 'meteo'],
       ["Qu'est-ce que j'ai demain ?", 'agenda'], ["Qu'est-ce qui m'attend ?", 'pourmoi'], ['Il y a quelque chose pour moi ?', 'pourmoi'], ['Où en est Iris ?', 'bot']];
     const rate = bons.filter(([t, k]) => (intention(t) || {}).kind !== k);
-    ok('réponses instantanées : l’heure, la date, la météo, l’agenda, ce qui t’attend et où en est un bot restent instantanés', !rate.length, JSON.stringify(rate.map(([t]) => [t, intention(t)]))); }
+    ok('réponses instantanées : l’heure, la date, la météo, l’agenda, ce qui t’attend et où en est un bot restent instantanés', !rate.length, JSON.stringify(rate.map(([t]) => [t, intention(t)])));
+    const salut = [['Bonjour Jarvis, quelle heure est-il ?', 'heure'], ['Salut, il est quelle heure ?', 'heure'], ['Ok Jarvis quelle heure est il', 'heure'], ['Hé Jarvis, quelle heure est-il ?', 'heure'], ['Euh quelle heure est-il', 'heure'], ['Salut, on est quel jour ?', 'date'], ['Bonjour, quel jour sommes-nous ?', 'date'], ['Coucou Jarvis on est le combien', 'date'],
+      ['Bonjour Jarvis', null], ['Salut Jarvis, à quelle heure part le train ?', null], ['Bonjour, quelle heure est-il à New York ?', null]];
+    const rate2 = salut.filter(([t, k]) => ((intention(t) || {}).kind || null) !== k);
+    ok('réponses instantanées : une salutation devant (« Bonjour Jarvis, quelle heure est-il ? », « Salut, on est quel jour ? ») garde la réponse instantanée ; « à quelle heure part… » ou une autre ville restent pour Claude', !rate2.length, JSON.stringify(rate2.map(([t]) => [t, intention(t)]))); }
 
   /* 3. voix-push#3 : pas de pique quand la question elle-même est grave */
   { const a = pique('meteo', 'Demain : entre 7 et 11 degrés, pluie probable à 80 %. Prends un parapluie.', '09:00', () => 0, "Quel temps fera-t-il demain pour l'enterrement de mon grand-père ?");
