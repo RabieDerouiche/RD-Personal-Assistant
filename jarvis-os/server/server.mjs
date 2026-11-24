@@ -32,7 +32,7 @@ import {createCoffreLien} from './coffre-lien.mjs';   /* 0.74.0 : le coffre en m
 import {createVerrou} from './verrou.mjs';   /* 0.75.0 : le verrou de l'app par passkey */
 const ACT = createActivite();   /* 0.33.0 : ce que fait Claude à l'instant */
 
-const VERSION = '0.80.0';
+const VERSION = '0.81.0';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PORT = +(process.env.PORT || 8787);
 const HOST = process.env.HOST || '127.0.0.1';

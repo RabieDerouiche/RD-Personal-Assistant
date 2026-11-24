@@ -75,7 +75,9 @@ export function resteA(fixes, rev, t, mode, ponctuels = []) {
    - « enveloppe » : un budget par mois, chaque semaine du mois en consomme un quart (du 1 au 7, du 8 au 14, du 15 au 21, du 22 à la fin) ;
      un quart compte tant que sa semaine n'est pas finie (« s'il reste deux semaines, il reste la moitié ») ;
    - « semaine » : un montant par passage, un jour de la semaine (0 = dimanche) : autant de fois que ce jour revient ;
-   - « mois » : une fois par mois, à un jour donné, ou sans jour : alors elle compte ce mois-ci tant qu'il ne l'a pas dite faite (`faits`). */
+   - « mois » : une fois par mois, à un jour donné, ou sans jour : alors elle compte ce mois-ci tant qu'il ne l'a pas dite faite (`faits`).
+   0.81.0 (« suivi du réel ») : `reels` = ce qu'il note avoir dépensé ({d: 'AAAA-MM-JJ', m: montant}). Un budget ne laisse jamais plus que ce
+   qui n'est pas encore dépensé ; une dépense « une fois par mois » notée ce mois-là est faite. */
 export const QUARTS = [[1, 7], [8, 14], [15, 21], [22, 31]];
 export function courantes(liste, a, b) {
   return (liste || []).map((c) => {
@@ -83,19 +85,25 @@ export function courantes(liste, a, b) {
     if (c.mode === 'semaine') { for (let x = a, k = 0; x <= b && k < 400; x = plus(x, 1), k++) if (x.getUTCDay() === (parseInt(c.jour, 10) || 0)) n++; total = n * m; }
     else for (let k = 0; k < 14; k++) {
       const p = J(a.getUTCFullYear(), a.getUTCMonth() + k, 1), Y = p.getUTCFullYear(), M = p.getUTCMonth(); if (p > b) break;
+      const ym = ymd(p).slice(0, 7), note = (c.reels || []).reduce((t, r) => t + (String(r.d).slice(0, 7) === ym ? cents(r.m) : 0), 0);   /* 0.81.0 : ce qu'il a noté avoir dépensé ce mois-là */
       if (c.mode === 'mois') {
-        if ((c.faits || []).includes(ymd(p).slice(0, 7))) continue;
+        if ((c.faits || []).includes(ym) || note > 0) continue;
         const j = parseInt(c.jour, 10);
         if (j >= 1) { const d = J(Y, M, Math.min(j, dim(Y, M))); if (d >= a && d <= b) { n++; total += m; } }
         else if (k === 0) { n++; total += m; }
       } else {
-        const q = Math.floor(m / 4);
-        QUARTS.forEach(([d1, d2], i) => { const deb = J(Y, M, d1), fin = J(Y, M, i === 3 ? dim(Y, M) : d2); if (fin >= a && deb <= b) { n++; total += i === 3 ? m - 3 * q : q; } });
+        const q = Math.floor(m / 4); let part = 0;
+        QUARTS.forEach(([d1, d2], i) => { const deb = J(Y, M, d1), fin = J(Y, M, i === 3 ? dim(Y, M) : d2); if (fin >= a && deb <= b) { n++; part += i === 3 ? m - 3 * q : q; } });
+        /* 0.81.0 : le budget ne peut pas laisser plus que ce qu'il n'a pas déjà dépensé (700 € notés sur 1 000 : il reste 300 au plus) */
+        total += note > 0 ? Math.min(part, Math.max(0, m - note)) : part;
       }
     }
     return {c, n, montant: total / 100};
   });
 }
+export const courantDuMois = (c, Y, M) => courantes([{...c, faits: [], reels: []}], J(Y, M, 1), J(Y, M, dim(Y, M)))[0].montant;
+export const RANG_COURANT = {courses: 'Alimentation', boucherie: 'Alimentation', marche: 'Alimentation', restaurant: 'Restaurants et repas livrés', livraison: 'Restaurants et repas livrés', essence: 'Voiture', parking: 'Voiture',
+  menage: 'Maison', coiffeur: 'Soin et santé', pharmacie: 'Soin et santé'};
 export const eur = (n) => Number(n).toLocaleString('fr-FR', {minimumFractionDigits: 2, maximumFractionDigits: 2}).replace(/ /g, ' ') + ' €';
 export const jourCourt = (x) => new Intl.DateTimeFormat('fr-FR', {timeZone: 'UTC', weekday: 'short'}).format(x) + ' ' + String(x.getUTCDate()).padStart(2, '0') + '/' + String(x.getUTCMonth() + 1).padStart(2, '0');
 const MOIS_L = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
@@ -520,6 +528,9 @@ export function createRadar({file, gmail, claude = async () => ({ok: false, erro
     const o = {id: /^[a-z0-9]{3,40}$/.test(String(c.id || '')) ? c.id : 'dc' + now().toString(36) + i, service, type: /^[a-z]{2,20}$/.test(String(c.type || '')) ? c.type : 'autre', mode, montant};
     const j = parseInt(c.jour, 10);
     if (mode === 'semaine') { if (!(j >= 0 && j <= 6)) return null; o.jour = j; }
+    /* 0.81.0 : ce qu'il a noté avoir dépensé, 13 mois au plus */
+    const lim = ymd(plus(auj(), -400)), rl = (Array.isArray(c.reels) ? c.reels : []).map((r) => ({d: String((r && r.d) || ''), m: Math.round((+String((r && r.m) ?? '').replace(',', '.')) * 100) / 100})).filter((r) => /^\d{4}-\d{2}-\d{2}$/.test(r.d) && r.d >= lim && r.m > 0 && r.m < 100000);
+    if (rl.length) o.reels = rl.sort((x, y) => (x.d < y.d ? -1 : 1)).slice(-200);
     if (mode === 'mois') { if (j >= 1 && j <= 31) o.jour = j; o.faits = [...new Set((Array.isArray(c.faits) ? c.faits : []).filter((x) => /^\d{4}-\d{2}$/.test(x)))].sort().slice(-6); }
     return o;
   };
@@ -538,7 +549,9 @@ export function createRadar({file, gmail, claude = async () => ({ok: false, erro
       if (!v || !(v.jour === 'dernier' || (parseInt(v.jour, 10) >= 1 && parseInt(v.jour, 10) <= 31))) return {ok: false, error: 'Jour de paie illisible.'};
       const jour = v.jour === 'dernier' ? 'dernier' : parseInt(v.jour, 10), des = parseInt(v.des, 10);
       /* 0.52.0 : une paie qui arrive « entre le 5 et le 10 » : le reste à payer court jusqu'au plus tard (le 10) */
-      R.revenus = {jour, avance: v.avance !== false, ...(des >= 1 && des <= 31 && (jour === 'dernier' || des < jour) ? {des} : {})};
+      /* 0.81.0 (son choix du 24/11/2026, « Reste à vivre ») : le montant de sa paie, facultatif, gardé ici seulement (radar.json) */
+      const mp = Math.round((+String(v.montant ?? '').replace(',', '.')) * 100) / 100;
+      R.revenus = {jour, avance: v.avance !== false, ...(des >= 1 && des <= 31 && (jour === 'dernier' || des < jour) ? {des} : {}), ...(mp > 0 && mp < 1000000 ? {montant: mp} : {})};
     }
     else if (cle === 'notif') { if (!v || typeof v !== 'object') return {ok: false, error: 'Réglage illisible.'}; const s = +v.seuil; R.notif = {veille: v.veille !== false, seuil: s >= 0 && s <= 100000 ? s : 20, echec: v.echec !== false}; }
     else return {ok: false, error: 'Réglage inconnu.'};
@@ -1104,12 +1117,24 @@ export function createRadar({file, gmail, claude = async () => ({ok: false, erro
   const demarrer = (ms) => { if (!timer) { timer = setInterval(tic, ms || 60000); timer.unref && timer.unref(); } };
 
   /* ---------- ce que la page reçoit ---------- */
+  /* le mois : ses dépenses fixes par catégorie. 0.81.0 (ses choix du 24/11/2026) : avec ses dépenses courantes (le mois entier, estimé), ce
+     qu'il a noté avoir dépensé, le reste à vivre s'il a donné le montant de sa paie, et les six derniers mois. Le total des dépenses courantes
+     de chaque mois est retenu au fil de l'eau (`R.evolution`) : un mois d'avant leur saisie n'en a pas. */
   function moisDe(t) {
-    const m0 = J(t.getUTCFullYear(), t.getUTCMonth(), 1), m1 = J(t.getUTCFullYear(), t.getUTCMonth() + 1, 0), p0 = J(t.getUTCFullYear(), t.getUTCMonth() - 1, 1), p1 = J(t.getUTCFullYear(), t.getUTCMonth(), 0);
-    const occ = (a, b) => R.fixes.flatMap((f) => occurrences(f, a, b)), som = (l) => l.reduce((s, o) => s + cents(o.f.montant), 0) / 100;
-    const ce = occ(m0, m1), cats = [...new Set(ce.map((o) => o.f.cat || 'Autres'))];
-    return {libelle: MOIS_L[t.getUTCMonth()] + ' ' + t.getUTCFullYear(), precedentLibelle: MOIS_L[p0.getUTCMonth()] + ' ' + p0.getUTCFullYear(), total: som(ce), precedent: som(occ(p0, p1)), fixes: true,
-      postes: cats.map((c) => { const l = ce.filter((o) => (o.f.cat || 'Autres') === c); return {id: plat(c), label: c, montant: som(l), n: l.length}; }).sort((a, b) => b.montant - a.montant)};
+    const Y0 = t.getUTCFullYear(), M0 = t.getUTCMonth(), occ = (a, b) => R.fixes.flatMap((f) => occurrences(f, a, b)), som = (l) => l.reduce((s, o) => s + cents(o.f.montant), 0) / 100;
+    const bornes = (k) => { const p = J(Y0, M0 - k, 1); return {Y: p.getUTCFullYear(), M: p.getUTCMonth(), a: p, b: J(p.getUTCFullYear(), p.getUTCMonth(), dim(p.getUTCFullYear(), p.getUTCMonth())), ym: ymd(p).slice(0, 7)}; };
+    const cr = R.courantes || [], m = bornes(0), p = bornes(1), ce = occ(m.a, m.b), cats = [...new Set(ce.map((o) => o.f.cat || 'Autres'))];
+    const reelDe = (ym) => cr.reduce((s, c) => s + (c.reels || []).reduce((x, r) => x + (String(r.d).slice(0, 7) === ym ? cents(r.m) : 0), 0), 0) / 100;
+    const parts = cr.map((c) => ({c, montant: courantDuMois(c, m.Y, m.M), label: RANG_COURANT[c.type] || 'Autres dépenses courantes'})), totalCourantes = parts.reduce((s, x) => s + cents(x.montant), 0) / 100, totalFixes = som(ce);
+    R.evolution = R.evolution || {};
+    if (cr.length ? R.evolution[m.ym] !== totalCourantes : m.ym in R.evolution) { if (cr.length) R.evolution[m.ym] = totalCourantes; else delete R.evolution[m.ym]; for (const k of Object.keys(R.evolution).sort().slice(0, -24)) delete R.evolution[k]; sauver(); }
+    const avant = (k) => { const b = bornes(k), f = som(occ(b.a, b.b)), c = k === 0 ? (cr.length ? totalCourantes : null) : (b.ym in R.evolution ? R.evolution[b.ym] : null); return {mois: b.ym, libelle: MOIS_L[b.M] + ' ' + b.Y, fixes: f, courantes: c, reel: reelDe(b.ym), total: Math.round((f + (c || 0)) * 100) / 100}; };
+    const evolution = [5, 4, 3, 2, 1, 0].map(avant), total = Math.round((totalFixes + totalCourantes) * 100) / 100, paie = (R.revenus && R.revenus.montant) || null;
+    const postes = cats.map((c) => { const l = ce.filter((o) => (o.f.cat || 'Autres') === c); return {id: plat(c), label: c, montant: som(l), n: l.length}; })
+      .concat([...new Set(parts.map((x) => x.label))].map((lb) => { const l = parts.filter((x) => x.label === lb); return {id: 'c-' + plat(lb), label: lb, montant: l.reduce((s, x) => s + cents(x.montant), 0) / 100, courant: true, note: l.map((x) => x.c.service).join(', ') + ' · estimé'}; }))
+      .sort((a, b) => b.montant - a.montant);
+    return {libelle: MOIS_L[M0] + ' ' + Y0, precedentLibelle: MOIS_L[p.M] + ' ' + p.Y, total, precedent: evolution[4].total, fixes: true, totalFixes, totalCourantes, reel: reelDe(m.ym), postes, evolution,
+      ...(paie ? {paie, resteAVivre: Math.round((paie - total) * 100) / 100} : {})};
   }
   /* 0.66.0 : l'historique d'une dépense : un prélèvement par mois (le mail le plus récent du mois, complété par les autres), le plus récent d'abord */
   function histoDe(l) {
