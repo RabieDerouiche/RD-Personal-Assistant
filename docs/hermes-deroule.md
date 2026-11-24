@@ -266,3 +266,41 @@ liste des fichiers que son garde-fou lui interdit). Refait avant toute saisie :
   Non vérifiable au banc : le lancement par `systemd-run` (pas de systemd dans le conteneur) : c'est `--essai`
   sur le serveur qui le prouve.
 
+## Le coffre en mémoire (ses réponses du 24/11/2026 : « sécuriser au maximum », il a NordPass)
+
+Ses positions, par QCM :
+- NordPass à chaque usage (Face ID) : bien pour les couches, **refusé comme règle** : une tâche où Hermes doit être
+  autonome à 100 % serait bloquée.
+- Coffre chiffré avec la clé de la machine (`systemd-creds`) : **refusé** : « quiconque a accès au disque peut tout
+  faire ».
+- Retenu : **un coffre dont la clé n'est jamais sur le disque, seulement en mémoire, pour tout** (mots de passe de
+  sites et accès Google de JARVIS). Il le déverrouille une fois après chaque redémarrage du serveur ; ensuite tout
+  est autonome. Il accepte le prix : après un redémarrage, JARVIS n'a plus Google et Hermes attend, jusqu'au
+  déverrouillage.
+
+Faits vérifiés le 24/11/2026 :
+- (Likely, aide de NordPass) NordPass a une ligne de commande (`np signin` par le navigateur, `np unlock` avec le mot
+  de passe maître, verrouillage après 15 minutes) ; aucun jeton de service ni accès limité à un élément trouvé :
+  la mettre sur le serveur exposerait tout son coffre NordPass. **NordPass reste sur son iPhone** : il y garde la
+  phrase du coffre du serveur. Un élément NordPass accepte plusieurs adresses (certain).
+- (certain) Le VPS n'a pas de puce TPM ; l'accès Google de JARVIS est aujourd'hui en clair dans `state.json` (0600).
+
+Montage à construire (`jarvis-coffre`) :
+1. Un service à part (utilisateur dédié, code à root, enfermé, sans échange ni image mémoire). Sur le disque :
+   la clé du coffre enveloppée par une clé dérivée de sa phrase (scrypt), et chaque secret chiffré (AES-256-GCM).
+   En mémoire, après déverrouillage seulement : la clé.
+2. **Déverrouillage après un redémarrage** : JARVIS le prévient par une notification (sa clé de notification reste
+   lisible au démarrage) ; il lance `sudo jarvis-coffre ouvrir` dans Termius et colle la phrase gardée dans
+   NordPass. La phrase ne passe ni par JARVIS, ni par Hermes, ni par une conversation. `fermer` reverrouille tout.
+3. Deux portées de secret : « service » (l'accès Google : rendu au serveur de JARVIS, qui le garde en mémoire et ne
+   l'écrit plus dans `state.json`) et « guichet » (mots de passe de sites : jamais rendus ; seuls des gestes d'une
+   liste fermée, à root, s'en servent, comme « décaler la livraison des couches »).
+4. Après la bascule de l'accès Google : lui faire refaire « Reconnecter » (et changer le secret du client Google),
+   pour que l'ancien jeton, resté une semaine en clair sur le disque, ne vaille plus rien.
+5. Redémarrages : vérifier que les mises à jour automatiques ne redémarrent pas le serveur seules.
+Limite qui reste, dite à lui : quelqu'un qui prend la main en root sur le serveur allumé peut lire la mémoire.
+
+En attendant : `portail-couches.sh` ne garde **plus rien** par défaut (identifiants passés par un tube au programme
+enfermé, ni disque, ni échange, ni image mémoire) ; `--garder` (coffre de systemd) reste pour mémoire. Banc :
+`sudo bash jarvis-os/server/tests/portail-coffre.test.sh` (13 vérifications).
+
