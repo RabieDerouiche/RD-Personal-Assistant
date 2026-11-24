@@ -83,12 +83,12 @@ try {
   const m1 = plat(await p.locator('.rad-mois').textContent());
   await p.getByRole('button', {name: 'Donner le montant de ma paie'}).tap(); await p.waitForTimeout(500);
   await p.locator('.rad-form input[inputmode=decimal]').fill('3000'); await p.locator('.rad-form button[type=submit]').tap(); await p.waitForTimeout(900);
-  const m2 = plat(await p.locator('.rad-vivre').textContent()), evo = await p.locator('.rad-evo').count(), dernier6 = plat(await p.locator('.rad-evo').last().textContent()), premier6 = plat(await p.locator('.rad-evo').first().textContent());
+  const m2 = plat(await p.locator('.rad-vivre').textContent()), evo = await p.locator('.rad-evo').count(), dernier6 = plat(await p.locator('.rad-evo').last().textContent()), premier6 = plat(await p.locator('.rad-evo-note').textContent());
   ok('« Le mois » : 520 € en tout (400 de courses + 120 de boucherie, estimés), ce qui est noté, les postes « Alimentation » ; sans montant de paie, il le propose',
     m1.includes(eur(520)) && m1.includes('environ ' + eur(520) + ' de dépenses courantes (estimé)') && m1.includes('Tu as noté ' + eur(350)) && /Alimentation/.test(m1) && /Donne le montant de ta paie/.test(m1), m1.slice(0, 400));
   ok('paie de 3 000 € saisie : « Reste à vivre ce mois-ci » 2 480 € (17 % de la paie partent en dépenses prévues) ; six mois affichés, le dernier avec ses dépenses courantes, les plus anciens sans',
-    m2.includes(eur(2480)) && m2.includes('17 % de ta paie') && evo === 6 && dernier6.includes(eur(520)) && /dépenses courantes pas encore saisies/.test(premier6) && (await c('/api/radar', {headers: A})).body.revenus.montant === 3000, [m2, evo, dernier6].join(' | '));
-  if (process.env.COURANTES_CAPTURE) { await p.evaluate(() => { const e = document.querySelector('.rad-vivre'); if (e) e.scrollIntoView({block: 'start'}); }); await p.waitForTimeout(3500); await p.screenshot({path: process.env.COURANTES_CAPTURE + '-mois.png'}); }
+    m2.includes(eur(2480)) && m2.includes('17 % de ta paie') && evo === 6 && dernier6.includes(eur(520)) && /prélèvements seulement, tes dépenses courantes n’étaient pas encore saisies/.test(premier6) && (await c('/api/radar', {headers: A})).body.revenus.montant === 3000, [m2, evo, dernier6].join(' | '));
+  if (process.env.COURANTES_CAPTURE) { await p.evaluate(() => { document.querySelectorAll('.toast-x').forEach((b) => b.click()); const e = document.querySelector('.rad-mois'); if (e) e.scrollIntoView({block: 'start'}); }); await p.waitForTimeout(3500); await p.screenshot({path: process.env.COURANTES_CAPTURE + '-mois.png'}); }
   await seg('Fixes');
   await ouvrir('Courses'); await fiche.locator('.rad-cr-notes button').tap(); await p.waitForTimeout(800);
   const sansNote = plat(await fiche.locator('.rad-cr-etat').textContent()); await fermer();

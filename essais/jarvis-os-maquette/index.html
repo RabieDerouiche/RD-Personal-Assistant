@@ -1216,8 +1216,10 @@
   /* 0.81.0 : suivi du réel, reste à vivre */
   .rad-cr-etat { margin: 0 0 6px; font-weight: 600; } .rad-cr-rythme { margin: 6px 0 0; font-size: 13px; } .rad-bar-t.is-trop i { background: linear-gradient(90deg, #f59e0b, #ef4444); }
   .rad-cr-notes { margin: 10px 0 0; padding: 0; list-style: none; display: grid; gap: 6px; } .rad-cr-notes li { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-  .rad-vivre { display: grid; gap: 4px; } .rad-vivre .rad-big { font: 700 28px var(--display); } .rad-vivre.is-bad .rad-big { color: #fca5a5; } .rad-vivre p { margin: 0; font-size: 13.5px; } .rad-vivre .btn { justify-self: start; margin-top: 4px; }
+  .rad-vivre { display: grid; gap: 4px; padding: 16px 18px; } .rad-vivre .rad-big { font: 700 28px var(--display); } .rad-vivre.is-bad .rad-big { color: #fca5a5; } .rad-vivre p { margin: 0; font-size: 13.5px; } .rad-vivre .btn { justify-self: start; margin-top: 4px; }
   .rad-mois-dont { margin: 0; font-size: 13.5px; }
+  .rad-evo-box { display: grid; gap: 11px; padding: 14px 16px; } .rad-evo { display: grid; grid-template-columns: 4.4em 1fr auto; align-items: center; gap: 10px; }
+  .rad-evo-m { color: var(--muted); font-size: 13px; white-space: nowrap; } .rad-evo-v { font: 600 14px var(--display); white-space: nowrap; } .rad-evo-note { margin: 0; font-size: 13px; }
   .mchip.is-amber { border-color: rgba(var(--warn), .5); color: #fde68a; }
   .ready { height: 6px; border-radius: 3px; background: rgba(255, 255, 255, .08); overflow: hidden; margin: 2px 0 4px; }
   .ready i { display: block; height: 100%; background: linear-gradient(90deg, var(--bc, #06b6d4), #6ee7b7); border-radius: 3px; }
@@ -4675,9 +4677,11 @@ void main(){
       m.postes.map((p) => h('div', {class: 'rad-bar' + (p.courant ? ' is-courant' : '')}, h('div', {class: 'rad-bar-h'}, h('b', {text: p.label}), h('span', {text: (p.courant ? '≈ ' : '') + radEur(p.montant)})),
         h('div', {class: 'rad-bar-t'}, h('i', {style: 'width:' + Math.max(2, Math.round((p.montant || 0) / max * 100)) + '%'})),
         h('small', {class: 'muted', text: p.note || (p.n ? p.n + (p.n > 1 ? ' paiements' : ' paiement') : '')}))),
-      ev.length ? panel('Six derniers mois', h('span', {class: 'aside', text: 'total par mois'}), ev.map((e) => h('div', {class: 'rad-bar rad-evo', 'data-mois': e.mois}, h('div', {class: 'rad-bar-h'}, h('b', {text: e.libelle}), h('span', {text: radEur(e.total)})),
-        h('div', {class: 'rad-bar-t'}, h('i', {style: 'width:' + Math.max(2, Math.round((e.total || 0) / evMax * 100)) + '%'})),
-        h('small', {class: 'muted', text: e.courantes == null ? 'prélèvements seulement (dépenses courantes pas encore saisies)' : radEur(e.fixes) + ' de prélèvements, environ ' + radEur(e.courantes) + ' de dépenses courantes' + (e.reel ? ', ' + radEur(e.reel) + ' notés' : '')})))) : null,
+      /* six lignes serrées dans une seule carte (six cartes l'une sous l'autre prenaient deux écrans) */
+      ev.length ? panel('Six derniers mois', h('span', {class: 'aside', text: 'total par mois'}),
+        h('div', {class: 'card rad-evo-box'}, ev.map((e) => h('div', {class: 'rad-evo', 'data-mois': e.mois},
+          h('span', {class: 'rad-evo-m', title: e.libelle, text: (['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'][+String(e.mois).slice(5, 7) - 1] || e.libelle) + ' ' + String(e.mois).slice(2, 4)}), h('div', {class: 'rad-bar-t'}, h('i', {style: 'width:' + Math.max(2, Math.round((e.total || 0) / evMax * 100)) + '%'})), h('b', {class: 'rad-evo-v', text: radEur(e.total)})))),
+        ev.some((e) => e.courantes == null) ? h('p', {class: 'muted rad-evo-note', text: 'Jusqu’à ' + ev.filter((e) => e.courantes == null).pop().libelle + ' : prélèvements seulement, tes dépenses courantes n’étaient pas encore saisies.'}) : null) : null,
       h('p', {class: 'muted', text: complet ? 'Tes prélèvements validés dans « Fixes » et tes dépenses courantes, par poste. Les dépenses courantes sont estimées : rien n’est lu dans tes comptes.' : m.fixes ? 'Tes dépenses fixes du mois, par catégorie : celles que tu as validées dans « Fixes ».' : 'Seuls les paiements annoncés par un mail sont comptés : pas les achats par carte en magasin.'}));
   }
   function radNavigo(nv) {
