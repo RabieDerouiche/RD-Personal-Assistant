@@ -223,6 +223,24 @@ Termius) ; le geste d'après le squelette qu'elle rapporte ; les décisions à b
   l'outil des mails, a `web_search` et `web_extract`). **Non vérifié** : la recherche web sans clé elle-même
   (services gratuits d'Exa, Parallel, Firecrawl, Keenable, d'après la doc d'Hermes) : premier vrai passage.
 
+## Autres workflows étudiés pour Hermes (sa question du 24/11/2026)
+
+Sa question : sur quoi Hermes serait plus efficace, et quoi ajouter à ce que fait déjà JARVIS. Réponse donnée :
+Hermes n'est aujourd'hui « plus efficace » sur rien par ses moyens (même serveur, même Claude, même forfait que
+JARVIS, et moins d'outils que ses missions) ; son intérêt est la mémoire d'un passage à l'autre, le jugement
+sur des mails à heure fixe sans la réserve Grok, et les boucles « repérer, demander, agir, confirmer, retenir ».
+
+| Sujet | Déjà géré par | Verdict |
+|---|---|---|
+| Dossiers qui dorment (tiers muet depuis N jours : carte Relancer / Attendre / Clore, brouillon de relance) | Iris, au cas par cas, sans règle de délai ; dépend de la réserve Grok (une relance manquée pendant la pause du 13 au 17/11) | Le plus utile ; à greffer sur la Veille du matin, sans passage en plus ; demande un outil borné pour écrire dans Dossiers et une ligne dans la Charte |
+| Abonnements et renouvellements | Le Radar de JARVIS (mails lus chaque matin par règles) ; Hermes n'a pas le droit de lire le Radar | Doublon : si des boutons Garder / Résilier sont voulus, ils vont dans le Radar, sans Hermes |
+| Mail à l'arrivée sans Grok | Iris (Courrier prioritaire), Kairos (Signal prix), Chronos (Facture reçue) | Seul Courrier prioritaire est transférable (Signal prix exige le web, Facture reçue un portail) ; plus de filtres Gmail à la main, mais le plus gros chantier |
+| Retours et garanties d'achats | Personne (Likely ; Charte non relue) | Nouveau, gain incertain ; sans le web, délai légal de 14 jours par défaut |
+
+**Sa décision (QCM du 24/11/2026) : « Rien avant la comparaison ».** On termine le scénario des couches, la Veille
+du matin reste en double, et rien d'autre n'est ajouté à Hermes avant la comparaison (à partir du 07/12/2026, à
+sa demande). Ne repropose pas ces sujets d'ici là.
+
 ## Le coffre (sa question du 24/11/2026 : « c'est pas en clair j'espère »)
 
 La première version de `portail-couches.sh` gardait l'adresse et le mot de passe en clair dans le dossier de JARVIS
