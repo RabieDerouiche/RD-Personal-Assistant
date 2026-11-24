@@ -82,26 +82,7 @@ try {
   ok('délier sans clé : 401, rien ne change', delSans.status === 401 && etat().tokens.length === 1, JSON.stringify(delSans));
 } catch (e) { ok('exception', false, e && e.stack); }
 try { srv.kill(); } catch { /* rien */ }
-
-/* ---------- le service worker de l'ancienne app (jarvis-os/app/public/sw.js, recopié tel quel dans jarvis-os/web/sw.js) ---------- */
-try {
-  const SRC = fs.readFileSync(path.join(HERE, '..', '..', 'app', 'public', 'sw.js'), 'utf8'), WEB = fs.readFileSync(path.join(HERE, '..', '..', 'web', 'sw.js'), 'utf8');
-  ok('ancienne app : le service worker servi (web/sw.js) est la copie exacte de celui de l’app (app/public/sw.js)', SRC === WEB);
-  const vieux = (o = {}) => {
-    const H = {}, j = {effaces: [], gardes: []};
-    const self = {addEventListener: (t, f) => { H[t] = f; }, skipWaiting: () => Promise.resolve(), clients: {claim: () => Promise.resolve()}};
-    const caches = {open: () => Promise.resolve({addAll: () => Promise.resolve(), put: (r) => { j.gardes.push(typeof r === 'string' ? r : r.url); return Promise.resolve(); }}),
-      keys: () => Promise.resolve(o.caches || []), delete: (k) => { j.effaces.push(k); return Promise.resolve(true); }, match: () => Promise.resolve(null)};
-    vm.runInNewContext(SRC, {self, caches, fetch: () => Promise.resolve({ok: true, status: 200, clone: () => ({})}), URL, Promise, location: {origin: 'https://jarvis.essai'}});
-    const attendre = async (t, ev) => { const w = []; H[t](Object.assign({waitUntil: (p) => w.push(p)}, ev || {})); await Promise.all(w); };
-    const charger = async (url) => { let rendu = null; H.fetch({request: {method: 'GET', url}, respondWith: (p) => { rendu = p; }}); if (rendu) await rendu; return !!rendu; };
-    return {j, attendre, charger};
-  };
-  { const S = vieux({caches: ['jarvis-os-v3', 'jarvis-os-app-v4', 'jarvis-os-app-v3', 'panier-v2', 'autre']}); await S.attendre('activate');
-    ok('ancienne app : à l’activation, elle n’efface que ses propres anciens caches (jarvis-os-v3), ni ceux de la nouvelle app (jarvis-os-app-…) ni Panier', S.j.effaces.join() === 'jarvis-os-v3', JSON.stringify(S.j)); }
-  { const S = vieux(), api = await S.charger('https://jarvis.essai/api/status'), page = await S.charger('https://jarvis.essai/ancienne/'); await attends(10);
-    ok('ancienne app : une réponse de /api/ n’est plus gardée en copie (ses données restaient dans le cache du téléphone) ; la page, oui', !api && page && S.j.gardes.join() === 'https://jarvis.essai/ancienne/', JSON.stringify([api, page, S.j.gardes])); }
-} catch (e) { ok('exception (ancien service worker)', false, e && e.stack); }
+/* 0.79.0 : le service worker de l'ancienne app est retiré avec elle (son choix du 24/11/2026) ; son essai aussi. */
 
 console.log(results.join('\n')); console.log(fails ? fails + ' échec(s)' : 'Tout passe (' + results.length + ' vérifications).');
 fs.rmSync(DATA, {recursive: true, force: true});

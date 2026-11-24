@@ -20,7 +20,7 @@ const code = execFileSync(process.execPath, [SRV + '/server.mjs', 'pair'], {env}
 const srv = spawn(process.execPath, [SRV + '/server.mjs'], {env, stdio: ['ignore', 'pipe', 'pipe']}); await new Promise((r) => srv.stdout.once('data', r));
 const out = [], errs = []; const ok = (n, c, i) => out.push((c ? 'OK    ' : 'ÉCHEC ') + n + (i ? ' :: ' + i : ''));
 const b = await chromium.launch({args: ['--autoplay-policy=no-user-gesture-required']}); const ctx = await b.newContext({...devices['iPhone 15 Pro Max']});
-await ctx.addInitScript(() => { try { if (!localStorage.getItem('jarvis.reglages.onglet')) localStorage.setItem('jarvis.reglages.onglet', 'tout'); } catch (e) { /* rien */ } });   /* 0.78.0 : Réglages a des onglets ; ce banc lit la page entière (« Tout ») */
+await ctx.addInitScript(() => { try { localStorage.setItem('jarvis.banc.reglages', 'entier'); } catch (e) { /* rien */ } });   /* Réglages a des onglets ; ce banc lit la page entière */
 const p = await ctx.newPage();
 p.on('pageerror', (e) => errs.push(e.message));
 await p.route(FG.url + '/auth**', (route) => { const u = new URL(route.request().url()); route.fulfill({status: 302, headers: {location: BASE + '/api/google/callback?state=' + u.searchParams.get('state') + '&code=CODE-OK'}}); });
@@ -771,7 +771,7 @@ try {
     await lance2();
     try {
     const tok2 = (await (await fetch(B2 + '/api/pair', {method: 'POST', headers: {'content-type': 'application/json'}, body: JSON.stringify({code: code2, device: 'iPhone maj'})})).json()).token;
-    const ouvre = async () => { const c = await b.newContext({...devices['iPhone 15 Pro Max']}); await c.addInitScript((t) => { try { localStorage.setItem('jarvis.reglages.onglet', 'tout'); localStorage.setItem('jarvis.settings', JSON.stringify({serverToken: t})); } catch (e) { /* rien */ } }, tok2); const q = await c.newPage(); q.on('pageerror', (e) => errs.push('maj : ' + e.message)); await q.goto(B2 + '/?serveur#accueil'); return q; };
+    const ouvre = async () => { const c = await b.newContext({...devices['iPhone 15 Pro Max']}); await c.addInitScript((t) => { try { localStorage.setItem('jarvis.banc.reglages', 'entier'); localStorage.setItem('jarvis.settings', JSON.stringify({serverToken: t})); } catch (e) { /* rien */ } }, tok2); const q = await c.newPage(); q.on('pageerror', (e) => errs.push('maj : ' + e.message)); await q.goto(B2 + '/?serveur#accueil'); return q; };
     const vue = (q) => q.evaluate(() => { const m = document.getElementById('maj'); return {ouvert: !!m && !m.hidden, etape: m && m.querySelector('.maj-card') ? m.querySelector('.maj-card').dataset.etape : '', txt: m ? m.textContent : ''}; });
     const autre = await ouvre(); await autre.waitForTimeout(3200); await autre.tap('#maj-non'); await autre.waitForTimeout(300); await autre.evaluate(() => { window.__marque = 'ancienne page'; });
     const q = await ouvre(); await q.waitForTimeout(3200); let v = await vue(q);

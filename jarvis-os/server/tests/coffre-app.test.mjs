@@ -105,21 +105,21 @@ try {
     const carte = p.locator('#coffre-card'), onglet = (nom) => p.locator('.set-tabs [role=tab]', {hasText: nom}), choisi = () => p.locator('.set-tabs [role=tab][aria-selected=true]').textContent();
     const vus = () => p.evaluate(() => [...document.querySelectorAll('#view section[data-onglet]')].filter((x) => !x.hidden).map((x) => (x.querySelector('b, h2') || {}).textContent));
     const v0 = await vus();
-    ok('Réglages : sept onglets, « Général » ouvert (serveur, version, état des systèmes) ; le coffre et les assistants reliés sont rangés ailleurs ; un point sur « Sécurité » (coffre verrouillé)',
-      (await p.locator('.set-tabs [role=tab]').allTextContents()).join() === 'Général,Sécurité,Connexions,Voix,Alertes,Mémoire,Tout' && await choisi() === 'Général' && v0.includes('Serveur JARVIS') && v0.includes('JARVIS') && v0.includes('État des systèmes')
+    ok('Réglages : six onglets (plus de « Tout »), « Général » ouvert (serveur, version, état des systèmes) ; le coffre et les assistants reliés sont rangés ailleurs ; un point sur « Sécurité » (coffre verrouillé)',
+      (await p.locator('.set-tabs [role=tab]').allTextContents()).join() === 'Général,Sécurité,Connexions,Voix,Alertes,Mémoire' && await choisi() === 'Général' && v0.includes('Serveur JARVIS') && v0.includes('JARVIS') && v0.includes('État des systèmes')
       && !v0.includes('Coffre') && !v0.includes('Assistants reliés (MCP)') && await carte.isHidden() && await onglet('Sécurité').locator('.set-tab-pt').count() === 1 && await onglet('Général').locator('.set-tab-pt').count() === 0, JSON.stringify(v0));
     await onglet('Sécurité').tap(); const v1 = await vus();
     ok('onglet « Sécurité » : le verrou de l\'app et le coffre, rien d\'autre', v1.slice().sort().join() === 'Coffre,Verrou de l’app' && await carte.isVisible(), JSON.stringify(v1));
     await onglet('Voix').tap(); const v2 = await vus();
     ok('onglet « Voix » : la voix du serveur, la voix et l\'écoute (sorties de la carte JARVIS), le tour de Claude', v2.some((t) => /^Voix du serveur/.test(t)) && v2.includes('Voix et écoute') && v2.every((t) => /^(Voix|Tour de Claude)/.test(t)), JSON.stringify(v2));
-    await onglet('Tout').tap(); const v3 = await vus();
-    ok('onglet « Tout » : la page entière, comme avant', v3.length >= 10 && v3.includes('Coffre') && v3.includes('Notifications') && v3.includes('État des systèmes'), String(v3.length));
-    await p.goto(BASE + '/?serveur#voir-reglages-mcp'); await p.waitForSelector('#mcp-card', {timeout: 20000}); await p.waitForTimeout(1500);
-    ok('depuis « Tout », un lien direct vers une carte la montre sans changer d\'onglet (elle se voit déjà)', await choisi() === 'Tout' && await p.locator('#mcp-card').isVisible(), await choisi());
+    ok('la carte « JARVIS » ne propose plus l\'ancienne app', await p.locator('a[href="/ancienne/"]').count() === 0);
     await onglet('Général').tap(); await p.goto(BASE + '/?serveur#voir-reglages-mcp'); await p.waitForSelector('#mcp-card', {timeout: 20000}); await p.waitForTimeout(1500);
     ok('depuis « Général », un lien direct vers une carte (assistants reliés) ouvre son onglet, « Connexions »', await choisi() === 'Connexions' && await p.locator('#mcp-card').isVisible() && await carte.isHidden(), await choisi());
     await onglet('Sécurité').tap(); await p.reload(); await p.waitForSelector('#coffre-card', {timeout: 20000});
     ok('l\'onglet choisi est retenu après un rechargement', await choisi() === 'Sécurité');
+    await p.evaluate(() => localStorage.setItem('jarvis.banc.reglages', 'entier')); await p.reload(); await p.waitForSelector('#mcp-card', {timeout: 20000});
+    ok('pour le banc de bout en bout seulement (« jarvis.banc.reglages ») : la page entière, toutes les cartes visibles', (await vus()).length >= 10 && await carte.isVisible());
+    await p.evaluate(() => localStorage.removeItem('jarvis.banc.reglages')); await p.reload(); await p.waitForSelector('#coffre-card', {timeout: 20000});
     if (process.env.COFFRE_APP_CAPTURE) { await carte.scrollIntoViewIfNeeded(); await p.screenshot({path: process.env.COFFRE_APP_CAPTURE}); }   /* pour relire la carte à l'œil */
     ok('carte « Coffre » dans Réglages : « Verrouillé », un champ de mot de passe rempli par le gestionnaire (current-password) et sa fiche (username)',
       /Verrouillé · 2 secrets/.test(await carte.textContent()) && await carte.locator('input[type=password][autocomplete=current-password]').count() === 1 && await carte.locator('input[autocomplete=username]').inputValue() === 'Coffre JARVIS', await carte.textContent());

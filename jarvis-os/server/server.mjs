@@ -32,7 +32,7 @@ import {createCoffreLien} from './coffre-lien.mjs';   /* 0.74.0 : le coffre en m
 import {createVerrou} from './verrou.mjs';   /* 0.75.0 : le verrou de l'app par passkey */
 const ACT = createActivite();   /* 0.33.0 : ce que fait Claude à l'instant */
 
-const VERSION = '0.78.0';
+const VERSION = '0.79.0';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PORT = +(process.env.PORT || 8787);
 const HOST = process.env.HOST || '127.0.0.1';
@@ -44,7 +44,9 @@ const OS_DIR = process.env.JARVIS_OS_DIR || path.join(REPO, 'essais', 'jarvis-os
 /* 0.53.0 (son choix du 22/11/2026 : « Sur ton serveur ») : les maquettes, faites de données inventées, sont servies ici, le dépôt passant en
    privé (GitHub Pages ne les publierait plus). /maquettes/ : la liste ; /maquettes/<nom>/ : le dossier essais/<dossier>/ du dépôt, à jour
    après chaque « Mettre à jour ». Une nouvelle maquette = une entrée ici (son dossier entre dans MAJ_CHEMINS). */
-const MAQUETTES = {ux: {dossier: 'jarvis-os-ux', titre: 'Refonte UX de JARVIS'}, passkey: {dossier: 'passkey-essai', titre: 'Essai : ton iPhone comme clé du coffre (passkey, Face ID)'}};
+/* 0.79.0 (son choix du 24/11/2026 : « supprime tout ce qui est reliquat ») : la maquette de la refonte UX (appliquée depuis la 0.54.0) et la page
+   d'essai de la passkey sont retirées ; la liste est vide jusqu'à la prochaine maquette. JARVIS_MAQUETTES (JSON {nom: {dossier, titre}}) : pour le banc. */
+const MAQUETTES = (() => { const m = {}; try { for (const [k, v] of Object.entries(JSON.parse(process.env.JARVIS_MAQUETTES || '{}'))) if (/^[a-z0-9-]+$/.test(k) && v && /^[a-z0-9-]+$/.test(v.dossier || '')) m[k] = {dossier: v.dossier, titre: String(v.titre || k).replace(/[<>&"]/g, '')}; } catch { /* liste vide */ } return m; })();
 const ESSAIS = process.env.JARVIS_ESSAIS || path.dirname(OS_DIR);   /* le dossier essais/ du dépôt (celui de la nouvelle app) */
 const ORIGINS = (process.env.JARVIS_ORIGINS || 'https://rabiederouiche.github.io').split(',').map((s) => s.trim()).filter(Boolean);
 const AGENTS = ['claude', 'jarvis', ...BOT_IDS];
@@ -2237,7 +2239,7 @@ const server = http.createServer(async (req, res) => {
       if (p === '/api/push/test' && req.method === 'POST') { const r = await PUSH.send({title: 'JARVIS', body: 'Les notifications marchent sur cet appareil.', url: '/#voir-reglages-notifs', tag: 'essai'}); return json(res, 200, {ok: r.some((x) => x.ok), results: r}); }
       if (p === '/api/push/prefs' && req.method === 'POST') { const b = await readBody(req), pr = S.push.prefs;
         if (typeof b.bots === 'boolean') pr.bots = b.bots; if (typeof b.rappels === 'boolean') pr.rappels = b.rappels; if (/^([01]\d|2[0-3]):[0-5]\d$/.test(String(b.heure || ''))) pr.heure = b.heure; save(); return json(res, 200, {prefs: pr}); }
-      if (p === '/api/push/check' && req.method === 'POST') { const b = await readBody(req); return json(res, 200, await notifyTick({only: ['canal', 'digest', 'resume'].includes(b.only) ? b.only : undefined, force: true})); }
+      if (p === '/api/push/check' && req.method === 'POST') { const b = await readBody(req); return json(res, 200, await notifyTick({only: ['canal', 'digest', 'resume', 'soir'].includes(b.only) ? b.only : undefined, force: true})); }
       if (p === '/api/sante') return json(res, 200, SANTE.status());
       /* 0.18.0 : consommation de Claude des 7 derniers jours, par type (jetons, part lue dans le cache) */
       if (p === '/api/conso') {
@@ -2361,8 +2363,7 @@ const server = http.createServer(async (req, res) => {
       if (p === '/api/memory' && req.method === 'DELETE') { S.msgs = []; S.missions = []; S.session = null; closeSession(); save(); return json(res, 200, {ok: true}); }
       return json(res, 404, {error: 'Adresse inconnue du serveur.'});
     }
-    /* les apps (16/11/2026) : la nouvelle (page Jarvis refondue) à la racine ; l'ancienne PWA à /ancienne/ (ses réglages avancés) ;
-       /os/ (adresse d'essai) renvoie à la racine ; un fichier absent de la nouvelle app est cherché dans l'ancienne (ex. /confidentialite.html) */
+    /* l'app à la racine ; /os/ (adresse d'essai) renvoie à la racine ; un fichier absent de l'app est cherché dans jarvis-os/web (/confidentialite.html) */
     const mq = p.match(/^\/maquettes(?:\/([a-z0-9-]+))?(\/.*)?$/);
     if (mq) {
       const ent = {'x-robots-tag': 'noindex', 'cache-control': 'no-cache'};
@@ -2380,15 +2381,18 @@ const server = http.createServer(async (req, res) => {
     }
     /* 0.73.0 : les « / » de tête retirés : /os//autre-site renvoyait vers un autre domaine (« //autre-site ») */
     if (p === '/os' || p.startsWith('/os/')) { res.writeHead(301, {location: '/' + p.slice(4).replace(/^[/\\]+/, '') + url.search}); res.end(); return; }
-    if (p === '/ancienne') { res.writeHead(302, {location: '/ancienne/'}); res.end(); return; }
-    const old = p.startsWith('/ancienne/'), rel = decodeURIComponent(old ? p.slice('/ancienne'.length) : p);
+    /* 0.79.0 (son choix du 24/11/2026) : l'ancienne app (/ancienne/) est retirée. Son adresse renvoie à l'app ; rien d'autre n'y est servi.
+       Le dossier jarvis-os/web ne garde que les règles de confidentialité déclarées à Google (/confidentialite.html). */
+    if (p === '/ancienne' || p === '/ancienne/') { res.writeHead(301, {location: '/'}); res.end(); return; }
+    if (p.startsWith('/ancienne/')) { if (decodeURIComponent(p).includes('\0')) return json(res, 400, {error: 'Adresse invalide.'}); res.writeHead(404); res.end(); return; }
+    const rel = decodeURIComponent(p);
     const tryFile = (root, cb) => { let f = path.normalize(path.join(root, rel)); if (!f.startsWith(path.normalize(root))) return cb(null); if (rel.endsWith('/')) f = path.join(f, 'index.html'); fs.readFile(f, (e, d) => cb(e ? null : {f, d})); };
     const send = (r) => { if (!r) { res.writeHead(404); res.end(); return; } res.writeHead(200, {'content-type': TYPES[path.extname(r.f)] || 'application/octet-stream', 'cache-control': /\.(html|js|webmanifest)$/.test(r.f) ? 'no-cache' : 'public, max-age=3600'}); res.end(r.d); };
     if (rel.split('/').includes('..')) return json(res, 403, {error: 'Interdit.'});
     if (rel.includes('\0')) return json(res, 400, {error: 'Adresse invalide.'});
     /* 0.73.0 : les bancs d'essai (banc/, tests) ne sont pas servis, comme pour /maquettes/ : la page n'en a pas besoin */
     if (/(^|\/)(banc|tests?)(\.|\/|$)/.test(rel)) { res.writeHead(404); res.end(); return; }
-    if (old) tryFile(WEB, send); else tryFile(OS_DIR, (r) => (r ? send(r) : tryFile(WEB, send)));
+    tryFile(OS_DIR, (r) => (r ? send(r) : tryFile(WEB, send)));
   } catch (e) {
     /* 0.73.0 : un corps trop gros (413) ou une adresse mal encodée (400) ne sont pas des pannes ; une vraie erreur est écrite dans le journal
        (méthode et chemin seulement : jamais la requête ni ses en-têtes, où sont les clés) */
