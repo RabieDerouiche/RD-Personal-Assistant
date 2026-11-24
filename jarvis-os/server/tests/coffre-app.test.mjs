@@ -99,6 +99,21 @@ try {
     const errs = [], envois = []; p.on('pageerror', (e) => errs.push(e.message));
     p.on('request', (r) => { if (r.url().startsWith(BASE)) envois.push(r.url() + ' ' + (r.postData() || '')); });
     await p.addInitScript((j) => { try { localStorage.setItem('jarvis.settings', JSON.stringify({serverToken: j})); } catch (e) { /* rien */ } }, jeton);
+    /* 0.82.0 (son constat du 24/11/2026 sur son iPad) : un appareil jamais relié ne voit que la porte, pas l'app vide ni son prénom */
+    { const c0 = await nav.newContext({...devices['iPad Pro 11']}), q = await c0.newPage(), e0 = []; q.on('pageerror', (e) => e0.push(e.message));
+      await q.goto(BASE + '/?serveur'); await q.waitForSelector('#porte-ecran', {timeout: 20000}); await q.waitForTimeout(1500);
+      const couvre = await q.evaluate(() => { const e = document.getElementById('porte-ecran').getBoundingClientRect(); return e.width >= innerWidth && e.height >= innerHeight && [[innerWidth / 2, 40], [40, innerHeight / 2], [innerWidth - 40, innerHeight - 40], [innerWidth / 2, innerHeight / 2]].every(([x, y]) => !!document.elementFromPoint(x, y).closest('#porte-ecran')); });
+      const texte = await q.locator('#porte-ecran').textContent();
+      ok('appareil jamais relié (iPad) : seule la porte se voit, elle couvre tout l\'écran, sans prénom ni donnée, et demande le code du serveur',
+        couvre && /pas relié à JARVIS/.test(texte) && /Le code se demande à ton serveur/.test(texte) && !/Rabie|décision|rendez-vous|agenda/i.test(texte) && await q.locator('#porte-code').count() === 1, texte);
+      await q.fill('#porte-code', 'AAAA-BBBB'); await q.tap('#porte-relier'); await q.waitForFunction(() => document.querySelector('#porte-ecran [role=status]').textContent.length > 3, null, {timeout: 15000});
+      const refus = await q.locator('#porte-ecran [role=status]').textContent();
+      await q.fill('#porte-code', appairer()); await q.tap('#porte-relier');
+      await q.waitForFunction(() => !document.getElementById('porte-ecran') && !!window.JarvisServeur && window.JarvisServeur.linked(), null, {timeout: 20000}); await q.waitForTimeout(1200);
+      ok('porte : un mauvais code est refusé et le dit ; le bon code relie l\'appareil, la page se recharge et la porte part', refus.length > 3 && await q.locator('#porte-ecran').count() === 0 && (await c('/api/state', {headers: {authorization: 'Bearer ' + await q.evaluate(() => JSON.parse(localStorage.getItem('jarvis.settings')).serverToken)}})).status === 200, refus);
+      await q.evaluate(() => localStorage.setItem('jarvis.settings', JSON.stringify({serverToken: 'jeton-qui-n-existe-plus'}))); await q.reload(); await q.waitForSelector('#porte-ecran', {timeout: 20000});
+      ok('porte : un appareil dont le jeton n\'existe plus (délié, coquille vide) revient à la porte ; aucune erreur de script', await q.locator('#porte-ecran').count() === 1 && e0.length === 0, e0.join(' | '));
+      await c0.close(); }
     /* 0.78.0 : Réglages en onglets. « Général » d'abord ; le coffre, verrouillé, met un point sur « Sécurité » ; l'onglet choisi est retenu ;
        un lien direct vers une carte ouvre son onglet ; « Tout » rend la page entière. */
     await p.goto(BASE + '/?serveur#reglages'); await p.waitForSelector('.set-tabs', {timeout: 20000});
