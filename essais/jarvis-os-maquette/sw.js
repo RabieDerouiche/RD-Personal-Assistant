@@ -7,7 +7,7 @@
    (1,16 Mo), sans limite ; v4 efface celles déjà gardées. Ce service n'efface que ses propres caches (« jarvis-os-app-… »), plus jarvis-os-v3,
    périmé (l'ancienne app y gardait des réponses de /api/) ; jamais jarvis-os-v4 ni Panier, qui partagent le même stockage du domaine. */
 const CACHE = 'jarvis-os-app-v4';
-const CORE = ['./', './index.html', './jarvis-voix.js', './jarvis-serveur.js', './manifest.webmanifest', './icon-180.png', './icon-192.png', './icon-512.png'];
+const CORE = ['./', './index.html', './jarvis-voix.js', './jarvis-serveur.js', './sceller.mjs', './manifest.webmanifest', './icon-180.png', './icon-192.png', './icon-512.png'];
 self.addEventListener('install', (e) => { e.waitUntil(caches.open(CACHE).then((c) => Promise.all(CORE.map((u) => c.add(u).catch(() => null))))); });
 self.addEventListener('message', (e) => { if (e.data && e.data.type === 'active') self.skipWaiting(); });   /* l'app est à l'arrière-plan : la relève peut se faire */
 self.addEventListener('activate', (e) => { e.waitUntil(caches.keys().then((ks) => Promise.all(ks.filter((k) => (k.startsWith('jarvis-os-app-') && k !== CACHE) || k === 'jarvis-os-v3').map((k) => caches.delete(k)))).then(() => self.clients.claim())); });

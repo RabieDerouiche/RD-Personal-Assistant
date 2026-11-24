@@ -373,7 +373,10 @@ Fait dans le dépôt le 24/11/2026 (pas encore sur le serveur : le coffre n'y es
   avant resterait valable), révoquer le jeton Telegram chez @BotFather, changer la phrase du coffre si elle a pu être
   vue, la clé de la voix Google (synthèse vocale seulement) si le disque a pu être lu.
   Non essayé hors banc : vrai systemd, `runuser`, sortie réelle de `claude auth logout`.
-- Reste à construire : la carte « Coffre » de Réglages (état, champ de la phrase rempli par NordPass, « Verrouiller »),
-  les routes `/api/coffre/…` du serveur, le verrou de l'app par la passkey, le bouton d'arrêt d'urgence, puis
-  l'accès Google dans le coffre.
+- **Carte « Coffre » de JARVIS (0.74.0)** : état, ouverture par la phrase que NordPass remplit (scellée dans la page,
+  le serveur ne fait que passer le paquet), « Verrouiller » ; absente tant que le coffre n'est pas installé. Routes
+  `/api/coffre…` réservées à un appareil relié. Banc : `node jarvis-os/server/tests/coffre-app.test.mjs` (20).
+  Non essayé : Safari, l'app de l'écran d'accueil, NordPass (son essai du point 4).
+- Reste à construire : le verrou de l'app par la passkey, le bouton d'arrêt d'urgence, la notification « coffre
+  verrouillé » après un redémarrage, puis l'accès Google dans le coffre.
 

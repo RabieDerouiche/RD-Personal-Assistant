@@ -253,6 +253,21 @@
       verifier: () => req('/api/voix/google/verifier', {}).then((r) => (r.status === 200 ? r.j : null)).catch(() => null),   /* 0.47.0 : une vraie phrase demandée à Google (comptée) */
       relancer: () => req('/api/voix/google/relancer', {}).then((r) => (r.status === 200 ? r.j : null)).catch(() => null)   /* 0.48.0 : après une alerte de budget de Google Cloud, lui seul relance Google */
     },
+    /* 0.74.0 : le coffre en mémoire du serveur (jarvis-coffre). La phrase est scellée ICI, pour le coffre seul (sceller.mjs : la clé et un
+       défi à usage unique viennent du coffre) ; le serveur de JARVIS ne reçoit que le paquet chiffré. Rien n'est gardé dans l'app. */
+    coffre: {
+      etat: () => req('/api/coffre').then((r) => (r.status === 200 && r.j && typeof r.j.installe === 'boolean' ? r.j : null)).catch(() => null),
+      ouvrir: async (phrase) => {
+        try {
+          const k = await req('/api/coffre/cle');
+          if (k.status !== 200 || !k.j.cle) return {error: (k.j && k.j.error) || 'Le coffre ne répond pas.'};
+          const {scellerPhrase} = await import('./sceller.mjs');
+          const r = await req('/api/coffre/ouvrir', await scellerPhrase(phrase, k.j.cle, k.j.defi));
+          return r.j && typeof r.j.installe === 'boolean' ? r.j : {error: (r.j && r.j.error) || 'Ouverture refusée.'};
+        } catch (e) { return {error: 'Ouverture impossible depuis cet appareil : ouvre le coffre dans Termius (sudo jarvis-coffre ouvrir).'}; }
+      },
+      fermer: () => req('/api/coffre/fermer', {}).then((r) => (r.j && typeof r.j.installe === 'boolean' ? r.j : null)).catch(() => null)
+    },
     /* 0.39.0 : le serveur MCP (assistants reliés : app Claude, Grok Bot) et l'accord sur une proposition venue d'eux */
     mcp: {
       etat: () => req('/api/mcp').then((r) => (r.status === 200 ? r.j : null)).catch(() => null),
