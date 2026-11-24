@@ -10159,6 +10159,9 @@ void main(){
     });
     const ajouter = geste(async () => { dire(''); if (!(await prouver())) return; const c = await JS.verrou.creer('Passkey de JARVIS ' + (st.cles.length + 1)); if (!prendre(c)) { dire((c && c.error) || 'Le serveur ne répond pas.', true); return; } if (await prouver()) dire('Passkey ajoutée et prouvée.'); else dire('Passkey créée mais pas prouvée : elle sera oubliée dans 10 minutes.', true); });
     const eteindre = geste(async () => { dire(''); if (!(await prouver())) return; const r = await JS.verrou.desactiver(); if (prendre(r)) dire('Verrou désactivé : le jeton de l’appareil suffit de nouveau.'); else dire((r && r.error) || 'Le serveur ne répond pas.', true); });
+    /* 0.76.0 : après combien de temps hors de l'app Face ID est redemandé (son retour du 24/11/2026) */
+    const DELAI_DIT = {0: 'dès que tu la quittes', 60: 'après 1 min hors de l’app', 120: 'après 2 min hors de l’app', 300: 'après 5 min hors de l’app'}, DELAI_BOUTON = {0: 'Tout de suite', 60: '1 min', 120: '2 min', 300: '5 min'};
+    const regler = (n) => geste(async () => { dire(''); if (n === st.delai) return; if (!(await prouver())) return; const r = await JS.verrou.delai(n); if (prendre(r)) dire('Réglé : Face ID redemandé ' + DELAI_DIT[n] + '.'); else dire((r && r.error) || 'Le serveur ne répond pas.', true); });
     const retirer = (k) => geste(async () => { dire(''); if (!(await prouver())) return; const r = await JS.verrou.retirer(k.id); if (prendre(r)) dire('Passkey retirée.'); else dire((r && r.error) || 'Le serveur ne répond pas.', true); });
     const paint = () => {
       card.dataset.etat = st.actif ? 'actif' : 'eteint';
@@ -10167,11 +10170,13 @@ void main(){
       if (!st.actif) {
         etat.textContent = 'Désactivé : le jeton gardé par l’app suffit pour ouvrir JARVIS.' + (n ? ' ' + pk + ' déjà enregistrée' + (n > 1 ? 's' : '') + '.' : '');
         zone.replaceChildren(h('button', {type: 'button', class: 'btn main sm', onclick: activer}, n ? 'Activer (Face ID)' : 'Activer avec une passkey (Face ID)'),
-          h('p', {class: 'muted set-small', text: 'Ton gestionnaire de mots de passe garde la passkey ; Face ID la présente à chaque ouverture de l’app, et après ' + st.inactif + ' min sans usage. Tous les appareils reliés devront la présenter. Rien n’est activé si l’essai échoue. Hors du verrou : le Raccourci Siri, les invitations et les assistants reliés, qui ont leurs propres clés. Secours si la passkey est perdue : sur le serveur, « node server.mjs verrou --retirer ».'}));
+          h('p', {class: 'muted set-small', text: 'Ton gestionnaire de mots de passe garde la passkey ; Face ID la présente à chaque ouverture de l’app, et quand tu y reviens après plus d’une minute (réglable). Tous les appareils reliés devront la présenter. Rien n’est activé si l’essai échoue. Hors du verrou : le Raccourci Siri, les invitations et les assistants reliés, qui ont leurs propres clés. Secours si la passkey est perdue : sur le serveur, « node server.mjs verrou --retirer ».'}));
         return;
       }
-      etat.textContent = 'Activé · ' + pk + '. Face ID à chaque ouverture de l’app, et après ' + st.inactif + ' min sans usage.';
+      etat.textContent = 'Activé · ' + pk + '. Face ID à chaque ouverture de l’app, et ' + (DELAI_DIT[st.delai] || 'après une absence') + '.';
       zone.replaceChildren(
+        (st.delais || []).length ? h('div', {class: 'verrou-delai'}, h('small', {class: 'pick-label', text: 'Redemander Face ID'}),
+          h('div', {class: 'seg set-seg', role: 'group'}, st.delais.map((n) => h('button', {type: 'button', 'aria-pressed': String(n === st.delai), onclick: regler(n)}, DELAI_BOUTON[n] || n + ' s')))) : null,
         h('ul', {class: 'mem-list'}, st.cles.map((k) => h('li', {class: 'mem-it'}, h('span', {}, h('b', {text: k.nom}), h('small', {class: 'muted', text: ' · créée le ' + fmt(new Date(k.at), {day: 'numeric', month: 'short'})})),
           n > 1 ? h('button', {type: 'button', class: 'btn ghost sm danger', onclick: retirer(k)}, 'Retirer') : null))),
         h('div', {class: 'row-actions'},

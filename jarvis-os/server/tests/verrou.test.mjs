@@ -121,6 +121,16 @@ try {
   await pause(3000);
   ok('une app qui parle reste ouverte (4 s de demandes espacées de 1 s) ; 3 s de silence : reverrouillée', tenus.join() === '200,200,200,200' && await etatDe(A) === 423 && (await c('/api/verrou', {headers: A})).body.ouvert === false, tenus.join());
 
+  /* 5 bis. l'app à l'arrière-plan : le délai réglé (0.76.0) */
+  await prouver(A, K);
+  const d1 = await post('/api/verrou/delai', A, {delai: 120}), d2 = await post('/api/verrou/delai', A, {delai: 45}), d3 = await post('/api/verrou/delai', B, {delai: 0});
+  await post('/api/verrou/cache', A); const pendant = await etatDe(A), revenu = await post('/api/verrou/retour', A);
+  await prouver(A, K); const d4 = await post('/api/verrou/delai', A, {delai: 0});
+  await post('/api/verrou/cache', A); const apresCache = await etatDe(A), revenu0 = await post('/api/verrou/retour', A);
+  await prouver(A, K); const d5 = await post('/api/verrou/delai', A, {delai: 60});
+  ok('délai d\'absence : 60 s par défaut ; réglé à 2 min après une preuve (une valeur hors liste et un appareil verrouillé sont refusés)', e0.body.delai === 60 && d1.status === 200 && d1.body.delai === 120 && d2.status === 403 && d3.status === 423 && d5.body.delai === 60, [d1.status, d2.status, d3.status, d5.status].join());
+  ok('app à l\'arrière-plan, délai de 2 min : elle reste ouverte et son retour efface le compte ; délai « tout de suite » : fermée dès qu\'elle quitte l\'écran, le retour le dit',
+    pendant === 200 && revenu.body.ouvert === true && d4.body.delai === 0 && apresCache === 423 && revenu0.body.ouvert === false, [pendant, revenu.body.ouvert, apresCache, revenu0.body.ouvert].join());
   /* 6. deuxième passkey (RSA), compteur, retrait */
   await prouver(A, K);
   const R = passkey('rsa'), cR = await post('/api/verrou/creer', A, R.creation(await defiC(A), {n: 3}));
@@ -165,24 +175,41 @@ try {
     if (process.env.VERROU_CAPTURE) { await carte.scrollIntoViewIfNeeded(); await p.screenshot({path: process.env.VERROU_CAPTURE + '-carte.png'}); }
     await p.reload(); await p.waitForSelector('#verrou-card', {timeout: 20000}); await p.waitForTimeout(1500);
     ok('un simple rechargement de la page ne redemande pas Face ID', await ecran() === 0 && await carte.getAttribute('data-etat') === 'actif');
-    /* l'app fermée puis relancée : sessionStorage repart vide */
-    await p.evaluate(() => sessionStorage.clear()); await p.reload(); await p.waitForSelector('#verrou-ecran', {timeout: 20000}); await p.waitForTimeout(1500);
-    ok('app relancée : écran « JARVIS est verrouillé » par-dessus tout, et le serveur refuse cet appareil (423)', /JARVIS est verrouillé/.test(await p.locator('#verrou-ecran').textContent()) && await etatDe(A) === 423
+    const verifie = (oui) => cdp.send('WebAuthn.setUserVerified', {authenticatorId, isUserVerified: oui});
+    const relancer = async () => { await p.evaluate(() => sessionStorage.clear()); await p.reload(); };   /* l'app fermée puis relancée : sessionStorage repart vide */
+    const quitter = (ms) => p.evaluate(async (t) => { Object.defineProperty(document, 'visibilityState', {configurable: true, get: () => window.__vis || 'visible'}); window.__vis = 'hidden'; document.dispatchEvent(new Event('visibilitychange')); await new Promise((z) => setTimeout(z, t)); window.__vis = 'visible'; document.dispatchEvent(new Event('visibilitychange')); }, ms);
+    /* a. app relancée, Face ID réussit : il part tout seul, sans toucher l'écran */
+    await relancer(); await p.waitForSelector('#verrou-card', {timeout: 20000}); await p.waitForTimeout(1500);
+    ok('app relancée : Face ID part tout seul (aucun toucher), l\'app s\'ouvre', await ecran() === 0 && await etatDe(A) === 200 && await carte.getAttribute('data-etat') === 'actif');
+    /* b. app relancée, Face ID échoue : l'écran reste, sans message d'erreur pour l'essai automatique ; le bouton est le secours */
+    await verifie(false); await relancer(); await p.waitForSelector('#verrou-ecran', {timeout: 20000}); await p.waitForTimeout(2500);
+    ok('app relancée, Face ID sans succès : écran « JARVIS est verrouillé » par-dessus tout, aucun message pour l\'essai automatique, et le serveur refuse cet appareil (423)',
+      /JARVIS est verrouillé/.test(await p.locator('#verrou-ecran').textContent()) && await p.locator('#verrou-ecran [role=status]').textContent() === '' && await etatDe(A) === 423
       && await p.evaluate(() => { const e = document.getElementById('verrou-ecran').getBoundingClientRect(); return e.width >= innerWidth && e.height >= innerHeight && document.elementFromPoint(innerWidth / 2, 40).closest('#verrou-ecran') !== null; }));
     if (process.env.VERROU_CAPTURE) await p.screenshot({path: process.env.VERROU_CAPTURE + '-ecran.png'});
-    await cdp.send('WebAuthn.setUserVerified', {authenticatorId, isUserVerified: false});
     await p.locator('#verrou-ouvrir').tap(); await p.waitForFunction(() => document.querySelector('#verrou-ecran [role=status]').textContent.length > 3, null, {timeout: 20000});
-    ok('Face ID refusé : l\'écran reste, un message le dit, le serveur reste fermé', await ecran() === 1 && await etatDe(A) === 423, await p.locator('#verrou-ecran').textContent());
-    await cdp.send('WebAuthn.setUserVerified', {authenticatorId, isUserVerified: true});
+    ok('bouton « Déverrouiller », Face ID refusé : l\'écran reste, un message le dit, le serveur reste fermé', await ecran() === 1 && await etatDe(A) === 423, await p.locator('#verrou-ecran').textContent());
+    await verifie(true);
     await p.locator('#verrou-ouvrir').tap(); await p.waitForSelector('#verrou-card', {timeout: 20000}); await p.waitForTimeout(1500);
-    ok('Face ID réussi : l\'écran part, l\'app est rechargée et ouverte', await ecran() === 0 && await etatDe(A) === 200 && await carte.getAttribute('data-etat') === 'actif');
-    await carte.getByRole('button', {name: 'Verrouiller maintenant'}).tap(); await p.waitForSelector('#verrou-ecran', {timeout: 20000});
-    ok('« Verrouiller maintenant » : écran de verrou, serveur fermé pour cet appareil', await etatDe(A) === 423);
+    ok('bouton « Déverrouiller », Face ID réussi : l\'écran part, l\'app est rechargée et ouverte', await ecran() === 0 && await etatDe(A) === 200 && await carte.getAttribute('data-etat') === 'actif');
+    /* c. il quitte l'app et revient : rien avant le délai (1 min par défaut) ; au-delà, verrou et Face ID tout seul */
+    await quitter(400); await p.waitForTimeout(1200);
+    ok('il quitte l\'app une demi-seconde (délai : 1 min) : rien n\'est redemandé', await ecran() === 0 && await etatDe(A) === 200);
+    await carte.getByRole('button', {name: 'Tout de suite'}).tap();
+    await p.waitForFunction(() => /dès que tu la quittes/.test(document.querySelector('#verrou-card .verrou-etat').textContent), null, {timeout: 20000});
+    ok('carte : le délai se règle (Face ID redemandé), ici « Tout de suite »', (await c('/api/verrou', {headers: A})).body.delai === 0, await carte.textContent());
+    await verifie(false); await quitter(400); await p.waitForSelector('#verrou-ecran', {timeout: 20000}); await p.waitForTimeout(1500);
+    ok('délai « tout de suite » : il quitte l\'app et revient, elle est verrouillée (écran, 423)', await ecran() === 1 && await etatDe(A) === 423);
+    await verifie(true); await quitter(300); await p.waitForSelector('#verrou-card', {timeout: 20000}); await p.waitForTimeout(1500);
+    ok('il revient sur l\'écran de verrou : Face ID repart tout seul et ouvre', await ecran() === 0 && await etatDe(A) === 200);
+    /* d. verrouillé à la main : Face ID ne repart pas tout seul */
+    await carte.getByRole('button', {name: 'Verrouiller maintenant'}).tap(); await p.waitForSelector('#verrou-ecran', {timeout: 20000}); await p.waitForTimeout(2000);
+    ok('« Verrouiller maintenant » : écran de verrou qui reste (pas de Face ID automatique), serveur fermé pour cet appareil', await ecran() === 1 && await etatDe(A) === 423);
     await p.locator('#verrou-ouvrir').tap(); await p.waitForSelector('#verrou-card', {timeout: 20000}); await p.waitForTimeout(1000);
     await carte.getByRole('button', {name: 'Désactiver'}).tap();
     await p.waitForFunction(() => document.querySelector('#verrou-card').dataset.etat === 'eteint', null, {timeout: 20000});
     ok('« Désactiver » (Face ID redemandé) : verrou éteint pour tous les appareils', (await c('/api/verrou', {headers: B})).body.actif === false && await etatDe(B) === 200);
-    await p.evaluate(() => sessionStorage.clear()); await p.reload(); await p.waitForSelector('#verrou-card', {timeout: 20000}); await p.waitForTimeout(1500);
+    await relancer(); await p.waitForSelector('#verrou-card', {timeout: 20000}); await p.waitForTimeout(1500);
     ok('verrou éteint : l\'app relancée s\'ouvre sans écran de verrou', await ecran() === 0);
     ok('aucune erreur de script dans la page', errs.length === 0, errs.join(' | '));
     await nav.close(); nav = null;

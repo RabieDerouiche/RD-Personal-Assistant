@@ -382,7 +382,9 @@ Fait dans le dépôt le 24/11/2026 (pas encore sur le serveur : le coffre n'y es
   appareil relié prouve la passkey (Face ID) à chaque lancement de l'app et après 5 minutes sans usage ; l'ouverture
   est gardée par le serveur, en mémoire. Secours sans passkey : `node server.mjs verrou --retirer`, service arrêté.
   Hors du verrou : Raccourci Siri, invitations, assistants MCP. Banc : `node jarvis-os/server/tests/verrou.test.mjs`
-  (34). Non essayé : Safari, l'app de l'écran d'accueil, NordPass. La page d'essai `/maquettes/passkey/` ne sert plus
+  (41). **Activé par lui le 24/11/2026 sur son iPhone : la passkey NordPass marche dans l'app de l'écran d'accueil.**
+  0.76.0, son retour : Face ID part tout seul (bouton en secours), reverrouillage au retour après une absence (1 min par
+  défaut, réglable ; avant : 5 min sans demande). La page d'essai `/maquettes/passkey/` ne sert plus
   (son essai du 24/11 à midi, dans Chrome : toujours aucune clé « prf » ; le point 4 n'a pas été fait).
 - Reste à construire : le bouton d'arrêt d'urgence, la notification « coffre verrouillé » après un redémarrage,
   l'accès Google dans le coffre ; et, pour les couches, la question à boutons (ne dépend pas de lui) puis le geste
