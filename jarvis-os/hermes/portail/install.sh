@@ -25,10 +25,10 @@ BANC=${HERMES_BANC:-0}   # 1 = banc d'essai (conteneur sans systemd) : ni servic
 
 dire() { printf '\n== %s\n' "$*"; }
 [ "$(id -u)" = 0 ] || { echo "À lancer en root : sudo bash $0"; exit 1; }
-for f in politique.yaml hermes-portail filtre.py sortie.nft hermes-portail-sortie.service hermes-portail-filtre.service hermes-portail-essai.service domaines.defaut skills/portail/portail/SKILL.md; do
+for f in politique.yaml hermes-portail filtre.py sortie.nft hermes-portail-sortie.service hermes-portail-filtre.service hermes-portail-essai.service domaines.defaut navigateur-regles.json skills/portail/portail/SKILL.md; do
   [ -f "$ICI/$f" ] || { echo "Fichier manquant : $ICI/$f"; exit 1; }
 done
-bash -n "$ICI/hermes-portail" && python3 -I -c "import ast,sys; ast.parse(open(sys.argv[1]).read())" "$ICI/filtre.py" || { echo "Le code du dépôt ne passe pas le contrôle de syntaxe : rien n'a été posé."; exit 1; }
+bash -n "$ICI/hermes-portail" && python3 -I -c "import ast,sys; ast.parse(open(sys.argv[1]).read())" "$ICI/filtre.py" && python3 -I -c "import json,sys; json.load(open(sys.argv[1]))" "$ICI/navigateur-regles.json" || { echo "Le code du dépôt ne passe pas le contrôle de syntaxe : rien n'a été posé."; exit 1; }
 
 NPM_DIR=$(dirname "$(command -v npm 2>/dev/null || echo /usr/bin/npm)")
 passe=()
@@ -124,6 +124,14 @@ comme hermes config set skills.external_dirs "[\"$ETC/skills\"]" >/dev/null
 fournies=$(find "$HH/hermes-agent/skills" -name SKILL.md -exec sed -n 's/^name: *//p' {} \; 2>/dev/null | tr -d "\"'" | sort -u | paste -sd, -)
 [ -n "$fournies" ] && comme hermes config set skills.disabled "[$fournies]" >/dev/null
 echo "Skill du dépôt : $(find "$ETC/skills" -name SKILL.md | wc -l) ; skills livrées avec Hermes coupées : $(printf '%s' "$fournies" | tr ',' '\n' | grep -c .)."
+
+dire "Règles du navigateur (root)"
+# Chrome for Testing (celui qu'Hermes installe) lit ses règles d'administrateur ici ; l'utilisateur hermes-portail ne
+# peut pas les changer. Elles valent pour tout Chrome for Testing de la machine : il n'y a que celui-là.
+REGLES=/etc/opt/chrome_for_testing/policies/managed
+install -d -o root -g root -m 0755 /etc/opt/chrome_for_testing /etc/opt/chrome_for_testing/policies "$REGLES"
+install -o root -g root -m 0644 "$ICI/navigateur-regles.json" "$REGLES/hermes-portail.json"
+echo "$REGLES/hermes-portail.json : gestionnaire de mots de passe, vérification de fuite, remplissage, compte Google, mises à jour et mesures coupés."
 
 dire "Commande et relais (copies root)"
 install -o root -g root -m 0755 "$ICI/hermes-portail" /usr/local/sbin/hermes-portail

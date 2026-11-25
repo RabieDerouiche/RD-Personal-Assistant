@@ -49,7 +49,23 @@ platform_toolsets:
 browser:
   headed: false
   user_data_dir: "navigateur"            # sous son HERMES_HOME : la session du portail y reste d'un passage à l'autre
-  chromium_args: ["--proxy-server=http://127.0.0.1:@RELAIS@"]
+  # Le relais d'abord ; puis ce que le navigateur envoie de lui-même à Google est coupé à la source (le relais le
+  # refusait déjà : remplissage automatique, heure réseau, suggestions). Un seul --disable-features compte, le
+  # dernier : il reprend « Translate », qu'Hermes pose avant. Le reste est dans navigateur-regles.json.
+  #
+  # --no-sandbox, dit en clair : sur Ubuntu, AppArmor refuse les espaces de noms sans privilège et Hermes lance
+  # alors Chromium sans son bac à sable de toute façon (tools/browser_launcher.py). L'écrire ici évite qu'il tente
+  # de le monter là où AppArmor le permettrait : l'unité d'un passage interdit les espaces de noms
+  # (RestrictNamespaces) et Chromium s'arrêterait au démarrage (vu au banc). C'est donc l'unité systemd qui enferme
+  # le navigateur, pas lui-même : limite connue, notée dans docs/hermes-portail.md.
+  chromium_args:
+    - "--proxy-server=http://127.0.0.1:@RELAIS@"
+    - "--no-sandbox"
+    - "--disable-dev-shm-usage"
+    - "--disable-features=Translate,AutofillServerCommunication,OptimizationHints,MediaRouter,DialMediaRouteProvider,NetworkTimeServiceQuerying"
+    - "--no-pings"
+    - "--disable-domain-reliability"
+    - "--disable-client-side-phishing-detection"
 
 vault:
   key_storage: file                      # le « fichier » est un lien vers la mémoire vive (/run/hermes-portail-cle)

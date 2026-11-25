@@ -84,8 +84,9 @@ tenu par la commande) : pas encore faite.
 |---|---|
 | `install.sh` | Root, relançable. Utilisateur `hermes-portail`, Hermes à la version figée du Hermes principal (lue dans `../install.sh`) avec son navigateur, plugin de l'abonnement Claude et Claude Code à lui, politique, skill, copies root de la commande et du relais, lien de la clé, règles réseau et relais. Ne démarre aucun agent. |
 | `hermes-portail` | La commande (`/usr/local/sbin/hermes-portail`) : `etat`, `connexion-claude`, `enregistrer`, `domaines`, `essai`, `cle`, `fermer`, `oublier`. Un essai lance l'unité `hermes-portail-essai`. |
-| `hermes-portail-essai.service` | Un passage, enfermé (mêmes lignes que `hermes-gateway.service`, mémoire sans échange). Une vraie unité, pas `systemd-run` : au premier essai sur le serveur, `systemd-run -p IPAddressDeny=link-local` a été refusé alors que la même ligne est valable dans une unité. Consigne dans `/home/hermes-portail/.consigne`, réponse dans `/var/lib/hermes-portail/essais/`. |
-| `politique.yaml` | Sa politique (`/etc/hermes-portail/config.yaml`, root) : outils `browser`, `terminal`, `skills` seulement ; Sonnet ; profil de navigateur gardé ; navigateur envoyé vers le relais. |
+| `hermes-portail-essai.service` | Un passage, enfermé (mêmes lignes que `hermes-gateway.service`, mémoire sans échange ; depuis le 25/11/2026, filtre d'appels système et espaces de noms interdits). Une vraie unité, pas `systemd-run` : au premier essai sur le serveur, `systemd-run -p IPAddressDeny=link-local` a été refusé alors que la même ligne est valable dans une unité. Consigne dans `/home/hermes-portail/.consigne`, réponse dans `/var/lib/hermes-portail/essais/`. |
+| `politique.yaml` | Sa politique (`/etc/hermes-portail/config.yaml`, root) : outils `browser`, `terminal`, `skills` seulement ; Sonnet ; profil de navigateur gardé ; navigateur envoyé vers le relais, lancé sans son bac à sable (dit en clair, voir « Durcissement »), remplissage automatique et heure réseau coupés. |
+| `navigateur-regles.json` | Règles d'administrateur du navigateur (`/etc/opt/chrome_for_testing/policies/managed/hermes-portail.json`, root) : pas de gestionnaire de mots de passe, pas de vérification de fuite, pas de compte Google, pas de mesures. |
 | `skills/portail/portail/SKILL.md` | Sa marche à suivre : se connecter par le coffre, lecture seule, ne jamais taper un mot de passe, ne rien soumettre, s'arrêter si un code est demandé, attente finale, réponse sans donnée personnelle. |
 | `filtre.py`, `hermes-portail-filtre.service` | Le relais filtrant (Python du système, sans dépendance, utilisateur passager) : CONNECT vers le port 443 des hôtes de la liste, refus notés. |
 | `sortie.nft`, `hermes-portail-sortie.service` | Ce que l'utilisateur peut joindre : le relais et les ports éphémères locaux, rien d'autre. |
@@ -108,24 +109,53 @@ le serveur). Faux portail `essais/hermes/faux_portail.py`, faux terminal `essais
 
 ## Ce que le banc prouve, et ce qu'il ne prouve pas
 
-Prouvé (56 vérifications, 24/11/2026) : installation ; outils réduits et politique figée ; clé seulement en ramfs,
+Prouvé (66 vérifications, 25/11/2026) : installation ; outils réduits et politique figée ; clé seulement en ramfs,
 nulle part en clair sur le disque, gardée par jarvis-coffre ; enregistrement dans un faux terminal sans que le mot de
 passe s'affiche ; connexion au faux portail par le coffre, tableau lu, formulaire ouvert, rien de soumis ; mot de
 passe et clé jamais envoyés au modèle ; session gardée au second passage ; coffre verrouillé : refus propre ;
 redémarrage simulé puis reprise après la phrase ; pas de DNS, pas d'Internet direct, pas de JARVIS ; relais (hôte ou
-port hors liste, requête en clair : refusés ; hôte de la liste : permis).
+port hors liste, requête en clair : refusés ; hôte de la liste : permis) ; le navigateur et Hermes sous le filtre
+d'appels système de l'unité, reproduit par `essais/hermes/filtre_appels.py` ; plus d'appel du navigateur vers la
+vérification de fuite ni le remplissage automatique.
 
 Pas prouvé, à voir sur le vrai serveur :
 - jarvis-coffre sous un vrai systemd (jamais lancé hors banc) ;
 - l'unité passagère enfermée avec Chromium et Claude Code dedans (si un passage échoue au lancement : relâcher une
   propriété de `lancer_agent`, la noter ici) ;
-- Chromium sous Ubuntu 26.04 (Hermes lui retire son bac à sable quand AppArmor restreint les espaces de noms : Likely) ;
+- le filtre d'appels système sous le vrai systemd du serveur (le banc le reproduit avec un autre noyau et un autre
+  systemd) ;
 - Claude Code à travers le relais (hôtes de `domaines.defaut` devinés d'après ses adresses connues : les refus
   s'affichent dans `etat`) ;
 - le vrai modèle suivant la skill (le banc joue une suite d'appels écrite d'avance) ;
 - le vrai portail : accepte-t-il un navigateur venu d'un serveur, quels hôtes annexes lui faut-il, sa page de
   connexion en une ou deux étapes ;
 - la mémoire du VPS-1 pendant un passage (environ 1 Go : navigateur, Hermes, Claude Code).
+
+## Durcissement (25/11/2026, son choix par QCM : « Second passage puis durcir »)
+
+- **L'unité d'un passage** gagne `SystemCallFilter=@system-service`, moins `@privileged`, plus `capset`, et
+  `RestrictNamespaces=yes`. `capset` est rendu exprès : Chromium s'en sert pour abandonner ses droits et s'arrête
+  net si on le lui refuse (`credentials.cc`, « Operation not permitted »). Sans capacité permise, il ne sert qu'à
+  en perdre.
+- **Le navigateur tourne sans son propre bac à sable** (`--no-sandbox`, écrit dans la politique). Sur Ubuntu,
+  AppArmor refuse les espaces de noms sans privilège et Hermes 0.23.3 retire alors le bac à sable de lui-même
+  (`tools/browser_launcher.py`, `needs_chromium_sandbox_bypass`) ; l'écrire évite qu'il le tente ailleurs, où
+  `RestrictNamespaces` le ferait tomber au démarrage. **Limite connue** : c'est l'unité systemd qui enferme le
+  navigateur, pas lui-même. Une page qui percerait le navigateur aurait les droits de `hermes-portail`, donc la clé
+  du coffre tant qu'elle est en mémoire. Ce qui borne : le relais (rien ne sort hors des hôtes permis), le filtre
+  d'appels système, aucun autre fichier du serveur à sa portée. Pas de meilleure option avec cette version d'Hermes
+  (l'aide `chrome_sandbox` en setuid est incompatible avec `NoNewPrivileges`).
+- **Ce que le navigateur envoyait de lui-même à Google** : la vérification de fuite du mot de passe (un fragment
+  d'empreinte) et le remplissage automatique (la forme des formulaires du portail) sont coupés à la source, par
+  les règles d'administrateur et par option ; le gestionnaire de mots de passe de Chrome est coupé aussi (rien ne
+  peut finir dans son fichier). Quatre appels restent, sans donnée du portail, toujours refusés par le relais :
+  liste des comptes Google, dictionnaire, mise à jour, mode IA (aucune règle ni option de Chrome 156 ne les a
+  coupés au banc).
+- **Le banc reproduit le filtre sans systemd** : `essais/hermes/filtre_appels.py` lit les lignes de l'unité et pose
+  le même filtre avec libseccomp autour de chaque passage. C'est lui qui a trouvé `capset` et le bac à sable avant
+  le serveur. Il ne remplace pas l'essai réel : noyau et version de systemd différents.
+- **Un passage peut rendre le code 0 sans navigateur** : si Chromium ne démarre pas, Hermes le dit dans sa réponse
+  mais sort en 0. Juger un passage à sa réponse (ligne « Connexion »), pas à son code. À corriger.
 
 ## État
 
@@ -181,20 +211,26 @@ Pas prouvé, à voir sur le vrai serveur :
   de mot de passe, qui envoie un fragment d'empreinte : à couper aussi dans le navigateur), mises à jour et listes
   de modèles cherchées par Hermes, le service de rapports d'erreurs du portail, une bibliothèque servie par un CDN
   (à surveiller sur d'autres pages).
+- 25/11/2026, 14h27 : **second passage : la session est gardée.** Hermes arrive sur le tableau de bord sans se
+  reconnecter (68 s, pic de 1 Go). Écart non expliqué : la liste des dépenses récentes, remplie au passage
+  précédent, est décrite vide cette fois (une bibliothèque du portail servie par un CDN est refusée par le relais :
+  cause possible, pas vérifiée). À regarder avant la note à blanc.
+- 25/11/2026 : durcissement écrit et passé au banc (66 vérifications), voir « Durcissement ». Sur le serveur :
+  à appliquer puis à vérifier par un passage réel.
 
 ## Ce qui reste (au 25/11/2026)
 
 Pour ce portail :
-1. **Session gardée ?** Un second passage doit dire « session encore ouverte ». Puis un contrôle par jour pendant une
-   à deux semaines, pour savoir combien de temps le portail la garde (minuterie à écrire).
+1. **Combien de temps la session tient** : elle tient d'un passage au suivant (une heure d'écart). Reste un contrôle
+   par jour pendant une à deux semaines (minuterie à écrire, sur sa demande).
 2. **Note de frais à blanc** : aller jusqu'au dernier écran sans valider, comparer avec ce que Chronos a créé. Il faut
    d'abord les règles de Chronos (onglet « Textes des routines » de Pilotage : montants, contrôles, interdits ne sont
    pas dans sa fiche) et une skill par geste.
 3. **Redémarrage du serveur** : vérifier pour de vrai que tout attend le coffre, puis repart après
    `sudo jarvis-coffre ouvrir` (la carte « Coffre » de l'app n'est pas encore branchée : `jarvis` n'est dans le groupe
    du coffre qu'à son prochain redémarrage).
-4. **Durcir** : filtre d'appels système et `RestrictNamespaces` sur l'unité d'un passage (à essayer maintenant que le
-   passage réussit) ; couper dans Chromium la vérification de fuite, le remplissage et les mises à jour.
+4. **Durcir** : écrit et passé au banc ; reste à l'appliquer sur le serveur et à refaire un passage réel. Puis : un
+   passage dont le navigateur ne démarre pas doit rendre un code d'erreur ; l'écart sur la liste des dépenses.
 Ensuite :
 5. Les deux autres portails (CRA mensuel, CRA hebdomadaire) : même marche, `enregistrer`, `domaines`, `essai`. Leur
    connexion (code, session courte) n'est pas connue.

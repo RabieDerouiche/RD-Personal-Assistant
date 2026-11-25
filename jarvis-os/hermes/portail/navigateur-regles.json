@@ -1,0 +1,21 @@
+{
+  "PasswordManagerEnabled": false,
+  "PasswordLeakDetectionEnabled": false,
+  "SafeBrowsingProtectionLevel": 0,
+  "AutofillAddressEnabled": false,
+  "AutofillCreditCardEnabled": false,
+  "BrowserSignin": 0,
+  "SyncDisabled": true,
+  "MetricsReportingEnabled": false,
+  "UrlKeyedAnonymizedDataCollectionEnabled": false,
+  "ComponentUpdatesEnabled": false,
+  "BrowserNetworkTimeQueriesEnabled": false,
+  "DomainReliabilityAllowed": false,
+  "SearchSuggestEnabled": false,
+  "AlternateErrorPagesEnabled": false,
+  "SpellCheckServiceEnabled": false,
+  "TranslateEnabled": false,
+  "NetworkPredictionOptions": 2,
+  "BackgroundModeEnabled": false,
+  "DnsOverHttpsMode": "off"
+}

@@ -42,9 +42,7 @@ IOWeight=20
 Nice=5
 TasksMax=512
 
-# ---- Enfermement (les mêmes lignes que hermes-gateway.service, qui tournent déjà sur ce serveur). Pas encore de
-# filtre d'appels système ni RestrictNamespaces : Chromium n'a jamais tourné sous ces deux-là ici ; à ajouter une fois
-# le premier passage réussi, après essai.
+# ---- Enfermement (les mêmes lignes que hermes-gateway.service, qui tournent déjà sur ce serveur).
 NoNewPrivileges=yes
 CapabilityBoundingSet=
 AmbientCapabilities=
@@ -67,5 +65,16 @@ RestrictSUIDSGID=yes
 LockPersonality=yes
 RemoveIPC=yes
 UMask=0077
+# Filtre d'appels système et espaces de noms (25/11/2026). Sur ce serveur, Hermes lance Chromium sans son bac à
+# sable (AppArmor y refuse les espaces de noms sans privilège) : c'est cette unité qui enferme le navigateur.
+# « capset » est rendu après le retrait de @privileged : Chromium s'en sert pour abandonner ses droits et s'arrête
+# net si on le lui refuse (vu au banc, essais/hermes/filtre_appels.py) ; sans aucune capacité permise
+# (CapabilityBoundingSet vide, NoNewPrivileges), il ne peut servir qu'à en perdre.
+RestrictNamespaces=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged
+SystemCallFilter=capset
+SystemCallErrorNumber=EPERM
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
 IPAddressDeny=link-local multicast
