@@ -558,7 +558,17 @@ tant qu'une routine n'est pas basculée) :
    Routines de Chronos (Pilotage, « Textes des routines ») : note de l'abonnement d'IA (le 21), note de la box (le
    15), validation des jours (le 24), CRA mensuel (le 26), CRA hebdomadaire (le vendredi), note de télétravail (le
    1er, bientôt le dernier jour), « Facture reçue » (à l'arrivée d'une facture), et la note de l'abonnement Grok Bot
-   (le 4), qui n'est pas dans sa liste du 25/11/2026 : à trancher.
+   (le 4) : **elle reste chez Chronos et s'arrête avec Grok** (QCM du 25/11/2026 au soir).
+   **Ordre (même QCM) : le CRA hebdomadaire d'abord**, puis les notes de l'abonnement d'IA et de la box. Premier pas
+   (25/11/2026, nuit, demande au serveur en lecture seule) : relever les quatre semaines de novembre sur le portail
+   (état, code et quantité par jour) pour les comparer à ce que donnent son agenda et les règles de Chronos ;
+   mesure du serveur ; connexion à l'espace client d'électricité. Règles de Chronos pour ce CRA (Pilotage) : le
+   vendredi midi, son oui sur l'agenda de la semaine ; chaque journée travaillée (télétravail ou sur site) :
+   « R002 Regular Day », quantité 1 ; rien pour congés, fériés, week-ends ; une demi-journée : demander ; garder les
+   saisies justes, une divergence : prévenir et attendre ; Save, relecture, Submit, vérification ; jamais deux
+   soumissions d'une même semaine. À construire : le mode « CRA » de la skill et de la commande (saisie, Save,
+   Submit, à blanc d'abord), la semaine dans JARVIS (carte et oui, comme les jours du mois), le déclenchement par
+   root depuis le oui donné dans JARVIS, le compte rendu et la notification de première exécution.
 
 **Dettes connues**
 - Un passage dont le navigateur ne démarre pas rend quand même le code 0 : juger à la réponse.
