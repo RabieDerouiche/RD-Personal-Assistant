@@ -83,7 +83,8 @@ tenu par la commande) : pas encore faite.
 | Fichier | Rôle |
 |---|---|
 | `install.sh` | Root, relançable. Utilisateur `hermes-portail`, Hermes à la version figée du Hermes principal (lue dans `../install.sh`) avec son navigateur, plugin de l'abonnement Claude et Claude Code à lui, politique, skill, copies root de la commande et du relais, lien de la clé, règles réseau et relais. Ne démarre aucun agent. |
-| `hermes-portail` | La commande (`/usr/local/sbin/hermes-portail`) : `etat`, `connexion-claude`, `enregistrer`, `domaines`, `essai`, `cle`, `fermer`, `oublier`. Un essai tourne dans une unité passagère enfermée (`systemd-run`). |
+| `hermes-portail` | La commande (`/usr/local/sbin/hermes-portail`) : `etat`, `connexion-claude`, `enregistrer`, `domaines`, `essai`, `cle`, `fermer`, `oublier`. Un essai lance l'unité `hermes-portail-essai`. |
+| `hermes-portail-essai.service` | Un passage, enfermé (mêmes lignes que `hermes-gateway.service`, mémoire sans échange). Une vraie unité, pas `systemd-run` : au premier essai sur le serveur, `systemd-run -p IPAddressDeny=link-local` a été refusé alors que la même ligne est valable dans une unité. Consigne dans `/home/hermes-portail/.consigne`, réponse dans `/var/lib/hermes-portail/essais/`. |
 | `politique.yaml` | Sa politique (`/etc/hermes-portail/config.yaml`, root) : outils `browser`, `terminal`, `skills` seulement ; Sonnet ; profil de navigateur gardé ; navigateur envoyé vers le relais. |
 | `skills/portail/portail/SKILL.md` | Sa marche à suivre : se connecter par le coffre, lecture seule, ne jamais taper un mot de passe, ne rien soumettre, s'arrêter si un code est demandé, attente finale, réponse sans donnée personnelle. |
 | `filtre.py`, `hermes-portail-filtre.service` | Le relais filtrant (Python du système, sans dépendance, utilisateur passager) : CONNECT vers le port 443 des hôtes de la liste, refus notés. |
@@ -149,3 +150,9 @@ Pas prouvé, à voir sur le vrai serveur :
   disponibles). Défaut vu : `hermes-portail etat` rendait le code 2 sans aucun essai (corrigé, banc).
   Reste, de son côté, dans Termius : `sudo jarvis-coffre creer`, `sudo hermes-portail connexion-claude`,
   `sudo hermes-portail enregistrer`, puis l'hôte du portail et le premier essai.
+- 25/11/2026, 09h12 : ses saisies faites dans Termius (coffre créé, identifiant du portail enregistré : « Stored »).
+  **Premier essai réel : échec avant le départ** (« Failed to parse IP address prefix 'link-local' », 0 s) : c'est
+  `systemd-run` qui refusait un réglage. Corrigé : unité `hermes-portail-essai.service`, contrôlée au banc par
+  `systemd-analyze verify`. Vu aussi : sa commande « domaines ajouter » a affiché l'aide (Likely : espaces insécables
+  d'une commande recopiée sur l'iPhone ; la commande les accepte maintenant) ; `etat` dit si Claude est relié.
+  Banc 59 sur 59.

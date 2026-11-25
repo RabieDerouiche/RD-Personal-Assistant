@@ -120,18 +120,16 @@ PASSAGE='"$0" chat -Q --oneshot --max-turns 25 -s portail --query-file "$1"; rc=
 lancer_agent() {   # lancer_agent <fichier de consigne> <fichier de sortie> : un passage sans personne, enfermé
   local consigne=$1 sortie=$2 rc
   if [ "$SYSTEMD" = 1 ]; then
-    systemd-run --quiet --wait --collect --pipe --unit="hermes-portail-essai-$(date +%s)" \
-      -p User="$U" -p Group="$U" -p WorkingDirectory="$H" \
-      -p MemoryMax=1500M -p MemoryHigh=1300M -p MemorySwapMax=0 -p LimitCORE=0 -p OOMScoreAdjust=700 -p CPUWeight=20 -p TasksMax=512 \
-      -p RuntimeMaxSec=900 -p NoNewPrivileges=yes -p CapabilityBoundingSet= -p AmbientCapabilities= \
-      -p ProtectSystem=strict -p ReadWritePaths="$H" -p ProtectHome=tmpfs -p BindPaths="$H" -p BindReadOnlyPaths="$RAM" \
-      -p InaccessiblePaths="-/opt -/srv -/var/lib/caddy -/var/backups -/var/lib/jarvis-coffre" -p PrivateTmp=yes \
-      -p ProtectKernelTunables=yes -p ProtectKernelModules=yes -p ProtectKernelLogs=yes -p ProtectControlGroups=yes \
-      -p ProtectClock=yes -p ProtectHostname=yes -p ProtectProc=invisible -p RestrictSUIDSGID=yes -p RestrictRealtime=yes \
-      -p LockPersonality=yes -p UMask=0077 -p IPAddressDeny="link-local multicast" \
-      $(printf -- '-E %q ' "${ENVIRONNEMENT[@]}" PATH="$(chemin_hermes)") \
-      /bin/sh -c "$PASSAGE" "$H/.local/bin/hermes" "$consigne" > "$sortie" 2>&1
-    rc=$?
+    # l'unité hermes-portail-essai (posée par install.sh) lit $H/.consigne et écrit $VAR/essais/courant.txt
+    : > "$VAR/essais/courant.txt"; chmod 0600 "$VAR/essais/courant.txt"
+    systemctl reset-failed hermes-portail-essai.service 2>/dev/null
+    systemctl start hermes-portail-essai.service 2> "$VAR/essais/.lancement"
+    rc=$(systemctl show -p ExecMainStatus --value hermes-portail-essai.service 2>/dev/null); rc=${rc:-1}
+    [ "$(systemctl show -p Result --value hermes-portail-essai.service 2>/dev/null)" = success ] || [ "$rc" != 0 ] || rc=1
+    cat "$VAR/essais/courant.txt" > "$sortie"
+    if [ "$rc" != 0 ]; then   # ce que systemd en dit (jamais la réponse du modèle : elle est dans le fichier)
+      { echo; echo "-- systemd :"; cat "$VAR/essais/.lancement" 2>/dev/null; journalctl -u hermes-portail-essai.service -n 12 --no-pager -o cat 2>/dev/null; } >> "$sortie"
+    fi
   else   # banc : pas de systemd
     comme_portail timeout 600 /bin/sh -c "$PASSAGE" "$H/.local/bin/hermes" "$consigne" > "$sortie" 2>&1
     rc=$?
@@ -140,6 +138,11 @@ lancer_agent() {   # lancer_agent <fichier de consigne> <fichier de sortie> : un
   return $rc
 }
 
+# Une commande recopiée depuis l'iPhone arrive parfois avec des espaces insécables : les mots restent collés et rien
+# n'est reconnu (vu le 25/11/2026 : « domaines ajouter » a affiché l'aide). On les rend à des espaces ordinaires.
+case "$*" in *$'\xc2\xa0'*|*$'\xe2\x80\xaf'*)
+  set -f; set -- $(printf '%s ' "$@" | sed -e 's/\xc2\xa0/ /g' -e 's/\xe2\x80\xaf/ /g'); set +f ;;
+esac
 commande=${1:-etat}; [ $# -gt 0 ] && shift
 case "$commande" in
   etat)
@@ -152,6 +155,7 @@ case "$commande" in
       if [ -s "$RAM/vault.key" ]; then echo "Identifiants enregistrés (jamais leur mot de passe) :"; comme_portail hermes vault list 2>&1 | propre | grep -E 'vault_|Vault' | head -12
       else echo "Identifiants enregistrés : oui (liste lisible une fois la clé en mémoire)"; fi
     else echo "Identifiants enregistrés : aucun"; fi
+    if comme_portail "$H/.local/lib/claude-code/node_modules/.bin/claude" auth status 2>/dev/null | grep -qi '"loggedIn": *true\|logged in'; then echo "Claude : relié à l'abonnement"; else echo "Claude : pas encore relié (sudo hermes-portail connexion-claude)"; fi
     echo "Hôtes permis par le relais : $(grep -vE '^\s*(#|$)' "$ETC/domaines" 2>/dev/null | paste -sd' ' -)"
     if [ "$SYSTEMD" = 1 ]; then
       echo "Relais : $(systemctl is-active hermes-portail-filtre 2>/dev/null) ; règles réseau : $(systemctl is-active hermes-portail-sortie 2>/dev/null)"
@@ -241,7 +245,7 @@ FIN
     [[ "$adresse" =~ ^https?://[A-Za-z0-9._:/?=%\&~+-]+$ ]] || { echo "Adresse attendue (https://…)."; exit 1; }
     cle; rc=$?; [ $rc = 0 ] || exit $rc
     install -d -o root -g root -m 0700 "$VAR/essais"
-    consigne=$(mktemp "$H/.consigne.XXXXXX"); sortie="$VAR/essais/$(date +%Y-%m-%d_%H%M%S).txt"
+    consigne="$H/.consigne"; sortie="$VAR/essais/$(date +%Y-%m-%d_%H%M%S).txt"; rm -f "$consigne"
     if [ -n "$fichier" ]; then cat "$fichier" > "$consigne"
     else cat > "$consigne" <<FIN
 Essai en lecture seule, selon ta skill « portail ». Adresse : $adresse
@@ -252,7 +256,7 @@ FIN
     fi
     chown "$U:$U" "$consigne"; chmod 0600 "$consigne"
     debut=$(date +%s); lancer_agent "$consigne" "$sortie"; rc=$?
-    rm -f "$consigne"
+    rm -f "$consigne"; chmod 0600 "$sortie" 2>/dev/null
     echo "== Essai du $(date '+%d/%m/%Y %H:%M') ($(( $(date +%s) - debut )) s, code $rc)"
     propre < "$sortie" | grep -v '^session_id:' | tail -40
     echo "(gardé dans $sortie, lisible par root seul)"

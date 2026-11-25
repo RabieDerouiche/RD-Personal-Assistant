@@ -25,7 +25,7 @@ BANC=${HERMES_BANC:-0}   # 1 = banc d'essai (conteneur sans systemd) : ni servic
 
 dire() { printf '\n== %s\n' "$*"; }
 [ "$(id -u)" = 0 ] || { echo "À lancer en root : sudo bash $0"; exit 1; }
-for f in politique.yaml hermes-portail filtre.py sortie.nft hermes-portail-sortie.service hermes-portail-filtre.service domaines.defaut skills/portail/portail/SKILL.md; do
+for f in politique.yaml hermes-portail filtre.py sortie.nft hermes-portail-sortie.service hermes-portail-filtre.service hermes-portail-essai.service domaines.defaut skills/portail/portail/SKILL.md; do
   [ -f "$ICI/$f" ] || { echo "Fichier manquant : $ICI/$f"; exit 1; }
 done
 bash -n "$ICI/hermes-portail" && python3 -I -c "import ast,sys; ast.parse(open(sys.argv[1]).read())" "$ICI/filtre.py" || { echo "Le code du dépôt ne passe pas le contrôle de syntaxe : rien n'a été posé."; exit 1; }
@@ -122,6 +122,13 @@ uid=$(id -u "$U")
 sed -e "s/@UID@/$uid/g" -e "s/@RELAIS@/$RELAIS/g" "$ICI/sortie.nft" > "$ETC/sortie.nft"; chmod 0644 "$ETC/sortie.nft"
 install -o root -g root -m 0644 "$ICI/hermes-portail-sortie.service" /etc/systemd/system/hermes-portail-sortie.service
 sed "s/@RELAIS@/$RELAIS/g" "$ICI/hermes-portail-filtre.service" > /etc/systemd/system/hermes-portail-filtre.service; chmod 0644 /etc/systemd/system/hermes-portail-filtre.service
+# l'unité d'un passage : même PATH que le Hermes principal (son Node et son npm à lui)
+node_bin=$(ls -d "$HH"/tools/node-*/bin 2>/dev/null | sort -V | tail -1)
+npm_bin=$(ls -d "$HH"/tools/npm-*/bin 2>/dev/null | sort -V | tail -1)
+chemin="${node_bin:+$node_bin:}${npm_bin:+$npm_bin:}$HH/hermes-agent/node_modules/.bin:$H/.local/bin:/usr/local/bin:/usr/bin:/bin"
+sed -e "s#@PATH@#$chemin#" -e "s/@RELAIS@/$RELAIS/g" "$ICI/hermes-portail-essai.service" > /etc/systemd/system/hermes-portail-essai.service
+chmod 0644 /etc/systemd/system/hermes-portail-essai.service
+install -d -o root -g root -m 0700 "$VAR/essais"
 nft -c -f "$ETC/sortie.nft" 2>/dev/null && echo "Règles réseau : syntaxe vérifiée." || [ "$BANC" = 1 ] || { echo "Règles réseau refusées par nft : arrêt."; exit 1; }
 if [ "$BANC" != 1 ]; then
   systemctl daemon-reload
