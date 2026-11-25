@@ -168,6 +168,20 @@ faisant le geste ; chaque geste nouveau (dépôt, aperçu, lecture de la facture
 passages, toutes passées au tri (dont une qui corrige une note de départ : sur le formulaire d'ajout, le bouton
 s'appelle « Créer », pas la coche verte).
 
+**Troisième passage réel (25/11/2026, 17h48) : la dépense d'essai est enregistrée.** Son choix par QCM (« Ouvrir et
+refaire, avec marge ») : les deux hôtes annexes ouverts (le stockage des fichiers et un dépôt de bibliothèques), une
+marge de trois hôtes de plus que la session du serveur n'a pas eu à utiliser. Hermes a joint la fausse facture,
+le portail a lu le montant (TTC et HT pré-remplis), Hermes a saisi le vendeur, la TVA, la catégorie, le
+commentaire, décoché « Refacturable », puis cliqué « Créer ». Une seule ligne de plus dans la liste (3 puis 4),
+aucun rapport créé, aucune étiquette. Le dépôt du fichier ne crée pas la dépense : elle n'existe qu'après « Créer ».
+150 s, pic de 1,1 Go. **Pas prouvé** : que l'état affiché, « En attente », ne veut pas dire « en attente de
+validation » (Hermes le dit lui-même) ; à lui de le regarder en la supprimant. Pas fait non plus : rouvrir la
+dépense pour relire ses champs.
+
+Notes : 17 pour ce portail, dont 9 écrites par Hermes ; une corrige une note de départ (la catégorie n'était pas
+pré-remplie cette fois). Défaut vu : le tri ne reconnaît un doublon que mot pour mot (une note redite autrement
+est passée).
+
 Garde-fou réel : seulement la skill et le modèle. Rien de technique n'empêche un clic sur le mauvais bouton (le
 relais ne voit pas dans le HTTPS). Conséquence au pire : une dépense d'essai d'un euro envoyée au valideur, à
 retirer à la main. Limite de tours portée à 40 par passage (un formulaire demande plus d'allers-retours).
@@ -297,9 +311,10 @@ Le Hermes de Telegram, lui, a sa mémoire et propose des skills, validées par `
 Pour ce portail :
 1. **Combien de temps la session tient** : elle tient d'un passage au suivant (une heure d'écart). Reste un contrôle
    par jour pendant une à deux semaines (minuterie à écrire, sur sa demande).
-2. **Note de frais** : le dépôt du justificatif bute sur un hôte de stockage refusé par le relais ; à ouvrir (son
-   oui), puis refaire le brouillon. Ensuite : le chemin de la vraie facture (du mail au dépôt d'Hermes, par
-   JARVIS), une skill par note de frais de Chronos, comparaison avec Chronos.
+2. **Note de frais** : le geste est prouvé avec une fausse facture (dépôt, champs, enregistrement). Restent : ce que
+   veut dire l'état « En attente » ; relire la dépense après l'enregistrement et vérifier les étiquettes ; le
+   chemin de la vraie facture (du mail au dépôt d'Hermes, par JARVIS) ; une skill par note de frais de Chronos, avec
+   ses contrôles (doublon du mois, TVA) ; comparaison avec Chronos ; les doublons de notes dits autrement.
 3. **Redémarrage du serveur** : vérifier pour de vrai que tout attend le coffre, puis repart après
    `sudo jarvis-coffre ouvrir` (la carte « Coffre » de l'app n'est pas encore branchée : `jarvis` n'est dans le groupe
    du coffre qu'à son prochain redémarrage).
