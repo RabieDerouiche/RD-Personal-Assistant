@@ -157,8 +157,8 @@ case "$commande" in
       echo "Relais : $(systemctl is-active hermes-portail-filtre 2>/dev/null) ; règles réseau : $(systemctl is-active hermes-portail-sortie 2>/dev/null)"
       echo "Derniers refus du relais :"; journalctl -u hermes-portail-filtre --no-pager -n 400 2>/dev/null | grep ' refusé ' | sed -E 's/^.*refusé /  /' | sort | uniq -c | sort -rn | head -8
     fi
-    echo "Derniers essais :"; ls -1t "$VAR"/essais 2>/dev/null | head -5 | sed 's/^/  /'
-    ;;
+    echo "Derniers essais :"; { ls -1t "$VAR"/essais 2>/dev/null || true; } | head -5 | sed 's/^/  /'
+    exit 0 ;;   # un état se lit : il ne rend jamais un code d'erreur (vu sur le serveur : code 2 quand aucun essai n'existait)
   cle)
     [ $# = 0 ] || usage
     cle; rc=$?; [ $rc = 0 ] && echo "Clé du coffre d'Hermes en mémoire vive."; exit $rc ;;
