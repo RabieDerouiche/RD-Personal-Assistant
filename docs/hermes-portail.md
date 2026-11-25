@@ -207,6 +207,17 @@ que Chronos saisit vraiment (nom du produit, jour de la date).
 - `brouillon … --sans-creer` (« MODE À BLANC ») : Hermes joint la facture, relève ce que le portail a pré-rempli,
   met chaque champ à la valeur de la consigne, puis annule et vérifie qu'aucune ligne n'a été ajoutée. Pour un
   montant ou une date, il dit seulement « égal » ou « différent » de la consigne.
+**Essai réel (25/11/2026, 18h30, son oui dans la session du serveur) : réussi.** La facture du dernier abonnement a
+été trouvée dans Gmail du premier coup (texte lisible), déposée, et le formulaire rempli puis annulé : aucune
+ligne ajoutée (trois avant, trois après). Le portail avait pré-rempli juste le pays, la devise, les trois
+montants et le moyen de paiement ; Hermes a corrigé le vendeur, la date (décalée d'un jour par le portail), la
+catégorie, rempli le commentaire et posé l'étiquette (le formulaire d'ajout le permet, avant la création). La
+comparaison avec la dépense que Chronos avait créée pour la même facture : **identique sur tous les champs**,
+étiquette comprise. 2 min 41 s puis 1 min 58 s, pic de 1,2 Go. 28 notes sur ce portail. Reste de l'essai : le fichier
+déposé demeure sans doute dans le stockage du portail, sans dépense. Vu sur la facture : pas de « date de
+paiement » (une date d'émission et une d'échéance) ; l'émetteur et son pays de TVA ne sont pas ceux que la routine
+de Chronos écrit (repris tels quels, pour comparer à l'identique : à lui de dire si c'est voulu).
+
 Qui lit la facture pour écrire le fichier des champs : pour l'essai, la session du serveur, à partir de
 `facture.txt` ; pour une routine, à construire (règles par sorte de facture, côté JARVIS).
 
@@ -230,7 +241,7 @@ d'authentification : il a la clé de configuration). Sa consigne : s'organiser a
   saisir dans le même appel, sans l'afficher. Fichier effacé à la fin. Hermes ne va jamais sur une messagerie.
 
 **Ordre retenu** (du plus sûr au plus lourd, chaque étape en lecture seule ou à blanc avant toute écriture) :
-1. Abonnement d'IA : vraie facture à blanc, comparée à la dépense de Chronos (demande déjà chez la session du serveur).
+1. Abonnement d'IA : **fait le 25/11/2026**, à blanc, identique à la dépense de Chronos (voir « La vraie facture »).
 2. Les trois autres portails : il enregistre lui-même leurs identifiants (une séance Termius), puis un passage de
    connexion en lecture seule sur chacun, avec une marge d'hôtes annexes ; on sait alors ce qui est faisable.
 3. La box : télécharger la facture dans l'espace client (code par mail), puis la dépense à blanc.
