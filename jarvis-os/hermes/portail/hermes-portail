@@ -130,8 +130,10 @@ lancer_agent() {   # lancer_agent <fichier de consigne> <fichier de sortie> : un
     if [ "$rc" != 0 ]; then   # ce que systemd en dit (jamais la réponse du modèle : elle est dans le fichier)
       { echo; echo "-- systemd :"; cat "$VAR/essais/.lancement" 2>/dev/null; journalctl -u hermes-portail-essai.service -n 12 --no-pager -o cat 2>/dev/null; } >> "$sortie"
     fi
-  else   # banc : pas de systemd
-    comme_portail timeout 600 /bin/sh -c "$PASSAGE" "$H/.local/bin/hermes" "$consigne" > "$sortie" 2>&1
+  else   # banc : pas de systemd ; le filtre d'appels système de l'unité y est reproduit (essais/hermes/filtre_appels.py)
+    local filtre=()
+    [ -n "${HERMES_BANC_FILTRE:-}" ] && filtre=(python3 -I "$HERMES_BANC_FILTRE" --unite /etc/systemd/system/hermes-portail-essai.service --)
+    comme_portail timeout 600 "${filtre[@]}" /bin/sh -c "$PASSAGE" "$H/.local/bin/hermes" "$consigne" > "$sortie" 2>&1
     rc=$?
     sleep 1; pkill -u "$U" 2>/dev/null   # sous systemd, la fin de l'unité arrête ce qui reste (le pilote du navigateur) ; ici, à la main
   fi

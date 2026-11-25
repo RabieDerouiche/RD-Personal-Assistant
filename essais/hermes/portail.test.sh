@@ -35,6 +35,9 @@ fi
 nft delete table inet hermes_portail_sortie 2>/dev/null
 rm -rf $T /var/lib/jarvis-coffre /run/jarvis-coffre; mkdir -p $T/traces; chmod 755 $T; chmod 777 $T/traces
 umount $RAM 2>/dev/null; rm -f $HH/vault/vault.json.enc 2>/dev/null; rm -rf $HH/navigateur 2>/dev/null   # le banc part d'un coffre d'Hermes vide
+# Pas de systemd ici : le filtre d'appels système de l'unité d'un passage est reproduit par filtre_appels.py, que
+# la commande hermes-portail pose autour de chaque passage du banc (HERMES_BANC_FILTRE).
+install -m 0755 "$ICI/filtre_appels.py" $T/filtre_appels.py; export HERMES_BANC_FILTRE=$T/filtre_appels.py
 
 echo "== Installation (jarvis-coffre puis le kit portail, en mode banc)"
 CA=/etc/ssl/certs/ca-certificates.crt
@@ -57,6 +60,11 @@ outils=$(hp hermes tools list --platform cli 2>/dev/null | propre | grep '✓ en
 verif "outils : seulement browser skills terminal ($outils)" [ "$outils" = "browser skills terminal " ]
 verif "il ne peut pas changer ses outils (refusé)" bash -c "$(declare -f hp); H=$H; HH=$HH; U=$U; hp hermes config set agent.disabled_toolsets '[]' 2>&1 | grep -q 'managed by your administrator'"
 verif "skill « portail » du dépôt active, à root" bash -c "$(declare -f hp); H=$H; HH=$HH; U=$U; hp hermes skills list 2>/dev/null | grep -q 'portail' && [ \"\$(stat -c %U /etc/hermes-portail/skills/portail/portail/SKILL.md)\" = root ]"
+UNITE=/etc/systemd/system/hermes-portail-essai.service
+verif "unité d'un passage : filtre d'appels système, capset rendu, espaces de noms interdits" bash -c "grep -qx 'SystemCallFilter=@system-service' $UNITE && grep -qx 'SystemCallFilter=~@privileged' $UNITE && grep -qx 'SystemCallFilter=capset' $UNITE && grep -qx 'RestrictNamespaces=yes' $UNITE"
+sous_filtre() { (cd /tmp && runuser -u $U -- env -i PATH=/usr/bin:/bin python3 -I $T/filtre_appels.py --unite $UNITE -- "$@"); }
+verif "sous ce filtre : pas d'espace de noms, pas de chroot, pas de traçage d'un autre processus" bash -c "$(declare -f sous_filtre); U=$U; T=$T; UNITE=$UNITE; sous_filtre /bin/sh -c 'grep -q \"^Seccomp:.2\" /proc/self/status && ! unshare -U true 2>/dev/null && ! unshare -n true 2>/dev/null && ! chroot / true 2>/dev/null && ! strace -o /dev/null true 2>/dev/null && true'"
+verif "règles du navigateur posées à root (mots de passe, fuite, remplissage, compte Google coupés)" bash -c "f=/etc/opt/chrome_for_testing/policies/managed/hermes-portail.json; [ \"\$(stat -c '%U %a' \$f)\" = 'root 644' ] && python3 -I -c \"import json,sys; r=json.load(open('\$f')); sys.exit(0 if r['PasswordManagerEnabled'] is False and r['PasswordLeakDetectionEnabled'] is False and r['BrowserSignin'] == 0 else 1)\""
 verif "unités valides (systemd-analyze verify)" bash -c "cd /etc/systemd/system && systemd-analyze verify --man=no ./hermes-portail-essai.service ./hermes-portail-filtre.service ./hermes-portail-sortie.service 2>&1 | grep -v 'hermes-portail-\(sortie\|filtre\).service.*not found\|Failed to prepare filename' | grep -c . | grep -qx 0"
 verif "une commande aux espaces insécables (recopiée de l'iPhone) est comprise" bash -c "bash /usr/local/sbin/hermes-portail \$'domaines\xc2\xa0ajouter\xc2\xa0insecable.exemple.test' | grep -q 'Permis : insecable.exemple.test' && bash /usr/local/sbin/hermes-portail domaines retirer insecable.exemple.test >/dev/null"
 verif "etat rend le code 0 sur une installation neuve (ni coffre, ni essai)" bash -c "bash /usr/local/sbin/hermes-portail etat >/dev/null 2>&1"
@@ -124,7 +132,16 @@ Essai du banc. SUITE: [
 FIN
 }
 suite; : > $T/traces/portail.jsonl
-bash /usr/local/sbin/hermes-portail essai "http://127.0.0.1:$PP/tableau" --consigne-fichier $T/consigne.txt > $T/essai1.log 2>&1; rc=$?
+bash /usr/local/sbin/hermes-portail essai "http://127.0.0.1:$PP/tableau" --consigne-fichier $T/consigne.txt > $T/essai1.log 2>&1 &
+passage=$!; filtre_vu=0   # pendant le passage : le navigateur tourne-t-il bien sous le filtre ?
+for i in $(seq 1 300); do
+  kill -0 $passage 2>/dev/null || break
+  pid=$(pgrep -u $U -f 'chrome-linux64/chrome .*--remote-debugging-port' | head -1)
+  [ -n "$pid" ] && grep -q '^Seccomp:.2' /proc/$pid/status 2>/dev/null && grep -q -- '--disable-features=Translate,AutofillServerCommunication' /proc/$pid/cmdline && { filtre_vu=1; break; }
+  sleep 0.5
+done
+wait $passage; rc=$?
+verif "le navigateur du passage tourne sous le filtre d'appels système, avec ses options" [ $filtre_vu = 1 ]
 verif "essai : code 0, alors que l'unité du Hermes principal est présente sur la machine" bash -c "[ $rc = 0 ] && [ -e /etc/systemd/system/hermes-gateway.service ]"
 verif "le faux portail a reçu une connexion réussie (bon identifiant, mot de passe de la bonne longueur)" grep -q '"evenement": "connexion", "reussie": true, "identifiant_recu": "banc@exemple.test", "longueur_mot_de_passe": '${#MDP} $T/traces/portail.jsonl
 verif "Hermes a lu le tableau de bord et ouvert le formulaire" bash -c "grep -q '\"evenement\": \"tableau\"' $T/traces/portail.jsonl && grep -q '\"evenement\": \"formulaire\"' $T/traces/portail.jsonl && grep -q 'libelle,montant,date,soumettre' $T/essai1.log"
@@ -167,6 +184,14 @@ saisir "$PHRASE\n" /usr/local/sbin/jarvis-coffre ouvrir > $T/ouvrir.log 2>&1
 bash /usr/local/sbin/hermes-portail essai "http://127.0.0.1:$PP/tableau" --consigne-fichier $T/consigne.txt > $T/essai4.log 2>&1; rc=$?
 verif "coffre rouvert par la phrase : l'essai repart seul et se reconnecte" bash -c "[ $rc = 0 ] && grep -q '\"evenement\": \"connexion\", \"reussie\": true' $T/traces/portail.jsonl && [ \"\$(cat $RAM/vault.key)\" = '$CLE' ]"
 verif "la mémoire vive est bien un ramfs remonté par la commande" bash -c "[ \"\$(stat -f -c %T $RAM)\" = ramfs ]"
+
+echo "== Ce que le navigateur a tenté de joindre de lui-même"
+# Les deux appels qui portaient quelque chose du portail (un fragment de l'empreinte du mot de passe, la forme des
+# formulaires) doivent avoir disparu. Quatre autres restent, sans donnée du portail, et le relais les refuse : liste
+# des comptes Google, dictionnaire, mise à jour, mode IA (aucune règle ni option de Chrome 156 ne les a coupés).
+verif "plus d'appel vers la vérification de fuite du mot de passe ni vers le remplissage automatique" bash -c "grep -aq 'refusé exemple.org' $T/filtre.log && ! grep -aE 'refusé [^ ]*(passwordsleakcheck|content-autofill|clients2\.google)' $T/filtre.log"
+verif "tout le reste a été refusé par le relais (aucun hôte permis hors de la liste du banc)" bash -c "! grep -a ' permis ' $T/filtre.log | grep -av 'permis localhost'"
+grep -aoE 'refusé (http://)?[^ /?]*' $T/filtre.log | sort | uniq -c | sort -rn | sed 's/^/    /' | head -12
 
 echo "== Garde-fous de la commande"
 runuser -u $U -- bash -c "printf 'x' > $HH/vault/.essai" 2>/dev/null; rm -f $HH/vault/.essai
