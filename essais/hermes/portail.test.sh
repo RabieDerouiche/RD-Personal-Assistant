@@ -193,6 +193,23 @@ texte = open(sys.argv[1]).read(); maintenant = time.time()
 sys.exit(1 if any(totp(sys.argv[2], maintenant - d) in texte for d in range(0, 240, 30)) else 0)
 PY"
 
+echo "== Deux étapes, champ du code que le coffre ne reconnaît pas (vu sur un vrai portail le 25/11/2026)"
+cat > $T/consigne-brut.txt <<FIN
+Essai du banc, champ du code non reconnu. SUITE: [
+ {"nom": "browser_exec", "args": {"code": "# Déconnexion puis porte à deux étapes\nnew_tab('http://localhost:$PP/deconnexion')\nwait_for_load()\ngoto_url('http://localhost:$PP/brut')\nwait_for_load()\nfill_input('#identifiant', 'banc2@exemple.test')\nprint(page_info())"}},
+ {"nom": "tool_call", "args": {"calls": [{"name": "browser_vault", "arguments": {"action": "fill", "handle": "$HANDLE2"}}]}},
+ {"nom": "browser_exec", "args": {"code": "# Première étape\njs(\"document.querySelector('#entrer').click()\")\nwait_for_load()\nprint(page_info())"}},
+ {"nom": "tool_call", "args": {"calls": [{"name": "browser_vault", "arguments": {"action": "enter_code", "handle": "$HANDLE2"}}]}},
+ {"nom": "browser_exec", "args": {"code": "# Le champ n'est pas reconnu : on lui donne l'attribut que le coffre attend\njs(\"document.querySelector('#code2fa').setAttribute('autocomplete','one-time-code')\")\nprint('attribut posé')"}},
+ {"nom": "tool_call", "args": {"calls": [{"name": "browser_vault", "arguments": {"action": "enter_code", "handle": "$HANDLE2"}}]}},
+ {"nom": "browser_exec", "args": {"code": "# Seconde étape\nif js(\"!!document.querySelector('#verifier')\"):\n    js(\"document.querySelector('#verifier').click()\")\nwait_for_load()\nprint(page_info())"}}
+]
+FIN
+: > $T/traces/portail.jsonl; : > $T/traces/modele.jsonl
+bash /usr/local/sbin/hermes-portail essai "http://localhost:$PP/brut" --consigne-fichier $T/consigne-brut.txt > $T/essai-brut.log 2>&1; rc=$?
+verif "champ non reconnu : le coffre refuse d'abord (no_code_field), comme sur le vrai portail" bash -c "[ $rc = 0 ] && grep -q 'no_code_field' $T/essai-brut.log"
+verif "champ non reconnu : une fois l'attribut posé, le coffre saisit le code et le faux portail l'accepte" bash -c "grep -q '\"evenement\": \"code\", \"bon\": true, \"longueur\": 6' $T/traces/portail.jsonl && grep -q '\"evenement\": \"tableau\"' $T/traces/portail.jsonl && ! grep -qF -- '$TOTP' $T/traces/modele.jsonl"
+
 echo "== Mode brouillon : une dépense enregistrée, jamais soumise"
 verif "brouillon sans fichier des champs : refus" bash -c "! bash /usr/local/sbin/hermes-portail brouillon 'http://127.0.0.1:$PP/tableau' >/dev/null 2>&1"
 printf 'Libellé : x\n' > $T/champs-pas-root.txt; chown $U: $T/champs-pas-root.txt

@@ -91,14 +91,18 @@ class P(BaseHTTPRequestHandler):
             return self.rendre(200, page('Connexion — Notes de frais (banc)', CONNEXION % ''))
         if chemin == '/sante':
             return self.rendre(200, b'ok')
-        if chemin == '/double':      # la même maison, mais par une porte à deux étapes
+        if chemin in ('/double', '/brut'):      # la même maison, mais par une porte à deux étapes
             if s:
                 return self.vers('/tableau')
-            return self.rendre(200, page('Connexion en deux étapes (banc)', CONNEXION.replace('/connexion', '/double/connexion') % ''))
+            return self.rendre(200, page('Connexion en deux étapes (banc)', CONNEXION.replace('/connexion', chemin + '/connexion') % ''))
         if chemin == '/double/code':
             return self.rendre(200, page('Code de vérification (banc)',
                 '<form method="post" action="/double/code"><label>Code à 6 chiffres <input name="otp" id="otp" autocomplete="one-time-code" inputmode="numeric" maxlength="6"></label> '
                 '<button type="submit" id="verifier">Vérifier</button></form>'))
+        if chemin == '/brut/code':   # comme un vrai portail vu le 25/11/2026 : ni « autocomplete », ni nom ni libellé que le coffre reconnaisse
+            return self.rendre(200, page('Code de sécurité (banc)',
+                '<form method="post" action="/brut/code"><label>Code de sécurité <input name="code2fa" id="code2fa" type="text"></label> '
+                '<button type="submit" id="verifier">Connexion</button></form>'))
         if not s:
             note(evenement='sans-session', chemin=chemin)
             return self.vers('/connexion')
@@ -139,17 +143,17 @@ class P(BaseHTTPRequestHandler):
             jeton = secrets.token_urlsafe(24)
             SESSIONS[jeton] = time.time() + ARGS.duree_session
             return self.vers('/tableau', [('Set-Cookie', 'session=%s; Path=/; HttpOnly; SameSite=Lax; Max-Age=%d' % (jeton, ARGS.duree_session))])
-        if chemin == '/double/connexion':
+        if chemin in ('/double/connexion', '/brut/connexion'):
             bon = (secrets.compare_digest(champs.get('identifiant', ''), ARGS.identifiant2)
                    and secrets.compare_digest(champs.get('mot_de_passe', ''), ARGS.mot_de_passe))
             note(evenement='connexion-double', reussie=bon)
             if not bon:
                 return self.rendre(401, page('Connexion en deux étapes (banc)', '<p id="erreur">Identifiants refusés.</p>'))
             e = secrets.token_urlsafe(16); ETAPES[e] = time.time() + 300
-            return self.vers('/double/code', [('Set-Cookie', 'etape=%s; Path=/; HttpOnly; SameSite=Lax' % e)])
-        if chemin == '/double/code':
+            return self.vers(chemin.replace('/connexion', '/code'), [('Set-Cookie', 'etape=%s; Path=/; HttpOnly; SameSite=Lax' % e)])
+        if chemin in ('/double/code', '/brut/code'):
             e = next((b.strip().partition('=')[2] for b in (self.headers.get('Cookie') or '').split(';') if b.strip().startswith('etape=')), '')
-            recu = champs.get('otp', '')
+            recu = champs.get('otp', '') or champs.get('code2fa', '')
             bon = bool(ARGS.totp) and ETAPES.get(e, 0) > time.time() and any(secrets.compare_digest(recu, totp(ARGS.totp, time.time() + d)) for d in (-30, 0, 30))
             note(evenement='code', bon=bon, longueur=len(recu))
             if not bon:

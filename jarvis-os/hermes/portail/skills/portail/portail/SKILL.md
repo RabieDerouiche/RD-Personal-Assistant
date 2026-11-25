@@ -41,9 +41,17 @@ connais ni ses mails, ni son agenda, ni ses dossiers.
    - Si la page demande ensuite un code :
      - l'identifiant du coffre porte `two_factor: automatic` (la liste le montre) : `browser_vault` avec
        `action: enter_code` et le même `handle`, puis valide si la page ne le fait pas seule. Tu ne vois jamais ce code.
+       Si `enter_code` répond `no_code_field` alors que le champ du code est bien à l'écran (le coffre ne le
+       reconnaît pas à son nom) : donne à ce champ l'attribut `autocomplete="one-time-code"` avec `js()`, par
+       exemple `js("document.querySelector('SÉLECTEUR').setAttribute('autocomplete','one-time-code')")`, puis
+       rappelle `enter_code` une seule fois. Cela ne change que ta copie de la page.
      - la consigne contient une ligne « Code par mail » : suis la section « Code reçu par mail ».
      - sinon (SMS, application sans clé enregistrée, validation sur un appareil) : arrête-toi et dis exactement ce
        qui est demandé. N'essaie rien d'autre.
+   - Le formulaire de connexion est dans un cadre (une iframe) d'une autre origine que la page : `browser_vault`
+     ne voit que la page principale et refuse (`origin_mismatch`). Relève l'adresse complète du cadre (avec ses
+     paramètres) et ouvre-la dans l'onglet avec `goto_url`. Si le formulaire s'y affiche en pleine page, connecte-toi
+     là, puis reviens à l'adresse de la consigne. S'il ne s'affiche pas : arrête-toi et dis-le.
    - Identifiants refusés par le site : arrête-toi et dis-le. Un seul essai, jamais deux.
 
 ## Code reçu par mail (seulement si la consigne contient « Code par mail »)
