@@ -331,6 +331,12 @@ l'été prochain.
    « Frais de télétravail <mois> <année> – N jours », sans étiquette (relevé du compte) ; à blanc d'abord.
 Chronos fait celle du mois écoulé le 1er : Hermes ne la crée pas, il la prépare à blanc pour comparer.
 
+**Ses réponses (QCM du 25/11/2026 au soir)** : l'espace client du fournisseur d'électricité se connecte par e-mail
+et mot de passe (donc un identifiant de plus à enregistrer par lui, sans second facteur) ; le PDF suffit, comme en
+octobre (pas de classeur à remplir ni à envoyer) ; et son accord mensuel sur ses jours se donnera dans JARVIS (une
+notification avec le bilan tiré de l'agenda « Présence », un bouton pour confirmer, un champ pour corriger), pas
+dans Telegram.
+
 ## Ce qu'Hermes apprend d'un portail (25/11/2026, sa demande : « qu'il développe ses skills »)
 
 Avant : rien. Mémoire, recherche dans ses passages et relecture de fond sont coupées dans sa politique (il lit des
