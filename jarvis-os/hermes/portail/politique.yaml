@@ -14,7 +14,7 @@ model:
   default: "sonnet"          # une marche à suivre écrite : Sonnet suffit et use moins le forfait
 
 agent:
-  max_turns: 30
+  max_turns: 45            # un formulaire à remplir demande plus de tours qu'une lecture
   disabled_toolsets:
     - web
     - file

@@ -18,7 +18,7 @@ User=hermes-portail
 Group=hermes-portail
 WorkingDirectory=/home/hermes-portail
 # « $$ » : un vrai « $ » pour le shell (systemd garde « $NOM » pour ses propres variables)
-ExecStart=/bin/sh -c '"$$0" chat -Q --oneshot --max-turns 25 -s portail --query-file "$$1"; rc=$$?; "$$0" gateway stop >/dev/null 2>&1; exit $$rc' /home/hermes-portail/.local/bin/hermes /home/hermes-portail/.consigne
+ExecStart=/bin/sh -c '"$$0" chat -Q --oneshot --max-turns 40 -s portail --query-file "$$1"; rc=$$?; "$$0" gateway stop >/dev/null 2>&1; exit $$rc' /home/hermes-portail/.local/bin/hermes /home/hermes-portail/.consigne
 Environment="HOME=/home/hermes-portail" "USER=hermes-portail" "LOGNAME=hermes-portail" "LANG=C.UTF-8"
 Environment="PATH=@PATH@"
 Environment="HERMES_HOME=/home/hermes-portail/hermes" "HERMES_MANAGED_DIR=/etc/hermes-portail"
