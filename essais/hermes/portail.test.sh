@@ -192,6 +192,26 @@ sys.exit(0 if 'MODE BROUILLON' in t and t.index('MODE BROUILLON') < t.index('Jus
 PY"
 verif "brouillon : pas de nouvelle connexion (session gardée), mot de passe jamais parti vers le modèle" bash -c "! grep -q '\"evenement\": \"connexion\"' $T/traces/portail.jsonl && ! grep -q '$MDP' $T/traces/modele.jsonl"
 
+echo "== À blanc : la dépense est préparée puis annulée, rien n'est créé"
+cat > $T/champs-blanc.txt <<FIN
+Libellé : Essai à blanc
+Montant TTC : 2,00
+SUITE: [
+ {"nom": "browser_exec", "args": {"code": "# Formulaire rempli, puis retour sans enregistrer\nnew_tab('http://127.0.0.1:$PP/depense/nouvelle')\nwait_for_load()\nupload_file('#justificatif', '/var/lib/hermes-portail-depot/justificatif.pdf')\nfill_input('#libelle', 'Essai à blanc')\nfill_input('#montant', '2,00')\ngoto_url('http://127.0.0.1:$PP/tableau')\nwait_for_load()\nprint(js(\"document.querySelector('#depenses').innerText\"))"}},
+ {"nom": "browser_exec", "args": {"code": "# Enregistrement de la session\nimport time\ntime.sleep(32)\nprint('session enregistrée')", "timeout_s": 90}}
+]
+FIN
+: > $T/traces/portail.jsonl; : > $T/traces/modele.jsonl
+bash /usr/local/sbin/hermes-portail brouillon "http://127.0.0.1:$PP/tableau" --champs-fichier $T/champs-blanc.txt --justificatif /usr/local/lib/hermes-portail/justificatif-essai.pdf --sans-creer > $T/blanc.log 2>&1; rc=$?
+verif "à blanc : code 0, le portail n'a reçu ni enregistrement ni soumission" bash -c "[ $rc = 0 ] && grep -q '== À blanc du' $T/blanc.log && grep -q '\"evenement\": \"formulaire\"' $T/traces/portail.jsonl && ! grep -q 'ENREGISTREE\|SOUMISSION' $T/traces/portail.jsonl"
+verif "à blanc : la consigne commence par « MODE À BLANC » et dit d'annuler ; le fichier a quitté le dépôt" bash -c "python3 -I - $T/traces/modele.jsonl <<'PY' && [ ! -e /var/lib/hermes-portail-depot/justificatif.pdf ]
+import json, sys
+c = [json.loads(l) for l in open(sys.argv[1])][0]['corps']
+t = ' '.join(m['content'] if isinstance(m['content'], str) else ' '.join(x.get('text', '') for x in m['content']) for m in c['messages'] if m['role'] == 'user')
+sys.exit(0 if 'MODE À BLANC' in t and 'MODE BROUILLON' not in t and 'ANNULE' in t and t.index('MODE À BLANC') < t.index('Libellé : Essai à blanc') else 1)
+PY"
+verif "essai n'accepte pas --sans-creer" bash -c "! bash /usr/local/sbin/hermes-portail essai 'http://127.0.0.1:$PP/tableau' --sans-creer >/dev/null 2>&1"
+
 echo "== Ce qu'Hermes apprend d'un portail"
 N=/var/lib/hermes-portail/notes/127.0.0.1.txt
 verif "les deux notes utiles du passage sont gardées, à root seul" bash -c "[ \"\$(stat -c '%U %a' $N)\" = 'root 600' ] && [ \"\$(wc -l < $N)\" = 2 ] && grep -q 'Enregistrer sans envoyer' $N && grep -q '/depense/nouvelle' $N"
@@ -236,6 +256,40 @@ echo "== Ce que le navigateur a tenté de joindre de lui-même"
 verif "plus d'appel vers la vérification de fuite du mot de passe ni vers le remplissage automatique" bash -c "grep -aq 'refusé exemple.org' $T/filtre.log && ! grep -aE 'refusé [^ ]*(passwordsleakcheck|content-autofill|clients2\.google)' $T/filtre.log"
 verif "tout le reste a été refusé par le relais (aucun hôte permis hors de la liste du banc)" bash -c "! grep -a ' permis ' $T/filtre.log | grep -av 'permis localhost'"
 grep -aoE 'refusé (http://)?[^ /?]*' $T/filtre.log | sort | uniq -c | sort -rn | sed 's/^/    /' | head -12
+
+echo "== La facture d'un mail, par l'accès Google de JARVIS (faux JARVIS)"
+FJ=$T/faux-jarvis; mkdir -p $FJ/serveur $FJ/donnees $T/facture $T/facture-pas-root; chown $U: $T/facture-pas-root
+cp "$RACINE/jarvis-os/server/pdf.mjs" $FJ/serveur/pdf.mjs; cp /usr/local/lib/hermes-portail/justificatif-essai.pdf $FJ/serveur/facture.pdf
+cat > $FJ/serveur/google.mjs <<'FIN'
+// Faux Gmail du banc : un fil, un mail, deux pièces jointes (un reçu qui n'est pas la facture, puis la facture).
+import fs from 'node:fs';
+export function createGoogle({S, save}) {
+  return {tool: async (serveur, nom, i) => {
+    if (nom === 'search_threads') return /rien/.test(i.query) ? {} : {threads: [{id: 't1'}]};
+    if (nom === 'get_thread') return {id: 't1', messages: [{id: 'm1', date: '2026-11-18T09:00:00.000Z', sender: 'factures@exemple.test', attachments: [
+      {filename: 'Receipt-0001.pdf', mimeType: 'application/pdf', size: 12, attachmentId: 'recu'},
+      {filename: 'Invoice-0001.pdf', mimeType: 'application/pdf', size: 896, attachmentId: 'facture'}]}]};
+    if (nom === 'get_attachment') return i.attachmentId === 'facture' ? {size: 896, data: fs.readFileSync(new URL('./facture.pdf', import.meta.url)).toString('base64url')} : {size: 12, data: Buffer.from('pas un pdf').toString('base64url')};
+    throw new Error('outil inattendu : ' + nom);   // toute écriture (envoi, étiquette, corbeille) ferait échouer le banc
+  }};
+}
+FIN
+printf '{"google": {"refresh": "jeton-invente-du-banc", "clientId": "x", "clientSecret": "y"}, "autre": 1}' > $FJ/donnees/state.json
+chmod -R a+rX $FJ; avant=$(sha256sum < $FJ/donnees/state.json)
+export HERMES_BANC_JARVIS_U=nobody HERMES_BANC_JARVIS_SRV=$FJ/serveur HERMES_BANC_JARVIS_DATA=$FJ/donnees
+bash /usr/local/sbin/hermes-portail facture --requete 'from:factures@exemple.test' --nom '^Invoice-.*\.pdf$' --vers $T/facture > $T/facture.log 2>&1; rc=$?
+verif "facture : la bonne pièce jointe (la facture, pas le reçu) est rendue à root, identique à l'original" bash -c "[ $rc = 0 ] && cmp -s $T/facture/facture.pdf $FJ/serveur/facture.pdf && [ \"\$(stat -c '%U %a' $T/facture/facture.pdf)\" = 'root 600' ] && grep -q 'Invoice-0001.pdf' $T/facture.log && grep -q 'mail du 2026-11-18' $T/facture.log"
+verif "facture : son texte est lu sur le serveur (montant et date lisibles), à root seul ; rien du contenu n'est affiché" bash -c "grep -q 'Total TTC : 1,00 EUR' $T/facture/facture.txt && [ \"\$(stat -c '%U %a' $T/facture/facture.txt)\" = 'root 600' ] && ! grep -q 'Total TTC' $T/facture.log"
+verif "facture : l'état de JARVIS n'est jamais réécrit" [ "$avant" = "$(sha256sum < $FJ/donnees/state.json)" ]
+bash /usr/local/sbin/hermes-portail facture --requete 'rien du tout' --vers $T/facture > $T/facture2.log 2>&1; rc=$?
+verif "facture : aucun PDF trouvé, code 4 et il le dit" bash -c "[ $rc = 4 ] && grep -q 'Aucun PDF' $T/facture2.log"
+bash /usr/local/sbin/hermes-portail facture --requete 'x' --nom '^Receipt' --vers $T/facture > $T/facture3.log 2>&1; rc=$?
+verif "facture : une pièce jointe qui n'est pas un PDF est refusée (code 5)" [ $rc = 5 ]
+printf '{"google": {}}' > $FJ/donnees/state.json
+bash /usr/local/sbin/hermes-portail facture --requete 'x' --vers $T/facture > $T/facture4.log 2>&1; rc=$?
+verif "facture : Google pas relié à JARVIS, code 3" bash -c "[ $rc = 3 ] && grep -q 'pas relié' $T/facture4.log"
+verif "facture : un dossier de destination qui n'est pas à root est refusé" bash -c "! bash /usr/local/sbin/hermes-portail facture --requete 'x' --vers $T/facture-pas-root >/dev/null 2>&1"
+unset HERMES_BANC_JARVIS_U HERMES_BANC_JARVIS_SRV HERMES_BANC_JARVIS_DATA
 
 echo "== Garde-fous de la commande"
 runuser -u $U -- bash -c "printf 'x' > $HH/vault/.essai" 2>/dev/null; rm -f $HH/vault/.essai
