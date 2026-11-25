@@ -214,9 +214,19 @@ Pas prouvé, à voir sur le vrai serveur :
 - 25/11/2026, 14h27 : **second passage : la session est gardée.** Hermes arrive sur le tableau de bord sans se
   reconnecter (68 s, pic de 1 Go). Écart non expliqué : la liste des dépenses récentes, remplie au passage
   précédent, est décrite vide cette fois (une bibliothèque du portail servie par un CDN est refusée par le relais :
-  cause possible, pas vérifiée). À regarder avant la note à blanc.
-- 25/11/2026 : durcissement écrit et passé au banc (66 vérifications), voir « Durcissement ». Sur le serveur :
-  à appliquer puis à vérifier par un passage réel.
+  hypothèse écartée ensuite, voir plus bas).
+- 25/11/2026, 14h52 : **durcissement appliqué sur le serveur, passage de contrôle bon** (son oui dans la session du
+  serveur ; pas de retour arrière). Unité notée 1,8 par `systemd-analyze security` ; AppArmor y restreint bien les
+  espaces de noms (le navigateur y tournait donc déjà sans son bac à sable) ; systemd 259. Session encore ouverte,
+  67 s, pic de 1,1 Go. La demande d'heure réseau a disparu des refus du relais. Pas encore vu sur le serveur :
+  l'arrêt de la vérification de fuite et du remplissage (aucun mot de passe saisi à ce passage ; vu au banc
+  seulement). La session du serveur doute que les règles du navigateur soient lues (les appels vers la liste des
+  comptes et la mise à jour continuent) : au banc, `chrome://policy` les montre lues par ce même navigateur, et ces
+  appels-là sont ceux qu'aucune règle ne coupe ; à confirmer sur le serveur au prochain passage avec connexion.
+  Copies d'avant gardées dans `/root/` (`hermes-portail-essai.service.avant`, `hermes-portail-config.yaml.avant`).
+- Liste des dépenses récentes : remplie (3) au passage de 13h32, décrite vide aux deux suivants. La bibliothèque
+  refusée par le relais l'était déjà au premier : ce n'est pas elle. Les pages d'arrivée diffèrent (tableau de bord
+  nommé au premier, racine ensuite). Non expliqué ; à regarder avec la note à blanc.
 
 ## Ce qui reste (au 25/11/2026)
 
@@ -229,8 +239,8 @@ Pour ce portail :
 3. **Redémarrage du serveur** : vérifier pour de vrai que tout attend le coffre, puis repart après
    `sudo jarvis-coffre ouvrir` (la carte « Coffre » de l'app n'est pas encore branchée : `jarvis` n'est dans le groupe
    du coffre qu'à son prochain redémarrage).
-4. **Durcir** : écrit et passé au banc ; reste à l'appliquer sur le serveur et à refaire un passage réel. Puis : un
-   passage dont le navigateur ne démarre pas doit rendre un code d'erreur ; l'écart sur la liste des dépenses.
+4. **Durcir** : fait et vérifié sur le serveur. Restent : un passage dont le navigateur ne démarre pas doit rendre un
+   code d'erreur ; confirmer sur le serveur que les règles du navigateur sont lues ; l'écart sur la liste des dépenses.
 Ensuite :
 5. Les deux autres portails (CRA mensuel, CRA hebdomadaire) : même marche, `enregistrer`, `domaines`, `essai`. Leur
    connexion (code, session courte) n'est pas connue.
