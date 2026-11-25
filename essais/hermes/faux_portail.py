@@ -96,6 +96,7 @@ class P(BaseHTTPRequestHandler):
                 '<label>Libellé <input name="libelle" id="libelle"></label><br>'
                 '<label>Montant TTC <input name="montant" id="montant"></label><br>'
                 '<label>Date <input name="date" id="date" type="date"></label><br>'
+                '<label>Justificatif <input name="justificatif" id="justificatif" type="file"></label><br>'
                 '<button type="submit" formaction="/depense/enregistrer" id="enregistrer">Enregistrer sans envoyer</button> '
                 '<button type="submit" id="soumettre">Soumettre</button></form><p><a href="/tableau">Retour</a></p>'))
         if chemin == '/deconnexion':
