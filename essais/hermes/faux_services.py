@@ -124,13 +124,17 @@ def reponse_scenario(messages):
         t = texte_de(m.get("content")) if m.get("role") == "user" else ""
         if "SUITE:" in t:
             try:
-                suite, _ = json.JSONDecoder().raw_decode(t.split("SUITE:", 1)[1].strip())   # du texte peut suivre
+                reste = t.split("SUITE:", 1)[1].strip()
+                suite, fin = json.JSONDecoder().raw_decode(reste)   # du texte peut suivre
+                dire = ""   # « DIRE: "…" » après la suite : une phrase que le faux modèle ajoute à sa réponse finale
+                if "DIRE:" in reste[fin:]:
+                    dire = "\n" + json.JSONDecoder().raw_decode(reste[fin:].split("DIRE:", 1)[1].strip())[0]
             except ValueError:
                 break
             resultats = [texte_de(x.get("content")) for x in messages if x.get("role") == "tool"]
             if len(resultats) < len(suite):
                 return None, suite[len(resultats)]
-            return "Résultats : " + " ||| ".join(r[:1500] for r in resultats), None
+            return "Résultats : " + " ||| ".join(r[:1500] for r in resultats) + dire, None
     if "APPELLE:" in texte:
         try:
             return None, json.loads(texte.split("APPELLE:", 1)[1].strip())

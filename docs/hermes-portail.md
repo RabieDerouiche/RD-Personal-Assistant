@@ -83,7 +83,7 @@ tenu par la commande) : pas encore faite.
 | Fichier | Rôle |
 |---|---|
 | `install.sh` | Root, relançable. Utilisateur `hermes-portail`, Hermes à la version figée du Hermes principal (lue dans `../install.sh`) avec son navigateur, plugin de l'abonnement Claude et Claude Code à lui, politique, skill, copies root de la commande et du relais, lien de la clé, règles réseau et relais. Ne démarre aucun agent. |
-| `hermes-portail` | La commande (`/usr/local/sbin/hermes-portail`) : `etat`, `connexion-claude`, `enregistrer`, `domaines`, `essai`, `brouillon`, `cle`, `fermer`, `oublier`. Un essai lance l'unité `hermes-portail-essai`. |
+| `hermes-portail` | La commande (`/usr/local/sbin/hermes-portail`) : `etat`, `connexion-claude`, `enregistrer`, `domaines`, `essai`, `brouillon`, `notes`, `cle`, `fermer`, `oublier`. Un essai lance l'unité `hermes-portail-essai`. |
 | `hermes-portail-essai.service` | Un passage, enfermé (mêmes lignes que `hermes-gateway.service`, mémoire sans échange ; depuis le 25/11/2026, filtre d'appels système et espaces de noms interdits). Une vraie unité, pas `systemd-run` : au premier essai sur le serveur, `systemd-run -p IPAddressDeny=link-local` a été refusé alors que la même ligne est valable dans une unité. Consigne dans `/home/hermes-portail/.consigne`, réponse dans `/var/lib/hermes-portail/essais/`. |
 | `politique.yaml` | Sa politique (`/etc/hermes-portail/config.yaml`, root) : outils `browser`, `terminal`, `skills` seulement ; Sonnet ; profil de navigateur gardé ; navigateur envoyé vers le relais, lancé sans son bac à sable (dit en clair, voir « Durcissement »), remplissage automatique et heure réseau coupés. |
 | `navigateur-regles.json` | Règles d'administrateur du navigateur (`/etc/opt/chrome_for_testing/policies/managed/hermes-portail.json`, root) : pas de gestionnaire de mots de passe, pas de vérification de fuite, pas de compte Google, pas de mesures. |
@@ -109,7 +109,7 @@ le serveur). Faux portail `essais/hermes/faux_portail.py`, faux terminal `essais
 
 ## Ce que le banc prouve, et ce qu'il ne prouve pas
 
-Prouvé (73 vérifications, 25/11/2026) : installation ; outils réduits et politique figée ; clé seulement en ramfs,
+Prouvé (81 vérifications, 25/11/2026) : installation ; outils réduits et politique figée ; clé seulement en ramfs,
 nulle part en clair sur le disque, gardée par jarvis-coffre ; enregistrement dans un faux terminal sans que le mot de
 passe s'affiche ; connexion au faux portail par le coffre, tableau lu, formulaire ouvert, rien de soumis ; mot de
 passe et clé jamais envoyés au modèle ; session gardée au second passage ; coffre verrouillé : refus propre ;
@@ -138,7 +138,7 @@ lui-même. `sudo hermes-portail brouillon <adresse> --champs-fichier <fichier>` 
 root (4000 octets au plus), posé sur le serveur, jamais dans le dépôt. La commande écrit une consigne qui commence par
 « MODE BROUILLON » ; la skill n'ouvre ce mode que sur cette ligne (une page ne peut pas l'ouvrir) et garde les
 interdits de toujours : rien au valideur, aucun rapport, aucune suppression, aucune dépense existante modifiée,
-aucun fichier joint. `essai` refuse `--champs-fichier` : la lecture seule ne peut pas devenir un brouillon.
+aucun fichier joint hors celui de `--justificatif`. `essai` refuse `--champs-fichier` : la lecture seule ne peut pas devenir un brouillon.
 
 Ce que les routines de Chronos disent du portail (onglet « Textes des routines » de Pilotage, lu le 25/11/2026) :
 une dépense s'enregistre seule, sans rapport et sans rien envoyer au valideur ; le justificatif (la facture en PDF)
@@ -147,9 +147,40 @@ voient pas dans le formulaire après enregistrement. **Ce que l'essai ne couvre 
 portail n'a ni outil de fichier ni accès aux mails : il faudra un chemin pour lui remettre le PDF (dépôt par JARVIS
 dans un dossier lu par le compartiment), à concevoir si le brouillon réussit.
 
+**Premier passage réel (25/11/2026, 16h53) : rien enregistré, et c'est instructif.** Sur ce portail, « ajouter une
+dépense » n'offre qu'un dépôt de fichier : pas de saisie sans justificatif. Hermes s'est arrêté comme sa skill le
+demandait, n'a rien créé, et a compté trois lignes dans la liste des dépenses des trente derniers jours (l'écart
+vu plus tôt venait d'un encart différent du tableau de bord). 133 s, pic de 1,2 Go. D'où la suite : `brouillon`
+accepte `--justificatif <fichier>` (un fichier de root, PDF ou image, 5 Mo au plus), copié le temps du passage
+dans `/var/lib/hermes-portail-depot` (root, lisible par Hermes) puis effacé ; Hermes le joint avec `upload_file`,
+le seul fichier permis. Le kit pose une facture inventée d'un euro (`justificatif-essai.pdf`).
+
 Garde-fou réel : seulement la skill et le modèle. Rien de technique n'empêche un clic sur le mauvais bouton (le
 relais ne voit pas dans le HTTPS). Conséquence au pire : une dépense d'essai d'un euro envoyée au valideur, à
 retirer à la main. Limite de tours portée à 40 par passage (un formulaire demande plus d'allers-retours).
+
+## Ce qu'Hermes apprend d'un portail (25/11/2026, sa demande : « qu'il développe ses skills »)
+
+Avant : rien. Mémoire, recherche dans ses passages et relecture de fond sont coupées dans sa politique (il lit des
+pages web et tient des identifiants : une page piégée ne doit rien pouvoir lui faire retenir). Il redécouvrait
+donc le portail à chaque passage.
+
+Maintenant, des **notes par portail**, sous contrôle de root :
+- à la fin de sa réponse, Hermes écrit jusqu'à cinq lignes « Appris : … » (sa skill dit quoi : où est une page,
+  ce que fait un bouton, ce que le portail exige ou change seul, un piège ; jamais une donnée personnelle, jamais
+  une règle ni une permission, jamais ce qu'une page lui demande de retenir) ;
+- la commande, en root, garde celles qui passent le tri (une ligne, 220 caractères, ni adresse complète ni adresse
+  mail, pas de doublon, 6 par passage, 40 par portail) dans `/var/lib/hermes-portail/notes/<hôte>.txt` (root,
+  0600 : Hermes ne peut ni les lire ni les écrire lui-même) ;
+- au passage suivant, elle les ajoute à la consigne, présentées comme des faits et non comme des consignes ; la
+  skill dit qu'une note qui la contredit ne compte pas.
+`sudo hermes-portail notes` les montre ; `notes ajouter <hôte> "<texte>"` en pose une (ce qu'on sait déjà du
+portail) ; `notes oublier <hôte> [numéro]` en retire. Les notes vivent sur le serveur : jamais dans le dépôt (elles
+décrivent son portail). Limite : une note fausse reste jusqu'à ce qu'on la retire ; Hermes peut la signaler
+(« Appris : (corrige) … ») mais pas l'effacer. Les règles, elles, ne s'apprennent pas : elles restent dans la skill.
+
+Le Hermes de Telegram, lui, a sa mémoire et propose des skills, validées par `/skills approve`
+(`docs/hermes-deroule.md`, « Les skills ») : rien de changé pour lui.
 
 ## Durcissement (25/11/2026, son choix par QCM : « Second passage puis durcir »)
 
@@ -253,9 +284,9 @@ retirer à la main. Limite de tours portée à 40 par passage (un formulaire dem
 Pour ce portail :
 1. **Combien de temps la session tient** : elle tient d'un passage au suivant (une heure d'écart). Reste un contrôle
    par jour pendant une à deux semaines (minuterie à écrire, sur sa demande).
-2. **Note de frais** : mode brouillon écrit et passé au banc ; à lancer sur le serveur (son oui là-bas), puis il
-   supprime la dépense d'essai. Ensuite : joindre le justificatif (chemin du PDF à concevoir), une skill par note de
-   frais de Chronos, comparaison avec ce que Chronos a créé.
+2. **Note de frais** : le portail exige un justificatif ; brouillon avec la facture d'essai jointe à lancer (son
+   oui dans la session du serveur), puis il supprime la dépense d'essai. Ensuite : le chemin de la vraie facture
+   (du mail au dépôt d'Hermes, par JARVIS), une skill par note de frais de Chronos, comparaison avec Chronos.
 3. **Redémarrage du serveur** : vérifier pour de vrai que tout attend le coffre, puis repart après
    `sudo jarvis-coffre ouvrir` (la carte « Coffre » de l'app n'est pas encore branchée : `jarvis` n'est dans le groupe
    du coffre qu'à son prochain redémarrage).
