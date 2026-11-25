@@ -62,7 +62,9 @@ done
 dire "Hermes $HERMES_VERSION avec son navigateur (installeur officiel vérifié par son empreinte, lancé en tant que $U)"
 deja=""
 [ -d "$HH/hermes-agent/.git" ] && deja=$(comme git -C "$HH/hermes-agent" rev-parse HEAD 2>/dev/null || true)
-if [ "$deja" != "$HERMES_COMMIT" ]; then
+# Installé pour de bon = au bon commit ET la commande présente : un installeur coupé en route (longue construction sur
+# un petit serveur) laisse le bon commit sans la commande, et une relance doit alors le refaire.
+if [ "$deja" != "$HERMES_COMMIT" ] || [ ! -x "$H/.local/bin/hermes" ]; then
   tmp=$(mktemp)
   curl -fsSL -o "$tmp" "https://raw.githubusercontent.com/NousResearch/hermes-agent/$HERMES_COMMIT/scripts/install.sh"
   echo "$HERMES_INSTALLEUR_SHA256  $tmp" | sha256sum -c --quiet - || { echo "Empreinte de l'installeur différente : arrêt."; rm -f "$tmp"; exit 1; }
