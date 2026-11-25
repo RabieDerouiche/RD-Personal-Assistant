@@ -252,6 +252,12 @@ d'authentification : il a la clé de configuration). Sa consigne : s'organiser a
 6. Télétravail : le plus lourd (calcul, modèle de feuille, justificatifs dont une facture à prendre sur un autre
    espace client). Le travail déjà fait est sur l'ordinateur des bots (`/workspace/ndf/teletravail/`), illisible
    d'ici : demander à Chronos, par le Canal, de le copier dans Drive.
+**Ses réponses (QCM du 25/11/2026 au soir)** : dans son compte, une dépense créée « part seule » (contrôlée puis
+remboursée sans geste de sa part : créer, c'est soumettre) ; et pour le dernier clic, « comme Chronos
+aujourd'hui » : Hermes créera seul les notes de frais et le préviendra après ; pour les CRA, son oui sur les jours
+d'abord, puis saisie et validation. Donc aucun bouton de confirmation à construire, mais aucune création par
+Hermes tant que la routine n'est pas basculée (sinon doublon soumis).
+
 Règles de Chronos reprises telles quelles (il les a déjà tranchées) : ce que chaque routine crée ou soumet seule,
 et quand elle attend son oui. Pendant le double, Hermes ne crée rien (à blanc) : sinon doublon.
 
