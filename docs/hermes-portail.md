@@ -549,6 +549,16 @@ tant qu'une routine n'est pas basculée) :
    raccourci de présence, et partie seule (sa précision du 25/11/2026 au soir) ; à blanc tant que Chronos tourne.
 5. *Déclenchement et bascule* : une minuterie par routine (ou l'arrivée du mail), le compte rendu à lui (JARVIS ou
    Telegram), puis la comparaison avec Chronos et sa décision, routine par routine.
+   **Sa règle du 25/11/2026 au soir (pour Chronos)** : pas de double de deux semaines. Dès qu'une routine d'Hermes
+   est **finalisée** (à blanc identique à Chronos, déclenchement automatique et compte rendu prêts, banc passé), la
+   routine de Chronos s'arrête (mise en pause par une ligne du Canal, jamais supprimée : `docs/hermes-deroule.md`,
+   « La méthode de bascule ») et Hermes passe en réel. **À la première exécution réelle de chaque routine d'Hermes
+   qui remplace Chronos, il est notifié** (JARVIS) pour vérifier ce qui a été fait et corriger si besoin. Rien ne se
+   crée en réel avant la mise en pause de la routine de Chronos (sinon doublon soumis).
+   Routines de Chronos (Pilotage, « Textes des routines ») : note de l'abonnement d'IA (le 21), note de la box (le
+   15), validation des jours (le 24), CRA mensuel (le 26), CRA hebdomadaire (le vendredi), note de télétravail (le
+   1er, bientôt le dernier jour), « Facture reçue » (à l'arrivée d'une facture), et la note de l'abonnement Grok Bot
+   (le 4), qui n'est pas dans sa liste du 25/11/2026 : à trancher.
 
 **Dettes connues**
 - Un passage dont le navigateur ne démarre pas rend quand même le code 0 : juger à la réponse.

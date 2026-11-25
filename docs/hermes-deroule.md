@@ -84,6 +84,11 @@ Ouvrir un accès direct plus tard reste possible : c'est sa décision, par QCM.
 Tant qu'une routine est en double, Grok Bot n'est pas allégé : c'est le prix de la comparaison. L'allègement
 commence à la première bascule.
 
+**Chronos (sa règle du 25/11/2026 au soir)** : pas de double de deux semaines pour ses routines (elles écrivent sur
+des portails : en double, ce serait un doublon soumis). Hermes les prépare à blanc et les compare à ce que Chronos
+a fait ; finalisée, la routine de Chronos est mise en pause (étape 3) et Hermes passe en réel ; **la première
+exécution réelle de chaque routine lui est notifiée** pour qu'il vérifie et corrige. Détail : `docs/hermes-portail.md`.
+
 ## Les skills
 
 - **Hermes, du dépôt** (`jarvis-os/hermes/skills/`, copiées dans `/etc/hermes/skills`, en lecture seule pour
