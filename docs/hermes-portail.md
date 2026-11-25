@@ -256,6 +256,12 @@ différentes, aucune écriture nulle part :
   par un autre moyen, à concevoir.
 Quatre hôtes annexes ouverts par la marge pour ce dernier portail ; aucun pour les deux autres.
 
+**Second essai (25/11/2026, 21h30, lecture seule, sans question pour lui)** : *l'intranet est acquis* : avec
+l'attribut posé, le code généré par le coffre est accepté ; Hermes lit le CRA du mois (statut, jours renseignés,
+fin de mission) sans rien cliquer. *L'espace client de la box* : en pleine page, le formulaire s'affiche, le coffre
+le remplit, le code par mail arrive et il est accepté (six cases d'un chiffre) ; mais la page des factures ne
+reconnaît pas la session. Le fournisseur a enregistré le navigateur d'Hermes comme appareil de confiance.
+
 **Ordre retenu** (du plus sûr au plus lourd, chaque étape en lecture seule ou à blanc avant toute écriture) :
 1. Abonnement d'IA : **fait le 25/11/2026**, à blanc, identique à la dépense de Chronos (voir « La vraie facture »).
 2. Les trois autres portails : il enregistre lui-même leurs identifiants (une séance Termius), puis un passage de
@@ -276,6 +282,54 @@ Hermes tant que la routine n'est pas basculée (sinon doublon soumis).
 
 Règles de Chronos reprises telles quelles (il les a déjà tranchées) : ce que chaque routine crée ou soumet seule,
 et quand elle attend son oui. Pendant le double, Hermes ne crée rien (à blanc) : sinon doublon.
+
+## La note de frais de télétravail (ses fichiers et ses précisions du 25/11/2026 au soir)
+
+Il a envoyé le classeur modèle de la société de portage, l'exemple d'octobre (accepté et remboursé) et l'avis de
+taxe foncière de l'année. Rangés dans Drive, dossier « Note de frais télétravail » (ID dans `CLAUDE.md`) : aucun de
+ces fichiers, aucun montant, aucune adresse dans le dépôt.
+
+**Ce que l'exemple montre.** Le justificatif déposé sur le portail de notes de frais est UN PDF : une page de
+synthèse (le tableau du classeur : un « 1 » sous chaque jour télétravaillé, les surfaces, les charges, le total),
+puis les pièces, dans l'ordre : appel de charges de la copropriété, avis de taxe foncière, attestation
+d'assurance habitation, facture d'électricité du mois. La page de synthèse de l'exemple n'est pas le classeur
+imprimé : c'est un tableau recréé à l'identique. Le portail n'accepte de toute façon que PDF ou image.
+
+**Le calcul** (formule du classeur, cellule du total ; refaite et vérifiée : elle retrouve le total d'octobre au
+centime) :
+`total = surface du bureau × jours télétravaillés × (loyer + charges de copropriété + autres taxes + taxe foncière/12
++ taxe d'habitation/12 + assurance/12 + électricité + eau) / surface du logement / jours ouvrés du mois`.
+Jours ouvrés = tous les lundis à vendredis du mois, fériés compris (`NB.JOURS.OUVRES` sans liste de fériés) ; seuls
+les jours télétravaillés du numérateur excluent fériés et congés (règle de Chronos).
+
+**D'où vient chaque chiffre**
+
+| Donnée | Source | Rythme |
+|---|---|---|
+| Jours télétravaillés | Agenda « Présence » et jours fériés, par JARVIS ; son oui | Chaque mois |
+| Électricité | Facture du mois, sur l'espace client du fournisseur (le mail d'annonce n'a pas de PDF) | Chaque mois, un portail de plus |
+| Charges de copropriété | Appel de charges trimestriel, en pièce jointe dans Gmail : total du lot de l'appartement, divisé par trois | Chaque trimestre |
+| Assurance habitation | Mail de la nouvelle police et attestation, dans Gmail | Chaque année, à la date d'échéance |
+| Taxe foncière | L'avis qu'il fournit (Drive) | Chaque année |
+| Surfaces, date de début de mission, nom | Fixes : fichier de réglages sur le serveur, jamais dans le dépôt | — |
+
+**L'avis de taxe foncière suivant** (sa consigne) : dès qu'un mail de l'administration fiscale annonce de nouveaux
+documents avec un avis de taxes foncières, JARVIS lui crée une tâche « envoie-moi le nouvel avis » ; il l'envoie,
+on le range dans le dossier Drive. À brancher sur la veille du matin d'Hermes (ou une règle du Radar) : pas avant
+l'été prochain.
+
+**Ce qu'il faut construire** (rien n'existe encore) :
+1. *Télécharger un fichier depuis un portail* (la facture d'électricité ; servira aussi à la facture de la box) :
+   un mode de plus pour Hermes portail, un dossier de téléchargement à lui, que root relève à la fin du passage.
+2. *Aller chercher un fichier dans Drive* depuis le serveur, par l'accès Google de JARVIS (comme `facture.mjs` pour
+   Gmail).
+3. *Fabriquer le PDF* : la page de synthèse (HTML rendu en PDF par le Chromium déjà installé, sans rien installer),
+   puis l'assemblage avec les pièces (un outil de fusion de PDF à installer sur le serveur).
+4. *Lire les montants* dans les PDF (`pdf.mjs` de JARVIS) : total de la facture d'électricité, total du lot de
+   l'appel de charges. Par règles, avec un garde-fou : écart inhabituel par rapport au mois d'avant = on s'arrête.
+5. *La dépense* : vendeur, date au dernier jour du mois, catégorie propre au télétravail, sans TVA, commentaire
+   « Frais de télétravail <mois> <année> – N jours », sans étiquette (relevé du compte) ; à blanc d'abord.
+Chronos fait celle du mois écoulé le 1er : Hermes ne la crée pas, il la prépare à blanc pour comparer.
 
 ## Ce qu'Hermes apprend d'un portail (25/11/2026, sa demande : « qu'il développe ses skills »)
 

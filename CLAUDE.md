@@ -21,6 +21,7 @@ Dépôt **public** : n'y écris et n'y commit jamais de donnée personnelle (nom
 | `Grok Bot/Pilotage Grok Bot` (Google Sheet) | `1kIu7U1X28RCVO_SAF2l9IMt9QWiOWbGWcRX5bV1-7z0` |
 | `Grok Bot/Charte commune`, `Fiche <Bot>`, `Plan Grok Bot v2` (Google Docs) | retrouvés par titre dans `Grok Bot/` |
 | `RD Assistant/Jarvis (sources de la page)/` (code complet de la page Jarvis, un fichier `jarvis-page-v<version>.html` par version publiée) | `1LO_y3DbvXjQQtuSQPlQfbnMU5Mlyzz3X` |
+| `RD Assistant/Note de frais télétravail/` (classeur modèle de la société de portage, exemple accepté d'octobre 2026, avis de taxe foncière de l'année ; il y dépose le nouvel avis chaque année ; détail : `docs/hermes-portail.md`) | `1r0kqeIYxMmzALFza60BiaP7-7iG14Smr` |
 | `RD Assistant/Hermes/` | archive d'un ancien assistant arrêté : ne plus lire, ne plus écrire |
 
 Si un ID ne répond plus, retrouve le fichier avec `search_files` par titre.
