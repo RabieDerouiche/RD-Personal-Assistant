@@ -274,7 +274,7 @@ IP publique de la machine (origine inconnue : la page ou Hermes).
 1. Abonnement d'IA : **fait le 25/11/2026**, à blanc, identique à la dépense de Chronos (voir « La vraie facture »).
 2. Les trois autres portails : il enregistre lui-même leurs identifiants (une séance Termius), puis un passage de
    connexion en lecture seule sur chacun, avec une marge d'hôtes annexes ; on sait alors ce qui est faisable.
-3. La box : télécharger la facture dans l'espace client (code par mail), puis la dépense à blanc.
+3. La box : **faite le 25/11/2026**, à blanc, identique à la dépense de Chronos (« Où on en est », étape 1).
 4. Les jours du mois : la validation du 24 (agenda « Présence » et jours fériés, par les outils de JARVIS, son oui),
    dont dépendent le CRA mensuel et le télétravail. Ce n'est pas un portail : c'est pour le Hermes de Telegram.
 5. CRA hebdomadaire puis CRA mensuel, à blanc (lecture de l'état, ce qui serait saisi), puis une vraie saisie sur
@@ -328,7 +328,7 @@ l'été prochain.
 
 **Ce qu'il faut construire** (rien n'existe encore) :
 1. *Télécharger un fichier depuis un portail* (la facture d'électricité ; sert aussi à la facture de la box) :
-   **écrit et passé au banc le 25/11/2026, pas encore sur le serveur.** `essai … --telecharger <dossier de root>` :
+   **sur le serveur depuis le 25/11/2026, prouvé sur la facture de la box.** `essai … --telecharger <dossier de root>` :
    la consigne annonce « Téléchargement permis », Hermes range UN fichier dans son dossier
    `/home/hermes-portail/telechargements` (skill, section « Télécharger un fichier » : `Browser.setDownloadBehavior`
    puis le clic ; à défaut, le PDF ouvert dans un onglet est repris par `fetch`), et root le relève à la fin : un
@@ -482,9 +482,10 @@ Le Hermes de Telegram, lui, a sa mémoire et propose des skills, validées par `
 - Les trois autres portails : Hermes y entre (code d'application par le coffre pour l'intranet ; cadre ouvert en
   pleine page pour l'espace client de la box ; rien de particulier pour le CRA hebdomadaire). Lecture seule.
 
-**Écrit et passé au banc, pas encore sur le serveur** (le serveur est resté au commit `172aa8a`) : le
-contournement du champ de code et du cadre dans la skill (aujourd'hui portés par des notes), le téléchargement
-d'un fichier, la commande `texte`.
+- La box (25/11/2026, 21h24 à 21h34) : facture du dernier mois rapportée de l'espace client, dépense à blanc,
+  **identique à la dépense de Chronos** (détail à l'étape 1 ci-dessous).
+- Le kit sur le serveur est à jour depuis le 25/11/2026 au soir (`a22ee66`) : contournement du champ de code et du
+  cadre dans la skill, téléchargement d'un fichier, commande `texte`. Copies d'avant dans `/root/*.avant-box`.
 
 **La suite, dans l'ordre** (une seule demande à la session du serveur par chantier ; rien n'est créé ni soumis
 tant qu'une routine n'est pas basculée) :
@@ -500,7 +501,25 @@ tant qu'une routine n'est pas basculée) :
    Chronos (vendeur, catégorie, étiquette seule, aucun commentaire, montants entiers) ; `brouillon --sans-creer` ;
    comparaison en lecture seule avec la dépense de Chronos de la même date (champ par champ, étiquettes, part
    remboursée) ; découverte de la page de connexion du fournisseur d'électricité avec une marge de 5 hôtes ;
-   ménage. Une seule question pour lui dans la session du serveur. Résultat : à reporter ici.
+   ménage. Une seule question pour lui dans la session du serveur.
+   **Résultat (son oui à 21h24, tout fait en dix minutes, aucun hôte de marge, rien de créé)** :
+   - Kit : `172aa8a` → `a22ee66`, `install.sh` code 0, contrôles attendus, durcissement intact, JARVIS non touché.
+   - Facture : rapportée en un passage, par téléchargement direct (le bouton de la liste est un lien), session
+     encore ouverte, aucun code demandé ; vraie facture de la ligne fixe, texte lisible (date, HT, TVA, TTC
+     trouvés). Hermes a dit la facture datée d'un jour plus tôt que ce qu'elle porte : **la date se lit dans le
+     texte de la facture, jamais dans la réponse d'Hermes**.
+   - À blanc : tout pré-rempli juste par le portail sauf la catégorie (« Repas », corrigée) ; étiquette posée
+     dans le formulaire d'ajout, sans l'étiquette « refacturable » ajoutée seule ; annulé, aucune ligne ajoutée.
+   - Comparaison avec la dépense de Chronos de la même date : **identique sur tous les champs**, une seule
+     étiquette, état « Conforme », une seule dépense de ce vendeur pour le mois ; part remboursée = la moitié
+     (politique affichée par le portail, pas de chiffre). Le texte de la routine de Chronos est juste pour celle-ci.
+   - Électricité : la connexion est sur l'origine du site lui-même (lien « Espace client », puis une page de
+     connexion du même hôte) ; e-mail et mot de passe sur un seul écran, pas de cadre, aucun code annoncé. Un
+     hôte ouvert, aucun de marge. Il a enregistré son identifiant dans Termius le soir même (pas encore essayé).
+   - Notes : 35 pour le portail de notes de frais, 29 pour l'espace client de la box, 1 pour l'électricité ;
+     aucune ne contient un montant ou un numéro (vérifié).
+   - Reste pour une routine sans personne : écrire le fichier des champs sans la session du serveur (pour la
+     box, tout est fixe sauf la date et les trois montants, lus dans le texte : une règle sans IA suffit).
 2. *Les jours du mois* (pas un portail : JARVIS et le Hermes de Telegram) : lire l'agenda « Présence » et les jours
    fériés par les outils de JARVIS, appliquer les règles de la routine « Validation mensuelle des jours » de
    Chronos (onglet « Textes des routines » de Pilotage), lui montrer le bilan dans JARVIS avec un bouton pour
