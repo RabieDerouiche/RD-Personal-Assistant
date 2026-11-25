@@ -1,0 +1,262 @@
+#!/bin/bash
+# hermes-portail — la commande du Hermes « portail » (essai des portails ; docs/hermes-portail.md).
+# Posée par install.sh dans /usr/local/sbin/hermes-portail (root) : jamais un fichier du dépôt n'est exécuté.
+#
+#   sudo hermes-portail etat                       (coffre, clé, identifiants, hôtes permis, derniers essais ; aucun secret)
+#   sudo hermes-portail connexion-claude           (Termius : relie son Claude Code à l'abonnement, une fois)
+#   sudo hermes-portail enregistrer                (Termius : identifiant et mot de passe d'un portail, saisis sans affichage)
+#   sudo hermes-portail domaines [ajouter <hôte> | retirer <hôte>]
+#   sudo hermes-portail essai <adresse> [--consigne-fichier <fichier>]   (lecture seule : se connecte, dit ce qu'il voit)
+#   sudo hermes-portail cle                        (remet la clé du coffre d'Hermes en mémoire vive, depuis jarvis-coffre)
+#   sudo hermes-portail fermer                     (efface la clé de la mémoire vive)
+#   sudo hermes-portail oublier <handle>           (retire un identifiant enregistré)
+#
+# La clé du coffre d'Hermes n'est jamais sur le disque : elle vit dans un dossier en mémoire vive (ramfs, jamais
+# envoyé dans l'échange), et sa seule copie durable est dans jarvis-coffre, chiffrée par la phrase du propriétaire.
+# Après un redémarrage du serveur, rien ne peut se connecter tant que jarvis-coffre n'est pas rouvert.
+# Aucun réglage par l'environnement : les chemins ci-dessous sont fixes (le banc en fait une copie modifiée).
+set +x
+set -uo pipefail
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+U=hermes-portail
+H=/home/$U
+HH=$H/hermes               # pas ~/.hermes : Hermes cherche alors une unité « hermes-gateway » au nom nu, celle du Hermes principal
+ETC=/etc/hermes-portail
+LIB=/usr/local/lib/hermes-portail
+VAR=/var/lib/hermes-portail
+RAM=/run/hermes-portail-cle
+COFFRE=/usr/local/sbin/jarvis-coffre
+PRISE=/run/jarvis-coffre/service.sock
+NOM_CLE=hermes-portail-cle
+RELAIS=8891
+SYSTEMD=1; [ -d /run/systemd/system ] || SYSTEMD=0
+HOTE='^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$'
+
+usage() { sed -n '4,11p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,3\}//'; exit "${1:-1}"; }
+[ "$(id -u)" = 0 ] || { echo "À lancer en root : sudo hermes-portail ${1:-etat}"; exit 1; }
+id "$U" >/dev/null 2>&1 && [ -x "$H/.local/bin/hermes" ] || { echo "Hermes « portail » n'est pas installé : sudo bash /opt/rd/jarvis-os/hermes/portail/install.sh"; exit 1; }
+terminal() { [ -t 0 ] || { echo "À lancer dans un vrai terminal (Termius) : cette commande demande une saisie."; exit 1; }; }
+
+chemin_hermes() {   # le PATH du Hermes portail : son Node et son npm à lui, puis son Claude Code
+  local n m
+  n=$(ls -d "$HH"/tools/node-*/bin 2>/dev/null | sort -V | tail -1); m=$(ls -d "$HH"/tools/npm-*/bin 2>/dev/null | sort -V | tail -1)
+  printf '%s' "${n:+$n:}${m:+$m:}$HH/hermes-agent/node_modules/.bin:$H/.local/bin:/usr/local/bin:/usr/bin:/bin"
+}
+ENVIRONNEMENT=(HOME="$H" USER="$U" LOGNAME="$U" LANG=C.UTF-8 HERMES_HOME="$HH" HERMES_MANAGED_DIR="$ETC"
+  HTTPS_PROXY="http://127.0.0.1:$RELAIS" https_proxy="http://127.0.0.1:$RELAIS" NO_PROXY=localhost,127.0.0.1,::1 no_proxy=localhost,127.0.0.1,::1
+  CLAUDE_SUBSCRIPTION_DIRECTSDK_COMMAND="$H/.local/lib/claude-code/node_modules/.bin/claude" DISABLE_AUTOUPDATER=1)
+comme_portail() { (cd "$H" && runuser -u "$U" -- env -i "${ENVIRONNEMENT[@]}" PATH="$(chemin_hermes)" TERM="${TERM:-xterm}" "$@"); }
+propre() { sed 's/\x1b\[[0-9;?]*[A-Za-z]//g'; }
+
+# ---- la clé du coffre d'Hermes : en mémoire vive seulement
+memoire_vive() {   # le dossier en mémoire vive et le lien que le coffre d'Hermes suit
+  if ! mountpoint -q "$RAM"; then
+    install -d -m 0700 "$RAM"
+    mount -t ramfs -o mode=0700,nosuid,nodev,noexec ramfs "$RAM" || { echo "Impossible de créer le dossier en mémoire vive ($RAM)."; return 1; }
+  fi
+  [ "$(stat -f -c %T "$RAM")" = ramfs ] || { echo "Refus : $RAM n'est pas en mémoire vive (ramfs)."; return 1; }
+  chown "$U:$U" "$RAM"; chmod 0700 "$RAM"
+  install -d -o "$U" -g "$U" -m 0700 "$HH/vault"
+  if [ -e "$HH/vault/vault.key" ] && [ ! -L "$HH/vault/vault.key" ]; then
+    echo "Refus : $HH/vault/vault.key est un vrai fichier sur le disque. La clé ne doit exister qu'en mémoire vive."
+    echo "S'il vient d'un essai : sudo hermes-portail oublier --tout, puis recommence."; return 1
+  fi
+  [ "$(readlink "$HH/vault/vault.key" 2>/dev/null)" = "$RAM/vault.key" ] || runuser -u "$U" -- ln -sfn "$RAM/vault.key" "$HH/vault/vault.key"
+}
+coffre_etat() {   # 0 ouvert, 3 verrouillé, 4 pas encore créé, 1 injoignable ou pas installé
+  [ -x "$COFFRE" ] && [ -S "$PRISE" ] || return 1
+  python3 -I - "$PRISE" <<'PY'
+import json, socket, sys
+try:
+    s = socket.socket(socket.AF_UNIX); s.settimeout(5); s.connect(sys.argv[1]); s.sendall(b'{"commande":"etat"}\n')
+    r = json.loads(s.makefile('rb').readline() or b'{}')
+except Exception:
+    sys.exit(1)
+sys.exit(0 if r.get('ouvert') else 3 if r.get('existe') else 4)
+PY
+}
+cle_depuis_coffre() {   # écrit la clé droit de la prise du coffre dans la mémoire vive : jamais en argument, jamais sur le disque
+  python3 -I - "$PRISE" "$NOM_CLE" "$RAM/vault.key" <<'PY'
+import json, os, re, socket, sys
+prise, nom, sortie = sys.argv[1:4]
+try:
+    s = socket.socket(socket.AF_UNIX); s.settimeout(8); s.connect(prise)
+    s.sendall((json.dumps({"commande": "lire", "nom": nom}) + "\n").encode())
+    r = json.loads(s.makefile('rb').readline() or b'{}')
+except Exception:
+    sys.exit(1)
+if not r.get('ok'):
+    sys.exit(4 if r.get('code') == 'inconnu' else 3 if r.get('code') in ('verrouille', 'ferme') else 1)
+v = (r.get('valeur') or '').strip()
+if not re.fullmatch(r'[A-Za-z0-9_-]{43}=', v):
+    sys.exit(5)
+fd = os.open(sortie, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o600)
+os.write(fd, v.encode()); os.close(fd)
+PY
+}
+cle() {   # 0 : la clé est en mémoire vive ; sinon dit pourquoi (3 coffre verrouillé, 4 aucune clé encore, 1 autre)
+  memoire_vive || return 1
+  [ -s "$RAM/vault.key" ] && { chown "$U:$U" "$RAM/vault.key"; chmod 0600 "$RAM/vault.key"; return 0; }
+  coffre_etat; local e=$?
+  case $e in
+    0) ;;
+    3) echo "jarvis-coffre est verrouillé : ouvre-le (carte « Coffre » de JARVIS, ou sudo jarvis-coffre ouvrir), puis recommence."; return 3 ;;
+    4) echo "jarvis-coffre n'a pas encore été créé : sudo jarvis-coffre creer"; return 4 ;;
+    *) echo "jarvis-coffre n'est pas installé ou ne répond pas : sudo bash /opt/rd/jarvis-os/coffre/install.sh"; return 1 ;;
+  esac
+  cle_depuis_coffre; e=$?
+  case $e in
+    0) chown "$U:$U" "$RAM/vault.key"; chmod 0600 "$RAM/vault.key"; return 0 ;;
+    4) echo "Aucun identifiant de portail encore : sudo hermes-portail enregistrer"; return 4 ;;
+    3) echo "jarvis-coffre est verrouillé : ouvre-le, puis recommence."; return 3 ;;
+    5) echo "La clé gardée par jarvis-coffre n'a pas la forme attendue : rien n'a été écrit."; return 1 ;;
+    *) echo "Lecture de la clé refusée par jarvis-coffre."; return 1 ;;
+  esac
+}
+
+# Un passage : la question, puis l'arrêt propre de la passerelle qu'Hermes a lancée pour lui. Tuée par un signal, elle
+# se note « en marche » et le passage suivant l'attend jusqu'à l'échéance (« Gateway starting: deadline », vu au banc).
+PASSAGE='"$0" chat -Q --oneshot --max-turns 25 -s portail --query-file "$1"; rc=$?; "$0" gateway stop >/dev/null 2>&1; exit $rc'
+lancer_agent() {   # lancer_agent <fichier de consigne> <fichier de sortie> : un passage sans personne, enfermé
+  local consigne=$1 sortie=$2 rc
+  if [ "$SYSTEMD" = 1 ]; then
+    systemd-run --quiet --wait --collect --pipe --unit="hermes-portail-essai-$(date +%s)" \
+      -p User="$U" -p Group="$U" -p WorkingDirectory="$H" \
+      -p MemoryMax=1500M -p MemoryHigh=1300M -p MemorySwapMax=0 -p LimitCORE=0 -p OOMScoreAdjust=700 -p CPUWeight=20 -p TasksMax=512 \
+      -p RuntimeMaxSec=900 -p NoNewPrivileges=yes -p CapabilityBoundingSet= -p AmbientCapabilities= \
+      -p ProtectSystem=strict -p ReadWritePaths="$H" -p ProtectHome=tmpfs -p BindPaths="$H" -p BindReadOnlyPaths="$RAM" \
+      -p InaccessiblePaths="-/opt -/srv -/var/lib/caddy -/var/backups -/var/lib/jarvis-coffre" -p PrivateTmp=yes \
+      -p ProtectKernelTunables=yes -p ProtectKernelModules=yes -p ProtectKernelLogs=yes -p ProtectControlGroups=yes \
+      -p ProtectClock=yes -p ProtectHostname=yes -p ProtectProc=invisible -p RestrictSUIDSGID=yes -p RestrictRealtime=yes \
+      -p LockPersonality=yes -p UMask=0077 -p IPAddressDeny="link-local multicast" \
+      $(printf -- '-E %q ' "${ENVIRONNEMENT[@]}" PATH="$(chemin_hermes)") \
+      /bin/sh -c "$PASSAGE" "$H/.local/bin/hermes" "$consigne" > "$sortie" 2>&1
+    rc=$?
+  else   # banc : pas de systemd
+    comme_portail timeout 600 /bin/sh -c "$PASSAGE" "$H/.local/bin/hermes" "$consigne" > "$sortie" 2>&1
+    rc=$?
+    sleep 1; pkill -u "$U" 2>/dev/null   # sous systemd, la fin de l'unité arrête ce qui reste (le pilote du navigateur) ; ici, à la main
+  fi
+  return $rc
+}
+
+commande=${1:-etat}; [ $# -gt 0 ] && shift
+case "$commande" in
+  etat)
+    echo "== Hermes « portail »"
+    comme_portail hermes --version 2>/dev/null | head -1 | propre
+    coffre_etat; case $? in 0) echo "jarvis-coffre : ouvert" ;; 3) echo "jarvis-coffre : verrouillé (les portails attendent)" ;; 4) echo "jarvis-coffre : pas encore créé" ;; *) echo "jarvis-coffre : pas installé ou muet" ;; esac
+    if mountpoint -q "$RAM" && [ -s "$RAM/vault.key" ]; then echo "Clé du coffre d'Hermes : en mémoire vive"; else echo "Clé du coffre d'Hermes : absente de la mémoire (sudo hermes-portail cle)"; fi
+    if [ -e "$HH/vault/vault.key" ] && [ ! -L "$HH/vault/vault.key" ]; then echo "ATTENTION : une clé est sur le disque ($HH/vault/vault.key)."; fi
+    if [ -s "$HH/vault/vault.json.enc" ]; then
+      if [ -s "$RAM/vault.key" ]; then echo "Identifiants enregistrés (jamais leur mot de passe) :"; comme_portail hermes vault list 2>&1 | propre | grep -E 'vault_|Vault' | head -12
+      else echo "Identifiants enregistrés : oui (liste lisible une fois la clé en mémoire)"; fi
+    else echo "Identifiants enregistrés : aucun"; fi
+    echo "Hôtes permis par le relais : $(grep -vE '^\s*(#|$)' "$ETC/domaines" 2>/dev/null | paste -sd' ' -)"
+    if [ "$SYSTEMD" = 1 ]; then
+      echo "Relais : $(systemctl is-active hermes-portail-filtre 2>/dev/null) ; règles réseau : $(systemctl is-active hermes-portail-sortie 2>/dev/null)"
+      echo "Derniers refus du relais :"; journalctl -u hermes-portail-filtre --no-pager -n 400 2>/dev/null | grep ' refusé ' | sed -E 's/^.*refusé /  /' | sort | uniq -c | sort -rn | head -8
+    fi
+    echo "Derniers essais :"; ls -1t "$VAR"/essais 2>/dev/null | head -5 | sed 's/^/  /'
+    ;;
+  cle)
+    [ $# = 0 ] || usage
+    cle; rc=$?; [ $rc = 0 ] && echo "Clé du coffre d'Hermes en mémoire vive."; exit $rc ;;
+  fermer)
+    [ $# = 0 ] || usage
+    if mountpoint -q "$RAM"; then rm -f "$RAM/vault.key"; fi
+    echo "Clé effacée de la mémoire vive : plus aucune connexion possible jusqu'à « sudo hermes-portail cle »." ;;
+  connexion-claude)
+    [ $# = 0 ] || usage
+    terminal
+    CL="$H/.local/lib/claude-code/node_modules/.bin/claude"
+    [ -x "$CL" ] || { echo "Claude Code du Hermes portail absent : relance install.sh."; exit 1; }
+    if comme_portail "$CL" auth status 2>/dev/null | grep -qi '"loggedIn": *true\|logged in'; then
+      echo "Déjà relié :"; comme_portail "$CL" auth status || true
+      read -r -p "Le relier à nouveau ? (o/N) " r; [ "${r:-n}" = o ] || exit 0
+    fi
+    echo "Connexion avec ton abonnement Claude (le compte de ton forfait Max)."
+    comme_portail "$CL" auth login --claudeai
+    echo; comme_portail "$CL" auth status || true ;;
+  enregistrer)
+    [ $# = 0 ] || usage
+    terminal
+    coffre_etat; e=$?
+    [ $e = 0 ] || { case $e in 3) echo "jarvis-coffre est verrouillé : sudo jarvis-coffre ouvrir, puis recommence." ;; 4) echo "jarvis-coffre n'a pas encore été créé : sudo jarvis-coffre creer, puis recommence." ;; *) echo "jarvis-coffre n'est pas installé : sudo bash /opt/rd/jarvis-os/coffre/install.sh" ;; esac; exit 1; }
+    memoire_vive || exit 1
+    if [ ! -s "$RAM/vault.key" ]; then
+      cle_depuis_coffre; e=$?
+      if [ $e = 4 ]; then
+        [ -s "$HH/vault/vault.json.enc" ] && { echo "Des identifiants existent mais jarvis-coffre n'a plus leur clé : ils sont perdus. sudo hermes-portail oublier --tout, puis recommence."; exit 1; }
+        # première fois : la clé naît dans la mémoire vive, puis part chiffrée dans jarvis-coffre (jamais sur le disque)
+        python3 -I -c "import base64,os,sys; fd=os.open(sys.argv[1], os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW, 0o600); os.write(fd, base64.urlsafe_b64encode(os.urandom(32))); os.close(fd)" "$RAM/vault.key" \
+          || { echo "Impossible de créer la clé en mémoire vive."; exit 1; }
+        "$COFFRE" mettre "$NOM_CLE" --portee service --depuis-entree < "$RAM/vault.key" >/dev/null \
+          || { rm -f "$RAM/vault.key"; echo "jarvis-coffre a refusé de garder la clé : rien n'a été fait."; exit 1; }
+        echo "Clé du coffre d'Hermes créée en mémoire vive et gardée, chiffrée, par jarvis-coffre."
+      elif [ $e != 0 ]; then echo "Lecture de la clé refusée par jarvis-coffre : rien n'a été fait."; exit 1; fi
+    fi
+    chown "$U:$U" "$RAM/vault.key"; chmod 0600 "$RAM/vault.key"
+    cat <<FIN
+
+Enregistrement d'un identifiant de portail. Réponds aux questions d'Hermes :
+  Label        : le nom du portail (ce que tu veux)
+  Site origin  : l'adresse du site, par exemple https://portail.exemple.com (sans rien après le nom du site)
+  Identifier   : Entrée pour « email », puis ton adresse de connexion
+  Password     : ton mot de passe (rien ne s'affiche)
+  Authenticator: Entrée (ne rien mettre : le second facteur reste chez toi)
+FIN
+    comme_portail hermes vault add --kind login; rc=$?
+    echo; comme_portail hermes vault list 2>&1 | propre | grep -E 'vault_|Vault|never' | head -12
+    if [ -e "$HH/vault/vault.key" ] && [ ! -L "$HH/vault/vault.key" ]; then echo "ATTENTION : une clé est apparue sur le disque. Dis-le à Claude avant d'aller plus loin."; exit 1; fi
+    echo "N'oublie pas l'hôte du portail : sudo hermes-portail domaines ajouter <hôte>"
+    exit $rc ;;
+  oublier)
+    [ $# = 1 ] || usage
+    if [ "$1" = --tout ]; then
+      rm -f "$HH/vault/vault.json.enc" "$HH/vault/vault.key" "$RAM/vault.key" 2>/dev/null
+      coffre_etat && "$COFFRE" retirer "$NOM_CLE" >/dev/null 2>&1
+      echo "Coffre d'Hermes vidé (identifiants et clé). La session gardée par le navigateur aussi :"; rm -rf "$HH/navigateur"; echo "  $HH/navigateur effacé."
+    else
+      [[ "$1" =~ ^vault_[a-f0-9]{6,40}$ ]] || { echo "Handle attendu (vault_…), voir « etat »."; exit 1; }
+      cle >/dev/null || { echo "Clé absente de la mémoire : sudo hermes-portail cle"; exit 1; }
+      comme_portail hermes vault rm "$1" | propre
+    fi ;;
+  domaines)
+    [ -f "$ETC/domaines" ] || { echo "Fichier des hôtes absent : relance install.sh."; exit 1; }
+    case "${1:-liste}" in
+      liste) grep -vE '^\s*(#|$)' "$ETC/domaines" ;;
+      ajouter|retirer)
+        [ $# = 2 ] || usage
+        h=${2,,}; h=${h#https://}; h=${h%%/*}; p=""; [ "${h:0:1}" = . ] && { p=.; h=${h:1}; }
+        [[ "$h" =~ $HOTE ]] || { echo "Hôte refusé : un nom de site attendu (exemple : portail.exemple.com, ou .exemple.com avec ses sous-domaines)."; exit 1; }
+        if [ "$1" = ajouter ]; then grep -qxF "$p$h" "$ETC/domaines" || echo "$p$h" >> "$ETC/domaines"; echo "Permis : $p$h"
+        else grep -vxF "$p$h" "$ETC/domaines" > "$ETC/domaines.nouveau"; chmod 0644 "$ETC/domaines.nouveau"; mv "$ETC/domaines.nouveau" "$ETC/domaines"; echo "Retiré : $p$h"; fi ;;
+      *) usage ;;
+    esac ;;
+  essai)
+    [ $# -ge 1 ] || usage
+    adresse=$1; shift; fichier=""
+    while [ $# -gt 0 ]; do case "$1" in --consigne-fichier) fichier=${2:-}; shift 2 ;; *) usage ;; esac; done
+    [[ "$adresse" =~ ^https?://[A-Za-z0-9._:/?=%\&~+-]+$ ]] || { echo "Adresse attendue (https://…)."; exit 1; }
+    cle; rc=$?; [ $rc = 0 ] || exit $rc
+    install -d -o root -g root -m 0700 "$VAR/essais"
+    consigne=$(mktemp "$H/.consigne.XXXXXX"); sortie="$VAR/essais/$(date +%Y-%m-%d_%H%M%S).txt"
+    if [ -n "$fichier" ]; then cat "$fichier" > "$consigne"
+    else cat > "$consigne" <<FIN
+Essai en lecture seule, selon ta skill « portail ». Adresse : $adresse
+Ouvre cette adresse. Connecte-toi avec l'identifiant du coffre si une page de connexion s'affiche. Dis où tu
+arrives et ce que tu vois, sans donnée personnelle. Ne crée, ne modifie, ne soumets rien.
+Termine par l'étape « Avant de finir » de ta skill (l'attente qui enregistre la session), puis réponds.
+FIN
+    fi
+    chown "$U:$U" "$consigne"; chmod 0600 "$consigne"
+    debut=$(date +%s); lancer_agent "$consigne" "$sortie"; rc=$?
+    rm -f "$consigne"
+    echo "== Essai du $(date '+%d/%m/%Y %H:%M') ($(( $(date +%s) - debut )) s, code $rc)"
+    propre < "$sortie" | grep -v '^session_id:' | tail -40
+    echo "(gardé dans $sortie, lisible par root seul)"
+    exit $rc ;;
+  -h|--help|aide) usage 0 ;;
+  *) usage ;;
+esac

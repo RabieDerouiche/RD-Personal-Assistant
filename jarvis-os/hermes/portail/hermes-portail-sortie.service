@@ -1,0 +1,13 @@
+# JARVIS OS — règles réseau de l'utilisateur hermes-portail (docs/hermes-portail.md). Posé par install.sh.
+[Unit]
+Description=Règles réseau sortantes de l'utilisateur hermes-portail (essai des portails, JARVIS OS)
+After=network-pre.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/sbin/nft -f /etc/hermes-portail/sortie.nft
+ExecStop=/usr/sbin/nft delete table inet hermes_portail_sortie
+
+[Install]
+WantedBy=multi-user.target

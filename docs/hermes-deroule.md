@@ -498,3 +498,11 @@ n'est pas Hermes, qui d'autre, « Nod » compris. Réponse donnée :
   reprise de main depuis le téléphone, mais 5 tâches actives ; OpenClaw : déclencheur Gmail natif, passif de sécurité ;
   Gemini : pas de déclencheur, agent exclu de l'Europe ; n8n classique : bonne colle, pas un assistant ; Poke, Manus,
   Lindy : crédits trop justes ; Perplexity, Zapier Agents : hors budget.
+
+### Essai des portails (24/11/2026, nuit)
+
+Sa demande : « essai portail sur notre Hermes actuel ». Ses choix (QCM) : le portail des notes de frais d'abord
+(mot de passe seul) ; l'identifiant gardé dans le coffre d'Hermes, comme chez Grok Bot (sa correction : chez Grok
+l'identifiant ne se retape pas) ; la clé de ce coffre en mémoire seulement. Tout est dans `docs/hermes-portail.md` :
+un second Hermes à part (`hermes-portail`), relais filtrant, clé en ramfs gardée par jarvis-coffre. Banc 56 sur 56.
+Reste : l'installer sur le serveur, ses trois saisies dans Termius, puis le premier essai réel.
