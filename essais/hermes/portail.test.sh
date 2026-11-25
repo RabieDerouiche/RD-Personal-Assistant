@@ -76,7 +76,7 @@ sed -e 's/^  provider: "claude-subscription-directsdk-experimental"/  provider: 
 cat $T/config.yaml > /etc/hermes-portail/config.yaml
 hp hermes config set model.base_url "http://127.0.0.1:$PM/v1" >/dev/null
 (cd /tmp && nohup python3 -I "$ICI/faux_services.py" $PM 40081 $T/traces > $T/faux.log 2>&1 &)
-(cd /tmp && nohup python3 -I "$ICI/faux_portail.py" --port $PP --journal $T/traces/portail.jsonl --mot-de-passe "$MDP" --totp "$TOTP" > $T/portail.log 2>&1 &)
+(cd /tmp && nohup python3 -I "$ICI/faux_portail.py" --port $PP --journal $T/traces/portail.jsonl --mot-de-passe "$MDP" --totp "$TOTP" --pdf "$KIT/justificatif-essai.pdf" > $T/portail.log 2>&1 &)
 printf 'localhost\npermis.exemple.test\n' >> /etc/hermes-portail/domaines
 (cd /tmp && nohup python3 -I /usr/local/lib/hermes-portail/filtre.py --port $RELAIS --domaines /etc/hermes-portail/domaines --ports 443,$PC --prives > $T/filtre.log 2>&1 &)
 (cd /tmp && nohup python3 -I -m http.server $PC --bind 127.0.0.1 > /dev/null 2>&1 &)
@@ -260,6 +260,20 @@ sys.exit(0 if 'MODE À BLANC' in t and 'MODE BROUILLON' not in t and 'ANNULE' in
 PY"
 verif "essai n'accepte pas --sans-creer" bash -c "! bash /usr/local/sbin/hermes-portail essai 'http://127.0.0.1:$PP/tableau' --sans-creer >/dev/null 2>&1"
 
+echo "== Télécharger une facture depuis le portail"
+mkdir -p $T/recu $T/recu-pas-root; chown $U: $T/recu-pas-root
+cat > $T/consigne-tel.txt <<FIN
+Essai du banc, téléchargement. SUITE: [
+ {"nom": "browser_exec", "args": {"code": "# Téléchargement\nimport os, time\nd = '/home/hermes-portail/telechargements'\nnew_tab('http://127.0.0.1:$PP/tableau')\nwait_for_load()\ncdp('Browser.setDownloadBehavior', behavior='allow', downloadPath=d)\njs(\"document.querySelector('#telecharger').click()\")\nf = []\nfor _ in range(30):\n    f = [x for x in os.listdir(d) if not x.endswith('.crdownload')]\n    if f: break\n    time.sleep(1)\nprint('fichier reçu' if f else 'rien reçu', [os.path.getsize(os.path.join(d, x)) for x in f])", "timeout_s": 120}}
+]
+FIN
+: > $T/traces/portail.jsonl; : > $T/traces/modele.jsonl
+bash /usr/local/sbin/hermes-portail essai "http://127.0.0.1:$PP/tableau" --consigne-fichier $T/consigne-tel.txt --telecharger $T/recu > $T/essai-tel.log 2>&1; rc=$?
+verif "téléchargement : la facture du portail est rapportée à root, identique à l'original" bash -c "[ $rc = 0 ] && grep -q 'fichier reçu' $T/essai-tel.log && cmp -s $T/recu/telecharge.pdf $KIT/justificatif-essai.pdf && [ \"\$(stat -c '%U %a' $T/recu/telecharge.pdf)\" = 'root 600' ] && grep -q '\"evenement\": \"telechargement\"' $T/traces/portail.jsonl"
+verif "téléchargement : la consigne l'annonce, et le dossier d'Hermes est vidé après le passage" bash -c "grep -q 'Téléchargement permis' $T/traces/modele.jsonl && [ ! -e /home/hermes-portail/telechargements ]"
+verif "téléchargement : un dossier de destination qui n'est pas à root est refusé ; brouillon ne l'accepte pas" bash -c "! bash /usr/local/sbin/hermes-portail essai 'http://127.0.0.1:$PP/tableau' --telecharger $T/recu-pas-root >/dev/null 2>&1 && ! bash /usr/local/sbin/hermes-portail brouillon 'http://127.0.0.1:$PP/tableau' --champs-fichier $T/champs.txt --telecharger $T/recu >/dev/null 2>&1"
+verif "sans --telecharger, la consigne n'annonce aucun téléchargement" bash -c "! grep -q 'Téléchargement permis' $T/essai2.log && ! grep -rq 'Téléchargement permis' $T/blanc.log"
+
 echo "== Ce qu'Hermes apprend d'un portail"
 N=/var/lib/hermes-portail/notes/127.0.0.1.txt
 verif "les deux notes utiles du passage sont gardées, à root seul" bash -c "[ \"\$(stat -c '%U %a' $N)\" = 'root 600' ] && [ \"\$(wc -l < $N)\" = 2 ] && grep -q 'Enregistrer sans envoyer' $N && grep -q '/depense/nouvelle' $N"
@@ -353,6 +367,8 @@ verif "code par mail : pendant le passage, le code du mail le plus récent arriv
 verif "code par mail : le code n'est jamais parti vers le modèle, et le fichier est effacé après le passage" bash -c "! grep -q '482913\|111111' $T/traces/modele.jsonl && ! grep -q '482913' $T/essai-code.log && [ ! -e /var/lib/hermes-portail-depot/code.txt ]"
 verif "code par mail : la consigne l'annonce et donne le chemin du fichier" bash -c "grep -q 'Code par mail' $T/traces/modele.jsonl && grep -q '/var/lib/hermes-portail-depot/code.txt' $T/traces/modele.jsonl"
 verif "code par mail : un mail plus ancien que le passage ne compte pas (code 4)" bash -c "cd / && runuser -u nobody -- env -i HOME=/nonexistent PATH=/usr/local/bin:/usr/bin:/bin JARVIS_DATA=$FJ/donnees node /usr/local/lib/hermes-portail/facture.mjs --requete 'subject:code' --code-apres \$(( (\$(date +%s) + 3600) * 1000 )) --serveur $FJ/serveur >/dev/null 2>&1; [ \$? = 4 ]"
+bash /usr/local/sbin/hermes-portail texte $T/recu/telecharge.pdf > $T/texte.log 2>&1; rc=$?
+verif "texte : le texte de la facture rapportée est lu par le code de JARVIS, sous son utilisateur" bash -c "[ $rc = 0 ] && grep -q 'Total TTC : 1,00 EUR' $T/texte.log"
 unset HERMES_BANC_JARVIS_U HERMES_BANC_JARVIS_SRV HERMES_BANC_JARVIS_DATA
 
 echo "== Garde-fous de la commande"

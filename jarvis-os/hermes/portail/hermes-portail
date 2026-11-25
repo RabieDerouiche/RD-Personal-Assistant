@@ -6,7 +6,8 @@
 #   sudo hermes-portail connexion-claude           (Termius : relie son Claude Code à l'abonnement, une fois)
 #   sudo hermes-portail enregistrer                (Termius : identifiant et mot de passe d'un portail, saisis sans affichage)
 #   sudo hermes-portail domaines [ajouter <hôte> | retirer <hôte>]
-#   sudo hermes-portail essai <adresse> [--consigne-fichier <fichier>] [--code-mail "<recherche Gmail>"]   (lecture seule : se connecte, dit ce qu'il voit ; --code-mail : le site envoie son code de connexion par mail)
+#   sudo hermes-portail essai <adresse> [--consigne-fichier <fichier>] [--code-mail "<recherche Gmail>"] [--telecharger <dossier>]   (lecture seule : se connecte, dit ce qu'il voit ; --code-mail : le site envoie son code de connexion par mail ; --telecharger : il peut rapporter UN fichier, une facture en PDF)
+#   sudo hermes-portail texte <fichier.pdf>          (le texte d'un PDF, lu par le code de JARVIS sous son utilisateur ; pour en tirer montants et dates)
 #   sudo hermes-portail brouillon <adresse> --champs-fichier <fichier> [--justificatif <fichier>] [--sans-creer]   (UNE dépense, enregistrée sans l'envoyer ; avec --sans-creer : remplie puis annulée, rien n'est créé)
 #   sudo hermes-portail facture --requete "<recherche Gmail>" --nom "<expression du nom>" --vers <dossier>   (va chercher UNE facture PDF dans ses mails, par l'accès Google de JARVIS ; lecture seule)
 #   sudo hermes-portail notes [ajouter <hôte> "<texte>" | oublier <hôte> [numéro]]   (ce qu'Hermes a appris d'un portail, relu à chaque passage)
@@ -31,6 +32,7 @@ VAR=/var/lib/hermes-portail
 RAM=/run/hermes-portail-cle
 NOTES=$VAR/notes                       # ce qu'Hermes a appris de chaque portail : un fichier par hôte, à root, jamais dans le dépôt
 JARVIS_U=jarvis; JARVIS_SRV=/opt/rd/jarvis-os/server; JARVIS_DONNEES=""   # qui a l'accès à Gmail, et son code
+RECU=/home/hermes-portail/telechargements   # où Hermes dépose le fichier qu'un passage l'autorise à télécharger (vidé avant et après)
 DEPOT=/var/lib/hermes-portail-depot    # le fichier remis à Hermes pour un passage (root, lisible par lui, effacé ensuite)
 COFFRE=/usr/local/sbin/jarvis-coffre
 PRISE=/run/jarvis-coffre/service.sock
@@ -42,7 +44,7 @@ if [ "$SYSTEMD" = 0 ]; then   # banc seulement (pas de systemd) : un faux JARVIS
 fi
 HOTE='^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$'
 
-usage() { sed -n '4,15p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,3\}//'; exit "${1:-1}"; }
+usage() { sed -n '4,16p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,3\}//'; exit "${1:-1}"; }
 [ "$(id -u)" = 0 ] || { echo "À lancer en root : sudo hermes-portail ${1:-etat}"; exit 1; }
 id "$U" >/dev/null 2>&1 && [ -x "$H/.local/bin/hermes" ] || { echo "Hermes « portail » n'est pas installé : sudo bash /opt/rd/jarvis-os/hermes/portail/install.sh"; exit 1; }
 terminal() { [ -t 0 ] || { echo "À lancer dans un vrai terminal (Termius) : cette commande demande une saisie."; exit 1; }; }
@@ -151,7 +153,8 @@ notes_apprises() {  # notes_apprises <hôte> <réponse du passage> : 6 notes au 
   [ $n -gt 0 ] && echo "Notes gardées pour ce portail : $n (sudo hermes-portail notes)"
   return 0
 }
-ligne_code() {  # la ligne de consigne qui annonce un code par mail, si la commande l'a demandé
+ligne_code() {  # les lignes de consigne qui annoncent un code par mail ou un téléchargement, si la commande les a demandés
+  [ -z "${vers:-}" ] || echo "Téléchargement permis : UN fichier, celui que la consigne demande, dans le dossier $RECU (voir ta skill, « Télécharger un fichier »)."
   [ -n "${codemail:-}" ] || return 0
   echo "Code par mail : si le site demande un code de vérification, choisis l'envoi par e-mail, puis suis ta skill (« Code reçu par mail »). Le code arrivera dans le fichier $DEPOT/code.txt."
 }
@@ -311,13 +314,15 @@ FIN
     esac ;;
   essai|brouillon)
     [ $# -ge 1 ] || usage
-    adresse=$1; shift; fichier=""; champs=""; justificatif=""; joint=""; blanc=0; codemail=""; guet=""
+    adresse=$1; shift; fichier=""; champs=""; justificatif=""; joint=""; blanc=0; codemail=""; guet=""; vers=""
     while [ $# -gt 0 ]; do case "$1" in
       --consigne-fichier) [ "$commande" = essai ] || usage; fichier=${2:-}; shift 2 ;;
       --champs-fichier) [ "$commande" = brouillon ] || usage; champs=${2:-}; shift 2 ;;
       --justificatif) [ "$commande" = brouillon ] || usage; justificatif=${2:-}; shift 2 ;;
       --sans-creer) [ "$commande" = brouillon ] || usage; blanc=1; shift ;;
       --code-mail) codemail=${2:-}; [ -n "$codemail" ] && [ ${#codemail} -le 300 ] || usage; shift 2 ;;
+      --telecharger) [ "$commande" = essai ] || usage; vers=${2:-}; shift 2
+        [ -d "$vers" ] && [ "$(stat -c %U "$vers")" = root ] || { echo "Dossier de destination attendu, à root (exemple : /root/facture)."; exit 1; } ;;
       *) usage ;; esac; done
     [[ "$adresse" =~ ^https?://[A-Za-z0-9._:/?=%\&~+-]+$ ]] || { echo "Adresse attendue (https://…)."; exit 1; }
     hote=$(hote_de "$adresse") || { echo "Adresse attendue (https://…)."; exit 1; }
@@ -374,6 +379,7 @@ FIN
       install -d -o root -g "$U" -m 0750 "$DEPOT"; rm -f "$DEPOT/code.txt" "$DEPOT/.code"
       guetter_code "$codemail" & guet=$!
     fi
+    if [ -n "$vers" ]; then rm -rf "$RECU"; install -d -o "$U" -g "$U" -m 0700 "$RECU"; else rm -rf "$RECU"; fi
     debut=$(date +%s); lancer_agent "$consigne" "$sortie"; rc=$?
     [ -n "$guet" ] && { kill "$guet" 2>/dev/null; wait "$guet" 2>/dev/null; rm -f "$DEPOT/code.txt" "$DEPOT/.code"; }
     rm -f "$consigne"; [ -n "$joint" ] && rm -f "$joint"; chmod 0600 "$sortie" 2>/dev/null
@@ -383,7 +389,23 @@ FIN
     propre < "$sortie" | grep -v '^session_id:' | tail -40
     echo "(gardé dans $sortie, lisible par root seul)"
     notes_apprises "$hote" "$sortie"
+    if [ -n "$vers" ]; then   # le fichier rapporté : un seul, un vrai PDF de 10 Mo au plus, jamais suivi par un lien ; rendu à root
+      n=0
+      for f in "$RECU"/*; do
+        [ -f "$f" ] && [ ! -L "$f" ] || continue
+        if [ $n = 0 ] && [ "$(wc -c < "$f")" -le 10000000 ] && [ "$(head -c 5 "$f")" = "%PDF-" ]; then
+          install -o root -g root -m 0600 "$f" "$vers/telecharge.pdf"; n=1
+          echo "Fichier rapporté : $(wc -c < "$vers/telecharge.pdf") octets, gardé dans $vers/telecharge.pdf (à root seul)."
+        else echo "Fichier écarté (un seul PDF de 10 Mo au plus est accepté) : $(basename "$f" | tr -cd 'A-Za-z0-9._-' | cut -c1-60)"; fi
+      done
+      [ $n = 1 ] || echo "Aucun fichier rapporté."
+      rm -rf "$RECU"
+    fi
     exit $rc ;;
+  texte)
+    [ $# = 1 ] && [ -f "$1" ] && [ "$(wc -c < "$1")" -le 10000000 ] || { echo "Fichier PDF attendu (10 Mo au plus)."; exit 1; }
+    id "$JARVIS_U" >/dev/null 2>&1 && [ -f "$JARVIS_SRV/pdf.mjs" ] || { echo "JARVIS n'est pas installé ici (utilisateur $JARVIS_U, $JARVIS_SRV)."; exit 1; }
+    par_jarvis --texte-de-l-entree < "$1"; exit $? ;;
   facture)
     # La facture d'une note de frais arrive par mail : Hermes portail n'a pas de mails. C'est JARVIS qui a l'accès à
     # Gmail ; son code le lit ici, sous l'utilisateur jarvis, en lecture seule, et rend le PDF et son texte à root.
