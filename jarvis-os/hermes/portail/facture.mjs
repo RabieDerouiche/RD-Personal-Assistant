@@ -8,6 +8,10 @@
 
      node facture.mjs --requete '<recherche Gmail>' --nom '<expression sur le nom du fichier>' [--serveur <dossier du serveur JARVIS>]
 
+     node facture.mjs --requete '<recherche Gmail>' --code-apres <instant en ms> [--motif '<expression du code>']
+       → le code à usage unique du mail le plus récent reçu après cet instant (par défaut : 6 chiffres), seul sur
+         la sortie ; code 4 s'il n'est pas encore arrivé. Pour un site qui envoie son code de connexion par mail.
+
    Sortie : une ligne JSON {nom, taille, dateMail, expediteur, pdf (base64), texte}. Le PDF le plus récent qui
    correspond. Code 3 : Google pas relié ; 4 : aucun PDF trouvé ; 5 : fichier trop gros ou qui n'est pas un PDF. */
 import fs from 'node:fs';
@@ -28,6 +32,26 @@ const {texteDePdf} = await import(pathToFileURL(path.join(serveur, 'pdf.mjs')).h
 /* une copie de l'accès, et un « enregistrer » qui ne fait rien : ce programme ne réécrit jamais l'état de JARVIS */
 const G = createGoogle({S: {google: structuredClone(etat.google || {})}, save: () => {}});
 if (!(etat.google && etat.google.refresh)) fin(3, "Google n'est pas relié à JARVIS (Réglages, Connecter Google).");
+
+const codeApres = +arg('code-apres', '0');
+if (codeApres) {
+  let motif; try { motif = new RegExp(arg('motif', '(?<![0-9])([0-9]{6})(?![0-9])')); } catch { fin(2, 'Expression du code invalide.'); }
+  try {
+    const r = await G.tool('Gmail', 'search_threads', {query: requete, pageSize: 5, idsOnly: true});
+    let meilleur = null;
+    for (const t of (r.threads || [])) {
+      const fil = await G.tool('Gmail', 'get_thread', {threadId: t.id});
+      for (const m of (fil.messages || [])) {
+        const quand = +m.internalDate || Date.parse(m.date) || 0;
+        if (quand <= codeApres || (meilleur && quand <= meilleur.quand)) continue;
+        const x = motif.exec(String(m.subject || '') + '\n' + String(m.plaintextBody || ''));
+        if (x) meilleur = {quand, code: x[1] || x[0]};
+      }
+    }
+    if (!meilleur) fin(4, 'Pas encore de code dans les mails.');
+    process.stdout.write(meilleur.code + '\n'); process.exit(0);
+  } catch (e) { fin(e && e.code === 'server_not_connected' ? 3 : 1, 'Gmail : ' + ((e && e.message) || String(e))); }
+}
 
 try {
   const r = await G.tool('Gmail', 'search_threads', {query: requete, pageSize: 10, idsOnly: true});

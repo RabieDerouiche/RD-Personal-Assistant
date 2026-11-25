@@ -10,7 +10,7 @@ requête utile) : le banc y lit si Hermes s'est connecté, ce qu'il a ouvert, et
 
 Identifiants du banc : banc@exemple.test / un mot de passe passé par --mot-de-passe (inventé par le banc).
 """
-import argparse, html, json, secrets, ssl, time
+import argparse, base64, hashlib, hmac, html, json, secrets, ssl, struct, time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs
 
@@ -20,11 +20,23 @@ A.add_argument('--journal', required=True)
 A.add_argument('--identifiant', default='banc@exemple.test')
 A.add_argument('--mot-de-passe', required=True)
 A.add_argument('--duree-session', type=int, default=3600)
+A.add_argument('--totp', default='')                     # clé (base32) du second facteur de la connexion « double »
+A.add_argument('--identifiant2', default='banc2@exemple.test')
 A.add_argument('--cert'); A.add_argument('--cle')
 ARGS = A.parse_args()
 SESSIONS = {}          # jeton -> heure de fin
 DEPENSES = [('FRAIS-0001', 'Abonnement logiciel (inventé)', '20,00 €', 'Validée'),
             ('FRAIS-0002', 'Téléphone (inventé)', '15,99 €', 'En attente')]
+
+
+ETAPES = {}            # jeton d'étape (mot de passe accepté, code attendu) -> heure de fin
+
+
+def totp(cle, instant):
+    k = base64.b32decode(cle.upper() + '=' * (-len(cle) % 8))
+    h = hmac.new(k, struct.pack('>Q', int(instant // 30)), hashlib.sha1).digest()
+    o = h[-1] & 15
+    return '%06d' % ((struct.unpack('>I', h[o:o + 4])[0] & 0x7fffffff) % 1000000)
 
 
 def note(**k):
@@ -79,6 +91,14 @@ class P(BaseHTTPRequestHandler):
             return self.rendre(200, page('Connexion — Notes de frais (banc)', CONNEXION % ''))
         if chemin == '/sante':
             return self.rendre(200, b'ok')
+        if chemin == '/double':      # la même maison, mais par une porte à deux étapes
+            if s:
+                return self.vers('/tableau')
+            return self.rendre(200, page('Connexion en deux étapes (banc)', CONNEXION.replace('/connexion', '/double/connexion') % ''))
+        if chemin == '/double/code':
+            return self.rendre(200, page('Code de vérification (banc)',
+                '<form method="post" action="/double/code"><label>Code à 6 chiffres <input name="otp" id="otp" autocomplete="one-time-code" inputmode="numeric" maxlength="6"></label> '
+                '<button type="submit" id="verifier">Vérifier</button></form>'))
         if not s:
             note(evenement='sans-session', chemin=chemin)
             return self.vers('/connexion')
@@ -118,6 +138,23 @@ class P(BaseHTTPRequestHandler):
                 return self.rendre(401, page('Connexion — Notes de frais (banc)', CONNEXION % '<p id="erreur">Identifiants refusés.</p>'))
             jeton = secrets.token_urlsafe(24)
             SESSIONS[jeton] = time.time() + ARGS.duree_session
+            return self.vers('/tableau', [('Set-Cookie', 'session=%s; Path=/; HttpOnly; SameSite=Lax; Max-Age=%d' % (jeton, ARGS.duree_session))])
+        if chemin == '/double/connexion':
+            bon = (secrets.compare_digest(champs.get('identifiant', ''), ARGS.identifiant2)
+                   and secrets.compare_digest(champs.get('mot_de_passe', ''), ARGS.mot_de_passe))
+            note(evenement='connexion-double', reussie=bon)
+            if not bon:
+                return self.rendre(401, page('Connexion en deux étapes (banc)', '<p id="erreur">Identifiants refusés.</p>'))
+            e = secrets.token_urlsafe(16); ETAPES[e] = time.time() + 300
+            return self.vers('/double/code', [('Set-Cookie', 'etape=%s; Path=/; HttpOnly; SameSite=Lax' % e)])
+        if chemin == '/double/code':
+            e = next((b.strip().partition('=')[2] for b in (self.headers.get('Cookie') or '').split(';') if b.strip().startswith('etape=')), '')
+            recu = champs.get('otp', '')
+            bon = bool(ARGS.totp) and ETAPES.get(e, 0) > time.time() and any(secrets.compare_digest(recu, totp(ARGS.totp, time.time() + d)) for d in (-30, 0, 30))
+            note(evenement='code', bon=bon, longueur=len(recu))
+            if not bon:
+                return self.rendre(401, page('Code de vérification (banc)', '<p id="erreur">Code refusé.</p>'))
+            ETAPES.pop(e, None); jeton = secrets.token_urlsafe(24); SESSIONS[jeton] = time.time() + ARGS.duree_session
             return self.vers('/tableau', [('Set-Cookie', 'session=%s; Path=/; HttpOnly; SameSite=Lax; Max-Age=%d' % (jeton, ARGS.duree_session))])
         if chemin == '/depense/enregistrer':
             if not self.session():

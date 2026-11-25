@@ -110,7 +110,7 @@ le serveur). Faux portail `essais/hermes/faux_portail.py`, faux terminal `essais
 
 ## Ce que le banc prouve, et ce qu'il ne prouve pas
 
-Prouvé (91 vérifications, 25/11/2026) : installation ; outils réduits et politique figée ; clé seulement en ramfs,
+Prouvé (100 vérifications, 25/11/2026) : installation ; outils réduits et politique figée ; clé seulement en ramfs,
 nulle part en clair sur le disque, gardée par jarvis-coffre ; enregistrement dans un faux terminal sans que le mot de
 passe s'affiche ; connexion au faux portail par le coffre, tableau lu, formulaire ouvert, rien de soumis ; mot de
 passe et clé jamais envoyés au modèle ; session gardée au second passage ; coffre verrouillé : refus propre ;
@@ -209,6 +209,40 @@ que Chronos saisit vraiment (nom du produit, jour de la date).
   montant ou une date, il dit seulement « égal » ou « différent » de la consigne.
 Qui lit la facture pour écrire le fichier des champs : pour l'essai, la session du serveur, à partir de
 `facture.txt` ; pour une routine, à construire (règles par sorte de facture, côté JARVIS).
+
+## Tout Chronos : le périmètre et l'ordre (son rappel du 25/11/2026 au soir)
+
+Ce qu'il a rappelé : trois notes de frais (l'abonnement d'IA ; la box, dont la facture se télécharge sur l'espace
+client du fournisseur, qui envoie un code par mail à la connexion ; le télétravail, déclaré le 1er pour le mois
+précédent avec les jours télétravaillés et des justificatifs) et deux CRA (l'hebdomadaire du client ; le mensuel
+de la société de portage, dont l'intranet demande, après le mot de passe, le code d'une application
+d'authentification : il a la clé de configuration). Sa consigne : s'organiser au mieux, peu d'allers-retours.
+
+**Les deux seconds facteurs sont couverts, au banc :**
+- **Code d'application (TOTP)** : le coffre d'Hermes le fait de lui-même. `hermes vault add` (donc
+  `hermes-portail enregistrer`) demande une « Authenticator key », saisie sans affichage dans Termius ; l'identifiant
+  porte alors `two_factor: automatic`, et `browser_vault` avec `action: enter_code` génère le code et le saisit sans
+  que le modèle le voie. La clé est chiffrée dans le coffre d'Hermes, dont la clé ne vit qu'en mémoire. Jamais dans
+  une conversation (règle de sécurité 4) : il la tape lui-même.
+- **Code reçu par mail** : `essai` ou `brouillon` avec `--code-mail "<recherche Gmail>"`. Pendant le passage, root
+  guette ce mail par l'accès Google de JARVIS (`facture.mjs --code-apres`, dix minutes au plus, seuls les mails
+  arrivés après le début du passage) et pose le code dans le dépôt ; la skill dit à Hermes de le lire et de le
+  saisir dans le même appel, sans l'afficher. Fichier effacé à la fin. Hermes ne va jamais sur une messagerie.
+
+**Ordre retenu** (du plus sûr au plus lourd, chaque étape en lecture seule ou à blanc avant toute écriture) :
+1. Abonnement d'IA : vraie facture à blanc, comparée à la dépense de Chronos (demande déjà chez la session du serveur).
+2. Les trois autres portails : il enregistre lui-même leurs identifiants (une séance Termius), puis un passage de
+   connexion en lecture seule sur chacun, avec une marge d'hôtes annexes ; on sait alors ce qui est faisable.
+3. La box : télécharger la facture dans l'espace client (code par mail), puis la dépense à blanc.
+4. Les jours du mois : la validation du 24 (agenda « Présence » et jours fériés, par les outils de JARVIS, son oui),
+   dont dépendent le CRA mensuel et le télétravail. Ce n'est pas un portail : c'est pour le Hermes de Telegram.
+5. CRA hebdomadaire puis CRA mensuel, à blanc (lecture de l'état, ce qui serait saisi), puis une vraie saisie sur
+   son oui. Attention : sur l'intranet, chaque clic dans le CRA s'enregistre aussitôt.
+6. Télétravail : le plus lourd (calcul, modèle de feuille, justificatifs dont une facture à prendre sur un autre
+   espace client). Le travail déjà fait est sur l'ordinateur des bots (`/workspace/ndf/teletravail/`), illisible
+   d'ici : demander à Chronos, par le Canal, de le copier dans Drive.
+Règles de Chronos reprises telles quelles (il les a déjà tranchées) : ce que chaque routine crée ou soumet seule,
+et quand elle attend son oui. Pendant le double, Hermes ne crée rien (à blanc) : sinon doublon.
 
 ## Ce qu'Hermes apprend d'un portail (25/11/2026, sa demande : « qu'il développe ses skills »)
 
