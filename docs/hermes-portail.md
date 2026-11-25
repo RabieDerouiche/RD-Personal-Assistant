@@ -107,7 +107,7 @@ le serveur). Faux portail `essais/hermes/faux_portail.py`, faux terminal `essais
 
 ## Ce que le banc prouve, et ce qu'il ne prouve pas
 
-Prouvé (55 vérifications, 24/11/2026) : installation ; outils réduits et politique figée ; clé seulement en ramfs,
+Prouvé (56 vérifications, 24/11/2026) : installation ; outils réduits et politique figée ; clé seulement en ramfs,
 nulle part en clair sur le disque, gardée par jarvis-coffre ; enregistrement dans un faux terminal sans que le mot de
 passe s'affiche ; connexion au faux portail par le coffre, tableau lu, formulaire ouvert, rien de soumis ; mot de
 passe et clé jamais envoyés au modèle ; session gardée au second passage ; coffre verrouillé : refus propre ;
@@ -128,4 +128,8 @@ Pas prouvé, à voir sur le vrai serveur :
 
 ## État
 
-- 24/11/2026 : kit écrit, banc 55 puis 56 sur 56 depuis zéro (le plugin de l'abonnement est imposé à la version du Hermes principal : le catalogue avait avancé le jour même, `docs/hermes.md`). Rien sur le serveur encore.
+- 24/11/2026 (nuit) : kit écrit. Banc 56 sur 56, avec le Hermes principal installé sur la même machine (comme sur le
+  serveur). Trois défauts trouvés par le banc et corrigés avant le serveur : le plugin de l'abonnement suivait le
+  catalogue (imposé par `--ref`, `docs/hermes.md`) ; avec `~/.hermes`, le Hermes portail cherchait la passerelle du
+  Hermes principal (dossier à lui) ; la passerelle passagère tuée en fin de passage bloquait le suivant (arrêt propre).
+  Rien sur le serveur encore.

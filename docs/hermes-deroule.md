@@ -504,5 +504,5 @@ n'est pas Hermes, qui d'autre, « Nod » compris. Réponse donnée :
 Sa demande : « essai portail sur notre Hermes actuel ». Ses choix (QCM) : le portail des notes de frais d'abord
 (mot de passe seul) ; l'identifiant gardé dans le coffre d'Hermes, comme chez Grok Bot (sa correction : chez Grok
 l'identifiant ne se retape pas) ; la clé de ce coffre en mémoire seulement. Tout est dans `docs/hermes-portail.md` :
-un second Hermes à part (`hermes-portail`), relais filtrant, clé en ramfs gardée par jarvis-coffre. Banc 55 sur 55.
+un second Hermes à part (`hermes-portail`), relais filtrant, clé en ramfs gardée par jarvis-coffre. Banc 56 sur 56.
 Reste : l'installer sur le serveur, ses trois saisies dans Termius, puis le premier essai réel.
