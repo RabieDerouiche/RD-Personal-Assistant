@@ -140,3 +140,12 @@ Pas prouvé, à voir sur le vrai serveur :
   préférer l'IPv4 (`precedence ::ffff:0:0/96 100` dans `/etc/gai.conf`, copie de l'ancien fichier dans `/root`).
   Corrigé dans le kit pour ne pas en dépendre : le relais essaie l'IPv4 d'abord, puis chaque adresse (6 s chacune) ;
   l'installeur refait une installation coupée en route (bon commit mais commande absente). Banc 56 sur 56.
+- 25/11/2026, 08h12 (heure de Paris) : **Hermes portail installé sur le serveur** (code 0, 3,7 Go). L'installeur embarque
+  son propre Python, qui ignore `/etc/gai.conf` : il a fallu en plus retirer la route IPv6 par défaut (son accord dans
+  la session du serveur ; ligne gardée dans `/root/route-ipv6-default.bak-20261125` ; **elle revient au redémarrage**,
+  correctif durable à lui proposer : OVH, ou IPv6 coupé dans la configuration réseau). Contrôles : jarvis,
+  hermes-gateway, jarvis-coffre, hermes-portail-filtre et hermes-portail-sortie actifs ; table nft en place (elle a
+  déjà rejeté des paquets de cet utilisateur) ; Hermes de Telegram inchangé ; mémoire « Confortable » (2,6 Go
+  disponibles). Défaut vu : `hermes-portail etat` rendait le code 2 sans aucun essai (corrigé, banc).
+  Reste, de son côté, dans Termius : `sudo jarvis-coffre creer`, `sudo hermes-portail connexion-claude`,
+  `sudo hermes-portail enregistrer`, puis l'hôte du portail et le premier essai.
