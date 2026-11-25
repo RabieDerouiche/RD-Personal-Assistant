@@ -26,13 +26,14 @@ import {createRoutines, lirePhrase, quandDit} from './routines.mjs';
 import {createFlux, SECOURS} from './flux.mjs';
 import {createActivite, outilNom} from './activite.mjs';
 import {createRadar} from './radar.mjs';
+import {createJours} from './jours.mjs';
 import {pique, PERSO_ORAL} from './humour.mjs';   /* 21/11/2026 : sa personnalité à l'oral (« sarcastique assumé ») */
 import {createAudio, typeSon, silence} from './audio.mjs';   /* 0.64.0 : le message vocal d'un proche, mis au format de l'écoute */
 import {createCoffreLien} from './coffre-lien.mjs';   /* 0.74.0 : le coffre en mémoire, ouvert depuis l'app */
 import {createVerrou} from './verrou.mjs';   /* 0.75.0 : le verrou de l'app par passkey */
 const ACT = createActivite();   /* 0.33.0 : ce que fait Claude à l'instant */
 
-const VERSION = '0.82.0';
+const VERSION = '0.83.0';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PORT = +(process.env.PORT || 8787);
 const HOST = process.env.HOST || '127.0.0.1';
@@ -1546,6 +1547,16 @@ const RADAR = createRadar({file: path.join(DATA, 'radar.json'), now, log: (t) =>
     return runClaude({kind: 'radar', titre: 'Radar : lecture de factures', prompt, system, model: MODELS.rapide, cwd: box, timeoutMs: 180000,
       tools: {allow: [], deny: ['Bash', 'Read', 'Edit', 'Write', 'Glob', 'Grep', 'NotebookEdit', 'WebFetch', 'WebSearch', 'Task']}}); },
   push: (msg) => (S.push && S.push.subs.length ? PUSH.send(msg, {urgency: 'high'}) : Promise.resolve([]))});
+/* 0.83.0 : les jours du mois (jours.mjs ; « Hermes remplace Chronos », étape 2) : le bilan tiré de l'agenda « Présence » et des fériés, sans
+   IA, envoyé le 24 à midi et relu le dernier jour ; son oui dans JARVIS. Gardé à part, dans jours.json ; Claude ne lit qu'une correction
+   que les règles n'ont pas comprise, sans aucun outil. */
+const JOURS = createJours({file: path.join(DATA, 'jours.json'), now, log: (t) => console.log(t),
+  agenda: {lie: () => GG.status('').linked, calendriers: async () => ((await GG.tool('Google Calendar', 'list_calendars', {})) || {}).calendars || [],
+    evenements: async (calendarId, debut, fin) => ((await GG.tool('Google Calendar', 'list_events', {calendarId, startTime: debut + 'T00:00:00', endTime: fin + 'T00:00:00', pageSize: 250})) || {}).events || []},
+  claude: (prompt, system) => { const box = path.join(DATA, 'jours'); fs.mkdirSync(box, {recursive: true, mode: 0o700});
+    return runClaude({kind: 'jours', titre: 'Jours du mois : lecture d’une correction', prompt, system, model: MODELS.rapide, cwd: box, timeoutMs: 90000,
+      tools: {allow: [], deny: ['Bash', 'Read', 'Edit', 'Write', 'Glob', 'Grep', 'NotebookEdit', 'WebFetch', 'WebSearch', 'Task']}}); },
+  push: (msg) => (S.push && S.push.subs.length ? PUSH.send(msg, {urgency: 'high'}) : Promise.resolve([]))});
 const COMP = createComparatifs({S, save, DATA, runClaude, onIdee: ideeFinie, model: MODELS.equilibre, ideesModel: process.env.JARVIS_IDEES_MODELE || MODELS.profond, visionModel: MODELS.rapide,   /* 0.29.0 : Opus pour les idées (bien meilleur à chercher), JARVIS_IDEES_MODELE pour changer */
   steamBase: process.env.JARVIS_STEAM_URL || undefined, settings: guardSettings('chat'), now, log: (t) => { S.compErr = {at: now(), t: String(t).slice(0, 300)}; }});
 function installEcoute() {
@@ -2045,6 +2056,7 @@ const server = http.createServer(async (req, res) => {
       }
       if (!authed(req)) return appareil(req) ? json(res, 423, {error: 'JARVIS est verrouillé.', verrou: true}) : json(res, 401, {error: 'Appareil non relié.'});
       if (p.startsWith('/api/radar')) { const r = await RADAR.traiter(req.method, p, () => readBody(req)); if (r) return json(res, r.status, r.body); }   /* Radar (21/11/2026) */
+      if (p === '/api/jours' || p.startsWith('/api/jours/')) { const r = await JOURS.traiter(req.method, p, () => readBody(req), url.searchParams); if (r) return json(res, r.status, r.body); }   /* 0.83.0 : les jours du mois */
       if (p === '/api/google') return json(res, 200, GG.status(googleRedirect(req)));
       if (p === '/api/google/config' && req.method === 'POST') { const r = GG.configure(await readBody(req)); return json(res, r.ok ? 200 : 400, {...r, google: GG.status(googleRedirect(req))}); }
       if (p === '/api/google/link' && req.method === 'POST') { const r = GG.link(googleRedirect(req)); return json(res, r.ok ? 200 : 400, r); }
@@ -2420,6 +2432,7 @@ server.listen(PORT, HOST, () => {
   TOUR.warm();   /* 0.36.0 : Smart Turn aussi */
   ROUT.demarrer(+process.env.JARVIS_ROUTINES_MS || 30000);   /* 0.41.0 : l'horloge des routines */
   RADAR.demarrer(+process.env.JARVIS_RADAR_TICK_MS || 60000);
+  JOURS.demarrer(+process.env.JARVIS_JOURS_TICK_MS || 60000);   /* 0.83.0 : le bilan des jours, le 24 et le dernier jour à midi */
   { const t = setInterval(() => { budgetGoogle().catch(() => {}); }, +process.env.JARVIS_VOIX_BUDGET_MS || 900000); if (t.unref) t.unref(); setTimeout(() => { budgetGoogle().catch(() => {}); }, 60000).unref(); }   /* 0.48.0 : les alertes de budget de Google Cloud */   /* Radar : lecture du matin (6 h 50), notification de la veille (19 h) */
   setTimeout(() => { profilLire().catch(() => {}); }, 5000);   /* 0.37.0 : le Profil, lu une première fois */
   if (!S.tokens.length && !fs.existsSync(PAIR)) console.log('Aucun appareil relié. Code d\'appairage : ' + newPairing() + ' (30 minutes)');

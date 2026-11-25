@@ -10609,6 +10609,121 @@ void main(){
     draw(/[?&#]google=ok/.test(location.href) ? msg('Google est relié.') : null);
   };
 
+  /* ================= JARVIS OS 0.83.0 : les jours du mois (« Hermes remplace Chronos », étape 2 ; ses choix, QCM du 25/11/2026) =================
+     Le bilan du mois, fait par le serveur sans IA (agenda « Présence » et fériés, règles de Chronos), arrive le 24 à midi par une notification
+     (#voir-jours-AAAA-MM) et se range dans « Pour moi », filtre Décider : « Confirmer » (seulement quand tout est connu), « Corriger » (une phrase,
+     relue et remontrée avant tout oui). Avant le 24 il ne se montre que par son lien ; validé, il disparaît, et revient si un jour change. */
+  const JRS = {data: null, mois: '', loading: null, at: 0, force: false, msg: '', ouvert: false, busy: false};
+  const joursAPI = () => (SRV_OS && window.JarvisServeur && window.JarvisServeur.jours ? window.JarvisServeur.jours : null);
+  const joursOn = () => (SRV_OS ? !!joursAPI() : !!window.__JOURS);
+  const JRS_COURT = {T: 'Télétravail', S: 'Sur site', C: 'Congé', F: 'Férié', '?': 'Non noté', X: 'Conflit'};   /* courts : une case fait la largeur de « Télétravail » */
+  function joursLoad(force) {
+    if (!joursOn() || JRS.loading || (!force && Date.now() - JRS.at < 30000)) return JRS.loading;
+    const api = joursAPI();
+    JRS.loading = (api ? api.lire(JRS.mois) : Promise.resolve(window.__JOURS ? JSON.parse(JSON.stringify(window.__JOURS)) : null))
+      .then((d) => { if (d) JRS.data = d; }).catch(() => {}).finally(() => { JRS.at = Date.now(); JRS.loading = null; if (TAB === 'demandes') renderView(true); try { header(); } catch (e) { /* rien */ } });
+    return JRS.loading;
+  }
+  /* la maquette (sans serveur) : la même forme, changée sur place */
+  function joursMaquette(action, txt) {
+    const d = JRS.data, b = d && d.bilan; if (!b) return {ok: false, error: 'Maquette sans bilan.'};
+    if (action === 'confirmer') { if (!b.complet) return {ok: false, error: 'Il reste des jours à confirmer ou à résoudre : corrige-les d’abord.'}; return Object.assign(d, {ok: true, etat: 'valide', demande: false, valide: {at: Date.now(), texte: d.texte}}); }
+    if (action === 'corriger') {
+      const t = String(txt || '').toLowerCase(), code = /t[ée]l[ée]travail|maison/.test(t) ? 'T' : /site|bureau/.test(t) ? 'S' : /cong/.test(t) ? 'C' : '';
+      if (!code) return {ok: false, error: 'Je n’ai pas compris : écris par exemple « jeudi 26 : télétravail ».'};
+      const vises = b.jours.filter((j) => j.M === '?' || j.A === '?'); vises.forEach((j) => { j.M = j.A = code; j.corrige = true; });
+      b.aConfirmer = []; b.complet = !b.aResoudre.length; const k = code === 'T' ? 'teletravail' : code === 'S' ? 'surSite' : 'conges'; b.totaux[k] += vises.length; if (code !== 'C') b.totaux.travailles += vises.length;
+      b.empreinte = b.empreinte + '-c'; d.texte = d.texte.replace(/ ; à confirmer : [^;.]*/, '');
+      return Object.assign(d, {ok: true, etat: 'a_valider', corrections: (d.corrections || 0) + vises.length, compris: vises.map((j) => j.jour).join(', ') + ' : ' + ({T: 'télétravail', S: 'sur site', C: 'congé'})[code], par: 'règles', refus: []});
+    }
+    return d;
+  }
+  function joursAgir(action, txt) {
+    const api = joursAPI(), d = JRS.data; if (!d || JRS.busy) return;
+    JRS.busy = true; renderView(true);
+    const p = api ? (action === 'confirmer' ? api.confirmer(d.mois, d.bilan && d.bilan.empreinte) : action === 'corriger' ? api.corriger(d.mois, txt) : action === 'effacer' ? api.effacer(d.mois) : api.relire(d.mois)) : Promise.resolve(joursMaquette(action, txt));
+    p.then((r) => {
+      if (r && r.ok) {
+        const garde = {...r}; delete garde.ok; JRS.data = Object.assign({}, JRS.data, garde);
+        if (action === 'confirmer') { JRS.msg = 'Merci : tes jours de ' + d.libelle + ' sont validés. Ils serviront au CRA et à la note de télétravail.'; toast('Jours validés', d.libelle); }
+        else if (action === 'corriger') { JRS.ouvert = false; JRS.msg = 'Compris : ' + (r.compris || '') + (r.par === 'Claude' ? ' (lu par Claude)' : '') + '.' + ((r.refus || []).length ? ' Écarté : ' + r.refus.join(' ; ') + '.' : '') + ' Vérifie le bilan, puis confirme.'; }
+        else if (action === 'effacer') JRS.msg = 'Tes corrections sont effacées : le bilan revient à ton agenda.';
+        else JRS.msg = 'Agenda relu.';
+      } else JRS.msg = (r && r.error) || 'Pas enregistré sur ton serveur : réessaie.';
+    }).catch(() => { JRS.msg = 'Pas enregistré sur ton serveur : réessaie.'; }).finally(() => { JRS.busy = false; renderView(true); try { header(); } catch (e) { /* rien */ } });
+  }
+  function joursSemaines(b) {
+    const out = []; let cur = null;
+    for (const j of b.jours) {
+      if (!j.ouvre) { cur = null; continue; }
+      if (!cur) { cur = h('div', {class: 'jrs-sem'}); out.push(cur); }
+      const demi = j.M !== j.A, cls = 'jrs-j jrs-' + (j.M === '?' || j.A === '?' ? 'q' : j.M === 'X' || j.A === 'X' ? 'x' : j.M.toLowerCase());
+      cur.append(h('div', {class: cls + (j.corrige ? ' is-corr' : ''), 'data-date': j.date, title: j.ferie || ''}, h('b', {text: j.jour.replace(/^(\w{3})\w*/, '$1')}),
+        h('span', {text: demi ? (JRS_COURT[j.M] || j.M) + ' / ' + (JRS_COURT[j.A] || j.A) : (JRS_COURT[j.M] || j.M)})));
+    }
+    return out;
+  }
+  function joursCard() {
+    const d = JRS.data; if (!d || !d.bilan || !(d.demande || JRS.force)) return null;
+    const b = d.bilan, t = b.totaux, kids = [];
+    const nb = (x) => String(x).replace('.', ',');
+    kids.push(h('p', {class: 'jrs-tot'}, h('b', {text: nb(t.travailles)}), ' jours travaillés · ', nb(t.teletravail) + ' en télétravail · ' + nb(t.surSite) + ' sur site · ' + nb(t.conges) + ' de congé · ' + t.feries + ' férié' + (t.feries > 1 ? 's' : '')));
+    kids.push(h('div', {class: 'jrs-grille'}, joursSemaines(b)));
+    if (b.aConfirmer.length) kids.push(h('p', {class: 'jrs-alerte'}, h('b', {text: 'À confirmer : '}), b.aConfirmer.map((x) => (b.jours.find((j) => j.date === x) || {}).jour || x).join(', ') + ' (rien dans ton agenda « Présence »).'));
+    b.aResoudre.forEach((x) => kids.push(h('p', {class: 'jrs-alerte'}, h('b', {text: ((b.jours.find((j) => j.date === x.date) || {}).jour || x.date) + ' : '}), x.raison + '.')));
+    (b.remarques || []).forEach((x) => kids.push(h('p', {class: 'jrs-rq', text: x + '.'})));
+    if (d.erreur) kids.push(h('p', {class: 'jrs-alerte', text: d.erreur}));
+    if (d.etat === 'valide' && d.valide) kids.push(h('p', {class: 'jrs-ok', text: 'Validé le ' + new Date(d.valide.at).toLocaleDateString('fr-FR', {weekday: 'long', day: 'numeric', month: 'long'}) + '.'}));
+    else if (d.etat === 'a_revoir') kids.push(h('p', {class: 'jrs-alerte', text: 'Un jour a changé dans ton agenda depuis ton oui : relis et confirme à nouveau.'}));
+    if (JRS.msg) kids.push(h('p', {class: 'jrs-msg', role: 'status', text: JRS.msg}));
+    const acts = h('div', {class: 'row jrs-acts'});
+    if (d.etat !== 'valide') { const c = btn(b.complet ? 'Confirmer' : 'Confirmer (tout n’est pas connu)', () => joursAgir('confirmer'), 'sm main jrs-confirmer'); if (!b.complet || JRS.busy) c.disabled = true; acts.append(c); }
+    acts.append(btn(JRS.ouvert ? 'Fermer' : d.etat === 'valide' ? 'Corriger quand même' : 'Corriger', () => { JRS.ouvert = !JRS.ouvert; renderView(true); }, 'sm jrs-corriger'));
+    if (d.corrections) acts.append(btn('Effacer mes corrections', () => joursAgir('effacer'), 'sm ghost jrs-effacer'));
+    acts.append(btn('Relire l’agenda', () => joursAgir('relire'), 'sm ghost jrs-relire'));
+    kids.push(acts);
+    if (JRS.ouvert) {
+      const ta = h('textarea', {class: 'jrs-txt', rows: '2', maxlength: '800', placeholder: 'ex. jeudi 26 et vendredi 27 : télétravail ; lundi 30 matin : congé', 'aria-label': 'Ce qui change'});
+      const go2 = btn('Envoyer la correction', () => { const v = ta.value.trim(); if (v.length < 2) { ta.focus(); return; } joursAgir('corriger', v); }, 'sm main jrs-envoyer');
+      kids.push(h('div', {class: 'jrs-form'}, ta, go2));
+    }
+    const aside = d.etat === 'valide' ? 'validé' : d.etat === 'a_revoir' ? 'à revoir' : b.complet ? 'à confirmer' : 'à compléter';
+    return h('section', {class: 'panel pm-sec', id: 'pm-jours'}, h('header', {class: 'panel-h'}, h('h2', {text: 'Tes jours de ' + d.libelle}), h('span', {class: 'aside', text: aside})),
+      h('div', {class: 'pm-list'}, h('article', {class: 'card item jours-card', 'data-mois': d.mois}, kids)));
+  }
+  document.head.append(h('style', {text: '.jours-card{display:grid;gap:10px}.jrs-tot{margin:0}.jrs-tot b{font:600 20px var(--display)}.jrs-grille{display:grid;gap:6px}'
+    + '.jrs-sem{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px}.jrs-j{border-radius:8px;padding:4px 5px;font-size:11.5px;line-height:1.25;border:1px solid rgba(var(--c1),.25);min-width:0;overflow:hidden}'
+    + '.jrs-j b{display:block;font:600 11px var(--display);opacity:.8}.jrs-j span{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.jrs-t{background:rgba(var(--c1),.12)}.jrs-s{background:rgba(var(--c2),.16)}'
+    + '.jrs-c{background:rgba(120,200,140,.14)}.jrs-f{background:rgba(255,255,255,.06);opacity:.75}.jrs-q,.jrs-x{border-color:var(--warn,#f5b041);background:rgba(245,176,65,.14)}.jrs-j.is-corr{outline:1px dashed rgba(var(--c1),.6)}'
+    + '.jrs-alerte{margin:0;color:var(--warn,#f5b041)}.jrs-rq{margin:0;opacity:.75;font-size:12.5px}.jrs-ok{margin:0;color:rgb(120,200,140)}.jrs-msg{margin:0;font-size:13px}.jrs-acts{flex-wrap:wrap;gap:6px}'
+    + '.jrs-form{display:grid;gap:6px}.jrs-txt{width:100%;box-sizing:border-box;font:14px var(--sans);border-radius:10px;padding:8px;background:rgba(0,0,0,.25);color:inherit;border:1px solid rgba(var(--c1),.35)}'}));
+  {
+    const V_JRS = VIEWS.demandes;
+    VIEWS.demandes = (el) => {
+      V_JRS(el);
+      joursLoad(false);
+      if (typeof FOCUS === 'object' && FOCUS && FOCUS.on) return;
+      const c = joursCard(); if (!c) return;
+      const sum = el.querySelector('.pm-sum'), sec = el.querySelector('.pm-sec');
+      if (sec) sec.before(c); else if (sum) sum.after(c); else el.append(c);
+      el.querySelectorAll(':scope > .empty').forEach((x) => x.remove());   /* « Rien ne t'attend » ne vaut plus : le bilan attend */
+    };
+    const PMN_JRS = pourMoiN;
+    pourMoiN = function () { return PMN_JRS() + (JRS.data && JRS.data.demande ? 1 : 0); };
+    const VU_JRS = voirUrl;
+    voirUrl = function (hash) {
+      const m = String(hash || '').match(/^#voir-jours(?:-(\d{4}-\d{2}))?$/);
+      if (!m) return VU_JRS(hash);
+      JRS.force = true; if (m[1] && m[1] !== JRS.mois) { JRS.mois = m[1]; JRS.data = null; }
+      try { history.replaceState(null, '', '#demandes'); } catch (e) { /* rien */ }
+      if (TAB !== 'demandes') go('demandes'); else renderView(true);
+      joursLoad(true);
+      if (typeof cibler === 'function') cibler(() => document.getElementById('pm-jours'));
+      return true;
+    };
+    if (joursOn()) setTimeout(() => joursLoad(true), 1200);
+  }
+
   /* ================= refonte UX (22/11/2026, maquette validée) : Équipe absorbe Suivi et Automatisations ; Pour moi en filtres =================
      Rien n'est réécrit : les panneaux d'origine (mêmes boutons, mêmes données) sont rangés sous un filtre. Suivi et Automatisations restent des
      adresses valides (#suivi, #automatisations : liens des notifications du serveur), qui ouvrent Équipe sur le bon filtre. */
@@ -10650,8 +10765,8 @@ void main(){
     /* Réglages : l'état des systèmes (venu de Suivi) en bas */
     VIEWS.reglages = (el) => { V_REG(el); const p = h('section', {class: 'panel', 'data-onglet': 'general'}, h('header', {class: 'panel-h'}, h('h2', {text: 'État des systèmes'}), h('span', {class: 'aside', text: 'v' + VERSION})), sysBox()); const sb = santeBox(); if (sb) p.append(sb); p.hidden = !regVoit('general'); el.append(p); };   /* 0.73.0 : le même panneau, sans reconstruire Suivi */
     /* Pour moi : Tout, Décider, À faire, Infos ; « Mes tâches » (venues de Suivi) dans À faire */
-    const PM = {decider: ['pm-dec'], faire: ['pm-todo', 'pm-proj', 'pm-mail', 'pm-taches', 'pm-wait'], infos: ['pm-rep']};
-    const PM_ITEM = {'pm-rep': '.pm-list > .pm-rep', 'pm-wait': '.cote-it', 'pm-mail': 'li.tri', 'pm-taches': '.card.item, .rec-it'};   /* un élément montré : une carte (par défaut), une réponse (pas le lien « Les N réponses »), une carte de côté, un mail, une tâche */
+    const PM = {decider: ['pm-dec', 'pm-jours'], faire: ['pm-todo', 'pm-proj', 'pm-mail', 'pm-taches', 'pm-wait'], infos: ['pm-rep']};   /* 0.83.0 : les jours du mois, à décider */
+    const PM_ITEM = {'pm-rep': '.pm-list > .pm-rep', 'pm-wait': '.cote-it', 'pm-mail': 'li.tri', 'pm-taches': '.card.item, .rec-it', 'pm-jours': '.jours-card'};   /* un élément montré : une carte (par défaut), une réponse (pas le lien « Les N réponses »), une carte de côté, un mail, une tâche */
     const PM_VIDE = {decider: 'Rien à décider pour l’instant.', faire: 'Rien à faire pour l’instant.', infos: 'Aucune réponse de tes bots ces 3 derniers jours.'};
     VIEWS.demandes = (el) => {
       V_DEM(el);

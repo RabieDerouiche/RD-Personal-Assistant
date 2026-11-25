@@ -525,6 +525,14 @@ tant qu'une routine n'est pas basculée) :
    Chronos (onglet « Textes des routines » de Pilotage), lui montrer le bilan dans JARVIS avec un bouton pour
    confirmer et un champ pour corriger (son choix), garder les jours validés sur le serveur. Code de JARVIS
    (`jarvis-os/server`, `jarvis-os/app`) : bancs de JARVIS à passer, journal à tenir.
+   **Écrit le 25/11/2026 au soir : JARVIS 0.83.0** (`jarvis-os/server/jours.mjs`, détail dans `docs/jarvis-os.md`).
+   Ses choix (QCM du 25/11/2026) : bilan le 24 à midi, relu le dernier jour (oui redemandé seulement si un jour a
+   changé) ; pendant le double, il valide dans les deux (Grok et JARVIS) et JARVIS ne prépare aucun brouillon de
+   mail ; premier essai sur novembre, dès la mise à jour. Le bilan est fait sans IA ; une correction s'écrit en une
+   phrase. Ce n'est pas le Hermes de Telegram qui le fait : c'est JARVIS lui-même (moins cher, rien à apprendre).
+   Mise en service : il accepte « Mettre à jour » dans JARVIS (aucune demande à la session du serveur). Les jours
+   validés restent dans `jours.json` sur le serveur ; le CRA (étape 3) les lira par un outil à ajouter.
+   À comparer en décembre : le bilan de JARVIS et celui de Chronos, jour par jour.
 3. *CRA hebdomadaire puis CRA mensuel*, à blanc : dire ce qui serait saisi, jour par jour, d'après les jours
    validés, sans rien cliquer (sur l'intranet, chaque clic s'enregistre) ; puis une vraie saisie sur son oui, avec
    les règles de Chronos (types de journée, congés, fériés, soumission, fin de mission).

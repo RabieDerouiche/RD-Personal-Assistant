@@ -191,7 +191,7 @@ try {
       const rowN = 100 + FG.appends.length, vals = Array.from({length: rowN}, () => []); vals[0] = ['Ajoutée le', 'Tâche', 'Pour le', 'Statut', 'Remarque']; vals[rowN - 1] = ['22/11/2026', 'Prendre rendez-vous chez le pédiatre pour demain', '', 'Fait', 'De Lina']; FG.sheet['Tâches!A1:E500'] = vals;
       const st = await fetch(BASE + '/api/invite/taches', {headers: IH}), sj = await st.json();
       ok('invité : elle voit le statut de ses tâches (« Fait »), rien d’autre', st.status === 200 && sj.nom === 'Lina' && sj.taches.length === 1 && sj.taches[0].statut === 'Fait' && Object.keys(sj).sort().join() === 'm4a,nom,taches', JSON.stringify(sj));
-      const autres = await Promise.all(['/api/snap', '/api/radar', '/api/memory', '/api/invites', '/api/missions', '/api/google'].map((u) => fetch(BASE + u, {headers: IH}).then((x) => x.status)));
+      const autres = await Promise.all(['/api/snap', '/api/radar', '/api/jours', '/api/memory', '/api/invites', '/api/missions', '/api/google'].map((u) => fetch(BASE + u, {headers: IH}).then((x) => x.status)));
       ok('invité : sa clé n’ouvre rien d’autre de JARVIS (401 partout)', autres.every((s) => s === 401), JSON.stringify(autres));
       const vide = await fetch(BASE + '/api/invite/tache', {method: 'POST', headers: IH, body: JSON.stringify({texte: ' '})}), faux = await fetch(BASE + '/api/invite/tache', {method: 'POST', headers: {authorization: 'Bearer faux', 'content-type': 'application/json'}, body: JSON.stringify({texte: 'Une tâche'})});
       ok('invité : rien entendu → « redis ta tâche » ; une autre clé → refusée', vide.status === 400 && /redis/.test(await vide.text()) && faux.status === 401);
@@ -988,6 +988,20 @@ try {
           ok('veilleur : « Retirer » le jeton d\'Hermes ne coupe pas « Hermes Web », qui garde le nom qu\'il signe', rth.status === 200 && !rth.body.fixes.some((x) => x.nom === 'Hermes') && fv2.signe === 'Hermes' && lv2.status === 200 && lv2.body.result.tools.length === 5, JSON.stringify(rth.body.fixes));
           await P('/api/mcp/retirer', {id: jv.body.id}); delete PIL.Sources; }
         await P('/api/mcp/retirer', {id: jh.body.id}); await P('/api/mcp/retirer', {id: jg.body.id}); await P('/api/push/unsubscribe', {endpoint: ep}); PS.close();
+        /* 0.83.0 : les jours du mois, de bout en bout (vrai serveur, faux Google) : les deux agendas reconnus, le bilan, sa correction, son oui */
+        { const FH = 'fr.french#holiday@group.v.calendar.google.com'; FG.calendriers.push({id: FH, summary: 'Holidays in France', accessRole: 'reader'});
+          FG.events['pres@group.calendar.example'] = [{id: 'pj1', summary: 'Télétravail', status: 'confirmed', start: {date: '2026-11-16'}, end: {date: '2026-11-21'}}, {id: 'pj2', summary: 'Congé', status: 'confirmed', start: {date: '2026-11-02'}, end: {date: '2026-11-04'}}];   /* inventés */
+          FG.events[FH] = [{id: 'fh1', summary: 'Armistice Day', description: 'Public holiday', status: 'confirmed', start: {date: '2026-11-11'}, end: {date: '2026-11-12'}}, {id: 'fh2', summary: 'Fête inventée', description: 'Observance', status: 'confirmed', start: {date: '2026-11-20'}, end: {date: '2026-11-21'}}];
+          const J = (u, b) => call(u, {method: b ? 'POST' : 'GET', headers: A, ...(b ? {body: JSON.stringify(b)} : {})});
+          const j1 = await J('/api/jours?mois=2026-11'), jc = FG.calls.filter((x) => /pres%40group|pres@group/.test(x.path) && /\/events$/.test(x.path)).pop() || {q: {}};
+          ok('jours : GET lit « Présence » et les fériés de France (le mois entier, instances dépliées) ; 5 en télétravail, 2 de congé, 1 férié, le reste à confirmer', j1.status === 200 && j1.body.bilan && j1.body.bilan.totaux.teletravail === 5 && j1.body.bilan.totaux.conges === 2 && j1.body.bilan.totaux.feries === 1 && !j1.body.bilan.complet
+            && jc.q.singleEvents === 'true' && /^2026-11-01T00:00:00/.test(jc.q.timeMin || '') && /^2026-12-01T00:00:00/.test(jc.q.timeMax || ''), JSON.stringify(j1.body && (j1.body.erreur || j1.body.bilan && j1.body.bilan.totaux)) + ' ' + JSON.stringify(jc.q));
+          const j0 = await J('/api/jours/confirmer', {mois: '2026-11', empreinte: j1.body.bilan && j1.body.bilan.empreinte});
+          const j2 = await J('/api/jours/corriger', {mois: '2026-11', texte: 'tout le reste du mois : sur site'});
+          const j3 = await J('/api/jours/confirmer', {mois: '2026-11', empreinte: j2.body && j2.body.bilan && j2.body.bilan.empreinte});
+          ok('jours : pas de oui sur un bilan incomplet ; sa phrase lue par les règles ; son oui donné, gardé dans jours.json (600)', j0.status === 409 && j2.status === 200 && j2.body.par === 'règles' && j2.body.bilan.complet && j3.status === 200 && j3.body.etat === 'valide'
+            && (fs.statSync(path.join(DATA, 'jours.json')).mode & 0o777) === 0o600, JSON.stringify([j0.status, j2.status, j2.body && j2.body.compris, j3.status, j3.body && j3.body.etat]));
+          FG.calendriers.pop(); delete FG.events[FH]; delete FG.events['pres@group.calendar.example']; }
         FG.onglets = null; delete FG.fils.thpj; delete FG.events['ech@group.calendar.example']; await P('/api/google/unlink', {}); }
       /* 0.41.0 : les routines planifiées (une phrase → un moment et une tâche ; à l'heure dite, sa mission) et le brief du matin sans IA */
       { const RJ = (u, b, m) => call(u, {method: m || (b ? 'POST' : 'GET'), headers: A, ...(b ? {body: JSON.stringify(b)} : {})});
