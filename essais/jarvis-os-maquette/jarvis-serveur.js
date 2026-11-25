@@ -493,7 +493,11 @@
       confirmer: (mois, empreinte) => req('/api/jours/confirmer', {mois, empreinte}).then((r) => ({...r.j, ok: r.status === 200})).catch(() => ({ok: false, error: 'Serveur JARVIS injoignable.'})),
       corriger: (mois, texte) => req('/api/jours/corriger', {mois, texte}).then((r) => ({...r.j, ok: r.status === 200})).catch(() => ({ok: false, error: 'Serveur JARVIS injoignable.'})),
       effacer: (mois) => req('/api/jours/effacer', {mois}).then((r) => ({...r.j, ok: r.status === 200})).catch(() => ({ok: false, error: 'Serveur JARVIS injoignable.'})),
-      relire: (mois) => req('/api/jours/relire', {mois}).then((r) => ({...r.j, ok: r.status === 200})).catch(() => ({ok: false, error: 'Serveur JARVIS injoignable.'}))},
+      relire: (mois) => req('/api/jours/relire', {mois}).then((r) => ({...r.j, ok: r.status === 200})).catch(() => ({ok: false, error: 'Serveur JARVIS injoignable.'})),
+      /* 0.84.0 : le CRA de la semaine (son oui le vendredi ; Hermes saisit et soumet ensuite) */
+      semaine: (lundi) => req('/api/jours/semaine' + (lundi ? '?lundi=' + encodeURIComponent(lundi) : '')).then((r) => (r.status === 200 ? r.j : null)).catch(() => null),
+      semaineConfirmer: (lundi, empreinte) => req('/api/jours/semaine/confirmer', {lundi, empreinte}).then((r) => ({...r.j, ok: r.status === 200})).catch(() => ({ok: false, error: 'Serveur JARVIS injoignable.'})),
+      semaineCorriger: (lundi, texte) => req('/api/jours/semaine/corriger', {lundi, texte}).then((r) => ({...r.j, ok: r.status === 200})).catch(() => ({ok: false, error: 'Serveur JARVIS injoignable.'}))},
     memoire: {
       liste: () => req('/api/memoire').then((r) => (r.status === 200 ? r.j : null)).catch(() => null),
       ajouter: (texte, source) => req('/api/memoire', {texte, source}).then((r) => r.j).catch(() => ({ok: false, error: 'Serveur injoignable.'})),

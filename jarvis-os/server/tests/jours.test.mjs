@@ -125,6 +125,48 @@ try {
     ok('le dernier jour, validé mais deux jours sans lieu ni congé : notification « un lieu manque », qui les nomme', appels.push.length === n0 + 2 && /un lieu manque/.test(manque.title) && /jeudi 26, vendredi 27/.test(manque.body) && J11.etat('2026-11').etat === 'valide', JSON.stringify(manque));
     pres11.push(jour(26, 'Télétravail'), jour(27, 'Hors Domicile')); J11.brut().mois['2026-11'].verifFin = ''; await J11.tic();
     ok('le dernier jour, les lieux notés ensuite par son raccourci : son oui tient, aucune notification de plus', appels.push.length === n0 + 2 && J11.etat('2026-11').etat === 'valide' && J11.etat('2026-11').bilan.complet); }
+  /* ---------- 0.84.0 : le CRA de la semaine ---------- */
+  { const SD = path.join(DIR, 'sem'); fs.mkdirSync(SD, {recursive: true}); const pushS = [];
+    let presS = [...BASE];
+    const agS = {...agenda, evenements: async (id, debut, fin) => (id.includes('french') ? FER : id.includes('tn.') ? [] : presS)};
+    T = Date.parse('2026-11-26T11:05:00Z');   /* jeudi 26, midi : trop tôt pour le oui */
+    const JS = createJours({file: path.join(SD, 'jours.json'), agenda: agS, claude, push: async (m) => { pushS.push(m); return []; }, now: () => T});
+    let s = await JS.lireSemaine('2026-11-23');
+    ok('semaine : lundi 23 congé (rien), mardi 24 sur site, mercredi 25 télétravail, jeudi 26 et vendredi 27 lieu pas noté : 1 (seule compte l’absence de congé)', s.jours.map((d) => d.q).join() === '0,1,1,1,1' && s.jours[3].lieu === '?' && !s.jours.some((d) => d.bloque), JSON.stringify(s.jours.map((d) => [d.date.slice(8), d.q, d.lieu])));
+    let c = JS.confirmerSemaine('2026-11-23', s.empreinte);
+    ok('semaine : pas de oui avant le vendredi', !c.ok && /vendredi/.test(c.error));
+    T = Date.parse('2026-11-27T11:05:00Z');   /* vendredi 27, 12 h 05 */
+    await JS.tic(); await JS.tic();
+    const pc = pushS.filter((m) => /^cra-/.test(m.tag));
+    ok('semaine : le vendredi à midi, une notification (une seule), qui ouvre la semaine', pc.length === 1 && /CRA de la semaine du lundi 23 au vendredi 27 novembre/.test(pc[0].title) && /4 jours travaillés ; rien : lundi 23 \(congé\)/.test(pc[0].body) && pc[0].url === '/#voir-cra-2026-11-23', JSON.stringify(pushS));
+    const g = await JS.traiter('GET', '/api/jours', async () => ({}), q('2026-11'));
+    ok('semaine : GET /api/jours la donne, « à confirmer » dans Pour moi', g.body.semaine && g.body.semaine.lundi === '2026-11-23' && g.body.semaine.demande && g.body.semaine.confirmable);
+    c = JS.confirmerSemaine('2026-11-23', 'autre');
+    ok('semaine : un oui sur une semaine qui a changé depuis l’affichage est refusé', !c.ok && /changé/.test(c.error));
+    let r = await JS.traiter('POST', '/api/jours/semaine/corriger', async () => ({lundi: '2026-11-23', texte: 'jeudi 26 : congé'}));
+    ok('semaine : « jeudi 26 : congé » : rien ce jour-là ; corrigé dans le mois aussi', r.status === 200 && r.body.jours.map((d) => d.q).join() === '0,1,1,0,1' && JS.brut().mois['2026-11'].corrections['2026-11-26'].M.code === 'C', JSON.stringify(r.body.jours && r.body.jours.map((d) => d.q)));
+    r = await JS.traiter('POST', '/api/jours/semaine/confirmer', async () => ({lundi: '2026-11-23', empreinte: r.body.empreinte}));
+    ok('semaine : oui donné : « valide », les quantités gardées pour root (jours.json)', r.status === 200 && r.body.etat === 'valide' && JSON.parse(fs.readFileSync(path.join(SD, 'jours.json'), 'utf8')).semaines['2026-11-23'].valide.jours.map((d) => d.q).join() === '0,1,1,0,1');
+    /* le compte rendu d'Hermes, posé par root */
+    fs.mkdirSync(path.join(SD, 'portail-retours'), {recursive: true});
+    fs.writeFileSync(path.join(SD, 'portail-retours', 'cra-2026-11-23.json'), JSON.stringify({semaine: '2026-11-23', resultat: 'soumise', texte: 'Trois jours saisis, semaine soumise.', premiere: true, at: T}));
+    await JS.tic();
+    const pr = pushS[pushS.length - 1];
+    ok('semaine : le compte rendu d’Hermes : « soumise », notification « première exécution : vérifie », fichier retiré', JS.etatSemaine('2026-11-23').etat === 'soumise' && /Première exécution d’Hermes/.test(pr.title) && /Vérifie sur le portail/.test(pr.body) && !fs.existsSync(path.join(SD, 'portail-retours', 'cra-2026-11-23.json')), JSON.stringify(pr));
+    r = await JS.traiter('POST', '/api/jours/semaine/corriger', async () => ({lundi: '2026-11-23', texte: 'mardi 24 : congé'}));
+    ok('semaine : une semaine soumise ne se corrige plus dans JARVIS', r.status === 400 && /déjà soumise/.test(r.body.error));
+    fs.writeFileSync(path.join(SD, 'portail-retours', 'cra-2026-11-16.json'), JSON.stringify({semaine: '2026-11-16', resultat: 'rien', texte: 'Une saisie existante diffère : rien changé.', premiere: false}));
+    await JS.tic();
+    ok('semaine : « rien saisi » : « à la main », notification « pas soumis »', JS.etatSemaine('2026-11-16').etat === 'a_la_main' && /pas soumis/.test(pushS[pushS.length - 1].title) && /À faire à la main/.test(pushS[pushS.length - 1].body));
+    /* une demi-journée de congé bloque ; une semaine à cheval sur deux mois */
+    presS = [...BASE, jour(26, 'Congé matin')];
+    s = await (createJours({file: path.join(SD, 'demi.json'), agenda: agS, now: () => T})).lireSemaine('2026-11-23');
+    ok('semaine : une demi-journée de congé bloque la saisie automatique (la quantité n’est pas définie)', s.jours[3].q === null && /demi-journée/.test(s.jours[3].bloque), JSON.stringify(s.jours[3]));
+    T = Date.parse('2026-12-04T11:05:00Z'); presS = [...BASE, {summary: 'Télétravail', start: {date: '2026-12-01'}, end: {date: '2026-12-05'}, status: 'confirmed'}];
+    r = await JS.traiter('POST', '/api/jours/semaine/corriger', async () => ({lundi: '2026-11-30', texte: 'mardi 1er : congé'}));
+    ok('semaine à cheval sur deux mois : « mardi 1er » est le 1er décembre ; la correction va dans le mois de décembre', r.status === 200 && r.body.jours.map((d) => d.q).join() === '1,0,1,1,1' && JS.brut().mois['2026-12'].corrections['2026-12-01'].M.code === 'C', JSON.stringify(r.body.error || r.body.jours.map((d) => d.q)));
+    T = Date.parse('2026-11-30T11:05:00Z');
+  }
   /* les agendas reconnus à leur identité réelle */
   cals = CALS.filter((c) => !c.id.includes('french'));
   const e1 = await (createJours({file: path.join(DIR, 'j5.json'), agenda, now: () => T})).lire('2026-11');

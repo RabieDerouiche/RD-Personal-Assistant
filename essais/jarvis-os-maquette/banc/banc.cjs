@@ -1477,6 +1477,25 @@ srv.listen(0, async () => {
       const d = await lu();
       ok('jours : « Confirmer » : congés validés, dit, plus de bouton Confirmer', /sont validés pour le CRA/.test(d.txt) && !d.conf && /congés validés/.test(d.txt), d.txt.slice(0, 200));
       await q.screenshot({path: path.join(SH, 'jours-2.png')});
+      /* 0.84.0 : le CRA de la semaine, ouvert par sa notification ; « Confirmer et soumettre » ; un jour bloqué ferme le bouton */
+      const CRA_INIT = (bloque) => { const j = (d, n, q, lieu, bl) => ({date: '2026-11-' + d, jour: n, M: lieu === 'C' ? 'C' : 'T', A: lieu === 'C' ? 'C' : 'T', q, lieu, bloque: bl || ''});
+        const s = {lundi: '2026-11-23', libelle: 'du lundi 23 au vendredi 27 novembre', etat: 'a_valider', demande: true, confirmable: true, empreinte: 'e', erreur: '', valide: null, retour: null,
+          jours: [j(23, 'lundi 23', 0, 'C'), j(24, 'mardi 24', 1, 'S'), j(25, 'mercredi 25', 1, 'T'), bloque ? j(26, 'jeudi 26', null, '', 'demi-journée de congé : à saisir à la main') : j(26, 'jeudi 26', 1, '?'), j(27, 'vendredi 27', 1, 'T')]};
+        s.bloque = !!bloque; window.__JOURS = {mois: '2026-11', libelle: 'novembre 2026', etat: 'valide', demande: false, semaine: s, bilan: null}; };
+      for (const bl of [false, true]) {
+        const cx = await b.newContext({...devices['iPhone 15 Pro Max']}); await cx.addInitScript(PAUSE_INIT); await cx.addInitScript(CRA_INIT, bl);
+        const w = await cx.newPage(); w.on('pageerror', (e) => errs.push('cra : ' + e.message)); await w.goto(base + '#voir-cra-2026-11-23'); await w.waitForTimeout(3500);
+        const v = await w.evaluate(() => { const c = document.getElementById('pm-cra'), cf = c && c.querySelector('.cra-confirmer');
+          return {vu: !!c && c.offsetParent !== null, vise: !!c && c.hasAttribute('data-vise'), jours: c ? c.querySelectorAll('.cra-j').length : 0, uns: c ? c.querySelectorAll('.cra-j.is-1').length : 0, conf: cf ? {dis: cf.disabled, t: cf.textContent} : null, txt: c ? c.textContent : '', large: document.documentElement.scrollWidth <= window.innerWidth + 1}; });
+        if (!bl) {
+          ok('cra : la notification ouvre « Pour moi » sur la semaine, mise en évidence ; 5 jours, 4 à « 1 » ; « Confirmer et soumettre » ouvert', v.vu && v.vise && v.jours === 5 && v.uns === 4 && v.conf && !v.conf.dis && v.conf.t === 'Confirmer et soumettre' && /rien/.test(v.txt) && v.large, JSON.stringify({...v, txt: v.txt.slice(0, 160)}));
+          await w.screenshot({path: path.join(SH, 'cra-1.png')});
+          await w.click('#pm-cra .cra-confirmer'); await w.waitForTimeout(800);
+          const v2 = await w.evaluate(() => document.getElementById('pm-cra').textContent);
+          ok('cra : « Confirmer et soumettre » : confirmé, Hermes s’en occupe, plus de bouton', /Confirmé : Hermes saisit et soumet/.test(v2) && !/Confirmer et soumettre/.test(v2), v2.slice(0, 200));
+        } else ok('cra : un jour bloqué (demi-journée de congé) ferme le bouton et le dit', v.conf && v.conf.dis && /demi-journée de congé/.test(v.txt), JSON.stringify(v.conf));
+        await cx.close();
+      }
       const e0 = errs.length, r = await page('#demandes');
       ok('jours : sans bilan (maquette de base), rien de nouveau dans « Pour moi »', await r.evaluate(() => !document.getElementById('pm-jours')) && errs.length === e0, errs.slice(e0).join(' | ')); }
   } catch (e) { ok('exception', false, e.stack); }

@@ -10706,21 +10706,84 @@ void main(){
     + '.jrs-c{background:rgba(120,200,140,.14)}.jrs-f{background:rgba(255,255,255,.06);opacity:.75}.jrs-q,.jrs-x{border-color:var(--warn,#f5b041);background:rgba(245,176,65,.14)}.jrs-v{border-style:dashed;opacity:.8}.jrs-j.is-corr{outline:1px dashed rgba(var(--c1),.6)}'
     + '.jrs-alerte{margin:0;color:var(--warn,#f5b041)}.jrs-rq{margin:0;opacity:.75;font-size:12.5px}.jrs-ok{margin:0;color:rgb(120,200,140)}.jrs-msg{margin:0;font-size:13px}.jrs-acts{flex-wrap:wrap;gap:6px}'
     + '.jrs-form{display:grid;gap:6px}.jrs-txt{width:100%;box-sizing:border-box;font:14px var(--sans);border-radius:10px;padding:8px;background:rgba(0,0,0,.25);color:inherit;border:1px solid rgba(var(--c1),.35)}'}));
+  /* 0.84.0 : le CRA de la semaine (sa décision du 25/11/2026 : Hermes à la place de Chronos dès le vendredi 27/11). Le vendredi à midi, la carte
+     « CRA de la semaine » : 1 pour chaque journée travaillée, rien pour un congé ou un férié ; « Confirmer » (le vendredi, sans jour bloqué),
+     puis Hermes saisit et soumet ; son compte rendu revient ici (et en notification, la première fois pour qu'il vérifie). */
+  const CRA = {force: '', busy: false, msg: '', ouvert: false};
+  const CRA_ETAT = {a_valider: 'à confirmer', valide: 'confirmé, Hermes s’en occupe', soumise: 'soumis', deja: 'déjà soumis', a_la_main: 'à faire à la main'};
+  const craSem = () => { const s = JRS.data && JRS.data.semaine; return s && (!CRA.force || s.lundi === CRA.force) ? s : null; };
+  function craCharger(lundi) {
+    const api = joursAPI();
+    const p = api && api.semaine ? api.semaine(lundi) : Promise.resolve(window.__JOURS && window.__JOURS.semaine ? JSON.parse(JSON.stringify(window.__JOURS.semaine)) : null);
+    return p.then((s) => { if (s) { JRS.data = Object.assign({}, JRS.data || {}, {semaine: s}); } }).catch(() => {}).finally(() => { if (TAB === 'demandes') renderView(true); });
+  }
+  function craAgir(action, txt) {
+    const s = craSem(), api = joursAPI(); if (!s || CRA.busy) return;
+    CRA.busy = true; renderView(true);
+    const local = () => { const x = JSON.parse(JSON.stringify(s));
+      if (action === 'confirmer') { if (!x.confirmable || x.bloque) return {ok: false, error: 'Pas encore : le oui se donne le vendredi, sans jour bloqué.'}; x.etat = 'valide'; x.valide = {at: Date.now()}; x.demande = false; return Object.assign(x, {ok: true}); }
+      const t = String(txt || '').toLowerCase(), m = t.match(/\b(\d{1,2})\b/), j = m && x.jours.find((d) => +d.date.slice(8) === +m[1]);
+      if (!j || !/cong/.test(t)) return {ok: false, error: 'Je n’ai pas compris : écris par exemple « jeudi 26 : congé ».'};
+      j.q = 0; j.lieu = 'C'; return Object.assign(x, {ok: true, compris: j.jour + ' : congé', par: 'règles', refus: []}); };
+    const p = api && api.semaineConfirmer ? (action === 'confirmer' ? api.semaineConfirmer(s.lundi, s.empreinte) : api.semaineCorriger(s.lundi, txt)) : Promise.resolve(local());
+    p.then((r) => {
+      if (r && r.ok) { const g = {...r}; delete g.ok; JRS.data = Object.assign({}, JRS.data || {}, {semaine: g});
+        if (action === 'confirmer') { CRA.msg = 'Confirmé : Hermes saisit et soumet ta semaine dans les minutes qui viennent. Tu auras son compte rendu ici.'; toast('CRA confirmé', s.libelle); }
+        else { CRA.ouvert = false; CRA.msg = 'Compris : ' + (r.compris || '') + (r.par === 'Claude' ? ' (lu par Claude)' : '') + '.' + ((r.refus || []).length ? ' Écarté : ' + r.refus.join(' ; ') + '.' : '') + ' Vérifie, puis confirme.'; } }
+      else CRA.msg = (r && r.error) || 'Pas enregistré sur ton serveur : réessaie.';
+    }).catch(() => { CRA.msg = 'Pas enregistré sur ton serveur : réessaie.'; }).finally(() => { CRA.busy = false; renderView(true); try { header(); } catch (e) { /* rien */ } });
+  }
+  function craCard() {
+    const s = craSem(); if (!s || !(s.jours || []).length) return null;
+    const recent = s.retour && Date.now() - (s.retour.at || 0) < 3 * 864e5;
+    if (!(s.demande || CRA.force || s.etat === 'valide' || recent)) return null;
+    const kids = [], nom = (d) => (d.lieu === 'C' ? 'Congé' : d.lieu === 'F' ? 'Férié' : d.lieu === 'T' ? 'Télétravail' : d.lieu === 'S' ? 'Sur site' : d.lieu === 'mixte' ? 'Travaillé' : d.lieu === '?' ? 'Non noté' : '—');
+    kids.push(h('div', {class: 'cra-jours'}, s.jours.map((d) => h('div', {class: 'cra-j' + (d.bloque ? ' is-bloque' : '') + (d.q === 1 ? ' is-1' : ''), 'data-date': d.date},
+      h('b', {text: d.jour.replace(/^(\S{3})\S*/, '$1')}), h('span', {text: d.bloque ? 'à voir' : nom(d)}), h('em', {text: d.bloque ? '?' : d.q === 1 ? '1' : 'rien'})))));
+    s.jours.filter((d) => d.bloque).forEach((d) => kids.push(h('p', {class: 'jrs-alerte'}, h('b', {text: d.jour + ' : '}), d.bloque + '.')));
+    if (s.erreur) kids.push(h('p', {class: 'jrs-alerte', text: s.erreur}));
+    if (s.retour) kids.push(h('p', {class: s.retour.resultat === 'soumise' || s.retour.resultat === 'deja' ? 'jrs-ok' : 'jrs-alerte'}, h('b', {text: 'Hermes : '}), s.retour.texte || s.retour.resultat, s.retour.premiere ? ' Première exécution : vérifie sur le portail ce qui a été saisi.' : ''));
+    else if (s.etat === 'valide') kids.push(h('p', {class: 'jrs-ok', text: 'Confirmé : Hermes saisit et soumet ta semaine dans les minutes qui viennent.'}));
+    if (CRA.msg) kids.push(h('p', {class: 'jrs-msg', role: 'status', text: CRA.msg}));
+    if (s.etat === 'a_valider') {
+      kids.push(h('p', {class: 'jrs-rq', text: s.confirmable ? 'Ton oui lance Hermes : il saisit « 1 » pour chaque journée travaillée, rien pour un congé ou un férié, puis soumet la semaine.' : 'Le oui se donne à partir du vendredi (ton raccourci note chaque jour à 11 h).'}));
+      const acts = h('div', {class: 'row jrs-acts'}), c = btn(s.bloque ? 'Confirmer (un jour à voir)' : 'Confirmer et soumettre', () => craAgir('confirmer'), 'sm main cra-confirmer');
+      if (s.bloque || !s.confirmable || CRA.busy) c.disabled = true;
+      acts.append(c, btn(CRA.ouvert ? 'Fermer' : 'Corriger', () => { CRA.ouvert = !CRA.ouvert; renderView(true); }, 'sm cra-corriger'));
+      kids.push(acts);
+      if (CRA.ouvert) { const ta = h('textarea', {class: 'jrs-txt cra-txt', rows: '2', maxlength: '800', placeholder: 'ex. jeudi 26 : congé ; mardi : télétravail', 'aria-label': 'Ce qui change'});
+        kids.push(h('div', {class: 'jrs-form'}, ta, btn('Envoyer la correction', () => { const v = ta.value.trim(); if (v.length < 2) { ta.focus(); return; } craAgir('corriger', v); }, 'sm main cra-envoyer'))); }
+    }
+    return h('section', {class: 'panel pm-sec', id: 'pm-cra'}, h('header', {class: 'panel-h'}, h('h2', {text: 'CRA de la semaine'}), h('span', {class: 'aside', text: CRA_ETAT[s.etat] || s.etat})),
+      h('div', {class: 'pm-list'}, h('article', {class: 'card item cra-card', 'data-lundi': s.lundi}, h('p', {class: 'jrs-tot', text: 'Semaine ' + s.libelle}), kids)));
+  }
+  document.head.append(h('style', {text: '.cra-card{display:grid;gap:10px}.cra-jours{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px}.cra-j{border-radius:8px;padding:4px 5px;font-size:11.5px;line-height:1.25;border:1px solid rgba(var(--c1),.25);min-width:0;overflow:hidden}'
+    + '.cra-j b,.cra-j span,.cra-j em{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.cra-j b{font:600 11px var(--display);opacity:.8}.cra-j em{font:600 15px var(--display);font-style:normal}.cra-j.is-1{background:rgba(var(--c1),.12)}.cra-j.is-bloque{border-color:var(--warn,#f5b041);background:rgba(245,176,65,.14)}'}));
+
   {
     const V_JRS = VIEWS.demandes;
     VIEWS.demandes = (el) => {
       V_JRS(el);
       joursLoad(false);
       if (typeof FOCUS === 'object' && FOCUS && FOCUS.on) return;
-      const c = joursCard(); if (!c) return;
+      const cartes = [craCard(), joursCard()].filter(Boolean); if (!cartes.length) return;   /* 0.84.0 : le CRA de la semaine d'abord */
       const sum = el.querySelector('.pm-sum'), sec = el.querySelector('.pm-sec');
-      if (sec) sec.before(c); else if (sum) sum.after(c); else el.append(c);
+      if (sec) sec.before(...cartes); else if (sum) sum.after(...cartes); else el.append(...cartes);
       el.querySelectorAll(':scope > .empty').forEach((x) => x.remove());   /* « Rien ne t'attend » ne vaut plus : le bilan attend */
     };
     const PMN_JRS = pourMoiN;
-    pourMoiN = function () { return PMN_JRS() + (JRS.data && JRS.data.demande ? 1 : 0); };
+    pourMoiN = function () { return PMN_JRS() + (JRS.data && JRS.data.demande ? 1 : 0) + (JRS.data && JRS.data.semaine && JRS.data.semaine.demande ? 1 : 0); };
     const VU_JRS = voirUrl;
     voirUrl = function (hash) {
+      const mc = String(hash || '').match(/^#voir-cra-(\d{4}-\d{2}-\d{2})$/);
+      if (mc) {   /* 0.84.0 : la notification du CRA de la semaine */
+        CRA.force = mc[1];
+        try { history.replaceState(null, '', '#demandes'); } catch (e) { /* rien */ }
+        if (TAB !== 'demandes') go('demandes'); else renderView(true);
+        craCharger(mc[1]);
+        if (typeof cibler === 'function') cibler(() => document.getElementById('pm-cra'));
+        return true;
+      }
       const m = String(hash || '').match(/^#voir-jours(?:-(\d{4}-\d{2}))?$/);
       if (!m) return VU_JRS(hash);
       JRS.force = true; if (m[1] && m[1] !== JRS.mois) { JRS.mois = m[1]; JRS.data = null; }
@@ -10774,8 +10837,8 @@ void main(){
     /* Réglages : l'état des systèmes (venu de Suivi) en bas */
     VIEWS.reglages = (el) => { V_REG(el); const p = h('section', {class: 'panel', 'data-onglet': 'general'}, h('header', {class: 'panel-h'}, h('h2', {text: 'État des systèmes'}), h('span', {class: 'aside', text: 'v' + VERSION})), sysBox()); const sb = santeBox(); if (sb) p.append(sb); p.hidden = !regVoit('general'); el.append(p); };   /* 0.73.0 : le même panneau, sans reconstruire Suivi */
     /* Pour moi : Tout, Décider, À faire, Infos ; « Mes tâches » (venues de Suivi) dans À faire */
-    const PM = {decider: ['pm-dec', 'pm-jours'], faire: ['pm-todo', 'pm-proj', 'pm-mail', 'pm-taches', 'pm-wait'], infos: ['pm-rep']};   /* 0.83.0 : les jours du mois, à décider */
-    const PM_ITEM = {'pm-rep': '.pm-list > .pm-rep', 'pm-wait': '.cote-it', 'pm-mail': 'li.tri', 'pm-taches': '.card.item, .rec-it', 'pm-jours': '.jours-card'};   /* un élément montré : une carte (par défaut), une réponse (pas le lien « Les N réponses »), une carte de côté, un mail, une tâche */
+    const PM = {decider: ['pm-dec', 'pm-cra', 'pm-jours'], faire: ['pm-todo', 'pm-proj', 'pm-mail', 'pm-taches', 'pm-wait'], infos: ['pm-rep']};   /* 0.83.0 : les jours du mois, à décider */
+    const PM_ITEM = {'pm-rep': '.pm-list > .pm-rep', 'pm-wait': '.cote-it', 'pm-mail': 'li.tri', 'pm-taches': '.card.item, .rec-it', 'pm-jours': '.jours-card', 'pm-cra': '.cra-card'};   /* un élément montré : une carte (par défaut), une réponse (pas le lien « Les N réponses »), une carte de côté, un mail, une tâche */
     const PM_VIDE = {decider: 'Rien à décider pour l’instant.', faire: 'Rien à faire pour l’instant.', infos: 'Aucune réponse de tes bots ces 3 derniers jours.'};
     VIEWS.demandes = (el) => {
       V_DEM(el);
