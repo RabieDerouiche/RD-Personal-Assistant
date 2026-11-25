@@ -83,7 +83,7 @@ tenu par la commande) : pas encore faite.
 | Fichier | Rôle |
 |---|---|
 | `install.sh` | Root, relançable. Utilisateur `hermes-portail`, Hermes à la version figée du Hermes principal (lue dans `../install.sh`) avec son navigateur, plugin de l'abonnement Claude et Claude Code à lui, politique, skill, copies root de la commande et du relais, lien de la clé, règles réseau et relais. Ne démarre aucun agent. |
-| `hermes-portail` | La commande (`/usr/local/sbin/hermes-portail`) : `etat`, `connexion-claude`, `enregistrer`, `domaines`, `essai`, `brouillon` (et `--sans-creer`), `facture`, `notes`, `cle`, `fermer`, `oublier`. Un essai lance l'unité `hermes-portail-essai`. |
+| `hermes-portail` | La commande (`/usr/local/sbin/hermes-portail`) : `etat`, `connexion-claude`, `enregistrer`, `domaines`, `essai` (et `--code-mail`, `--telecharger`), `brouillon` (et `--sans-creer`), `facture`, `texte`, `notes`, `cle`, `fermer`, `oublier`. Un essai lance l'unité `hermes-portail-essai`. |
 | `hermes-portail-essai.service` | Un passage, enfermé (mêmes lignes que `hermes-gateway.service`, mémoire sans échange ; depuis le 25/11/2026, filtre d'appels système et espaces de noms interdits). Une vraie unité, pas `systemd-run` : au premier essai sur le serveur, `systemd-run -p IPAddressDeny=link-local` a été refusé alors que la même ligne est valable dans une unité. Consigne dans `/home/hermes-portail/.consigne`, réponse dans `/var/lib/hermes-portail/essais/`. |
 | `politique.yaml` | Sa politique (`/etc/hermes-portail/config.yaml`, root) : outils `browser`, `terminal`, `skills` seulement ; Sonnet ; profil de navigateur gardé ; navigateur envoyé vers le relais, lancé sans son bac à sable (dit en clair, voir « Durcissement »), remplissage automatique et heure réseau coupés. |
 | `facture.mjs` | Va chercher UNE facture PDF dans ses mails : lancé par `hermes-portail facture` sous l'utilisateur `jarvis`, avec l'accès Google et le code de JARVIS (`google.mjs`, `pdf.mjs`), en lecture seule ; l'état de JARVIS n'est jamais réécrit. Rend le PDF et son texte à root. |
@@ -110,7 +110,7 @@ le serveur). Faux portail `essais/hermes/faux_portail.py`, faux terminal `essais
 
 ## Ce que le banc prouve, et ce qu'il ne prouve pas
 
-Prouvé (102 vérifications, 25/11/2026) : installation ; outils réduits et politique figée ; clé seulement en ramfs,
+Prouvé (107 vérifications, 25/11/2026) : installation ; outils réduits et politique figée ; clé seulement en ramfs,
 nulle part en clair sur le disque, gardée par jarvis-coffre ; enregistrement dans un faux terminal sans que le mot de
 passe s'affiche ; connexion au faux portail par le coffre, tableau lu, formulaire ouvert, rien de soumis ; mot de
 passe et clé jamais envoyés au modèle ; session gardée au second passage ; coffre verrouillé : refus propre ;
@@ -262,6 +262,14 @@ fin de mission) sans rien cliquer. *L'espace client de la box* : en pleine page,
 le remplit, le code par mail arrive et il est accepté (six cases d'un chiffre) ; mais la page des factures ne
 reconnaît pas la session. Le fournisseur a enregistré le navigateur d'Hermes comme appareil de confiance.
 
+**Troisième essai (25/11/2026, 21h45, lecture seule) : Hermes entre sur les quatre portails.** Le CRA
+hebdomadaire : identifiants ressaisis par lui, connexion sans second facteur, feuille de la semaine lue (elle
+s'affiche dans un cadre). L'espace client de la box : le cadre de connexion ouvert en pleine page, le coffre remplit,
+le site renvoie vers une page de retour vide, puis la page des factures reconnaît la session ; aucun code demandé
+cette fois (appareil déjà enregistré au passage d'avant) ; une vingtaine de factures listées, chacune avec un
+téléchargement. Refus nouveaux du relais pendant ce passage, laissés fermés : deux services qui renvoient l'adresse
+IP publique de la machine (origine inconnue : la page ou Hermes).
+
 **Ordre retenu** (du plus sûr au plus lourd, chaque étape en lecture seule ou à blanc avant toute écriture) :
 1. Abonnement d'IA : **fait le 25/11/2026**, à blanc, identique à la dépense de Chronos (voir « La vraie facture »).
 2. Les trois autres portails : il enregistre lui-même leurs identifiants (une séance Termius), puis un passage de
@@ -319,8 +327,13 @@ on le range dans le dossier Drive. À brancher sur la veille du matin d'Hermes (
 l'été prochain.
 
 **Ce qu'il faut construire** (rien n'existe encore) :
-1. *Télécharger un fichier depuis un portail* (la facture d'électricité ; servira aussi à la facture de la box) :
-   un mode de plus pour Hermes portail, un dossier de téléchargement à lui, que root relève à la fin du passage.
+1. *Télécharger un fichier depuis un portail* (la facture d'électricité ; sert aussi à la facture de la box) :
+   **écrit et passé au banc le 25/11/2026, pas encore sur le serveur.** `essai … --telecharger <dossier de root>` :
+   la consigne annonce « Téléchargement permis », Hermes range UN fichier dans son dossier
+   `/home/hermes-portail/telechargements` (skill, section « Télécharger un fichier » : `Browser.setDownloadBehavior`
+   puis le clic ; à défaut, le PDF ouvert dans un onglet est repris par `fetch`), et root le relève à la fin : un
+   seul vrai PDF de 10 Mo au plus, rendu à root sous le nom `telecharge.pdf`, dossier vidé. `hermes-portail texte
+   <fichier.pdf>` en donne le texte (par `pdf.mjs` de JARVIS, sous son utilisateur, sans accès à Google).
 2. *Aller chercher un fichier dans Drive* depuis le serveur, par l'accès Google de JARVIS (comme `facture.mjs` pour
    Gmail).
 3. *Fabriquer le PDF* : la page de synthèse (HTML rendu en PDF par le Chromium déjà installé, sans rien installer),
@@ -330,6 +343,9 @@ l'été prochain.
 5. *La dépense* : vendeur, date au dernier jour du mois, catégorie propre au télétravail, sans TVA, commentaire
    « Frais de télétravail <mois> <année> – N jours », sans étiquette (relevé du compte) ; à blanc d'abord.
 Chronos fait celle du mois écoulé le 1er : Hermes ne la crée pas, il la prépare à blanc pour comparer.
+**Sa précision (25/11/2026, tard)** : avec Hermes, la note de télétravail sera générée et lui sera soumise pour
+validation **le dernier jour du mois** (et non le 1er du mois suivant). Tous les jours du mois sont alors connus ;
+la facture d'électricité et l'appel de charges du mois sont déjà arrivés.
 
 **Ses réponses (QCM du 25/11/2026 au soir)** : l'espace client du fournisseur d'électricité se connecte par e-mail
 et mot de passe (donc un identifiant de plus à enregistrer par lui, sans second facteur) ; le PDF suffit, comme en
@@ -457,23 +473,48 @@ Le Hermes de Telegram, lui, a sa mémoire et propose des skills, validées par `
   refusée par le relais l'était déjà au premier : ce n'est pas elle. Les pages d'arrivée diffèrent (tableau de bord
   nommé au premier, racine ensuite). Non expliqué ; à regarder avec la note à blanc.
 
-## Ce qui reste (au 25/11/2026)
+## Où on en est, et la suite (au 25/11/2026, fin de journée)
 
-Pour ce portail :
-1. **Combien de temps la session tient** : elle tient d'un passage au suivant (une heure d'écart). Reste un contrôle
-   par jour pendant une à deux semaines (minuterie à écrire, sur sa demande).
-2. **Note de frais** : geste prouvé avec une fausse facture ; à lancer : la vraie facture du dernier abonnement,
-   à blanc, comparée à la dépense de Chronos. Ensuite : la lecture de la facture sans la session du serveur (règles
-   par sorte de facture), le déclenchement (arrivée du mail, date), son oui par bouton avant « Créer », une skill
-   par note de frais avec ses contrôles (doublon du mois, TVA), l'étiquette à poser et à vérifier.
-3. **Redémarrage du serveur** : vérifier pour de vrai que tout attend le coffre, puis repart après
-   `sudo jarvis-coffre ouvrir` (la carte « Coffre » de l'app n'est pas encore branchée : `jarvis` n'est dans le groupe
-   du coffre qu'à son prochain redémarrage).
-4. **Durcir** : fait et vérifié sur le serveur. Restent : un passage dont le navigateur ne démarre pas doit rendre un
-   code d'erreur ; confirmer sur le serveur que les règles du navigateur sont lues ; l'écart sur la liste des dépenses.
-Ensuite :
-5. Les deux autres portails (CRA mensuel, CRA hebdomadaire) : même marche, `enregistrer`, `domaines`, `essai`. Leur
-   connexion (code, session courte) n'est pas connue.
-6. Brancher sur le reste : un guichet de JARVIS pour demander un passage (sans donner le navigateur au Hermes de
-   Telegram), la facture arrivée par mail, son oui par bouton avant toute soumission.
-7. Serveur : l'IPv6 sortant (la route retirée revient au redémarrage).
+**Acquis, prouvé sur le serveur**
+- Le compartiment (durci), le coffre et sa clé en mémoire, le relais et sa liste d'hôtes, les notes par portail.
+- Portail de notes de frais : connexion, session gardée, dépôt d'un justificatif, formulaire rempli ; la facture de
+  l'abonnement d'IA, à blanc, **identique à la dépense de Chronos**.
+- Les trois autres portails : Hermes y entre (code d'application par le coffre pour l'intranet ; cadre ouvert en
+  pleine page pour l'espace client de la box ; rien de particulier pour le CRA hebdomadaire). Lecture seule.
+
+**Écrit et passé au banc, pas encore sur le serveur** (le serveur est resté au commit `172aa8a`) : le
+contournement du champ de code et du cadre dans la skill (aujourd'hui portés par des notes), le téléchargement
+d'un fichier, la commande `texte`.
+
+**La suite, dans l'ordre** (une seule demande à la session du serveur par chantier ; rien n'est créé ni soumis
+tant qu'une routine n'est pas basculée) :
+1. *Chantier « box »* : mise à jour du kit ; télécharger la dernière facture de la box ; en lire le texte ; la
+   dépense à blanc sur le portail de notes de frais ; comparer à celle de Chronos (catégorie, étiquette, pas de
+   commentaire, montant entier : le portail le divise lui-même par deux). Dans la même demande : la page de
+   connexion de l'espace client d'électricité, sans identifiant (nouvel hôte), pour lui dire quelle origine
+   enregistrer dans Termius.
+2. *Les jours du mois* (pas un portail : JARVIS et le Hermes de Telegram) : lire l'agenda « Présence » et les jours
+   fériés par les outils de JARVIS, appliquer les règles de la routine « Validation mensuelle des jours » de
+   Chronos (onglet « Textes des routines » de Pilotage), lui montrer le bilan dans JARVIS avec un bouton pour
+   confirmer et un champ pour corriger (son choix), garder les jours validés sur le serveur. Code de JARVIS
+   (`jarvis-os/server`, `jarvis-os/app`) : bancs de JARVIS à passer, journal à tenir.
+3. *CRA hebdomadaire puis CRA mensuel*, à blanc : dire ce qui serait saisi, jour par jour, d'après les jours
+   validés, sans rien cliquer (sur l'intranet, chaque clic s'enregistre) ; puis une vraie saisie sur son oui, avec
+   les règles de Chronos (types de journée, congés, fériés, soumission, fin de mission).
+4. *Télétravail* : les briques 2 à 5 de la section « La note de frais de télétravail » (fichier de Drive, PDF de
+   synthèse et assemblage, lecture des montants, dépense à blanc), générée et soumise à sa validation le dernier
+   jour du mois.
+5. *Déclenchement et bascule* : une minuterie par routine (ou l'arrivée du mail), le compte rendu à lui (JARVIS ou
+   Telegram), puis la comparaison avec Chronos et sa décision, routine par routine.
+
+**Dettes connues**
+- Un passage dont le navigateur ne démarre pas rend quand même le code 0 : juger à la réponse.
+- Deux notes dites autrement ne sont pas reconnues comme un doublon ; une note fausse reste jusqu'à son retrait.
+- La lecture d'une facture pour écrire le fichier des champs est faite par la session du serveur : à remplacer par
+  des règles par sorte de facture pour une routine sans personne.
+- Sur la facture de l'abonnement d'IA, l'émetteur et son pays de TVA ne sont pas ceux que la routine de Chronos
+  écrit : repris tels quels pour comparer ; à lui de dire si c'est voulu.
+- Redémarrage du serveur jamais essayé : tout doit attendre `sudo jarvis-coffre ouvrir` ; la route IPv6 retirée
+  revient ; les sessions de portail faites de cookies de session ne survivent pas à un passage.
+- L'avis de taxe foncière suivant : tâche à lui créer quand le mail de l'administration fiscale arrive.
+- Le texte de la routine d'abonnement d'IA noté dans Pilotage est en retard sur ce que Chronos saisit.

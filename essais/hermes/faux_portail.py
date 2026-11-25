@@ -20,6 +20,7 @@ A.add_argument('--journal', required=True)
 A.add_argument('--identifiant', default='banc@exemple.test')
 A.add_argument('--mot-de-passe', required=True)
 A.add_argument('--duree-session', type=int, default=3600)
+A.add_argument('--pdf', default='')                      # une facture inventée, proposée au téléchargement une fois connecté
 A.add_argument('--totp', default='')                     # clé (base32) du second facteur de la connexion « double »
 A.add_argument('--identifiant2', default='banc2@exemple.test')
 A.add_argument('--cert'); A.add_argument('--cle')
@@ -111,8 +112,13 @@ class P(BaseHTTPRequestHandler):
             lignes = ''.join('<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>' % d for d in DEPENSES)
             return self.rendre(200, page('Tableau de bord — Notes de frais (banc)',
                 '<p id="bonjour">Connecté : %s</p><table id="depenses"><tr><th>Référence</th><th>Libellé</th><th>Montant</th><th>État</th></tr>%s</table>'
-                '<p><a href="/depense/nouvelle" id="nouvelle">Nouvelle dépense</a> · <a href="/deconnexion">Se déconnecter</a></p>'
+                '<p><a href="/depense/nouvelle" id="nouvelle">Nouvelle dépense</a> · <a href="/facture.pdf" id="telecharger" download>Télécharger la facture</a> · <a href="/deconnexion">Se déconnecter</a></p>'
                 % (html.escape(ARGS.identifiant), lignes)))
+        if chemin == '/facture.pdf':
+            note(evenement='telechargement')
+            corps = open(ARGS.pdf, 'rb').read() if ARGS.pdf else b''
+            self.send_response(200); self.send_header('Content-Type', 'application/pdf'); self.send_header('Content-Length', str(len(corps)))
+            self.send_header('Content-Disposition', 'attachment; filename="facture-du-banc.pdf"'); self.end_headers(); self.wfile.write(corps); return None
         if chemin == '/depense/nouvelle':
             note(evenement='formulaire')
             return self.rendre(200, page('Nouvelle dépense — Notes de frais (banc)',

@@ -19,6 +19,17 @@ import os from 'node:os';
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
 
+/* node facture.mjs --texte-de-l-entree [--serveur …] : le texte du PDF reçu sur l'entrée standard, par pdf.mjs de JARVIS.
+   Aucun accès à Google ni à l'état de JARVIS dans ce mode : il sert à lire un fichier que root a déjà (une facture
+   rapportée d'un portail), sous un utilisateur sans droits plutôt qu'en root. */
+if (process.argv.includes('--texte-de-l-entree')) {
+  const i = process.argv.indexOf('--serveur'), srv = i > 0 && process.argv[i + 1] ? process.argv[i + 1] : '/opt/rd/jarvis-os/server';
+  const {texteDePdf} = await import(pathToFileURL(path.join(srv, 'pdf.mjs')).href);
+  const buf = fs.readFileSync(0);
+  if (buf.length > 10e6 || buf.subarray(0, 5).toString('latin1') !== '%PDF-') { console.error("L'entrée n'est pas un PDF de 10 Mo au plus."); process.exit(5); }
+  let texte = ''; try { texte = texteDePdf(buf, 40000); } catch { /* PDF sans texte */ }
+  process.stdout.write(texte + '\n'); process.exit(0);
+}
 const arg = (n, d = '') => { const i = process.argv.indexOf('--' + n); return i > 0 && process.argv[i + 1] ? process.argv[i + 1] : d; };
 const requete = arg('requete'), nom = arg('nom', '\\.pdf$'), serveur = arg('serveur', '/opt/rd/jarvis-os/server');
 const fin = (code, msg) => { console.error(msg); process.exit(code); };

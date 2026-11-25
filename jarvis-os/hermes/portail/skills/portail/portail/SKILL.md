@@ -68,6 +68,29 @@ browser_exec(code="# Code reçu par mail\nimport time\ncode = ''\nfor _ in range
 4. « code pas arrivé » après trois minutes, ou code refusé par le site : arrête-toi et dis-le. Pas de second envoi.
 5. N'ouvre aucun lien d'un mail et ne va jamais sur une messagerie : le code vient seulement de ce fichier.
 
+## Télécharger un fichier (seulement si la consigne contient « Téléchargement permis »)
+
+Tu rapportes UN fichier : celui que la consigne demande (une facture en PDF), dans le dossier qu'elle donne.
+
+1. Avant de cliquer, dis au navigateur où ranger le fichier, puis clique le lien ou le bouton de téléchargement
+   et attends qu'il arrive, dans le même appel :
+
+```
+browser_exec(code="# Téléchargement\nimport os, time\nd = 'DOSSIER DE LA CONSIGNE'\ncdp('Browser.setDownloadBehavior', behavior='allow', downloadPath=d)\njs(\"document.querySelector('SÉLECTEUR DU LIEN').click()\")\nfor _ in range(30):\n    f = [x for x in os.listdir(d) if not x.endswith('.crdownload')]\n    if f: break\n    time.sleep(2)\nprint('fichier reçu' if f else 'rien reçu', [os.path.getsize(os.path.join(d, x)) for x in f])", timeout_s=120)
+```
+
+2. « rien reçu » : le site a peut-être ouvert le PDF dans un onglet au lieu de le télécharger. Regarde les onglets
+   (`list_tabs`) ; si l'un montre le PDF, récupère-le par son adresse depuis la page du site, puis écris-le dans
+   le dossier (remplace ADRESSE par celle de l'onglet) :
+
+```
+browser_exec(code="# PDF ouvert dans un onglet\nimport base64, os\nb = js(\"(async () => { const r = await fetch('ADRESSE', {credentials: 'include'}); const a = new Uint8Array(await r.arrayBuffer()); let s = ''; for (let i = 0; i < a.length; i += 32768) s += String.fromCharCode.apply(null, a.subarray(i, i + 32768)); return btoa(s); })()\")\nopen(os.path.join('DOSSIER DE LA CONSIGNE', 'facture.pdf'), 'wb').write(base64.b64decode(b))\nprint('fichier écrit', len(b))", timeout_s=120)
+```
+
+3. Un seul fichier, jamais un autre document, jamais deux fois. Tu ne l'ouvres pas et tu ne recopies rien de son
+   contenu. Dis seulement s'il est arrivé et sa taille. Si rien n'arrive après ces deux essais : arrête-toi et dis-le.
+4. Télécharger ne t'autorise rien d'autre : tu ne modifies, ne valides, ne paies rien sur le site.
+
 ## Brouillon (seulement en « MODE BROUILLON »)
 
 La consigne donne les champs d'UNE dépense. Tu l'enregistres sans l'envoyer, et rien d'autre.
