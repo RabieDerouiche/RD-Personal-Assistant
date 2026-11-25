@@ -97,9 +97,17 @@ async def client(r, w):
     cibles = [i[4][0] for i in infos if adresse_sure(i[4][0])]
     if not cibles:
         return await refuser(403, 'adresse privée ou locale', hote)
-    try:
-        r2, w2 = await asyncio.wait_for(asyncio.open_connection(cibles[0], int(port)), 20)
-    except (OSError, asyncio.TimeoutError):
+    # IPv4 d'abord, puis chaque adresse à son tour, 6 s chacune : sur le serveur, l'IPv6 sortant ne répond pas
+    # (constaté le 25/11/2026) et une seule tentative en IPv6 aurait fait attendre chaque connexion.
+    cibles = sorted(dict.fromkeys(cibles), key=lambda a: ':' in a)[:4]
+    r2 = w2 = None
+    for cible in cibles:
+        try:
+            r2, w2 = await asyncio.wait_for(asyncio.open_connection(cible, int(port)), 6)
+            break
+        except (OSError, asyncio.TimeoutError):
+            continue
+    if w2 is None:
         return await refuser(502, 'injoignable', hote)
     dire('permis', hote)
     w.write(b'HTTP/1.1 200 Connection established\r\n\r\n')

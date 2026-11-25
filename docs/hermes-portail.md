@@ -133,3 +133,10 @@ Pas prouvé, à voir sur le vrai serveur :
   catalogue (imposé par `--ref`, `docs/hermes.md`) ; avec `~/.hermes`, le Hermes portail cherchait la passerelle du
   Hermes principal (dossier à lui) ; la passerelle passagère tuée en fin de passage bloquait le suivant (arrêt propre).
   Rien sur le serveur encore.
+- 25/11/2026, sur le serveur (session « Serveur JARVIS », après son accord par QCM là-bas) : **jarvis-coffre installé**,
+  service démarré et verrouillé (code 0 : première fois sous un vrai systemd). Installation du Hermes portail lancée :
+  bloquée vingt minutes parce que **l'IPv6 sortant du serveur ne répond pas** (route présente, aucun paquet ne
+  revient) ; chaque connexion attendait environ deux minutes avant l'IPv4. Son choix (QCM de la session du serveur) :
+  préférer l'IPv4 (`precedence ::ffff:0:0/96 100` dans `/etc/gai.conf`, copie de l'ancien fichier dans `/root`).
+  Corrigé dans le kit pour ne pas en dépendre : le relais essaie l'IPv4 d'abord, puis chaque adresse (6 s chacune) ;
+  l'installeur refait une installation coupée en route (bon commit mais commande absente). Banc 56 sur 56.
