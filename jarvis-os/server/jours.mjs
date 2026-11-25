@@ -4,10 +4,13 @@
    site), « Congé » ; week-ends non travaillés ; un vrai jour férié et un congé priment sur une présence ; congé et férié le même jour =
    une journée, classée fériée ; demi-journées respectées ; deux indications opposées, une présence un jour férié, un libellé ambigu ou
    une journée partielle mal définie sont à résoudre ; un jour ouvré sans indication est « à confirmer », jamais deviné.
-   Ses choix (QCM du 25/11/2026) : le bilan part le 24 à midi ; le dernier jour il est relu et son oui n'est redemandé que si un jour a
-   changé ; pendant le double avec Chronos il valide dans les deux, et JARVIS ne prépare aucun brouillon de mail. Le oui se donne dans
-   JARVIS (bouton « Confirmer ») ; une correction s'écrit en une phrase, lue par des règles (Claude seulement pour ce qu'elles ne lisent
-   pas), puis le bilan corrigé lui est remontré avant tout oui.
+   Ses choix (QCM du 25/11/2026) : le bilan part le 24 à midi ; pendant le double avec Chronos il valide dans les deux, et JARVIS ne
+   prépare aucun brouillon de mail. Sa précision du 25/11/2026 au soir (0.83.1) : **son oui du 24 porte sur ses congés**, seule chose dont
+   le CRA du 26 a besoin : un jour sans indication (le lieu à venir, que son raccourci note chaque jour à 11 h) ne bloque pas ce oui ; la
+   note de télétravail, elle, part seule le dernier jour, quand le raccourci a tout noté. Le dernier jour à midi, le bilan est relu : il
+   n'est prévenu que si un congé a changé depuis son oui (le CRA est peut-être déjà parti) ou si un jour n'a toujours ni lieu ni congé
+   (la note l'attend). Le oui se donne dans JARVIS (« Confirmer ») ; une correction s'écrit en une phrase, lue par des règles (Claude
+   seulement pour ce qu'elles ne lisent pas), puis le bilan corrigé lui est remontré.
    Gardé à part, dans jours.json (600). Aucun outil MCP ne le lit encore : le CRA d'Hermes le lira (étape 3). */
 import fs from 'node:fs';
 import {feries} from './radar.mjs';
@@ -16,7 +19,7 @@ import {paris} from './notify.mjs';
 export const nrm = (t) => String(t ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[’`]/g, "'").replace(/\s+/g, ' ').trim();
 export const MOIS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
 const SEM = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
-export const NOMS = {T: 'télétravail', S: 'sur site', C: 'congé', F: 'férié', W: 'week-end', '?': 'à confirmer', X: 'à résoudre'};
+export const NOMS = {T: 'télétravail', S: 'sur site', C: 'congé', F: 'férié', W: 'week-end', '?': 'lieu pas encore noté', X: 'à résoudre'};
 const VALEURS = ['T', 'S', 'C'];
 export const dernierJour = (y, m) => new Date(Date.UTC(y, m, 0)).getUTCDate();   /* m de 1 à 12 */
 const deux = (n) => String(n).padStart(2, '0');
@@ -71,7 +74,10 @@ function couverture(ev, debutMois, finMois, fraction) {
 }
 
 /* le bilan d'un mois. presence et feriesAgenda : les événements des deux agendas (singleEvents) ; corrections : {date: {M: {code, cal}, A: …}} */
-export function bilan({ym, presence = [], feriesAgenda = [], corrections = {}}) {
+/* l'empreinte de ce que son oui valide : congés, fériés et conflits, jour par jour (le lieu, télétravail ou sur site, n'en fait pas partie) */
+const classe = (c) => (c === 'C' || c === 'F' || c === 'X' || c === 'W' ? c : 'w');
+export const empreinteConges = (jours) => jours.filter((d) => d.ouvre !== false).map((d) => d.date.slice(8) + classe(d.M) + classe(d.A)).join('');
+export function bilan({ym, presence = [], feriesAgenda = [], corrections = {}, aujourdhui = ''}) {
   const [y, m] = ym.split('-').map(Number), n = dernierJour(y, m), debut = ymdDe(y, m, 1), fin = ymdDe(y, m, n), loi = feries(y);
   const J = {};
   for (let d = 1; d <= n; d++) { const date = ymdDe(y, m, d), dow = dowDe(date); J[date] = {date, dow, ouvre: dow >= 1 && dow <= 5, ferie: null, ind: {M: new Set(), A: new Set()}, ambigus: [], courts: [], notes: []}; }
@@ -125,17 +131,22 @@ export function bilan({ym, presence = [], feriesAgenda = [], corrections = {}}) 
   const compte = (code) => jours.reduce((s, d) => s + (d.M === code ? 0.5 : 0) + (d.A === code ? 0.5 : 0), 0);
   const totaux = {teletravail: compte('T'), surSite: compte('S'), conges: compte('C'), feries: jours.filter((d) => d.ouvre && d.ferie).length,
     ouvres: jours.filter((d) => d.ouvre).length, aConfirmer: aConfirmer.length, aResoudre: aResoudre.length};
-  totaux.travailles = totaux.teletravail + totaux.surSite;
-  const empreinte = jours.filter((d) => d.ouvre).map((d) => d.date.slice(8) + d.M + d.A).join('');
-  return {mois: ym, jours, totaux, aConfirmer, aResoudre, remarques: [...new Set(remarques)], complet: !aConfirmer.length && !aResoudre.length, empreinte};
+  /* un jour ouvré sans congé est travaillé (le CRA n'a besoin que de ça), même si son lieu n'est pas encore noté */
+  totaux.aVenir = compte('?'); totaux.travailles = totaux.teletravail + totaux.surSite + totaux.aVenir;
+  const conges = jours.filter((d) => d.M === 'C' || d.A === 'C').map((d) => ({date: d.date, fraction: d.M === 'C' && d.A === 'C' ? null : d.M === 'C' ? 'M' : 'A'}));
+  const nonNotes = aujourdhui ? aConfirmer.filter((d) => d < aujourdhui) : [];
+  return {mois: ym, jours, totaux, conges, aConfirmer, nonNotes, aResoudre, remarques: [...new Set(remarques)],
+    validable: !aResoudre.length,                          /* son oui (congés) possible : aucun conflit */
+    complet: !aConfirmer.length && !aResoudre.length,       /* tout est connu, lieu compris : la note de télétravail peut partir */
+    empreinte: empreinteConges(jours)};
 }
 
 /* la phrase du bilan : « Novembre 2026 : 13 jours travaillés (8 en télétravail, 5 sur site), 5 de congé, 1 férié ; à confirmer : jeudi 26, vendredi 27. » */
 export function resume(b) {
   const t = b.totaux, L = libelleMois(b.mois);
-  let s = L.charAt(0).toUpperCase() + L.slice(1) + ' : ' + pluriel(t.travailles, 'jour travaillé', 'jours travaillés') + ' (' + nb(t.teletravail) + ' en télétravail, ' + nb(t.surSite) + ' sur site)';
-  s += ', ' + nb(t.conges) + ' de congé, ' + pluriel(t.feries, 'férié', 'fériés');
-  if (b.aConfirmer.length) s += ' ; à confirmer : ' + b.aConfirmer.map(jourDit).join(', ');
+  let s = L.charAt(0).toUpperCase() + L.slice(1) + ' : ' + pluriel(t.travailles, 'jour travaillé', 'jours travaillés') + ' (' + nb(t.teletravail) + ' en télétravail, ' + nb(t.surSite) + ' sur site' + (t.aVenir ? ', ' + nb(t.aVenir) + ' lieu à venir' : '') + ')';
+  s += ', ' + nb(t.conges) + ' de congé' + ((b.conges || []).length ? ' (' + b.conges.map((c) => jourDit(c.date) + (c.fraction === 'M' ? ' matin' : c.fraction === 'A' ? ' après-midi' : '')).join(', ') + ')' : '') + ', ' + pluriel(t.feries, 'férié', 'fériés');
+  if ((b.nonNotes || []).length) s += ' ; lieu non noté : ' + b.nonNotes.map(jourDit).join(', ');
   if (b.aResoudre.length) s += ' ; à résoudre : ' + b.aResoudre.map((x) => jourDit(x.date)).join(', ');
   return s + '.';
 }
@@ -241,10 +252,12 @@ export function createJours({file, agenda, claude = null, push = async () => [],
         const [y, m] = ym.split('-').map(Number), debut = ymdDe(y, m, 1), apres = plusJour(ymdDe(y, m, dernierJour(y, m)), 1);
         const ag = await agendas();
         const [presence, feriesAgenda] = await Promise.all([agenda.evenements(ag.presence.id, debut, apres), agenda.evenements(ag.feries.id, debut, apres)]);
-        const b = bilan({ym, presence: presence || [], feriesAgenda: feriesAgenda || [], corrections: x.corrections});
+        const b = bilan({ym, presence: presence || [], feriesAgenda: feriesAgenda || [], corrections: x.corrections, aujourdhui: paris(new Date(now())).ymd});
         x.bilan = b; x.agendas = ag; x.lu = now(); x.erreur = '';
         x.source = {presence: (presence || []).filter((e) => e && e.status !== 'cancelled').map((e) => ({titre: TXT(e.summary, 40), debut: (e.start && (e.start.date || e.start.dateTime)) || '', fin: (e.end && (e.end.date || e.end.dateTime)) || ''})).slice(0, 80)};
-        if (x.etat === 'valide' && x.valide && b.empreinte !== x.valide.empreinte) { x.etat = 'a_revoir'; x.historique.push({at: now(), quoi: 'changé depuis ton oui'}); }
+        /* un congé (ou un conflit) qui change après son oui : « à revoir » ; un lieu noté par son raccourci, non (attendu) ; un oui de la 0.83.0
+           gardait une empreinte avec le lieu : elle est refaite depuis ses jours validés */
+        if (x.etat === 'valide' && x.valide && b.empreinte !== (x.valide.v === 2 ? x.valide.empreinte : empreinteConges(x.valide.jours || []))) { x.etat = 'a_revoir'; x.historique.push({at: now(), quoi: 'congés changés depuis ton oui'}); }
       } catch (e) { x.erreur = TXT((e && e.message) || e, 200); }
       noter(); return x;
     })().finally(() => { occupe = null; });
@@ -253,16 +266,16 @@ export function createJours({file, agenda, claude = null, push = async () => [],
   function etat(ym) {
     const x = M(ym), b = x.bilan || null;
     /* demande : il est dans « Pour moi » (à partir du 24, ou quand un jour a changé depuis son oui) ; avant, le bilan se voit par son lien */
-    return {mois: ym, libelle: libelleMois(ym), etat: x.etat, demande: x.etat === 'a_revoir' || (!!x.envoye24 && x.etat !== 'valide'), bilan: b, texte: b ? resume(b) : '', erreur: x.erreur || '', lu: x.lu || 0,
+    return {mois: ym, libelle: libelleMois(ym), aujourdhui: paris(new Date(now())).ymd, etat: x.etat, demande: x.etat === 'a_revoir' || (!!x.envoye24 && x.etat !== 'valide'), bilan: b, texte: b ? resume(b) : '', erreur: x.erreur || '', lu: x.lu || 0,
       valide: x.valide ? {at: x.valide.at, texte: x.valide.texte} : null, corrections: Object.keys(x.corrections || {}).length,
       dernieres: (x.historique || []).slice(-6), agendas: x.agendas ? {presence: x.agendas.presence.nom, feries: x.agendas.feries.nom} : null};
   }
   function confirmer(ym, empreinte) {
     const x = M(ym), b = x.bilan;
     if (!b) return {ok: false, error: 'Bilan pas encore lu.'};
-    if (!b.complet) return {ok: false, error: 'Il reste des jours à confirmer ou à résoudre : corrige-les d’abord.'};
-    if (String(empreinte || '') !== b.empreinte) return {ok: false, error: 'Le bilan a changé depuis son affichage : relis-le.'};
-    x.etat = 'valide'; x.valide = {at: now(), empreinte: b.empreinte, texte: resume(b), totaux: b.totaux, jours: b.jours.filter((d) => d.ouvre).map((d) => ({date: d.date, M: d.M, A: d.A}))};
+    if (!b.validable) return {ok: false, error: 'Il reste des jours à résoudre : corrige-les d’abord.'};
+    if (String(empreinte || '') !== b.empreinte) return {ok: false, error: 'Tes congés ont changé depuis l’affichage : relis le bilan.'};
+    x.etat = 'valide'; x.valide = {v: 2, at: now(), empreinte: b.empreinte, texte: resume(b), totaux: b.totaux, conges: b.conges, jours: b.jours.filter((d) => d.ouvre).map((d) => ({date: d.date, M: d.M, A: d.A}))};
     x.historique.push({at: now(), quoi: 'validé'}); noter();
     return {ok: true};
   }
@@ -278,11 +291,11 @@ export function createJours({file, agenda, claude = null, push = async () => [],
     }
     if (!lu.changements.length) return {ok: false, error: lu.refus.length ? lu.refus.join(' ; ') + '.' : 'Je n’ai pas compris : écris par exemple « jeudi 26 : télétravail » ou « le reste du mois : sur site ».', nonLu: lu.nonLu};
     const ap = appliquer(x.corrections, lu.changements, b);
-    x.corrections = ap.corrections; if (x.etat === 'valide') x.etat = 'a_valider';
-    if (x.etat === 'a_revoir') x.etat = 'a_valider';
+    x.corrections = ap.corrections;
     const compris = comprisDit(lu.changements);
     x.historique.push({at: now(), quoi: 'corrigé : ' + TXT(compris, 200)}); noter();
     await lire(ym);
+    if (x.etat === 'a_revoir') x.etat = 'a_valider';   /* il a changé ses congés lui-même : son oui est à redonner ; un lieu corrigé seul garde son oui */
     return {ok: true, compris, par, nonLu: lu.nonLu, refus: [...lu.refus, ...ap.refus]};
   }
   async function parClaude(texte, b) {
@@ -301,7 +314,7 @@ export function createJours({file, agenda, claude = null, push = async () => [],
       fractions: c.fraction === 'matin' ? ['M'] : c.fraction === 'apres-midi' ? ['A'] : ['M', 'A'], code: code[nrm(c.type)] || null})).filter((c) => c.dates.length && c.code);
     return {changements, incompris: TXT(j.incompris, 200)};
   }
-  function effacer(ym) { const x = M(ym); x.corrections = {}; if (x.etat !== 'valide') x.etat = 'a_valider'; x.historique.push({at: now(), quoi: 'corrections effacées'}); noter(); return lire(ym); }
+  async function effacer(ym) { const x = M(ym); x.corrections = {}; x.historique.push({at: now(), quoi: 'corrections effacées'}); noter(); await lire(ym); if (x.etat === 'a_revoir') x.etat = 'a_valider'; noter(); return x; }
 
   /* le 24 à midi (rattrapé jusqu'à la fin du mois si le serveur était arrêté) ; le dernier jour à midi, relu */
   const avertir = (ym, title, corps) => push({title, body: TXT(corps, 230), url: '/#voir-jours-' + ym, tag: 'jours-' + ym}).catch(() => {});
@@ -312,12 +325,15 @@ export function createJours({file, agenda, claude = null, push = async () => [],
       const t = paris(new Date(now())), ym = t.ymd.slice(0, 7), x = M(ym), dern = dernierJour(t.y, t.m);
       if (t.d >= 24 && t.hm >= heure && !x.envoye24) {
         x.envoye24 = t.ymd; noter(); await lire(ym);
-        if (x.bilan && x.etat !== 'valide') await avertir(ym, 'Tes jours de ' + MOIS[t.m - 1], resume(x.bilan) + ' À valider dans JARVIS.');
+        if (x.bilan && x.etat !== 'valide') await avertir(ym, 'Tes jours de ' + MOIS[t.m - 1], resume(x.bilan) + ' Ton oui sur tes congés sert au CRA du 26.');
       }
       if (t.d === dern && t.hm >= heure && x.verifFin !== t.ymd) {
         x.verifFin = t.ymd; noter(); await lire(ym);
-        if (x.bilan && x.etat === 'a_revoir') await avertir(ym, 'Tes jours de ' + MOIS[t.m - 1] + ' ont changé', resume(x.bilan) + ' Ton oui est à redonner dans JARVIS.');
-        else if (x.bilan && x.etat !== 'valide') await avertir(ym, 'Tes jours de ' + MOIS[t.m - 1] + ' : toujours à valider', resume(x.bilan));
+        /* le raccourci a noté le dernier jour à 11 h : tout est connu, sauf oubli ; rien à dire si tout va bien (la note de télétravail part seule) */
+        const b = x.bilan;
+        if (b && x.etat === 'a_revoir') await avertir(ym, 'Tes congés de ' + MOIS[t.m - 1] + ' ont changé depuis ton oui', resume(b) + ' Le CRA est peut-être déjà parti : vérifie, puis confirme à nouveau.');
+        else if (b && x.etat !== 'valide') await avertir(ym, 'Tes jours de ' + MOIS[t.m - 1] + ' : toujours à valider', resume(b));
+        else if (b && !b.complet) await avertir(ym, 'Tes jours de ' + MOIS[t.m - 1] + ' : un lieu manque', (b.aConfirmer.length ? 'Ni lieu ni congé noté : ' + b.aConfirmer.map(jourDit).join(', ') + '. ' : '') + (b.aResoudre.length ? 'À résoudre : ' + b.aResoudre.map((r) => jourDit(r.date)).join(', ') + '. ' : '') + 'La note de télétravail attend ta correction.');
       }
     } catch (e) { log('jours : tic impossible (' + TXT((e && e.message) || e, 200) + ')'); }
     finally { enTic = false; }

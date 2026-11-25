@@ -33,7 +33,7 @@ import {createCoffreLien} from './coffre-lien.mjs';   /* 0.74.0 : le coffre en m
 import {createVerrou} from './verrou.mjs';   /* 0.75.0 : le verrou de l'app par passkey */
 const ACT = createActivite();   /* 0.33.0 : ce que fait Claude à l'instant */
 
-const VERSION = '0.83.0';
+const VERSION = '0.83.1';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PORT = +(process.env.PORT || 8787);
 const HOST = process.env.HOST || '127.0.0.1';
@@ -1548,7 +1548,7 @@ const RADAR = createRadar({file: path.join(DATA, 'radar.json'), now, log: (t) =>
       tools: {allow: [], deny: ['Bash', 'Read', 'Edit', 'Write', 'Glob', 'Grep', 'NotebookEdit', 'WebFetch', 'WebSearch', 'Task']}}); },
   push: (msg) => (S.push && S.push.subs.length ? PUSH.send(msg, {urgency: 'high'}) : Promise.resolve([]))});
 /* 0.83.0 : les jours du mois (jours.mjs ; « Hermes remplace Chronos », étape 2) : le bilan tiré de l'agenda « Présence » et des fériés, sans
-   IA, envoyé le 24 à midi et relu le dernier jour ; son oui dans JARVIS. Gardé à part, dans jours.json ; Claude ne lit qu'une correction
+   IA, envoyé le 24 à midi et relu le dernier jour ; son oui dans JARVIS (0.83.1 : sur ses congés, pour le CRA du 26). Gardé à part, dans jours.json ; Claude ne lit qu'une correction
    que les règles n'ont pas comprise, sans aucun outil. */
 const JOURS = createJours({file: path.join(DATA, 'jours.json'), now, log: (t) => console.log(t),
   agenda: {lie: () => GG.status('').linked, calendriers: async () => ((await GG.tool('Google Calendar', 'list_calendars', {})) || {}).calendars || [],

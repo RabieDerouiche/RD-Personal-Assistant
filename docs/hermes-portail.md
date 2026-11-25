@@ -346,6 +346,9 @@ Chronos fait celle du mois écoulé le 1er : Hermes ne la crée pas, il la prép
 **Sa précision (25/11/2026, tard)** : avec Hermes, la note de télétravail sera générée et lui sera soumise pour
 validation **le dernier jour du mois** (et non le 1er du mois suivant). Tous les jours du mois sont alors connus ;
 la facture d'électricité et l'appel de charges du mois sont déjà arrivés.
+**Précisée le 25/11/2026 au soir** : la note part **automatiquement** le dernier jour, une fois que son raccourci de
+présence a noté le dernier jour (11 h) : pas de nouvelle validation des jours ce jour-là. Seuls l'arrêtent un jour
+ouvré sans lieu ni congé noté, ou un conflit (JARVIS le prévient). Le CRA du 26, lui, n'a besoin que des congés.
 
 **Ses réponses (QCM du 25/11/2026 au soir)** : l'espace client du fournisseur d'électricité se connecte par e-mail
 et mot de passe (donc un identifiant de plus à enregistrer par lui, sans second facteur) ; le PDF suffit, comme en
@@ -533,12 +536,17 @@ tant qu'une routine n'est pas basculée) :
    Mise en service : il accepte « Mettre à jour » dans JARVIS (aucune demande à la session du serveur). Les jours
    validés restent dans `jours.json` sur le serveur ; le CRA (étape 3) les lira par un outil à ajouter.
    À comparer en décembre : le bilan de JARVIS et celui de Chronos, jour par jour.
+   **Sa précision le soir même (JARVIS 0.83.1)** : le CRA peut partir le 26 parce qu'il n'a besoin que des congés ;
+   son oui du 24 porte donc sur ses congés, même si le lieu (télétravail ou sur site) des derniers jours n'est pas
+   encore noté. La note de télétravail part seule le dernier jour, quand le raccourci a tout noté. Le dernier jour,
+   JARVIS ne le prévient que si un congé a changé depuis son oui (le CRA est peut-être déjà parti) ou si un jour n'a
+   ni lieu ni congé (la note l'attend) ; sinon, rien.
 3. *CRA hebdomadaire puis CRA mensuel*, à blanc : dire ce qui serait saisi, jour par jour, d'après les jours
    validés, sans rien cliquer (sur l'intranet, chaque clic s'enregistre) ; puis une vraie saisie sur son oui, avec
    les règles de Chronos (types de journée, congés, fériés, soumission, fin de mission).
 4. *Télétravail* : les briques 2 à 5 de la section « La note de frais de télétravail » (fichier de Drive, PDF de
-   synthèse et assemblage, lecture des montants, dépense à blanc), générée et soumise à sa validation le dernier
-   jour du mois.
+   synthèse et assemblage, lecture des montants, dépense à blanc), générée le dernier jour du mois après le
+   raccourci de présence, et partie seule (sa précision du 25/11/2026 au soir) ; à blanc tant que Chronos tourne.
 5. *Déclenchement et bascule* : une minuterie par routine (ou l'arrivée du mail), le compte rendu à lui (JARVIS ou
    Telegram), puis la comparaison avec Chronos et sa décision, routine par routine.
 
