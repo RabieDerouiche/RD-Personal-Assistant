@@ -158,6 +158,8 @@ try {
     fs.writeFileSync(path.join(SD, 'portail-retours', 'cra-2026-11-16.json'), JSON.stringify({semaine: '2026-11-16', resultat: 'rien', texte: 'Une saisie existante diffère : rien changé.', premiere: false}));
     await JS.tic();
     ok('semaine : « rien saisi » : « à la main », notification « pas soumis »', JS.etatSemaine('2026-11-16').etat === 'a_la_main' && /pas soumis/.test(pushS[pushS.length - 1].title) && /À faire à la main/.test(pushS[pushS.length - 1].body));
+    { await JS.lireSemaine('2026-11-16'); const e16 = JS.etatSemaine('2026-11-16'), v1 = JS.confirmerSemaine('2026-11-16', e16.empreinte), at1 = JS.brut().semaines['2026-11-16'].valide.at;
+      ok('semaine : « à la main », un nouveau oui relance Hermes (nouvelle tentative : un autre instant de oui)', v1.ok && JS.etatSemaine('2026-11-16').etat === 'valide' && at1 > 0, JSON.stringify(v1)); }
     /* une demi-journée de congé bloque ; une semaine à cheval sur deux mois */
     presS = [...BASE, jour(26, 'Congé matin')];
     s = await (createJours({file: path.join(SD, 'demi.json'), agenda: agS, now: () => T})).lireSemaine('2026-11-23');

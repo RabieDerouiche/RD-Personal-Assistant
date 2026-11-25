@@ -1,0 +1,13 @@
+# JARVIS OS — le CRA de la semaine (docs/hermes-portail.md ; sa décision du 25/11/2026 : Hermes à la place de Chronos dès le 27/11).
+# Posé par install.sh ; lancé toutes les 5 minutes par hermes-portail-cra.timer. Il ne fait rien sans /etc/hermes-portail/cra.conf (root,
+# l'adresse du portail, jamais dans le dépôt) ni sans une semaine que le propriétaire a confirmée dans JARVIS (jours.json). Une semaine
+# confirmée : un passage d'Hermes (saisie, « Save », « Submit »), puis le compte rendu posé pour JARVIS, qui le lui notifie.
+[Unit]
+Description=CRA de la semaine : une semaine confirmée dans JARVIS, saisie et soumise par le Hermes portail
+After=network-online.target hermes-portail-filtre.service hermes-portail-sortie.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/hermes-portail cra-auto
+TimeoutStartSec=1500
+Nice=5

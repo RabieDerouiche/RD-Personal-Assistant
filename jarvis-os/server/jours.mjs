@@ -371,7 +371,7 @@ export function createJours({file, agenda, claude = null, push = async () => [],
   function confirmerSemaine(l, empreinte) {
     const s = D.semaines[l];
     if (!s || !s.jours) return {ok: false, error: 'Semaine pas encore lue.'};
-    if (!['a_valider', 'valide'].includes(s.etat)) return {ok: false, error: 'Cette semaine est déjà traitée (' + s.etat + ').'};
+    if (!['a_valider', 'valide', 'a_la_main'].includes(s.etat)) return {ok: false, error: 'Cette semaine est déjà soumise.'};   /* « à la main » : un nouveau oui relance Hermes (une tentative par oui) */
     if (paris(new Date(now())).ymd < plusJour(l, 4)) return {ok: false, error: 'Le oui se donne à partir du vendredi : ton raccourci note chaque jour à 11 h.'};
     if (s.jours.some((d) => d.bloque)) return {ok: false, error: 'Un jour bloque la saisie automatique : corrige-le, ou saisis cette semaine à la main.'};
     if (String(empreinte || '') !== s.empreinte) return {ok: false, error: 'La semaine a changé depuis son affichage : relis-la.'};

@@ -10745,6 +10745,7 @@ void main(){
     if (s.retour) kids.push(h('p', {class: s.retour.resultat === 'soumise' || s.retour.resultat === 'deja' ? 'jrs-ok' : 'jrs-alerte'}, h('b', {text: 'Hermes : '}), s.retour.texte || s.retour.resultat, s.retour.premiere ? ' Première exécution : vérifie sur le portail ce qui a été saisi.' : ''));
     else if (s.etat === 'valide') kids.push(h('p', {class: 'jrs-ok', text: 'Confirmé : Hermes saisit et soumet ta semaine dans les minutes qui viennent.'}));
     if (CRA.msg) kids.push(h('p', {class: 'jrs-msg', role: 'status', text: CRA.msg}));
+    if (s.etat === 'a_la_main' && !s.bloque) kids.push(h('div', {class: 'row jrs-acts'}, btn('Relancer Hermes', () => craAgir('confirmer'), 'sm main cra-relancer')));   /* un nouveau oui = une nouvelle tentative */
     if (s.etat === 'a_valider') {
       kids.push(h('p', {class: 'jrs-rq', text: s.confirmable ? 'Ton oui lance Hermes : il saisit « 1 » pour chaque journée travaillée, rien pour un congé ou un férié, puis soumet la semaine.' : 'Le oui se donne à partir du vendredi (ton raccourci note chaque jour à 11 h).'}));
       const acts = h('div', {class: 'row jrs-acts'}), c = btn(s.bloque ? 'Confirmer (un jour à voir)' : 'Confirmer et soumettre', () => craAgir('confirmer'), 'sm main cra-confirmer');

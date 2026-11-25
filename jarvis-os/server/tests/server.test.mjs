@@ -1001,6 +1001,11 @@ try {
           const j3 = await J('/api/jours/confirmer', {mois: '2026-11', empreinte: j2.body && j2.body.bilan && j2.body.bilan.empreinte});
           ok('jours : son oui sur ses congés, le lieu des autres jours pas encore noté (0.83.1) ; sa phrase lue par les règles, son oui tient ; gardé dans jours.json (600)', j0.status === 200 && j0.body.etat === 'valide' && j2.status === 200 && j2.body.par === 'règles' && j2.body.bilan.complet && j2.body.etat === 'valide' && j3.status === 200 && j3.body.etat === 'valide'
             && (fs.statSync(path.join(DATA, 'jours.json')).mode & 0o777) === 0o600, JSON.stringify([j0.status, j2.status, j2.body && j2.body.compris, j3.status, j3.body && j3.body.etat]));
+          /* 0.84.0 : le CRA de la semaine, de bout en bout : la semaine du 16 (télétravail du lundi au vendredi), son oui, gardé pour root */
+          const s1 = await J('/api/jours/semaine?lundi=2026-11-16'), s2 = await J('/api/jours/semaine/confirmer', {lundi: '2026-11-16', empreinte: s1.body && s1.body.empreinte});
+          const sj = JSON.parse(fs.readFileSync(path.join(DATA, 'jours.json'), 'utf8')).semaines || {};
+          ok('jours : CRA de la semaine : « 1 » chaque jour travaillé ; son oui gardé dans jours.json pour root ; un lundi mal écrit refusé', s1.status === 200 && s1.body.jours.map((d) => d.q).join() === '1,1,1,1,1' && s2.status === 200 && s2.body.etat === 'valide'
+            && sj['2026-11-16'].valide.jours.length === 5 && (await J('/api/jours/semaine/confirmer', {lundi: '2026-11-17'})).status === 400, JSON.stringify([s1.status, s1.body && s1.body.jours && s1.body.jours.map((d) => d.q), s2.status, s2.body && (s2.body.etat || s2.body.error)]));
           FG.calendriers.pop(); delete FG.events[FH]; delete FG.events['pres@group.calendar.example']; }
         FG.onglets = null; delete FG.fils.thpj; delete FG.events['ech@group.calendar.example']; await P('/api/google/unlink', {}); }
       /* 0.41.0 : les routines planifiées (une phrase → un moment et une tâche ; à l'heure dite, sa mission) et le brief du matin sans IA */

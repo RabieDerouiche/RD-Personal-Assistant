@@ -25,7 +25,7 @@ BANC=${HERMES_BANC:-0}   # 1 = banc d'essai (conteneur sans systemd) : ni servic
 
 dire() { printf '\n== %s\n' "$*"; }
 [ "$(id -u)" = 0 ] || { echo "À lancer en root : sudo bash $0"; exit 1; }
-for f in politique.yaml hermes-portail filtre.py sortie.nft hermes-portail-sortie.service hermes-portail-filtre.service hermes-portail-essai.service domaines.defaut navigateur-regles.json justificatif-essai.pdf facture.mjs skills/portail/portail/SKILL.md; do
+for f in politique.yaml hermes-portail filtre.py sortie.nft hermes-portail-sortie.service hermes-portail-filtre.service hermes-portail-essai.service hermes-portail-cra.service hermes-portail-cra.timer domaines.defaut navigateur-regles.json justificatif-essai.pdf facture.mjs skills/portail/portail/SKILL.md; do
   [ -f "$ICI/$f" ] || { echo "Fichier manquant : $ICI/$f"; exit 1; }
 done
 bash -n "$ICI/hermes-portail" && python3 -I -c "import ast,sys; ast.parse(open(sys.argv[1]).read())" "$ICI/filtre.py" && python3 -I -c "import json,sys; json.load(open(sys.argv[1]))" "$ICI/navigateur-regles.json" || { echo "Le code du dépôt ne passe pas le contrôle de syntaxe : rien n'a été posé."; exit 1; }
@@ -163,13 +163,18 @@ chemin="${node_bin:+$node_bin:}${npm_bin:+$npm_bin:}$HH/hermes-agent/node_module
 sed -e "s#@PATH@#$chemin#" -e "s/@RELAIS@/$RELAIS/g" "$ICI/hermes-portail-essai.service" > /etc/systemd/system/hermes-portail-essai.service
 chmod 0644 /etc/systemd/system/hermes-portail-essai.service
 install -d -o root -g root -m 0700 "$VAR/essais"
+# le CRA de la semaine (25/11/2026) : la minuterie ne fait rien sans /etc/hermes-portail/cra.conf (posé sur le serveur, jamais dans le dépôt)
+install -o root -g root -m 0644 "$ICI/hermes-portail-cra.service" /etc/systemd/system/hermes-portail-cra.service
+install -o root -g root -m 0644 "$ICI/hermes-portail-cra.timer" /etc/systemd/system/hermes-portail-cra.timer
+install -d -o root -g root -m 0700 "$VAR/cra"
 nft -c -f "$ETC/sortie.nft" 2>/dev/null && echo "Règles réseau : syntaxe vérifiée." || [ "$BANC" = 1 ] || { echo "Règles réseau refusées par nft : arrêt."; exit 1; }
 if [ "$BANC" != 1 ]; then
   systemctl daemon-reload
   systemctl enable --now hermes-portail-filtre.service
   systemctl enable --now hermes-portail-sortie.service
   systemctl restart hermes-portail-sortie.service
-  echo "Relais : $(systemctl is-active hermes-portail-filtre) ; règles réseau : $(systemctl is-active hermes-portail-sortie)."
+  systemctl enable --now hermes-portail-cra.timer
+  echo "Relais : $(systemctl is-active hermes-portail-filtre) ; règles réseau : $(systemctl is-active hermes-portail-sortie) ; CRA de la semaine : $(systemctl is-active hermes-portail-cra.timer)$([ -f "$ETC/cra.conf" ] || echo ' (sans cra.conf : ne fait rien)')."
 fi
 
 dire "Fini"

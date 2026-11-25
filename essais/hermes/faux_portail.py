@@ -31,6 +31,7 @@ DEPENSES = [('FRAIS-0001', 'Abonnement logiciel (inventé)', '20,00 €', 'Valid
 
 
 ETAPES = {}            # jeton d'étape (mot de passe accepté, code attendu) -> heure de fin
+FEUILLES = {}          # feuilles de temps du banc : date du lundi (MM/JJ/AAAA) -> quantités et état
 
 
 def totp(cle, instant):
@@ -129,6 +130,18 @@ class P(BaseHTTPRequestHandler):
                 '<label>Justificatif <input name="justificatif" id="justificatif" type="file"></label><br>'
                 '<button type="submit" formaction="/depense/enregistrer" id="enregistrer">Enregistrer sans envoyer</button> '
                 '<button type="submit" id="soumettre">Soumettre</button></form><p><a href="/tableau">Retour</a></p>'))
+        if chemin == '/feuille':   # 25/11/2026 : une feuille de temps d'une semaine (CRA hebdomadaire), comme celle d'un vrai portail
+            q = parse_qs(self.path.split('?', 1)[1]) if '?' in self.path else {}
+            d = (q.get('date') or ['11/23/2026'])[0][:10]
+            f = FEUILLES.setdefault(d, {'qty': [''] * 5, 'etat': ''})
+            note(evenement='feuille', date=d, etat=f['etat'])
+            cases = ''.join('<td><input name="QTY_DAY%d" id="QTY_DAY%d" value="%s"%s></td>' % (k + 1, k + 1, html.escape(f['qty'][k]), ' disabled' if f['etat'] == 'Submitted' else '') for k in range(5))
+            return self.rendre(200, page('Timesheet (banc)',
+                '<form method="post" action="/feuille/save" id="feuille"><label>Date <input name="date" id="DATE_DAY1" value="%s"></label> '
+                '<a id="actualiser" href="/feuille?date=%s">Actualiser</a>'
+                '<table id="grille"><tr><th>Code</th><th>Lun</th><th>Mar</th><th>Mer</th><th>Jeu</th><th>Ven</th></tr><tr><td>R002 - Regular Day</td>%s</tr></table>'
+                '<button type="submit" id="save">Save</button> <button type="submit" formaction="/feuille/submit" id="submit">Submit</button></form>'
+                '<table id="statut"><tr><th>Reported Time Status</th></tr><tr><td id="etat">%s</td></tr></table>' % (html.escape(d), html.escape(d), cases, html.escape(f['etat'] or ''))))
         if chemin == '/deconnexion':
             SESSIONS.pop(s, None)
             note(evenement='deconnexion')
@@ -166,6 +179,16 @@ class P(BaseHTTPRequestHandler):
                 return self.rendre(401, page('Code de vérification (banc)', '<p id="erreur">Code refusé.</p>'))
             ETAPES.pop(e, None); jeton = secrets.token_urlsafe(24); SESSIONS[jeton] = time.time() + ARGS.duree_session
             return self.vers('/tableau', [('Set-Cookie', 'session=%s; Path=/; HttpOnly; SameSite=Lax; Max-Age=%d' % (jeton, ARGS.duree_session))])
+        if chemin in ('/feuille/save', '/feuille/submit'):
+            if not self.session():
+                return self.vers('/connexion')
+            d = champs.get('date', '')[:10]; f = FEUILLES.setdefault(d, {'qty': [''] * 5, 'etat': ''})
+            if f['etat'] == 'Submitted':
+                note(evenement='CRA-DEJA', date=d); return self.vers('/feuille?date=' + d)
+            f['qty'] = [champs.get('QTY_DAY%d' % (k + 1), '') for k in range(5)]
+            f['etat'] = 'Submitted' if chemin.endswith('submit') else 'Saved'
+            note(evenement='CRA-SUBMIT' if chemin.endswith('submit') else 'CRA-SAVE', date=d, qty=f['qty'])
+            return self.vers('/feuille?date=' + d)
         if chemin == '/depense/enregistrer':
             if not self.session():
                 return self.vers('/connexion')
