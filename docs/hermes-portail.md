@@ -83,9 +83,10 @@ tenu par la commande) : pas encore faite.
 | Fichier | Rôle |
 |---|---|
 | `install.sh` | Root, relançable. Utilisateur `hermes-portail`, Hermes à la version figée du Hermes principal (lue dans `../install.sh`) avec son navigateur, plugin de l'abonnement Claude et Claude Code à lui, politique, skill, copies root de la commande et du relais, lien de la clé, règles réseau et relais. Ne démarre aucun agent. |
-| `hermes-portail` | La commande (`/usr/local/sbin/hermes-portail`) : `etat`, `connexion-claude`, `enregistrer`, `domaines`, `essai`, `brouillon`, `notes`, `cle`, `fermer`, `oublier`. Un essai lance l'unité `hermes-portail-essai`. |
+| `hermes-portail` | La commande (`/usr/local/sbin/hermes-portail`) : `etat`, `connexion-claude`, `enregistrer`, `domaines`, `essai`, `brouillon` (et `--sans-creer`), `facture`, `notes`, `cle`, `fermer`, `oublier`. Un essai lance l'unité `hermes-portail-essai`. |
 | `hermes-portail-essai.service` | Un passage, enfermé (mêmes lignes que `hermes-gateway.service`, mémoire sans échange ; depuis le 25/11/2026, filtre d'appels système et espaces de noms interdits). Une vraie unité, pas `systemd-run` : au premier essai sur le serveur, `systemd-run -p IPAddressDeny=link-local` a été refusé alors que la même ligne est valable dans une unité. Consigne dans `/home/hermes-portail/.consigne`, réponse dans `/var/lib/hermes-portail/essais/`. |
 | `politique.yaml` | Sa politique (`/etc/hermes-portail/config.yaml`, root) : outils `browser`, `terminal`, `skills` seulement ; Sonnet ; profil de navigateur gardé ; navigateur envoyé vers le relais, lancé sans son bac à sable (dit en clair, voir « Durcissement »), remplissage automatique et heure réseau coupés. |
+| `facture.mjs` | Va chercher UNE facture PDF dans ses mails : lancé par `hermes-portail facture` sous l'utilisateur `jarvis`, avec l'accès Google et le code de JARVIS (`google.mjs`, `pdf.mjs`), en lecture seule ; l'état de JARVIS n'est jamais réécrit. Rend le PDF et son texte à root. |
 | `navigateur-regles.json` | Règles d'administrateur du navigateur (`/etc/opt/chrome_for_testing/policies/managed/hermes-portail.json`, root) : pas de gestionnaire de mots de passe, pas de vérification de fuite, pas de compte Google, pas de mesures. |
 | `skills/portail/portail/SKILL.md` | Sa marche à suivre : se connecter par le coffre, lecture seule, ne jamais taper un mot de passe, ne rien soumettre, s'arrêter si un code est demandé, attente finale, réponse sans donnée personnelle. |
 | `filtre.py`, `hermes-portail-filtre.service` | Le relais filtrant (Python du système, sans dépendance, utilisateur passager) : CONNECT vers le port 443 des hôtes de la liste, refus notés. |
@@ -109,7 +110,7 @@ le serveur). Faux portail `essais/hermes/faux_portail.py`, faux terminal `essais
 
 ## Ce que le banc prouve, et ce qu'il ne prouve pas
 
-Prouvé (81 vérifications, 25/11/2026) : installation ; outils réduits et politique figée ; clé seulement en ramfs,
+Prouvé (91 vérifications, 25/11/2026) : installation ; outils réduits et politique figée ; clé seulement en ramfs,
 nulle part en clair sur le disque, gardée par jarvis-coffre ; enregistrement dans un faux terminal sans que le mot de
 passe s'affiche ; connexion au faux portail par le coffre, tableau lu, formulaire ouvert, rien de soumis ; mot de
 passe et clé jamais envoyés au modèle ; session gardée au second passage ; coffre verrouillé : refus propre ;
@@ -185,6 +186,29 @@ est passée).
 Garde-fou réel : seulement la skill et le modèle. Rien de technique n'empêche un clic sur le mauvais bouton (le
 relais ne voit pas dans le HTTPS). Conséquence au pire : une dépense d'essai d'un euro envoyée au valideur, à
 retirer à la main. Limite de tours portée à 40 par passage (un formulaire demande plus d'allers-retours).
+
+## La vraie facture (25/11/2026, ses choix par QCM : « La vraie facture », « Remplir sans créer »)
+
+**Ce que le relevé du compte a montré** (passage en lecture seule, à sa demande : « regarde toutes les notes de
+frais créées par Chronos ») : une vingtaine de dépenses sur douze mois, toutes avec un justificatif PDF, de quatre
+sortes (abonnement d'IA, box, télétravail, un achat de matériel). Le portail ne dit pas qui a créé une dépense ; les
+plus récentes, au vendeur écrit « Société (Produit) » et au commentaire détaillé, sont celles de Chronos. **Aucune
+liste de rapports n'existe dans ce compte**, et les états s'enchaînent : « En attente », « Conforme », « Remboursé ».
+Conclusion (Likely) : sur ce portail, créer une dépense, c'est la soumettre ; la consigne de Chronos « ne crée pas
+de rapport, n'envoie rien au valideur » ne protège de rien. D'où : jamais de création par Hermes sans son accord, et
+le mode à blanc pour comparer. Écart vu au passage : le texte de la routine noté dans Pilotage est en retard sur ce
+que Chronos saisit vraiment (nom du produit, jour de la date).
+
+**Deux pièces de plus** :
+- `sudo hermes-portail facture --requete "<recherche Gmail>" --nom "<expression du nom>" --vers <dossier de root>` :
+  JARVIS a l'accès à Gmail, Hermes portail non. La commande lance `facture.mjs` sous l'utilisateur `jarvis` (lecture
+  seule : une recherche, les fils trouvés, une pièce jointe), et garde le PDF et son texte dans le dossier de root.
+  Rien du contenu n'est affiché. Le Hermes portail ne voit jamais les mails : seulement le PDF, le temps du passage.
+- `brouillon … --sans-creer` (« MODE À BLANC ») : Hermes joint la facture, relève ce que le portail a pré-rempli,
+  met chaque champ à la valeur de la consigne, puis annule et vérifie qu'aucune ligne n'a été ajoutée. Pour un
+  montant ou une date, il dit seulement « égal » ou « différent » de la consigne.
+Qui lit la facture pour écrire le fichier des champs : pour l'essai, la session du serveur, à partir de
+`facture.txt` ; pour une routine, à construire (règles par sorte de facture, côté JARVIS).
 
 ## Ce qu'Hermes apprend d'un portail (25/11/2026, sa demande : « qu'il développe ses skills »)
 
@@ -311,10 +335,10 @@ Le Hermes de Telegram, lui, a sa mémoire et propose des skills, validées par `
 Pour ce portail :
 1. **Combien de temps la session tient** : elle tient d'un passage au suivant (une heure d'écart). Reste un contrôle
    par jour pendant une à deux semaines (minuterie à écrire, sur sa demande).
-2. **Note de frais** : le geste est prouvé avec une fausse facture (dépôt, champs, enregistrement). Restent : ce que
-   veut dire l'état « En attente » ; relire la dépense après l'enregistrement et vérifier les étiquettes ; le
-   chemin de la vraie facture (du mail au dépôt d'Hermes, par JARVIS) ; une skill par note de frais de Chronos, avec
-   ses contrôles (doublon du mois, TVA) ; comparaison avec Chronos ; les doublons de notes dits autrement.
+2. **Note de frais** : geste prouvé avec une fausse facture ; à lancer : la vraie facture du dernier abonnement,
+   à blanc, comparée à la dépense de Chronos. Ensuite : la lecture de la facture sans la session du serveur (règles
+   par sorte de facture), le déclenchement (arrivée du mail, date), son oui par bouton avant « Créer », une skill
+   par note de frais avec ses contrôles (doublon du mois, TVA), l'étiquette à poser et à vérifier.
 3. **Redémarrage du serveur** : vérifier pour de vrai que tout attend le coffre, puis repart après
    `sudo jarvis-coffre ouvrir` (la carte « Coffre » de l'app n'est pas encore branchée : `jarvis` n'est dans le groupe
    du coffre qu'à son prochain redémarrage).
