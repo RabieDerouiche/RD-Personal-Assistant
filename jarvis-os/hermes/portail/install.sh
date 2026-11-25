@@ -77,6 +77,28 @@ comme hermes --version | head -1
 ls -d "$HH"/tools/chromium-* >/dev/null 2>&1 || comme hermes pm install chromium | tail -1
 ls -d "$HH"/tools/chromium-* >/dev/null 2>&1 && echo "Navigateur : $(basename "$(ls -d "$HH"/tools/chromium-* | tail -1)")" || { echo "Navigateur d'Hermes absent : arrêt."; exit 1; }
 
+dire "Bibliothèques du navigateur (paquets du système)"
+# L'installeur d'Hermes tourne sans droits : il pose Chromium mais pas les bibliothèques du système dont il a besoin.
+# Au premier passage sur le serveur (25/11/2026), Chromium ne démarrait pas (libatk et onze autres absentes).
+# Les noms changent d'une version d'Ubuntu à l'autre (suffixe « t64 ») : le premier nom connu d'apt est pris.
+if [ "$BANC" != 1 ]; then
+  paquets=""
+  for groupe in "libatk1.0-0t64 libatk1.0-0" "libatk-bridge2.0-0t64 libatk-bridge2.0-0" "libatspi2.0-0t64 libatspi2.0-0" \
+      "libcups2t64 libcups2" "libasound2t64 libasound2" "libglib2.0-0t64 libglib2.0-0" libgbm1 libdrm2 libpango-1.0-0 libcairo2 \
+      libxcomposite1 libxdamage1 libxfixes3 libxrandr2 libxkbcommon0 libxext6 libx11-6 libxcb1 libdbus-1-3 libnss3 libnspr4 fonts-liberation; do
+    trouve=""
+    for p in $groupe; do apt-cache show "$p" >/dev/null 2>&1 && { trouve=$p; break; }; done
+    [ -n "$trouve" ] && paquets="$paquets $trouve" || echo "Paquet introuvable chez apt pour : $groupe"
+  done
+  # shellcheck disable=SC2086
+  apt-get install -y -q --no-install-recommends $paquets >/dev/null
+fi
+chrome=$(ls "$HH"/tools/chromium-*/chrome-linux*/chrome 2>/dev/null | tail -1)
+[ -n "$chrome" ] || { echo "Chromium d'Hermes introuvable sous $HH/tools : arrêt."; exit 1; }
+manque=$(ldd "$chrome" 2>/dev/null | awk '/not found/{print $1}' | sort -u | paste -sd' ' -)
+if [ -z "$manque" ]; then echo "Navigateur : toutes ses bibliothèques sont là."
+else echo "Navigateur : bibliothèques encore absentes : $manque"; echo "Il ne démarrerait pas : arrêt."; exit 1; fi
+
 dire "Plugin de l'abonnement Claude et Claude Code $CLAUDE_CODE_VERSION (les siens, séparés des autres)"
 [ -d "$HH/plugins/$PLUGIN_ID" ] || comme hermes plugins install "$PLUGIN_CATALOGUE" --ref "$PLUGIN_COMMIT" | tail -2
 comme hermes plugins enable "$PLUGIN_ID" | tail -1

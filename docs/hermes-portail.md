@@ -156,3 +156,10 @@ Pas prouvé, à voir sur le vrai serveur :
   `systemd-analyze verify`. Vu aussi : sa commande « domaines ajouter » a affiché l'aide (Likely : espaces insécables
   d'une commande recopiée sur l'iPhone ; la commande les accepte maintenant) ; `etat` dit si Claude est relié.
   Banc 59 sur 59.
+- 25/11/2026, 09h56 : **deuxième essai réel** (unité `hermes-portail-essai`, son accord dans la session du serveur) :
+  l'unité passe (code 0, 42 s, pic de 916 Mo), **Claude répond à travers le relais** et suit la skill (réponse en cinq
+  lignes, pas de terminal), le coffre est ouvert, l'identifiant listé. **Mais Chromium ne démarre pas** : douze
+  bibliothèques du système absentes (libatk, libgbm, libcups, libpango…). L'installeur d'Hermes, lancé sans droits, ne
+  les pose pas ; au banc elles étaient déjà dans le conteneur. Corrigé : `install.sh` les installe (noms avec ou sans
+  « t64 ») et s'arrête si `ldd` en trouve encore une absente. Refus du relais vu : `models.dev` (Hermes y cherche la
+  liste des modèles ; sans effet, laissé refusé).
