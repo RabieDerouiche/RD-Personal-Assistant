@@ -110,7 +110,7 @@ le serveur). Faux portail `essais/hermes/faux_portail.py`, faux terminal `essais
 
 ## Ce que le banc prouve, et ce qu'il ne prouve pas
 
-Prouvé (100 vérifications, 25/11/2026) : installation ; outils réduits et politique figée ; clé seulement en ramfs,
+Prouvé (102 vérifications, 25/11/2026) : installation ; outils réduits et politique figée ; clé seulement en ramfs,
 nulle part en clair sur le disque, gardée par jarvis-coffre ; enregistrement dans un faux terminal sans que le mot de
 passe s'affiche ; connexion au faux portail par le coffre, tableau lu, formulaire ouvert, rien de soumis ; mot de
 passe et clé jamais envoyés au modèle ; session gardée au second passage ; coffre verrouillé : refus propre ;
@@ -239,6 +239,22 @@ d'authentification : il a la clé de configuration). Sa consigne : s'organiser a
   guette ce mail par l'accès Google de JARVIS (`facture.mjs --code-apres`, dix minutes au plus, seuls les mails
   arrivés après le début du passage) et pose le code dans le dépôt ; la skill dit à Hermes de le lire et de le
   saisir dans le même appel, sans l'afficher. Fichier effacé à la fin. Hermes ne va jamais sur une messagerie.
+
+**Premier essai de connexion sur les trois autres portails (25/11/2026, 21h) : aucun des trois.** Trois causes
+différentes, aucune écriture nulle part :
+- *CRA hebdomadaire* : identifiants refusés par le portail (une tentative, pas de relance). À lui de les vérifier
+  en se connectant lui-même, puis de les réenregistrer (retirer d'abord l'ancien avec `oublier`).
+- *Intranet (CRA mensuel)* : mot de passe accepté, puis `enter_code` répond `no_code_field` alors que le champ est à
+  l'écran. Cause lue dans le code d'Hermes (`agent/vault_login_classifier.py`) : sans `autocomplete=one-time-code`,
+  le coffre ne reconnaît un champ de code qu'à un nom ou un libellé en anglais, mots entiers ; un nom collé et un
+  libellé français ne passent pas. Contournement, reproduit au banc : poser l'attribut sur le champ avec `js()`,
+  puis rappeler `enter_code` (dans la skill).
+- *Espace client de la box* : le formulaire est dans un cadre (iframe) d'une autre origine ; `browser_vault` ne
+  regarde que la page principale et refuse (`origin_mismatch`). Piste (dans la skill, pas prouvée) : ouvrir
+  l'adresse complète du cadre en pleine page. Si elle échoue : enregistrer aussi l'identifiant sous l'origine de
+  la page principale ne suffira pas (le coffre n'inspecte pas l'intérieur d'un cadre) ; il faudrait alors une saisie
+  par un autre moyen, à concevoir.
+Quatre hôtes annexes ouverts par la marge pour ce dernier portail ; aucun pour les deux autres.
 
 **Ordre retenu** (du plus sûr au plus lourd, chaque étape en lecture seule ou à blanc avant toute écriture) :
 1. Abonnement d'IA : **fait le 25/11/2026**, à blanc, identique à la dépense de Chronos (voir « La vraie facture »).
