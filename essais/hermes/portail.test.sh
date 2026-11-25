@@ -49,6 +49,7 @@ verif "install.sh du kit portail se termine sans erreur" [ $rc = 0 ]
 [ $rc = 0 ] || { tail -15 $T/install.log; echo "Banc arrêté : installation en échec."; exit 1; }
 verif "Hermes v0.23.3 au commit figé, pour $U" bash -c "$(declare -f hp); H=$H; HH=$HH; U=$U; hp hermes --version 2>/dev/null | grep -q 'v0.23.3.*caafe5389ae5'"
 verif "plugin de l'abonnement à la version figée (72eb3b8), comme le Hermes principal" grep -q 72eb3b87215e98d11cecfb26ca95b86be73b32de $HH/plugins/.install-metadata.json
+verif "l'installeur contrôle les bibliothèques du navigateur (aucune absente)" grep -q 'Navigateur : toutes ses bibliothèques sont là' $T/install.log
 verif "navigateur d'Hermes installé" bash -c "ls -d $HH/tools/chromium-* >/dev/null 2>&1"
 verif "utilisateur sans shell, hors des groupes sudo, hermes, jarvis et du coffre" bash -c "[ \"\$(getent passwd $U | cut -d: -f7)\" = /usr/sbin/nologin ] && ! id -nG $U | tr ' ' '\\n' | grep -qxE 'sudo|adm|docker|lxd|hermes|jarvis|jarvis-coffre-clients'"
 verif "politique root 0644, commande et relais en copies root" bash -c "[ \"\$(stat -c '%U %a' /etc/hermes-portail/config.yaml)\" = 'root 644' ] && [ \"\$(stat -c '%U %a' /usr/local/sbin/hermes-portail)\" = 'root 755' ] && [ \"\$(stat -c '%U' /usr/local/lib/hermes-portail/filtre.py)\" = root ]"
