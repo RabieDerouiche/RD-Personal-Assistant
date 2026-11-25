@@ -1451,6 +1451,33 @@ srv.listen(0, async () => {
     ok('réglages en maquette : explication', await p.evaluate(() => /Maquette/.test(document.querySelector('.view-in').textContent)));
     p = await page('#automatisations');
     ok('automatisations : frise', await p.evaluate(() => document.querySelectorAll('.track').length > 0));
+    /* 0.83.0 : les jours du mois (« Hermes remplace Chronos », étape 2) : la carte de « Pour moi », ouverte par sa notification ; Confirmer seulement
+       quand tout est connu ; « Corriger » en une phrase ; sans bilan (maquette de base), rien de nouveau dans Pour moi */
+    { const JOURS_INIT = () => {
+        const SEMJ = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'], code = {2: 'S', 3: 'S', 4: 'T', 5: 'T', 6: 'T', 9: 'T', 10: 'S', 11: 'F', 12: 'C', 13: 'C', 16: 'S', 17: 'T', 18: 'T', 19: 'S', 20: 'T', 23: 'C', 24: 'S', 25: 'T', 30: 'T'};   /* un mois inventé */
+        const jours = []; for (let d = 1; d <= 30; d++) { const dt = new Date(Date.UTC(2026, 10, d)), dow = dt.getUTCDay(), ouvre = dow >= 1 && dow <= 5, c = ouvre ? (code[d] || '?') : 'W';
+          jours.push({date: '2026-11-' + String(d).padStart(2, '0'), jour: SEMJ[dow] + ' ' + (d === 1 ? '1er' : d), ouvre, ferie: d === 11 ? 'Armistice Day' : null, cal: {M: c, A: c}, M: c, A: c, corrige: false}); }
+        window.__JOURS = {mois: '2026-11', libelle: 'novembre 2026', etat: 'a_valider', demande: true, texte: 'Novembre 2026 : 15 jours travaillés (9 en télétravail, 6 sur site), 3 de congé, 1 férié ; à confirmer : jeudi 26, vendredi 27.', erreur: '', corrections: 0, valide: null,
+          bilan: {mois: '2026-11', jours, totaux: {teletravail: 9, surSite: 6, conges: 3, feries: 1, ouvres: 21, aConfirmer: 2, aResoudre: 0, travailles: 15}, aConfirmer: ['2026-11-26', '2026-11-27'], aResoudre: [], remarques: [], complet: false, empreinte: 'x'}}; };
+      const ctx = await b.newContext({...devices['iPhone 15 Pro Max']}); await ctx.addInitScript(PAUSE_INIT); await ctx.addInitScript(JOURS_INIT);
+      const q = await ctx.newPage(); q.on('pageerror', (e) => errs.push('jours : ' + e.message)); await q.goto(base + '#voir-jours-2026-11'); await q.waitForTimeout(3500);
+      const lu = () => q.evaluate(() => { const c = document.getElementById('pm-jours'), cf = c && c.querySelector('.jrs-confirmer');
+        return {tab: (document.querySelector('.tab[aria-current="page"], .tab.is-on') || {}).dataset ? (document.querySelector('.tab[aria-current="page"], .tab.is-on') || {}).dataset.tab : '', vu: !!c && c.offsetParent !== null, vise: !!c && c.hasAttribute('data-vise'),
+          titre: c ? c.querySelector('h2').textContent : '', jours: c ? c.querySelectorAll('.jrs-j').length : 0, q: c ? c.querySelectorAll('.jrs-q').length : 0, conf: cf ? {dis: cf.disabled, t: cf.textContent} : null,
+          txt: c ? c.textContent : '', dec: ([...document.querySelectorAll('.ux-seg button')].find((x) => x.dataset.f === 'decider') || {}).textContent || '', large: document.documentElement.scrollWidth <= window.innerWidth + 1}; });
+      const a = await lu();
+      ok('jours : la notification ouvre « Pour moi » sur la carte, mise en évidence ; 21 jours ouvrés, 2 à confirmer ; « Confirmer » fermé tant que tout n’est pas connu ; compté dans « Décider »', a.vu && a.vise && a.titre === 'Tes jours de novembre 2026' && a.jours === 21 && a.q === 2 && a.conf && a.conf.dis && /jeudi 26, vendredi 27/.test(a.txt) && /Décider\s*[1-9]/.test(a.dec) && a.large, JSON.stringify({...a, txt: a.txt.slice(0, 160)}));
+      await q.screenshot({path: path.join(SH, 'jours-1.png')});
+      await q.click('#pm-jours .jrs-corriger'); await q.waitForTimeout(400);
+      await q.fill('#pm-jours .jrs-txt', 'jeudi 26 et vendredi 27 : télétravail'); await q.click('#pm-jours .jrs-envoyer'); await q.waitForTimeout(800);
+      const c = await lu();
+      ok('jours : « Corriger » ouvre un champ ; la phrase envoyée, le bilan corrigé est remontré (« Compris : … ») et « Confirmer » s’ouvre', /Compris : jeudi 26, vendredi 27 : télétravail/.test(c.txt) && c.q === 0 && c.conf && !c.conf.dis && /^Confirmer$/.test(c.conf.t) && /Effacer mes corrections/.test(c.txt), JSON.stringify({...c, txt: c.txt.slice(0, 200)}));
+      await q.click('#pm-jours .jrs-confirmer'); await q.waitForTimeout(800);
+      const d = await lu();
+      ok('jours : « Confirmer » : validé, dit, plus de bouton Confirmer', /sont validés/.test(d.txt) && !d.conf && /validé/.test(d.txt), d.txt.slice(0, 200));
+      await q.screenshot({path: path.join(SH, 'jours-2.png')});
+      const e0 = errs.length, r = await page('#demandes');
+      ok('jours : sans bilan (maquette de base), rien de nouveau dans « Pour moi »', await r.evaluate(() => !document.getElementById('pm-jours')) && errs.length === e0, errs.slice(e0).join(' | ')); }
   } catch (e) { ok('exception', false, e.stack); }
   ok('aucune erreur de page', !errs.length, errs.join(' | '));
   console.log(out.join('\n')); console.log(fails ? fails + ' échec(s)' : 'Tout passe (' + out.length + ' vérifications). Captures : ' + SH);

@@ -487,6 +487,13 @@
       agir: (id, action, minutes) => req('/api/invites/recues/' + id, {action, ...(minutes ? {minutes} : {})}).then((r) => (r.status === 200 ? r.j : null)).catch(() => null),
       audio: (id) => fetch(BASE + '/api/invites/audio/' + encodeURIComponent(id), {headers: {authorization: 'Bearer ' + token()}}).then((r) => (r.ok ? r.blob() : null)).then((b) => (b ? URL.createObjectURL(b) : null)).catch(() => null)},
     radarAlerte: (id, action) => req('/api/radar/alerte', {id, action}).then((r) => (r.status === 200 ? r.j : null)).catch(() => null),   /* 0.56.0 : Retirer / Garder une dépense qui finit */
+    /* 0.83.0 : les jours du mois (bilan tiré de l'agenda « Présence » et des fériés) : son oui, sa correction en une phrase */
+    jours: {
+      lire: (mois) => req('/api/jours' + (mois ? '?mois=' + encodeURIComponent(mois) : '')).then((r) => (r.status === 200 ? r.j : null)).catch(() => null),
+      confirmer: (mois, empreinte) => req('/api/jours/confirmer', {mois, empreinte}).then((r) => ({...r.j, ok: r.status === 200})).catch(() => ({ok: false, error: 'Serveur JARVIS injoignable.'})),
+      corriger: (mois, texte) => req('/api/jours/corriger', {mois, texte}).then((r) => ({...r.j, ok: r.status === 200})).catch(() => ({ok: false, error: 'Serveur JARVIS injoignable.'})),
+      effacer: (mois) => req('/api/jours/effacer', {mois}).then((r) => ({...r.j, ok: r.status === 200})).catch(() => ({ok: false, error: 'Serveur JARVIS injoignable.'})),
+      relire: (mois) => req('/api/jours/relire', {mois}).then((r) => ({...r.j, ok: r.status === 200})).catch(() => ({ok: false, error: 'Serveur JARVIS injoignable.'}))},
     memoire: {
       liste: () => req('/api/memoire').then((r) => (r.status === 200 ? r.j : null)).catch(() => null),
       ajouter: (texte, source) => req('/api/memoire', {texte, source}).then((r) => r.j).catch(() => ({ok: false, error: 'Serveur injoignable.'})),
