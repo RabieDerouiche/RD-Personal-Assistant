@@ -56,6 +56,8 @@ outils=$(hp hermes tools list --platform cli 2>/dev/null | propre | grep '✓ en
 verif "outils : seulement browser skills terminal ($outils)" [ "$outils" = "browser skills terminal " ]
 verif "il ne peut pas changer ses outils (refusé)" bash -c "$(declare -f hp); H=$H; HH=$HH; U=$U; hp hermes config set agent.disabled_toolsets '[]' 2>&1 | grep -q 'managed by your administrator'"
 verif "skill « portail » du dépôt active, à root" bash -c "$(declare -f hp); H=$H; HH=$HH; U=$U; hp hermes skills list 2>/dev/null | grep -q 'portail' && [ \"\$(stat -c %U /etc/hermes-portail/skills/portail/portail/SKILL.md)\" = root ]"
+verif "unités valides (systemd-analyze verify)" bash -c "cd /etc/systemd/system && systemd-analyze verify --man=no ./hermes-portail-essai.service ./hermes-portail-filtre.service ./hermes-portail-sortie.service 2>&1 | grep -v 'hermes-portail-\(sortie\|filtre\).service.*not found\|Failed to prepare filename' | grep -c . | grep -qx 0"
+verif "une commande aux espaces insécables (recopiée de l'iPhone) est comprise" bash -c "bash /usr/local/sbin/hermes-portail \$'domaines\xc2\xa0ajouter\xc2\xa0insecable.exemple.test' | grep -q 'Permis : insecable.exemple.test' && bash /usr/local/sbin/hermes-portail domaines retirer insecable.exemple.test >/dev/null"
 verif "etat rend le code 0 sur une installation neuve (ni coffre, ni essai)" bash -c "bash /usr/local/sbin/hermes-portail etat >/dev/null 2>&1"
 verif "la clé du coffre d'Hermes est un lien vers la mémoire vive, aucun fichier" bash -c "[ -L $HH/vault/vault.key ] && [ \"\$(readlink $HH/vault/vault.key)\" = $RAM/vault.key ]"
 

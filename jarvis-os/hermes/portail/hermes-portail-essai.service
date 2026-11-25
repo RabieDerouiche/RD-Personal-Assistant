@@ -1,0 +1,71 @@
+# JARVIS OS — un passage du Hermes « portail » (docs/hermes-portail.md). Posé par install.sh ; lancé par
+# « sudo hermes-portail essai … » (systemctl start), jamais au démarrage du serveur. Une vraie unité plutôt que
+# systemd-run : ses réglages passent par le même lecteur que hermes-gateway.service (au premier essai sur le serveur,
+# systemd-run avait refusé « IPAddressDeny=link-local », pourtant valable dans une unité).
+#
+# La consigne est dans /home/hermes-portail/.consigne ; la réponse dans /var/lib/hermes-portail/essais/courant.txt
+# (ouvert par systemd en root : l'utilisateur hermes-portail n'écrit que dans son dossier). Après la question, la
+# passerelle qu'Hermes a lancée pour lui est arrêtée proprement ; la fin de l'unité arrête tout ce qui reste.
+
+[Unit]
+Description=Un passage du Hermes portail (essai des portails, JARVIS OS)
+After=network-online.target hermes-portail-sortie.service hermes-portail-filtre.service
+Requires=hermes-portail-sortie.service hermes-portail-filtre.service
+
+[Service]
+Type=oneshot
+User=hermes-portail
+Group=hermes-portail
+WorkingDirectory=/home/hermes-portail
+# « $$ » : un vrai « $ » pour le shell (systemd garde « $NOM » pour ses propres variables)
+ExecStart=/bin/sh -c '"$$0" chat -Q --oneshot --max-turns 25 -s portail --query-file "$$1"; rc=$$?; "$$0" gateway stop >/dev/null 2>&1; exit $$rc' /home/hermes-portail/.local/bin/hermes /home/hermes-portail/.consigne
+Environment="HOME=/home/hermes-portail" "USER=hermes-portail" "LOGNAME=hermes-portail" "LANG=C.UTF-8"
+Environment="PATH=@PATH@"
+Environment="HERMES_HOME=/home/hermes-portail/hermes" "HERMES_MANAGED_DIR=/etc/hermes-portail"
+Environment="HTTPS_PROXY=http://127.0.0.1:@RELAIS@" "https_proxy=http://127.0.0.1:@RELAIS@" "NO_PROXY=localhost,127.0.0.1,::1" "no_proxy=localhost,127.0.0.1,::1"
+Environment="CLAUDE_SUBSCRIPTION_DIRECTSDK_COMMAND=/home/hermes-portail/.local/lib/claude-code/node_modules/.bin/claude" "DISABLE_AUTOUPDATER=1"
+UnsetEnvironment=ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN ANTHROPIC_BASE_URL ANTHROPIC_TOKEN CLAUDE_CODE_OAUTH_TOKEN OPENROUTER_API_KEY OPENAI_API_KEY
+StandardOutput=truncate:/var/lib/hermes-portail/essais/courant.txt
+StandardError=inherit
+TimeoutStartSec=900
+KillMode=control-group
+TimeoutStopSec=20
+
+# ---- JARVIS d'abord ; rien de ce passage ne part dans l'échange (la clé du coffre est en mémoire)
+MemoryHigh=1300M
+MemoryMax=1500M
+MemorySwapMax=0
+LimitCORE=0
+OOMScoreAdjust=700
+CPUWeight=20
+IOWeight=20
+Nice=5
+TasksMax=512
+
+# ---- Enfermement (les mêmes lignes que hermes-gateway.service, qui tournent déjà sur ce serveur). Pas encore de
+# filtre d'appels système ni RestrictNamespaces : Chromium n'a jamais tourné sous ces deux-là ici ; à ajouter une fois
+# le premier passage réussi, après essai.
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+ProtectSystem=strict
+ReadWritePaths=/home/hermes-portail
+ProtectHome=tmpfs
+BindPaths=/home/hermes-portail
+BindReadOnlyPaths=/run/hermes-portail-cle
+InaccessiblePaths=-/opt -/srv -/var/lib/caddy -/var/backups -/var/mail -/var/spool/cron -/var/lib/jarvis-coffre
+PrivateTmp=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+ProtectProc=invisible
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+RemoveIPC=yes
+UMask=0077
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+IPAddressDeny=link-local multicast
