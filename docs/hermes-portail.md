@@ -569,6 +569,16 @@ tant qu'une routine n'est pas basculée) :
    soumissions d'une même semaine. À construire : le mode « CRA » de la skill et de la commande (saisie, Save,
    Submit, à blanc d'abord), la semaine dans JARVIS (carte et oui, comme les jours du mois), le déclenchement par
    root depuis le oui donné dans JARVIS, le compte rendu et la notification de première exécution.
+   **Résultat du relevé (25/11/2026, 23h20, lecture seule, aucune question)** : Hermes entre sans code, change de
+   semaine par le champ « Date » du cadre (MM/JJ/AAAA) et son bouton d'actualisation (les liens s'appellent
+   « Previous Period » / « Next Period ») ; l'état se lit dans « Reported Time Status », un par jour. Les trois
+   semaines passées sont approuvées, et **ce que Chronos a saisi est exactement ce que donnent son agenda et les
+   règles** (« R002 - Regular Day », 1,00 chaque jour travaillé, rien pour congés et fériés) ; la semaine en cours
+   est vide (Chronos la fait le vendredi). Refusé par le relais : un outil de visite guidée, inutile. 2 min 29,
+   pic de 1,2 Go. Électricité : connecté sans code ; factures à `/clients/mes-factures` (onze de l'année, une icône
+   de téléchargement par ligne, « Tout télécharger ») ; 1 min 38, 1,2 Go. Mesure du serveur : 3,8 Go, 2,1 Go
+   disponibles (2,6 Go juste après chaque passage), 0,65 Go d'échange utilisés, 22 Go de disque libres, aucun
+   processus tué en 14 jours, aucune retenue de JARVIS en 7 jours, diagnostic « Confortable ».
 
 **Dettes connues**
 - Un passage dont le navigateur ne démarre pas rend quand même le code 0 : juger à la réponse.
