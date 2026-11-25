@@ -493,6 +493,14 @@ tant qu'une routine n'est pas basculée) :
    commentaire, montant entier : le portail le divise lui-même par deux). Dans la même demande : la page de
    connexion de l'espace client d'électricité, sans identifiant (nouvel hôte), pour lui dire quelle origine
    enregistrer dans Termius.
+   **Demande envoyée le 25/11/2026 au soir** (une seule, banc passé avant) : copies d'avant du kit dans `/root`
+   (`*.avant-box`) pour le retour arrière ; la facture la plus récente de la liste (octobre : celle de novembre
+   n'est pas encore émise) rapportée par `essai --telecharger --code-mail`, avec une marge de 3 hôtes pour le
+   téléchargement ; champs écrits par la session du serveur d'après le texte et les règles de la routine de
+   Chronos (vendeur, catégorie, étiquette seule, aucun commentaire, montants entiers) ; `brouillon --sans-creer` ;
+   comparaison en lecture seule avec la dépense de Chronos de la même date (champ par champ, étiquettes, part
+   remboursée) ; découverte de la page de connexion du fournisseur d'électricité avec une marge de 5 hôtes ;
+   ménage. Une seule question pour lui dans la session du serveur. Résultat : à reporter ici.
 2. *Les jours du mois* (pas un portail : JARVIS et le Hermes de Telegram) : lire l'agenda « Présence » et les jours
    fériés par les outils de JARVIS, appliquer les règles de la routine « Validation mensuelle des jours » de
    Chronos (onglet « Textes des routines » de Pilotage), lui montrer le bilan dans JARVIS avec un bouton pour
