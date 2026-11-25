@@ -163,3 +163,41 @@ Pas prouvé, à voir sur le vrai serveur :
   les pose pas ; au banc elles étaient déjà dans le conteneur. Corrigé : `install.sh` les installe (noms avec ou sans
   « t64 ») et s'arrête si `ldd` en trouve encore une absente. Refus du relais vu : `models.dev` (Hermes y cherche la
   liste des modèles ; sans effet, laissé refusé).
+- 25/11/2026, 10h11 : **troisième essai réel** (bibliothèques posées par `install.sh` : 42 paquets, 75 Mo, aucun nom
+  introuvable). **Le navigateur démarre, le portail s'affiche depuis le serveur** (ni blocage, ni CAPTCHA),
+  l'identifiant est saisi, le coffre remplit le mot de passe, le bouton de connexion est cliqué. Échec ensuite :
+  « network error », parce que le relais refusait le service qui vérifie le mot de passe (un service d'identité
+  d'Amazon, hors du domaine du portail). Pic de mémoire : 1,2 Go ; 91 s. Refus sans conséquence, laissés refusés :
+  services de Google du navigateur (compte, remplissage, mises à jour), et ce qu'Hermes cherche de lui-même (mises à
+  jour, liste des modèles). Suite demandée à la session du serveur : ajouter cet hôte et le domaine du portail avec
+  ses sous-domaines, puis réessayer. Les hôtes d'un portail ne s'écrivent pas ici : ils sont dans
+  `/etc/hermes-portail/domaines` sur le serveur.
+- 25/11/2026, 13h32 : **quatrième essai réel : connecté.** Après son accord dans la session du serveur (elle avait
+  d'abord refusé d'élargir la liste des hôtes sur la seule demande d'une autre session : bon réflexe, à garder), les
+  deux hôtes ajoutés, Hermes s'est connecté au portail avec l'identifiant du coffre, sans code demandé, est arrivé
+  sur le tableau de bord, l'a décrit sans donnée personnelle, n'a rien créé ni soumis, et a fait l'attente qui
+  enregistre la session (89 s, pic de 1,2 Go, 2,6 Go disponibles ensuite). Refus du relais pendant ce passage, tous
+  sans effet sur la connexion et laissés refusés : services de Google du navigateur (dont la vérification de fuite
+  de mot de passe, qui envoie un fragment d'empreinte : à couper aussi dans le navigateur), mises à jour et listes
+  de modèles cherchées par Hermes, le service de rapports d'erreurs du portail, une bibliothèque servie par un CDN
+  (à surveiller sur d'autres pages).
+
+## Ce qui reste (au 25/11/2026)
+
+Pour ce portail :
+1. **Session gardée ?** Un second passage doit dire « session encore ouverte ». Puis un contrôle par jour pendant une
+   à deux semaines, pour savoir combien de temps le portail la garde (minuterie à écrire).
+2. **Note de frais à blanc** : aller jusqu'au dernier écran sans valider, comparer avec ce que Chronos a créé. Il faut
+   d'abord les règles de Chronos (onglet « Textes des routines » de Pilotage : montants, contrôles, interdits ne sont
+   pas dans sa fiche) et une skill par geste.
+3. **Redémarrage du serveur** : vérifier pour de vrai que tout attend le coffre, puis repart après
+   `sudo jarvis-coffre ouvrir` (la carte « Coffre » de l'app n'est pas encore branchée : `jarvis` n'est dans le groupe
+   du coffre qu'à son prochain redémarrage).
+4. **Durcir** : filtre d'appels système et `RestrictNamespaces` sur l'unité d'un passage (à essayer maintenant que le
+   passage réussit) ; couper dans Chromium la vérification de fuite, le remplissage et les mises à jour.
+Ensuite :
+5. Les deux autres portails (CRA mensuel, CRA hebdomadaire) : même marche, `enregistrer`, `domaines`, `essai`. Leur
+   connexion (code, session courte) n'est pas connue.
+6. Brancher sur le reste : un guichet de JARVIS pour demander un passage (sans donner le navigateur au Hermes de
+   Telegram), la facture arrivée par mail, son oui par bouton avant toute soumission.
+7. Serveur : l'IPv6 sortant (la route retirée revient au redémarrage).
