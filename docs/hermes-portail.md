@@ -155,6 +155,19 @@ accepte `--justificatif <fichier>` (un fichier de root, PDF ou image, 5 Mo au pl
 dans `/var/lib/hermes-portail-depot` (root, lisible par Hermes) puis effacé ; Hermes le joint avec `upload_file`,
 le seul fichier permis. Le kit pose une facture inventée d'un euro (`justificatif-essai.pdf`).
 
+**Second passage réel (25/11/2026, 17h39) : toujours rien d'enregistré.** Le dépôt de la facture d'essai a échoué
+(« le téléchargement du fichier a échoué »), le formulaire s'est affiché avec tous ses champs désactivés, et Hermes
+a annulé plutôt que de cliquer un bouton « Créer » dont il ne savait pas l'effet : bon réflexe. Cause probable
+(Likely) : au moment du dépôt, le relais a refusé l'espace de stockage où le portail reçoit les fichiers (un hôte
+à part, ni celui du portail ni ses sous-domaines) ; un second dépôt de bibliothèques a été refusé aussi. Rien au
+valideur, aucun rapport, aucune dépense créée d'après ce qu'il a vu (trois lignes avant, trois au passage de
+lecture suivant). 134 s, pic de 1,1 Go. Leçon : un portail s'appuie sur des hôtes annexes qu'on ne découvre qu'en
+faisant le geste ; chaque geste nouveau (dépôt, aperçu, lecture de la facture) peut en révéler un.
+
+**L'apprentissage marche sur le serveur** : 7 notes de départ posées, 4 ajoutées par Hermes lui-même en deux
+passages, toutes passées au tri (dont une qui corrige une note de départ : sur le formulaire d'ajout, le bouton
+s'appelle « Créer », pas la coche verte).
+
 Garde-fou réel : seulement la skill et le modèle. Rien de technique n'empêche un clic sur le mauvais bouton (le
 relais ne voit pas dans le HTTPS). Conséquence au pire : une dépense d'essai d'un euro envoyée au valideur, à
 retirer à la main. Limite de tours portée à 40 par passage (un formulaire demande plus d'allers-retours).
@@ -284,9 +297,9 @@ Le Hermes de Telegram, lui, a sa mémoire et propose des skills, validées par `
 Pour ce portail :
 1. **Combien de temps la session tient** : elle tient d'un passage au suivant (une heure d'écart). Reste un contrôle
    par jour pendant une à deux semaines (minuterie à écrire, sur sa demande).
-2. **Note de frais** : le portail exige un justificatif ; brouillon avec la facture d'essai jointe à lancer (son
-   oui dans la session du serveur), puis il supprime la dépense d'essai. Ensuite : le chemin de la vraie facture
-   (du mail au dépôt d'Hermes, par JARVIS), une skill par note de frais de Chronos, comparaison avec Chronos.
+2. **Note de frais** : le dépôt du justificatif bute sur un hôte de stockage refusé par le relais ; à ouvrir (son
+   oui), puis refaire le brouillon. Ensuite : le chemin de la vraie facture (du mail au dépôt d'Hermes, par
+   JARVIS), une skill par note de frais de Chronos, comparaison avec Chronos.
 3. **Redémarrage du serveur** : vérifier pour de vrai que tout attend le coffre, puis repart après
    `sudo jarvis-coffre ouvrir` (la carte « Coffre » de l'app n'est pas encore branchée : `jarvis` n'est dans le groupe
    du coffre qu'à son prochain redémarrage).
