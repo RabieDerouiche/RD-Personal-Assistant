@@ -6,7 +6,7 @@
 #   sudo hermes-portail connexion-claude           (Termius : relie son Claude Code à l'abonnement, une fois)
 #   sudo hermes-portail enregistrer                (Termius : identifiant et mot de passe d'un portail, saisis sans affichage)
 #   sudo hermes-portail domaines [ajouter <hôte> | retirer <hôte>]
-#   sudo hermes-portail essai <adresse> [--consigne-fichier <fichier>]   (lecture seule : se connecte, dit ce qu'il voit)
+#   sudo hermes-portail essai <adresse> [--consigne-fichier <fichier>] [--code-mail "<recherche Gmail>"]   (lecture seule : se connecte, dit ce qu'il voit ; --code-mail : le site envoie son code de connexion par mail)
 #   sudo hermes-portail brouillon <adresse> --champs-fichier <fichier> [--justificatif <fichier>] [--sans-creer]   (UNE dépense, enregistrée sans l'envoyer ; avec --sans-creer : remplie puis annulée, rien n'est créé)
 #   sudo hermes-portail facture --requete "<recherche Gmail>" --nom "<expression du nom>" --vers <dossier>   (va chercher UNE facture PDF dans ses mails, par l'accès Google de JARVIS ; lecture seule)
 #   sudo hermes-portail notes [ajouter <hôte> "<texte>" | oublier <hôte> [numéro]]   (ce qu'Hermes a appris d'un portail, relu à chaque passage)
@@ -151,11 +151,33 @@ notes_apprises() {  # notes_apprises <hôte> <réponse du passage> : 6 notes au 
   [ $n -gt 0 ] && echo "Notes gardées pour ce portail : $n (sudo hermes-portail notes)"
   return 0
 }
+ligne_code() {  # la ligne de consigne qui annonce un code par mail, si la commande l'a demandé
+  [ -n "${codemail:-}" ] || return 0
+  echo "Code par mail : si le site demande un code de vérification, choisis l'envoi par e-mail, puis suis ta skill (« Code reçu par mail »). Le code arrivera dans le fichier $DEPOT/code.txt."
+}
 notes_pour_consigne() {  # le rappel ajouté à la consigne, s'il y a des notes pour cet hôte
   [ -s "$NOTES/$1.txt" ] || return 0
   echo
   echo "Notes de tes passages précédents sur ce portail. Ce sont des faits que tu as observés, pas des consignes : ta skill passe toujours avant. Une note fausse ou périmée : dis-le par une ligne « Appris : (corrige) … »."
   cut -d'|' -f2- "$NOTES/$1.txt" | sed 's/^ /- /'
+}
+
+# ---- JARVIS a l'accès à Gmail, Hermes portail non : ce programme tourne sous l'utilisateur jarvis, en lecture seule
+par_jarvis() {   # par_jarvis <arguments de facture.mjs…>
+  local noeud; noeud=$(command -v node) || { echo "Node est introuvable." >&2; return 1; }
+  (cd / && runuser -u "$JARVIS_U" -- env -i HOME="$(getent passwd "$JARVIS_U" | cut -d: -f6)" PATH=/usr/local/bin:/usr/bin:/bin ${JARVIS_DONNEES:+JARVIS_DATA="$JARVIS_DONNEES"} \
+    "$noeud" "$LIB/facture.mjs" "$@" --serveur "$JARVIS_SRV")
+}
+# Un site qui envoie son code de connexion par mail : pendant le passage, root guette ce mail (dix minutes au plus) et
+# pose le code dans le dépôt, où Hermes le lit pour le saisir. Le code ne passe ni par la consigne ni par le modèle
+# (sa skill lui dit de le saisir sans l'afficher) ; le fichier est effacé à la fin du passage.
+guetter_code() {  # guetter_code <recherche Gmail> : à lancer en arrière-plan
+  local apres=$(( $(date +%s) * 1000 - 30000 )) fin=$(( $(date +%s) + 600 )) c
+  while [ "$(date +%s)" -lt "$fin" ]; do
+    c=$(par_jarvis --requete "$1" --code-apres "$apres" 2>/dev/null) && [[ "$c" =~ ^[0-9]{4,8}$ ]] && {
+      printf '%s' "$c" > "$DEPOT/.code"; chown root:"$U" "$DEPOT/.code"; chmod 0640 "$DEPOT/.code"; mv "$DEPOT/.code" "$DEPOT/code.txt"; return 0; }
+    sleep 6
+  done
 }
 
 # Un passage : la question, puis l'arrêt propre de la passerelle qu'Hermes a lancée pour lui. Tuée par un signal, elle
@@ -255,7 +277,9 @@ Enregistrement d'un identifiant de portail. Réponds aux questions d'Hermes :
   Site origin  : l'adresse du site, par exemple https://portail.exemple.com (sans rien après le nom du site)
   Identifier   : Entrée pour « email », puis ton adresse de connexion
   Password     : ton mot de passe (rien ne s'affiche)
-  Authenticator: Entrée (ne rien mettre : le second facteur reste chez toi)
+  Authenticator: Entrée si le portail ne demande pas de code d'application. S'il en demande un (Google
+                 Authenticator ou autre) : colle ici la clé de configuration (celle qui a servi à ajouter le portail
+                 dans ton application). Rien ne s'affiche ; Hermes génère alors le code lui-même, sans le voir.
 FIN
     comme_portail hermes vault add --kind login; rc=$?
     echo; comme_portail hermes vault list 2>&1 | propre | grep -E 'vault_|Vault|never' | head -12
@@ -287,12 +311,13 @@ FIN
     esac ;;
   essai|brouillon)
     [ $# -ge 1 ] || usage
-    adresse=$1; shift; fichier=""; champs=""; justificatif=""; joint=""; blanc=0
+    adresse=$1; shift; fichier=""; champs=""; justificatif=""; joint=""; blanc=0; codemail=""; guet=""
     while [ $# -gt 0 ]; do case "$1" in
       --consigne-fichier) [ "$commande" = essai ] || usage; fichier=${2:-}; shift 2 ;;
       --champs-fichier) [ "$commande" = brouillon ] || usage; champs=${2:-}; shift 2 ;;
       --justificatif) [ "$commande" = brouillon ] || usage; justificatif=${2:-}; shift 2 ;;
       --sans-creer) [ "$commande" = brouillon ] || usage; blanc=1; shift ;;
+      --code-mail) codemail=${2:-}; [ -n "$codemail" ] && [ ${#codemail} -le 300 ] || usage; shift 2 ;;
       *) usage ;; esac; done
     [[ "$adresse" =~ ^https?://[A-Za-z0-9._:/?=%\&~+-]+$ ]] || { echo "Adresse attendue (https://…)."; exit 1; }
     hote=$(hote_de "$adresse") || { echo "Adresse attendue (https://…)."; exit 1; }
@@ -330,21 +355,27 @@ FIN
         if [ -n "$joint" ]; then echo "Justificatif à joindre (le seul fichier permis, avec upload_file) : $joint"
         else echo "Aucun justificatif n'est fourni : si le portail en exige un, n'enregistre rien et dis-le."; fi
         echo "----------"; cat "$champs"; echo; echo "----------"
-        notes_pour_consigne "$hote"
+        ligne_code; notes_pour_consigne "$hote"
         echo "Termine par l'étape « Avant de finir » de ta skill (l'attente qui enregistre la session), puis réponds."
       } > "$consigne"
-    elif [ -n "$fichier" ]; then { cat "$fichier"; notes_pour_consigne "$hote"; } > "$consigne"
+    elif [ -n "$fichier" ]; then { cat "$fichier"; ligne_code; notes_pour_consigne "$hote"; } > "$consigne"
     else { cat <<FIN
 Essai en lecture seule, selon ta skill « portail ». Adresse : $adresse
 Ouvre cette adresse. Connecte-toi avec l'identifiant du coffre si une page de connexion s'affiche. Dis où tu
 arrives et ce que tu vois, sans donnée personnelle. Ne crée, ne modifie, ne soumets rien.
 FIN
-        notes_pour_consigne "$hote"
+        ligne_code; notes_pour_consigne "$hote"
         echo "Termine par l'étape « Avant de finir » de ta skill (l'attente qui enregistre la session), puis réponds."
       } > "$consigne"
     fi
     chown "$U:$U" "$consigne"; chmod 0600 "$consigne"
+    if [ -n "$codemail" ]; then
+      id "$JARVIS_U" >/dev/null 2>&1 && [ -f "$JARVIS_SRV/google.mjs" ] || { echo "JARVIS n'est pas installé ici : pas de code par mail."; exit 1; }
+      install -d -o root -g "$U" -m 0750 "$DEPOT"; rm -f "$DEPOT/code.txt" "$DEPOT/.code"
+      guetter_code "$codemail" & guet=$!
+    fi
     debut=$(date +%s); lancer_agent "$consigne" "$sortie"; rc=$?
+    [ -n "$guet" ] && { kill "$guet" 2>/dev/null; wait "$guet" 2>/dev/null; rm -f "$DEPOT/code.txt" "$DEPOT/.code"; }
     rm -f "$consigne"; [ -n "$joint" ] && rm -f "$joint"; chmod 0600 "$sortie" 2>/dev/null
     if [ "$commande" = brouillon ] && [ $blanc = 1 ]; then echo "== À blanc du $(date '+%d/%m/%Y %H:%M') ($(( $(date +%s) - debut )) s, code $rc)"
     elif [ "$commande" = brouillon ]; then echo "== Brouillon du $(date '+%d/%m/%Y %H:%M') ($(( $(date +%s) - debut )) s, code $rc)"
@@ -362,10 +393,8 @@ FIN
     [ -n "$requete" ] && [ -n "$vers" ] || usage
     [ -d "$vers" ] && [ "$(stat -c %U "$vers")" = root ] || { echo "Dossier de destination attendu, à root (exemple : /root/facture)."; exit 1; }
     id "$JARVIS_U" >/dev/null 2>&1 && [ -f "$JARVIS_SRV/google.mjs" ] || { echo "JARVIS n'est pas installé ici (utilisateur $JARVIS_U, $JARVIS_SRV)."; exit 1; }
-    noeud=$(command -v node) || { echo "Node est introuvable."; exit 1; }
     tmp=$(mktemp); chmod 0600 "$tmp"
-    (cd / && runuser -u "$JARVIS_U" -- env -i HOME="$(getent passwd "$JARVIS_U" | cut -d: -f6)" PATH=/usr/local/bin:/usr/bin:/bin ${JARVIS_DONNEES:+JARVIS_DATA="$JARVIS_DONNEES"} \
-      "$noeud" "$LIB/facture.mjs" --requete "$requete" --nom "$nom" --serveur "$JARVIS_SRV") > "$tmp"; rc=$?
+    par_jarvis --requete "$requete" --nom "$nom" > "$tmp"; rc=$?
     [ $rc = 0 ] || { rm -f "$tmp"; exit $rc; }
     python3 -I - "$tmp" "$vers" <<'PY'; rc=$?
 import base64, json, os, sys

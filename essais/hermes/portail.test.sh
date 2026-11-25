@@ -16,6 +16,7 @@ ICI=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd); RACINE=$(cd "$ICI/../.." && p
 T=/tmp/hermes-portail-banc; U=hermes-portail; H=/home/$U; HH=$H/hermes; RAM=/run/hermes-portail-cle
 PM=40080; PP=40090; PC=40443; RELAIS=8891   # faux modèle, faux portail, cible du relais ; ports éphémères permis par sortie.nft
 MDP='Banc-essai-0000'; PHRASE='phrase-du-banc-inventee-0123456789'
+TOTP='JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP'   # clé d'authentification inventée, pour la connexion à deux étapes du faux portail
 ok=0; ko=0
 verif() { local nom=$1; shift; if "$@"; then ok=$((ok + 1)); echo "  ✓ $nom"; else ko=$((ko + 1)); echo "  ✗ $nom"; fi; }
 propre() { sed 's/\x1b\[[0-9;?]*[A-Za-z]//g'; }
@@ -75,7 +76,7 @@ sed -e 's/^  provider: "claude-subscription-directsdk-experimental"/  provider: 
 cat $T/config.yaml > /etc/hermes-portail/config.yaml
 hp hermes config set model.base_url "http://127.0.0.1:$PM/v1" >/dev/null
 (cd /tmp && nohup python3 -I "$ICI/faux_services.py" $PM 40081 $T/traces > $T/faux.log 2>&1 &)
-(cd /tmp && nohup python3 -I "$ICI/faux_portail.py" --port $PP --journal $T/traces/portail.jsonl --mot-de-passe "$MDP" > $T/portail.log 2>&1 &)
+(cd /tmp && nohup python3 -I "$ICI/faux_portail.py" --port $PP --journal $T/traces/portail.jsonl --mot-de-passe "$MDP" --totp "$TOTP" > $T/portail.log 2>&1 &)
 printf 'localhost\npermis.exemple.test\n' >> /etc/hermes-portail/domaines
 (cd /tmp && nohup python3 -I /usr/local/lib/hermes-portail/filtre.py --port $RELAIS --domaines /etc/hermes-portail/domaines --ports 443,$PC --prives > $T/filtre.log 2>&1 &)
 (cd /tmp && nohup python3 -I -m http.server $PC --bind 127.0.0.1 > /dev/null 2>&1 &)
@@ -161,6 +162,36 @@ echo "== Second essai : la session du portail est gardée par le navigateur"
 bash /usr/local/sbin/hermes-portail essai "http://127.0.0.1:$PP/tableau" --consigne-fichier $T/consigne.txt > $T/essai2.log 2>&1
 verif "le portail n'a pas redemandé de connexion (session encore ouverte)" bash -c "grep -q '\"evenement\": \"tableau\"' $T/traces/portail.jsonl && ! grep -q '\"evenement\": \"connexion\"' $T/traces/portail.jsonl && ! grep -q 'sans-session' $T/traces/portail.jsonl"
 verif "toujours rien de soumis" bash -c "! grep -q SOUMISSION $T/traces/portail.jsonl"
+
+echo "== Connexion à deux étapes : le code de l'application d'authentification, généré par le coffre"
+saisir "Faux portail double\nhttp://localhost:$PP\nemail\nbanc2@exemple.test\n$MDP\n$TOTP\n" bash /usr/local/sbin/hermes-portail enregistrer > $T/enregistrer2.log 2>&1
+HANDLE2=$(sed -n 's/.*handle=\(vault_[a-f0-9]*\).*/\1/p' $T/enregistrer2.log | head -1)
+verif "second identifiant enregistré avec sa clé d'authentification ; ni mot de passe ni clé affichés" bash -c "[ -n '$HANDLE2' ] && [ '$HANDLE2' != '$HANDLE' ] && ! grep -q '$MDP' $T/enregistrer2.log && ! grep -q '$TOTP' $T/enregistrer2.log"
+verif "la clé d'authentification n'est en clair nulle part sur le disque" bash -c "! grep -rqF -- '$TOTP' $H /etc/hermes-portail /var/lib/hermes-portail 2>/dev/null"
+cat > $T/consigne-double.txt <<FIN
+Essai du banc, connexion à deux étapes. SUITE: [
+ {"nom": "browser_exec", "args": {"code": "# Porte à deux étapes\nnew_tab('http://localhost:$PP/double')\nwait_for_load()\nprint(page_info())"}},
+ {"nom": "tool_call", "args": {"calls": [{"name": "browser_vault", "arguments": {"action": "list"}}]}},
+ {"nom": "browser_exec", "args": {"code": "# Identifiant\nfill_input('#identifiant', 'banc2@exemple.test')\nprint('identifiant saisi')"}},
+ {"nom": "tool_call", "args": {"calls": [{"name": "browser_vault", "arguments": {"action": "fill", "handle": "$HANDLE2"}}]}},
+ {"nom": "browser_exec", "args": {"code": "# Première étape\njs(\"document.querySelector('#entrer').click()\")\nwait_for_load()\nprint(page_info())"}},
+ {"nom": "tool_call", "args": {"calls": [{"name": "browser_vault", "arguments": {"action": "enter_code", "handle": "$HANDLE2"}}]}},
+ {"nom": "browser_exec", "args": {"code": "# Seconde étape\nif js(\"!!document.querySelector('#verifier')\"):\n    js(\"document.querySelector('#verifier').click()\")\nwait_for_load()\nprint(page_info())"}},
+ {"nom": "browser_exec", "args": {"code": "# Enregistrement de la session\nimport time\ntime.sleep(32)\nprint('session enregistrée')", "timeout_s": 90}}
+]
+FIN
+: > $T/traces/portail.jsonl; : > $T/traces/modele.jsonl
+bash /usr/local/sbin/hermes-portail essai "http://localhost:$PP/double" --consigne-fichier $T/consigne-double.txt > $T/essai-double.log 2>&1; rc=$?
+verif "deux étapes : mot de passe puis code à 6 chiffres acceptés par le faux portail, tableau atteint" bash -c "[ $rc = 0 ] && grep -q '\"evenement\": \"connexion-double\", \"reussie\": true' $T/traces/portail.jsonl && grep -q '\"evenement\": \"code\", \"bon\": true, \"longueur\": 6' $T/traces/portail.jsonl && grep -q '\"evenement\": \"tableau\"' $T/traces/portail.jsonl"
+verif "deux étapes : le coffre annonce le second facteur « automatic », et la clé n'est jamais partie vers le modèle" bash -c "grep -q 'two_factor.*automatic' $T/essai-double.log && ! grep -qF -- '$TOTP' $T/traces/modele.jsonl && ! grep -q '$MDP' $T/traces/modele.jsonl"
+verif "deux étapes : le code généré n'apparaît pas dans ce que le modèle a reçu" bash -c "python3 -I - $T/traces/modele.jsonl '$TOTP' <<'PY'
+import base64, hashlib, hmac, json, struct, sys, time
+def totp(cle, t):
+    k = base64.b32decode(cle); h = hmac.new(k, struct.pack('>Q', int(t // 30)), hashlib.sha1).digest(); o = h[-1] & 15
+    return '%06d' % ((struct.unpack('>I', h[o:o + 4])[0] & 0x7fffffff) % 1000000)
+texte = open(sys.argv[1]).read(); maintenant = time.time()
+sys.exit(1 if any(totp(sys.argv[2], maintenant - d) in texte for d in range(0, 240, 30)) else 0)
+PY"
 
 echo "== Mode brouillon : une dépense enregistrée, jamais soumise"
 verif "brouillon sans fichier des champs : refus" bash -c "! bash /usr/local/sbin/hermes-portail brouillon 'http://127.0.0.1:$PP/tableau' >/dev/null 2>&1"
@@ -265,7 +296,11 @@ cat > $FJ/serveur/google.mjs <<'FIN'
 import fs from 'node:fs';
 export function createGoogle({S, save}) {
   return {tool: async (serveur, nom, i) => {
-    if (nom === 'search_threads') return /rien/.test(i.query) ? {} : {threads: [{id: 't1'}]};
+    if (nom === 'search_threads' && !/code/.test(i.query)) return /rien/.test(i.query) ? {} : {threads: [{id: 't1'}]};
+    if (nom === 'search_threads' && /code/.test(i.query)) return {threads: [{id: 'c1'}]};
+    if (nom === 'get_thread' && i.threadId === 'c1') return {id: 'c1', messages: [
+      {id: 'vieux', internalDate: String(Date.now() - 3600e3), subject: 'Votre code', plaintextBody: 'Votre code de vérification est 111111.'},
+      {id: 'neuf', internalDate: String(Date.now()), subject: 'Votre code de vérification est là', plaintextBody: 'Bonjour, votre code de vérification est 482913. Il est valable 10 minutes. Commande n° 20261118.'}]};
     if (nom === 'get_thread') return {id: 't1', messages: [{id: 'm1', date: '2026-11-18T09:00:00.000Z', sender: 'factures@exemple.test', attachments: [
       {filename: 'Receipt-0001.pdf', mimeType: 'application/pdf', size: 12, attachmentId: 'recu'},
       {filename: 'Invoice-0001.pdf', mimeType: 'application/pdf', size: 896, attachmentId: 'facture'}]}]};
@@ -289,6 +324,18 @@ printf '{"google": {}}' > $FJ/donnees/state.json
 bash /usr/local/sbin/hermes-portail facture --requete 'x' --vers $T/facture > $T/facture4.log 2>&1; rc=$?
 verif "facture : Google pas relié à JARVIS, code 3" bash -c "[ $rc = 3 ] && grep -q 'pas relié' $T/facture4.log"
 verif "facture : un dossier de destination qui n'est pas à root est refusé" bash -c "! bash /usr/local/sbin/hermes-portail facture --requete 'x' --vers $T/facture-pas-root >/dev/null 2>&1"
+printf '{"google": {"refresh": "jeton-invente-du-banc", "clientId": "x", "clientSecret": "y"}}' > $FJ/donnees/state.json
+cat > $T/consigne-code.txt <<FIN
+Essai du banc, code reçu par mail. SUITE: [
+ {"nom": "browser_exec", "args": {"code": "# Code reçu par mail\nimport time\ncode = ''\nfor _ in range(30):\n    try:\n        code = open('/var/lib/hermes-portail-depot/code.txt').read().strip()\n        if code: break\n    except OSError:\n        pass\n    time.sleep(2)\nprint('code saisi, longueur', len(code)) if code else print('code pas arrivé')", "timeout_s": 120}}
+]
+FIN
+: > $T/traces/modele.jsonl
+bash /usr/local/sbin/hermes-portail essai "http://127.0.0.1:$PP/tableau" --consigne-fichier $T/consigne-code.txt --code-mail 'subject:code newer_than:1d' > $T/essai-code.log 2>&1; rc=$?
+verif "code par mail : pendant le passage, le code du mail le plus récent arrive dans le dépôt et Hermes le lit" bash -c "[ $rc = 0 ] && grep -q 'code saisi, longueur 6' $T/essai-code.log"
+verif "code par mail : le code n'est jamais parti vers le modèle, et le fichier est effacé après le passage" bash -c "! grep -q '482913\|111111' $T/traces/modele.jsonl && ! grep -q '482913' $T/essai-code.log && [ ! -e /var/lib/hermes-portail-depot/code.txt ]"
+verif "code par mail : la consigne l'annonce et donne le chemin du fichier" bash -c "grep -q 'Code par mail' $T/traces/modele.jsonl && grep -q '/var/lib/hermes-portail-depot/code.txt' $T/traces/modele.jsonl"
+verif "code par mail : un mail plus ancien que le passage ne compte pas (code 4)" bash -c "cd / && runuser -u nobody -- env -i HOME=/nonexistent PATH=/usr/local/bin:/usr/bin:/bin JARVIS_DATA=$FJ/donnees node /usr/local/lib/hermes-portail/facture.mjs --requete 'subject:code' --code-apres \$(( (\$(date +%s) + 3600) * 1000 )) --serveur $FJ/serveur >/dev/null 2>&1; [ \$? = 4 ]"
 unset HERMES_BANC_JARVIS_U HERMES_BANC_JARVIS_SRV HERMES_BANC_JARVIS_DATA
 
 echo "== Garde-fous de la commande"
