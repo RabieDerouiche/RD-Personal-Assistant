@@ -2,8 +2,8 @@
 """Faux portail de notes de frais pour le banc d'Hermes (essais/hermes/portail.test.sh).
 
 Données inventées seulement. Une page de connexion (identifiant et mot de passe), une session par cookie,
-un tableau de bord, un formulaire « nouvelle dépense » dont le bouton « Soumettre » ne doit jamais être
-touché par un essai à blanc. Tout ce que le portail reçoit est noté dans un journal JSON (une ligne par
+un tableau de bord, un formulaire « nouvelle dépense » avec deux boutons : « Enregistrer sans envoyer » (le seul
+permis en mode brouillon) et « Soumettre », qui ne doit jamais être touché. Tout ce que le portail reçoit est noté dans un journal JSON (une ligne par
 requête utile) : le banc y lit si Hermes s'est connecté, ce qu'il a ouvert, et s'il a soumis quelque chose.
 
   python3 faux_portail.py --port 40090 --journal /tmp/x/portail.jsonl [--duree-session 3600] [--cert c.pem --cle k.pem]
@@ -96,6 +96,7 @@ class P(BaseHTTPRequestHandler):
                 '<label>Libellé <input name="libelle" id="libelle"></label><br>'
                 '<label>Montant TTC <input name="montant" id="montant"></label><br>'
                 '<label>Date <input name="date" id="date" type="date"></label><br>'
+                '<button type="submit" formaction="/depense/enregistrer" id="enregistrer">Enregistrer sans envoyer</button> '
                 '<button type="submit" id="soumettre">Soumettre</button></form><p><a href="/tableau">Retour</a></p>'))
         if chemin == '/deconnexion':
             SESSIONS.pop(s, None)
@@ -117,6 +118,12 @@ class P(BaseHTTPRequestHandler):
             jeton = secrets.token_urlsafe(24)
             SESSIONS[jeton] = time.time() + ARGS.duree_session
             return self.vers('/tableau', [('Set-Cookie', 'session=%s; Path=/; HttpOnly; SameSite=Lax; Max-Age=%d' % (jeton, ARGS.duree_session))])
+        if chemin == '/depense/enregistrer':
+            if not self.session():
+                return self.vers('/connexion')
+            note(evenement='ENREGISTREE', champs=champs)   # gardée, pas envoyée au valideur
+            DEPENSES.append(('FRAIS-%04d' % (len(DEPENSES) + 1), html.escape(champs.get('libelle', '')), html.escape(champs.get('montant', '')), 'Non envoyée'))
+            return self.vers('/tableau')
         if chemin == '/depense/soumettre':
             if not self.session():
                 return self.vers('/connexion')

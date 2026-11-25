@@ -83,7 +83,7 @@ tenu par la commande) : pas encore faite.
 | Fichier | Rôle |
 |---|---|
 | `install.sh` | Root, relançable. Utilisateur `hermes-portail`, Hermes à la version figée du Hermes principal (lue dans `../install.sh`) avec son navigateur, plugin de l'abonnement Claude et Claude Code à lui, politique, skill, copies root de la commande et du relais, lien de la clé, règles réseau et relais. Ne démarre aucun agent. |
-| `hermes-portail` | La commande (`/usr/local/sbin/hermes-portail`) : `etat`, `connexion-claude`, `enregistrer`, `domaines`, `essai`, `cle`, `fermer`, `oublier`. Un essai lance l'unité `hermes-portail-essai`. |
+| `hermes-portail` | La commande (`/usr/local/sbin/hermes-portail`) : `etat`, `connexion-claude`, `enregistrer`, `domaines`, `essai`, `brouillon`, `cle`, `fermer`, `oublier`. Un essai lance l'unité `hermes-portail-essai`. |
 | `hermes-portail-essai.service` | Un passage, enfermé (mêmes lignes que `hermes-gateway.service`, mémoire sans échange ; depuis le 25/11/2026, filtre d'appels système et espaces de noms interdits). Une vraie unité, pas `systemd-run` : au premier essai sur le serveur, `systemd-run -p IPAddressDeny=link-local` a été refusé alors que la même ligne est valable dans une unité. Consigne dans `/home/hermes-portail/.consigne`, réponse dans `/var/lib/hermes-portail/essais/`. |
 | `politique.yaml` | Sa politique (`/etc/hermes-portail/config.yaml`, root) : outils `browser`, `terminal`, `skills` seulement ; Sonnet ; profil de navigateur gardé ; navigateur envoyé vers le relais, lancé sans son bac à sable (dit en clair, voir « Durcissement »), remplissage automatique et heure réseau coupés. |
 | `navigateur-regles.json` | Règles d'administrateur du navigateur (`/etc/opt/chrome_for_testing/policies/managed/hermes-portail.json`, root) : pas de gestionnaire de mots de passe, pas de vérification de fuite, pas de compte Google, pas de mesures. |
@@ -109,7 +109,7 @@ le serveur). Faux portail `essais/hermes/faux_portail.py`, faux terminal `essais
 
 ## Ce que le banc prouve, et ce qu'il ne prouve pas
 
-Prouvé (66 vérifications, 25/11/2026) : installation ; outils réduits et politique figée ; clé seulement en ramfs,
+Prouvé (73 vérifications, 25/11/2026) : installation ; outils réduits et politique figée ; clé seulement en ramfs,
 nulle part en clair sur le disque, gardée par jarvis-coffre ; enregistrement dans un faux terminal sans que le mot de
 passe s'affiche ; connexion au faux portail par le coffre, tableau lu, formulaire ouvert, rien de soumis ; mot de
 passe et clé jamais envoyés au modèle ; session gardée au second passage ; coffre verrouillé : refus propre ;
@@ -130,6 +130,26 @@ Pas prouvé, à voir sur le vrai serveur :
 - le vrai portail : accepte-t-il un navigateur venu d'un serveur, quels hôtes annexes lui faut-il, sa page de
   connexion en une ou deux étapes ;
 - la mémoire du VPS-1 pendant un passage (environ 1 Go : navigateur, Hermes, Claude Code).
+
+## Mode brouillon (25/11/2026, son choix par QCM : « Note de frais à blanc », « Laisser un brouillon »)
+
+Première écriture dans son compte : UNE dépense d'essai, enregistrée sans être envoyée, qu'il supprime ensuite
+lui-même. `sudo hermes-portail brouillon <adresse> --champs-fichier <fichier>` : les champs viennent d'un fichier de
+root (4000 octets au plus), posé sur le serveur, jamais dans le dépôt. La commande écrit une consigne qui commence par
+« MODE BROUILLON » ; la skill n'ouvre ce mode que sur cette ligne (une page ne peut pas l'ouvrir) et garde les
+interdits de toujours : rien au valideur, aucun rapport, aucune suppression, aucune dépense existante modifiée,
+aucun fichier joint. `essai` refuse `--champs-fichier` : la lecture seule ne peut pas devenir un brouillon.
+
+Ce que les routines de Chronos disent du portail (onglet « Textes des routines » de Pilotage, lu le 25/11/2026) :
+une dépense s'enregistre seule, sans rapport et sans rien envoyer au valideur ; le justificatif (la facture en PDF)
+est joint à la création, et l'OCR du portail change alors la date et la catégorie, à corriger ; les étiquettes ne se
+voient pas dans le formulaire après enregistrement. **Ce que l'essai ne couvre pas** : joindre la facture. Hermes
+portail n'a ni outil de fichier ni accès aux mails : il faudra un chemin pour lui remettre le PDF (dépôt par JARVIS
+dans un dossier lu par le compartiment), à concevoir si le brouillon réussit.
+
+Garde-fou réel : seulement la skill et le modèle. Rien de technique n'empêche un clic sur le mauvais bouton (le
+relais ne voit pas dans le HTTPS). Conséquence au pire : une dépense d'essai d'un euro envoyée au valideur, à
+retirer à la main. Limite de tours portée à 40 par passage (un formulaire demande plus d'allers-retours).
 
 ## Durcissement (25/11/2026, son choix par QCM : « Second passage puis durcir »)
 
@@ -233,9 +253,9 @@ Pas prouvé, à voir sur le vrai serveur :
 Pour ce portail :
 1. **Combien de temps la session tient** : elle tient d'un passage au suivant (une heure d'écart). Reste un contrôle
    par jour pendant une à deux semaines (minuterie à écrire, sur sa demande).
-2. **Note de frais à blanc** : aller jusqu'au dernier écran sans valider, comparer avec ce que Chronos a créé. Il faut
-   d'abord les règles de Chronos (onglet « Textes des routines » de Pilotage : montants, contrôles, interdits ne sont
-   pas dans sa fiche) et une skill par geste.
+2. **Note de frais** : mode brouillon écrit et passé au banc ; à lancer sur le serveur (son oui là-bas), puis il
+   supprime la dépense d'essai. Ensuite : joindre le justificatif (chemin du PDF à concevoir), une skill par note de
+   frais de Chronos, comparaison avec ce que Chronos a créé.
 3. **Redémarrage du serveur** : vérifier pour de vrai que tout attend le coffre, puis repart après
    `sudo jarvis-coffre ouvrir` (la carte « Coffre » de l'app n'est pas encore branchée : `jarvis` n'est dans le groupe
    du coffre qu'à son prochain redémarrage).

@@ -124,7 +124,7 @@ def reponse_scenario(messages):
         t = texte_de(m.get("content")) if m.get("role") == "user" else ""
         if "SUITE:" in t:
             try:
-                suite = json.loads(t.split("SUITE:", 1)[1].strip())
+                suite, _ = json.JSONDecoder().raw_decode(t.split("SUITE:", 1)[1].strip())   # du texte peut suivre
             except ValueError:
                 break
             resultats = [texte_de(x.get("content")) for x in messages if x.get("role") == "tool"]

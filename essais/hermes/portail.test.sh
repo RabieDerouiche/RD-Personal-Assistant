@@ -144,7 +144,7 @@ wait $passage; rc=$?
 verif "le navigateur du passage tourne sous le filtre d'appels système, avec ses options" [ $filtre_vu = 1 ]
 verif "essai : code 0, alors que l'unité du Hermes principal est présente sur la machine" bash -c "[ $rc = 0 ] && [ -e /etc/systemd/system/hermes-gateway.service ]"
 verif "le faux portail a reçu une connexion réussie (bon identifiant, mot de passe de la bonne longueur)" grep -q '"evenement": "connexion", "reussie": true, "identifiant_recu": "banc@exemple.test", "longueur_mot_de_passe": '${#MDP} $T/traces/portail.jsonl
-verif "Hermes a lu le tableau de bord et ouvert le formulaire" bash -c "grep -q '\"evenement\": \"tableau\"' $T/traces/portail.jsonl && grep -q '\"evenement\": \"formulaire\"' $T/traces/portail.jsonl && grep -q 'libelle,montant,date,soumettre' $T/essai1.log"
+verif "Hermes a lu le tableau de bord et ouvert le formulaire" bash -c "grep -q '\"evenement\": \"tableau\"' $T/traces/portail.jsonl && grep -q '\"evenement\": \"formulaire\"' $T/traces/portail.jsonl && grep -q 'libelle,montant,date,enregistrer,soumettre' $T/essai1.log"
 verif "rien n'a été soumis" bash -c "! grep -q SOUMISSION $T/traces/portail.jsonl"
 verif "le mot de passe n'est jamais parti vers le modèle" bash -c "! grep -q '$MDP' $T/traces/modele.jsonl"
 verif "la clé du coffre n'est jamais partie vers le modèle" bash -c "! grep -qF -- '$CLE' $T/traces/modele.jsonl"
@@ -161,6 +161,32 @@ echo "== Second essai : la session du portail est gardée par le navigateur"
 bash /usr/local/sbin/hermes-portail essai "http://127.0.0.1:$PP/tableau" --consigne-fichier $T/consigne.txt > $T/essai2.log 2>&1
 verif "le portail n'a pas redemandé de connexion (session encore ouverte)" bash -c "grep -q '\"evenement\": \"tableau\"' $T/traces/portail.jsonl && ! grep -q '\"evenement\": \"connexion\"' $T/traces/portail.jsonl && ! grep -q 'sans-session' $T/traces/portail.jsonl"
 verif "toujours rien de soumis" bash -c "! grep -q SOUMISSION $T/traces/portail.jsonl"
+
+echo "== Mode brouillon : une dépense enregistrée, jamais soumise"
+verif "brouillon sans fichier des champs : refus" bash -c "! bash /usr/local/sbin/hermes-portail brouillon 'http://127.0.0.1:$PP/tableau' >/dev/null 2>&1"
+printf 'Libellé : x\n' > $T/champs-pas-root.txt; chown $U: $T/champs-pas-root.txt
+verif "brouillon avec un fichier des champs qui n'est pas à root : refus" bash -c "bash /usr/local/sbin/hermes-portail brouillon 'http://127.0.0.1:$PP/tableau' --champs-fichier $T/champs-pas-root.txt 2>&1 | grep -q 'appartenir à root'"
+verif "essai n'accepte pas --champs-fichier (la lecture seule ne peut pas devenir un brouillon)" bash -c "! bash /usr/local/sbin/hermes-portail essai 'http://127.0.0.1:$PP/tableau' --champs-fichier $T/champs-pas-root.txt >/dev/null 2>&1"
+cat > $T/champs.txt <<FIN
+Libellé : Essai Hermes
+Montant TTC : 1,00
+SUITE: [
+ {"nom": "browser_exec", "args": {"code": "# Formulaire de dépense\nnew_tab('http://127.0.0.1:$PP/depense/nouvelle')\nwait_for_load()\nfill_input('#libelle', 'Essai Hermes')\nfill_input('#montant', '1,00')\nprint(page_info())"}},
+ {"nom": "browser_exec", "args": {"code": "# Enregistrer sans envoyer\njs(\"document.querySelector('#enregistrer').click()\")\nwait_for_load()\nprint(js(\"document.querySelector('#depenses').innerText\"))"}},
+ {"nom": "browser_exec", "args": {"code": "# Enregistrement de la session\nimport time\ntime.sleep(32)\nprint('session enregistrée')", "timeout_s": 90}}
+]
+FIN
+: > $T/traces/portail.jsonl; : > $T/traces/modele.jsonl
+bash /usr/local/sbin/hermes-portail brouillon "http://127.0.0.1:$PP/tableau" --champs-fichier $T/champs.txt > $T/brouillon.log 2>&1; rc=$?
+verif "brouillon : code 0, la dépense est enregistrée une fois avec les valeurs du fichier" bash -c "[ $rc = 0 ] && [ \"\$(grep -c ENREGISTREE $T/traces/portail.jsonl)\" = 1 ] && grep -q '\"libelle\": \"Essai Hermes\", \"montant\": \"1,00\"' $T/traces/portail.jsonl"
+verif "brouillon : rien n'a été soumis, et la liste la montre « Non envoyée »" bash -c "! grep -q SOUMISSION $T/traces/portail.jsonl && grep -q 'Non envoyée' $T/brouillon.log"
+verif "brouillon : la consigne reçue par le modèle commence par « MODE BROUILLON », champs entre deux traits" bash -c "python3 -I - $T/traces/modele.jsonl <<'PY'
+import json, sys
+c = [json.loads(l) for l in open(sys.argv[1])][0]['corps']
+t = ' '.join(m['content'] if isinstance(m['content'], str) else ' '.join(x.get('text', '') for x in m['content']) for m in c['messages'] if m['role'] == 'user')
+sys.exit(0 if 'MODE BROUILLON' in t and t.index('MODE BROUILLON') < t.index('----------') < t.index('Libellé : Essai Hermes') else 1)
+PY"
+verif "brouillon : pas de nouvelle connexion (session gardée), mot de passe jamais parti vers le modèle" bash -c "! grep -q '\"evenement\": \"connexion\"' $T/traces/portail.jsonl && ! grep -q '$MDP' $T/traces/modele.jsonl"
 
 echo "== Coffre verrouillé, puis rouvert"
 bash /usr/local/sbin/hermes-portail fermer >/dev/null
