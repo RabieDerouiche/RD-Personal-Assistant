@@ -24,11 +24,13 @@ try {
   /* ---------- le bilan ---------- */
   const b = bilan({ym: '2026-11', presence: BASE, feriesAgenda: FER});
   const j = (d) => b.jours.find((x) => x.date === '2026-11-' + String(d).padStart(2, '0'));
-  ok('bilan : 15 travaillés (9 télétravail, 6 sur site), 3 de congé, 1 férié, 21 jours ouvrés', b.totaux.travailles === 15 && b.totaux.teletravail === 9 && b.totaux.surSite === 6 && b.totaux.conges === 3 && b.totaux.feries === 1 && b.totaux.ouvres === 21, JSON.stringify(b.totaux));
-  ok('bilan : jeudi 26 et vendredi 27 sans indication sont « à confirmer », jamais devinés ; le bilan n’est pas complet', b.aConfirmer.join() === '2026-11-26,2026-11-27' && !b.complet && j(26).M === '?');
+  ok('bilan : 17 travaillés (9 télétravail, 6 sur site, 2 au lieu à venir : un jour sans congé est travaillé), 3 de congé, 1 férié, 21 jours ouvrés', b.totaux.travailles === 17 && b.totaux.aVenir === 2 && b.totaux.teletravail === 9 && b.totaux.surSite === 6 && b.totaux.conges === 3 && b.totaux.feries === 1 && b.totaux.ouvres === 21, JSON.stringify(b.totaux));
+  ok('bilan : jeudi 26 et vendredi 27 sans indication : lieu jamais deviné ; oui possible (congés connus), pas complet (la note de télétravail attend)', b.aConfirmer.join() === '2026-11-26,2026-11-27' && !b.complet && b.validable && j(26).M === '?');
   ok('bilan : un congé sur deux jours (un seul événement, fin exclue) compte les deux ; celui d’octobre ne déborde pas', j(12).M === 'C' && j(13).A === 'C' && j(11).M === 'F' && j(2).M === 'S' && b.jours.length === 30);
   ok('bilan : la Toussaint un dimanche n’est pas un férié compté ; une « observance » n’est pas un férié', j(1).M === 'W' && !j(20).ferie && j(20).M === 'T');
-  ok('résumé en une phrase', resume(b) === 'Novembre 2026 : 15 jours travaillés (9 en télétravail, 6 sur site), 3 de congé, 1 férié ; à confirmer : jeudi 26, vendredi 27.', resume(b));
+  ok('résumé en une phrase, congés nommés', resume(b) === 'Novembre 2026 : 17 jours travaillés (9 en télétravail, 6 sur site, 2 lieu à venir), 3 de congé (jeudi 12, vendredi 13, lundi 23), 1 férié.', resume(b));
+  const bn = bilan({ym: '2026-11', presence: BASE, feriesAgenda: FER, aujourdhui: '2026-11-27'});
+  ok('un jour passé sans lieu ni congé est dit « lieu non noté » (le raccourci n’a pas tourné)', bn.nonNotes.join() === '2026-11-26' && /lieu non noté : jeudi 26/.test(resume(bn)), resume(bn));
   const b2 = bilan({ym: '2026-11', presence: [...BASE, jour(11, 'Télétravail'), jour(4, 'Hors Domicile'), jour(14, 'Télétravail'), jour(26, 'Médecin'), heure(27, '10:00', '11:00', 'Télétravail'), jour(16, 'Congé matin')], feriesAgenda: FER});
   const r = (d) => (b2.aResoudre.find((x) => x.date === '2026-11-' + String(d).padStart(2, '0')) || {}).raison || '';
   ok('à résoudre : présence un jour férié, deux indications opposées, présence un week-end', /férié/.test(r(11)) && /télétravail et sur site/.test(r(4)) && /week-end/.test(r(14)), JSON.stringify(b2.aResoudre));
@@ -75,22 +77,31 @@ try {
   let rep = await J.traiter('GET', '/api/jours', async () => ({}), q());
   ok('module : GET lit les deux agendas et rend le bilan du mois en cours ; le férié tunisien est ignoré', rep.status === 200 && rep.body.mois === '2026-11' && rep.body.bilan.totaux.surSite === 6 && rep.body.agendas.feries === 'Holidays in France' && rep.body.etat === 'a_valider', JSON.stringify(rep.body.agendas));
   ok('module : jours.json en 600', (fs.statSync(file).mode & 0o777) === 0o600);
-  rep = await J.traiter('POST', '/api/jours/confirmer', async () => ({mois: '2026-11', empreinte: rep.body.bilan.empreinte}));
-  ok('module : un bilan incomplet ne se confirme pas', rep.status === 409 && /confirmer ou à résoudre/.test(rep.body.error));
+  ok('module : le bilan du 25 : lieu de jeudi 26 et vendredi 27 « à venir », oui possible (congés connus), pas encore complet', rep.body.bilan.validable && !rep.body.bilan.complet && rep.body.bilan.totaux.aVenir === 2 && rep.body.demande === false);
+  const emp0 = rep.body.bilan.empreinte;
+  rep = await J.traiter('POST', '/api/jours/confirmer', async () => ({mois: '2026-11', empreinte: emp0.replace('23CC', '23ww')}));
+  ok('module : un oui sur des congés qui ont changé depuis l’affichage est refusé', rep.status === 409 && /congés ont changé/.test(rep.body.error));
+  rep = await J.traiter('POST', '/api/jours/confirmer', async () => ({mois: '2026-11', empreinte: emp0}));
+  ok('module : son oui sur ses congés, le lieu des derniers jours encore à venir : validé, congés gardés pour le CRA', rep.status === 200 && rep.body.etat === 'valide' && J.valides('2026-11').jours.length === 21 && J.valides('2026-11').conges.map((c) => c.date.slice(8)).join() === '12,13,23' && J.valides('2026-11').totaux.travailles === 17);
   rep = await J.traiter('POST', '/api/jours/corriger', async () => ({mois: '2026-11', texte: 'jeudi 26 et vendredi 27 : télétravail'}));
-  ok('module : correction lue par les règles (sans Claude), bilan complet remontré', rep.status === 200 && rep.body.par === 'règles' && appels.claude === 0 && rep.body.bilan.complet && rep.body.compris === 'jeudi 26, vendredi 27 : télétravail', JSON.stringify({par: rep.body.par, c: rep.body.compris}));
-  const emp = rep.body.bilan.empreinte;
-  rep = await J.traiter('POST', '/api/jours/confirmer', async () => ({mois: '2026-11', empreinte: emp.replace('26TT', '26SS')}));
-  ok('module : un oui sur un bilan qui a changé depuis son affichage est refusé', rep.status === 409 && /changé/.test(rep.body.error));
-  rep = await J.traiter('POST', '/api/jours/confirmer', async () => ({mois: '2026-11', empreinte: emp}));
-  ok('module : oui donné, état « validé », jours gardés pour le CRA', rep.status === 200 && rep.body.etat === 'valide' && J.valides('2026-11').jours.length === 21 && J.valides('2026-11').totaux.travailles === 17);
+  ok('module : un lieu corrigé (règles, sans Claude) garde son oui ; le bilan devient complet', rep.status === 200 && rep.body.par === 'règles' && appels.claude === 0 && rep.body.etat === 'valide' && rep.body.bilan.complet && rep.body.compris === 'jeudi 26, vendredi 27 : télétravail', JSON.stringify({par: rep.body.par, c: rep.body.compris, e: rep.body.etat}));
+  rep = await J.traiter('POST', '/api/jours/corriger', async () => ({mois: '2026-11', texte: 'lundi 30 : congé'}));
+  ok('module : un congé ajouté par lui : son oui est à redonner (« à valider », pas « à revoir »)', rep.status === 200 && rep.body.etat === 'a_valider' && rep.body.demande === false, rep.body.etat);
+  rep = await J.traiter('POST', '/api/jours/confirmer', async () => ({mois: '2026-11', empreinte: rep.body.bilan.empreinte}));
+  ok('module : oui redonné : 4 jours de congé gardés', rep.status === 200 && J.valides('2026-11').conges.length === 4 && J.valides('2026-11').totaux.travailles === 16);
   rep = await J.traiter('POST', '/api/jours/corriger', async () => ({mois: '2026-11', texte: 'on verra plus tard avec lui'}));
-  ok('module : une phrase que les règles ne lisent pas passe par Claude (une fois), et le bilan redevient à valider', rep.status === 200 && rep.body.par === 'Claude' && appels.claude === 1 && rep.body.etat === 'a_valider', JSON.stringify({s: rep.status, par: rep.body.par, e: rep.body.etat}));
-  await J.confirmer('2026-11', J.etat('2026-11').bilan.empreinte);
+  ok('module : une phrase que les règles ne lisent pas passe par Claude (une fois) ; un lieu seul ne retire pas son oui', rep.status === 200 && rep.body.par === 'Claude' && appels.claude === 1 && rep.body.etat === 'valide', JSON.stringify({s: rep.status, par: rep.body.par, e: rep.body.etat}));
+  { const J9 = createJours({file: path.join(DIR, 'j9.json'), agenda: {...agenda, evenements: async (id) => (id.includes('french') ? FER : [...BASE, jour(11, 'Télétravail')])}, now: () => T});
+    const r9 = await J9.traiter('GET', '/api/jours', async () => ({}), q('2026-11')), c9 = J9.confirmer('2026-11', r9.body.bilan.empreinte);
+    ok('module : un conflit (présence notée un jour férié) bloque le oui', !r9.body.bilan.validable && !c9.ok && /à résoudre/.test(c9.error)); }
+  { const J10 = createJours({file: path.join(DIR, 'j10.json'), agenda, now: () => T}), b0 = bilan({ym: '2026-11', presence: BASE, feriesAgenda: FER});
+    J10.brut().mois['2026-11'] = {etat: 'valide', corrections: {}, historique: [], valide: {at: T, empreinte: 'ancienne forme', jours: b0.jours.filter((d) => d.ouvre).map((d) => ({date: d.date, M: d.M, A: d.A}))}};
+    const x10 = await J10.lire('2026-11');
+    ok('module : un oui donné avec la 0.83.0 (empreinte avec le lieu) reste valide après la mise à jour', x10.etat === 'valide', x10.etat); }
   /* le 24 est passé : le rattrapage envoie une notification le 25 ; une seule */
   const J2 = createJours({file: path.join(DIR, 'j2.json'), agenda, push: async (m) => { appels.push.push(m); return []; }, now: () => T});
   await J2.tic(); await J2.tic();
-  ok('le 24 manqué (serveur arrêté, ou mis à jour le 25) : une notification, une seule, qui ouvre le bilan', appels.push.length === 1 && /Tes jours de novembre/.test(appels.push[0].title) && appels.push[0].url === '/#voir-jours-2026-11' && /À valider dans JARVIS/.test(appels.push[0].body), JSON.stringify(appels.push));
+  ok('le 24 manqué (serveur arrêté, ou mis à jour le 25) : une notification, une seule, qui ouvre le bilan', appels.push.length === 1 && /Tes jours de novembre/.test(appels.push[0].title) && appels.push[0].url === '/#voir-jours-2026-11' && /congés sert au CRA du 26/.test(appels.push[0].body), JSON.stringify(appels.push));
   T = Date.parse('2026-11-24T10:30:00Z');   /* le 24 à 11 h 30 : trop tôt */
   const J3 = createJours({file: path.join(DIR, 'j3.json'), agenda, push: async (m) => { appels.push.push(m); return []; }, now: () => T});
   await J3.tic();
@@ -100,11 +111,20 @@ try {
   /* le dernier jour : relu ; silencieux si rien n'a changé depuis son oui, notification si un jour a changé */
   T = Date.parse('2026-11-30T11:05:00Z');
   await J.tic();
-  ok('le dernier jour, rien de changé depuis son oui : aucune notification', appels.push.length === 2 && J.etat('2026-11').etat === 'valide');
+  ok('le dernier jour, tout est connu et rien n’a changé depuis son oui : aucune notification (la note de télétravail part seule)', appels.push.length === 2 && J.etat('2026-11').etat === 'valide' && J.etat('2026-11').bilan.complet);
   const J4 = createJours({file, agenda, push: async (m) => { appels.push.push(m); return []; }, now: () => T});
   pres.push(jour(27, 'Hors Domicile'));
   J4.brut().mois['2026-11'].verifFin = ''; await J4.tic();
-  ok('le dernier jour, un jour changé depuis son oui : « à revoir », notification « ont changé »', J4.etat('2026-11').etat === 'a_revoir' && /ont changé/.test(appels.push[appels.push.length - 1].title), J4.etat('2026-11').etat);
+  ok('le dernier jour, son raccourci dit autre chose que sa correction : conflit, « à revoir », notification « ont changé depuis ton oui »', J4.etat('2026-11').etat === 'a_revoir' && /ont changé depuis ton oui/.test(appels.push[appels.push.length - 1].title), J4.etat('2026-11').etat);
+  { const pres11 = [...BASE], ag11 = {...agenda, evenements: async (id) => (id.includes('french') ? FER : id.includes('tn.') ? [] : pres11)}, n0 = appels.push.length;
+    T = Date.parse('2026-11-25T11:30:00Z');
+    const J11 = createJours({file: path.join(DIR, 'j11.json'), agenda: ag11, push: async (m) => { appels.push.push(m); return []; }, now: () => T});
+    await J11.tic(); await J11.confirmer('2026-11', J11.etat('2026-11').bilan.empreinte);
+    T = Date.parse('2026-11-30T11:05:00Z'); await J11.tic();
+    const manque = appels.push[appels.push.length - 1];
+    ok('le dernier jour, validé mais deux jours sans lieu ni congé : notification « un lieu manque », qui les nomme', appels.push.length === n0 + 2 && /un lieu manque/.test(manque.title) && /jeudi 26, vendredi 27/.test(manque.body) && J11.etat('2026-11').etat === 'valide', JSON.stringify(manque));
+    pres11.push(jour(26, 'Télétravail'), jour(27, 'Hors Domicile')); J11.brut().mois['2026-11'].verifFin = ''; await J11.tic();
+    ok('le dernier jour, les lieux notés ensuite par son raccourci : son oui tient, aucune notification de plus', appels.push.length === n0 + 2 && J11.etat('2026-11').etat === 'valide' && J11.etat('2026-11').bilan.complet); }
   /* les agendas reconnus à leur identité réelle */
   cals = CALS.filter((c) => !c.id.includes('french'));
   const e1 = await (createJours({file: path.join(DIR, 'j5.json'), agenda, now: () => T})).lire('2026-11');

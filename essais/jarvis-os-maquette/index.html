@@ -10611,12 +10611,14 @@ void main(){
 
   /* ================= JARVIS OS 0.83.0 : les jours du mois (« Hermes remplace Chronos », étape 2 ; ses choix, QCM du 25/11/2026) =================
      Le bilan du mois, fait par le serveur sans IA (agenda « Présence » et fériés, règles de Chronos), arrive le 24 à midi par une notification
-     (#voir-jours-AAAA-MM) et se range dans « Pour moi », filtre Décider : « Confirmer » (seulement quand tout est connu), « Corriger » (une phrase,
-     relue et remontrée avant tout oui). Avant le 24 il ne se montre que par son lien ; validé, il disparaît, et revient si un jour change. */
+     (#voir-jours-AAAA-MM) et se range dans « Pour moi », filtre Décider : « Confirmer » porte sur ses congés (0.83.1, sa précision : le CRA du 26
+     n'a besoin que d'eux ; le lieu des jours à venir se note seul, par son raccourci), « Corriger » (une phrase, relue et remontrée). Avant le
+     24 il ne se montre que par son lien ; validé, il disparaît, et revient si un congé change. */
   const JRS = {data: null, mois: '', loading: null, at: 0, force: false, msg: '', ouvert: false, busy: false};
   const joursAPI = () => (SRV_OS && window.JarvisServeur && window.JarvisServeur.jours ? window.JarvisServeur.jours : null);
   const joursOn = () => (SRV_OS ? !!joursAPI() : !!window.__JOURS);
-  const JRS_COURT = {T: 'Télétravail', S: 'Sur site', C: 'Congé', F: 'Férié', '?': 'Non noté', X: 'Conflit'};   /* courts : une case fait la largeur de « Télétravail » */
+  const JRS_COURT = {T: 'Télétravail', S: 'Sur site', C: 'Congé', F: 'Férié', '?': 'À venir', X: 'Conflit'};   /* courts : une case fait la largeur de « Télétravail » ; un jour passé sans lieu : « Non noté » */
+  const jrsCourt = (c, date, auj) => (c === '?' && auj && date < auj ? 'Non noté' : JRS_COURT[c] || c);
   function joursLoad(force) {
     if (!joursOn() || JRS.loading || (!force && Date.now() - JRS.at < 30000)) return JRS.loading;
     const api = joursAPI();
@@ -10627,14 +10629,14 @@ void main(){
   /* la maquette (sans serveur) : la même forme, changée sur place */
   function joursMaquette(action, txt) {
     const d = JRS.data, b = d && d.bilan; if (!b) return {ok: false, error: 'Maquette sans bilan.'};
-    if (action === 'confirmer') { if (!b.complet) return {ok: false, error: 'Il reste des jours à confirmer ou à résoudre : corrige-les d’abord.'}; return Object.assign(d, {ok: true, etat: 'valide', demande: false, valide: {at: Date.now(), texte: d.texte}}); }
+    if (action === 'confirmer') { if (b.validable === false) return {ok: false, error: 'Il reste des jours à résoudre : corrige-les d’abord.'}; return Object.assign(d, {ok: true, etat: 'valide', demande: false, valide: {at: Date.now(), texte: d.texte}}); }
     if (action === 'corriger') {
       const t = String(txt || '').toLowerCase(), code = /t[ée]l[ée]travail|maison/.test(t) ? 'T' : /site|bureau/.test(t) ? 'S' : /cong/.test(t) ? 'C' : '';
       if (!code) return {ok: false, error: 'Je n’ai pas compris : écris par exemple « jeudi 26 : télétravail ».'};
       const vises = b.jours.filter((j) => j.M === '?' || j.A === '?'); vises.forEach((j) => { j.M = j.A = code; j.corrige = true; });
-      b.aConfirmer = []; b.complet = !b.aResoudre.length; const k = code === 'T' ? 'teletravail' : code === 'S' ? 'surSite' : 'conges'; b.totaux[k] += vises.length; if (code !== 'C') b.totaux.travailles += vises.length;
+      b.aConfirmer = []; b.nonNotes = []; b.complet = !b.aResoudre.length; const k = code === 'T' ? 'teletravail' : code === 'S' ? 'surSite' : 'conges'; b.totaux[k] += vises.length; b.totaux.aVenir = 0; if (code === 'C') b.totaux.travailles -= vises.length;
       b.empreinte = b.empreinte + '-c'; d.texte = d.texte.replace(/ ; à confirmer : [^;.]*/, '');
-      return Object.assign(d, {ok: true, etat: 'a_valider', corrections: (d.corrections || 0) + vises.length, compris: vises.map((j) => j.jour).join(', ') + ' : ' + ({T: 'télétravail', S: 'sur site', C: 'congé'})[code], par: 'règles', refus: []});
+      return Object.assign(d, {ok: true, etat: code === 'C' || d.etat !== 'valide' ? 'a_valider' : 'valide', corrections: (d.corrections || 0) + vises.length, compris: vises.map((j) => j.jour).join(', ') + ' : ' + ({T: 'télétravail', S: 'sur site', C: 'congé'})[code], par: 'règles', refus: []});
     }
     return d;
   }
@@ -10645,21 +10647,21 @@ void main(){
     p.then((r) => {
       if (r && r.ok) {
         const garde = {...r}; delete garde.ok; JRS.data = Object.assign({}, JRS.data, garde);
-        if (action === 'confirmer') { JRS.msg = 'Merci : tes jours de ' + d.libelle + ' sont validés. Ils serviront au CRA et à la note de télétravail.'; toast('Jours validés', d.libelle); }
-        else if (action === 'corriger') { JRS.ouvert = false; JRS.msg = 'Compris : ' + (r.compris || '') + (r.par === 'Claude' ? ' (lu par Claude)' : '') + '.' + ((r.refus || []).length ? ' Écarté : ' + r.refus.join(' ; ') + '.' : '') + ' Vérifie le bilan, puis confirme.'; }
+        if (action === 'confirmer') { JRS.msg = 'Merci : tes congés de ' + d.libelle + ' sont validés pour le CRA. Le lieu de chaque jour se complète seul jusqu’à la fin du mois.'; toast('Congés validés', d.libelle); }
+        else if (action === 'corriger') { JRS.ouvert = false; JRS.msg = 'Compris : ' + (r.compris || '') + (r.par === 'Claude' ? ' (lu par Claude)' : '') + '.' + ((r.refus || []).length ? ' Écarté : ' + r.refus.join(' ; ') + '.' : '') + (r.etat === 'valide' ? ' Ton oui tient (seul le lieu a changé).' : ' Vérifie le bilan, puis confirme.'); }
         else if (action === 'effacer') JRS.msg = 'Tes corrections sont effacées : le bilan revient à ton agenda.';
         else JRS.msg = 'Agenda relu.';
       } else JRS.msg = (r && r.error) || 'Pas enregistré sur ton serveur : réessaie.';
     }).catch(() => { JRS.msg = 'Pas enregistré sur ton serveur : réessaie.'; }).finally(() => { JRS.busy = false; renderView(true); try { header(); } catch (e) { /* rien */ } });
   }
-  function joursSemaines(b) {
+  function joursSemaines(b, auj) {
     const out = []; let cur = null;
     for (const j of b.jours) {
       if (!j.ouvre) { cur = null; continue; }
       if (!cur) { cur = h('div', {class: 'jrs-sem'}); out.push(cur); }
-      const demi = j.M !== j.A, cls = 'jrs-j jrs-' + (j.M === '?' || j.A === '?' ? 'q' : j.M === 'X' || j.A === 'X' ? 'x' : j.M.toLowerCase());
+      const demi = j.M !== j.A, cls = 'jrs-j jrs-' + (j.M === 'X' || j.A === 'X' ? 'x' : j.M === '?' || j.A === '?' ? (auj && j.date < auj ? 'q' : 'v') : j.M.toLowerCase());
       cur.append(h('div', {class: cls + (j.corrige ? ' is-corr' : ''), 'data-date': j.date, title: j.ferie || ''}, h('b', {text: j.jour.replace(/^(\w{3})\w*/, '$1')}),
-        h('span', {text: demi ? (JRS_COURT[j.M] || j.M) + ' / ' + (JRS_COURT[j.A] || j.A) : (JRS_COURT[j.M] || j.M)})));
+        h('span', {text: demi ? jrsCourt(j.M, j.date, auj) + ' / ' + jrsCourt(j.A, j.date, auj) : jrsCourt(j.M, j.date, auj)})));
     }
     return out;
   }
@@ -10667,17 +10669,24 @@ void main(){
     const d = JRS.data; if (!d || !d.bilan || !(d.demande || JRS.force)) return null;
     const b = d.bilan, t = b.totaux, kids = [];
     const nb = (x) => String(x).replace('.', ',');
-    kids.push(h('p', {class: 'jrs-tot'}, h('b', {text: nb(t.travailles)}), ' jours travaillés · ', nb(t.teletravail) + ' en télétravail · ' + nb(t.surSite) + ' sur site · ' + nb(t.conges) + ' de congé · ' + t.feries + ' férié' + (t.feries > 1 ? 's' : '')));
-    kids.push(h('div', {class: 'jrs-grille'}, joursSemaines(b)));
-    if (b.aConfirmer.length) kids.push(h('p', {class: 'jrs-alerte'}, h('b', {text: 'À confirmer : '}), b.aConfirmer.map((x) => (b.jours.find((j) => j.date === x) || {}).jour || x).join(', ') + ' (rien dans ton agenda « Présence »).'));
+    const auj = d.aujourdhui || '', jd = (x) => (b.jours.find((j) => j.date === x) || {}).jour || x, validable = b.validable !== false;
+    kids.push(h('p', {class: 'jrs-tot'}, h('b', {text: nb(t.conges)}), ' de congé' + ((b.conges || []).length ? ' (' + b.conges.map((c) => jd(c.date) + (c.fraction === 'M' ? ' matin' : c.fraction === 'A' ? ' après-midi' : '')).join(', ') + ')' : '') + ' · ' + t.feries + ' férié' + (t.feries > 1 ? 's' : '') + ' · ',
+      h('b', {text: nb(t.travailles)}), ' jours travaillés (' + nb(t.teletravail) + ' en télétravail, ' + nb(t.surSite) + ' sur site' + (t.aVenir ? ', ' + nb(t.aVenir) + ' lieu à venir' : '') + ')'));
+    kids.push(h('div', {class: 'jrs-grille'}, joursSemaines(b, auj)));
+    const avenir = b.aConfirmer.filter((x) => !auj || x >= auj), passes = b.aConfirmer.filter((x) => auj && x < auj);
+    if (avenir.length) kids.push(h('p', {class: 'jrs-rq'}, 'Lieu à venir : ' + avenir.map(jd).join(', ') + ' (ton raccourci le notera ; pas besoin pour ton oui).'));
+    if (passes.length) kids.push(h('p', {class: 'jrs-alerte'}, h('b', {text: 'Lieu non noté : '}), passes.map(jd).join(', ') + ' (la note de télétravail en aura besoin le dernier jour : corrige si ton raccourci a manqué ce jour-là).'));
     b.aResoudre.forEach((x) => kids.push(h('p', {class: 'jrs-alerte'}, h('b', {text: ((b.jours.find((j) => j.date === x.date) || {}).jour || x.date) + ' : '}), x.raison + '.')));
     (b.remarques || []).forEach((x) => kids.push(h('p', {class: 'jrs-rq', text: x + '.'})));
     if (d.erreur) kids.push(h('p', {class: 'jrs-alerte', text: d.erreur}));
     if (d.etat === 'valide' && d.valide) kids.push(h('p', {class: 'jrs-ok', text: 'Validé le ' + new Date(d.valide.at).toLocaleDateString('fr-FR', {weekday: 'long', day: 'numeric', month: 'long'}) + '.'}));
-    else if (d.etat === 'a_revoir') kids.push(h('p', {class: 'jrs-alerte', text: 'Un jour a changé dans ton agenda depuis ton oui : relis et confirme à nouveau.'}));
+    else if (d.etat === 'a_revoir') kids.push(h('p', {class: 'jrs-alerte', text: 'Un congé a changé dans ton agenda depuis ton oui (le CRA est peut-être déjà parti) : relis et confirme à nouveau.'}));
     if (JRS.msg) kids.push(h('p', {class: 'jrs-msg', role: 'status', text: JRS.msg}));
     const acts = h('div', {class: 'row jrs-acts'});
-    if (d.etat !== 'valide') { const c = btn(b.complet ? 'Confirmer' : 'Confirmer (tout n’est pas connu)', () => joursAgir('confirmer'), 'sm main jrs-confirmer'); if (!b.complet || JRS.busy) c.disabled = true; acts.append(c); }
+    if (d.etat !== 'valide') {
+      kids.push(h('p', {class: 'jrs-rq', text: 'Ton oui porte sur tes congés : c’est ce qu’il faut au CRA du 26. La note de télétravail partira seule le dernier jour.'}));
+      const c = btn(validable ? 'Confirmer mes congés' : 'Confirmer (un jour à résoudre)', () => joursAgir('confirmer'), 'sm main jrs-confirmer'); if (!validable || JRS.busy) c.disabled = true; acts.append(c);
+    }
     acts.append(btn(JRS.ouvert ? 'Fermer' : d.etat === 'valide' ? 'Corriger quand même' : 'Corriger', () => { JRS.ouvert = !JRS.ouvert; renderView(true); }, 'sm jrs-corriger'));
     if (d.corrections) acts.append(btn('Effacer mes corrections', () => joursAgir('effacer'), 'sm ghost jrs-effacer'));
     acts.append(btn('Relire l’agenda', () => joursAgir('relire'), 'sm ghost jrs-relire'));
@@ -10687,14 +10696,14 @@ void main(){
       const go2 = btn('Envoyer la correction', () => { const v = ta.value.trim(); if (v.length < 2) { ta.focus(); return; } joursAgir('corriger', v); }, 'sm main jrs-envoyer');
       kids.push(h('div', {class: 'jrs-form'}, ta, go2));
     }
-    const aside = d.etat === 'valide' ? 'validé' : d.etat === 'a_revoir' ? 'à revoir' : b.complet ? 'à confirmer' : 'à compléter';
+    const aside = d.etat === 'valide' ? 'congés validés' : d.etat === 'a_revoir' ? 'à revoir' : validable ? 'à confirmer' : 'à résoudre';
     return h('section', {class: 'panel pm-sec', id: 'pm-jours'}, h('header', {class: 'panel-h'}, h('h2', {text: 'Tes jours de ' + d.libelle}), h('span', {class: 'aside', text: aside})),
       h('div', {class: 'pm-list'}, h('article', {class: 'card item jours-card', 'data-mois': d.mois}, kids)));
   }
   document.head.append(h('style', {text: '.jours-card{display:grid;gap:10px}.jrs-tot{margin:0}.jrs-tot b{font:600 20px var(--display)}.jrs-grille{display:grid;gap:6px}'
     + '.jrs-sem{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px}.jrs-j{border-radius:8px;padding:4px 5px;font-size:11.5px;line-height:1.25;border:1px solid rgba(var(--c1),.25);min-width:0;overflow:hidden}'
     + '.jrs-j b{display:block;font:600 11px var(--display);opacity:.8}.jrs-j span{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.jrs-t{background:rgba(var(--c1),.12)}.jrs-s{background:rgba(var(--c2),.16)}'
-    + '.jrs-c{background:rgba(120,200,140,.14)}.jrs-f{background:rgba(255,255,255,.06);opacity:.75}.jrs-q,.jrs-x{border-color:var(--warn,#f5b041);background:rgba(245,176,65,.14)}.jrs-j.is-corr{outline:1px dashed rgba(var(--c1),.6)}'
+    + '.jrs-c{background:rgba(120,200,140,.14)}.jrs-f{background:rgba(255,255,255,.06);opacity:.75}.jrs-q,.jrs-x{border-color:var(--warn,#f5b041);background:rgba(245,176,65,.14)}.jrs-v{border-style:dashed;opacity:.8}.jrs-j.is-corr{outline:1px dashed rgba(var(--c1),.6)}'
     + '.jrs-alerte{margin:0;color:var(--warn,#f5b041)}.jrs-rq{margin:0;opacity:.75;font-size:12.5px}.jrs-ok{margin:0;color:rgb(120,200,140)}.jrs-msg{margin:0;font-size:13px}.jrs-acts{flex-wrap:wrap;gap:6px}'
     + '.jrs-form{display:grid;gap:6px}.jrs-txt{width:100%;box-sizing:border-box;font:14px var(--sans);border-radius:10px;padding:8px;background:rgba(0,0,0,.25);color:inherit;border:1px solid rgba(var(--c1),.35)}'}));
   {
