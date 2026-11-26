@@ -607,6 +607,20 @@ verif "teletravail complet : facture rapportée par Hermes (consigne : la factur
 verif "teletravail complet : la dépense est remplie avec le justificatif unique puis annulée ; le portail n'a rien enregistré ni soumis" bash -c "grep -q 'MODE À BLANC' $T/traces/modele.jsonl && grep -q 'Montant TTC : 14,44' $T/traces/modele.jsonl && grep -q '\"evenement\": \"formulaire\"' $T/traces/portail.jsonl && ! grep -q 'ENREGISTREE\|SOUMISSION' $T/traces/portail.jsonl && [ ! -e /var/lib/hermes-portail-depot/justificatif.pdf ]"
 verif "teletravail : le mois est gardé à root pour le garde-fou du mois suivant (600)" bash -c "[ \"\$(stat -c '%U %a' /var/lib/hermes-portail/teletravail/historique.json)\" = 'root 600' ] && python3 -I -c \"import json; h=json.load(open('/var/lib/hermes-portail/teletravail/historique.json')); assert h['2026-11']['a_blanc'] is True\""
 unset HERMES_BANC_JARVIS_U HERMES_BANC_JARVIS_SRV HERMES_BANC_JARVIS_DATA
+echo "== Note de télétravail : la minuterie du dernier jour (à blanc, compte rendu pour JARVIS)"
+rm -rf /var/lib/hermes-portail-retours; rm -f /var/lib/hermes-portail/teletravail/tentes.txt
+HERMES_BANC_AUJOURDHUI=2026-11-29 bash /usr/local/sbin/hermes-portail teletravail-auto > $T/tta0.log 2>&1; rc=$?
+verif "teletravail-auto : hors du dernier jour du mois, rien (code 0, aucune tentative, aucun compte rendu)" bash -c "[ $rc = 0 ] && [ ! -s /var/lib/hermes-portail/teletravail/tentes.txt ] && [ ! -e /var/lib/hermes-portail-retours/teletravail-2026-11.json ]"
+n0=$(grep -c ENREGISTREE $T/traces/portail.jsonl)
+HERMES_BANC_AUJOURDHUI=2026-11-30 HERMES_BANC_CONSIGNE_EN_PLUS=$T/tt-suite-elec.txt bash /usr/local/sbin/hermes-portail teletravail-auto > $T/tta1.log 2>&1; rc=$?
+RT=/var/lib/hermes-portail-retours/teletravail-2026-11.json
+verif "teletravail-auto : le dernier jour, la note à blanc ; compte rendu pour JARVIS (root 640 : « blanc », 10,5 jours, aucun montant) ; rien d'enregistré sur le portail" bash -c "[ $rc = 0 ] && grep -q 'Résultat télétravail : blanc' $T/tta1.log && [ \"\$(stat -c '%U %a' $RT)\" = 'root 640' ] && python3 -I -c \"import json,sys; r=json.load(open('$RT')); sys.exit(0 if r['resultat']=='blanc' and r['jours']==10.5 and r['a_blanc'] is True and 'total' not in r and '€' not in r['texte'] and not any(c.isdigit() for c in r['texte']) else 1)\" && [ \"\$(grep -c ENREGISTREE $T/traces/portail.jsonl)\" = $n0 ]"
+m0=$(stat -c %Y $RT)
+HERMES_BANC_AUJOURDHUI=2026-11-30 HERMES_BANC_CONSIGNE_EN_PLUS=$T/tt-suite-elec.txt bash /usr/local/sbin/hermes-portail teletravail-auto > $T/tta2.log 2>&1; rc=$?
+verif "teletravail-auto : une seule tentative par mois" bash -c "[ $rc = 0 ] && [ \"\$(wc -l < /var/lib/hermes-portail/teletravail/tentes.txt)\" = 1 ] && [ ! -s $T/tta2.log ] && [ \"\$(stat -c %Y $RT)\" = $m0 ]"
+rm -f /etc/hermes-portail/teletravail.conf
+verif "teletravail-auto : sans teletravail.conf, rien" bash -c "HERMES_BANC_AUJOURDHUI=2026-12-31 bash /usr/local/sbin/hermes-portail teletravail-auto > /dev/null 2>&1 && ! grep -q 2026-12 /var/lib/hermes-portail/teletravail/tentes.txt"
+rm -rf /var/lib/hermes-portail-retours
 rm -f /etc/hermes-portail/teletravail.conf /etc/hermes-portail/teletravail-champs.txt; rm -rf /var/lib/hermes-portail/teletravail
 
 echo "== Garde-fous de la commande"
