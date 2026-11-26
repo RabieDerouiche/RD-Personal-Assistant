@@ -262,6 +262,17 @@ AVIS = E("HERMES_RELANCE_AVIS", "/var/lib/hermes-relance-avis")
 PORTAIL = E("HERMES_RELANCE_PORTAIL", "/var/lib/hermes-portail/limite")
 GARDE_ARRET = E("HERMES_GARDE_ETAT", "/var/lib/hermes-garde/arret")
 GARDE_COUPE = E("HERMES_RELANCE_GARDE_COUPE", "/etc/hermes/garde.coupe")   # garde coupé à sa demande (26/11 au 3/12/2026)
+
+
+def coupe_active(jour):
+    """Garde coupé à sa demande : le fichier existe et, s'il porte une date de fin (AAAA-MM-JJ), elle n'est pas passée
+    (même règle que garde-forfait.sh et diagnostic.sh : une date passée vaut « pas de coupure »)."""
+    try:
+        with open(GARDE_COUPE, encoding="utf-8", errors="replace") as f:
+            m = re.search(r"\d{4}-\d{2}-\d{2}", f.read(200))
+    except OSError:
+        return False
+    return not m or jour <= m.group(0)
 POLITIQUE = E("HERMES_GARDE_POLITIQUE", "/etc/hermes/config.yaml")
 PLAFOND = int(E("HERMES_RELANCE_PLAFOND", "12") or 12)            # relances par jour, routines et tâches confondues
 PASSERELLE_MAX = 2                                               # redémarrages de la passerelle par jour
@@ -482,9 +493,9 @@ def cmd_relancer(a):
     if sortie == "failed":
         if os.path.exists(GARDE_ARRET):
             dire.append("Passerelle d'Hermes en échec, mais arrêtée par le garde du forfait : c'est lui qui la relance.")
-        elif os.path.exists(GARDE_COUPE):
+        elif coupe_active(jour):
             aviser("passerelle", "Hermes : passerelle plantée",
-                   "systemd la dit « failed ». Pendant la coupure du garde du forfait (jusqu'au 3/12), je ne la redémarre pas seul : "
+                   "systemd la dit « failed ». Pendant la coupure du garde du forfait, je ne la redémarre pas seul : "
                    "session Serveur JARVIS, diagnostic.sh, puis systemctl restart hermes-gateway.", blanc, dire) if etat.get("passerelle_dit") != jour else None
             if not blanc:
                 etat["passerelle_dit"] = jour

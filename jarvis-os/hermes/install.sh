@@ -174,10 +174,16 @@ if [ "$BANC" != 1 ]; then
   systemctl daemon-reload
   systemctl enable --now hermes-sortie.service
   systemctl enable hermes-gateway.service
-  if [ -f /etc/hermes/garde.coupe ]; then
-    # garde coupé à sa demande (26/11/2026 : « période de mise en place, ignore les limites ») : une réinstallation ne le rallume pas
+  if [ -f /etc/hermes/garde.coupe ] && grep -qE '[0-9]{4}-[0-9]{2}-[0-9]{2}' /etc/hermes/garde.coupe; then
+    # coupé jusqu'à une date (26/11/2026 : « le couper jusqu'au 3/12 ») : la minuterie tourne, le garde ne décide rien
+    # jusqu'à cette date, puis retire le fichier et reprend seul
+    rm -f /var/lib/hermes-garde/arret
+    systemctl enable --now hermes-garde.timer
+    echo "Garde du forfait coupé jusqu'au $(grep -oE '[0-9]{4}-[0-9]{2}-[0-9]{2}' /etc/hermes/garde.coupe | head -1) : il reprendra seul le lendemain."
+  elif [ -f /etc/hermes/garde.coupe ]; then
+    # garde coupé à sa demande sans date : une réinstallation ne le rallume pas
     systemctl disable --now hermes-garde.timer 2>/dev/null; rm -f /var/lib/hermes-garde/arret
-    echo "Garde du forfait coupé (/etc/hermes/garde.coupe) : minuterie laissée arrêtée."
+    echo "Garde du forfait coupé (/etc/hermes/garde.coupe, sans date) : minuterie laissée arrêtée."
   else
     systemctl enable --now hermes-garde.timer   # toutes les 10 min : Hermes s'arrête au-delà de $SEUIL_FORFAIT % de la semaine
   fi

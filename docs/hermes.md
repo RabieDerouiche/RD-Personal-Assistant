@@ -19,7 +19,7 @@ nouveau n'était noté dans Pilotage ; c'est sa décision de faire l'essai quand
 | Bot Telegram | **Un nouveau bot** (le jeton de l'ancien bot d'octobre est resté sur l'ancien serveur ; à supprimer chez @BotFather) |
 | Connexion Claude (QCM après le rappel de la zone grise : plugin officiel d'Hermes mais pas approuvé par Anthropic, qui préfère une clé d'API) | **Garder le plugin** ; la clé d'API des crédits inclus dans Max reste le plan B |
 | Pouvoirs | Aucun au départ. **Depuis sa demande du 23/11/2026 au soir** (« droits équivalents à Grok Bot », routines pour alléger Grok Bot, relier à JARVIS) : Pilotage, Gmail et l'agenda **par les outils du serveur MCP de JARVIS** (profil « exécutant »), des routines posées depuis le dépôt, des skills ; toujours ni web, ni terminal, ni fichiers, ni jeton Google. Tout le déroulé : `docs/hermes-deroule.md` |
-| Garde du forfait | Seuil de **85 %** (QCM) ; **sur la semaine seulement** (sa demande du 23/11/2026, une fois Telegram en place : il remplit lui-même la fenêtre de 5 heures en testant JARVIS OS). **Coupé du 26/11 au 3/12/2026** (sa décision par QCM du 26/11 : « période de mise en place, ignore les limites ; j'ai un reset gratuit ») : `systemctl disable --now hermes-garde.timer` et le fichier `/etc/hermes/garde.coupe`, qui empêche `install.sh` de le rallumer. Rétablir après le 3/12 : `rm /etc/hermes/garde.coupe && systemctl enable --now hermes-garde.timer` (le seuil reste 85 %). Le garde écrit aussi le dernier usage lu dans `/var/lib/hermes-garde/usage.json` (chiffres seulement) pour le bilan de la semaine d'Hermes (outil `hermes_usage`) |
+| Garde du forfait | Seuil de **85 %** (QCM) ; **sur la semaine seulement** (sa demande du 23/11/2026, une fois Telegram en place : il remplit lui-même la fenêtre de 5 heures en testant JARVIS OS). **Coupé du 26/11 au 3/12/2026** (sa décision par QCM du 26/11 : « période de mise en place, ignore les limites ; j'ai un reset gratuit ») : le fichier `/etc/hermes/garde.coupe` porte la date de fin (`2026-12-03`) ; la minuterie tourne, le garde ne décide rien jusqu'à cette date, puis **reprend seul le lendemain** et le dit une fois sur Telegram (0.89.0 ; `/etc` est en lecture seule pour le service : le fichier reste, une date passée vaut « pas de coupure », pour le garde, `limite.py` et `diagnostic.sh`). Un `garde.coupe` sans date coupe le garde jusqu'à son retrait (`install.sh` laisse alors la minuterie arrêtée). Le seuil reste 85 %. Le garde écrit aussi le dernier usage lu dans `/var/lib/hermes-garde/usage.json` (chiffres seulement) pour le bilan de la semaine d'Hermes (outil `hermes_usage`) |
 
 ## L'abonnement Claude dans Hermes : ce qui est permis (vérifié le 23/11/2026)
 
@@ -169,7 +169,7 @@ Verdict (Likely) : **le VPS-1 suffit pour l'étape 1**.
     jamais un Hermes arrêté à la main ; usage illisible : aucune décision.
   - Réglages : `SEUIL_FORFAIT` et `GARDE_CINQ_HEURES` dans `install.sh` (écrits dans `/etc/hermes/garde.conf`).
     `install.sh` relancé pendant une pause du garde ne redémarre pas Hermes lui-même : il relance le garde, qui
-    décide avec ses règles du moment. Banc : `bash essais/hermes/garde.test.sh` (20 vérifications).
+    décide avec ses règles du moment. Banc : `bash essais/hermes/garde.test.sh` (25 vérifications, dont la coupure jusqu'à une date).
 - Regarder soi-même : `/usage` dans le chat d'Hermes (même compte, donc même chiffre que JARVIS), la page
   d'usage de claude.ai, ou `diagnostic.sh` (état du garde, dernier contrôle).
 
