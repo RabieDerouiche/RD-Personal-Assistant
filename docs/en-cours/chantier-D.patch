@@ -1,0 +1,1042 @@
+diff --git a/docs/_chantier-D.md b/docs/_chantier-D.md
+new file mode 100644
+index 0000000..f192be3
+--- /dev/null
++++ b/docs/_chantier-D.md
+@@ -0,0 +1,186 @@
++# Chantier D — 0.92.0 : Hermes et ses routines, en direct (26/11/2026)
++
++Note de passage pour le coordinateur : à fondre dans `docs/jarvis-os.md`, `docs/hermes.md`, `docs/jarvis-os-reprise.md` et la demande
++commune à la session « Serveur JARVIS », puis à retirer. Aucun secret, aucune donnée personnelle, aucun nom de portail ici.
++
++## 1. Textes à reprendre
++
++### Entrée pour `docs/jarvis-os.md`
++
++- **0.92.0 (26/11/2026) : Hermes et ses routines, en direct** (sa remarque : dans l'app, Espaces › « Hermes et ses routines » ne montrait qu'une ligne périmée de l'onglet Routines de Pilotage ; les vraies routines sont dans le cron d'Hermes, `jobs.json`, chez l'utilisateur `hermes`, que JARVIS ne peut pas lire). *Root écrit un résumé assaini* : à chaque passage de `hermes-relance` (toutes les 10 minutes), même sans rien à relancer et sans lire l'usage en plus, `limite.py` écrit `/var/lib/hermes-relance-etat/routines.json` (dossier `root:jarvis` 750, fichier 640, fichier temporaire puis renommage, jamais à travers un lien) : pour chaque routine de la liste fermée (`routines.conf`, copie root posée par `install.sh` et rafraîchie par `routines.sh`), nom, libellé, moment (« du lundi au vendredi à 7 h 40 », d'après l'horaire vraiment posé chez Hermes), mode (réel ou double, `routines.mode` l'emporte), posée ou non, active ou non, dernier passage, résultat (ok, erreur, jamais ; une erreur réduite à une catégorie : limite du forfait, réseau, résultat non envoyé, arrêtée à la main, erreur), prochain passage ; plus la passerelle (active, arrêtée, plantée, démarre, inconnue), le garde du forfait (actif, coupé et jusqu'à quand, a arrêté Hermes, arrêté) et l'heure d'écriture. Rien n'est recopié de `jobs.json` : les dates sont refaites, jamais le texte d'une erreur, un chemin, un jeton, un nom de portail ou un contenu de mail ; une routine `jarvis-…` hors de la liste est seulement comptée. Une erreur d'écriture du résumé est avalée et dite dans le journal (son genre seulement) : elle ne change ni la relance ni son code de sortie. *JARVIS le sert* : `hermes-routines.mjs`, `GET /api/hermes/routines` (appareil relié), fichier et dossier lus sans suivre de lien, 32 Ko au plus, JSON revalidé champ par champ (liste blanche de formes, mots connus) ; résumé absent, illisible, d'une autre version, daté dans le futur ou **de plus de 30 minutes** : `{disponible: false, code, raison}`, sans aucune routine ; JARVIS n'écrit jamais dans ce dossier. Chemin réglable pour le banc : `JARVIS_HERMES_ROUTINES`. *Santé* : une ligne d'information « Routines d'Hermes » (« 6 routines en direct ; dernière écriture à 14 h 02 ; en erreur au dernier passage : … », ou « résumé indisponible : … »), jamais une notification ; rien là où Hermes n'est pas installé (dossier absent). *App* (bloc « 0.92.0 : Hermes et ses routines en direct », juste après le bloc 0.86.0 ; il range ce qui existe) : Grok arrêté, la page « Hermes et ses routines » montre sa carte (passerelle, garde du forfait, dernier et prochain passage ; de Pilotage il ne reste que sa dernière note, datée) et ses routines (libellé, mode, moment, dernier passage et résultat, prochain passage, « à jour à HH:MM ») ; la tuile d'Espaces dit le nombre de routines et ce qui cloche d'abord (passerelle, routine en erreur), sinon la prochaine ; Équipe › Routines a un panneau « Hermes » en direct et ne lit plus les lignes `Bot = Hermes` de l'onglet Routines ; les « Routines de JARVIS » (celles du serveur) ne changent pas. Résumé indisponible : « indisponible » avec la raison partout, **jamais une liste périmée** (plus de repli sur Pilotage). Relu au plus toutes les 30 secondes, chaque minute tant que la page est à l'écran, redessiné seulement si le résumé a changé et jamais pendant une saisie. Pont : `JarvisServeur.hermesRoutines()` (un serveur pas encore à jour : « indisponible », « le serveur de JARVIS n'est pas encore à jour »). Maquette sans serveur : `window.__HERMES_ROUTINES` (données inventées ; scénario `hermesIndispo`). Aucun outil MCP nouveau, rien de bancaire. Variables du banc côté root : `HERMES_RELANCE_RESUME`, `HERMES_RELANCE_CONF`, `HERMES_RELANCE_MODES`. Bancs : relance 80 (56 avant), Hermes 88 (84), serveur 398 (385), maquette 356 OK et le même échec connu de l'agenda (349).
++
++### Paragraphe pour `docs/hermes.md`
++
++Ligne à ajouter au tableau « Ce qui est installé et où » :
++
++| Routines en direct dans JARVIS (0.92.0) | résumé écrit par `hermes-relance` à chaque passage : `/var/lib/hermes-relance-etat/routines.json` (root et groupe de JARVIS, 750 et 640) ; liste fermée : `/usr/local/lib/hermes-relance/routines.conf` (copie root de `routines.conf`, posée par `install.sh`, rafraîchie par `routines.sh`) |
++
++Section à ajouter après « Relance automatique après la limite du forfait » :
++
++### Les routines en direct dans JARVIS (0.92.0, 26/11/2026)
++
++Sa remarque : dans l'app, « Hermes et ses routines » ne montrait qu'une ligne périmée de l'onglet Routines de Pilotage. JARVIS ne
++peut pas lire le cron d'Hermes (`/home/hermes` en 0700) : c'est root qui lui en écrit un résumé, à chaque passage de
++`hermes-relance.timer` (toutes les 10 minutes), après la relance, même quand il n'y a rien à relancer.
++
++- **Ce qu'il contient** (`/var/lib/hermes-relance-etat/routines.json`, version 1) : l'heure d'écriture, la passerelle
++  (`systemctl is-active hermes-gateway`), le garde du forfait (coupé et jusqu'à quand, a arrêté Hermes, actif ou arrêté d'après
++  sa minuterie), et pour chaque routine de `routines.conf` : nom, libellé (« Routine « … » » de sa consigne), moment lisible
++  (d'après `schedule.expr` de `jobs.json`, sinon l'horaire de `routines.conf` ; un horaire tordu reste « cron … »), mode (réel ou
++  double : `/etc/hermes/routines.mode` l'emporte), posée ou non, active ou non, dernier passage, résultat, prochain passage.
++- **Assaini** : liste fermée (une routine `jarvis-…` absente de `routines.conf` est comptée, jamais décrite) ; les dates sont
++  refaites (UTC), jamais recopiées ; une erreur devient une catégorie (limite du forfait, réseau, résultat non envoyé, arrêtée à
++  la main, erreur), jamais son texte ; ni chemin, ni jeton, ni nom de portail, ni contenu de mail.
++- **Sans coût** : `jobs.json`, deux fichiers de root et `systemctl is-active` seulement. Aucune lecture d'usage en plus (la règle
++  « sans rien de coupé, le script ne lit même pas l'usage » reste vraie), Hermes n'est jamais lancé pour ça.
++- **Sans risque pour la relance** : écrit après elle, dans un `try` à part ; une erreur est dite dans le journal par son genre
++  seulement (« Résumé des routines pour JARVIS : pas écrit (…) ») et ne change pas le code de sortie. `--a-blanc` n'écrit rien.
++- **Droits** : dossier `root:jarvis` 750, fichier 640 (comme `/var/lib/hermes-relance-avis`), fichier temporaire puis
++  renommage, jamais à travers un lien. Un dossier à part, et pas celui des avis : les avis sont des notifications que JARVIS
++  marque « vues » et que root efface au bout de 14 jours, le résumé est un état remplacé toutes les 10 minutes ; les mêler
++  aurait obligé à toucher le lecteur d'avis de la 0.89.0. `hermes` n'est pas dans le groupe : il ne le lit pas.
++- **(certain, code d'Hermes v0.23.3, `cron/jobs.py`, et banc)** `jobs.json` = `{jobs: [...], updated_at}` ; par routine :
++  `name`, `enabled`, `state` (`scheduled`, `paused`, `completed`, `error`), `paused_at`, `schedule` `{kind, expr, display}`,
++  `next_run_at`, `last_run_at`, `last_status` (`ok`, `error`, `delivery_failed`, `cancelled`, ou un statut imposé),
++  `last_error`, `last_delivery_error`, `last_failure` `{at, detail}`. Le banc d'Hermes écrit le résumé à partir d'un vrai
++  `jobs.json` (une routine passée, une en pause).
++- JARVIS le relit et le revalide (`jarvis-os/server/hermes-routines.mjs`, `docs/jarvis-os.md`, 0.92.0) : au-delà de 30 minutes
++  sans écriture, il dit « indisponible ». `diagnostic.sh` montre les droits, l'âge et le nombre de routines du résumé.
++
++Bancs : `bash essais/hermes/relance.test.sh` (80 vérifications), `sudo bash essais/hermes/banc.sh --neuf` (88).
++
++### Lignes pour `docs/jarvis-os-reprise.md` (« Tester »)
++
++- Serveur : 398 vérifications (dont 0.92.0 : route `GET /api/hermes/routines`, refus sans appareil relié, résumé absent, vieux,
++  en lien, piégé, illisible, ligne « Routines d'Hermes » de la santé, aucune écriture de JARVIS).
++- Maquette : 356 OK et l'échec connu de l'agenda (dont 0.92.0 : page Hermes en direct, tuile, Équipe › Routines, indisponible).
++- Relance après la limite : 80. Hermes (`banc.sh --neuf`) : 88.
++
++## 2. Section pour la demande commune à la session « Serveur JARVIS »
++
++```text
++SECTION « HERMES ET SES ROUTINES EN DIRECT » (0.92.0 ; à fondre dans la demande commune ; <COMMIT> = le commit de main qui contient
++la fusion). Dans l'app, « Hermes et ses routines » ne montrait qu'une ligne périmée de Pilotage : désormais hermes-relance écrit à
++chaque passage un résumé assaini du cron d'Hermes, que JARVIS lit (groupe en lecture seule) et que l'app affiche.
++Aucun secret dans cette section ni dans ta réponse. Ne recopie jamais le contenu de /home/hermes/.hermes/cron/jobs.json
++(les consignes et les erreurs y sont en clair) : le résumé, lui, peut être recopié (noms, dates, mots connus).
++
++LECTURES (sans demander)
++- git -C /opt/rd log --oneline -1 ; systemctl is-active jarvis hermes-gateway hermes-relance.timer
++- ls -ld /var/lib/hermes-relance-etat 2>&1   (avant : « No such file or directory »)
++- id -gn jarvis ; id -nG hermes   (attendus : jarvis ; hermes sans le groupe jarvis)
++
++DÉPLOIEMENT (dans le même oui que la demande commune ; rien de plus à approuver si elle a déjà fait 1 à 3)
++1. sudo -u jarvis git -C /opt/rd pull --ff-only   (attendu : <COMMIT> ; sauter si déjà fait)
++2. sudo systemctl restart jarvis                    (sauter si déjà fait : la route GET /api/hermes/routines et la ligne de santé)
++3. sudo bash /opt/rd/jarvis-os/hermes/install.sh    (sauter si déjà fait). Pour ce chantier il pose : la nouvelle copie root de
++   limite.py et de hermes-relance, la copie root de routines.conf (/usr/local/lib/hermes-relance/routines.conf, 644) et le
++   dossier /var/lib/hermes-relance-etat (root:jarvis, 750). Les unités ne changent pas.
++4. Le premier résumé, sans attendre la minuterie (un passage normal de la relance, celui que la minuterie fait toutes les
++   10 minutes ; il ne lit l'usage et ne relance quelque chose que si une routine est coupée par la limite) :
++   sudo systemctl start hermes-relance.service ; systemctl show -p Result hermes-relance.service   (→ Result=success)
++
++CONTRÔLES (lecture seule)
++5. Droits : sudo stat -c '%U:%G %a %n' /var/lib/hermes-relance-etat /var/lib/hermes-relance-etat/routines.json /usr/local/lib/hermes-relance/routines.conf
++   → root:jarvis 750 … ; root:jarvis 640 … ; root:root 644 …
++   sudo ls -A /var/lib/hermes-relance-etat   (→ routines.json seul, pas de .tmp)
++   sudo cmp /opt/rd/jarvis-os/hermes/routines.conf /usr/local/lib/hermes-relance/routines.conf && echo identiques
++6. Le résumé (il peut être recopié en entier) :
++   sudo python3 -I -c 'import json,sys; d=json.load(open(sys.argv[1])); print(len(d["routines"]), "routines ; liste", d["liste"], "; cron", d["cron"], "; passerelle", d["passerelle"], "; garde", d["garde"], "; hors liste", d["inconnues"]); [print(" ", r["nom"], "|", r["moment"], "|", r["mode"], "|", "active" if r["active"] else "pas active", "|", r["dernier"], r["resultat"], r["cause"] or "", "|", r["prochain"]) for r in d["routines"]]' /var/lib/hermes-relance-etat/routines.json
++   Attendu : « 6 routines ; liste True ; cron True ; passerelle active ; garde {'etat': 'coupé', 'jusqua': '2026-12-03'} ; hors liste 0 »,
++   puis veille-du-matin, bilan-hebdo, reveil, digest-ia, prix-suivis, sorties-du-week-end, chacune en mode « réel », « active »,
++   avec un prochain passage ; aucune ligne ne doit contenir un texte d'erreur, un chemin ou une adresse.
++   Compare les prochains passages avec : sudo bash /opt/rd/jarvis-os/hermes/routines.sh --liste   (mêmes routines, mêmes heures à l'heure de Paris).
++7. JARVIS le lit avec ses seuls droits (le même code que la route) :
++   sudo -u jarvis node -e "import('/opt/rd/jarvis-os/server/hermes-routines.mjs').then((m) => { const r = m.createHermesRoutines({fichier: '/var/lib/hermes-relance-etat/routines.json'}).lire(); console.log(r.disponible ? 'disponible' : 'indisponible : ' + r.raison, r.passerelle || '', r.garde ? r.garde.etat : '', (r.routines || []).map((x) => x.nom + ':' + x.mode + ':' + x.resultat).join(' ')); })"
++   → « disponible active coupé veille-du-matin:réel:… bilan-hebdo:réel:… reveil:réel:… digest-ia:réel:… prix-suivis:réel:… sorties-du-week-end:réel:… »
++   Hermes ne le lit pas : sudo -u hermes cat /var/lib/hermes-relance-etat/routines.json 2>&1 | tail -1   (→ Permission denied ;
++   si sudo refuse l'utilisateur sans shell : sudo runuser -u hermes -- cat … ; même attendu)
++8. La route existe et reste fermée sans appareil relié (aucun jeton ici) :
++   curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8787/api/hermes/routines   (→ 401)
++9. Dix minutes plus tard (la minuterie seule) : sudo stat -c '%y' /var/lib/hermes-relance-etat/routines.json (heure du dernier
++   passage à :02, :12, …) ; journalctl -u hermes-relance --since -15min --no-pager -o cat | tail -3
++   (→ « Rien à relancer. » ; jamais « Résumé des routines pour JARVIS : pas écrit »)
++   sudo bash /opt/rd/jarvis-os/hermes/diagnostic.sh | grep -A1 'relance après la limite'   (la ligne « résumé pour JARVIS : … »)
++
++RETOUR ARRIÈRE
++- Le code : sudo -u jarvis git -C /opt/rd checkout <commit d'avant> && sudo systemctl restart jarvis && sudo bash /opt/rd/jarvis-os/hermes/install.sh
++  (l'ancienne copie de limite.py n'écrit plus de résumé ; l'app d'avant relit Pilotage). Puis, facultatif :
++  sudo rm -rf /var/lib/hermes-relance-etat ; sudo rm -f /usr/local/lib/hermes-relance/routines.conf
++- Le résumé seul, sans toucher au reste : rien à arrêter (il ne lance rien) ; le supprimer rend la page « indisponible »
++  jusqu'au passage suivant de la minuterie.
++
++CE QUE J'ATTENDS EN RETOUR
++Commit déployé ; le Result de l'étape 4 ; les trois lignes de droits et « identiques » (étape 5) ; la sortie complète de l'étape 6
++(le nombre de routines et les lignes) et ce que dit routines.sh --liste ; la ligne de l'étape 7 et le refus pour hermes ;
++le code de l'étape 8 ; les trois lignes du journal et la ligne du diagnostic (étape 9) ; toute erreur mot pour mot.
++```
++
++## 3. Ce que le propriétaire verra, et ce qu'il a à faire
++
++Ce qu'il verra, une fois le serveur à jour (et l'app rechargée) :
++
++- **Espaces**, tuile « Hermes » : « 6 routines », et dessous ce qui cloche d'abord (« passerelle arrêtée », « en erreur : Prix suivis »)
++  ou, quand tout va bien, la prochaine (« prochaine : Réveil, aujourd'hui à 18:15 »).
++- **Hermes et ses routines** : sa carte (Passerelle « en marche », Garde du forfait « coupé jusqu'au 3 décembre », Dernier passage,
++  Prochain, Sa dernière note, celle de Pilotage, datée) ; puis « Ses routines », six lignes : libellé, pastille « réel » ou
++  « en double », moment, « Dernier passage : aujourd'hui à 07:42 · réussi » (ou « en erreur : limite du forfait », « jamais
++  passée »), « Prochain passage : demain à 07:40 » (ou « en pause ») ; en haut du panneau « 6 · à jour à 14:02 ».
++- **Équipe › Routines** : un panneau « Hermes » (en direct) avec les mêmes routines suivies comme une livraison (Programmée,
++  Dernier passage, Prochain passage) ; les « Routines de JARVIS » restent telles quelles.
++- **Si le résumé manque ou a plus de 30 minutes** : « Indisponible » sur la tuile, « Routines d'Hermes indisponibles : … » avec
++  la raison sur la page et dans Équipe › Routines ; plus jamais l'ancienne ligne de Pilotage.
++- **Santé du serveur** : une ligne « Routines d'Hermes » (nombre, dernière écriture, routine en erreur), sans notification.
++
++De son côté : rien d'autre que le oui unique à la demande commune dans la session « Serveur JARVIS » (elle relance `install.sh`
++d'Hermes : l'étape 4 de ma section écrit le premier résumé tout de suite). Ensuite, ouvrir JARVIS, Espaces, « Hermes » : les six
++routines doivent y être en moins de 10 minutes. L'heure des prochains passages se compare à celle qu'il connaît (veille à 7 h 40,
++réveil à 9 h 15, 13 h 15 et 18 h 15, prix suivis à 9 h, sorties le jeudi à 19 h, bilan et digest le lundi).
++
++## 4. Bancs, avant et après
++
++| Banc | Avant | Après |
++|---|---|---|
++| `bash essais/hermes/relance.test.sh` | 56 | 80, 0 échec |
++| `sudo bash essais/hermes/banc.sh --neuf` | 84 | 88, 0 échec |
++| `node jarvis-os/server/tests/server.test.mjs` | 385 | 398, 0 échec |
++| `essais/jarvis-os-maquette/banc/banc.cjs` | 349 OK, 1 échec connu (agenda, date) | À COMPLÉTER |
++| `bash essais/hermes/routines-conf.test.sh` | 6 lignes | 6 lignes, 0 erreur |
++| `bash essais/hermes/garde.test.sh` | 25 | 25 |
++| `fiab-b1` et `fiab-b3` (page et pont hors navigateur) | 13 et 24 | 13 et 24 |
++
++Pas lancé : `banc-serveur.mjs` (laissé au coordinateur), les autres `fiab-*` (zone non touchée).
++
++Précisions : `banc.sh --neuf` a été passé une fois (88, installation en 154 s) ; la seule retouche faite après ce passage est la
++ligne de rangement `rm -rf /var/lib/hermes-relance-etat` à la fin du banc (aucune vérification changée, syntaxe contrôlée par
++`bash -n`), pas relancé pour elle. `server.test.mjs` (398) et `relance.test.sh` (80) ont été passés sur le code tel qu'il est
++commité. Les vérifications 0.92 de la maquette ont aussi été passées à part (les deux vérifications 0.86 adaptées et les sept
++nouvelles : 10 sur 10 avec « aucune erreur de page »).
++
++## 5. Ce qui n'a pas pu être testé, et les risques
++
++- **Format réel de `jobs.json` (certain)** : relu dans le code d'Hermes au commit figé (`cron/jobs.py`, v0.23.3) et vérifié au banc
++  d'Hermes avec un vrai `hermes cron create` et un vrai passage (statut `ok`, dates avec fuseau, routine en pause, `schedule.expr`).
++  **Pas vu en vrai (probable)** : un `last_status = error` produit par la vraie limite du plugin ; la catégorie « limite du
++  forfait » repose sur la même reconnaissance que la relance de la 0.89.0 (`est_limite`), les autres erreurs tombent dans
++  « réseau » ou « erreur ».
++- **Sous le vrai systemd (probable)** : `hermes-relance.service` a `ProtectSystem=full` (`/var` reste inscriptible, comme pour
++  les avis de la 0.89.0) ; le dossier est créé par `install.sh` et recréé au besoin par le script. Non vérifiable au banc (pas
++  de systemd) : c'est l'étape 4 et le contrôle 5 de la demande.
++- **Groupe de JARVIS (probable)** : même montage que `/var/lib/hermes-relance-avis` (déjà en service). Si `id -gn jarvis` n'était
++  pas `jarvis`, les droits attendus au contrôle 5 changeraient de nom, pas de principe.
++- **Heure des horaires (probable)** : le « moment » est dit à l'heure de Paris, comme `routines.conf` ; au banc, Hermes a bien
++  compté « 15 9 * * 1 » à 9 h 15 de Paris (08:15 UTC). Sur le serveur, à confirmer par la comparaison avec `routines.sh --liste`.
++- **L'app reliée au vrai serveur (probable)** : la page est testée sur la maquette (données inventées) et la route à part
++  (`server.test.mjs`) ; le bout en bout (`banc-serveur.mjs`) n'a pas été lancé ici. Rien n'a été vu sur un vrai iPhone.
++- **Fraîcheur** : le résumé a jusqu'à 10 minutes (la minuterie). Un passage juste lancé peut donc encore être dit « prochain »
++  pendant quelques minutes ; l'heure « à jour à … » est affichée pour ça.
++- **Conteneur de banc** : `install.sh` crée `/var/lib/hermes-relance-etat` ; `banc.sh` le retire à la fin, sinon un serveur
++  JARVIS lancé par un autre banc dans le même conteneur y verrait « un Hermes installé sans résumé » (une ligne de santé en plus).
++- **Ligne de santé gardée** : comme les autres lignes, celle des routines reste dans son dernier état si Hermes est désinstallé
++  (le veilleur ne retire pas une ligne dont le contrôle ne dit plus rien). Deviné sans gravité.
++- **Conflits de fusion possibles** : `index.html` (mon bloc est inséré entre le bloc 0.86.0 et le bloc 0.87.0, pas en fin de
++  script, pour ne pas toucher la même ligne que les autres chantiers), `server.mjs` (4 ajouts : import, constante après les avis
++  de root, ligne de santé, route), `server.test.mjs` (une variable d'environnement et un bloc après « santé : retour à la
++  normale »), `banc.cjs` (deux vérifications 0.86 adaptées, deux blocs avant la fin), `jarvis-os/hermes/limite.py` (ajouts
++  seulement, plus `"relancer": cmd_minuterie` dans `main`).
+diff --git a/essais/hermes/banc.sh b/essais/hermes/banc.sh
+index b7c6559..f857096 100755
+--- a/essais/hermes/banc.sh
++++ b/essais/hermes/banc.sh
+@@ -50,6 +50,7 @@ verif "garde du forfait : copie root 0755, jamais le fichier du dépôt" [ "$(st
+ verif "garde du forfait : seuil de 85 %" grep -qx 'HERMES_SEUIL_FORFAIT=85' /etc/hermes/garde.conf
+ verif "garde du forfait : semaine seulement (fenêtre de 5 heures ignorée)" grep -qx 'HERMES_GARDE_CINQ_HEURES=0' /etc/hermes/garde.conf
+ verif "Claude Code d'Hermes trouvé par son PATH (~/.local/bin/claude)" [ -L /home/hermes/.local/bin/claude ]
++verif "0.92.0 : copie root de routines.conf (644) et dossier du résumé des routines pour JARVIS (root, 750)" bash -c "[ \"\$(stat -c '%U %a' /usr/local/lib/hermes-relance/routines.conf)\" = 'root 644' ] && cmp -s '$KIT/routines.conf' /usr/local/lib/hermes-relance/routines.conf && [ \"\$(stat -c '%U %a' /var/lib/hermes-relance-etat)\" = 'root 750' ]"
+ 
+ echo "== Politique figée"
+ outils=$(hx hermes tools list --platform telegram 2>/dev/null | grep '✓ enabled' | awk '{print $3}' | sort | tr '\n' ' ')
+@@ -191,6 +192,23 @@ for l in open('$T/traces/modele.jsonl'):
+     if isinstance(c, dict) and 'scheduled cron job' in json.dumps(c.get('messages') or ''):
+         sys.exit(0 if sorted(t['function']['name'] for t in c.get('tools') or []) == ['memory', 'skill_manage', 'skill_view', 'skills_list', 'tool_call', 'tool_describe', 'tool_search'] else 1)
+ sys.exit(1)"
++# 0.92.0 : le résumé des routines pour JARVIS, écrit par la copie root de la relance à partir du VRAI jobs.json d'Hermes (faux systemctl,
++# aucune lecture d'usage : rien n'est à relancer) ; la liste vient de la copie root de routines.conf, rafraîchie par routines.sh
++printf '#!/bin/bash\ncase "$1" in is-active|is-failed) echo active ;; esac\n' > $T/faux-systemctl; chmod +x $T/faux-systemctl
++verif "routines.sh a rafraîchi la copie root de routines.conf (celle que la relance résume)" bash -c "grep -q '^lecture | actif | 15 9 ' /usr/local/lib/hermes-relance/routines.conf && grep -q '^dormante ' /usr/local/lib/hermes-relance/routines.conf"
++env HERMES_RELANCE_JOBS=$HH/cron/jobs.json HERMES_RELANCE_ETAT=$T/relance-etat HERMES_RELANCE_AVIS=$T/relance-avis HERMES_RELANCE_PORTAIL=$T/relance-portail HERMES_RELANCE_RESUME=$T/resume \
++  HERMES_RELANCE_MODES=$T/routines.mode HERMES_GARDE_ETAT=$T/garde-arret HERMES_RELANCE_GARDE_COUPE=$T/garde-coupe HERMES_RELANCE_SYSTEMCTL=$T/faux-systemctl HERMES_RELANCE_LANCER=/bin/false \
++  HERMES_RELANCE_USAGE_CMD="touch $T/usage-lu; echo '{}'" HERMES_RELANCE_JARVIS_U=nobody python3 -I /usr/local/lib/hermes-relance/limite.py relancer > $T/relance.log 2>&1
++verif "résumé des routines écrit à partir du vrai jobs.json d'Hermes : la routine passée (ok, dates, horaire lisible), la routine en pause, rien d'autre ; sans lecture d'usage" python3 -I -c "
++import json, re, sys
++d = json.load(open('$T/resume/routines.json')); r = {x['nom']: x for x in d['routines']}
++iso = re.compile(r'\\d{4}-\\d\\d-\\d\\dT\\d\\d:\\d\\d:\\d\\dZ')
++l, p = r['lecture'], r['dormante']
++ok = (sorted(r) == ['dormante', 'lecture'] and d['cron'] is True and d['liste'] is True and d['passerelle'] == 'active'
++      and l['posee'] and l['active'] and l['resultat'] == 'ok' and l['moment'] == 'le lundi à 9 h 15' and iso.fullmatch(l['dernier'] or '') and iso.fullmatch(l['prochain'] or '')
++      and p['posee'] and not p['active'] and p['resultat'] == 'jamais' and p['prochain'] is None and p['moment'] == 'le dimanche à 18 h 30')
++sys.exit(0 if ok else 1)"
++verif "… droits du résumé (750 et 640), aucune lecture d'usage, rien dit d'autre que « Rien à relancer »" bash -c "[ \"\$(stat -c %a $T/resume)\" = 750 ] && [ \"\$(stat -c %a $T/resume/routines.json)\" = 640 ] && [ ! -e $T/usage-lu ] && [ \"\$(cat $T/relance.log)\" = 'Rien à relancer.' ]"
+ wait 2>/dev/null; pic=$(sort -n $T/rss-routine.log | tail -1)
+ echo "  mémoire d'Hermes pendant une routine : $pic Mo au plus (plus environ 250 Mo pour son Claude Code)"
+ verif "mémoire pendant une routine sous 550 Mo" [ "${pic:-999}" -lt 550 ]
+@@ -247,6 +265,7 @@ pkill -f "faux_services.py $PM"
+ cp -p $T/config.avant $HH/config.yaml; cp -p $T/env.avant $HH/.env
+ rm -f /etc/hermes/jarvis.env; HERMES_BANC=1 bash "$KIT/install.sh" > $T/install-fin.log 2>&1   # le conteneur repart sans liaison
+ nft delete table inet hermes_sortie 2>/dev/null
++rm -rf /var/lib/hermes-relance-etat   # 0.92.0 : sinon un serveur JARVIS lancé par un autre banc dans ce conteneur y verrait un Hermes installé sans résumé
+ echo
+ echo "Banc d'Hermes : $ok vérifications réussies, $ko en échec."
+ [ $ko = 0 ]
+diff --git a/essais/hermes/relance.test.sh b/essais/hermes/relance.test.sh
+index 041fce3..5b75ce8 100644
+--- a/essais/hermes/relance.test.sh
++++ b/essais/hermes/relance.test.sh
+@@ -81,6 +81,7 @@ mkdir -p "$T/portail"; jobs "$T/jobs.json"; usage 100 40
+ relancer() { : > "$T/appels"; env HERMES_RELANCE_JOBS="$T/jobs.json" HERMES_RELANCE_ETAT="$T/etat" HERMES_RELANCE_AVIS="$T/avis" HERMES_RELANCE_PORTAIL="$T/portail" \
+   HERMES_GARDE_ETAT="$T/garde-arret" HERMES_RELANCE_GARDE_COUPE="$T/garde-coupe" HERMES_GARDE_POLITIQUE="$T/politique.yaml" HERMES_RELANCE_SYSTEMCTL="$T/systemctl" HERMES_RELANCE_LANCER="$T/lancer" \
+   HERMES_RELANCE_USAGE_CMD="${CMD:-touch $T/lu; cat $T/usage.json}" HERMES_RELANCE_MAINTENANT="${QUAND:-$N}" HERMES_RELANCE_JARVIS_U=nobody HERMES_RELANCE_PLAFOND="${PLAF:-12}" \
++  HERMES_RELANCE_RESUME="${RESUME:-$T/resume}" HERMES_RELANCE_CONF="${CONF:-$T/routines.conf}" HERMES_RELANCE_MODES="$T/routines.mode" \
+   python3 -I "$L" relancer "$@" > "$T/sortie" 2>&1; }
+ lances() { cat "$T/lances" 2>/dev/null | wc -l; }
+ QUAND=$((Q + 600)) relancer
+@@ -170,12 +171,84 @@ verif "… une demande pour une unité hors liste (la passerelle) : ignorée" ba
+ rm -f "$T/portail/relance-ndf.json"; relancer
+ verif "… second passage : rien de relancé de nouveau" bash -c "! grep -q '^start' '$T/appels'"
+ 
++echo "== Le résumé des routines pour JARVIS (0.92.0 : « Hermes et ses routines » en direct)"
++rm -rf "$T/etat" "$T/avis" "$T/lances" "$T/portail" "$T/resume"; mkdir -p "$T/portail"; rm -f "$T/garde-arret" "$T/garde-coupe" "$T/etat-passerelle" "$T/echec-passerelle" "$T/lu"
++cp "$KIT/routines.conf" "$T/routines.conf"; printf 'veille-du-matin reel\nprix-suivis double\nprix-suivis reel\npirate reel\n' > "$T/routines.mode"
++PIEGE="/home/hermes/.hermes/secret-chemin sk-ant-JETONPIEGE123 portail.exemple.invalid « Objet du mail : facture de novembre »"
++resume_jobs() {   # resume_jobs <heure des erreurs> : une routine saine, trois en erreur (limite, réseau, autre), une en pause, une pas posée, des intrus
++  py "
++import json, sys
++f, quand, piege = sys.argv[1:4]
++J = [dict(id='a1', name='jarvis-veille-du-matin', enabled=True, state='scheduled', schedule=dict(kind='cron', expr='40 7 * * 1-5', display='40 7 * * 1-5'),
++          last_status='ok', last_run_at='2026-11-26T07:40:12+01:00', last_error=None, next_run_at='2026-11-27T07:40:00+01:00'),
++     dict(id='b2', name='jarvis-prix-suivis', enabled=True, state='scheduled', last_status='error', last_run_at=quand,
++          last_error=\"RuntimeError: You've hit your 5-hour limit · resets 10:40am (UTC) \" + piege, next_run_at='2026-11-27T09:00:00+01:00'),
++     dict(id='c3', name='jarvis-digest-ia', enabled=True, state='scheduled', last_status='error', last_run_at=quand, last_error='ValueError: ' + piege,
++          last_failure=dict(at=quand, detail=piege), next_run_at='demain <script>alert(1)</script> /etc/passwd'),
++     dict(id='d4', name='jarvis-reveil', enabled=True, state='scheduled', last_status='error', last_run_at=quand, last_error='ConnectionError: DNS ' + piege, next_run_at='2026-11-26T18:15:00+01:00'),
++     dict(id='e5', name='jarvis-bilan-hebdo', enabled=False, state='paused', paused_at='2026-11-26T08:00:00+01:00', last_status=None, last_run_at=None, next_run_at=None),
++     dict(id='p1', name='jarvis-pirate', enabled=True, state='scheduled', last_status='ok', last_run_at=quand, prompt=piege, next_run_at=quand),
++     dict(id='p2', name='jarvis-veille-du-matin/../../etc', enabled=True, state='scheduled', last_status='ok', last_run_at=quand),
++     dict(id='f6', name='autre-chose', enabled=True, state='scheduled', last_status='error', last_run_at=quand, last_error=piege)]
++json.dump({'jobs': J, 'updated_at': quand}, open(f, 'w'))" "$T/jobs.json" "$1" "$PIEGE"
++}
++res() { py "
++import json, sys
++d = json.load(open(sys.argv[1])); r = {x['nom']: x for x in d['routines']}
++sys.exit(0 if eval(sys.argv[2]) else 1)" "${RES:-$T/resume/routines.json}" "$1"; }
++resume_jobs "$(iso $((N - 30 * 3600)))"; relancer; code=$?
++verif "rien à relancer (erreurs de plus de 24 heures) : le résumé est écrit quand même, sans lire l'usage du forfait" bash -c "[ $code = 0 ] && grep -q 'Rien à relancer' '$T/sortie' && [ ! -f '$T/lu' ] && [ -f '$T/resume/routines.json' ]"
++verif "… dossier 750, fichier 640 (root et groupe de JARVIS), écrit d'un coup (aucun fichier temporaire laissé)" bash -c "[ \"\$(stat -c %a '$T/resume')\" = 750 ] && [ \"\$(stat -c %a '$T/resume/routines.json')\" = 640 ] && [ \"\$(ls '$T/resume')\" = routines.json ]"
++verif "… les six routines de routines.conf, dans l'ordre, avec leur libellé et leur horaire lisible" res "d['v'] == 1 and d['at'] == $N and d['liste'] is True and d['cron'] is True and list(r) == ['veille-du-matin', 'bilan-hebdo', 'reveil', 'digest-ia', 'prix-suivis', 'sorties-du-week-end'] and r['veille-du-matin']['libelle'] == 'Veille du matin' and r['digest-ia']['libelle'] == 'Digest IA et .NET' and r['veille-du-matin']['moment'] == 'du lundi au vendredi à 7 h 40' and r['reveil']['moment'] == 'chaque jour à 9 h 15, 13 h 15 et 18 h 15' and r['bilan-hebdo']['moment'] == 'le lundi à 8 h 50' and r['prix-suivis']['moment'] == 'chaque jour à 9 h' and r['sorties-du-week-end']['moment'] == 'le jeudi à 19 h'"
++verif "… le mode noté sur le serveur l'emporte (routines.mode, la dernière ligne gagne) ; sinon celui de routines.conf" res "r['veille-du-matin']['mode'] == 'réel' and r['prix-suivis']['mode'] == 'réel' and r['digest-ia']['mode'] == 'double' and r['reveil']['mode'] == 'double'"
++verif "… routine saine : ok, dernier et prochain passage en dates ISO refaites (UTC)" res "r['veille-du-matin'] == dict(nom='veille-du-matin', libelle='Veille du matin', moment='du lundi au vendredi à 7 h 40', mode='réel', posee=True, active=True, dernier='2026-11-26T06:40:12Z', resultat='ok', cause=None, prochain='2026-11-27T06:40:00Z')"
++verif "… une erreur devient une catégorie courte : limite du forfait, réseau, ou « erreur »" res "[r[n]['resultat'] + ':' + str(r[n]['cause']) for n in ('prix-suivis', 'reveil', 'digest-ia')] == ['erreur:limite du forfait', 'erreur:réseau', 'erreur:erreur']"
++verif "… assaini : ni le texte d'une erreur, ni un chemin, ni un jeton, ni un nom de portail, ni un contenu de mail, ni une date piégée" bash -c "! grep -qiE 'hit your|RuntimeError|ValueError|ConnectionError|/home|secret|JETONPIEGE|sk-ant|exemple|invalid|facture|Objet|script|passwd|demain' '$T/resume/routines.json'"
++verif "… une date qui n'en est pas une : rien (jamais recopiée)" res "r['digest-ia']['prochain'] is None and r['digest-ia']['dernier'] == '$(py "import datetime,sys; print(datetime.datetime.fromtimestamp(int(sys.argv[1]), datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'))" $((N - 30 * 3600)))'"
++verif "… routine inconnue de routines.conf (jarvis-pirate, un nom piégé) ou hors « jarvis- » : ignorée, seulement comptée" bash -c "! grep -qE 'pirate|autre-chose|\\.\\./' '$T/resume/routines.json'"
++verif "… (deux ignorées, six décrites)" res "d['inconnues'] == 2 and len(d['routines']) == 6"
++verif "… en pause : pas active, jamais passée ; pas posée chez Hermes : dite « pas posée »" res "r['bilan-hebdo']['posee'] is True and r['bilan-hebdo']['active'] is False and r['bilan-hebdo']['resultat'] == 'jamais' and r['bilan-hebdo']['prochain'] is None and r['sorties-du-week-end']['posee'] is False and r['sorties-du-week-end']['resultat'] == 'jamais'"
++verif "… passerelle en marche, garde du forfait actif" res "d['passerelle'] == 'active' and d['garde'] == dict(etat='actif', jusqua=None)"
++verif "… seuls des appels « is-active » et « is-failed » à systemd : rien n'est lancé ni redémarré" bash -c "! grep -qvE '^(is-active|is-failed) ' '$T/appels'"
++echo failed > "$T/etat-passerelle"; echo "coupé jusqu'au 2026-12-03" > "$T/garde-coupe"; relancer
++verif "passerelle plantée, garde coupé jusqu'à une date : dits tels quels" res "d['passerelle'] == 'plantée' and d['garde'] == dict(etat='coupé', jusqua='2026-12-03')"
++echo inactive > "$T/etat-passerelle"; echo "coupé jusqu'au 2026-11-20" > "$T/garde-coupe"; touch "$T/garde-arret"; relancer
++verif "passerelle arrêtée, coupure finie, Hermes arrêté par le garde : « a arrêté Hermes »" res "d['passerelle'] == 'arrêtée' and d['garde'] == dict(etat='a arrêté Hermes', jusqua=None)"
++rm -f "$T/etat-passerelle" "$T/garde-coupe" "$T/garde-arret"
++rm -rf "$T/resume"; relancer --a-blanc
++verif "à blanc : aucun résumé écrit (rien n'est touché)" bash -c "[ ! -e '$T/resume' ] && grep -q 'Rien à relancer' '$T/sortie'"
++echo "contenu à ne pas toucher" > "$T/cible"; mkdir -p "$T/resume"; ln -s "$T/cible" "$T/resume/routines.json"; ln -s "$T/cible" "$T/resume/routines.json.tmp"; relancer
++verif "le résumé (ou son fichier temporaire) remplacé par un lien : jamais écrit à travers, le lien est remplacé par un vrai fichier" bash -c "[ \"\$(cat '$T/cible')\" = 'contenu à ne pas toucher' ] && [ ! -L '$T/resume/routines.json' ] && [ -f '$T/resume/routines.json' ] && [ ! -e '$T/resume/routines.json.tmp' ]"
++CONF="$T/absente.conf" relancer
++verif "copie root de routines.conf absente : résumé écrit sans aucune routine, et il le dit (« liste » fausse)" res "d['liste'] is False and d['routines'] == [] and d['inconnues'] == 7"
++printf '{pas du json' > "$T/jobs.json"; relancer
++verif "jobs.json illisible : le résumé le dit (« cron » faux), les routines connues restent « pas posées »" res "d['cron'] is False and len(d['routines']) == 6 and not any(x['posee'] for x in d['routines'])"
++# l'écriture du résumé impossible ne change rien à la relance : mêmes relances, même code de sortie
++rm -rf "$T/etat" "$T/avis" "$T/lances"; jobs "$T/jobs.json"; usage 3 40; echo "un fichier, pas un dossier" > "$T/bouche"
++RESUME="$T/bouche/resume" relancer; code=$?
++verif "résumé impossible à écrire : la relance se fait quand même (deux routines relancées, code 0), l'erreur est dite dans le journal sans détail" bash -c "[ $code = 0 ] && [ \"\$(sort '$T/lances' | paste -sd,)\" = 'a1,b2' ] && grep -q 'Résumé des routines pour JARVIS : pas écrit (NotADirectoryError)' '$T/sortie' && ! grep -q 'bouche' '$T/sortie'"
++relancer
++verif "… et avec une relance en cours, le résumé dit la routine en erreur par la limite (jamais son texte)" res "r['veille-du-matin']['resultat'] == 'erreur' and r['veille-du-matin']['cause'] == 'limite du forfait' and r['digest-ia']['cause'] == 'réseau' and r['bilan-hebdo']['resultat'] == 'ok'"
++verif "horaires : cas simples lisibles, cas tordus rendus tels quels (« cron … »)" py "
++import importlib.util, sys
++s = importlib.util.spec_from_file_location('limite', sys.argv[1]); m = importlib.util.module_from_spec(s); s.loader.exec_module(m)
++f = m.moment_lisible
++assert f('0 19 * * 4') == 'le jeudi à 19 h' and f('30 8 * * 6,0') == 'le samedi et le dimanche à 8 h 30' and f('5 6 * * 1-5') == 'du lundi au vendredi à 6 h 05'
++assert f('*/10 * * * *') == 'cron */10 * * * *' and f('0 9 1 * *') == 'cron 0 9 1 * *' and f('0 9 * * 5-1') == 'cron 0 9 * * 5-1'" "$L"
++
+ echo "== Le kit"
+ verif "relance.sh : syntaxe, et refuse une option inconnue" bash -c "bash -n '$KIT/relance.sh' && grep -q 'limite.py\" relancer' '$KIT/relance.sh'"
+ verif "install.sh pose la copie root, la minuterie (toutes les 10 minutes, rattrapée) et les dossiers (700, avis 750)" bash -c "grep -q 'hermes-relance/limite.py' '$KIT/install.sh' && grep -q 'enable --now hermes-relance.timer' '$KIT/install.sh' && grep -q 'OnCalendar=\*-\*-\* \*:02/10:00' '$KIT/hermes-relance.timer' && grep -q 'Persistent=true' '$KIT/hermes-relance.timer' && grep -q 'hermes-relance-avis' '$KIT/install.sh'"
+ verif "l'unité n'exécute que la copie root (jamais le dépôt), sans variable du banc" bash -c "grep -q '^ExecStart=/usr/local/sbin/hermes-relance$' '$KIT/hermes-relance.service' && ! grep -q 'HERMES_RELANCE' '$KIT/hermes-relance.service'"
+ verif "le kit portail installe le même limite.py et les hôtes de Claude" bash -c "grep -q '../limite.py\" \"\$LIB/limite.py\"' '$KIT/portail/install.sh' && grep -q 'domaines.defaut\" \"\$LIB/domaines.defaut\"' '$KIT/portail/install.sh'"
+ verif "desinstaller.sh retire la relance" grep -q 'hermes-relance.timer' "$KIT/desinstaller.sh"
++verif "0.92.0 : install.sh pose la copie root de routines.conf et le dossier du résumé (root et groupe de JARVIS, 750) ; routines.sh rafraîchit la copie ; desinstaller.sh retire le dossier" bash -c "grep -q 'routines.conf\" /usr/local/lib/hermes-relance/routines.conf' '$KIT/install.sh' && grep -q 'id -gn jarvis)\" -m 0750 /var/lib/hermes-relance-etat' '$KIT/install.sh' && grep -q 'RELANCE_LIB/routines.conf' '$KIT/routines.sh' && grep -q '/var/lib/hermes-relance-etat' '$KIT/desinstaller.sh'"
++verif "0.92.0 : le résumé n'ajoute ni lecture d'usage ni lancement d'Hermes (le code du résumé n'appelle que systemctl is-active)" py "
++import re, sys
++t = open(sys.argv[1], encoding='utf-8').read()
++bloc = t[t.index('le résumé des routines, pour JARVIS'):t.index('def cmd_minuterie')]
++assert 'lire_usage' not in bloc and 'lancer_routine' not in bloc and 'subprocess' not in bloc and 'HX' not in bloc
++assert set(re.findall(r'sctl\(\"([a-z-]+)\"', bloc)) == {'is-active'}" "$L"
+ 
+ echo
+ echo "Relance après la limite : $ok vérifications réussies, $ko en échec."
+diff --git a/essais/jarvis-os-maquette/banc/banc.cjs b/essais/jarvis-os-maquette/banc/banc.cjs
+index 6b854ff..7e0c933 100644
+--- a/essais/jarvis-os-maquette/banc/banc.cjs
++++ b/essais/jarvis-os-maquette/banc/banc.cjs
+@@ -1589,9 +1589,9 @@ srv.listen(0, async () => {
+       await q.context().close(); }
+     { const q = await pageWith({grokOff: true}, '#equipe');
+       const g = await q.evaluate(() => ({titre: document.querySelector('.view-title').textContent, seg: [...document.querySelectorAll('#view .ux-seg button')].map((x) => x.firstChild.textContent), routines: [...document.querySelectorAll('.hmh-r li b')].map((x) => x.textContent), pause: /Grok en pause/.test(document.getElementById('status') ? document.getElementById('status').textContent : '')}));
+-      ok('0.86 : Grok arrêté : Équipe devient « Hermes et ses routines » (sa carte, ses routines lues dans Pilotage), plus de coût de Grok, plus de « Grok en pause »', g.titre === 'Hermes et ses routines' && g.seg.join() === 'Hermes,Demandes,Routines' && g.routines.join() === 'Veille du matin,Semaine à venir,Prix suivis' && !g.pause, JSON.stringify(g));
++      ok('0.86 : Grok arrêté : Équipe devient « Hermes et ses routines » (sa carte, ses routines ; depuis 0.92.0 en direct, plus celles de Pilotage), plus de coût de Grok, plus de « Grok en pause »', g.titre === 'Hermes et ses routines' && g.seg.join() === 'Hermes,Demandes,Routines' && g.routines.join() === 'Veille du matin,Bilan de la semaine,Réveil,Digest IA et .NET,Prix suivis,Sorties du week-end' && !g.pause, JSON.stringify(g));
+       await q.evaluate(() => { location.hash = '#espaces'; }); await q.waitForTimeout(1200);
+-      ok('0.86 : Grok arrêté : la tuile d’Espaces dit Hermes et ses routines', await q.evaluate(() => { const t = document.querySelector('.esp-tile[data-go="equipe"]'); return !!t && /Hermes/.test(t.textContent) && /3 routines/.test(t.textContent); }));
++      ok('0.86 : Grok arrêté : la tuile d’Espaces dit Hermes et ses routines', await q.evaluate(() => { const t = document.querySelector('.esp-tile[data-go="equipe"]'); return !!t && /Hermes/.test(t.textContent) && /6 routines/.test(t.textContent); }));
+       await q.evaluate(() => { location.hash = '#demandes'; }); await q.waitForTimeout(1500);
+       const d = await q.evaluate(() => ({oui: /dans son chat|Tes oui à donner dans Grok/i.test(document.getElementById('view').textContent), couts: [...document.querySelectorAll('#view .cost')].map((x) => x.textContent).filter((x) => /passage|chat Grok|reprise/.test(x))}));
+       ok('0.86 : Grok arrêté : Pour moi sans « oui à donner dans Grok » ni badge de passage, de chat ou de reprise', !d.oui && !d.couts.length, JSON.stringify(d));
+@@ -1683,6 +1683,40 @@ srv.listen(0, async () => {
+       await q.evaluate(() => { location.hash = ''; }); await q.waitForTimeout(1500);
+       ok('0.87 : Grok arrêté : la phrase de l’accueil ne dit plus « Tes bots sont au travail » ; « En ce moment » sans les lignes « Reprise »', await q.evaluate(() => /Hermes et JARVIS font tes routines\./.test(document.querySelector('.hud-say').textContent) && !/Tes bots sont au travail/.test(document.querySelector('.hud-say').textContent) && !/reprends la demande/.test(document.getElementById('view').textContent)));
+       await q.context().close(); }
++    /* 0.92.0 : « Hermes et ses routines » en direct (le résumé du cron d'Hermes ; données inventées de la maquette), ou « indisponible » */
++    { const q = await pageWith({grokOff: true}, '#equipe');
++      const p = await q.evaluate(() => { const dl = {}; document.querySelectorAll('.hm-hermes .hmh-l div').forEach((d) => { dl[d.querySelector('dt').textContent] = d.querySelector('dd').textContent; });
++        const li = (n) => { const x = document.querySelector('#hr-routines li[data-hr="' + n + '"]'); return x ? {ko: x.classList.contains('ko'), t: [...x.querySelectorAll('b, .pill, small')].map((y) => y.textContent).join(' | ')} : null; };
++        return {dl, n: document.querySelectorAll('#hr-routines li.hr-li').length, modes: [...document.querySelectorAll('#hr-routines .hr-mode')].map((x) => x.textContent).join(), aside: document.querySelector('#hr-routines .panel-h .aside').textContent,
++          veille: li('veille-du-matin'), prix: li('prix-suivis'), digest: li('digest-ia'), vue: document.getElementById('view').innerText}; });
++      ok('0.92 : page Hermes en direct : sa carte dit la passerelle, le garde du forfait, le dernier et le prochain passage ; de Pilotage il ne reste que sa dernière note, datée',
++        p.dl['Passerelle'] === 'en marche' && p.dl['Garde du forfait'] === 'coupé jusqu’au 3 décembre' && /^(aujourd’hui|hier) à \d\d:\d\d · [^·]+ · (réussi|en erreur : limite du forfait)$/.test(p.dl['Dernier passage'] || '') && /^(aujourd’hui|demain) à \d\d:\d\d · [^·]+$/.test(p.dl['Prochain'] || '') && /^Veille du matin faite \(Pilotage, /.test(p.dl['Sa dernière note'] || '') && Object.keys(p.dl).length === 5, JSON.stringify(p.dl));
++      ok('0.92 : page Hermes en direct : six routines (libellé, moment, mode réel ou en double, dernier passage et résultat, prochain passage), l’heure du résumé',
++        p.n === 6 && p.modes === 'réel,réel,réel,en double,réel,réel' && /^6 · à jour à \d\d:\d\d$/.test(p.aside) && !!p.veille && !p.veille.ko && /^Veille du matin \| réel \| Du lundi au vendredi à 7 h 40 \| Dernier passage : .+ à 07:40 · réussi \| Prochain passage : .+ à 07:40$/.test(p.veille.t), JSON.stringify([p.n, p.modes, p.aside, p.veille]));
++      ok('0.92 : une routine en erreur dit sa catégorie (« limite du forfait »), jamais un texte d’erreur ; une routine en pause le dit ; plus aucune ligne de l’onglet Routines de Pilotage',
++        !!p.prix && p.prix.ko && /Dernier passage : .+ à 09:00 · en erreur : limite du forfait \|/.test(p.prix.t) && !!p.digest && /\| en double \|/.test(p.digest.t) && /Dernier passage : jamais passée \| Prochain passage : en pause$/.test(p.digest.t) && !/Semaine à venir|Dim 18h10|Lun-ven 7h40/.test(p.vue), JSON.stringify([p.prix, p.digest]));
++      await q.evaluate(() => { location.hash = '#espaces'; }); await q.waitForTimeout(1200);
++      const tu = await q.evaluate(() => [...document.querySelectorAll('.esp-tile[data-go="equipe"] .esp-n, .esp-tile[data-go="equipe"] .esp-v, .esp-tile[data-go="equipe"] .esp-s')].map((x) => x.textContent).join(' | '));
++      ok('0.92 : la tuile d’Espaces : le nombre de routines en direct et ce qui cloche d’abord', tu === 'Hermes | 6 routines | en erreur : Prix suivis', tu);
++      await q.evaluate(() => { location.hash = '#automatisations'; }); await q.waitForTimeout(1500);
++      const ro = await q.evaluate(() => ({aj: [...document.querySelectorAll('.auto-jump .aj')].map((x) => x.innerText.replace(/\s+/g, ' ')), cartes: [...document.querySelectorAll('#auto-hermes article.auto')].map((x) => x.dataset.hr), pills: [...document.querySelectorAll('#auto-hermes article.auto .pill')].map((x) => x.textContent).join(),
++        aside: document.querySelector('#auto-hermes .panel-h .aside').textContent, prix: [...document.querySelectorAll('#auto-hermes article[data-hr="prix-suivis"] .trk b, #auto-hermes article[data-hr="prix-suivis"] .trk small')].map((x) => x.textContent).join(' | '), vue: document.getElementById('view').innerText}));
++      ok('0.92 : Équipe › Routines : les lignes d’Hermes viennent du direct (panneau « Hermes », six cartes suivies comme une livraison), plus de Pilotage',
++        ro.aj.length === 1 && /^Hermes\s+6 routines · (aujourd’hui|demain) à \d\d:\d\d$/.test(ro.aj[0]) && ro.cartes.join() === 'veille-du-matin,bilan-hebdo,reveil,digest-ia,prix-suivis,sorties-du-week-end' && ro.pills === 'En réel,En réel,En réel,En pause,En réel,En réel' && /^en direct · à jour à \d\d:\d\d$/.test(ro.aside)
++        && /^Programmée \| Chaque jour à 9 h \| Dernier passage \| .+ à 09:00 · en erreur : limite du forfait \| Prochain passage \| .+ à 09:00$/.test(ro.prix) && !/Semaine à venir|Dim 18h10|Aucune routine lue dans Pilotage/.test(ro.vue), JSON.stringify({...ro, vue: ro.vue.length}));
++      await q.context().close(); }
++    { const q = await pageWith({grokOff: true, hermesIndispo: true}, '#equipe');
++      const p = await q.evaluate(() => { const dl = {}; document.querySelectorAll('.hm-hermes .hmh-l div').forEach((d) => { dl[d.querySelector('dt').textContent] = d.querySelector('dd').textContent; });
++        return {dl, n: document.querySelectorAll('#view .hr-li, #view .hmh-r li').length, msg: (document.querySelector('#hr-routines .hr-indispo') || {textContent: ''}).textContent, aside: document.querySelector('#hr-routines .panel-h .aside').textContent, vue: document.getElementById('view').innerText}; });
++      ok('0.92 : résumé indisponible : la page dit « indisponible » avec la raison, aucune routine affichée, jamais la liste périmée de Pilotage',
++        p.n === 0 && /^Routines d’Hermes indisponibles : dernière écriture du résumé à 07 h 52 : plus de 30 minutes/.test(p.msg) && p.aside === 'indisponible' && /^indisponible : dernière écriture/.test(p.dl['En direct'] || '') && !p.dl['Dernier passage'] && !p.dl['Prochain'] && !/Semaine à venir|Prix suivis|Dim 18h10/.test(p.vue), JSON.stringify({...p, vue: p.vue.length}));
++      await q.evaluate(() => { location.hash = '#espaces'; }); await q.waitForTimeout(1200);
++      const tu = await q.evaluate(() => [...document.querySelectorAll('.esp-tile[data-go="equipe"] .esp-n, .esp-tile[data-go="equipe"] .esp-v, .esp-tile[data-go="equipe"] .esp-s')].map((x) => x.textContent).join(' | '));
++      await q.evaluate(() => { location.hash = '#automatisations'; }); await q.waitForTimeout(1500);
++      const ro = await q.evaluate(() => ({n: document.querySelectorAll('#auto-hermes article.auto').length, msg: (document.querySelector('#auto-hermes .hr-indispo') || {textContent: ''}).textContent, aj: [...document.querySelectorAll('.auto-jump .aj')].map((x) => x.innerText.replace(/\s+/g, ' ')).join(), vue: document.getElementById('view').innerText}));
++      ok('0.92 : résumé indisponible : la tuile d’Espaces et Équipe › Routines le disent aussi (« Indisponible », la raison), sans aucune ligne de Pilotage pour Hermes',
++        /^Hermes \| Indisponible \| dernière écriture du résumé à 07 h 52 : plus de 30 minutes/.test(tu) && !/routine/.test(tu) && ro.n === 0 && /indisponibles : dernière écriture/.test(ro.msg) && /^Hermes\s+indisponible$/.test(ro.aj) && !/Semaine à venir|Prix suivis|Veille du matin/.test(ro.vue), JSON.stringify([tu, {...ro, vue: ro.vue.length}]));
++      await q.context().close(); }
+   } catch (e) { ok('exception', false, e.stack); }
+   ok('aucune erreur de page', !errs.length, errs.join(' | '));
+   console.log(out.join('\n')); console.log(fails ? fails + ' échec(s)' : 'Tout passe (' + out.length + ' vérifications). Captures : ' + SH);
+diff --git a/essais/jarvis-os-maquette/donnees-fictives.js b/essais/jarvis-os-maquette/donnees-fictives.js
+index cc32191..05f1389 100644
+--- a/essais/jarvis-os-maquette/donnees-fictives.js
++++ b/essais/jarvis-os-maquette/donnees-fictives.js
+@@ -521,6 +521,24 @@
+   /* 0.23.0 : la météo de l'accueil (en vrai : Open-Meteo, à la position de l'iPhone) */
+   window.__METEO = {current: {temperature_2m: 9.4, apparent_temperature: 6.2, weather_code: 3}, daily: {time: [fr(D(0)), fr(D(1))], weather_code: [3, 61], temperature_2m_min: [4, 2], temperature_2m_max: [11, 7], precipitation_probability_max: [10, 70]}};
+   window.__G = G; window.__MAIL = MAIL; window.__CAL = CAL;
++  /* 0.92.0 : les routines d'Hermes en direct (données inventées, même forme que GET /api/hermes/routines) ; elles ne sont pas celles de
++     l'onglet Routines plus haut (« Semaine à venir » n'y est plus) : la page ne doit montrer que celles-ci. SCEN.hermesIndispo : résumé indisponible */
++  if (SCEN.grokOff) {
++    /* la dernière occurrence passée (sens -1) ou la prochaine (sens 1) d'un horaire : jours de la semaine (0 = dimanche ; null = tous), heures */
++    const hrOcc = (jours, heures, sens) => { for (let k = 0; k < 9; k++) { const c = [];
++      heures.forEach(([hh, mi]) => { const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + sens * k, hh, mi); if ((!jours || jours.includes(d.getDay())) && (sens < 0 ? d <= now : d > now)) c.push(+d); });
++      if (c.length) return new Date(sens < 0 ? Math.max(...c) : Math.min(...c)).toISOString().slice(0, 19) + 'Z'; } return null; };
++    const hr = (nom, libelle, moment, mode, jours, heures, plus) => Object.assign({nom, libelle, moment, mode, posee: true, active: true, dernier: hrOcc(jours, heures, -1), resultat: 'ok', cause: null, prochain: hrOcc(jours, heures, 1)}, plus || {});
++    window.__HERMES_ROUTINES = SCEN.hermesIndispo
++      ? {disponible: false, code: 'vieux', raison: 'dernière écriture du résumé à 07 h 52 : plus de 30 minutes (la relance d’Hermes, hermes-relance, ne passe plus)'}
++      : {disponible: true, at: +now - 4 * 60000, passerelle: 'active', garde: {etat: 'coupé', jusqua: '2026-12-03'}, routines: [
++        hr('veille-du-matin', 'Veille du matin', 'du lundi au vendredi à 7 h 40', 'réel', [1, 2, 3, 4, 5], [[7, 40]]),
++        hr('bilan-hebdo', 'Bilan de la semaine', 'le lundi à 8 h 50', 'réel', [1], [[8, 50]]),
++        hr('reveil', 'Réveil', 'chaque jour à 9 h 15, 13 h 15 et 18 h 15', 'réel', null, [[9, 15], [13, 15], [18, 15]]),
++        hr('digest-ia', 'Digest IA et .NET', 'le lundi à 9 h 10', 'double', [1], [[9, 10]], {active: false, dernier: null, resultat: 'jamais', prochain: null}),
++        hr('prix-suivis', 'Prix suivis', 'chaque jour à 9 h', 'réel', null, [[9, 0]], {resultat: 'erreur', cause: 'limite du forfait'}),
++        hr('sorties-du-week-end', 'Sorties du week-end', 'le jeudi à 19 h', 'réel', [4], [[19, 0]])]};
++  }
+   /* 0.85.0 : l'espace « Travail » de la maquette (données inventées, même forme que GET /api/travail) */
+   /* 0.86.0 : une note de frais d'Hermes à valider (données inventées, même forme que GET /api/jours/notes) */
+   if (SCEN.notes) window.__NOTES = {notes: [{cle: 'box:2026-11', sorte: 'box', mois: '2026-11', nom: 'Note de la box', etat: 'a_valider', valide: false, montant: 39, date: '2026-11-05', jours: null,
+diff --git a/essais/jarvis-os-maquette/index.html b/essais/jarvis-os-maquette/index.html
+index 5dbe33f..64cf670 100644
+--- a/essais/jarvis-os-maquette/index.html
++++ b/essais/jarvis-os-maquette/index.html
+@@ -11552,6 +11552,118 @@ void main(){
+         + '.hmh-r{list-style:none;margin:0;padding:0;display:grid;gap:8px}.hmh-r li{display:grid;gap:2px;padding:11px 14px;border-radius:16px;border:1px solid rgba(var(--c1),.2);background:rgba(255,255,255,.03)}.hmh-r small{color:var(--muted);font-size:13px}'}));
+     }
+ 
++    /* ================= 0.92.0 : Hermes et ses routines en direct (sa remarque du 26/11/2026 : la page ne montrait qu'une ligne périmée de
++       l'onglet Routines de Pilotage). Les vraies routines sont dans le cron d'Hermes : sur le serveur, root en écrit un résumé assaini toutes
++       les 10 minutes, JARVIS le relit (GET /api/hermes/routines) et l'app le montre : la page « Hermes et ses routines », la tuile d'Espaces
++       et Équipe › Routines. Résumé absent, illisible ou de plus de 30 minutes : « indisponible » avec la raison, jamais une liste périmée
++       (Grok arrêté, plus aucun repli sur les lignes Bot = Hermes de l'onglet Routines de Pilotage). Les « Routines de JARVIS » (celles du
++       serveur) ne changent pas. Comme 0.86.0 et 0.87.0, rien n'est réécrit : ce bloc range ce qui existe. Il suit le bloc 0.86.0, dont il
++       remplace la lecture de Pilotage ; le bloc 0.87.0, plus bas, continue d'envelopper Équipe. ================= */
++    {
++      const HR = {data: null, at: 0, loading: null};
++      const hrAPI = () => (SRV_OS && window.JarvisServeur && window.JarvisServeur.hermesRoutines ? window.JarvisServeur.hermesRoutines : null);
++      const HR_SANS = {disponible: false, code: 'serveur', raison: 'le serveur de JARVIS ne répond pas'};
++      /* lu au plus toutes les 30 secondes ; la page n'est redessinée que si le résumé a changé, jamais pendant une saisie */
++      function hrLoad(force) {
++        const api = hrAPI();
++        if (!GOFF.on || HR.loading || (!force && HR.data && Date.now() - HR.at < 30000)) return HR.loading;
++        if (SRV_OS ? !api : !window.__HERMES_ROUTINES) { HR.data = {disponible: false, code: 'source', raison: 'cette page n’a pas de quoi lire les routines d’Hermes'}; HR.at = Date.now(); return null; }
++        const avant = JSON.stringify(HR.data);
++        HR.loading = (api ? api() : Promise.resolve(JSON.parse(JSON.stringify(window.__HERMES_ROUTINES))))
++          .then((d) => { HR.data = d && typeof d === 'object' && typeof d.disponible === 'boolean' ? d : HR_SANS; }).catch(() => { HR.data = HR_SANS; })
++          .finally(() => { HR.at = Date.now(); HR.loading = null; const a = document.activeElement;
++            if (JSON.stringify(HR.data) !== avant && (TAB === 'equipe' || TAB === 'espaces') && !(a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName))) renderView(true); });
++        return HR.loading;
++      }
++      setInterval(() => { if (GOFF.on && !document.hidden && (TAB === 'equipe' || TAB === 'espaces')) hrLoad(); }, 60000);
++      /* ce que la page montre : le résumé s'il est frais, sinon « indisponible » et pourquoi ; null = première lecture en cours */
++      const hrVue = () => { const d = HR.data; if (!d) return null;
++        if (d.disponible && (!Array.isArray(d.routines) || Date.now() - d.at > 35 * 60000)) return {disponible: false, code: 'vieux', raison: 'le résumé lu a plus de 30 minutes'};
++        return d; };
++      const hrQuand = (iso) => { const d = iso ? new Date(iso) : null; if (!d || isNaN(d)) return '';
++        const n = new Date(), k = Math.round((new Date(d.getFullYear(), d.getMonth(), d.getDate()) - new Date(n.getFullYear(), n.getMonth(), n.getDate())) / 864e5);
++        return (k === 0 ? 'aujourd’hui' : k === -1 ? 'hier' : k === 1 ? 'demain' : fmt(d, {weekday: 'short', day: 'numeric', month: 'short'}).replace(/\./g, '')) + ' à ' + hm(d); };
++      const hrRes = (r) => (!r.posee ? ['pas posée chez Hermes', 'is-demande'] : r.resultat === 'ok' ? ['réussi', 'is-ok'] : r.resultat === 'erreur' ? ['en erreur' + (r.cause && r.cause !== 'erreur' ? ' : ' + r.cause : ''), 'is-demande'] : ['jamais passée', '']);
++      const hrProchain = (r) => (!r.posee ? 'aucun' : !r.active ? 'en pause' : r.prochain ? hrQuand(r.prochain) : 'pas encore calculé');
++      const hrMaj = (m) => String(m || '').replace(/^./, (c) => c.toUpperCase());
++      const HR_PAS = {active: 'en marche', 'arrêtée': 'arrêtée', 'plantée': 'plantée', 'démarre': 'en train de démarrer', inconnue: 'état inconnu'};
++      const hrGarde = (g) => (!g ? '' : g.etat === 'coupé' ? 'coupé' + (g.jusqua ? ' jusqu’au ' + fmt(new Date(g.jusqua + 'T12:00:00'), {day: 'numeric', month: 'long'}) : '') : g.etat === 'a arrêté Hermes' ? 'a arrêté Hermes (forfait au-dessus du seuil)' : g.etat === 'actif' ? 'actif' : g.etat === 'arrêté' ? 'arrêté' : 'état inconnu');
++      const hrDernier = (v) => v.routines.filter((r) => r.dernier).sort((a, b) => (a.dernier < b.dernier ? 1 : -1))[0];
++      const hrSuivant = (v) => v.routines.filter((r) => r.active && r.prochain).sort((a, b) => (a.prochain < b.prochain ? -1 : 1))[0];
++      const hrIndispo = (v) => h('p', {class: 'empty hr-indispo', text: v ? 'Routines d’Hermes indisponibles : ' + v.raison + '.' : 'Lecture des routines d’Hermes…'});
++      /* 1. la page « Hermes et ses routines » : sa carte (passerelle, garde du forfait, dernier et prochain passage) et ses routines, en direct */
++      const hrLigne = (r) => { const [res, cls] = hrRes(r);
++        return h('li', {class: 'hr-li' + (r.resultat === 'erreur' || !r.posee ? ' ko' : ''), 'data-hr': r.nom},
++          h('div', {class: 'hr-t'}, h('b', {text: r.libelle}), h('span', {class: 'pill hr-mode' + (r.mode === 'réel' ? ' is-ok' : ''), text: r.mode === 'réel' ? 'réel' : 'en double'})),
++          h('small', {class: 'hr-m', text: hrMaj(r.moment)}),
++          h('small', {class: 'hr-d'}, 'Dernier passage : ' + (r.dernier ? hrQuand(r.dernier) + ' · ' : ''), h('span', {class: 'hr-res ' + cls, text: res})),
++          h('small', {class: 'hr-p', text: 'Prochain passage : ' + hrProchain(r)})); };
++      function hrPage(el) {
++        const hero = el.querySelector('.hm-hermes'); if (!hero) return;
++        const v = hrVue(), dl = hero.querySelector('.hmh-l'), lignes = [];
++        /* de Pilotage, seule sa dernière note reste (datée) : le dernier et le prochain passage viennent du direct */
++        const note = {}; if (dl) dl.querySelectorAll('div').forEach((d) => { const k = d.querySelector('dt'), x = d.querySelector('dd'); if (k && x) note[k.textContent] = x.textContent; });
++        if (!v) lignes.push(['En direct', 'lecture en cours…']);
++        else if (!v.disponible) { lignes.push(['En direct', 'indisponible : ' + v.raison]); if (v.passerelle) lignes.push(['Passerelle', HR_PAS[v.passerelle] || 'état inconnu']); if (v.garde) lignes.push(['Garde du forfait', hrGarde(v.garde)]); }
++        else { const d = hrDernier(v), s = hrSuivant(v);
++          lignes.push(['Passerelle', HR_PAS[v.passerelle] || 'état inconnu'], ['Garde du forfait', hrGarde(v.garde)],
++            ['Dernier passage', d ? hrQuand(d.dernier) + ' · ' + d.libelle + ' · ' + hrRes(d)[0] : 'aucun pour le moment'], ['Prochain', s ? hrQuand(s.prochain) + ' · ' + s.libelle : 'aucun de prévu']); }
++        if (note['Ce qu’il a fait']) lignes.push(['Sa dernière note', note['Ce qu’il a fait'] + (note['Dernier passage'] ? ' (Pilotage, ' + note['Dernier passage'] + ')' : '')]);
++        const neuf = h('dl', {class: 'hmh-l hr-dl'}, lignes.filter((x) => x[1]).map(([k, t]) => h('div', {}, h('dt', {text: k}), h('dd', {text: t}))));
++        if (dl) dl.replaceWith(neuf); else hero.querySelector('.hmh-t').after(neuf);
++        const pn = [...el.querySelectorAll('section.panel')].find((x) => { const t = x.querySelector('.panel-h h2'); return !!t && t.textContent.trim() === 'Ses routines'; }); if (!pn) return;
++        [...pn.children].forEach((n) => { if (!n.classList.contains('panel-h')) n.remove(); });
++        const as = pn.querySelector('.panel-h .aside'), ok = !!v && v.disponible;
++        if (as) as.textContent = ok ? v.routines.length + ' · à jour à ' + hm(new Date(v.at)) : v ? 'indisponible' : '';
++        pn.id = 'hr-routines';
++        pn.append(ok ? (v.routines.length ? h('ul', {class: 'hmh-r hr-list'}, v.routines.map(hrLigne)) : h('p', {class: 'empty', text: 'Aucune routine posée chez Hermes.'})) : hrIndispo(v));
++      }
++      /* 2. Équipe › Routines : les lignes d'Hermes viennent du direct (un panneau « Hermes »), plus jamais de Pilotage ; celles de JARVIS restent */
++      const hrPas = (label, txt, cls) => h('li', {class: 'trk ' + cls}, h('span', {class: 'trk-dot'}), h('div', {}, h('b', {text: label}), h('small', {text: txt})));
++      function hrRoutines(el) {
++        const v = hrVue(), ok = !!v && v.disponible, nav = el.querySelector('.auto-jump'), lead = el.querySelector('p.lead');
++        if (lead && /^Aucune routine lue dans Pilotage/.test(lead.textContent)) lead.remove();
++        const s = ok ? hrSuivant(v) : null;
++        const puce = h('button', {type: 'button', class: 'aj hr-aj', onclick: () => { const t = document.getElementById('auto-hermes'); if (t) t.scrollIntoView({behavior: 'smooth', block: 'start'}); }},
++          h('span', {}, h('b', {text: 'Hermes'}), h('small', {text: ok ? (v.routines.length > 1 ? v.routines.length + ' routines · ' : '') + (s ? hrQuand(s.prochain) : 'en direct') : v ? 'indisponible' : 'lecture…'})));
++        const cartes = ok ? v.routines.map((r) => { const [res] = hrRes(r), bon = r.posee && r.active;
++          return h('article', {class: 'auto card', 'data-hr': r.nom},
++            h('div', {class: 'auto-h'}, h('b', {text: r.libelle}), h('span', {class: 'pill' + (bon ? ' is-ok' : ' is-demande'), text: !r.posee ? 'Pas posée' : !r.active ? 'En pause' : r.mode === 'réel' ? 'En réel' : 'En double'})),
++            h('ol', {class: 'track'}, hrPas('Programmée', hrMaj(r.moment) || 'horaire inconnu', 'done'),
++              hrPas('Dernier passage', (r.dernier ? hrQuand(r.dernier) + ' · ' : '') + res, r.resultat === 'ok' ? 'done' : 'todo'),
++              hrPas('Prochain passage', hrProchain(r), 'next'))); }) : [hrIndispo(v)];
++        const pn = Object.assign(panel('Hermes', h('span', {class: 'aside', text: ok ? 'en direct · à jour à ' + hm(new Date(v.at)) : v ? 'indisponible' : ''}), cartes), {id: 'auto-hermes'});
++        if (nav) { nav.prepend(puce); nav.after(pn); } else el.append(pn);
++      }
++      const VEQ92 = VIEWS.equipe;
++      VIEWS.equipe = (el) => {
++        if (!GOFF.on || (typeof AGENT !== 'undefined' && AGENT)) { VEQ92(el); return; }
++        const tous = S.rout; S.rout = (tous || []).filter((r) => !/^hermes$/i.test(String(r['Bot'] || '').trim()));
++        try { VEQ92(el); } finally { S.rout = tous; }
++        hrLoad();
++        const on = el.querySelector('.ux-seg [aria-pressed="true"]'), k = on ? on.dataset.f : 'bots';
++        if (k === 'rout') hrRoutines(el); else if (k !== 'dem') hrPage(el);
++      };
++      /* 3. la tuile d'Espaces : le nombre de routines en direct et la prochaine, ce qui cloche d'abord ; ou « Indisponible » et pourquoi */
++      const VE92 = VIEWS.espaces;
++      VIEWS.espaces = (el) => {
++        VE92(el); if (!GOFF.on) return;
++        hrLoad();
++        const tl = el.querySelector('.esp-tile[data-go="equipe"]'), tv = tl && tl.querySelector('.esp-v'), ts = tl && tl.querySelector('.esp-s'); if (!tv || !ts) return;
++        const v = hrVue(); ts.classList.add('hr-clip');
++        if (!v) { tv.textContent = 'Hermes'; ts.textContent = 'lecture de ses routines…'; return; }
++        if (!v.disponible) { tv.textContent = 'Indisponible'; ts.textContent = v.raison; return; }
++        const n = v.routines.length, err = v.routines.filter((r) => r.resultat === 'erreur'), s = hrSuivant(v);
++        tv.textContent = n + (n > 1 ? ' routines' : ' routine');
++        ts.textContent = v.passerelle !== 'active' ? 'passerelle ' + (HR_PAS[v.passerelle] || 'état inconnu') : err.length ? 'en erreur : ' + err.map((r) => r.libelle).join(', ') : s ? 'prochaine : ' + s.libelle + ', ' + hrQuand(s.prochain) : 'en direct';
++      };
++      document.head.append(h('style', {id: 'ux-0920', text: ''
++        + '.hr-li .hr-t{display:flex;align-items:center;justify-content:space-between;gap:8px}.hr-li .hr-t b{min-width:0}.hr-li.ko{border-color:rgba(var(--warn),.5)}'
++        + '.hr-li .hr-mode{flex:0 0 auto}.hr-res.is-ok{color:var(--green);font-weight:600}.hr-res.is-demande{color:#fde68a;font-weight:600}'
++        + '.hr-indispo{padding:14px 16px;border-radius:16px;border:1px solid rgba(var(--warn),.45);background:rgba(var(--warn),.07);color:var(--fg);text-align:left}'
++        + '.esp-s.hr-clip{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}'}));
++    }
++
+     /* ================= 0.87.0 : suite de la refonte UX (ses choix au QCM du 26/11/2026).
+        Grok arrêté : les cartes de « Pour moi » des anciens bots sont confiées à Hermes (une ligne « Reprise » pour lui dans le Canal, une seule
+        par demande ; elles disent « Hermes ») ; le filtre Routines d'Équipe ne montre que celles d'Hermes et de JARVIS.
+diff --git a/essais/jarvis-os-maquette/jarvis-serveur.js b/essais/jarvis-os-maquette/jarvis-serveur.js
+index 276a9d4..a28e472 100644
+--- a/essais/jarvis-os-maquette/jarvis-serveur.js
++++ b/essais/jarvis-os-maquette/jarvis-serveur.js
+@@ -394,6 +394,8 @@
+     /* veilleur de santé du serveur (0.16.0) : accès Google, Claude, sauvegarde, lecture de Pilotage, notifications */
+     sante: () => req('/api/sante').then((r) => (r.status === 200 ? r.j : null)).catch(() => null),
+     santeMaintenant: () => req('/api/sante/maintenant', {}).then((r) => (r.status === 200 ? r.j : null)).catch(() => null),
++    /* 0.92.0 : « Hermes et ses routines » en direct (le résumé du cron d'Hermes écrit par root, relu par le serveur) ; null = pas de réponse */
++    hermesRoutines: () => req('/api/hermes/routines').then((r) => (r.status === 200 ? r.j : r.status === 404 ? {disponible: false, code: 'ancien', raison: 'le serveur de JARVIS n’est pas encore à jour (0.92.0)'} : null)).catch(() => null),
+     /* missions de Claude (0.15.0) : lancer une mission longue, suivre les dernières ; notification à la fin */
+     mission: (texte, parent) => req('/api/mission', parent ? {texte, parent} : {texte}).then((r) => { try { if (r.j && r.j.ok && window.JarvisActivite) setTimeout(window.JarvisActivite, 300); } catch (e) { /* rien */ } return r.j; }).catch(() => ({ok: false, error: 'Serveur injoignable.'})),   /* 0.33.0 : visible tout de suite dans l'activité */
+     /* cartes mises de côté (0.20.0) : liste, ajout (avec ou sans date de retour), retrait */
+diff --git a/jarvis-os/hermes/desinstaller.sh b/jarvis-os/hermes/desinstaller.sh
+index a5225f6..c6bd25e 100755
+--- a/jarvis-os/hermes/desinstaller.sh
++++ b/jarvis-os/hermes/desinstaller.sh
+@@ -15,7 +15,7 @@ nft delete table inet hermes_sortie 2>/dev/null || true
+ rm -f /etc/systemd/system/hermes-gateway.service /etc/systemd/system/hermes-sortie.service /etc/systemd/system/hermes-garde.service /etc/systemd/system/hermes-garde.timer
+ rm -f /etc/systemd/system/hermes-reveil.service /etc/systemd/system/hermes-reveil.path /usr/local/sbin/hermes-reveil
+ rm -f /usr/local/sbin/hermes-garde-forfait; rm -rf /var/lib/hermes-garde
+-rm -f /etc/systemd/system/hermes-relance.service /etc/systemd/system/hermes-relance.timer /usr/local/sbin/hermes-relance; rm -rf /usr/local/lib/hermes-relance /var/lib/hermes-relance /var/lib/hermes-relance-avis
++rm -f /etc/systemd/system/hermes-relance.service /etc/systemd/system/hermes-relance.timer /usr/local/sbin/hermes-relance; rm -rf /usr/local/lib/hermes-relance /var/lib/hermes-relance /var/lib/hermes-relance-avis /var/lib/hermes-relance-etat
+ systemctl daemon-reload
+ rm -rf /etc/hermes
+ echo "Hermes est arrêté ; service, garde du forfait, règles réseau et politique retirés."
+diff --git a/jarvis-os/hermes/diagnostic.sh b/jarvis-os/hermes/diagnostic.sh
+index c1fe0b5..d3120b5 100755
+--- a/jarvis-os/hermes/diagnostic.sh
++++ b/jarvis-os/hermes/diagnostic.sh
+@@ -77,7 +77,14 @@ if id hermes >/dev/null 2>&1; then
+     else echo "    garde COUPÉ à sa demande jusqu'au $f (/etc/hermes/garde.coupe) : il reprend seul le lendemain"; fi
+   fi
+   echo "  relance après la limite du forfait : $(systemctl is-active hermes-relance.timer 2>/dev/null || echo absente)"
+-  journalctl -u hermes-relance --since "-24h" --no-pager -o cat 2>/dev/null | grep -E 'relancée|redémarrée|AVIS|en attente' | tail -3 | sed 's/^/    /'
++  journalctl -u hermes-relance --since "-24h" --no-pager -o cat 2>/dev/null | grep -E 'relancée|redémarrée|AVIS|en attente|Résumé' | tail -3 | sed 's/^/    /'
++  # 0.92.0 : le résumé des routines que JARVIS affiche en direct (écrit par hermes-relance à chaque passage)
++  res=/var/lib/hermes-relance-etat/routines.json
++  if [ -f "$res" ]; then
++    echo "    résumé pour JARVIS : dossier $(stat -c '%U:%G %a' /var/lib/hermes-relance-etat), fichier $(stat -c '%U:%G %a' "$res"), écrit il y a $(( ($(date +%s) - $(stat -c %Y "$res")) / 60 )) min, $(python3 -I -c 'import json,sys; print(len(json.load(open(sys.argv[1])).get("routines") or []))' "$res" 2>/dev/null || echo '?') routines"
++  else
++    echo "    résumé pour JARVIS : absent (écrit au prochain passage de hermes-relance ; sinon relancer install.sh)"
++  fi
+   echo "  réveil par JARVIS : $(systemctl is-active hermes-reveil.path 2>/dev/null || echo absent)"
+   echo "  dernières lignes utiles du journal :"
+   grep -E "telegram connected|Connected to Telegram|ERROR|Traceback|plan limit|extra usage|denied" /home/hermes/.hermes/logs/gateway.log 2>/dev/null | tail -5 | cut -c1-160 | sed -E 's/[0-9]{6,}/<n>/g; s/^/    /'
+diff --git a/jarvis-os/hermes/install.sh b/jarvis-os/hermes/install.sh
+index c79ecc3..fafea86 100755
+--- a/jarvis-os/hermes/install.sh
++++ b/jarvis-os/hermes/install.sh
+@@ -169,6 +169,11 @@ install -o root -g root -m 0644 "$ICI/hermes-relance.service" /etc/systemd/syste
+ install -o root -g root -m 0644 "$ICI/hermes-relance.timer" /etc/systemd/system/hermes-relance.timer
+ install -d -o root -g root -m 0700 /var/lib/hermes-relance
+ if id jarvis >/dev/null 2>&1; then install -d -o root -g "$(id -gn jarvis)" -m 0750 /var/lib/hermes-relance-avis; else install -d -o root -g root -m 0750 /var/lib/hermes-relance-avis; fi
++# 0.92.0 : « Hermes et ses routines » en direct dans JARVIS. À chaque passage, hermes-relance écrit un résumé assaini du cron
++# d'Hermes (routines.json) dans un dossier de root lisible par le groupe de JARVIS (750, fichier 640) ; la liste fermée des
++# routines et leurs libellés viennent d'une copie root de routines.conf (jamais lue dans le dépôt par la minuterie).
++install -o root -g root -m 0644 "$ICI/routines.conf" /usr/local/lib/hermes-relance/routines.conf
++if id jarvis >/dev/null 2>&1; then install -d -o root -g "$(id -gn jarvis)" -m 0750 /var/lib/hermes-relance-etat; else install -d -o root -g root -m 0750 /var/lib/hermes-relance-etat; fi
+ nft -c -f /etc/hermes/sortie.nft 2>/dev/null && echo "Règles réseau : syntaxe vérifiée." || [ "$BANC" = 1 ] || { echo "Règles réseau refusées par nft : arrêt."; exit 1; }
+ if [ "$BANC" != 1 ]; then
+   systemctl daemon-reload
+diff --git a/jarvis-os/hermes/limite.py b/jarvis-os/hermes/limite.py
+index 1bdb953..a8a1006 100644
+--- a/jarvis-os/hermes/limite.py
++++ b/jarvis-os/hermes/limite.py
+@@ -11,6 +11,10 @@ jamais un fichier du dépôt n'est exécuté par root.
+                                                   et tâches d'hermes-portail coupées par la limite, relancées UNE fois après sa levée
+   limite.py passage|verdict|attente|planifier …   les aides d'hermes-portail (voir plus bas)
+ 
++À chaque passage de la minuterie (0.92.0), même sans rien à relancer et sans lire l'usage en plus, un résumé assaini du cron
++d'Hermes est écrit pour JARVIS (/var/lib/hermes-relance-etat/routines.json, root et groupe de JARVIS, 750 et 640) : voir
++« le résumé des routines » plus bas. Son écriture ne peut ni faire échouer ni retarder la relance.
++
+ Règles (sa demande, et la sécurité d'abord) :
+ - rien ne repart tant que la limite tient : une fenêtre du forfait à 100 %, ou l'heure de reprise annoncée pas encore passée ;
+ - une seule relance par échec (état root 600), un plafond par jour ; une erreur qui n'est pas la limite n'est jamais relancée ;
+@@ -598,6 +602,177 @@ def cmd_relancer(a):
+     menage_avis()
+ 
+ 
++# ---------------------------------------------------------------- le résumé des routines, pour JARVIS (0.92.0)
++# Sa remarque du 26/11/2026 : dans l'app, « Hermes et ses routines » ne montrait qu'une ligne périmée de l'onglet Routines de
++# Pilotage. Les vraies routines sont dans le cron d'Hermes (jobs.json, chez l'utilisateur hermes, illisible pour JARVIS) :
++# root en écrit ici un résumé ASSAINI, que JARVIS lit (groupe en lecture seule) et que l'app affiche en direct.
++# - liste fermée : seules les routines de routines.conf (copie root posée par install.sh et routines.sh), jamais une autre ;
++# - chaque valeur passe par une liste blanche de formes : noms, mots connus, dates ISO refaites ici. Jamais le texte d'une
++#   erreur (une catégorie courte à la place), jamais un chemin, un jeton, un nom de portail ni un contenu de mail ;
++# - aucune lecture d'usage, aucun lancement d'Hermes : jobs.json, deux fichiers de root et systemctl is-active seulement.
++RESUME = E("HERMES_RELANCE_RESUME", "/var/lib/hermes-relance-etat")
++ROUTINES_CONF = E("HERMES_RELANCE_CONF", "/usr/local/lib/hermes-relance/routines.conf")   # copie root de routines.conf
++ROUTINES_MODE = E("HERMES_RELANCE_MODES", "/etc/hermes/routines.mode")                    # écrit par routines.sh --reel / --double
++GARDE_MINUTERIE = "hermes-garde.timer"
++R_NOM = re.compile(r"[a-z0-9][a-z0-9-]{1,39}")
++R_CRON = re.compile(r"[0-9*,/-]{1,20}(?: [0-9*,/-]{1,20}){4}")
++R_LIBELLE = re.compile(r"Routine «\s*([A-Za-zÀ-ÖØ-öø-ÿ0-9 .'’-]{2,60}?)\s*»")
++JOURS = ("dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche")
++RESEAU = re.compile(r"connection|connect ?error|timeout|timed out|\bdns\b|unreachable|network|name resolution|\b50[234]\b", re.I)
++CAUSES = ("limite du forfait", "réseau", "résultat non envoyé", "arrêtée à la main", "erreur")
++PASSERELLE = {"active": "active", "inactive": "arrêtée", "deactivating": "arrêtée", "failed": "plantée", "activating": "démarre", "reloading": "démarre"}
++
++
++def _suite(mots):
++    return mots[0] if len(mots) == 1 else ", ".join(mots[:-1]) + " et " + mots[-1]
++
++
++def moment_lisible(cron):
++    """« 40 7 * * 1-5 » → « du lundi au vendredi à 7 h 40 » (heure de Paris) ; un horaire plus tordu est rendu tel quel (« cron … »)."""
++    c = cron.split()
++    brut = "cron " + cron
++    if len(c) != 5 or c[2] != "*" or c[3] != "*" or not c[0].isdigit() or int(c[0]) > 59:
++        return brut
++    heures = c[1].split(",")
++    if not all(x.isdigit() and int(x) <= 23 for x in heures) or len(heures) > 6:
++        return brut
++    mi = int(c[0])
++    quand = "à " + _suite(["%d h%s" % (int(x), " %02d" % mi if mi else "") for x in heures])
++    j = c[4]
++    if j == "*":
++        return "chaque jour " + quand
++    m = re.fullmatch(r"([0-7])-([0-7])", j)
++    if m and int(m.group(1)) < int(m.group(2)):
++        return "du %s au %s %s" % (JOURS[int(m.group(1))], JOURS[int(m.group(2))], quand)
++    if re.fullmatch(r"[0-7](?:,[0-7]){0,6}", j):
++        return _suite(["le " + JOURS[int(x)] for x in j.split(",")]) + " " + quand
++    return brut
++
++
++def routines_connues():
++    """La liste fermée (copie root de routines.conf) : nom → {libelle, horaire, mode}. None si la copie manque."""
++    t = lire_texte(ROUTINES_CONF, 200_000)
++    if not t:
++        return None
++    connues = {}
++    for ligne in t.splitlines():
++        if not ligne.strip() or ligne.lstrip().startswith("#"):
++            continue
++        c = [x.strip() for x in ligne.split("|", 5)]
++        if len(c) < 6 or not R_NOM.fullmatch(c[0]) or not R_CRON.fullmatch(" ".join(c[2].split())) or len(connues) >= 40:
++            continue
++        m = R_LIBELLE.search(c[5])
++        connues[c[0]] = {"libelle": m.group(1).strip() if m else c[0], "horaire": " ".join(c[2].split()),
++                         "mode": "réel" if "« en réel »" in c[5] else "double"}
++    # le mode noté sur le serveur (routines.sh --reel / --double) l'emporte, comme dans routines.sh ; la dernière ligne gagne
++    for ligne in lire_texte(ROUTINES_MODE, 20_000).splitlines():
++        mots = ligne.split()
++        if len(mots) == 2 and mots[0] in connues and mots[1] in ("reel", "double"):
++            connues[mots[0]]["mode"] = "réel" if mots[1] == "reel" else "double"
++    return connues
++
++
++def iso_sur(v):
++    """Une date de jobs.json refaite ici (AAAA-MM-JJTHH:MM:SSZ, UTC) : jamais la valeur lue recopiée. None si elle n'en est pas une."""
++    ep = iso_ep(v) if isinstance(v, str) and len(v) <= 40 else None
++    if ep is None or not 1_577_836_800 <= ep <= 4_102_444_800:   # entre 2020 et 2100
++        return None
++    return datetime.datetime.fromtimestamp(ep, datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
++
++
++def resultat_de(j):
++    """(résultat, cause) du dernier passage : ok, erreur ou jamais ; pour une erreur, une catégorie courte, jamais son texte."""
++    st = j.get("last_status")
++    if not j.get("last_run_at") or st is None:
++        return "jamais", None
++    if st == "ok":
++        return "ok", None
++    if st == "delivery_failed":
++        return "erreur", "résultat non envoyé"
++    if st == "cancelled":
++        return "erreur", "arrêtée à la main"
++    err = erreur_du_passage(j)
++    return "erreur", "limite du forfait" if est_limite(err) else "réseau" if RESEAU.search(err) else "erreur"
++
++
++def etat_garde(jour):
++    """Le garde du forfait : coupé (jusqu'à une date), a arrêté Hermes, actif, ou arrêté (sa minuterie ne tourne pas)."""
++    try:
++        with open(GARDE_COUPE, encoding="utf-8", errors="replace") as f:
++            m = re.search(r"\d{4}-\d{2}-\d{2}", f.read(200))
++        if not m or jour <= m.group(0):
++            return {"etat": "coupé", "jusqua": m.group(0) if m else None}
++    except OSError:
++        pass
++    if os.path.exists(GARDE_ARRET):
++        return {"etat": "a arrêté Hermes", "jusqua": None}
++    return {"etat": "actif" if sctl("is-active", GARDE_MINUTERIE)[1] == "active" else "arrêté", "jusqua": None}
++
++
++def resume_routines():
++    """Ce que JARVIS peut savoir du cron d'Hermes : voir plus haut. Rien n'est recopié tel quel de jobs.json."""
++    t = maintenant()
++    jour = datetime.datetime.fromtimestamp(t, _zone("Europe/Paris")).strftime("%Y-%m-%d")
++    connues = routines_connues()
++    data = lire_json(JOBS)
++    jobs = [j for j in data["jobs"] if isinstance(j, dict)] if isinstance(data, dict) and isinstance(data.get("jobs"), list) else None
++    par_nom, inconnues = {}, 0
++    for j in jobs or []:
++        nom = j.get("name")
++        if not isinstance(nom, str) or not nom.startswith("jarvis-"):
++            continue
++        if connues is not None and nom[7:] in connues:
++            par_nom[nom[7:]] = j
++        else:
++            inconnues += 1   # une routine jarvis-… hors de la liste : comptée, jamais décrite
++    routines = []
++    for nom, c in (connues or {}).items():
++        j = par_nom.get(nom)
++        r = {"nom": nom, "libelle": c["libelle"], "moment": moment_lisible(c["horaire"]), "mode": c["mode"], "posee": j is not None,
++             "active": False, "dernier": None, "resultat": "jamais", "cause": None, "prochain": None}
++        if j is not None:
++            expr = j["schedule"].get("expr") if isinstance(j.get("schedule"), dict) else None
++            if isinstance(expr, str) and R_CRON.fullmatch(" ".join(expr.split())):
++                r["moment"] = moment_lisible(" ".join(expr.split()))   # l'horaire vraiment posé chez Hermes
++            r["active"] = j.get("enabled", True) is not False and j.get("state") not in ("paused", "completed") and not j.get("paused_at")
++            r["resultat"], r["cause"] = resultat_de(j)
++            if r["cause"] is not None and r["cause"] not in CAUSES:
++                r["cause"] = "erreur"
++            r["dernier"] = iso_sur(j.get("last_run_at")) if r["resultat"] != "jamais" else None
++            r["prochain"] = iso_sur(j.get("next_run_at")) if r["active"] else None
++        routines.append(r)
++    return {"v": 1, "at": t, "liste": connues is not None, "cron": jobs is not None,
++            "passerelle": PASSERELLE.get(sctl("is-active", SERVICE)[1], "inconnue"), "garde": etat_garde(jour),
++            "routines": routines, "inconnues": min(inconnues, 99)}
++
++
++def ecrire_resume():
++    """Le résumé dans le dossier de root lisible par le groupe de JARVIS (750, fichier 640), d'un coup, jamais à travers un lien."""
++    g = groupe_jarvis()
++    os.makedirs(RESUME, mode=0o750, exist_ok=True)
++    if os.path.islink(RESUME):
++        raise OSError("dossier du résumé : un lien")
++    try:
++        os.chown(RESUME, 0, g if g is not None else 0)
++    except OSError:
++        pass
++    os.chmod(RESUME, 0o750)
++    ecrire_json(os.path.join(RESUME, "routines.json"), resume_routines(), mode=0o640, groupe=g)
++
++
++def cmd_minuterie(a):
++    """La minuterie : la relance d'abord, puis le résumé pour JARVIS, quoi qu'il soit arrivé à la relance. Une erreur du résumé
++    est avalée et dite dans le journal (son genre seulement) : elle ne change ni le résultat ni le code de sortie de la relance."""
++    try:
++        cmd_relancer(a)
++    finally:
++        if not a.a_blanc:
++            try:
++                ecrire_resume()
++            except Exception as e:   # jamais la relance en échec pour un résumé
++                print("Résumé des routines pour JARVIS : pas écrit (%s)." % type(e).__name__)
++
++
+ def main():
+     p = argparse.ArgumentParser(description="La limite du forfait Claude (JARVIS OS)")
+     s = p.add_subparsers(dest="cmd", required=True)
+@@ -611,7 +786,7 @@ def main():
+     x = s.add_parser("relancer"); x.add_argument("--a-blanc", action="store_true")
+     x = s.add_parser("aviser"); x.add_argument("--cle", required=True); x.add_argument("--titre", required=True); x.add_argument("--texte", default="")
+     a = p.parse_args()
+-    {"texte": cmd_texte, "passage": cmd_passage, "verdict": cmd_verdict, "attente": cmd_attente, "planifier": cmd_planifier, "relancer": cmd_relancer, "aviser": cmd_aviser}[a.cmd](a)
++    {"texte": cmd_texte, "passage": cmd_passage, "verdict": cmd_verdict, "attente": cmd_attente, "planifier": cmd_planifier, "relancer": cmd_minuterie, "aviser": cmd_aviser}[a.cmd](a)
+ 
+ 
+ if __name__ == "__main__":
+diff --git a/jarvis-os/hermes/relance.sh b/jarvis-os/hermes/relance.sh
+index dd9c02d..fc0cf17 100644
+--- a/jarvis-os/hermes/relance.sh
++++ b/jarvis-os/hermes/relance.sh
+@@ -6,6 +6,10 @@
+ #   sudo hermes-relance             relance UNE fois, après la levée de la limite, ce qu'elle a coupé : routines jarvis-… d'Hermes,
+ #                                   tâches d'hermes-portail coupées avant tout contact avec le portail ; redémarre une passerelle plantée
+ #   sudo hermes-relance --a-blanc   dit ce qu'il ferait, sans rien toucher (ni état, ni service, ni notification)
++#
++# 0.92.0 : à chaque passage (pas à blanc), même sans rien à relancer, il écrit aussi pour JARVIS un résumé assaini du cron d'Hermes
++# (/var/lib/hermes-relance-etat/routines.json, root et groupe de JARVIS, 750 et 640) : l'app montre « Hermes et ses routines » en direct.
++# Aucune lecture d'usage en plus, Hermes n'est pas lancé ; une erreur de ce résumé ne change jamais le résultat de la relance.
+ set -uo pipefail
+ [ "$(id -u)" = 0 ] || { echo "À lancer en root : sudo hermes-relance"; exit 1; }
+ case "${1:-}" in ""|--a-blanc) ;; *) sed -n '5,7p' "$0" | sed 's/^# \{0,3\}//'; exit 1 ;; esac
+diff --git a/jarvis-os/hermes/routines.sh b/jarvis-os/hermes/routines.sh
+index 92d8da1..7380bec 100755
+--- a/jarvis-os/hermes/routines.sh
++++ b/jarvis-os/hermes/routines.sh
+@@ -135,6 +135,10 @@ while IFS=$'\t' read -r ident nom _; do
+   case "$voulues" in *" $nom "*) ;; *) hx hermes cron remove "$ident" >/dev/null 2>&1 && echo "  − ${nom#jarvis-} : retirée (plus dans routines.conf)" ;; esac
+ done < <(poses)
+ mv "$nouvel_etat" "$ETAT" && chmod 0644 "$ETAT"
++# 0.92.0 : la liste que hermes-relance résume pour JARVIS (« Hermes et ses routines » en direct) suit ce qui vient d'être posé :
++# copie root de routines.conf, comme install.sh (la minuterie ne lit jamais un fichier du dépôt)
++RELANCE_LIB=${HERMES_RELANCE_LIB:-/usr/local/lib/hermes-relance}
++[ -d "$RELANCE_LIB" ] && install -o root -g root -m 0644 "$CONF" "$RELANCE_LIB/routines.conf" 2>/dev/null || true
+ 
+ echo; echo "Routines d'Hermes :"; lister
+ [ "$(systemctl is-active hermes-gateway 2>/dev/null)" = active ] || [ "${HERMES_BANC:-0}" = 1 ] || echo "Attention : Hermes n'est pas en marche, aucune routine ne passera (sudo systemctl status hermes-gateway)."
+diff --git a/jarvis-os/server/hermes-routines.mjs b/jarvis-os/server/hermes-routines.mjs
+new file mode 100644
+index 0000000..73d9dea
+--- /dev/null
++++ b/jarvis-os/server/hermes-routines.mjs
+@@ -0,0 +1,102 @@
++/* JARVIS OS — « Hermes et ses routines » en direct (0.92.0, 26/11/2026). Sa remarque : dans l'app, la page ne montrait qu'une ligne
++   périmée de l'onglet Routines de Pilotage. Les vraies routines sont dans le cron d'Hermes (jobs.json, chez l'utilisateur hermes, que
++   JARVIS ne peut pas lire). Root (hermes-relance, toutes les 10 minutes ; jarvis-os/hermes/limite.py) en écrit un résumé assaini dans
++   /var/lib/hermes-relance-etat/routines.json (root et groupe de JARVIS, 750 et 640). Ici, JARVIS le lit, en lecture seule :
++   - jamais à travers un lien (ni le fichier, ni son dossier), fichier ordinaire, taille bornée ;
++   - le JSON est revalidé champ par champ (liste blanche de formes : noms, mots connus, dates ISO) : rien d'autre ne sort d'ici ;
++   - résumé absent, illisible ou plus vieux que 30 minutes : « indisponible », avec la raison ; jamais une liste périmée.
++   JARVIS n'écrit jamais dans ce dossier. */
++import fs from 'node:fs';
++import path from 'node:path';
++import {heureParis} from './limite.mjs';
++
++export const RESUME_VIEUX = 30 * 60000;   /* la minuterie passe toutes les 10 minutes : au-delà de 30, le résumé ne dit plus rien de sûr */
++const TAILLE_MAX = 32768, ROUTINES_MAX = 40;
++const NOM = /^[a-z0-9][a-z0-9-]{1,39}$/, LIBELLE = /^[A-Za-zÀ-ÖØ-öø-ÿ0-9 .'’-]{2,60}$/, MOMENT = /^[A-Za-zÀ-ÖØ-öø-ÿ0-9 ,*/-]{2,90}$/;
++const ISO = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/, JOUR = /^\d{4}-\d{2}-\d{2}$/;
++const PASSERELLES = ['active', 'arrêtée', 'plantée', 'démarre', 'inconnue'], GARDES = ['actif', 'coupé', 'a arrêté Hermes', 'arrêté'];
++const MODES = ['réel', 'double'], RESULTATS = ['ok', 'erreur', 'jamais'], CAUSES = ['limite du forfait', 'réseau', 'résultat non envoyé', 'arrêtée à la main', 'erreur'];
++
++const parmi = (v, liste, defaut) => (liste.includes(v) ? v : defaut);
++const date = (v) => (typeof v === 'string' && ISO.test(v) && !isNaN(Date.parse(v)) ? v : null);
++
++/* lecture sûre d'un fichier de root : {ok, json} ou {ok: false, code} ; jamais un lien, fichier ordinaire, petit */
++function lireSur(fichier) {
++  let fd;
++  try {
++    const d = fs.lstatSync(path.dirname(fichier));
++    if (d.isSymbolicLink() || !d.isDirectory()) return {ok: false, code: 'lien'};
++  } catch (e) { return {ok: false, code: e && e.code === 'ENOENT' ? 'dossier' : 'droits'}; }
++  try {
++    fd = fs.openSync(fichier, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW | fs.constants.O_NONBLOCK);
++    const st = fs.fstatSync(fd);
++    if (!st.isFile()) return {ok: false, code: 'illisible'};
++    if (st.size > TAILLE_MAX) return {ok: false, code: 'gros'};
++    return {ok: true, json: JSON.parse(fs.readFileSync(fd, 'utf8'))};
++  } catch (e) {
++    const c = e && e.code;
++    return {ok: false, code: c === 'ENOENT' ? 'absent' : c === 'ELOOP' || c === 'EMLINK' ? 'lien' : c === 'EACCES' || c === 'EPERM' ? 'droits' : 'illisible'};
++  } finally { if (fd !== undefined) try { fs.closeSync(fd); } catch { /* rien */ } }
++}
++
++const RAISONS = {
++  dossier: 'le résumé des routines n’existe pas sur ce serveur (Hermes n’y est pas installé, ou son install.sh n’a pas été relancé depuis la 0.92.0)',
++  absent: 'le résumé des routines n’est pas encore écrit (il vient au prochain passage de la relance d’Hermes, toutes les 10 minutes)',
++  lien: 'le résumé des routines est un lien : refusé',
++  droits: 'JARVIS n’a pas le droit de lire le résumé des routines (dossier de root, groupe de JARVIS)',
++  gros: 'le résumé des routines est trop gros : refusé',
++  illisible: 'le résumé des routines est illisible',
++  liste: 'la liste des routines manque du côté de root (relancer install.sh d’Hermes)',
++  cron: 'le cron d’Hermes est illisible pour root (jobs.json)'
++};
++
++/* une routine du résumé, revalidée ; null si son nom n'en est pas un */
++function routine(x) {
++  if (!x || typeof x !== 'object' || typeof x.nom !== 'string' || !NOM.test(x.nom)) return null;
++  const resultat = parmi(x.resultat, RESULTATS, 'jamais'), posee = x.posee === true, active = posee && x.active === true;
++  return {
++    nom: x.nom,
++    libelle: typeof x.libelle === 'string' && LIBELLE.test(x.libelle) ? x.libelle : x.nom,
++    moment: typeof x.moment === 'string' && MOMENT.test(x.moment) ? x.moment : '',
++    mode: parmi(x.mode, MODES, 'double'),
++    posee, active,
++    dernier: resultat === 'jamais' ? null : date(x.dernier),
++    resultat,
++    cause: resultat === 'erreur' ? parmi(x.cause, CAUSES, 'erreur') : null,
++    prochain: active ? date(x.prochain) : null
++  };
++}
++
++export function createHermesRoutines({fichier, now = () => Date.now()}) {
++  const non = (code, raison, plus = {}) => ({disponible: false, code, raison: raison || RAISONS[code] || RAISONS.illisible, ...plus});
++  /* ce que l'app affiche : {disponible: true, at (ms), passerelle, garde, routines} ou {disponible: false, code, raison} */
++  function lire() {
++    const l = lireSur(fichier);
++    if (!l.ok) return non(l.code);
++    const d = l.json;
++    if (!d || typeof d !== 'object' || Array.isArray(d) || d.v !== 1 || !Number.isInteger(d.at) || d.at < 1.5e9 || d.at > 4.2e9 || !Array.isArray(d.routines)) return non('illisible');
++    const at = d.at * 1000, t = now();
++    if (at > t + 5 * 60000) return non('illisible', 'le résumé des routines porte une date à venir : refusé');
++    const g = d.garde && typeof d.garde === 'object' ? d.garde : {};
++    const etat = {at, passerelle: parmi(d.passerelle, PASSERELLES, 'inconnue'),
++      garde: {etat: parmi(g.etat, GARDES, 'inconnu'), jusqua: typeof g.jusqua === 'string' && JOUR.test(g.jusqua) ? g.jusqua : null}};
++    if (t - at > RESUME_VIEUX) return non('vieux', 'dernière écriture du résumé ' + heureParis(at, t).replace(/^(\d)/, 'à $1') + ' : plus de 30 minutes (la relance d’Hermes, hermes-relance, ne passe plus)', {at});
++    if (d.liste === false) return non('liste', '', etat);
++    if (d.cron === false) return non('cron', '', etat);
++    const vus = new Set(), routines = [];
++    for (const x of d.routines.slice(0, ROUTINES_MAX)) { const r = routine(x); if (r && !vus.has(r.nom)) { vus.add(r.nom); routines.push(r); } }
++    return {disponible: true, ...etat, routines};
++  }
++  /* la ligne de la santé du serveur : une information, jamais une notification ; rien à dire là où Hermes n'est pas installé */
++  function sante() {
++    const r = lire();
++    if (!r.disponible && r.code === 'dossier') return null;
++    if (!r.disponible) return {nom: 'Routines d’Hermes', ok: false, detail: 'résumé indisponible : ' + r.raison + '.', pousser: false};
++    const n = r.routines.length, err = r.routines.filter((x) => x.resultat === 'erreur'), pause = r.routines.filter((x) => !x.active).length;
++    const d = [n + ' routine' + (n > 1 ? 's' : '') + ' en direct' + (pause ? ' (' + pause + ' pas active' + (pause > 1 ? 's' : '') + ')' : ''), 'dernière écriture ' + heureParis(r.at, now()).replace(/^(\d)/, 'à $1'),
++      err.length ? 'en erreur au dernier passage : ' + err.slice(0, 4).map((x) => x.libelle + ' (' + x.cause + ')').join(', ') : '',
++      r.passerelle !== 'active' ? 'passerelle ' + r.passerelle : '', r.garde.etat === 'a arrêté Hermes' ? 'le garde du forfait a arrêté Hermes' : ''].filter(Boolean);
++    return {nom: 'Routines d’Hermes', ok: true, detail: d.join(' ; ') + '.', pousser: false};
++  }
++  return {lire, sante};
++}
+diff --git a/jarvis-os/server/server.mjs b/jarvis-os/server/server.mjs
+index 377e40b..da05c34 100644
+--- a/jarvis-os/server/server.mjs
++++ b/jarvis-os/server/server.mjs
+@@ -36,6 +36,7 @@ import {createVerrou} from './verrou.mjs';   /* 0.75.0 : le verrou de l'app par
+ import {createPilotageLocal, createCopieDrive} from './pilotage-local.mjs';   /* 0.88.0 : Pilotage hébergé par JARVIS (son choix du 26/11/2026) */
+ import {cliPilotage} from './pilotage-cli.mjs';
+ import {limiteDe, estLimite, heureParis, ecritureFaite, createAvisRelance} from './limite.mjs';   /* 0.89.0 : la relance automatique après la limite du forfait */
++import {createHermesRoutines} from './hermes-routines.mjs';   /* 0.92.0 : « Hermes et ses routines » en direct (le résumé de root, lu sans rien écrire) */
+ const ACT = createActivite();   /* 0.33.0 : ce que fait Claude à l'instant */
+ 
+ const VERSION = '0.89.0';
+@@ -1179,6 +1180,9 @@ setInterval(() => { coteTick().catch(() => {}); }, +process.env.JARVIS_NOTIFY_TI
+ /* 0.89.0 : les avis de root (routine d'Hermes ou tâche d'hermes-portail restée en échec après sa relance après la limite) : poussés une fois */
+ const AVIS_RELANCE = createAvisRelance({dir: process.env.JARVIS_RELANCE_AVIS || '/var/lib/hermes-relance-avis', S, save, push: PUSH, log: (t) => console.log(t)});
+ setInterval(() => { AVIS_RELANCE.tick().catch(() => {}); }, +process.env.JARVIS_LIMITE_TICK_MS || 60000).unref();
++/* 0.92.0 : les routines d'Hermes en direct : le résumé assaini que root (hermes-relance) écrit toutes les 10 minutes, relu et revalidé à
++   chaque demande (GET /api/hermes/routines, ligne « Routines d'Hermes » de la santé) ; JARVIS n'écrit jamais dans ce dossier */
++const HERMES_ROUT = createHermesRoutines({fichier: process.env.JARVIS_HERMES_ROUTINES || '/var/lib/hermes-relance-etat/routines.json', now});
+ /* veilleur de santé (0.16.0) : toutes les 10 minutes, sans Claude ; prévient une fois de ce qui casse sans bruit */
+ if (GG.status('').linked && !S.googleVu) { S.googleVu = true; save(); }
+ const SANTE = createSante({S, save, push: PUSH, checks: {
+@@ -1209,6 +1213,8 @@ const SANTE = createSante({S, save, push: PUSH, checks: {
+     const d = [jusqua ? 'limite atteinte, reprise vers ' + heureParis(jusqua, t) : '', att.length ? 'en attente de la levée : ' + att.slice(0, 4).join(', ') : '', faites.length ? faites.length + ' relancé' + (faites.length > 1 ? 's' : '') + ' automatiquement depuis hier' : ''].filter(Boolean);
+     return {nom: 'Forfait Claude', ok: true, detail: d.join(' ; ') + '.', pousser: false};
+   },
++  /* 0.92.0 : les routines d'Hermes en direct (nombre, dernière écriture du résumé de root), ou « résumé indisponible » ; une information */
++  hermesRoutines: async () => HERMES_ROUT.sante(),
+   notifications: async () => { const l = S.push && S.push.last; if (!l || !l.total) return null; return {nom: 'Notifications', ok: l.ok > 0, detail: l.ok > 0 ? 'reçues' : 'refusées par le service (' + (l.detail || '?') + ') : Réglages, Notifications.', pousser: false}; }
+ }});
+ { const ms = +process.env.JARVIS_SANTE_TICK_MS || 600000; setTimeout(() => { SANTE.tick().catch(() => {}); setInterval(() => { SANTE.tick().catch(() => {}); }, ms).unref(); }, Math.min(ms, 120000)).unref(); }
+@@ -2419,6 +2425,7 @@ const server = http.createServer(async (req, res) => {
+         return json(res, r.error ? 400 : 200, {...r, ...mcpEtat(req)});
+       }
+       /* 0.41.0 : les routines planifiées et le brief du matin */
++      if (p === '/api/hermes/routines' && req.method === 'GET') return json(res, 200, HERMES_ROUT.lire());   /* 0.92.0 : les routines d'Hermes en direct, ou « indisponible » et pourquoi */
+       if (p === '/api/routines' && req.method === 'GET') return json(res, 200, {routines: ROUT.liste(), brief: S.brief || null});
+       if (p === '/api/routines/lire' && req.method === 'POST') { const b = await readBody(req), l = lirePhrase(b.phrase); return json(res, 200, {lu: l, quand: l.erreur ? '' : quandDit(l)}); }
+       if (p === '/api/routines' && req.method === 'POST') { const r = ROUT.ajouter(await readBody(req)); return json(res, r.ok ? 200 : 400, {...r, routines: ROUT.liste()}); }
+diff --git a/jarvis-os/server/tests/server.test.mjs b/jarvis-os/server/tests/server.test.mjs
+index 8fec728..24a51a9 100644
+--- a/jarvis-os/server/tests/server.test.mjs
++++ b/jarvis-os/server/tests/server.test.mjs
+@@ -49,7 +49,9 @@ Object.assign(env, {JARVIS_STEAM_URL: VB, JARVIS_STT_HELPER: path.join(HERE, 'fa
+   /* 0.64.0 : message vocal (faux convertisseur à la place de PyAV, pas de ffmpeg) et rappels toutes les 0,7 s au lieu de 5 min */
+   JARVIS_AUDIO_PY: process.execPath, JARVIS_AUDIO_HELPER: path.join(HERE, 'fake-audio.mjs'), JARVIS_FFMPEG: '', JARVIS_RAPPEL_MS: '700', JARVIS_RAPPEL_TICK_MS: '150', JARVIS_TACHES_CACHE_MS: '0',
+   /* 0.89.0 : la relance après la limite du forfait : tic de 0,3 s, sans la minute de marge ; les avis de root dans un dossier du banc */
+-  JARVIS_LIMITE_TICK_MS: '300', JARVIS_LIMITE_MARGE_MS: '0', JARVIS_RELANCE_AVIS: path.join(DATA, 'avis-relance')});
++  JARVIS_LIMITE_TICK_MS: '300', JARVIS_LIMITE_MARGE_MS: '0', JARVIS_RELANCE_AVIS: path.join(DATA, 'avis-relance'),
++  /* 0.92.0 : le résumé des routines d'Hermes écrit par root, dans un dossier du banc (absent au départ : Hermes « pas installé ») */
++  JARVIS_HERMES_ROUTINES: path.join(DATA, 'hermes-etat', 'routines.json')});
+ const sansN = (u) => String(u || '').replace(/\?n=[0-9a-f]{12}(?=#|$)/, '');   /* 0.69.0 : l'adresse d'une notification sans son identifiant */
+ const results = []; let fails = 0;
+ { const H = ['Domaine', 'Fait', 'Valeur'], v = (x) => pauseDepuisFaits([H, ['Grok Bot', "Grok en pause jusqu'au", x]]);
+@@ -728,6 +730,43 @@ try {
+       ok('santé (0.89.0) : une ligne « Forfait Claude » d’information (en attente de la levée, relances du jour), jamais une notification', it('forfait').ok === true && /en attente de la levée : digest-ia/.test(it('forfait').detail) && /relancés? automatiquement depuis hier/.test(it('forfait').detail), JSON.stringify(it('forfait')));
+       FG.refreshOk = true; r = await G('/api/google/link', {}); await fetch(BASE + '/api/google/callback?state=' + new URL(r.body.url).searchParams.get('state') + '&code=CODE-OK');
+       n0 = got.length; r = await G('/api/sante/maintenant', {}); ok('santé : retour à la normale noté, sans notification', it('google').ok === true && got.length === n0, JSON.stringify(r.body.items));
++      /* 0.92.0 : « Hermes et ses routines » en direct : le résumé assaini de root (ici un dossier du banc), relu et revalidé par JARVIS */
++      { const HD = path.join(DATA, 'hermes-etat'), HF = path.join(HD, 'routines.json'), sec = () => Math.floor(Date.now() / 1000);
++        const lire = async () => (await G('/api/hermes/routines')).body, ligne = async () => ((await G('/api/sante/maintenant', {})).body.items || []).find((x) => x.cle === 'hermesRoutines');
++        const resume = (plus = {}) => ({v: 1, at: sec(), liste: true, cron: true, passerelle: 'active', garde: {etat: 'coupé', jusqua: '2026-12-03'}, inconnues: 1, secret: 'PIEGE', routines: [
++          {nom: 'veille-du-matin', libelle: 'Veille du matin', moment: 'du lundi au vendredi à 7 h 40', mode: 'réel', posee: true, active: true, dernier: '2026-11-26T06:40:12Z', resultat: 'ok', cause: null, prochain: '2026-11-27T06:40:00Z'},
++          {nom: 'prix-suivis', libelle: 'Prix suivis', moment: 'chaque jour à 9 h', mode: 'réel', posee: true, active: true, dernier: '2026-11-26T08:00:03Z', resultat: 'erreur', cause: 'limite du forfait', prochain: '2026-11-27T08:00:00Z'},
++          {nom: 'digest-ia', libelle: '<img src=x onerror=alert(1)>', moment: 'voir /home/hermes/.hermes/PIEGE', mode: 'root', posee: true, active: true, dernier: 'hier, jeton sk-PIEGE', resultat: 'erreur', cause: 'RuntimeError: portail.exemple.invalid a refusé (PIEGE)', prochain: '2026-13-45T99:00:00Z', last_error: 'texte brut PIEGE', prompt: 'PIEGE'},
++          {nom: 'bilan-hebdo', libelle: 'Bilan de la semaine', moment: 'le lundi à 8 h 50', mode: 'double', posee: true, active: false, dernier: '2026-11-23T07:50:00Z', resultat: 'jamais', cause: 'erreur', prochain: '2026-11-30T07:50:00Z'},
++          {nom: '../../etc/passwd', libelle: 'PIEGE', resultat: 'ok'}, 'PIEGE', null, {nom: 'veille-du-matin', libelle: 'Doublon PIEGE'}], ...plus});
++        const pose = (o) => fs.writeFileSync(HF, typeof o === 'string' ? o : JSON.stringify(o), {mode: 0o640});
++        r = await call('/api/hermes/routines'); ok('routines d’Hermes (0.92.0) : refusé sans appareil relié', r.status === 401);
++        let h = await lire(), l = await ligne();
++        ok('… dossier du résumé absent (Hermes pas installé) : « indisponible » avec la raison ; rien dans la santé', h.disponible === false && h.code === 'dossier' && /n’existe pas sur ce serveur/.test(h.raison) && !('routines' in h) && !l, JSON.stringify([h, l]));
++        fs.mkdirSync(HD, {mode: 0o750}); n0 = got.length; h = await lire(); l = await ligne();
++        ok('… résumé pas encore écrit : « indisponible » ; la santé le dit (« résumé indisponible »), sans notification', h.disponible === false && h.code === 'absent' && /pas encore écrit/.test(h.raison) && l && l.ok === false && /^résumé indisponible : /.test(l.detail) && got.length === n0, JSON.stringify([h, l]));
++        const bon = resume(); pose(bon); h = await lire(); const noms = (h.routines || []).map((x) => x.nom), di = (h.routines || []).find((x) => x.nom === 'digest-ia') || {}, bh = (h.routines || []).find((x) => x.nom === 'bilan-hebdo') || {};
++        ok('… résumé frais : les routines en direct (libellé, moment, mode, dernier passage et résultat, prochain passage), la passerelle, le garde', h.disponible === true && h.at === bon.at * 1000 && h.passerelle === 'active' && h.garde.etat === 'coupé' && h.garde.jusqua === '2026-12-03'
++          && noms.join() === 'veille-du-matin,prix-suivis,digest-ia,bilan-hebdo' && JSON.stringify(h.routines[0]) === JSON.stringify(bon.routines[0]) && h.routines[1].resultat === 'erreur' && h.routines[1].cause === 'limite du forfait', JSON.stringify(h));
++        ok('… résumé piégé : chaque champ repasse par la liste blanche (libellé, moment, mode, dates, cause ramenés à du sûr ; champs en trop, nom piégé, doublon écartés)', di.libelle === 'digest-ia' && di.moment === '' && di.mode === 'double' && di.dernier === null && di.prochain === null && di.cause === 'erreur'
++          && bh.dernier === null && bh.cause === null && bh.prochain === null && !/PIEGE|exemple|onerror|passwd|hermes\/|sk-|last_error|prompt|secret|inconnues/.test(JSON.stringify(h)) && Object.keys(h).sort().join() === 'at,disponible,garde,passerelle,routines', JSON.stringify(h));
++        n0 = got.length; l = await ligne();
++        ok('… santé : une ligne « Routines d’Hermes » (nombre, dernière écriture, ce qui est en erreur par sa catégorie), jamais une notification', l && l.ok === true && l.nom === 'Routines d’Hermes' && /^4 routines en direct \(1 pas active\) ; dernière écriture à \d\d h \d\d ; en erreur au dernier passage : Prix suivis \(limite du forfait\), digest-ia \(erreur\)\.$/.test(l.detail) && got.length === n0, JSON.stringify(l));
++        pose(resume({passerelle: 'rm -rf /', garde: {etat: 'PIEGE', jusqua: 'demain'}})); h = await lire();
++        ok('… passerelle ou garde hors de la liste des mots connus : « inconnue », « inconnu », pas de date', h.disponible === true && h.passerelle === 'inconnue' && h.garde.etat === 'inconnu' && h.garde.jusqua === null, JSON.stringify(h));
++        pose(resume({at: sec() - 31 * 60})); h = await lire(); l = await ligne();
++        ok('… résumé de plus de 30 minutes : « indisponible » (dernière écriture dite), jamais la liste périmée', h.disponible === false && h.code === 'vieux' && /dernière écriture du résumé à \d\d h \d\d : plus de 30 minutes/.test(h.raison) && !('routines' in h) && l.ok === false && /plus de 30 minutes/.test(l.detail), JSON.stringify([h, l]));
++        pose(resume({at: sec() + 3600})); const futur = await lire(); pose('{"v": 1, "at": '); const coupe = await lire(); pose(resume({v: 2})); const autre = await lire(); pose(JSON.stringify(resume()) + ' '.repeat(40000)); const gros = await lire(); pose('[]'); const liste = await lire();
++        ok('… résumé illisible (JSON coupé, autre version, date à venir, pas un objet) ou trop gros : « indisponible », rien n’en sort', [futur, coupe, autre, liste].every((x) => x.disponible === false && x.code === 'illisible' && !('routines' in x)) && gros.disponible === false && gros.code === 'gros', JSON.stringify([futur, coupe, autre, gros, liste].map((x) => x.code)));
++        pose(resume({liste: false, routines: []})); const sl = await lire(); pose(resume({cron: false})); const sc = await lire();
++        ok('… root n’a pas pu lire sa liste ou le cron d’Hermes : « indisponible » avec la raison (la passerelle et le garde restent dits)', sl.disponible === false && sl.code === 'liste' && /install\.sh/.test(sl.raison) && sc.disponible === false && sc.code === 'cron' && sc.passerelle === 'active' && !('routines' in sc), JSON.stringify([sl, sc]));
++        fs.rmSync(HF); fs.writeFileSync(path.join(DATA, 'ailleurs.json'), JSON.stringify(resume())); fs.symlinkSync(path.join(DATA, 'ailleurs.json'), HF); h = await lire();
++        ok('… résumé remplacé par un lien : refusé, jamais suivi', h.disponible === false && h.code === 'lien' && !('routines' in h), JSON.stringify(h));
++        fs.rmSync(HF); fs.renameSync(HD, HD + '-vrai'); fs.symlinkSync(HD + '-vrai', HD); pose(resume()); h = await lire(); fs.rmSync(HD); fs.renameSync(HD + '-vrai', HD);
++        ok('… dossier du résumé remplacé par un lien : refusé aussi', h.disponible === false && h.code === 'lien', JSON.stringify(h));
++        const avant = fs.readdirSync(HD).join(), m0 = fs.statSync(HF).mtimeMs; pose(resume()); const m1 = fs.statSync(HF).mtimeMs; await lire(); await ligne();
++        ok('… JARVIS n’écrit jamais dans ce dossier (lecture seule : ni fichier en plus, ni résumé touché)', fs.readdirSync(HD).join() === avant && avant === 'routines.json' && fs.statSync(HF).mtimeMs === m1 && m1 >= m0);
++        fs.rmSync(HD, {recursive: true, force: true}); }
+       const gs = JSON.parse(fs.readFileSync(path.join(DATA, 'guard-mission.json'), 'utf8'));
+       ok('missions : Claude Code refuse les chemins secrets (état du serveur, ~/.claude, /proc) et le garde-fou voit les outils de fichiers', /Read/.test(gs.hooks.PreToolUse[0].matcher) && gs.permissions.deny.includes('Read(//' + path.resolve(DATA).replace(/^\/+/, '') + '/*.json)') && gs.permissions.deny.some((x) => /^Read\(\/\/.*\/\.claude\/\*\*\)$/.test(x)) && gs.permissions.deny.includes('Read(//proc/**)'), JSON.stringify(gs.permissions.deny.slice(0, 4)));
+       ok('0.73.0 : la copie d’un state.json abîmé (state.json.corrompu-<ms>) est aussi refusée à Claude Code (lecture et écriture)', ['Read', 'Edit'].every((v) => gs.permissions.deny.includes(v + '(//' + path.resolve(DATA).replace(/^\/+/, '') + '/*.corrompu-*)')), JSON.stringify(gs.permissions.deny.filter((x) => /corrompu/.test(x))));
