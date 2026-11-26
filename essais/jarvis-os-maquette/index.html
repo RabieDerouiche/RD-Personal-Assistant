@@ -11910,9 +11910,9 @@ void main(){
           h('ol', {class: 'yes-l'},
             h('li', {text: 'Dans l’app Raccourcis, duplique ton Raccourci JARVIS (la copie garde ta clé) et nomme-la « Ranger dans JARVIS ».'}),
             h('li', {text: 'Dans les détails de la copie, active « Afficher dans la feuille de partage » et garde Images, PDF et Fichiers.'}),
-            h('li', {}, 'Garde une seule action « Obtenir le contenu de l’URL » : méthode POST, le même en-tête Authorization, corps de la requête « Fichier » = l’entrée du raccourci, et cette adresse : ', h('code', {class: 'dep-url', text: base + '/api/raccourci/depot'})),
+            h('li', {}, 'Garde une seule action « Obtenir le contenu de l’URL » : méthode POST, le même en-tête Authorization, corps de la requête « Formulaire » avec un champ « fichier » de type Fichier = l’entrée du raccourci (le nom du fichier est gardé), et cette adresse : ', h('code', {class: 'dep-url', text: base + '/api/raccourci/depot'})),
             h('li', {text: 'Ajoute « Afficher le résultat » : JARVIS répond « Reçu », et le fichier t’attend ici.'})),
-          h('p', {class: 'muted', text: 'Les noms des menus de l’app Raccourcis peuvent changer selon la version d’iOS. Sur Android, JARVIS installé apparaît tout seul dans le menu Partager.'})));
+          h('p', {class: 'muted', text: 'Un fichier à la fois. Les noms des menus de l’app Raccourcis peuvent changer selon la version d’iOS. Sur Android, JARVIS installé apparaît tout seul dans le menu Partager.'})));
     }
     function depotVue() {
       const d = DP.data, out = [h('b', {class: 'dep-t', text: 'JARVIS range tes papiers'}),
