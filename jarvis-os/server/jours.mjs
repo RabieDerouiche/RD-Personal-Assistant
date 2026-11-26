@@ -220,7 +220,7 @@ export function appliquer(corrections, changements, b) {
 }
 
 /* ---------- le module : jours.json, l'agenda, la notification du 24 et du dernier jour ---------- */
-export function createJours({file, agenda, claude = null, push = async () => [], now = Date.now, log = () => {}, heure = '12:00'}) {
+export function createJours({file, agenda, claude = null, push = async () => [], now = Date.now, log = () => {}, heure = '12:00', retours = '/var/lib/hermes-portail-retours'}) {
   const lireFichier = () => {
     try { const j = JSON.parse(fs.readFileSync(file, 'utf8')); if (j && typeof j === 'object' && !Array.isArray(j)) return j; } catch (e) { if (e && e.code === 'ENOENT') return {}; }
     const cote = file.replace(/\.json$/, '') + '-illisible-' + new Date(now()).toISOString().slice(0, 19).replace(/[:T]/g, '-') + '.json';
@@ -322,7 +322,8 @@ export function createJours({file, agenda, claude = null, push = async () => [],
      Le vendredi à midi (le raccourci a noté le jour à 11 h), le bilan de la semaine : 1 pour chaque journée travaillée (télétravail, sur site,
      ou lieu pas noté : seule compte l'absence de congé), rien pour un congé ou un férié ; une demi-journée de congé ou un conflit bloquent la
      saisie automatique (règle de Chronos : ne pas inventer une quantité). Son oui dans JARVIS ; root le lit dans jours.json (`hermes-portail
-     cra-auto`), fait saisir et soumettre par Hermes, et pose le compte rendu dans portail-retours/ : JARVIS le lui notifie. */
+     cra-auto`), fait saisir et soumettre par Hermes, et pose le compte rendu dans son dossier (`retours`, à root, lisible par JARVIS) :
+     JARVIS le lui notifie. */
   if (!D.semaines || typeof D.semaines !== 'object' || Array.isArray(D.semaines)) D.semaines = {};
   const S7 = (l) => (D.semaines[l] = D.semaines[l] || {etat: 'a_valider', historique: []});
   const lundiDe = (s) => plusJour(s, -((dowDe(s) + 6) % 7));
@@ -401,15 +402,18 @@ export function createJours({file, agenda, claude = null, push = async () => [],
     await lireSemaine(l);
     return {ok: true, compris, par, nonLu: lu.nonLu, refus: [...lu.refus, ...refus]};
   }
-  const dirRetours = path.join(path.dirname(file), 'portail-retours');
-  /* les comptes rendus d'Hermes, posés par root : l'état de la semaine, et une notification (la première exécution, pour qu'il vérifie) */
+  /* les comptes rendus d'Hermes, posés par root dans un dossier à lui (26/11/2026 : jamais dans un dossier de JARVIS, où un lien lui
+     ferait écraser un fichier du système) ; JARVIS ne peut pas les effacer : il garde ceux déjà lus (nom et heure) dans D.retoursLus */
+  if (!D.retoursLus || typeof D.retoursLus !== 'object' || Array.isArray(D.retoursLus)) D.retoursLus = {};
   async function lireRetours() {
-    let noms = []; try { noms = fs.readdirSync(dirRetours).filter((n) => /^cra-\d{4}-\d{2}-\d{2}\.json$/.test(n)); } catch { return; }
-    for (const n of noms) {
-      const f = path.join(dirRetours, n); let r = null;
-      try { r = JSON.parse(fs.readFileSync(f, 'utf8')); } catch { /* illisible : ignoré, puis retiré */ }
-      try { fs.unlinkSync(f); } catch { /* rien */ }
-      const l = n.slice(4, 14); if (!r || !okLundi(l)) continue;
+    let noms = []; try { noms = fs.readdirSync(retours).filter((n) => /^cra-\d{4}-\d{2}-\d{2}\.json$/.test(n)); } catch { return; }
+    for (const n of noms.sort()) {
+      const f = path.join(retours, n); let r = null;
+      try { if (fs.lstatSync(f).isFile() && fs.statSync(f).size < 200000) r = JSON.parse(fs.readFileSync(f, 'utf8')); } catch { /* illisible : ignoré */ }
+      const l = n.slice(4, 14); if (!r || typeof r !== 'object' || !okLundi(l)) continue;
+      const cle = String(+r.at || 0); if (D.retoursLus[n] === cle) continue;
+      D.retoursLus[n] = cle;
+      const garder = Object.keys(D.retoursLus).sort().slice(-60); D.retoursLus = Object.fromEntries(garder.map((k) => [k, D.retoursLus[k]]));
       const res = ['soumise', 'deja', 'rien', 'echec', 'blanc'].includes(r.resultat) ? r.resultat : 'echec', s = S7(l);
       s.retour = {resultat: res, texte: TXT(r.texte, 700), premiere: r.premiere === true, at: +r.at || now()};
       s.etat = res === 'soumise' ? 'soumise' : res === 'deja' ? 'deja' : res === 'blanc' ? s.etat : 'a_la_main';

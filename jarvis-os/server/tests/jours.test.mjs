@@ -130,7 +130,7 @@ try {
     let presS = [...BASE];
     const agS = {...agenda, evenements: async (id, debut, fin) => (id.includes('french') ? FER : id.includes('tn.') ? [] : presS)};
     T = Date.parse('2026-11-26T11:05:00Z');   /* jeudi 26, midi : trop tôt pour le oui */
-    const JS = createJours({file: path.join(SD, 'jours.json'), agenda: agS, claude, push: async (m) => { pushS.push(m); return []; }, now: () => T});
+    const RT = path.join(SD, 'retours-root'), JS = createJours({file: path.join(SD, 'jours.json'), retours: RT, agenda: agS, claude, push: async (m) => { pushS.push(m); return []; }, now: () => T});
     let s = await JS.lireSemaine('2026-11-23');
     ok('semaine : lundi 23 congé (rien), mardi 24 sur site, mercredi 25 télétravail, jeudi 26 et vendredi 27 lieu pas noté : 1 (seule compte l’absence de congé)', s.jours.map((d) => d.q).join() === '0,1,1,1,1' && s.jours[3].lieu === '?' && !s.jours.some((d) => d.bloque), JSON.stringify(s.jours.map((d) => [d.date.slice(8), d.q, d.lieu])));
     let c = JS.confirmerSemaine('2026-11-23', s.empreinte);
@@ -148,14 +148,18 @@ try {
     r = await JS.traiter('POST', '/api/jours/semaine/confirmer', async () => ({lundi: '2026-11-23', empreinte: r.body.empreinte}));
     ok('semaine : oui donné : « valide », les quantités gardées pour root (jours.json)', r.status === 200 && r.body.etat === 'valide' && JSON.parse(fs.readFileSync(path.join(SD, 'jours.json'), 'utf8')).semaines['2026-11-23'].valide.jours.map((d) => d.q).join() === '0,1,1,0,1');
     /* le compte rendu d'Hermes, posé par root */
-    fs.mkdirSync(path.join(SD, 'portail-retours'), {recursive: true});
-    fs.writeFileSync(path.join(SD, 'portail-retours', 'cra-2026-11-23.json'), JSON.stringify({semaine: '2026-11-23', resultat: 'soumise', texte: 'Trois jours saisis, semaine soumise.', premiere: true, at: T}));
+    fs.mkdirSync(RT, {recursive: true});
+    fs.writeFileSync(path.join(RT, 'cra-2026-11-23.json'), JSON.stringify({semaine: '2026-11-23', resultat: 'soumise', texte: 'Trois jours saisis, semaine soumise.', premiere: true, at: T}));
+    fs.mkdirSync(path.join(SD, 'portail-retours'), {recursive: true});   /* l'ancien dossier, dans les données de JARVIS : plus jamais lu */
+    fs.writeFileSync(path.join(SD, 'portail-retours', 'cra-2026-11-09.json'), JSON.stringify({semaine: '2026-11-09', resultat: 'soumise', texte: 'x', premiere: true, at: T}));
     await JS.tic();
-    const pr = pushS[pushS.length - 1];
-    ok('semaine : le compte rendu d’Hermes : « soumise », notification « première exécution : vérifie », fichier retiré', JS.etatSemaine('2026-11-23').etat === 'soumise' && /Première exécution d’Hermes/.test(pr.title) && /Vérifie sur le portail/.test(pr.body) && !fs.existsSync(path.join(SD, 'portail-retours', 'cra-2026-11-23.json')), JSON.stringify(pr));
+    const pr = pushS[pushS.length - 1], nPush = pushS.length;
+    ok('semaine : le compte rendu d’Hermes (dossier de root) : « soumise », notification « première exécution : vérifie » ; l’ancien dossier des données de JARVIS ignoré', JS.etatSemaine('2026-11-23').etat === 'soumise' && /Première exécution d’Hermes/.test(pr.title) && /Vérifie sur le portail/.test(pr.body) && !JS.brut().semaines['2026-11-09'], JSON.stringify(pr));
+    await JS.tic();
+    ok('semaine : un compte rendu déjà lu (JARVIS ne peut pas l’effacer) ne se notifie pas deux fois', pushS.length === nPush && JS.brut().retoursLus['cra-2026-11-23.json'] === String(T), String(pushS.length - nPush));
     r = await JS.traiter('POST', '/api/jours/semaine/corriger', async () => ({lundi: '2026-11-23', texte: 'mardi 24 : congé'}));
     ok('semaine : une semaine soumise ne se corrige plus dans JARVIS', r.status === 400 && /déjà soumise/.test(r.body.error));
-    fs.writeFileSync(path.join(SD, 'portail-retours', 'cra-2026-11-16.json'), JSON.stringify({semaine: '2026-11-16', resultat: 'rien', texte: 'Une saisie existante diffère : rien changé.', premiere: false}));
+    fs.writeFileSync(path.join(RT, 'cra-2026-11-16.json'), JSON.stringify({semaine: '2026-11-16', at: T + 1, resultat: 'rien', texte: 'Une saisie existante diffère : rien changé.', premiere: false}));
     await JS.tic();
     ok('semaine : « rien saisi » : « à la main », notification « pas soumis »', JS.etatSemaine('2026-11-16').etat === 'a_la_main' && /pas soumis/.test(pushS[pushS.length - 1].title) && /À faire à la main/.test(pushS[pushS.length - 1].body));
     { await JS.lireSemaine('2026-11-16'); const e16 = JS.etatSemaine('2026-11-16'), v1 = JS.confirmerSemaine('2026-11-16', e16.empreinte), at1 = JS.brut().semaines['2026-11-16'].valide.at;
