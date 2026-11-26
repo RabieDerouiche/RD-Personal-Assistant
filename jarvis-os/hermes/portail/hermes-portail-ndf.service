@@ -1,0 +1,13 @@
+# JARVIS OS — une note de frais validée dans JARVIS, créée pour de vrai (docs/hermes-portail.md ; sa décision du 26/11/2026 : « valide avec moi la
+# première fois, c'est tout »). Posé par install.sh ; lancé toutes les 5 minutes par hermes-portail-ndf.timer. `ndf-auto` ne fait rien sans
+# une note posée « à valider » dont il a donné son oui dans JARVIS (sur l'empreinte de ses champs et de son justificatif) ; il la crée une seule
+# fois (registre de root), puis pose le compte rendu que JARVIS lui notifie (« Première exécution : vérifie »).
+[Unit]
+Description=Notes de frais validées dans JARVIS : création réelle par le Hermes portail
+After=network-online.target hermes-portail-filtre.service hermes-portail-sortie.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/hermes-portail ndf-auto
+TimeoutStartSec=1500
+Nice=5

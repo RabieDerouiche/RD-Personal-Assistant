@@ -25,10 +25,10 @@ BANC=${HERMES_BANC:-0}   # 1 = banc d'essai (conteneur sans systemd) : ni servic
 
 dire() { printf '\n== %s\n' "$*"; }
 [ "$(id -u)" = 0 ] || { echo "À lancer en root : sudo bash $0"; exit 1; }
-for f in politique.yaml hermes-portail filtre.py sortie.nft hermes-portail-sortie.service hermes-portail-filtre.service hermes-portail-essai.service hermes-portail-cra.service hermes-portail-cra.timer hermes-portail-teletravail.service hermes-portail-teletravail.timer domaines.defaut navigateur-regles.json justificatif-essai.pdf facture.mjs teletravail.mjs teletravail.py skills/portail/portail/SKILL.md; do
+for f in politique.yaml hermes-portail filtre.py sortie.nft hermes-portail-sortie.service hermes-portail-filtre.service hermes-portail-essai.service hermes-portail-cra.service hermes-portail-cra.timer hermes-portail-teletravail.service hermes-portail-teletravail.timer hermes-portail-ndf.service hermes-portail-ndf.timer domaines.defaut navigateur-regles.json justificatif-essai.pdf facture.mjs teletravail.mjs teletravail.py note.py skills/portail/portail/SKILL.md; do
   [ -f "$ICI/$f" ] || { echo "Fichier manquant : $ICI/$f"; exit 1; }
 done
-bash -n "$ICI/hermes-portail" && python3 -I -c "import ast,sys; ast.parse(open(sys.argv[1]).read())" "$ICI/filtre.py" && python3 -I -c "import ast,sys; ast.parse(open(sys.argv[1]).read())" "$ICI/teletravail.py" &&python3 -I -c "import json,sys; json.load(open(sys.argv[1]))" "$ICI/navigateur-regles.json" || { echo "Le code du dépôt ne passe pas le contrôle de syntaxe : rien n'a été posé."; exit 1; }
+bash -n "$ICI/hermes-portail" && python3 -I -c "import ast,sys; ast.parse(open(sys.argv[1]).read())" "$ICI/filtre.py" && python3 -I -c "import ast,sys; ast.parse(open(sys.argv[1]).read())" "$ICI/teletravail.py" && python3 -I -c "import ast,sys; ast.parse(open(sys.argv[1]).read())" "$ICI/note.py" &&python3 -I -c "import json,sys; json.load(open(sys.argv[1]))" "$ICI/navigateur-regles.json" || { echo "Le code du dépôt ne passe pas le contrôle de syntaxe : rien n'a été posé."; exit 1; }
 
 NPM_DIR=$(dirname "$(command -v npm 2>/dev/null || echo /usr/bin/npm)")
 passe=()
@@ -139,6 +139,8 @@ install -o root -g root -m 0644 "$ICI/filtre.py" "$LIB/filtre.py"
 install -o root -g root -m 0644 "$ICI/facture.mjs" "$LIB/facture.mjs"   # lancé sous l'utilisateur jarvis par « hermes-portail facture »
 install -o root -g root -m 0644 "$ICI/teletravail.mjs" "$LIB/teletravail.mjs"   # note de télétravail : jours et Drive, sous l'utilisateur jarvis
 install -o root -g root -m 0644 "$ICI/teletravail.py" "$LIB/teletravail.py"     # note de télétravail : calcul, garde-fous, synthèse (root, sans réseau)
+install -o root -g root -m 0644 "$ICI/note.py" "$LIB/note.py"                   # notes à facture (box, Claude) : montant et date par règles, champs (root, sans réseau)
+install -d -o root -g root -m 0700 "$VAR/ndf"                                   # les notes préparées, le registre des notes créées (jamais dans le dépôt)
 install -d -o root -g root -m 0700 "$VAR/teletravail"              # ses dossiers par mois et l'historique des montants (jamais dans le dépôt)
 install -o root -g root -m 0644 "$ICI/justificatif-essai.pdf" "$LIB/justificatif-essai.pdf"   # facture inventée, pour un brouillon d'essai
 install -d -o root -g root -m 0700 "$VAR/notes"                    # ce qu'Hermes apprend de chaque portail (jamais dans le dépôt)
@@ -171,6 +173,8 @@ install -o root -g root -m 0644 "$ICI/hermes-portail-cra.service" /etc/systemd/s
 install -o root -g root -m 0644 "$ICI/hermes-portail-cra.timer" /etc/systemd/system/hermes-portail-cra.timer
 install -o root -g root -m 0644 "$ICI/hermes-portail-teletravail.service" /etc/systemd/system/hermes-portail-teletravail.service
 install -o root -g root -m 0644 "$ICI/hermes-portail-teletravail.timer" /etc/systemd/system/hermes-portail-teletravail.timer
+install -o root -g root -m 0644 "$ICI/hermes-portail-ndf.service" /etc/systemd/system/hermes-portail-ndf.service
+install -o root -g root -m 0644 "$ICI/hermes-portail-ndf.timer" /etc/systemd/system/hermes-portail-ndf.timer
 install -d -o root -g root -m 0700 "$VAR/cra"
 nft -c -f "$ETC/sortie.nft" 2>/dev/null && echo "Règles réseau : syntaxe vérifiée." || [ "$BANC" = 1 ] || { echo "Règles réseau refusées par nft : arrêt."; exit 1; }
 if [ "$BANC" != 1 ]; then
@@ -180,7 +184,8 @@ if [ "$BANC" != 1 ]; then
   systemctl restart hermes-portail-sortie.service
   systemctl enable --now hermes-portail-cra.timer
   systemctl enable --now hermes-portail-teletravail.timer
-  echo "Relais : $(systemctl is-active hermes-portail-filtre) ; règles réseau : $(systemctl is-active hermes-portail-sortie) ; CRA de la semaine : $(systemctl is-active hermes-portail-cra.timer)$([ -f "$ETC/cra.conf" ] || echo ' (sans cra.conf : ne fait rien)') ; note de télétravail : $(systemctl is-active hermes-portail-teletravail.timer)$([ -f "$ETC/teletravail.conf" ] || echo ' (sans teletravail.conf : ne fait rien)')."
+  systemctl enable --now hermes-portail-ndf.timer
+  echo "Relais : $(systemctl is-active hermes-portail-filtre) ; règles réseau : $(systemctl is-active hermes-portail-sortie) ; CRA de la semaine : $(systemctl is-active hermes-portail-cra.timer)$([ -f "$ETC/cra.conf" ] || echo ' (sans cra.conf : ne fait rien)') ; notes de frais du jour : $(systemctl is-active hermes-portail-teletravail.timer) ; notes validées : $(systemctl is-active hermes-portail-ndf.timer)$([ -f "$ETC/teletravail.conf" ] || echo ' (sans teletravail.conf : ne fait rien)')."
 fi
 
 dire "Fini"

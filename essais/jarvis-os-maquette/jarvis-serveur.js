@@ -497,7 +497,10 @@
       /* 0.84.0 : le CRA de la semaine (son oui le vendredi ; Hermes saisit et soumet ensuite) */
       semaine: (lundi) => req('/api/jours/semaine' + (lundi ? '?lundi=' + encodeURIComponent(lundi) : '')).then((r) => (r.status === 200 ? r.j : null)).catch(() => null),
       semaineConfirmer: (lundi, empreinte) => req('/api/jours/semaine/confirmer', {lundi, empreinte}).then((r) => ({...r.j, ok: r.status === 200})).catch(() => ({ok: false, error: 'Serveur JARVIS injoignable.'})),
-      semaineCorriger: (lundi, texte) => req('/api/jours/semaine/corriger', {lundi, texte}).then((r) => ({...r.j, ok: r.status === 200})).catch(() => ({ok: false, error: 'Serveur JARVIS injoignable.'}))},
+      semaineCorriger: (lundi, texte) => req('/api/jours/semaine/corriger', {lundi, texte}).then((r) => ({...r.j, ok: r.status === 200})).catch(() => ({ok: false, error: 'Serveur JARVIS injoignable.'})),
+      /* 0.86.0 : les notes de frais d'Hermes (la première de chaque sorte validée par lui, puis créée par Hermes) */
+      notes: () => req('/api/jours/notes').then((r) => (r.status === 200 ? r.j : null)).catch(() => null),
+      noteValider: (sorte, mois, empreinte) => req('/api/jours/note/valider', {sorte, mois, empreinte}).then((r) => ({...r.j, ok: r.status === 200})).catch(() => ({ok: false, error: 'Serveur JARVIS injoignable.'}))},
     /* 0.85.0 : l'espace « Travail » (une carte par routine : qui, étapes, dates, données prévues) ; « Renommer » garde le titre sur le serveur */
     travail: {
       lire: () => req('/api/travail').then((r) => (r.status === 200 ? r.j : null)).catch(() => null),

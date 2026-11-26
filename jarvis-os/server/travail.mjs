@@ -13,10 +13,12 @@ import {MOIS, mailCraRempli} from './jours.mjs';
 const TITRES = {semaine: 'CRA de la semaine', mois: 'CRA du mois', jours: 'Jours du mois', claude: 'Abonnement Claude', box: 'Box internet', teletravail: 'Télétravail', grok: 'Grok Bot'};
 /* l'avancement du remplacement de Chronos par Hermes, note par note (état du chantier au 26/11/2026 ; `travail.json` peut le remplacer) */
 const NOTES = [
-  {id: 'claude', jour: 21, qui: 'chronos', quiDit: 'Chronos', journal: 'claude|anthropic', etapes: [['Facture lue', 'fait'], ['Dépense à blanc', 'fait'], ['Identique à Chronos', 'fait'], ['Part seule', ''], ['Bascule', '']]},
-  {id: 'box', jour: 15, qui: 'chronos', quiDit: 'Chronos', journal: 'box|internet|fibre', etapes: [['Facture téléchargée', 'fait'], ['Dépense à blanc', 'fait'], ['Identique à Chronos', 'fait'], ['Part seule', ''], ['Bascule', '']]},
-  {id: 'teletravail', jour: 'dernier', qui: 'chronos', quiDit: 'Chronos le 1er · Hermes à blanc le dernier jour', journal: 't[ée]l[ée]travail', etapes: [['Jours (JARVIS)', 'fait'], ['Électricité', ''], ['Charges et pièces', ''], ['PDF', ''], ['À blanc', '']]},
-  {id: 'grok', jour: 4, qui: 'chronos', quiDit: 'Chronos', journal: 'grok|xai', etapes: [['Chronos jusqu’à l’arrêt de Grok', 'fait']]}
+  /* 0.86.0 (sa décision du 26/11/2026 : « tout arrêter ce soir » chez Chronos ; « valide avec moi la première fois, c'est tout ») : Hermes
+     fait ces trois notes ; ses étapes viennent de la note posée par root (jours.mjs, notes[sorte:mois]) */
+  {id: 'claude', jour: 21, qui: 'reel', quiDit: 'Hermes', journal: 'claude|anthropic', piece: 'Facture lue'},
+  {id: 'box', jour: 15, qui: 'reel', quiDit: 'Hermes', journal: 'box|internet|fibre', piece: 'Facture téléchargée'},
+  {id: 'teletravail', jour: 'dernier', qui: 'reel', quiDit: 'Hermes', journal: 't[ée]l[ée]travail', piece: 'Pièces et calcul'},
+  {id: 'grok', jour: 4, qui: 'reel', quiDit: 'Hermes', journal: 'grok|xai', piece: 'Facture lue'}
 ];
 const SEM = ['dim.', 'lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.'];
 const pad = (n) => String(n).padStart(2, '0');
@@ -96,13 +98,31 @@ export function createTravail({file, jours, retours = '/var/lib/hermes-portail-r
     for (const N0 of NOTES) {
       const N = Object.assign({}, N0, ((C.notes || {})[N0.id]) || {}), jr = N.jour === 'dernier' ? dernierJour(y, m) : +N.jour;
       const ce = ymdDe(y, m, Math.min(jr, dernierJour(y, m))), suiv = auj <= ce ? ce : (() => { const y2 = m === 12 ? y + 1 : y, m2 = m === 12 ? 1 : m + 1; return ymdDe(y2, m2, N.jour === 'dernier' ? dernierJour(y2, m2) : Math.min(jr, dernierJour(y2, m2))); })();
-      let etapes = N.etapes, derniere = derChronos(N.journal), toi = '';
-      if (N.id === 'teletravail') {   /* la note préparée à blanc par Hermes le dernier jour (compte rendu de root, lu par jours.mjs) */
-        const TT = (jours.brut() || {}).teletravail || {}, k = Object.keys(TT).filter((x) => x <= ym).sort().pop(), tt = k ? TT[k] : null, okT = tt && ['blanc', 'prete'].includes(tt.resultat);
-        etapes = [['Jours (JARVIS)', 'fait'], ['Pièces et calcul', tt ? (okT ? 'fait' : 'bloque') : ''], ['PDF unique', okT ? 'fait' : ''], ['À blanc', tt && tt.resultat === 'blanc' ? 'fait' : ''], ['Comparé à Chronos', '']];
-        if (tt) { const hd = jjmm(new Date(tt.at).toISOString().slice(0, 10)); const hermes = {quand: hd, quoi: (okT ? 'à blanc' : 'arrêtée') + (tt.jours != null ? ', ' + String(tt.jours).replace('.', ',') + ' j' : ''), par: 'Hermes', ok: okT}; if (!derniere || tt.at > Date.parse(plusJour(auj, -40))) derniere = hermes; if (!okT) toi = 'Hermes s’est arrêté : ' + tt.texte; }
+      let etapes = N.etapes, derniere = derChronos(N.journal), toi = '', note = null;
+      if (N.piece) {   /* une note d'Hermes : la plus récente posée par root (jusqu'au mois en cours) */
+        const NS = (jours.brut() || {}).notes || {}, k = Object.keys(NS).filter((x) => x.startsWith(N.id + ':') && x.slice(-7) <= ym).sort().pop(), n = k ? NS[k] : null;
+        const deja = Object.keys(NS).some((x) => x.startsWith(N.id + ':') && ['creee', 'deja'].includes(NS[x].etat) && NS[x].oui);
+        const cree = n && ['creee', 'deja'].includes(n.etat), oui = n && n.oui && n.oui.empreinte === n.empreinte;
+        etapes = [[N.piece, n ? (n.etat === 'arret' ? 'bloque' : 'fait') : ''], ['Vérifiée à blanc', n && n.etat !== 'arret' ? 'fait' : ''],
+          [deja ? 'Validée une fois : part seule' : 'Ta validation (1re fois)', cree || oui || n && n.etat === 'auto' || deja ? 'fait' : n && n.etat === 'a_valider' ? 'encours' : ''],
+          ['Créée dans le portail', cree ? 'fait' : n && n.etat === 'echec' ? 'bloque' : oui ? 'encours' : '']];
+        if (n) {
+          const qd = jjmm(new Date(n.at).toISOString().slice(0, 10)), mo = MOIS[+n.mois.slice(5, 7) - 1];
+          derniere = {quand: qd, quoi: mo + ' : ' + ({a_valider: oui ? 'validée, en cours de création' : 'préparée, à valider', auto: 'préparée, part seule', creee: 'créée', deja: 'déjà présente', echec: 'pas créée', arret: 'arrêtée'}[n.etat] || n.etat), par: 'Hermes', ok: !['echec', 'arret'].includes(n.etat)};
+          if (n.etat === 'a_valider' && !oui) toi = 'Note de ' + mo + ' à valider : relis-la, puis « Valider et créer ».';
+          else if (['echec', 'arret'].includes(n.etat)) toi = 'Note de ' + mo + ' pas créée : ' + n.texte;
+          note = {cle: k, etat: n.etat, valide: !!oui};
+        } else if (N.id === 'teletravail') {   /* le passage du dernier jour arrêté avant d'avoir une note (pièce manquante, jour sans lieu) */
+          const TT = (jours.brut() || {}).teletravail || {}, kt = Object.keys(TT).filter((x) => x <= ym).sort().pop(), tt = kt ? TT[kt] : null;
+          if (tt) {
+            const okT = ['blanc', 'prete'].includes(tt.resultat);
+            etapes[0][1] = okT ? 'fait' : 'bloque';
+            derniere = {quand: jjmm(new Date(tt.at).toISOString().slice(0, 10)), quoi: (okT ? 'à blanc' : 'arrêtée') + (tt.jours != null ? ', ' + String(tt.jours).replace('.', ',') + ' j' : ''), par: 'Hermes', ok: okT};
+            if (!okT) toi = 'Hermes s’est arrêté : ' + tt.texte;
+          }
+        }
       }
-      routines.push({id: N.id, bloc: 'frais', titre: titre(C, N.id), qui: N.qui, quiDit: N.quiDit, prochaine: court(suiv), etapes, derniere, toi, ouvrir: 'note'});
+      routines.push({id: N.id, bloc: 'frais', titre: titre(C, N.id), qui: N.qui, quiDit: N.quiDit, prochaine: court(suiv), etapes, derniere, toi, ouvrir: 'note', ...(note ? {note} : {})});
       ev(suiv, titre(C, N.id), N.quiDit);
     }
     frise.sort((x, z) => (x.date < z.date ? -1 : 1));

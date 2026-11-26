@@ -740,10 +740,42 @@ au futur (`mailCraPhrases` de JARVIS, 0.85.0).
 | CRA mensuel (le 26) | En pause chez Chronos ; Hermes, en réel (novembre validé le 26/11) | Déclenchement seul le 26 après son oui (`cra-mois` à brancher sur une minuterie, comme `cra-auto`) ; dépôt du CRA du client |
 | Mails du mois (le 24 et le 26) | JARVIS prépare le brouillon, il l'envoie depuis JARVIS (0.85.0) | Modèles à poser sur le serveur (`travail.json`) |
 | CRA hebdomadaire (vendredi) | En pause chez Chronos ; Hermes, en réel dès son oui du 27/11 | Sa vérification après la première exécution |
-| Note de télétravail (le 1er) | Chronos ; Hermes à blanc le 30/11 (en construction) | Comparer avec Chronos le 1/12, puis bascule |
-| Note de la box (le 15) | Chronos ; Hermes à blanc identique (25/11) | Déclenchement seul, champs par règles, puis bascule |
-| Note de l'abonnement Claude (le 21 et « Facture reçue ») | Chronos ; Hermes à blanc identique (25/11) | Déclenchement à la facture, puis bascule |
-| Note Grok Bot (le 4) | Chronos, jusqu'à l'arrêt de Grok (son choix) | Rien |
+| Note de télétravail (fin de mois) | Hermes, en réel (Chronos arrêté le 26/11, ligne 101) : préparée le 30/11, posée « à valider » | Son « Valider et créer » dans JARVIS (première exécution), puis sa vérification |
+| Note de la box (le 15) | Hermes, en réel (Chronos arrêté ; novembre fait par Chronos le 15/11) | Première vraie note le 15/12, posée « à valider » |
+| Note de l'abonnement Claude (le 21 et « Facture reçue ») | Hermes, en réel (Chronos arrêté, « Facture reçue » aussi ; novembre fait par Chronos) | Première vraie note à la facture de décembre (vers le 21/12), « à valider » |
+| Note Grok Bot (le 4) | Hermes (Chronos arrêté, ligne 102 ; novembre fait par Chronos le 4/11) | Une éventuelle dernière facture de xAI après le 3/12, « à valider » ; ensuite retirer `note-grok.conf` |
+
+**Les notes de frais en réel (26/11/2026, soir ; ses décisions : « tout arrêter ce soir » chez Chronos, « valide avec moi la
+première fois, c'est tout » ; Grok Bot s'arrête le 3/12)** : Chronos ne fait plus les notes Claude, box ni télétravail (ligne 101
+du Canal, section H de sa fiche), ni « Facture reçue » ni la note Grok Bot (ligne 102) : plus rien chez lui au 3/12. Hermes les fait, par un circuit commun (`hermes-portail`, `ndf_*`) :
+- *préparer* : `note box|claude|grok` (la facture : espace client de la box avec `--code-mail`, ou Gmail pour les abonnements
+  Claude et Grok Bot, vendeurs réglés sur le serveur ; son texte ;
+  montant et date par règles sans IA, `note.py` ; garde-fous : facture hors de la période attendue, montant à plus de 50 % du mois
+  d'avant, même facture déjà servie ; contrôle de TVA réglé par sorte : `tva_controle` = aucune, presente ou taux:20, celui de
+  la routine de Chronos pour Grok Bot) ; `teletravail` (inchangé, voir plus haut) ; dans les deux cas la dépense est d'abord
+  remplie puis annulée (à blanc) ;
+- *poser* : la note (champs, justificatif, empreinte) dans `/var/lib/hermes-portail/ndf/<sorte>-<mois>/` (root) et son compte
+  rendu `ndf-<sorte>-<mois>.json` pour JARVIS ; la première de chaque sorte est « à valider » ;
+- *valider* : JARVIS 0.86.0 la lui montre (« Pour moi », espace Travail) ; son oui est gardé dans `jours.json` sur l'empreinte ;
+- *créer* : `ndf-auto` (minuterie de 5 minutes, `hermes-portail-ndf.timer`) lit son oui et fait créer la note par Hermes
+  (« MODE NOTE » de la skill : doublon vérifié d'abord, un seul clic qui crée, liste relue) ; registre de root (`creees.txt`) :
+  jamais deux fois ; compte rendu « créée » (première exécution : il vérifie), « déjà présente » ou « pas créée » ;
+- *ensuite* : une sorte créée une fois après son oui part seule (posée « auto », créée aussitôt), et il est notifié.
+Déclenchement : `notes-auto` chaque jour à 12 h 20 (`hermes-portail-teletravail.timer`) : télétravail le dernier jour, box à
+partir du `jour` de ses réglages (15), Claude et Grok Bot dès que leur facture du mois est dans Gmail (sinon réessayée le lendemain ; Grok Bot s'arrête le 3/12 : une
+éventuelle dernière facture passe par Hermes, validée par lui).
+Comparatifs et rodage, rien de posé : `note <sorte> --mois <mois fait par Chronos> --comparer <JJ/MM/AAAA>` (à blanc, puis
+Hermes ouvre la dépense de Chronos de ce jour-là en lecture seule et dit champ par champ « identique » ou « différent », sans
+recopier de valeur) ; `teletravail --mois <mois> --jours-rodage <jours> [--comparer <JJ/MM/AAAA>]` (les jours d'une note
+acceptée, quand l'agenda n'avait pas encore les lieux ; `--jours-rodage jarvis` : les jours de JARVIS notés jusqu'ici, ceux à
+venir ignorés, pour un rodage en cours de mois). Réglages sur le serveur seulement (root 600) : `notes.conf`
+(`ndf_adresse`), `note-box.conf`, `note-claude.conf` et `note-grok.conf` (`source`, `facture_adresse` ou `facture_requete`/`facture_nom`,
+`code_mail`, `facture_fenetre`, `jour`, `date_depense` = facture, `jour:NN` ou `dernier`, `champs`, `precedent_montant`, et
+`montant_motif`/`date_motif` si la lecture par défaut ne trouve pas, `ht_motif`/`tva_motif` et `tva_controle`) et leurs modèles de champs (`{DATE}`, `{DATE_FACTURE}`,
+`{MONTANT}`, `{MONTANT_HT}`, `{TVA}`, `{MOIS_NOM}`, `{ANNEE}`). Banc : 18 vérifications de plus (note posée, oui sur une autre
+empreinte refusé, création unique, box : période, montant inhabituel, comparatif, première validée, mois suivant seul, minuterie ;
+Grok Bot : contrôle de TVA qui arrête une facture fausse, puis posée à valider ; rodage du télétravail sur les jours de JARVIS),
+et `essais/hermes/note.test.sh` (10, la lecture des factures).
 
 **Le mois, au complet (ses précisions et QCM du 26/11/2026, nuit)** : la validation du 24 et le CRA du 26 de Chronos
 font aussi deux mails et un rattachement, pas encore chez Hermes ; ces deux routines de Chronos ne se mettent pas en
