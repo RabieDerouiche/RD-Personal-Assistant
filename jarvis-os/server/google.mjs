@@ -7,11 +7,17 @@
 import crypto from 'node:crypto';
 
 const FAKE = process.env.JARVIS_GOOGLE_FAKE || '';   /* banc d'essai : toutes les adresses Google vers un faux serveur */
-const URLS = FAKE ? {auth: FAKE + '/auth', token: FAKE + '/token', revoke: FAKE + '/revoke', sheets: FAKE + '/sheets', cal: FAKE + '/calendar', gmail: FAKE + '/gmail', drive: FAKE + '/drive'}
+const URLS = FAKE ? {auth: FAKE + '/auth', token: FAKE + '/token', revoke: FAKE + '/revoke', sheets: FAKE + '/sheets', cal: FAKE + '/calendar', gmail: FAKE + '/gmail', drive: FAKE + '/drive', upload: FAKE + '/upload/drive'}
   : {auth: 'https://accounts.google.com/o/oauth2/v2/auth', token: 'https://oauth2.googleapis.com/token', revoke: 'https://oauth2.googleapis.com/revoke',
-    sheets: 'https://sheets.googleapis.com', cal: 'https://www.googleapis.com/calendar/v3', gmail: 'https://gmail.googleapis.com/gmail/v1', drive: 'https://www.googleapis.com/drive/v3'};
+    sheets: 'https://sheets.googleapis.com', cal: 'https://www.googleapis.com/calendar/v3', gmail: 'https://gmail.googleapis.com/gmail/v1', drive: 'https://www.googleapis.com/drive/v3', upload: 'https://www.googleapis.com/upload/drive/v3'};
 export const SCOPES = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/calendar.events', 'https://www.googleapis.com/auth/calendar.readonly',
   'https://www.googleapis.com/auth/gmail.modify', 'https://www.googleapis.com/auth/drive.readonly'];
+/* 0.88.0 (Pilotage hébergé par JARVIS) : drive.file, la plus étroite des portées d'écriture (les seuls fichiers créés par JARVIS), pour la
+   copie chiffrée de chaque nuit. Demandée à chaque « Connecter Google », mais FACULTATIVE : un lien qui ne l'a pas fait tout le reste ; seule
+   la copie dans Drive attend, et la santé du serveur le dit (« à relier »). Elle ne compte pas dans les droits manquants. */
+export const SCOPE_DRIVE_FILE = 'https://www.googleapis.com/auth/drive.file';
+export const SCOPES_OPTION = [SCOPE_DRIVE_FILE];
+const portees = (s) => String(s || '').split(/\s+/).filter((x) => /^https:\/\/www\.googleapis\.com\/auth\//.test(x));
 const TZ = 'Europe/Paris';
 
 class ToolError extends Error { constructor(code, message, status) { super(message); this.code = code; this.status = status || 0; } }
@@ -128,7 +134,9 @@ export function createGoogle({S, save, log = () => {}}) {
   const lireJson = async (r) => { try { return await r.json(); } catch (e) { if (estDelai(e)) throw errDelai(); return {}; } };
 
   const status = (redirect) => ({configured: !!(G.clientId && G.clientSecret), linked: !!G.refresh, account: G.account || '', linkedAt: G.linkedAt || 0,
-    clientId: G.clientId ? G.clientId.slice(0, 12) + '…' : '', redirect, scopes: SCOPES});
+    clientId: G.clientId ? G.clientId.slice(0, 12) + '…' : '', redirect, scopes: SCOPES, driveCopies: drivePortee()});
+  /* 0.88.0 : drive.file accordée ? « inconnue » pour un lien d'avant la 0.88.0, jusqu'au premier renouvellement du jeton (Google y redit les portées) */
+  function drivePortee() { if (!G.refresh) return 'non'; return Array.isArray(G.portees) ? (G.portees.includes(SCOPE_DRIVE_FILE) ? 'oui' : 'non') : 'inconnue'; }
   function configure(b) {
     const id = String(b.clientId || '').trim(), sec = String(b.clientSecret || '').trim();
     if (!/^[\w.-]+\.apps\.googleusercontent\.com$/.test(id)) return {ok: false, error: "L'identifiant client doit finir par .apps.googleusercontent.com."};
@@ -142,7 +150,7 @@ export function createGoogle({S, save, log = () => {}}) {
     const state = crypto.randomBytes(24).toString('hex');
     for (const [k, v] of pending) if (Date.now() - v.at > 600e3) pending.delete(k);
     pending.set(state, {redirect, at: Date.now()});
-    const q = new URLSearchParams({client_id: G.clientId, redirect_uri: redirect, response_type: 'code', scope: SCOPES.join(' '), access_type: 'offline', prompt: 'consent', include_granted_scopes: 'true', state});
+    const q = new URLSearchParams({client_id: G.clientId, redirect_uri: redirect, response_type: 'code', scope: [...SCOPES, ...SCOPES_OPTION].join(' '), access_type: 'offline', prompt: 'consent', include_granted_scopes: 'true', state});
     return {ok: true, url: URLS.auth + '?' + q};
   }
   async function tokenCall(params) {
@@ -162,13 +170,13 @@ export function createGoogle({S, save, log = () => {}}) {
       const granted = String(j.scope || '').split(/\s+/), missing = SCOPES.filter((s) => !granted.includes(s));
       G.refresh = j.refresh_token; G.linkedAt = Date.now(); access = {token: j.access_token, exp: Date.now() + (j.expires_in || 3600) * 1000 - 60e3};
       try { const p = await api('GET', URLS.gmail + '/users/me/profile'); G.account = p.emailAddress || ''; } catch { G.account = ''; }
-      G.missing = missing; save();
+      G.missing = missing; G.portees = portees(j.scope); save();
       return {ok: true, account: G.account, missing};
     } catch (e) { return {ok: false, error: 'Échange avec Google refusé : ' + e.message}; }
   }
   async function unlink() {
     const t = G.refresh;
-    G.refresh = ''; G.account = ''; G.linkedAt = 0; access = {token: '', exp: 0}; save();
+    G.refresh = ''; G.account = ''; G.linkedAt = 0; delete G.portees; access = {token: '', exp: 0}; save();
     if (t) { try { await gfetch(URLS.revoke, {method: 'POST', headers: {'content-type': 'application/x-www-form-urlencoded'}, body: new URLSearchParams({token: t})}); } catch { /* rien */ } }
     return {ok: true};
   }
@@ -181,7 +189,12 @@ export function createGoogle({S, save, log = () => {}}) {
     const rt = G.refresh;
     if (!enCours || enCours.rt !== rt) {
       const p = tokenCall({client_id: G.clientId, client_secret: G.clientSecret, refresh_token: rt, grant_type: 'refresh_token'})
-        .then((j) => { if (G.refresh === rt) access = {token: j.access_token, exp: Date.now() + (j.expires_in || 3600) * 1000 - 60e3}; return j.access_token; },
+        .then((j) => {
+          if (G.refresh === rt) {
+            access = {token: j.access_token, exp: Date.now() + (j.expires_in || 3600) * 1000 - 60e3};
+            if (j.scope) { const g = portees(j.scope); if (JSON.stringify(g) !== JSON.stringify(G.portees)) { G.portees = g; save(); } }   /* 0.88.0 : drive.file vue sans relier */
+          }
+          return j.access_token; },
           (e) => { if (e.code === 'needs_reauth' && G.refresh === rt) { G.refresh = ''; save(); } throw e; })
         .finally(() => { if (enCours && enCours.p === p) enCours = null; });
       enCours = {rt, p};
@@ -408,6 +421,53 @@ export function createGoogle({S, save, log = () => {}}) {
       }
     }
   };
+  /* ---------- 0.88.0 : ce que seul le serveur appelle (hors de T, donc jamais par l'app ni par /api/tool) ----------
+     Pour l'import de Pilotage : les noms d'onglets et les formules du classeur. Pour la copie chiffrée de chaque nuit : son dossier et ses
+     fichiers dans Drive, créés par JARVIS (portée drive.file) et reconnus à leur marque appProperties « jarvis ». */
+  async function apiBrut(method, url, body, type, retry = true) {
+    const t = await token();
+    const r = await gfetch(url, {method, headers: {authorization: 'Bearer ' + t, 'content-type': type}, body});
+    if (r.status === 401 && retry) { if (access.token === t) access = {token: '', exp: 0}; return apiBrut(method, url, body, type, false); }
+    const j = await lireJson(r);
+    if (!r.ok) { const msg = (j.error && (j.error.message || j.error)) || 'HTTP ' + r.status; throw new ToolError(r.status === 401 ? 'needs_reauth' : r.status === 403 && /scope|insufficient/i.test(JSON.stringify(j)) ? 'not_granted' : 'tool_error', String(msg), r.status); }
+    return j;
+  }
+  const DOSSIER = 'application/vnd.google-apps.folder', marque = (v) => `appProperties has { key='jarvis' and value='${v}' }`;
+  const idSur = (id) => { if (!/^[A-Za-z0-9_-]{2,200}$/.test(String(id || ''))) throw new ToolError('tool_error', 'Identifiant Drive invalide.', 400); return String(id); };
+  const lettre = (i) => { let s = ''; for (i += 1; i > 0; i = Math.floor((i - 1) / 26)) s = String.fromCharCode(65 + (i - 1) % 26) + s; return s; };
+  const interne = {
+    titres: async (id) => ((await api('GET', `${URLS.sheets}/v4/spreadsheets/${enc(id)}?fields=${enc('sheets.properties.title')}`)).sheets || []).map((x) => String((x.properties || {}).title || '')).filter(Boolean),
+    /* {onglet: [[« D4 », « =IF(… »], …]} : les seules cases qui portent une formule */
+    formules: async (id) => {
+      const j = await api('GET', `${URLS.sheets}/v4/spreadsheets/${enc(id)}?includeGridData=true&fields=${enc('sheets(properties.title,data(startRow,startColumn,rowData.values.userEnteredValue.formulaValue))')}`), out = {};
+      for (const sh of j.sheets || []) {
+        const nom = String((sh.properties || {}).title || ''), l = [];
+        for (const d of sh.data || []) (d.rowData || []).forEach((r, ri) => ((r && r.values) || []).forEach((v, ci) => { const f = v && v.userEnteredValue && v.userEnteredValue.formulaValue; if (f) l.push([lettre((d.startColumn || 0) + ci) + ((d.startRow || 0) + ri + 1), String(f)]); }));
+        if (l.length) out[nom] = l;
+      }
+      return out;
+    }
+  };
+  const drive = {
+    portee: () => drivePortee(),
+    /* le dossier des copies : celui que JARVIS a déjà créé ; sinon un neuf sous RD Assistant ; refusé là (drive.file n'y a pas accès), à la racine */
+    dossier: async (nom, parent) => {
+      const j = await api('GET', `${URLS.drive}/files?` + new URLSearchParams({q: `mimeType = '${DOSSIER}' and trashed = false and ${marque('sauvegardes')}`, fields: 'files(id,name,parents)', pageSize: '10', spaces: 'drive'}));
+      const f = (j.files || [])[0]; if (f) return {id: idSur(f.id), racine: !(f.parents || []).includes(parent)};
+      const meta = {name: String(nom).slice(0, 80), mimeType: DOSSIER, appProperties: {jarvis: 'sauvegardes'}};
+      try { const c = await api('POST', `${URLS.drive}/files?fields=id,parents`, {...meta, parents: [idSur(parent)]}); return {id: idSur(c.id), racine: false}; }
+      catch (e) { if (!(e instanceof ToolError) || e.code === 'not_granted' || ![403, 404].includes(e.status)) throw e; const c = await api('POST', `${URLS.drive}/files?fields=id,parents`, meta); return {id: idSur(c.id), racine: true}; }
+    },
+    lister: async (dossier) => ((await api('GET', `${URLS.drive}/files?` + new URLSearchParams({q: `'${idSur(dossier)}' in parents and trashed = false and ${marque('pilotage')}`, fields: 'files(id,name,createdTime,size)', pageSize: '200', orderBy: 'name', spaces: 'drive'}))).files || [])
+      .map((x) => ({id: x.id, name: String(x.name || ''), createdTime: x.createdTime || '', size: +x.size || 0})),
+    envoyer: async ({dossier, nom, octets}) => {
+      const b = 'jarvis' + crypto.randomBytes(12).toString('hex'), meta = {name: String(nom).slice(0, 120), parents: [idSur(dossier)], mimeType: 'application/octet-stream', appProperties: {jarvis: 'pilotage'}};
+      const body = Buffer.concat([Buffer.from('--' + b + '\r\ncontent-type: application/json; charset=UTF-8\r\n\r\n' + JSON.stringify(meta) + '\r\n--' + b + '\r\ncontent-type: application/octet-stream\r\n\r\n'), Buffer.from(octets), Buffer.from('\r\n--' + b + '--\r\n')]);
+      return apiBrut('POST', `${URLS.upload}/files?uploadType=multipart&fields=id,name`, body, 'multipart/related; boundary=' + b);
+    },
+    jeter: (id) => api('PATCH', `${URLS.drive}/files/${enc(idSur(id))}`, {trashed: true}),   /* à la corbeille (vidée par Google au bout de 30 jours), jamais effacé d'un coup */
+    lire: (id) => apiOctets(`${URLS.drive}/files/${enc(idSur(id))}?alt=media`, 64 * 1024 * 1024)
+  };
   async function tool(server, name, input) {
     const fn = T[server] && T[server][name];
     if (!fn) throw new ToolError('not_in_manifest', `${server} · ${name} : pas encore relié à l'accès Google direct.`);
@@ -415,5 +475,5 @@ export function createGoogle({S, save, log = () => {}}) {
     catch (e) { if (e instanceof ToolError) throw e; throw new ToolError('tool_error', e.message || String(e)); }
   }
   const tools = () => Object.entries(T).map(([name, t]) => ({name, tools: Object.keys(t)}));
-  return {status, configure, link, callback, unlink, tool, tools, ToolError};
+  return {status, configure, link, callback, unlink, tool, tools, ToolError, interne, drive};
 }

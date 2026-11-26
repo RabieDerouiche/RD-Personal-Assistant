@@ -70,7 +70,14 @@ if id hermes >/dev/null 2>&1; then
   [ "$(sed -n 's/^HERMES_GARDE_CINQ_HEURES=//p' /etc/hermes/garde.conf 2>/dev/null)" = 1 ] && fenetres="semaine et fenêtre de 5 heures" || fenetres="semaine seulement"
   echo "  garde du forfait : $(systemctl is-active hermes-garde.timer 2>/dev/null || echo absent) (seuil ${seuil:-?} %, $fenetres)$([ -f /var/lib/hermes-garde/arret ] && echo ' ; HERMES EN PAUSE : forfait au-dessus du seuil')"
   journalctl -u hermes-garde -n 30 --utc --no-pager -o short-iso 2>/dev/null | grep -E ': (Forfait|Hermes|Usage) ' | tail -1 | sed -E 's/^([0-9T:-]+)[^ ]* [^ ]+ [^ ]+: /\1 UTC : /; s/T/ /; s/^/    dernier contrôle : /'
-  [ -f /etc/hermes/garde.coupe ] && echo "    garde COUPÉ à sa demande (/etc/hermes/garde.coupe), jusqu'au 3/12/2026"
+  if [ -f /etc/hermes/garde.coupe ]; then
+    f=$(grep -oE '[0-9]{4}-[0-9]{2}-[0-9]{2}' /etc/hermes/garde.coupe | head -1)
+    if [ -z "$f" ]; then echo "    garde COUPÉ à sa demande (/etc/hermes/garde.coupe, sans date : à retirer à la main)"
+    elif [[ "$(TZ=Europe/Paris date +%F)" > "$f" ]]; then echo "    coupure du garde finie (jusqu'au $f) : le garde suit ses règles ; /etc/hermes/garde.coupe peut être retiré"
+    else echo "    garde COUPÉ à sa demande jusqu'au $f (/etc/hermes/garde.coupe) : il reprend seul le lendemain"; fi
+  fi
+  echo "  relance après la limite du forfait : $(systemctl is-active hermes-relance.timer 2>/dev/null || echo absente)"
+  journalctl -u hermes-relance --since "-24h" --no-pager -o cat 2>/dev/null | grep -E 'relancée|redémarrée|AVIS|en attente' | tail -3 | sed 's/^/    /'
   echo "  réveil par JARVIS : $(systemctl is-active hermes-reveil.path 2>/dev/null || echo absent)"
   echo "  dernières lignes utiles du journal :"
   grep -E "telegram connected|Connected to Telegram|ERROR|Traceback|plan limit|extra usage|denied" /home/hermes/.hermes/logs/gateway.log 2>/dev/null | tail -5 | cut -c1-160 | sed -E 's/[0-9]{6,}/<n>/g; s/^/    /'

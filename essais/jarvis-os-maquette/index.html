@@ -6477,7 +6477,7 @@ void main(){
   }});
   /* 0.86.0 : Grok Bot arrêté (onglet Faits, « Grok Bot arrêté le ») : une demande à un bot devient une ligne pour Hermes, lue à son prochain
      passage, sans sonnette (docs/hermes-deroule.md) ; Claude garde la sienne */
-  const opCanal = (bot, type, msg, objet) => GOFF.on && bot !== 'claude' ? ({label: 'une ligne pour Hermes dans le Canal, lue à son prochain passage', ring: null, bot: 'hermes', msg, sig: 'canal|hermes|' + msg, src: 'canal', server: LV.SHEETS,
+  const opCanal = (bot, type, msg, objet) => (GOFF.on || bot === 'hermes') && bot !== 'claude' ? ({   /* 0.87.0 : une carte d'Hermes lui répond, sans sonnette, même avant l'arrêt */label: 'une ligne pour Hermes dans le Canal, lue à son prochain passage', ring: null, bot: 'hermes', msg, sig: 'canal|hermes|' + msg, src: 'canal', server: LV.SHEETS,
     run: () => lvCall(LV.SHEETS, 'append_values', {spreadsheetId: LV.SHEET, range: 'Canal!A1', values: [[lvToday(), 'Rabie', 'Hermes', type, msg, 'À faire', '', objet || '']]})}) : ({label: 'une ligne pour ' + lvName(bot) + ' dans le Canal', ring: bot, bot, msg, sig: 'canal|' + bot + '|' + msg, src: 'canal', server: LV.SHEETS,
     run: () => lvCall(LV.SHEETS, 'append_values', {spreadsheetId: LV.SHEET, range: 'Canal!A1', values: [[lvToday(), 'Rabie', lvName(bot), type, msg, 'À faire', '', objet || '']]})});
   const opEchStatus = (it, statut) => ({label: 'statut « ' + statut + ' » dans Échéances', sig: 'ech|' + it._row + '|' + statut, src: 'ech', server: LV.SHEETS, run: async () => {
@@ -8937,12 +8937,11 @@ void main(){
     const hi = h('span', {class: 'hud-hi'}), say = h('span'), A = hello() + ', Rabie.';
     const B = (pm ? pm + (pm > 1 ? ' décisions t’attendent' : ' décision t’attend') + (urg ? ', dont ' + urg + (urg > 1 ? ' urgentes' : ' urgente') : '') + '. ' : 'Rien ne t’attend. ')
       + (today.length ? today.length + (today.length > 1 ? ' rendez-vous' : ' rendez-vous') + ' aujourd’hui' + (next ? ', le prochain à ' + next.time.replace('h', ' h ') : '') + '. ' : 'Journée libre dans ton agenda. ')
-      + (GP.on ? 'Grok est en pause' + (GP.until ? ' jusqu’à ' + fmt(GP.until, {weekday: 'long'}) + ' ' + hmFr(GP.until) : '') + '.' : 'Tes bots sont au travail.');
+      + (GP.on ? 'Grok est en pause' + (GP.until ? ' jusqu’à ' + fmt(GP.until, {weekday: 'long'}) + ' ' + hmFr(GP.until) : '') + '.' : GOFF.on ? 'Hermes et JARVIS font tes routines.' : 'Tes bots sont au travail.');   /* 0.87.0 : après Grok, plus de « bots au travail » */
     const scr = h('section', {class: 'hud', 'aria-label': 'JARVIS'},
       h('div', {class: 'hud-top'}, h('div', {}, h('div', {class: 'hud-clock', id: 'hud-clock', html: hudClock()}), h('div', {class: 'hud-date', html: escH(cap1(fmt(TODAY, {weekday: 'long', day: 'numeric', month: 'long'}))) + (pr ? '<br>' + escH(CODE[pr]) : '')})),
         h('div', {class: 'hud-on'}, h('i'), 'J.A.R.V.I.S', h('small', {text: 'en ligne · ' + (BOTS.length + 1) + ' agents'}))),
-      core, h('p', {class: 'hud-say'}, hi, ' ', say, h('i', {class: 'hud-caret'})),
-      h('div', {class: 'hud-act'}, h('button', {type: 'button', class: 'btn main', onclick: () => (window.JarvisAsk || (() => openChat('claude')))()}, 'Parler à JARVIS'), typeof briefCard === 'function' ? null : null));
+      core, h('p', {class: 'hud-say'}, hi, ' ', say, h('i', {class: 'hud-caret'})));   /* 0.87.0 (son choix au QCM du 26/11/2026) : plus de grand bouton « Parler à JARVIS », l'orbe de la barre suffit */
     requestAnimationFrame(() => requestAnimationFrame(hudLines));
     /* la phrase du jour : dite une fois par ouverture de l'app, pendant que le globe parle ; elle continue si la page est redessinée (données qui arrivent) */
     HUD.hi = hi; HUD.say = say; HUD.A = A; HUD.txt = wait ? A : ko ? A + ' Je n’arrive pas à lire ton agenda ni Pilotage pour l’instant : nouvel essai dans quelques minutes.' : A + ' ' + B;
@@ -11551,6 +11550,245 @@ void main(){
         + '.hm-hermes{display:grid;gap:12px;padding:16px}.hmh-t b{display:block;font:700 22px var(--display)}.hmh-t small{color:var(--muted);font-size:13.5px}'
         + '.hmh-l{margin:0;display:grid;gap:6px}.hmh-l div{display:grid;grid-template-columns:8.5rem minmax(0,1fr);gap:8px}.hmh-l dt{color:var(--dim);font:600 11px var(--sans);letter-spacing:.06em;text-transform:uppercase;padding-top:3px}.hmh-l dd{margin:0;font-size:14px}'
         + '.hmh-r{list-style:none;margin:0;padding:0;display:grid;gap:8px}.hmh-r li{display:grid;gap:2px;padding:11px 14px;border-radius:16px;border:1px solid rgba(var(--c1),.2);background:rgba(255,255,255,.03)}.hmh-r small{color:var(--muted);font-size:13px}'}));
+    }
+
+    /* ================= 0.87.0 : suite de la refonte UX (ses choix au QCM du 26/11/2026).
+       Grok arrêté : les cartes de « Pour moi » des anciens bots sont confiées à Hermes (une ligne « Reprise » pour lui dans le Canal, une seule
+       par demande ; elles disent « Hermes ») ; le filtre Routines d'Équipe ne montre que celles d'Hermes et de JARVIS.
+       Étape 6 : Achats, Voyages, Argent et Papiers sur le modèle de la maquette (carte phare, un seul filtre collé sous l'en-tête, le secondaire
+       replié en bas). Étape 7 : plus de rubrique par-dessus (#app : la présence ouvre l'Agenda, le dépôt ouvre Papiers › Déposer) ; la
+       discussion devient la feuille du bas, plein écran. Comme 0.86.0, rien n'est réécrit : ce bloc range ce qui existe. ================= */
+    {
+      const GROK_IDS = ['hydra', 'medusa', 'unicorn', 'mermaid', 'griffon', 'cyclops', 'plutus'];
+      const grokId = (name) => { const id = idOf(lvLow(name).split(/[\s,(]/)[0]); return GROK_IDS.includes(id) ? id : null; };
+      /* 0. Hermes est reconnu partout où un nom de Pilotage est lu (lvBot) : avant, un nom inconnu revenait à Iris, et une ligne pour Hermes
+         s'affichait « Iris » (Équipe › Demandes, son État, son Journal). Il n'entre pas dans l'équipe des bots de Grok (BOTS). */
+      BOT.hermes = {id: 'hermes', name: 'Hermes', role: 'Routines sur ton serveur', obj: '', room: '', c: '#38bdf8', d: '#bae6fd', s: 'rgba(56,189,248,.13)', short: 'Routines · serveur', title: 'Routines sur ton serveur', myth: 'le messager', why: 'tes routines, sur ton serveur', mission: 'Fait tes routines sur ton serveur JARVIS, à la place des bots de Grok Bot.'};
+      NAME2ID.hermes = 'hermes'; ORB_PAL.hermes = ['#0e7490', '#38bdf8', '#e0f2fe', 5.3]; EMB.hermes = ['M5 15c3-1 6-4 7-9 1 5 4 8 7 9', 'M12 6v13'];
+      NAMES.hermes = ['Hermes', 'le messager', 'tes routines, sur ton serveur']; OLDNAME.hermes = 'Hermes'; ROUTINES.hermes = []; PRESETS.hermes = [['Où en es-tu ?', 'Point fait.']]; LOGS.hermes = []; BOTJOB.hermes = 'routines'; LV_FOLLOW.hermes = [];
+      S.doing.hermes = ''; S.last.hermes = '…'; S.next.hermes = '…';
+      /* les cartes de Chronos (CRA, notes de frais) : Grok arrêté, elles quittent « Pour moi » (hermes-portail les fait déjà, espace Travail) ;
+         une seule ligne « CRA et notes de frais : voir Travail » les remplace. Elles ne sont pas confiées à Hermes. */
+      const CHR = {n: 0};
+      const sansChronos = () => {
+        if (!GOFF.on) { CHR.n = 0; return; }
+        const all = S.demandes || [], c = all.filter((d) => d && d.bot === 'medusa');
+        if (c.length) S.demandes = all.filter((d) => !(d && d.bot === 'medusa'));
+        const rows = LV.t && LV.t.atoi && LV.t.atoi.rows;
+        CHR.n = rows ? rows.filter((r) => r['Sujet'] && r['Ce qu\'on attend de toi'] && grokId(r['Bot']) === 'medusa').length : (c.length || CHR.n);
+      };
+      const CA87 = coteApply; coteApply = function () { const r = CA87.apply(this, arguments); sansChronos(); return r; };
+      const GP87 = grokPause; grokPause = function () { const r = GP87.apply(this, arguments); sansChronos(); return r; };
+      /* ce qui dit qui fait quoi aujourd'hui (« Iris s'en occupe », « Kairos suit », « Athéna · à faire », « Écrire à Iris ») dit « Hermes » ;
+         l'historique (« Fait par Chronos », une réponse datée d'un bot, « proposée par Ulysse ») garde son nom */
+      const QUI_RE = /\b(Iris|Chronos|Kairos|Ulysse|Athéna|Argus|Plutus)(?=( s’en occupe| s'en occupe| suit\b| · (à faire|en cours|en retard|aujourd|demain|dans \d)))|(?<=\b(Écrire à|Répondre à|Demander à|Dis-le à|Préparer avec|Demande à) )(Iris|Chronos|Kairos|Ulysse|Athéna|Argus|Plutus)\b/g;
+      const QUI_T = new RegExp(QUI_RE.source);
+      const QUI_NOM = /^\s*(Iris|Chronos|Kairos|Ulysse|Athéna|Argus|Plutus)\s*$/;
+      const quiHermes = (root) => {
+        if (!GOFF.on || !root) return;
+        const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT), ts = [];
+        const seul = root.id === 'view' && TAB === 'agenda';   /* l'Agenda : le nom seul à côté d'une échéance = qui la suit aujourd'hui */
+        for (let n = w.nextNode(); n; n = w.nextNode()) if (QUI_T.test(n.nodeValue) || (seul && QUI_NOM.test(n.nodeValue))) ts.push(n);
+        ts.forEach((n) => { n.nodeValue = seul && QUI_NOM.test(n.nodeValue) ? n.nodeValue.replace(/\S+/, 'Hermes') : n.nodeValue.replace(QUI_RE, 'Hermes'); });
+      };
+      const RV87 = renderView; renderView = function () { const r = RV87.apply(this, arguments); quiHermes($('view')); return r; };
+      const OS87 = openSheet; openSheet = function () { const r = OS87.apply(this, arguments); quiHermes($('sheet')); return r; };
+      const AR87 = actRows; actRows = function () { const r = AR87.apply(this, arguments); (Array.isArray(r) ? r : [r]).forEach((x) => { if (x && x.nodeType) quiHermes(x); }); return r; };
+      /* 1. chaque demande encore ouverte d'un ancien bot (onglet « À toi ») devient une ligne « Reprise » pour Hermes, lue à son prochain passage
+         (le serveur le réveille pour une ligne du Canal) ; jamais deux fois la même : les lignes « Reprise » du Canal, et la liste gardée ici.
+         Une demande qu'Hermes pose lui-même (Bot = Hermes) n'est jamais reprise. */
+      const REP_K = 'jarvis.reprise';
+      const REP = new Set((() => { try { return JSON.parse(localStorage.getItem(REP_K) || '[]'); } catch (e) { return []; } })());
+      const repSave = () => { try { localStorage.setItem(REP_K, JSON.stringify([...REP].slice(-200))); } catch (e) { /* rien */ } };
+      let repT = 0, repBusy = false;
+      async function reprise() {
+        if (!GOFF.on || !LV.mcp || repBusy || !LV.t.atoi || !LV.t.canal) return;
+        /* déjà reprise : une ligne « Reprise » du Canal pour ce sujet, du jour de la demande ou après (une nouvelle demande au même sujet, plus tard, repart) */
+        const deja = {};
+        (LV.t.canal.rows || []).filter((r) => lvLow(r['Pour']) === 'hermes' && lvLow(r['Type']) === 'reprise').forEach((r) => { const k = String(r['Objet'] || '').trim(), d = lvFrIso(r['Date']) || ''; if (!deja[k] || d > deja[k]) deja[k] = d; });
+        const vo = (n) => /^[AEIOUYÉÈÊÂÎaeiouyéèêâî]/.test(n), de = (n) => (vo(n) ? 'd’' : 'de ') + n, que = (n) => (vo(n) ? 'qu’' : 'que ') + n;
+        const rows = [], cles = [];
+        (LV.t.atoi.rows || []).forEach((r) => {
+          const sub = String(r['Sujet'] || '').trim(), raw = String(r['Ce qu\'on attend de toi'] || '').trim(), id = grokId(r['Bot']), dep = lvFrIso(r['Depuis le']) || '', cle = sub + '|' + dep;
+          if (!sub || !raw || !id || id === 'medusa' || /^Ton oui dans le chat/i.test(raw) || (sub in deja && deja[sub] >= dep) || REP.has(cle)) return;
+          const who = lvName(id), ask = String(lvParse(raw).body || raw).replace(/\s+/g, ' ').trim().slice(0, 400);
+          rows.push([lvToday(), 'Rabie', 'Hermes', 'Reprise', 'À faire : reprends la demande ' + de(who) + ' à Rabie (« ' + sub + ' ») : ' + ask
+            + ' | Pourquoi : Grok Bot est arrêté ; ses demandes encore ouvertes te sont confiées. | Comment : elle reste dans « Pour moi » de JARVIS et sa réponse t’arrivera par le Canal ; fais alors ce '
+            + que(who) + ' aurait fait, avec tes outils et la Charte, rien de sortant sans son oui. Si elle n’a plus lieu d’être, dis-le dans la Réponse.', 'À faire', '', sub]);
+          cles.push(cle);
+        });
+        if (!rows.length) return;
+        cles.forEach((k) => REP.add(k)); repBusy = true;
+        try { await lvCall(LV.SHEETS, 'append_values', {spreadsheetId: LV.SHEET, range: 'Canal!A1', values: rows}); repSave(); lvReread(['canal']); }
+        catch (e) { cles.forEach((k) => REP.delete(k)); }
+        finally { repBusy = false; }
+      }
+      const LN87 = lvNews;
+      lvNews = function () { LN87.apply(this, arguments); clearTimeout(repT); if (GOFF.on) repT = setTimeout(reprise, 1500); };
+      /* leur affichage dit « Hermes » (la carte, sa feuille, ses boutons) */
+      const aHermes = (d) => GOFF.on && !!d && GROK_IDS.includes(d.bot);
+      const PMC87 = pmCard;
+      pmCard = function (d) {
+        const c = PMC87.apply(this, arguments);
+        if (aHermes(d) && c) {
+          const w = c.querySelector('.pm-who'), n = lvName(d.bot); if (w && w.textContent.startsWith(n)) w.textContent = 'Hermes' + w.textContent.slice(n.length);
+          c.querySelectorAll('button').forEach((b) => b.childNodes.forEach((t) => { if (t.nodeType === 3 && t.nodeValue.includes(n)) t.nodeValue = t.nodeValue.split(n).join('Hermes'); }));   /* « Répondre à Hermes » */
+          c.classList.add('is-hermes');
+        }
+        return c;
+      };
+      /* « En ce moment » (accueil) : une ligne « Reprise » n'est pas une demande en cours chez un bot */
+      const AB87 = actBots;
+      actBots = function () { if (!GOFF.on) return AB87(); const keep = S.ordres; S.ordres = (keep || []).filter((o) => lvLow(o.type) !== 'reprise'); try { return AB87(); } finally { S.ordres = keep; } };
+      const SD87 = SHEETCFG.demande;
+      SHEETCFG.demande = (d) => {
+        const c = SD87(d); if (!c || !aHermes(d)) return c;
+        const n = lvName(d.bot), sw = (s) => (typeof s === 'string' ? s.split(n).join('Hermes') : s);
+        c.kicker = sw(c.kicker); (c.actions || []).forEach((a) => { if (a) a.label = sw(a.label); });
+        if (Array.isArray(c.facts)) c.facts = c.facts.map((f) => (Array.isArray(f) ? [f[0], sw(f[1])] : f));
+        return c;
+      };
+      /* « Pour moi », Grok arrêté : à la place des cartes de Chronos, une seule ligne vers l'espace Travail */
+      const VD87 = VIEWS.demandes;
+      VIEWS.demandes = (el) => {
+        VD87(el);
+        if (!GOFF.on || !CHR.n) return;
+        const f = (el.querySelector('.ux-seg [aria-pressed="true"]') || {dataset: {}}).dataset.f || 'tout';
+        if (f === 'infos') return;
+        const ln = h('button', {type: 'button', class: 'card pm-travail', onclick: () => go('travail')}, h('span', {text: 'CRA et notes de frais : voir Travail'}), h('span', {class: 'pm-travail-go', text: '›'}));
+        const seg = el.querySelector(':scope > .ux-seg'), st = seg && seg.nextElementSibling && seg.nextElementSibling.matches('.fc-start, .fc-line') ? seg.nextElementSibling : seg;
+        if (st) st.after(ln); else el.prepend(ln);
+      };
+      /* Papiers › Déposer, Grok arrêté : plus d'« Iris range » ; le fichier va dans « À trier » et il le range lui-même pour l'instant */
+      const SDEP87 = SCREEN.depot;
+      SCREEN.depot = function (el) {
+        if (!GOFF.on) return SDEP87.apply(this, arguments);
+        const D = PT.data, root = D && D.roots.find((r) => r.key === 'papiers'), at = root ? (D.kids[root.id] || []).find((t) => /\ba trier\b/.test(papNorm(t.name))) : null;
+        el.append(h('div', {class: 'card depot dep-atrier'},
+          h('b', {class: 'dep-t', text: 'Le fichier va dans « À trier »'}),
+          h('p', {class: 'muted', text: 'Sur l’iPhone : ouvre la photo ou le PDF, touche Partager, puis Drive, dossier RD Assistant › Papiers › À trier. Range-le toi-même pour l’instant : le rangement par JARVIS viendra plus tard.'}),
+          at ? h('div', {class: 'row-actions'}, h('button', {type: 'button', class: 'btn main', onclick: () => { PAPS.open = at.id; renderView(false); }}, 'Ouvrir « À trier »')) : null,
+          h('p', {class: 'muted', text: 'Pas de relevé bancaire, de RIB, de bulletin de paie ni d’avis d’imposition ici : ils vont dans tes papiers privés.'})));
+      };
+      /* 3. Équipe › Routines, après Grok : celles d'Hermes et de JARVIS seulement (onglet Routines de Pilotage, lignes Bot = Hermes ou JARVIS ;
+         celles du serveur, brief du matin compris) */
+      const VEQ87 = VIEWS.equipe;
+      VIEWS.equipe = (el) => {
+        if (!GOFF.on) { VEQ87(el); return; }
+        const tous = S.rout; S.rout = (tous || []).filter((r) => /^(hermes|jarvis|claude)\b/i.test(String(r['Bot'] || '').trim()));
+        try { VEQ87(el); } finally { S.rout = tous; }
+        const t = el.querySelector('#routines .panel-h h2'); if (t && t.textContent === 'Routines de Claude') t.textContent = 'Routines de JARVIS';
+      };
+
+      /* 4. étape 6 : un seul filtre par page, collé sous l'en-tête ; changer de filtre garde le filtre en place sous l'en-tête */
+      const DMF = {};
+      const dmPick = (key, k) => {
+        const sc = $('scroller'), s = document.querySelector('#view .dm-seg'), p = s && s.previousElementSibling, top = document.querySelector('.top');
+        const y = sc ? sc.scrollTop : 0, st = sc && p ? Math.max(0, p.getBoundingClientRect().bottom - sc.getBoundingClientRect().top + sc.scrollTop - (top ? top.offsetHeight : 64)) : 0;
+        DMF[key] = k; renderView(true);
+        if (sc && y > st) sc.scrollTop = st;
+      };
+      const dmSeg = (key, cur, opts) => h('div', {class: 'seg ux-seg dm-seg', role: 'group', 'aria-label': 'Filtre'}, opts.map(([k, l, n]) => h('button', {type: 'button', 'aria-pressed': String(cur === k), 'data-f': k, onclick: () => dmPick(key, k)}, l, n ? h('b', {text: String(n)}) : null)));
+      const dmShow = (n, on) => {   /* seul ce que le filtre a caché revient (data-dmh) : ce que la page cachait d'elle-même le reste */
+        if (!n) return;
+        if (on) { if (n.hasAttribute('data-dmh')) { n.hidden = false; n.removeAttribute('data-dmh'); } }
+        else if (!n.hidden) { n.hidden = true; n.setAttribute('data-dmh', ''); }
+      };
+      const dmPlus = (title, n, kids) => h('details', {class: 'card dm-plus'}, h('summary', {}, h('span', {text: title}), n ? h('b', {text: String(n)}) : null), h('div', {class: 'dm-plus-b'}, kids));
+      const pnOf = (el, t) => [...el.querySelectorAll(':scope > section.panel, :scope > section.hm-sec')].find((x) => { const y = x.querySelector('h2'); return !!y && y.textContent.trim() === t; });
+      /* Achats : la carte de Kairos, puis À décider · Suivis · Idées · Achetés ; les autres veilles repliées en bas */
+      const VA87 = VIEWS.achats;
+      VIEWS.achats = (el) => {
+        if (!SEL.achats) SEL.achFilter = DMF.achats === 'fini' ? 'fini' : 'tous';
+        VA87(el);
+        const hero = el.querySelector(':scope > .shop-hero'); if (!hero || SEL.achats) return;
+        const hot = S.ach.filter((f) => ACH_HOT.includes(famState(f))), fini = S.ach.filter((f) => ['achete', 'retire'].includes(famState(f)));
+        const f = DMF.achats || (hot.length ? 'dec' : 'suivi');
+        const hotP = pnOf(el, 'À décider maintenant'), fort = pnOf(el, 'Temps forts'), all = pnOf(el, 'Tous mes achats'), autres = pnOf(el, 'Autres veilles de Kairos'), idees = el.querySelector(':scope > .idee-wrap');
+        const seg = dmSeg('achats', f, [['dec', 'À décider', hot.length], ['suivi', 'Suivis', S.ach.length - hot.length - fini.length], ['idees', 'Idées', (IDEES.list || []).length], ['fini', 'Achetés', fini.length]]);
+        hero.after(seg);
+        [[hotP, f === 'dec'], [fort, f === 'dec'], [all, f === 'suivi' || f === 'fini'], [idees, f === 'idees']].forEach(([n, on]) => dmShow(n, on));
+        if (f === 'dec' && !hotP) seg.after(emptyState('Rien à décider : Kairos te prévient dès qu’un prix passe sous ton seuil.'));
+        if (all) {
+          all.querySelectorAll(':scope > .seg, .ach-up').forEach((x) => x.remove());
+          const add = all.querySelector('.panel-h .btn'); if (add) add.remove();   /* « Suivre un produit » : celui de la carte de Kairos */
+          const t = all.querySelector('.panel-h h2'); if (t) t.textContent = f === 'fini' ? 'Achetés ou retirés' : 'Suivis';
+          if (!all.querySelector('.fam, .empty')) all.append(emptyState(f === 'fini' ? 'Rien d’acheté ni de retiré pour l’instant.' : 'Aucun autre produit suivi.'));
+        }
+        if (autres) { autres.remove(); el.append(dmPlus('Autres veilles de Kairos', autres.querySelectorAll('.watch').length, [...autres.children].filter((x) => !x.matches('.panel-h')))); }
+      };
+      /* Voyages : le prochain départ, puis Projets · Envies ; les règles repliées en bas */
+      const VV87 = VIEWS.voyages;
+      VIEWS.voyages = (el) => {
+        VV87(el);
+        const proj = pnOf(el, 'Tes projets'); if (SEL.voyages || !proj) return;
+        const env = pnOf(el, 'Tes envies'), reg = pnOf(el, 'Tes règles de voyage'), f = DMF.voyages || 'projets';
+        const seg = dmSeg('voyages', f, [['projets', 'Projets', proj.querySelectorAll('.voy').length], ['envies', 'Envies', env ? env.querySelectorAll('.envies button').length : 0]]);
+        const hero = el.querySelector(':scope > .trip-hero'); if (hero) hero.after(seg); else el.prepend(seg);
+        dmShow(proj, f === 'projets'); dmShow(env, f === 'envies');
+        if (reg) { reg.remove(); el.append(dmPlus('Tes règles de voyage', 0, [...reg.children].filter((x) => !x.matches('.panel-h')))); }
+      };
+      /* Argent : le filtre du Radar collé sous l'en-tête ; les ajouts rapides et les notifications repliés en bas */
+      const VAR87 = VIEWS.argent;
+      VIEWS.argent = (el) => {
+        VAR87(el);
+        const seg = el.querySelector(':scope > .rad-seg'); if (seg) seg.classList.add('ux-seg');
+        const fx = el.querySelector(':scope > .rad-fixes'); if (!fx) return;
+        const notif = [...fx.querySelectorAll(':scope > section.panel')].find((x) => /^Notifications/.test(((x.querySelector('h2') || {}).textContent || '').trim())), sm = fx.querySelector(':scope > .rad-sans-mail');
+        const kids = [sm, notif].filter(Boolean); if (!kids.length) return;
+        kids.forEach((x) => x.remove());
+        fx.append(dmPlus(notif ? 'Ajouts rapides et notifications' : 'Ajouts rapides', 0, kids));
+      };
+      /* Papiers : la recherche en carte phare, puis Personnes · Thèmes · Validité · Déposer. Les dossiers arrivent après coup (l'arbre du
+         Drive, refait sur place) : le filtre se réapplique à chaque arrivée. Un dossier ouvert ou une recherche : tout s'affiche, sans filtre. */
+      const PAP_K = (n) => {
+        const t = ((n.querySelector && n.querySelector(':scope > header h2')) || {}).textContent || '';
+        if (n.matches('.pap-dates')) return 'validite';
+        if (/^Déposer un document/.test(t)) return 'depot';
+        if (/^Par personne/.test(t)) return 'personnes';
+        if (/^(Par thème|En vrac|Papiers privés)/.test(t) || n.matches('.pap-priv, .face-note, .face-set')) return 'themes';
+        if (n.matches('.pap-n')) return 'compte';
+        return '*';
+      };
+      const VP87 = VIEWS.papiers;
+      VIEWS.papiers = (el) => {
+        VP87(el);
+        const top = el.querySelector(':scope > .pap-top'), quick = el.querySelector(':scope > .pap-quick'), body = el.querySelector(':scope > .stack:not(.pap-res)');
+        if (!top || !body) return;
+        const hero = h('section', {class: 'card hero pap-hero'}, h('small', {class: 'pap-k', text: 'Chercher un papier'}));
+        top.before(hero); hero.append(top); if (quick) hero.append(quick);
+        const f = DMF.papiers || 'personnes';
+        const seg = dmSeg('papiers', f, [['personnes', 'Personnes'], ['themes', 'Thèmes'], ['validite', 'Validité', (S.papiers || []).length], ['depot', 'Déposer']]);
+        hero.after(seg);
+        const apply = () => {
+          const open = !!body.querySelector(':scope > .pap-h');
+          seg.hidden = open || body.hidden;
+          [...body.children].forEach((n) => { const k = PAP_K(n); dmShow(n, open || k === '*' || k === f || (k === 'compte' && (f === 'personnes' || f === 'themes'))); });
+        };
+        apply();
+        new MutationObserver(apply).observe(body, {childList: true, attributes: true, attributeFilter: ['hidden']});
+      };
+
+      /* 5. étape 7 : plus de rubrique par-dessus ; la présence ouvre l'Agenda, le dépôt ouvre Papiers › Déposer (des pages de la pile) */
+      const OA87 = openApp;
+      openApp = function (id) {
+        if (id === 'agenda') { go('agenda'); return; }
+        if (id === 'depot') { DMF.papiers = 'depot'; if (TAB === 'papiers') { closeSheet(true); renderView(true); } else go('papiers'); return; }
+        return OA87.apply(this, arguments);
+      };
+      document.head.append(h('style', {id: 'ux-0870', text: '#view [data-dmh]{display:none!important}'
+        + '.ux-seg.rad-seg{display:flex;overflow-x:auto;scrollbar-width:none}.ux-seg.rad-seg button{flex:1 0 auto;padding:0 12px}'
+        + '.dm-plus{margin:4px 0 14px;padding:0!important}.dm-plus>summary{list-style:none;display:flex;align-items:center;gap:8px;padding:14px 16px;cursor:pointer;font:600 15px var(--sans);color:var(--fg)}.dm-plus>summary::-webkit-details-marker{display:none}'
+        + '.dm-plus>summary b{font:600 12px var(--display);color:var(--muted)}.dm-plus>summary::after{content:"";margin-left:auto;width:8px;height:8px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:rotate(45deg);transition:transform .2s}.dm-plus[open]>summary::after{transform:rotate(-135deg)}'
+        + '.dm-plus-b{display:grid;gap:12px;padding:0 12px 14px}.dm-plus-b>.panel{margin:0}'
+        + '.pm-travail{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;margin:0 0 12px;padding:13px 16px;font:600 15px var(--sans);color:var(--fg);text-align:left;cursor:pointer}.pm-travail-go{color:var(--muted);font-size:20px}'
+        + '.dep-atrier{display:grid;gap:8px;padding:16px}.dep-atrier .dep-t{font:700 17px var(--display)}.dep-atrier p{margin:0}'
+        + '.card.hero.pap-hero{display:grid;grid-template-columns:minmax(0,1fr);justify-items:stretch;align-items:start;text-align:left;gap:10px;padding:14px 14px 12px}.pap-hero .pap-k{font:600 11px var(--sans);letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}.pap-hero .pap-top,.pap-hero .pap-quick{margin:0}'
+        /* la discussion : une feuille du bas plein écran (bord arrondi, poignée, la page assombrie derrière) ; elle monte du bas */
+        + 'html .chat{top:calc(var(--sat, 0px) + 10px);border-radius:24px 24px 0 0;border-top:1px solid rgba(var(--c1),.35);box-shadow:0 0 0 100vmax rgba(0,0,0,.55),0 -14px 40px rgba(0,0,0,.6);overflow:hidden}'
+        + '.chat .chat-head{position:relative;padding-top:20px}.chat .chat-head::before{content:"";position:absolute;top:7px;left:50%;width:40px;height:5px;margin-left:-20px;border-radius:99px;background:rgba(255,255,255,.3)}'
+        + '#chat:not([hidden]):not(.ux-circ):not(.ux-circd){animation:uxChatUp .42s ' + EASE + ' both}@keyframes uxChatUp{from{transform:translateY(100%)}}'
+        + '@media (prefers-reduced-motion: reduce){#chat:not([hidden]){animation:none!important}}'}));
     }
 
     /* ================= 0.58.0 : fini les blocs bleus (son choix au QCM du 22/11/2026 : « verre noir, une couleur par rubrique, bord irisé sur les cartes phares »).

@@ -40,6 +40,27 @@ prevenir() {   # un message Telegram au propriétaire ; le jeton ne passe jamais
     "$jeton" "$qui" "$texte" | curl -K - -o /dev/null || true
 }
 
+# Garde coupé à sa demande (26/11/2026 : « le couper jusqu'au 3/12 ») : /etc/hermes/garde.coupe. S'il porte une date de fin
+# (AAAA-MM-JJ, heure de Paris), le garde reprend seul le lendemain et le dit une fois (le fichier reste : /etc est en
+# lecture seule pour ce service ; une date passée vaut « pas de coupure », ici comme dans limite.py et diagnostic.sh).
+# Sans date : coupé jusqu'à ce qu'on retire le fichier (install.sh laisse alors la minuterie arrêtée).
+COUPE=${HERMES_GARDE_COUPE:-/etc/hermes/garde.coupe}
+if [ -f "$COUPE" ]; then
+  fin=$(grep -oE '[0-9]{4}-[0-9]{2}-[0-9]{2}' "$COUPE" 2>/dev/null | head -1)
+  auj=${HERMES_GARDE_AUJOURDHUI:-$(TZ=Europe/Paris date +%F)}
+  if [ -n "$fin" ] && [[ "$auj" > "$fin" ]]; then
+    dit="$(dirname "$ETAT")/coupe-finie"
+    if [ "$(cat "$dit" 2>/dev/null)" != "$fin" ]; then
+      mkdir -p "$(dirname "$dit")"; echo "$fin" > "$dit"
+      echo "Coupure du garde finie (jusqu'au $fin) : le garde reprend."
+      prevenir "Le garde de ton forfait Claude reprend : il était coupé jusqu'au $(date -d "$fin" +%d/%m/%Y 2>/dev/null || echo "$fin"). Seuil de $SEUIL % sur la semaine."
+    fi
+  else
+    jusqua=""; [ -n "$fin" ] && jusqua=" jusqu'au $fin"
+    echo "Garde coupé à sa demande$jusqua : aucune décision."; exit 0
+  fi
+fi
+
 # Hermes arrêté (pas encore configuré, ou à la main) et pas par ce garde : rien à surveiller, aucune lecture
 # (une lecture lance Hermes et la sonde de Claude Code : environ 0,2 à 0,45 Go pendant quelques secondes)
 actif=$(sctl is-active "$SERVICE" 2>/dev/null || true)

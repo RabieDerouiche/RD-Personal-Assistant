@@ -31,6 +31,7 @@ EOF
 }
 lancer() { : > "$T/appels"; env HERMES_SEUIL_FORFAIT="${SEUIL:-85}" HERMES_GARDE_CINQ_HEURES="${CINQ:-}" HERMES_GARDE_USAGE_CMD="${CMD:-cat $T/usage.json}" \
   HERMES_GARDE_SYSTEMCTL="$T/systemctl" HERMES_GARDE_NOTIFIER="$T/notifier" HERMES_GARDE_ETAT="$T/etat/arret" HERMES_GARDE_POLITIQUE="$T/politique.yaml" \
+  HERMES_GARDE_COUPE="${COUPE_F:-$T/pas-de-coupe}" HERMES_GARDE_AUJOURDHUI="${AUJ:-}" \
   bash "$GARDE" > "$T/sortie" 2>&1; }
 messages() { cat "$T/messages" 2>/dev/null | wc -l; }
 
@@ -74,6 +75,20 @@ verif "valeur illisible (oui) : semaine seulement, pas d'arrêt" bash -c "! grep
 SEUIL=abc; usage 20 86 50 20; lancer; SEUIL=85
 verif "seuil illisible : 85 % par défaut" grep -q '^stop' "$T/appels"
 verif "le message ne contient ni guillemet ni jeton" bash -c "! grep -q '\"' '$T/messages'"
+
+echo "== Coupure du garde jusqu'à une date (sa décision du 26/11/2026 : « le couper jusqu'au 3/12 »)"
+rm -f "$T/etat/arret" "$T/etat/coupe-finie" "$T/messages"; echo active > "$T/etat-service"; usage 20 95 50 20
+echo 2026-12-03 > "$T/coupe"
+COUPE_F="$T/coupe" AUJ=2026-12-03 lancer
+verif "coupé jusqu'au 3/12, le 3/12 à 95 % : aucune décision, aucun message" bash -c "! grep -q 'stop\|start' '$T/appels' && grep -q 'aucune décision' '$T/sortie' && [ $(messages) = 0 ]"
+COUPE_F="$T/coupe" AUJ=2026-12-04 lancer
+verif "le 4/12 : le garde reprend seul (arrêt à 95 %) et le dit une fois" bash -c "grep -q '^stop' '$T/appels' && grep -q 'garde de ton forfait Claude reprend' '$T/messages' && [ -f '$T/coupe' ]"
+n=$(grep -c 'garde de ton forfait Claude reprend' "$T/messages"); echo active > "$T/etat-service"; rm -f "$T/etat/arret"
+COUPE_F="$T/coupe" AUJ=2026-12-05 lancer
+verif "le 5/12 : pas de second message « reprend », le garde suit ses règles" bash -c "[ $(grep -c 'garde de ton forfait Claude reprend' "$T/messages") = $n ] && grep -q '^stop' '$T/appels'"
+printf 'coupé à sa demande\n' > "$T/coupe-sans-date"; echo active > "$T/etat-service"; rm -f "$T/etat/arret"
+COUPE_F="$T/coupe-sans-date" AUJ=2027-01-01 lancer
+verif "coupure sans date : aucune décision, quelle que soit la date" bash -c "! grep -q 'stop\|start' '$T/appels' && grep -q 'aucune décision' '$T/sortie'"
 
 echo; echo "Garde du forfait : $ok vérifications réussies, $ko en échec."
 [ $ko = 0 ]

@@ -3,6 +3,7 @@
    l'entrée en flux (`--input-format stream-json`, une conversation qui reste ouverte), `claude auth status` et `claude mcp list`. */
 import fs from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
 const args = process.argv.slice(2);
 if (args[0] === 'mcp') { console.log('Checking MCP server health…\n\nclaude.ai Claude Docs: https://api.example/v1/pages/mcp - ✓ Connected\nclaude.ai Google Calendar: https://calendarmcp.example/mcp/v1 - ✓ Connected\nclaude.ai Google Sheets: https://sheetsmcp.example/mcp/v1 - ✓ Connected\nclaude.ai Gmail: https://gmailmcp.example/mcp/v1 - ✓ Connected'); process.exit(0); }
 if (args[0] === 'auth') { console.log(JSON.stringify({loggedIn: true, authMethod: 'claude.ai'})); process.exit(0); }
@@ -77,6 +78,11 @@ function answer(raw) {
   if (/^Mission : Reprends cette mission/.test(input)) return {text: 'Version 2 : ' + (input.match(/Sa consigne : ([^\n]+)/) || [])[1]};
   if (/^Mission : vérifie la réponse du syndic/.test(input)) return {text: 'Compte rendu : demande faite.\nRELANCE: {"quand":"' + demain + 'T10:30","quoi":"Voir si le syndic a répondu"}'};
   if (/^Mission : lente/.test(input)) return {text: /Reprise après un redémarrage/.test(input) ? 'Compte rendu repris.' : 'Compte rendu lent. ' + 'x'.repeat(2400)};
+  /* 0.89.0 : la limite du forfait (ancien format, l'époque de la reprise dans 2 s) : une fois (un fichier marque le premier appel), toujours, ou après un brouillon */
+  const LIM = () => "Claude AI usage limit reached|" + Math.floor(Date.now() / 1000 + 2) + " — You've hit your 5-hour limit";
+  if (/^Mission : limite une fois (\S+)/.test(input)) { const f = path.join(os.tmpdir(), 'fake-limite-' + input.match(/^Mission : limite une fois (\S+)/)[1]); if (!fs.existsSync(f)) { fs.writeFileSync(f, '1'); return {error: LIM()}; } return {text: 'Compte rendu après la limite.'}; }
+  if (/^Mission : limite toujours/.test(input)) return {error: LIM()};
+  if (/^Mission : limite après brouillon/.test(input)) return {error: LIM(), toolUses: [{name: 'mcp__claude_ai_Gmail__create_draft', input: {}}]};
   if (/montre le contexte/.test(input)) return {text: raw.split('[Question]\n')[0]};   /* banc des Raccourcis : renvoie les données reçues */
   /* tâche « Ordres Jarvis » faite par le serveur : répond aux lignes données, laisse « à valider » ce qui touche une fiche */
   if (/Lignes du Canal de Pilotage adressées à Claude/.test(input)) {
@@ -119,7 +125,8 @@ function answer(raw) {
   return {text: 'Tu as dit : ' + input.trim() + '. Session : ' + (resume || turn > 1 ? 'reprise' : 'nouvelle') + ', modèle : ' + model + ', outils : ' + allow + ', garde : ' + guard + ', processus : ' + process.pid + ', tour : ' + turn + ', contexte : ' + (ctx ? 'oui' : 'non') + ', secours : ' + (opt('--fallback-model') || 'aucun') + ', intégrés : ' + (args.includes('--tools') ? '[' + opt('--tools') + ']' : 'défaut') + ', consigne : ' + (opt('--system-prompt') ? 'remplacée' : 'ajoutée') + (raw.includes('[Entre-temps, JARVIS a répondu seul') ? ', entre-temps : oui' : '') + ', effort : ' + (opt('--effort') || 'défaut') + ', pensée : ' + (process.env.MAX_THINKING_TOKENS === '0' ? 'non' : 'oui') + '.'};   /* 0.63.0 */
 }
 async function emit(a) {
-  if (a.error) { process.stderr.write(a.error + '\n'); out({type: 'result', is_error: true, result: a.error, session_id: sid}); return false; }
+  if (a.error) { for (const t of a.toolUses || []) out({type: 'assistant', session_id: sid, message: {content: [{type: 'tool_use', name: t.name, input: t.input}]}});   /* 0.89.0 : un outil utilisé avant l'erreur */
+    process.stderr.write(a.error + '\n'); out({type: 'result', is_error: true, result: a.error, session_id: sid}); return false; }
   if (a.tools) out({type: 'assistant', session_id: sid, message: {content: a.tools.map((name) => ({type: 'tool_use', name, input: {}}))}});
   if (a.toolUses) for (const t of a.toolUses) { out({type: 'assistant', session_id: sid, message: {content: [{type: 'tool_use', name: t.name, input: t.input}]}}); await new Promise((r) => setTimeout(r, 200)); }
   if (a.pause) await new Promise((r) => setTimeout(r, a.pause));
