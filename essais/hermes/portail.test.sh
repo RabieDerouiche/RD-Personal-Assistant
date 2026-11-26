@@ -534,7 +534,7 @@ chmod -R a+rX $FT; etat_avant=$(cat $FT/donnees/state.json $FT/donnees/jours.jso
 export HERMES_BANC_JARVIS_U=nobody HERMES_BANC_JARVIS_SRV=$FT/serveur HERMES_BANC_JARVIS_DATA=$FT/donnees
 rm -f /etc/hermes-portail/teletravail.conf; rm -rf /var/lib/hermes-portail/teletravail
 verif "teletravail : sans fichier de réglages, refus (rien n'est lu)" bash -c "bash /usr/local/sbin/hermes-portail teletravail 2>&1 | grep -q 'Réglages attendus'"
-verif "teletravail --reel : refusé (Chronos crée la note tant que la bascule n'est pas faite)" bash -c "bash /usr/local/sbin/hermes-portail teletravail --reel 2>&1 | grep -q 'pas encore en réel'"
+verif "teletravail --reel : refusé (la note se crée après son oui dans JARVIS, par ndf-auto)" bash -c "bash /usr/local/sbin/hermes-portail teletravail --reel 2>&1 | grep -q 'après son oui dans JARVIS'"
 # le modèle des champs (au banc : avec la suite d'appels du faux modèle pour la dépense à blanc)
 cat > /etc/hermes-portail/teletravail-champs.txt <<FIN
 Vendeur : Vendeur invente
@@ -619,6 +619,125 @@ HERMES_BANC_AUJOURDHUI=2026-11-30 HERMES_BANC_CONSIGNE_EN_PLUS=$T/tt-suite-elec.
 verif "teletravail-auto : une seule tentative par mois" bash -c "[ $rc = 0 ] && [ \"\$(wc -l < /var/lib/hermes-portail/teletravail/tentes.txt)\" = 1 ] && [ ! -s $T/tta2.log ] && [ \"\$(stat -c %Y $RT)\" = $m0 ]"
 rm -f /etc/hermes-portail/teletravail.conf
 verif "teletravail-auto : sans teletravail.conf, rien" bash -c "HERMES_BANC_AUJOURDHUI=2026-12-31 bash /usr/local/sbin/hermes-portail teletravail-auto > /dev/null 2>&1 && ! grep -q 2026-12 /var/lib/hermes-portail/teletravail/tentes.txt"
+echo "== Notes de frais en réel (26/11/2026 : la première de chaque sorte validée dans JARVIS, puis seule)"
+NDFV=/var/lib/hermes-portail/ndf
+printf 'ndf_adresse=http://127.0.0.1:%s/tableau\n' $PP > /etc/hermes-portail/notes.conf; chmod 0600 /etc/hermes-portail/notes.conf
+RN=/var/lib/hermes-portail-retours/ndf-teletravail-2026-11.json
+verif "note de télétravail posée à valider (la première de sa sorte) : compte rendu pour JARVIS (root 640 : champs, montant, empreinte, justificatif)" bash -c "[ \"\$(cat $NDFV/teletravail-2026-11/etat)\" = a_valider ] && [ \"\$(stat -c '%U %a' $RN)\" = 'root 640' ] && python3 -I -c \"import json,sys; r=json.load(open('$RN')); sys.exit(0 if r['etat']=='a_valider' and r['montant']==14.44 and len(r['empreinte'])==32 and any(k=='Montant TTC' for k,v in r['champs']) and r['justificatif']=='note-2026-11.pdf' else 1)\""
+n0=$(grep -c ENREGISTREE $T/traces/portail.jsonl)
+bash /usr/local/sbin/hermes-portail ndf-auto > $T/ndf0.log 2>&1
+verif "ndf-auto sans son oui : rien de créé" bash -c "[ \"\$(grep -c ENREGISTREE $T/traces/portail.jsonl)\" = $n0 ] && [ \"\$(cat $NDFV/teletravail-2026-11/etat)\" = a_valider ] && [ ! -s $NDFV/creees.txt ]"
+oui() {   # oui <clé sorte:mois> <empreinte> : son oui, écrit comme JARVIS l'écrit dans jours.json (le faux JARVIS du banc)
+  python3 -I -c "import json,sys; f=sys.argv[1]; D=json.load(open(f)); D.setdefault('notes',{})[sys.argv[2]]={'etat':'a_valider','oui':{'empreinte':sys.argv[3],'at':1}}; json.dump(D,open(f,'w'))" $FT/donnees/jours.json "$1" "$2"
+}
+oui teletravail:2026-11 autre-empreinte
+bash /usr/local/sbin/hermes-portail ndf-auto > $T/ndf1.log 2>&1
+verif "ndf-auto : un oui donné sur une autre empreinte (la note a changé depuis) ne crée rien" bash -c "[ \"\$(grep -c ENREGISTREE $T/traces/portail.jsonl)\" = $n0 ] && [ ! -s $NDFV/creees.txt ]"
+cat > $T/note-suite.txt <<FIN
+SUITE: [
+ {"nom": "browser_exec", "args": {"code": "# Création de la dépense\nnew_tab('http://127.0.0.1:$PP/depense/nouvelle')\nwait_for_load()\nfill_input('#libelle', 'Note inventee')\nfill_input('#montant', '1,00')\njs(\"document.querySelector('#enregistrer').click()\")\nwait_for_load()\nprint(js(\"document.title\"))"}}
+]
+DIRE: "État : Non envoyée\nRésultat : créée"
+FIN
+: > $T/traces/modele.jsonl
+oui teletravail:2026-11 "$(python3 -I -c "import json; print(json.load(open('$NDFV/teletravail-2026-11/prepare.json'))['empreinte'])")"
+HERMES_BANC_NOTE_EN_PLUS=$T/note-suite.txt bash /usr/local/sbin/hermes-portail ndf-auto > $T/ndf2.log 2>&1
+verif "ndf-auto : son oui sur cette empreinte → la note créée pour de vrai (MODE NOTE, justificatif joint), une fois ; registre de root ; compte rendu « créée », première exécution" bash -c "grep -q 'Résultat note : creee' $T/ndf2.log && [ \"\$(grep -c ENREGISTREE $T/traces/portail.jsonl)\" = $((n0 + 1)) ] && grep -q 'MODE NOTE' $T/traces/modele.jsonl && grep -q 'justificatif.pdf' $T/traces/modele.jsonl && grep -q '^teletravail 2026-11 .* creee$' $NDFV/creees.txt && [ \"\$(stat -c '%U %a' $NDFV/creees.txt)\" = 'root 600' ] && python3 -I -c \"import json,sys; r=json.load(open('$RN')); sys.exit(0 if r['etat']=='creee' and r['premiere'] is True else 1)\""
+HERMES_BANC_NOTE_EN_PLUS=$T/note-suite.txt bash /usr/local/sbin/hermes-portail ndf-auto > $T/ndf3.log 2>&1
+verif "ndf-auto : une note créée ne repart jamais" bash -c "[ \"\$(grep -c ENREGISTREE $T/traces/portail.jsonl)\" = $((n0 + 1)) ]"
+# la box : facture donnée par root (inventée), lue par règles sans IA, garde-fous, à blanc, posée ; validée puis créée ; le mois suivant, seule
+python3 -I - $T <<'PY'
+import sys
+def pdf(chemin, lignes):
+    flux = 'BT /F1 11 Tf 50 780 Td 14 TL ' + ' '.join('(%s) Tj T*' % l for l in lignes) + ' ET'
+    objs = ['<< /Type /Catalog /Pages 2 0 R >>', '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+            '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>',
+            '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>',
+            '<< /Length %d >>\nstream\n%s\nendstream' % (len(flux.encode('latin-1')), flux)]
+    out = b'%PDF-1.4\n'; pos = []
+    for i, o in enumerate(objs, 1):
+        pos.append(len(out)); out += ('%d 0 obj\n%s\nendobj\n' % (i, o)).encode('latin-1')
+    x = len(out)
+    out += ('xref\n0 %d\n0000000000 65535 f \n' % (len(objs) + 1)).encode() + b''.join(('%010d 00000 n \n' % p).encode() for p in pos)
+    out += ('trailer\n<< /Size %d /Root 1 0 R >>\nstartxref\n%d\n%%%%EOF\n' % (len(objs) + 1, x)).encode()
+    open(chemin, 'wb').write(out)
+d = sys.argv[1]
+f = lambda date, ttc: ['FACTURE FOURNISSEUR INVENTE', 'Date de facture : ' + date, 'Total HT 32,50 EUR', 'TVA 20 % 6,50 EUR', 'Total TTC ' + ttc + ' EUR']
+pdf(d + '/box-nov.pdf', f('05/11/2026', '39,00')); pdf(d + '/box-dec.pdf', f('05/12/2026', '39,90'))
+pdf(d + '/box-sept.pdf', f('05/09/2026', '39,00')); pdf(d + '/box-cher.pdf', f('06/11/2026', '99,00'))
+PY
+chmod 0600 $T/box-*.pdf
+cat > /etc/hermes-portail/note-box-champs.txt <<FIN
+Date : {DATE}
+Vendeur : Fournisseur invente
+Montant TTC : {MONTANT}
+Commentaire : Box {MOIS_NOM} {ANNEE}
+FIN
+printf 'champs=/etc/hermes-portail/note-box-champs.txt\nfacture_fenetre=precedent_ou_courant\njour=15\nprecedent_montant=39,00\n' > /etc/hermes-portail/note-box.conf
+chmod 0600 /etc/hermes-portail/note-box-champs.txt /etc/hermes-portail/note-box.conf
+RB=/var/lib/hermes-portail-retours/ndf-box-2026-11.json
+HERMES_BANC_AUJOURDHUI=2026-11-16 bash /usr/local/sbin/hermes-portail note box --mois 2026-11 --facture $T/box-sept.pdf > $T/box1.log 2>&1; rc=$?
+verif "note box : une facture hors de la période attendue → arrêt, sans montant affiché ; compte rendu « arrêtée » pour JARVIS" bash -c "[ $rc = 2 ] && grep -q 'pas émise dans la période attendue' $T/box1.log && ! grep -q '39,00' $T/box1.log && python3 -I -c \"import json,sys; sys.exit(0 if json.load(open('$RB'))['etat']=='arret' else 1)\""
+HERMES_BANC_AUJOURDHUI=2026-11-16 bash /usr/local/sbin/hermes-portail note box --mois 2026-11 --facture $T/box-cher.pdf > $T/box2.log 2>&1; rc=$?
+verif "note box : un montant inhabituel (plus de 50 % d'écart avec le mois d'avant) → arrêt" bash -c "[ $rc = 2 ] && grep -q 'montant inhabituel' $T/box2.log && [ ! -d $NDFV/box-2026-11 ]"
+cat > $T/comparer-suite.txt <<FIN
+SUITE: [
+ {"nom": "browser_exec", "args": {"code": "# Lecture de la dépense existante\nnew_tab('http://127.0.0.1:$PP/tableau')\nwait_for_load()\nprint(js(\"document.querySelector('#depenses').innerText\")[:200])"}}
+]
+DIRE: "Vendeur : identique ; Montant : égal ; Date : égale\nComparaison : identique"
+FIN
+: > $T/traces/modele.jsonl
+HERMES_BANC_AUJOURDHUI=2026-11-26 HERMES_BANC_COMPARER_EN_PLUS=$T/comparer-suite.txt bash /usr/local/sbin/hermes-portail note box --mois 2026-11 --facture $T/box-nov.pdf --comparer 15/11/2026 > $T/box3.log 2>&1; rc=$?
+verif "note box --comparer : règles sans IA (montant, date), à blanc, puis comparée en lecture seule à la dépense existante du 15/11 ; « identique » ; rien n'est posé" bash -c "[ $rc = 0 ] && grep -q 'Résultat comparaison : identique' $T/box3.log && grep -q 'datée du 15/11/2026' $T/traces/modele.jsonl && grep -q 'Montant TTC : 39,00' $T/traces/modele.jsonl && grep -q 'Date : 05/11/2026' $T/traces/modele.jsonl && [ ! -d $NDFV/box-2026-11 ]"
+HERMES_BANC_AUJOURDHUI=2026-11-16 bash /usr/local/sbin/hermes-portail note box --mois 2026-11 --facture $T/box-nov.pdf > $T/box4.log 2>&1; rc=$?
+verif "note box : posée à valider (la première de sa sorte), justificatif = la facture, montant lu" bash -c "[ $rc = 0 ] && grep -q 'Résultat note : a_valider' $T/box4.log && [ \"\$(cat $NDFV/box-2026-11/etat)\" = a_valider ] && python3 -I -c \"import json,sys; r=json.load(open('$RB')); sys.exit(0 if r['etat']=='a_valider' and r['montant']==39.0 and r['date']=='2026-11-05' else 1)\""
+n1=$(grep -c ENREGISTREE $T/traces/portail.jsonl)
+oui box:2026-11 "$(python3 -I -c "import json; print(json.load(open('$NDFV/box-2026-11/prepare.json'))['empreinte'])")"
+HERMES_BANC_NOTE_EN_PLUS=$T/note-suite.txt bash /usr/local/sbin/hermes-portail ndf-auto > $T/box5.log 2>&1
+verif "note box : son oui → créée (première exécution)" bash -c "grep -q 'Résultat note : creee' $T/box5.log && [ \"\$(grep -c ENREGISTREE $T/traces/portail.jsonl)\" = $((n1 + 1)) ] && python3 -I -c \"import json,sys; r=json.load(open('$RB')); sys.exit(0 if r['etat']=='creee' and r['premiere'] is True else 1)\""
+HERMES_BANC_AUJOURDHUI=2026-12-16 HERMES_BANC_NOTE_EN_PLUS=$T/note-suite.txt bash /usr/local/sbin/hermes-portail note box --mois 2026-12 --facture $T/box-dec.pdf > $T/box6.log 2>&1; rc=$?
+verif "note box du mois suivant : la sorte a été validée une fois, elle part seule (créée sans attendre), compte rendu « créée », pas « première »" bash -c "[ $rc = 0 ] && grep -q 'elle part seule' $T/box6.log && grep -q 'Résultat note : creee' $T/box6.log && [ \"\$(grep -c ENREGISTREE $T/traces/portail.jsonl)\" = $((n1 + 2)) ] && grep -q '^box 2026-12 .* creee$' $NDFV/creees.txt && python3 -I -c \"import json,sys; r=json.load(open('/var/lib/hermes-portail-retours/ndf-box-2026-12.json')); sys.exit(0 if r['etat']=='creee' and r['premiere'] is False else 1)\""
+HERMES_BANC_AUJOURDHUI=2026-12-16 bash /usr/local/sbin/hermes-portail note box --mois 2026-12 --facture $T/box-dec.pdf > $T/box7.log 2>&1; rc=$?
+verif "note box : une note déjà créée n'est jamais reposée" bash -c "[ $rc = 3 ] && grep -q 'déjà créée' $T/box7.log && [ \"\$(grep -c ENREGISTREE $T/traces/portail.jsonl)\" = $((n1 + 2)) ]"
+# la minuterie de chaque jour : la box attend le 15 ; Claude attend sa facture dans Gmail (réessayée le lendemain)
+printf 'champs=/etc/hermes-portail/note-box-champs.txt\nsource=mail\nfacture_requete=subject:recu-invente has:attachment\nfacture_nom=\\.pdf$\n' > /etc/hermes-portail/note-claude.conf; chmod 0600 /etc/hermes-portail/note-claude.conf
+rm -f $NDFV/tentes.txt
+HERMES_BANC_AUJOURDHUI=2027-01-14 bash /usr/local/sbin/hermes-portail notes-auto > $T/na.log 2>&1; rc=$?
+verif "notes-auto : la box attend le 15 ; la facture Claude pas encore dans Gmail → réessayée demain (aucune tentative notée)" bash -c "[ $rc = 0 ] && ! grep -q '^box 2027-01' $NDFV/tentes.txt 2>/dev/null && ! grep -q '^claude' $NDFV/tentes.txt 2>/dev/null && grep -q 'Résultat note : attente' $T/na.log"
+bash /usr/local/sbin/hermes-portail ndf etat > $T/ndf-etat.log 2>&1
+verif "ndf etat : les notes et le registre des notes créées" bash -c "grep -q 'teletravail-2026-11 : creee' $T/ndf-etat.log && grep -q 'box 2026-12' $T/ndf-etat.log"
+# l'abonnement Grok Bot (facture de xAI inventée) : le contrôle de TVA de la routine de Chronos, puis posée à valider
+python3 -I - $T <<'PY'
+import sys
+def pdf(chemin, lignes):
+    flux = 'BT /F1 11 Tf 50 780 Td 14 TL ' + ' '.join('(%s) Tj T*' % l.replace('(', '\\(').replace(')', '\\)') for l in lignes) + ' ET'
+    objs = ['<< /Type /Catalog /Pages 2 0 R >>', '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+            '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>',
+            '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>',
+            '<< /Length %d >>\nstream\n%s\nendstream' % (len(flux.encode('latin-1')), flux)]
+    out = b'%PDF-1.4\n'; pos = []
+    for i, o in enumerate(objs, 1):
+        pos.append(len(out)); out += ('%d 0 obj\n%s\nendobj\n' % (i, o)).encode('latin-1')
+    x = len(out)
+    out += ('xref\n0 %d\n0000000000 65535 f \n' % (len(objs) + 1)).encode() + b''.join(('%010d 00000 n \n' % p).encode() for p in pos)
+    out += ('trailer\n<< /Size %d /Root 1 0 R >>\nstartxref\n%d\n%%%%EOF\n' % (len(objs) + 1, x)).encode()
+    open(chemin, 'wb').write(out)
+d = sys.argv[1]
+pdf(d + '/grok-nov.pdf', ['INVOICE (inventee)', 'Date of issue November 4, 2026', 'Subtotal 25.00', 'VAT 20% 5.00', 'Total 30.00'])
+pdf(d + '/grok-tva.pdf', ['INVOICE (inventee)', 'Date of issue November 4, 2026', 'Subtotal 25.00', 'VAT 20% 2.00', 'Total 27.00'])
+PY
+chmod 0600 $T/grok-*.pdf
+printf 'champs=/etc/hermes-portail/note-box-champs.txt\nsource=mail\nfacture_requete=subject:xai-invente has:attachment\nfacture_nom=\\.pdf$\nht_motif=Subtotal\ntva_motif=VAT\ntva_controle=taux:20\n' > /etc/hermes-portail/note-grok.conf; chmod 0600 /etc/hermes-portail/note-grok.conf
+HERMES_BANC_AUJOURDHUI=2026-11-26 bash /usr/local/sbin/hermes-portail note grok --mois 2026-11 --facture $T/grok-tva.pdf > $T/grok1.log 2>&1; rc=$?
+verif "note grok : le contrôle de TVA de la routine de Chronos (20 % du HT) arrête une facture fausse, sans montant affiché" bash -c "[ $rc = 2 ] && grep -q 'contrôle de TVA' $T/grok1.log && ! grep -qE '27[.,]00|25[.,]00' $T/grok1.log"
+HERMES_BANC_AUJOURDHUI=2026-11-26 bash /usr/local/sbin/hermes-portail note grok --mois 2026-11 --facture $T/grok-nov.pdf > $T/grok2.log 2>&1; rc=$?
+verif "note grok : TVA juste → posée à valider (la première de sa sorte) ; compte rendu pour JARVIS" bash -c "[ $rc = 0 ] && grep -q 'Résultat note : a_valider' $T/grok2.log && python3 -I -c \"import json,sys; r=json.load(open('/var/lib/hermes-portail-retours/ndf-grok-2026-11.json')); sys.exit(0 if r['etat']=='a_valider' and r['montant']==30.0 else 1)\""
+# le rodage du télétravail sur les jours de JARVIS notés jusqu'ici (le 30, à venir, ignoré)
+ttconf; touch $FT/serveur/sans-30; chmod a+r $FT/serveur/sans-30
+HERMES_BANC_AUJOURDHUI=2026-11-26 bash /usr/local/sbin/hermes-portail teletravail --mois 2026-11 --jours-rodage jarvis --electricite $T/elec.pdf --sans-depense > $T/ttr.log 2>&1; rc=$?
+verif "teletravail --jours-rodage jarvis : les jours notés jusqu'ici, le jour à venir sans lieu ignoré ; la note se prépare" bash -c "[ $rc = 0 ] && grep -q 'RODAGE, jours de JARVIS' $T/ttr.log && grep -q '1 jour(s) à venir ignoré' $T/ttr.log && grep -q 'Résultat télétravail : prete' $T/ttr.log"
+rm -f $FT/serveur/sans-30 /etc/hermes-portail/teletravail.conf /etc/hermes-portail/note-grok.conf
+rm -rf $NDFV; rm -f /etc/hermes-portail/notes.conf /etc/hermes-portail/note-box.conf /etc/hermes-portail/note-claude.conf /etc/hermes-portail/note-box-champs.txt
 rm -rf /var/lib/hermes-portail-retours
 unset HERMES_BANC_JARVIS_U HERMES_BANC_JARVIS_SRV HERMES_BANC_JARVIS_DATA
 rm -f /etc/hermes-portail/teletravail.conf /etc/hermes-portail/teletravail-champs.txt; rm -rf /var/lib/hermes-portail/teletravail

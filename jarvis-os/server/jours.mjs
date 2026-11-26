@@ -441,6 +441,7 @@ export function createJours({file, agenda, claude = null, push = async () => [],
   async function lireRetours() {
     let tous = []; try { tous = fs.readdirSync(retours); } catch { return; }
     await lireTeletravail(tous.filter((n) => /^teletravail-\d{4}-\d{2}\.json$/.test(n)));
+    await lireNotes(tous.filter((n) => /^ndf-(teletravail|box|claude|grok)-\d{4}-\d{2}\.json$/.test(n)));
     const noms = tous.filter((n) => /^cra-\d{4}-\d{2}-\d{2}\.json$/.test(n));
     for (const n of noms.sort()) {
       const f = path.join(retours, n); let r = null;
@@ -463,6 +464,44 @@ export function createJours({file, agenda, claude = null, push = async () => [],
   /* 0.85.0 : la note de télétravail du mois, préparée À BLANC par Hermes le dernier jour (sa décision du 26/11/2026) : le compte rendu de
      root (résultat, jours, raisons d'un arrêt ; jamais de montant), gardé pour l'espace « Travail » et notifié une fois */
   if (!D.teletravail || typeof D.teletravail !== 'object' || Array.isArray(D.teletravail)) D.teletravail = {};
+  /* 0.86.0 — les notes de frais d'Hermes EN RÉEL (sa décision du 26/11/2026 : Chronos s'arrête ; « valide avec moi la première fois, c'est
+     tout ») : root pose la note préparée et vérifiée à blanc (`ndf-<sorte>-<mois>.json` : champs, montant, justificatif, empreinte) ; la
+     première de chaque sorte attend son oui ici (« Valider et créer ») ; son oui est gardé dans jours.json (notes[sorte:mois].oui, sur
+     l'empreinte) et lu par root, qui la crée pour de vrai, une seule fois, puis pose le compte rendu (première exécution : « vérifie »). */
+  if (!D.notes || typeof D.notes !== 'object' || Array.isArray(D.notes)) D.notes = {};
+  const NOTE_NOM = {teletravail: 'Note de télétravail', box: 'Note de la box', claude: 'Note de l’abonnement Claude', grok: 'Note de l’abonnement Grok Bot'};
+  const okSorte = (s) => Object.prototype.hasOwnProperty.call(NOTE_NOM, s);
+  async function lireNotes(noms) {
+    for (const n of noms.sort()) {
+      const f = path.join(retours, n); let r = null;
+      try { if (fs.lstatSync(f).isFile() && fs.statSync(f).size < 200000) r = JSON.parse(fs.readFileSync(f, 'utf8')); } catch { /* illisible : ignoré */ }
+      const m = n.match(/^ndf-([a-z]+)-(\d{4}-\d{2})\.json$/); if (!r || typeof r !== 'object' || !m || !okSorte(m[1]) || !okMois(m[2])) continue;
+      const cle = String(+r.at || 0); if (D.retoursLus[n] === cle) continue;
+      D.retoursLus[n] = cle;
+      const s = m[1], ym = m[2], k = s + ':' + ym, avant = D.notes[k] || {};
+      const etat = ['a_valider', 'auto', 'creee', 'deja', 'echec', 'arret'].includes(r.etat) ? r.etat : 'echec';
+      const champs = Array.isArray(r.champs) ? r.champs.filter((c) => Array.isArray(c) && c.length === 2).slice(0, 20).map(([a, b]) => [TXT(a, 40), TXT(b, 200)]) : [];
+      D.notes[k] = {sorte: s, mois: ym, etat, montant: typeof r.montant === 'number' ? r.montant : null, date: /^\d{4}-\d{2}-\d{2}$/.test(String(r.date || '')) ? r.date : null,
+        jours: typeof r.jours === 'number' ? r.jours : null, champs, justificatif: TXT(r.justificatif, 80), taille: +r.taille || 0, empreinte: /^[0-9a-f]{16,64}$/.test(String(r.empreinte || '')) ? r.empreinte : (avant.empreinte || ''),
+        premiere: r.premiere === true, texte: TXT(r.texte, 500), at: +r.at || now(), ...(etat === 'a_valider' && avant.oui && avant.oui.empreinte === r.empreinte ? {oui: avant.oui} : {})};
+      noter();
+      const L = NOTE_NOM[s] + ' de ' + MOIS[+ym.slice(5, 7) - 1], url = '/#voir-note-' + s + '-' + ym, tag = 'note-' + k;
+      if (etat === 'a_valider') await push({title: L + ' : à valider', body: 'Hermes l’a préparée et vérifiée à blanc. C’est la première : relis-la dans JARVIS, puis « Valider et créer ».', url, tag}).catch(() => {});
+      else if (etat === 'creee') await push({title: (r.premiere ? 'Première exécution d’Hermes : ' : '') + L + ' créée', body: r.premiere ? 'Vérifie-la dans le portail de notes de frais, et dis-moi si un champ est faux.' : 'Créée par Hermes, avec son justificatif.', url, tag}).catch(() => {});
+      else if (etat === 'deja') await push({title: L + ' : déjà présente', body: 'Une dépense pareille existait : rien de créé en double.', url, tag}).catch(() => {});
+      else if (etat === 'echec' || etat === 'arret') await push({title: L + ' : pas créée', body: TXT(D.notes[k].texte + ' À faire à la main, ou à relancer.', 230), url, tag}).catch(() => {});
+    }
+  }
+  const noteVue = (k) => { const n = D.notes[k]; return n ? {...n, cle: k, nom: NOTE_NOM[n.sorte], valide: !!(n.oui && n.oui.empreinte === n.empreinte)} : null; };
+  const notesVues = () => Object.keys(D.notes).sort().reverse().map(noteVue).filter(Boolean);
+  function validerNote(s, ym, empreinte) {
+    const k = s + ':' + ym, n = D.notes[k];
+    if (!okSorte(s) || !okMois(ym) || !n) return {ok: false, error: 'Note introuvable.'};
+    if (n.etat !== 'a_valider') return {ok: false, error: n.etat === 'creee' || n.etat === 'deja' ? 'Cette note est déjà créée.' : 'Cette note n’attend pas de validation.'};
+    if (!n.empreinte || String(empreinte || '') !== n.empreinte) return {ok: false, error: 'La note a changé depuis son affichage : relis-la.'};
+    n.oui = {empreinte: n.empreinte, at: now()}; noter();
+    return {ok: true, note: noteVue(k)};
+  }
   async function lireTeletravail(noms) {
     for (const n of noms.sort()) {
       const f = path.join(retours, n); let r = null;
@@ -576,7 +615,9 @@ export function createJours({file, agenda, claude = null, push = async () => [],
       if (agenda.lie() && !['soumise', 'deja'].includes(s.etat) && (!s.jours || now() - (s.lu || 0) > 120e3)) await Promise.race([lireSemaine(l), new Promise((z) => setTimeout(z, 20000))]);
       return {status: 200, body: etatSemaine(l)};
     }
+    if (p === '/api/jours/notes' && method === 'GET') return {status: 200, body: {notes: notesVues()}};   /* 0.86.0 : les notes de frais d'Hermes */
     if (!p.startsWith('/api/jours/') || method !== 'POST') return null;
+    if (p === '/api/jours/note/valider') { const b = await lu(), r = validerNote(String(b.sorte || ''), String(b.mois || ''), b.empreinte); return {status: r.ok ? 200 : 409, body: r}; }
     if (p.startsWith('/api/jours/semaine/')) {
       const b = await lu(), l = okLundi(b.lundi) ? b.lundi : null;
       if (!l) return {status: 400, body: {ok: false, error: 'Semaine attendue (son lundi, AAAA-MM-JJ).'}};
@@ -594,5 +635,5 @@ export function createJours({file, agenda, claude = null, push = async () => [],
   }
   /* les jours validés d'un mois (pour le CRA d'Hermes, étape 3) : rien tant qu'il n'a pas dit oui */
   const valides = (ym) => { const x = D.mois[ym]; return x && x.etat === 'valide' && x.valide ? x.valide : null; };
-  return {etat, lire, confirmer, corriger, effacer, tic, demarrer, traiter, valides, lireSemaine, etatSemaine, confirmerSemaine, corrigerSemaine, lireRetours, brut: () => D};
+  return {etat, lire, confirmer, corriger, effacer, tic, demarrer, traiter, valides, lireSemaine, etatSemaine, confirmerSemaine, corrigerSemaine, lireRetours, notesVues, validerNote, brut: () => D};
 }

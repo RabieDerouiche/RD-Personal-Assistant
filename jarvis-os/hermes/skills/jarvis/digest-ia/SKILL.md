@@ -1,7 +1,7 @@
 ---
 name: digest-ia
-description: Routine « Digest IA et .NET » d'Hermes (en double de celle d'Athéna) - les nouveautés de la semaine qui changent ce que le propriétaire peut faire, lues sur le web, avec un lien vérifié et daté.
-version: 1.0.0
+description: Routine « Digest IA et .NET » d'Hermes (reprise d'Athéna) - les nouveautés de la semaine qui changent ce que le propriétaire peut faire, lues sur le web, avec un lien vérifié et daté.
+version: 1.1.0
 metadata:
   hermes:
     tags: [jarvis, routine, web, veille]
@@ -11,8 +11,8 @@ metadata:
 
 But : dire en un message ce qui, cette semaine, change ce qu'il peut faire avec ses outils d'IA ou en .NET.
 Cette routine lit le web : elle n'a donc accès ni à ses mails, ni à son agenda, ni à ses dossiers. Elle n'a de
-JARVIS que : `pilotage_lire` (onglet Sources seulement), `pilotage_ajouter` (Journal seulement),
-`pilotage_etat`, `jarvis_notifier`.
+JARVIS que les outils du jeton « Veilleur » : `pilotage_lire` (Sources, Prix, Relevés, Sorties, Routines),
+`pilotage_ajouter` (Journal, Relevés, Sorties), `pilotage_etat`, `jarvis_notifier`, `jarvis_meteo`.
 
 ## Règles
 
@@ -35,15 +35,22 @@ JARVIS que : `pilotage_lire` (onglet Sources seulement), `pilotage_ajouter` (Jou
      du mois ; changements des bibliothèques CQRS et de messagerie, licences comprises.
 3. « Important » veut dire : ce qui change ce qu'il peut faire cette semaine avec ses assistants ou ses outils,
    ou un nouveau modèle majeur. Garde 8 points au plus, dont 2 au plus pour .NET.
-4. Message : « En double · Digest IA et .NET », puis un point par ligne : ce qui change, l'effet pour lui, le lien
-   et sa date. Jamais un point déjà dit une semaine passée.
-5. Une source n'a pas pu être ouverte : termine par « ⚠️ non contrôlé : » suivi des sources. Silence
-   (`[SILENT]`) seulement si toutes les sources ont été ouvertes et qu'il n'y a rien d'important.
+4. Compte rendu : un point par ligne : ce qui change, l'effet pour lui, le lien et sa date. Jamais un point déjà
+   dit une semaine passée.
+5. Une source n'a pas pu être ouverte : termine par « ⚠️ non contrôlé : » suivi des sources. « Rien
+   d'important » seulement si toutes les sources ont été ouvertes.
 6. Retiens dans ta mémoire les titres de cette semaine (clé « digest-ia : déjà dit », les 40 derniers).
-7. Fin de passage : `pilotage_ajouter` au Journal (`Type` PASSAGE, `Sujet` « En double : Digest IA et .NET »,
-   `Détail` : nombre de points, sources non ouvertes), puis `pilotage_etat`.
+7. Fin de passage, selon le mode de la consigne :
+   - **en double** : `pilotage_ajouter` au Journal (`Type` PASSAGE, `Sujet` « En double : Digest IA et .NET »,
+     `Détail` : le compte rendu entier, 1 800 caractères au plus), `pilotage_etat`, puis `[SILENT]` ;
+   - **en réel** : Journal (`Type` ETAT s'il y a des points, PASSAGE sinon ; `Sujet` « Digest IA et .NET » ;
+     `Détail` : le compte rendu entier), `jarvis_notifier` s'il y a au moins un point (titre « Digest IA et
+     .NET », texte : le nombre de points et le plus important), `pilotage_etat`, puis `[SILENT]`.
+   - **Première exécution réelle** (pas de clé « en réel : digest-ia » dans ta mémoire) : notifie toujours,
+     même sans point (« Première exécution réelle : Digest IA et .NET, à vérifier dans JARVIS »), puis retiens
+     la clé avec la date.
 
-## En double : ce que tu ne fais pas
+## Ce qu'Athéna faisait et que tu ne fais pas
 
-Athéna écrit aussi cinq astuces pour Iris et signale à Argus une nouveauté de Grok Bot. Toi, pendant l'essai,
-tu ne le fais pas : dis-le en une phrase dans ta ligne du Journal si tu en aurais eu à signaler.
+Les cinq astuces pour Iris et le signalement des nouveautés de Grok Bot à Argus s'arrêtent avec Grok Bot (sa
+décision du 26/11/2026) : ne les écris pas.

@@ -4,6 +4,8 @@ import {lireTitre, bilan, resume, lireCorrections, appliquer, comprisDit, create
 const results = []; let fails = 0;
 const ok = (name, cond, info) => { results.push((cond ? 'OK   ' : 'ÉCHEC') + ' ' + name + (info ? ' :: ' + info : '')); if (!cond) fails++; };
 const DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'jours-'));
+/* les comptes rendus d'Hermes : jamais le vrai dossier du système (un banc d'Hermes lancé à côté y écrit) */
+const SANS_RETOURS = path.join(DIR, 'sans-retours');
 const jour = (d, titre, n = 1) => { const a = '2026-11-' + String(d).padStart(2, '0'); const b = new Date(Date.UTC(2026, 10, d + n)).toISOString().slice(0, 10); return {summary: titre, start: {date: a}, end: {date: b}, status: 'confirmed'}; };
 const heure = (d, de, a, titre) => ({summary: titre, start: {dateTime: '2026-11-' + String(d).padStart(2, '0') + 'T' + de + ':00+01:00'}, end: {dateTime: '2026-11-' + String(d).padStart(2, '0') + 'T' + a + ':00+01:00'}, status: 'confirmed'});
 const FER = [{summary: 'All Saints’ Day', description: 'Public holiday', start: {date: '2026-11-01'}, end: {date: '2026-11-02'}}, {summary: 'Armistice Day', description: 'Public holiday', start: {date: '2026-11-11'}, end: {date: '2026-11-12'}},
@@ -72,7 +74,7 @@ try {
   const agenda = {lie: () => true, calendriers: async () => { appels.cal++; return cals; }, evenements: async (id) => (id === 'p1@group.calendar.google.com' ? pres : id.includes('french#holiday') ? FER : [{summary: 'Fête tunisienne inventée', description: 'Public holiday', start: {date: '2026-11-05'}, end: {date: '2026-11-06'}}])};
   const file = path.join(DIR, 'jours.json');
   const claude = async (prompt) => { appels.claude++; return {ok: true, text: '{"changements":[{"dates":["2026-11-26","2026-11-27"],"fraction":"journee","type":"teletravail"}],"incompris":""}'}; };
-  const J = createJours({file, agenda, claude, push: async (m) => { appels.push.push(m); return []; }, now: () => T});
+  const J = createJours({retours: SANS_RETOURS, file, agenda, claude, push: async (m) => { appels.push.push(m); return []; }, now: () => T});
   const q = (mois) => new URLSearchParams(mois ? {mois} : {});
   let rep = await J.traiter('GET', '/api/jours', async () => ({}), q());
   ok('module : GET lit les deux agendas et rend le bilan du mois en cours ; le férié tunisien est ignoré', rep.status === 200 && rep.body.mois === '2026-11' && rep.body.bilan.totaux.surSite === 6 && rep.body.agendas.feries === 'Holidays in France' && rep.body.etat === 'a_valider', JSON.stringify(rep.body.agendas));
@@ -91,19 +93,19 @@ try {
   ok('module : oui redonné : 4 jours de congé gardés', rep.status === 200 && J.valides('2026-11').conges.length === 4 && J.valides('2026-11').totaux.travailles === 16);
   rep = await J.traiter('POST', '/api/jours/corriger', async () => ({mois: '2026-11', texte: 'on verra plus tard avec lui'}));
   ok('module : une phrase que les règles ne lisent pas passe par Claude (une fois) ; un lieu seul ne retire pas son oui', rep.status === 200 && rep.body.par === 'Claude' && appels.claude === 1 && rep.body.etat === 'valide', JSON.stringify({s: rep.status, par: rep.body.par, e: rep.body.etat}));
-  { const J9 = createJours({file: path.join(DIR, 'j9.json'), agenda: {...agenda, evenements: async (id) => (id.includes('french') ? FER : [...BASE, jour(11, 'Télétravail')])}, now: () => T});
+  { const J9 = createJours({retours: SANS_RETOURS, file: path.join(DIR, 'j9.json'), agenda: {...agenda, evenements: async (id) => (id.includes('french') ? FER : [...BASE, jour(11, 'Télétravail')])}, now: () => T});
     const r9 = await J9.traiter('GET', '/api/jours', async () => ({}), q('2026-11')), c9 = J9.confirmer('2026-11', r9.body.bilan.empreinte);
     ok('module : un conflit (présence notée un jour férié) bloque le oui', !r9.body.bilan.validable && !c9.ok && /à résoudre/.test(c9.error)); }
-  { const J10 = createJours({file: path.join(DIR, 'j10.json'), agenda, now: () => T}), b0 = bilan({ym: '2026-11', presence: BASE, feriesAgenda: FER});
+  { const J10 = createJours({retours: SANS_RETOURS, file: path.join(DIR, 'j10.json'), agenda, now: () => T}), b0 = bilan({ym: '2026-11', presence: BASE, feriesAgenda: FER});
     J10.brut().mois['2026-11'] = {etat: 'valide', corrections: {}, historique: [], valide: {at: T, empreinte: 'ancienne forme', jours: b0.jours.filter((d) => d.ouvre).map((d) => ({date: d.date, M: d.M, A: d.A}))}};
     const x10 = await J10.lire('2026-11');
     ok('module : un oui donné avec la 0.83.0 (empreinte avec le lieu) reste valide après la mise à jour', x10.etat === 'valide', x10.etat); }
   /* le 24 est passé : le rattrapage envoie une notification le 25 ; une seule */
-  const J2 = createJours({file: path.join(DIR, 'j2.json'), agenda, push: async (m) => { appels.push.push(m); return []; }, now: () => T});
+  const J2 = createJours({retours: SANS_RETOURS, file: path.join(DIR, 'j2.json'), agenda, push: async (m) => { appels.push.push(m); return []; }, now: () => T});
   await J2.tic(); await J2.tic();
   ok('le 24 manqué (serveur arrêté, ou mis à jour le 25) : une notification, une seule, qui ouvre le bilan', appels.push.length === 1 && /Tes jours de novembre/.test(appels.push[0].title) && appels.push[0].url === '/#voir-jours-2026-11' && /congés sert au CRA du 26/.test(appels.push[0].body), JSON.stringify(appels.push));
   T = Date.parse('2026-11-24T10:30:00Z');   /* le 24 à 11 h 30 : trop tôt */
-  const J3 = createJours({file: path.join(DIR, 'j3.json'), agenda, push: async (m) => { appels.push.push(m); return []; }, now: () => T});
+  const J3 = createJours({retours: SANS_RETOURS, file: path.join(DIR, 'j3.json'), agenda, push: async (m) => { appels.push.push(m); return []; }, now: () => T});
   await J3.tic();
   ok('le 24 avant midi : rien', appels.push.length === 1);
   T = Date.parse('2026-11-24T11:01:00Z'); await J3.tic();
@@ -112,13 +114,13 @@ try {
   T = Date.parse('2026-11-30T11:05:00Z');
   await J.tic();
   ok('le dernier jour, tout est connu et rien n’a changé depuis son oui : aucune notification (la note de télétravail part seule)', appels.push.length === 2 && J.etat('2026-11').etat === 'valide' && J.etat('2026-11').bilan.complet);
-  const J4 = createJours({file, agenda, push: async (m) => { appels.push.push(m); return []; }, now: () => T});
+  const J4 = createJours({retours: SANS_RETOURS, file, agenda, push: async (m) => { appels.push.push(m); return []; }, now: () => T});
   pres.push(jour(27, 'Hors Domicile'));
   J4.brut().mois['2026-11'].verifFin = ''; await J4.tic();
   ok('le dernier jour, son raccourci dit autre chose que sa correction : conflit, « à revoir », notification « ont changé depuis ton oui »', J4.etat('2026-11').etat === 'a_revoir' && /ont changé depuis ton oui/.test(appels.push[appels.push.length - 1].title), J4.etat('2026-11').etat);
   { const pres11 = [...BASE], ag11 = {...agenda, evenements: async (id) => (id.includes('french') ? FER : id.includes('tn.') ? [] : pres11)}, n0 = appels.push.length;
     T = Date.parse('2026-11-25T11:30:00Z');
-    const J11 = createJours({file: path.join(DIR, 'j11.json'), agenda: ag11, push: async (m) => { appels.push.push(m); return []; }, now: () => T});
+    const J11 = createJours({retours: SANS_RETOURS, file: path.join(DIR, 'j11.json'), agenda: ag11, push: async (m) => { appels.push.push(m); return []; }, now: () => T});
     await J11.tic(); await J11.confirmer('2026-11', J11.etat('2026-11').bilan.empreinte);
     T = Date.parse('2026-11-30T11:05:00Z'); await J11.tic();
     const manque = appels.push[appels.push.length - 1];
@@ -166,7 +168,7 @@ try {
       ok('semaine : « à la main », un nouveau oui relance Hermes (nouvelle tentative : un autre instant de oui)', v1.ok && JS.etatSemaine('2026-11-16').etat === 'valide' && at1 > 0, JSON.stringify(v1)); }
     /* une demi-journée de congé bloque ; une semaine à cheval sur deux mois */
     presS = [...BASE, jour(26, 'Congé matin')];
-    s = await (createJours({file: path.join(SD, 'demi.json'), agenda: agS, now: () => T})).lireSemaine('2026-11-23');
+    s = await (createJours({retours: SANS_RETOURS, file: path.join(SD, 'demi.json'), agenda: agS, now: () => T})).lireSemaine('2026-11-23');
     ok('semaine : une demi-journée de congé bloque la saisie automatique (la quantité n’est pas définie)', s.jours[3].q === null && /demi-journée/.test(s.jours[3].bloque), JSON.stringify(s.jours[3]));
     T = Date.parse('2026-12-04T11:05:00Z'); presS = [...BASE, {summary: 'Télétravail', start: {date: '2026-12-01'}, end: {date: '2026-12-05'}, status: 'confirmed'}];
     r = await JS.traiter('POST', '/api/jours/semaine/corriger', async () => ({lundi: '2026-11-30', texte: 'mardi 1er : congé'}));
@@ -175,15 +177,15 @@ try {
   }
   /* les agendas reconnus à leur identité réelle */
   cals = CALS.filter((c) => !c.id.includes('french'));
-  const e1 = await (createJours({file: path.join(DIR, 'j5.json'), agenda, now: () => T})).lire('2026-11');
+  const e1 = await (createJours({retours: SANS_RETOURS, file: path.join(DIR, 'j5.json'), agenda, now: () => T})).lire('2026-11');
   cals = [...CALS, {id: 'p2@group.calendar.google.com', summary: 'présence'}];
-  const e2 = await (createJours({file: path.join(DIR, 'j6.json'), agenda, now: () => T})).lire('2026-11');
+  const e2 = await (createJours({retours: SANS_RETOURS, file: path.join(DIR, 'j6.json'), agenda, now: () => T})).lire('2026-11');
   ok('agendas : sans l’agenda des fériés de France, ou avec deux « Présence » : une erreur dite, pas de bilan deviné', /fériés de France est introuvable/.test(e1.erreur) && !e1.bilan && /Deux agendas/.test(e2.erreur), e1.erreur + ' | ' + e2.erreur);
   cals = CALS;
-  const J7 = createJours({file: path.join(DIR, 'j7.json'), agenda: {...agenda, lie: () => false}, now: () => T});
+  const J7 = createJours({retours: SANS_RETOURS, file: path.join(DIR, 'j7.json'), agenda: {...agenda, lie: () => false}, now: () => T});
   rep = await J7.traiter('GET', '/api/jours', async () => ({}), q('2026-13'));
   ok('Google pas relié : GET répond sans bilan ; un mois mal écrit retombe sur le mois en cours', rep.status === 200 && rep.body.mois === '2026-11' && !rep.body.bilan);
-  fs.writeFileSync(path.join(DIR, 'j8.json'), '{abîmé'); const J8 = createJours({file: path.join(DIR, 'j8.json'), agenda, now: () => T});
+  fs.writeFileSync(path.join(DIR, 'j8.json'), '{abîmé'); const J8 = createJours({retours: SANS_RETOURS, file: path.join(DIR, 'j8.json'), agenda, now: () => T});
   ok('jours.json abîmé : mis de côté, pas écrasé', fs.readdirSync(DIR).some((f) => /^j8-illisible-/.test(f)) && J8.etat('2026-11').etat === 'a_valider');
 } catch (e) { ok('exception', false, (e && e.stack) || String(e)); }
 fs.rmSync(DIR, {recursive: true, force: true});
@@ -225,6 +227,30 @@ fs.rmSync(DIR, {recursive: true, force: true});
   fs.writeFileSync(path.join(RT2, 'teletravail-2026-11.json'), JSON.stringify({mois: '2026-11', resultat: 'arret', jours: null, texte: 'Arrêt : un jour ouvré n’a ni lieu ni congé noté.', at: Tm + 1000}));
   await JM.tic();
   ok('télétravail : un arrêt est notifié avec sa raison (Chronos le fera le 1er)', /arrêtée/.test(M2.push[M2.push.length - 1].title) && /ni lieu ni congé/.test(M2.push[M2.push.length - 1].body), JSON.stringify(M2.push.slice(-1)));
+  /* 0.86.0 : les notes de frais d'Hermes en réel : la première de chaque sorte validée par lui (montants inventés) */
+  { const NR = path.join(RT2, 'ndf-box-2026-11.json'), base = {sorte: 'box', mois: '2026-11', montant: 39, date: '2026-11-05', champs: [['Date', '05/11/2026'], ['Vendeur', 'Fournisseur inventé'], ['Montant TTC', '39,00']], justificatif: 'facture.pdf', taille: 1000, empreinte: 'abcdef0123456789abcdef0123456789'};
+    fs.writeFileSync(NR, JSON.stringify({...base, etat: 'a_valider', texte: 'Préparée et vérifiée à blanc.', at: Tm + 2000}));
+    const n0 = M2.push.length; await JM.tic(); await JM.tic();
+    const pn = M2.push.slice(n0), v = JM.notesVues()[0] || {};
+    ok('note à valider : gardée (champs, montant, empreinte), notifiée une fois, sans montant dans la notification, lien vers la note', pn.length === 1 && /Note de la box de novembre : à valider/.test(pn[0].title) && pn[0].url === '/#voir-note-box-2026-11' && !/39/.test(pn[0].body) && v.cle === 'box:2026-11' && v.montant === 39 && v.champs.length === 3 && !v.valide, JSON.stringify([pn, v]));
+    let r = await JM.traiter('POST', '/api/jours/note/valider', async () => ({sorte: 'box', mois: '2026-11', empreinte: 'autre'}));
+    ok('note : un oui sur une note qui a changé est refusé', r.status === 409 && /changé/.test(r.body.error));
+    r = await JM.traiter('POST', '/api/jours/note/valider', async () => ({sorte: 'box', mois: '2026-11', empreinte: base.empreinte}));
+    const jj = JSON.parse(fs.readFileSync(path.join(DIR, 'jm.json'), 'utf8'));
+    ok('note : son oui gardé dans jours.json sur l’empreinte (lu par root), la note « validée »', r.status === 200 && r.body.note.valide && jj.notes['box:2026-11'].oui.empreinte === base.empreinte, JSON.stringify(r.body));
+    const g = await JM.traiter('GET', '/api/jours/notes', async () => ({}));
+    ok('notes : GET /api/jours/notes les rend (la plus récente d’abord)', g.status === 200 && g.body.notes[0].cle === 'box:2026-11' && g.body.notes[0].valide);
+    fs.writeFileSync(NR, JSON.stringify({...base, etat: 'creee', premiere: true, texte: 'Créée sur le portail.', at: Tm + 3000}));
+    await JM.tic();
+    const pc = M2.push[M2.push.length - 1];
+    ok('note créée par root : « Première exécution d’Hermes … créée », vérifie dans le portail', /Première exécution d’Hermes : Note de la box de novembre créée/.test(pc.title) && /Vérifie/.test(pc.body) && JM.notesVues()[0].etat === 'creee', JSON.stringify(pc));
+    r = await JM.traiter('POST', '/api/jours/note/valider', async () => ({sorte: 'box', mois: '2026-11', empreinte: base.empreinte}));
+    ok('note : une note créée ne se valide plus', r.status === 409 && /déjà créée/.test(r.body.error));
+    fs.writeFileSync(path.join(RT2, 'ndf-autre-2026-11.json'), JSON.stringify({...base, sorte: 'autre', etat: 'a_valider', at: Tm + 4000}));
+    fs.writeFileSync(path.join(RT2, 'ndf-claude-2026-11.json'), JSON.stringify({...base, sorte: 'claude', etat: 'echec', texte: 'Pas créée : alerte du portail.', at: Tm + 5000}));
+    const n1 = M2.push.length; await JM.tic();
+    ok('notes : une sorte inconnue ignorée ; un échec notifié « pas créée », à faire à la main', M2.push.length === n1 + 1 && /abonnement Claude de novembre : pas créée/.test(M2.push[M2.push.length - 1].title) && !JM.brut().notes['autre:2026-11'], JSON.stringify(M2.push.slice(-1)));
+    fs.rmSync(path.join(RT2, 'ndf-autre-2026-11.json')); }
   const JO = createJours({file: path.join(DIR, 'jo.json'), agenda: ag2, retours: RT2, mails: {...mails, modeles: () => ({})}, push: async () => [], now: () => Tm});
   await JO.lire('2026-11'); JO.confirmer('2026-11', JO.etat('2026-11').bilan.empreinte); const n1 = M2.crees.length; await JO.tic();
   ok('mails du mois : sans modèle sur le serveur, rien n’est préparé', M2.crees.length === n1); }

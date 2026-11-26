@@ -1,0 +1,15 @@
+# JARVIS OS — un passage de la routine « reveil » d'Hermes (lancé par hermes-reveil.path ; posé par install.sh).
+# Exécute la copie root du script (/usr/local/sbin/hermes-reveil), jamais un fichier du dépôt.
+[Unit]
+Description=Réveil d'Hermes : un passage de la routine « reveil »
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/hermes-reveil
+TimeoutStartSec=60
+Nice=10
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes

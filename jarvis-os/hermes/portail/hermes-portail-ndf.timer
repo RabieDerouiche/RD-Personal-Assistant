@@ -1,0 +1,11 @@
+# JARVIS OS — toutes les 5 minutes : une note de frais validée dans JARVIS attend-elle d'être créée ? (hermes-portail-ndf.service)
+[Unit]
+Description=Notes de frais : vérifier toutes les 5 minutes si une note validée attend
+
+[Timer]
+OnBootSec=4min
+OnUnitInactiveSec=5min
+AccuracySec=30s
+
+[Install]
+WantedBy=timers.target

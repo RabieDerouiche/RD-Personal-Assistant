@@ -96,4 +96,11 @@ elif [ -f "$ETAT" ]; then
 else
   echo "Forfait à $pct % ($fenetre) : rien à faire (seuil $SEUIL %$([ "$CINQ_HEURES" = 1 ] || echo ', fenêtre de 5 heures ignorée'))."
 fi
+# le dernier usage lu, pour le bilan de la semaine d'Hermes (outil hermes_usage de JARVIS) : chiffres seulement, lisible par JARVIS
+USAGE_JSON=${HERMES_GARDE_USAGE_JSON:-$(dirname "$ETAT")/usage.json}
+mkdir -p "$(dirname "$USAGE_JSON")" 2>/dev/null && PCT="$pct" REMISE="$heure" FEN="$fenetre" ARRET="$([ -f "$ETAT" ] && echo 1 || echo 0)" python3 -I -c '
+import json, os, sys, time
+d = {"pct": int(os.environ["PCT"]), "remise": os.environ["REMISE"][:40], "fenetre": os.environ["FEN"][:40], "at": int(time.time()), "arret": os.environ["ARRET"] == "1"}
+t = sys.argv[1] + ".tmp"; open(t, "w").write(json.dumps(d, ensure_ascii=False) + "\n"); os.chmod(t, 0o644); os.replace(t, sys.argv[1])
+' "$USAGE_JSON" 2>/dev/null || true
 exit 0

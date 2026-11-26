@@ -29,5 +29,12 @@ mcp_servers:
         - gmail_brouillon
         - agenda_lire
         - jarvis_notifier
+        # routines de Grok Bot reprises (26/11/2026) : écrire dans Dossiers, Échéances et l'agenda « Échéances »,
+        # le courrier repéré par JARVIS, l'usage du forfait pour le bilan de la semaine
+        - pilotage_modifier
+        - echeance_agenda
+        - courrier_a_traiter
+        - courrier_traite
+        - hermes_usage
       resources: false
       prompts: false

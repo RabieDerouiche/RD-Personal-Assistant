@@ -155,6 +155,12 @@
   ];
   if (SCEN.bells) G['Faits'].push(['Assistants', 'Sonnette Kairos', 'bots+kairos@mail.grokbot.com', '', ''], ['Assistants', 'Lien Grok Argus', 'https://grok.com/bots/abc123', '', ''], ['Assistants', 'Sonnette Pirate', 'x@evil.example', '', '']);
   if (SCEN.pauseUntil) G['Faits'].push(['Grok Bot', "Grok en pause jusqu'au", SCEN.pauseUntil, '', 'Jarvis']);
+  /* 0.86.0 : Grok Bot arrêté (l'interrupteur de l'app) ; Hermes a ses routines et sa ligne d'État (données inventées) */
+  if (SCEN.grokOff) {
+    G['Faits'].push(['Grok Bot', 'Grok Bot arrêté le', fr(D(-1)), fr(D(-1)), 'Claude']);
+    G['Routines'].push(['Hermes', 'Veille du matin', 'Horaire (serveur de JARVIS)', 'Lun-ven 7h40', 'x', 'x', 'En place'], ['Hermes', 'Semaine à venir', 'Horaire (serveur de JARVIS)', 'Dim 18h10', 'x', 'x', 'En place'], ['Hermes', 'Prix suivis', 'Horaire (serveur de JARVIS)', 'Dim 17h', 'x', 'x', 'En place']);
+    G['État'].push(['Hermes', fr(D(0)) + ' 07:42', 'Veille du matin faite', fr(D(1)) + ' 07:40 (Veille du matin)', '']);
+  }
   G['Papiers'] = [
     ['Document', 'Personne', 'Où il est (lien Drive, ou « papier »)', "Valable jusqu'au", 'Sert pour', 'Mis à jour le', 'Remarque'],
     ['Passeport', 'Rabie', 'papier, tiroir', fr(D(210)), 'voyage', '', ''],
@@ -516,6 +522,10 @@
   window.__METEO = {current: {temperature_2m: 9.4, apparent_temperature: 6.2, weather_code: 3}, daily: {time: [fr(D(0)), fr(D(1))], weather_code: [3, 61], temperature_2m_min: [4, 2], temperature_2m_max: [11, 7], precipitation_probability_max: [10, 70]}};
   window.__G = G; window.__MAIL = MAIL; window.__CAL = CAL;
   /* 0.85.0 : l'espace « Travail » de la maquette (données inventées, même forme que GET /api/travail) */
+  /* 0.86.0 : une note de frais d'Hermes à valider (données inventées, même forme que GET /api/jours/notes) */
+  if (SCEN.notes) window.__NOTES = {notes: [{cle: 'box:2026-11', sorte: 'box', mois: '2026-11', nom: 'Note de la box', etat: 'a_valider', valide: false, montant: 39, date: '2026-11-05', jours: null,
+    champs: [['Date', '05/11/2026'], ['Vendeur', 'Fournisseur inventé'], ['Catégorie', 'Internet'], ['Montant TTC', '39,00'], ['Commentaire', 'Box novembre 2026']], justificatif: 'facture.pdf', taille: 48213,
+    empreinte: 'abcdef0123456789abcdef0123456789', texte: 'Préparée et vérifiée à blanc sur le portail.', at: now - 3600000}]};
   window.__TRAVAIL = {maj: now, aujourdhui: '2026-11-26', frise: [{date: '2026-11-27', quand: 'ven. 27/11', quoi: 'CRA du client (hebdo)', qui: 'ton oui, puis Hermes', toi: true}, {date: '2026-11-30', quand: 'lun. 30/11', quoi: 'Télétravail', qui: 'Hermes à blanc', toi: false}, {date: '2026-12-04', quand: 'ven. 04/12', quoi: 'Grok Bot', qui: 'Chronos', toi: false}],
     routines: [
       {id: 'jours', bloc: 'jours', titre: 'Jours de novembre', qui: 'reel', quiDit: 'JARVIS', prochaine: 'lun. 30/11 · relu', etapes: [['Bilan (24)', 'fait'], ['Ton oui', 'fait'], ['Lieux notés', 'encours'], ['Relu (30)', '']], prevu: {texte: 'Novembre', puces: [['17 jours travaillés', ''], ['3 congés', 'non'], ['1 férié', 'non'], ['2 lieux à venir', 'amb']]}, derniere: {quand: '24/11', quoi: 'congés validés', par: 'toi', ok: true}, toi: '', ouvrir: 'jours'},

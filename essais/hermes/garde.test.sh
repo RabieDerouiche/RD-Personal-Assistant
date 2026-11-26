@@ -42,6 +42,9 @@ verif "fenêtre de 5 heures à 99 %, semaine à 40 % : Hermes continue (il la re
 usage 20 86 50 20; lancer
 verif "semaine à 86 % : Hermes arrêté" grep -q '^stop hermes-gateway.service' "$T/appels"
 verif "… marqué comme arrêté par le garde" [ -f "$T/etat/arret" ]
+verif "… le dernier usage lu est écrit pour le bilan d'Hermes (usage.json : chiffres seulement, lisible par JARVIS)" python3 -I -c "
+import json, os, sys; p = sys.argv[1]; d = json.load(open(p))
+sys.exit(0 if d['pct'] == 86 and d['fenetre'] == 'semaine' and d['remise'] == 'le 26/11 à 11:00' and d['arret'] is True and d['at'] > 0 and oct(os.stat(p).st_mode)[-3:] == '644' else 1)" "$T/etat/usage.json"
 verif "… et le propriétaire prévenu (pourcentage, fenêtre, heure de Paris)" grep -q "à 86 % (semaine).*le 26/11 à 11:00" "$T/messages"
 usage 20 90 50 20; lancer
 verif "90 % ensuite : pas de second arrêt ni de second message" bash -c "! grep -q stop '$T/appels' && [ $(messages) = 1 ]"

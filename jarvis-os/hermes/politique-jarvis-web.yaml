@@ -1,6 +1,7 @@
   # Ajouté par install.sh quand /etc/hermes/jarvis.env contient JARVIS_MCP_TOKEN_WEB (relier-jarvis.sh --web).
-  # Le même serveur de JARVIS, vu par un second jeton au profil « Veilleur » : l'onglet Sources, sa ligne du
-  # Journal et de l'État, une notification. Rien de privé : c'est le seul serveur de la routine qui lit le web,
+  # Le même serveur de JARVIS, vu par un second jeton au profil « Veilleur » : les onglets Sources, Prix, Relevés,
+  # Sorties et Routines, ses lignes du Journal, de Relevés, de Sorties et de l'État, le dernier prix d'un produit,
+  # l'âge de l'enfant et les créneaux pris (sans titre), une notification. Rien de privé : c'est le seul serveur de la routine qui lit le web,
   # pour qu'une page piégée ne puisse rien lui faire lire de ses mails, de son agenda ni de ses dossiers.
   jarvis-web:
     url: "${JARVIS_MCP_URL}"
@@ -16,5 +17,9 @@
         - pilotage_etat
         - jarvis_notifier
         - jarvis_meteo
+        # routines de Grok Bot reprises (26/11/2026) : Prix suivis (Kairos), Sorties du week-end (Ulysse)
+        - prix_relever
+        - sorties_contexte
+        - agenda_libre
       resources: false
       prompts: false
