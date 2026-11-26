@@ -1243,6 +1243,22 @@ srv.listen(0, async () => {
       const s = await q.evaluate(() => ({titre: document.getElementById('sheet-title').textContent, mails: document.querySelectorAll('#sheet .trv-mails > div').length, acts: [...document.querySelectorAll('#sheet .sheet-actions .btn')].map((x) => x.firstChild.textContent.trim())}));
       ok('Travail : le détail en feuille du bas (étapes, mails envoyés, « Voir mes jours du mois »)', s.titre === 'CRA de la société de portage' && s.mails === 1 && s.acts[0] === 'Voir mes jours du mois', JSON.stringify(s));
       await q.context().close(); }
+    /* 0.86.0 : une note de frais d'Hermes à valider (la première de sa sorte) : dans « Pour moi », la note entière, « Valider et créer » */
+    { const q = await pageWith({notes: true}, '#demandes');
+      await q.waitForTimeout(800);
+      const c = await q.evaluate(() => ({panel: [...document.querySelectorAll('#view h2')].some((x) => /Notes de frais à valider/.test(x.textContent)), card: !!document.querySelector('article.ndf-card[data-note="box:2026-11"]'), first: (document.querySelector('#view h2') || {}).textContent || ''}));
+      ok('note à valider : en tête de « Pour moi », sa carte (montant, « Relire et valider »)', c.panel && c.card && /Notes de frais à valider/.test(c.first), JSON.stringify(c));
+      await q.evaluate(() => [...document.querySelector('article.ndf-card').querySelectorAll('button')].find((x) => /^Relire et valider/.test(x.textContent)).click()); await q.waitForTimeout(700);
+      const s = await q.evaluate(() => ({titre: document.getElementById('sheet-title').textContent, acts: [...document.querySelectorAll('#sheet .sheet-actions .btn')].map((x) => x.firstChild.textContent.trim()), champs: [...document.querySelectorAll('#sheet .ndf-box dt')].map((x) => x.textContent), montant: (document.querySelector('#sheet .ndf-sum b') || {}).textContent || '', pj: (document.querySelector('#sheet .ndf-pj') || {}).textContent || ''}));
+      ok('note à valider : la feuille montre la note entière (champs, montant, justificatif) avant « Valider et créer »', s.titre === 'Note de la box de novembre' && s.acts[0] === 'Valider et créer' && s.champs.includes('Vendeur') && s.champs.includes('Montant TTC') && /39,00/.test(s.montant) && /facture\.pdf/.test(s.pj), JSON.stringify(s));
+      await q.evaluate(() => [...document.querySelectorAll('#sheet .sheet-actions .btn')].find((x) => /^Valider et créer/.test(x.textContent)).click()); await q.waitForTimeout(400);
+      const conf = await q.evaluate(() => [...document.querySelectorAll('#sheet .btn')].some((x) => /^Oui : valider et créer/.test(x.textContent)));
+      await q.evaluate(() => { const b = [...document.querySelectorAll('#sheet .btn')].find((x) => /^Oui : valider et créer/.test(x.textContent)); if (b) b.click(); }); await q.waitForTimeout(900);
+      const f = await q.evaluate(() => ({toasts: [...document.querySelectorAll('#toasts .toast')].map((x) => x.textContent).join(' || '), card: !!document.querySelector('article.ndf-card')}));
+      ok('note à valider : « Valider et créer » demande confirmation, puis la note quitte « Pour moi » (Hermes la crée)', conf && /Note validée/.test(f.toasts) && !f.card, JSON.stringify(f));
+      await q.evaluate(() => { location.hash = '#voir-note-box-2026-11'; }); await q.waitForTimeout(900);
+      ok('note : le lien d’une notification (#voir-note-…) ouvre la note', await q.evaluate(() => !document.getElementById('sheet').hidden && document.getElementById('sheet-title').textContent === 'Note de la box de novembre'));
+      await q.context().close(); }
     { const q = await pageWith({draftPj: true}, '#demandes');
       await q.evaluate(() => { const c = [...document.querySelectorAll('article.draft-card')].find((x) => /Dossier location/.test(x.textContent)); if (c) [...c.querySelectorAll('button')].find((x) => /^Relire et envoyer/.test(x.textContent)).click(); }); await q.waitForTimeout(700);
       const pj = await q.evaluate(() => ({acts: [...document.querySelectorAll('#sheet .sheet-actions .btn')].map((x) => x.firstChild.textContent.trim()), note: (document.querySelector('#sheet .mailx-note') || {}).textContent || '', pj: (document.querySelector('#sheet .mailx-pj') || {}).textContent || ''}));

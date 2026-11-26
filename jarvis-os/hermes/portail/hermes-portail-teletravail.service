@@ -1,13 +1,14 @@
-# JARVIS OS — la note de télétravail du mois, À BLANC (docs/hermes-portail.md ; sa décision du 26/11/2026 : Hermes la prépare le dernier jour
-# du mois, Chronos la crée le 1er, on compare, puis bascule). Posé par install.sh ; lancé chaque jour par hermes-portail-teletravail.timer :
-# la commande ne fait rien sans /etc/hermes-portail/teletravail.conf (root, jamais dans le dépôt), hors du dernier jour du mois ou avant
-# midi (heure de Paris), ni deux fois pour un même mois. Le compte rendu (sans montant) est posé pour JARVIS, qui le lui notifie.
+# JARVIS OS — les notes de frais d'Hermes, chaque jour (docs/hermes-portail.md ; sa décision du 26/11/2026 : Chronos s'arrête, Hermes fait les
+# notes, la première de chaque sorte validée par lui dans JARVIS). Posé par install.sh ; lancé chaque jour par hermes-portail-teletravail.timer :
+# `notes-auto` prépare la note de télétravail le dernier jour du mois (après midi, heure de Paris), celle de la box à partir du 15 et celle de
+# l'abonnement Claude dès sa facture ; rien sans leurs réglages (root, jamais dans le dépôt), ni deux fois par sorte et par mois. Chaque note
+# est vérifiée à blanc, puis posée pour sa validation dans JARVIS (ou créée seule, si une note de la même sorte a déjà été validée).
 [Unit]
-Description=Note de télétravail du mois, à blanc, par le Hermes portail (dernier jour du mois)
+Description=Notes de frais du jour par le Hermes portail (télétravail, box, abonnement Claude)
 After=network-online.target hermes-portail-filtre.service hermes-portail-sortie.service
 
 [Service]
 Type=oneshot
-ExecStart=/usr/local/sbin/hermes-portail teletravail-auto
-TimeoutStartSec=3000
+ExecStart=/usr/local/sbin/hermes-portail notes-auto
+TimeoutStartSec=5400
 Nice=5

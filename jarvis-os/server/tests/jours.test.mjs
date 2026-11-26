@@ -225,6 +225,30 @@ fs.rmSync(DIR, {recursive: true, force: true});
   fs.writeFileSync(path.join(RT2, 'teletravail-2026-11.json'), JSON.stringify({mois: '2026-11', resultat: 'arret', jours: null, texte: 'Arrêt : un jour ouvré n’a ni lieu ni congé noté.', at: Tm + 1000}));
   await JM.tic();
   ok('télétravail : un arrêt est notifié avec sa raison (Chronos le fera le 1er)', /arrêtée/.test(M2.push[M2.push.length - 1].title) && /ni lieu ni congé/.test(M2.push[M2.push.length - 1].body), JSON.stringify(M2.push.slice(-1)));
+  /* 0.86.0 : les notes de frais d'Hermes en réel : la première de chaque sorte validée par lui (montants inventés) */
+  { const NR = path.join(RT2, 'ndf-box-2026-11.json'), base = {sorte: 'box', mois: '2026-11', montant: 39, date: '2026-11-05', champs: [['Date', '05/11/2026'], ['Vendeur', 'Fournisseur inventé'], ['Montant TTC', '39,00']], justificatif: 'facture.pdf', taille: 1000, empreinte: 'abcdef0123456789abcdef0123456789'};
+    fs.writeFileSync(NR, JSON.stringify({...base, etat: 'a_valider', texte: 'Préparée et vérifiée à blanc.', at: Tm + 2000}));
+    const n0 = M2.push.length; await JM.tic(); await JM.tic();
+    const pn = M2.push.slice(n0), v = JM.notesVues()[0] || {};
+    ok('note à valider : gardée (champs, montant, empreinte), notifiée une fois, sans montant dans la notification, lien vers la note', pn.length === 1 && /Note de la box de novembre : à valider/.test(pn[0].title) && pn[0].url === '/#voir-note-box-2026-11' && !/39/.test(pn[0].body) && v.cle === 'box:2026-11' && v.montant === 39 && v.champs.length === 3 && !v.valide, JSON.stringify([pn, v]));
+    let r = await JM.traiter('POST', '/api/jours/note/valider', async () => ({sorte: 'box', mois: '2026-11', empreinte: 'autre'}));
+    ok('note : un oui sur une note qui a changé est refusé', r.status === 409 && /changé/.test(r.body.error));
+    r = await JM.traiter('POST', '/api/jours/note/valider', async () => ({sorte: 'box', mois: '2026-11', empreinte: base.empreinte}));
+    const jj = JSON.parse(fs.readFileSync(path.join(DIR, 'jm.json'), 'utf8'));
+    ok('note : son oui gardé dans jours.json sur l’empreinte (lu par root), la note « validée »', r.status === 200 && r.body.note.valide && jj.notes['box:2026-11'].oui.empreinte === base.empreinte, JSON.stringify(r.body));
+    const g = await JM.traiter('GET', '/api/jours/notes', async () => ({}));
+    ok('notes : GET /api/jours/notes les rend (la plus récente d’abord)', g.status === 200 && g.body.notes[0].cle === 'box:2026-11' && g.body.notes[0].valide);
+    fs.writeFileSync(NR, JSON.stringify({...base, etat: 'creee', premiere: true, texte: 'Créée sur le portail.', at: Tm + 3000}));
+    await JM.tic();
+    const pc = M2.push[M2.push.length - 1];
+    ok('note créée par root : « Première exécution d’Hermes … créée », vérifie dans le portail', /Première exécution d’Hermes : Note de la box de novembre créée/.test(pc.title) && /Vérifie/.test(pc.body) && JM.notesVues()[0].etat === 'creee', JSON.stringify(pc));
+    r = await JM.traiter('POST', '/api/jours/note/valider', async () => ({sorte: 'box', mois: '2026-11', empreinte: base.empreinte}));
+    ok('note : une note créée ne se valide plus', r.status === 409 && /déjà créée/.test(r.body.error));
+    fs.writeFileSync(path.join(RT2, 'ndf-autre-2026-11.json'), JSON.stringify({...base, sorte: 'autre', etat: 'a_valider', at: Tm + 4000}));
+    fs.writeFileSync(path.join(RT2, 'ndf-claude-2026-11.json'), JSON.stringify({...base, sorte: 'claude', etat: 'echec', texte: 'Pas créée : alerte du portail.', at: Tm + 5000}));
+    const n1 = M2.push.length; await JM.tic();
+    ok('notes : une sorte inconnue ignorée ; un échec notifié « pas créée », à faire à la main', M2.push.length === n1 + 1 && /abonnement Claude de novembre : pas créée/.test(M2.push[M2.push.length - 1].title) && !JM.brut().notes['autre:2026-11'], JSON.stringify(M2.push.slice(-1)));
+    fs.rmSync(path.join(RT2, 'ndf-autre-2026-11.json')); }
   const JO = createJours({file: path.join(DIR, 'jo.json'), agenda: ag2, retours: RT2, mails: {...mails, modeles: () => ({})}, push: async () => [], now: () => Tm});
   await JO.lire('2026-11'); JO.confirmer('2026-11', JO.etat('2026-11').bilan.empreinte); const n1 = M2.crees.length; await JO.tic();
   ok('mails du mois : sans modèle sur le serveur, rien n’est préparé', M2.crees.length === n1); }
