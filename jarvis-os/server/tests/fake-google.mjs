@@ -36,10 +36,14 @@ export function startFakeGoogle() {
      « 'Onglet'!A1:Z50 » y est lue, une ligne ajoutée s'y ajoute, une case écrite s'y écrit. Sans F.onglets : les plages figées de F.sheet. */
   F.onglets = null;
   const colN = (c) => [...c].reduce((n, x) => n * 26 + x.charCodeAt(0) - 64, 0) - 1;
-  const plage = (r) => { const m = String(r).match(/^'?(.+?)'?!([A-Z]+)(\d+)?(?::([A-Z]+)(\d+)?)?$/); return m ? {nom: m[1].replace(/''/g, "'"), c1: colN(m[2]), l1: +(m[3] || 1), c2: m[4] ? colN(m[4]) : colN(m[2]), l2: m[5] ? +m[5] : m[4] ? 1e6 : +(m[3] || 1)} : null; };
+  const plage = (r) => { if (!String(r).includes('!')) return {nom: String(r).replace(/^'(.*)'$/, '$1').replace(/''/g, "'"), c1: 0, l1: 1, c2: 1e6, l2: 1e6};   /* 0.88.0 : un onglet entier (import de Pilotage) */
+    const m = String(r).match(/^'?(.+?)'?!([A-Z]+)(\d+)?(?::([A-Z]+)(\d+)?)?$/); return m ? {nom: m[1].replace(/''/g, "'"), c1: colN(m[2]), l1: +(m[3] || 1), c2: m[4] ? colN(m[4]) : colN(m[2]), l2: m[5] ? +m[5] : m[4] ? 1e6 : +(m[3] || 1)} : null; };
   /* ses agendas (0.71.0) : le principal porte son adresse, comme chez Google */
   F.calendriers = [{id: 'proprietaire@example.org', summary: 'proprietaire@example.org', primary: true, accessRole: 'owner'}, {id: 'ech@group.calendar.example', summary: 'Échéances', accessRole: 'owner'},
     {id: 'pres@group.calendar.example', summary: 'Présence', accessRole: 'owner'}, {id: 'fr.french#holiday@group.v.calendar.example', summary: 'Holidays in France', accessRole: 'reader'}];
+  /* 0.88.0 : les fichiers créés par JARVIS dans Drive (copies chiffrées de Pilotage) ; refusDriveFile : la portée drive.file pas accordée ;
+     refusParent : le dossier RD Assistant hors de portée (le dossier des copies va à la racine) ; F.formules : les formules du classeur */
+  F.sav = []; F.savSeq = 0; F.refusDriveFile = false; F.refusParent = false; F.formules = {};
   F.brouillons = []; F.fils = {};   /* brouillons créés (jamais envoyés) ; fils Gmail posés par le banc, au format de l'API */
   const send = (res, st, body) => { res.writeHead(st, {'content-type': 'application/json'}); res.end(st === 204 ? '' : JSON.stringify(body)); };
   const server = http.createServer((req, res) => {
@@ -50,13 +54,45 @@ export function startFakeGoogle() {
       if (p === '/token') {
         if (body.client_id !== F.client.id || body.client_secret !== F.client.secret) return send(res, 401, {error: 'invalid_client'});
         if (body.grant_type === 'authorization_code') { if (body.code !== 'CODE-OK' || !/\/api\/google\/callback$/.test(body.redirect_uri)) return send(res, 400, {error: 'invalid_grant', error_description: 'mauvais code'}); const t = 'AT' + (++F.seq); F.valid.add(t); return send(res, 200, {access_token: t, expires_in: 3599, refresh_token: 'RT1', scope: F.scope || 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/drive.readonly', token_type: 'Bearer'}); }
-        if (body.grant_type === 'refresh_token') { if (!F.refreshOk || body.refresh_token !== 'RT1') return send(res, 400, {error: 'invalid_grant', error_description: 'Token has been expired or revoked.'}); const t = 'AT' + (++F.seq); F.valid.add(t); return send(res, 200, {access_token: t, expires_in: 3599}); }
+        if (body.grant_type === 'refresh_token') { if (!F.refreshOk || body.refresh_token !== 'RT1') return send(res, 400, {error: 'invalid_grant', error_description: 'Token has been expired or revoked.'}); const t = 'AT' + (++F.seq); F.valid.add(t); return send(res, 200, {access_token: t, expires_in: 3599, ...(F.scopeRefresh ? {scope: F.scopeRefresh} : {})}); }
         return send(res, 400, {error: 'unsupported_grant_type'});
       }
       if (p === '/revoke') { F.revoked = body.token; return send(res, 200, {}); }
       if (!F.valid.has(auth)) return send(res, 401, {error: {code: 401, message: 'Request had invalid authentication credentials.'}});
       let m;
       if (p === '/gmail/users/me/profile') return send(res, 200, {emailAddress: 'proprietaire@example.org'});
+      /* 0.88.0 : le classeur lui-même (import de Pilotage) : ses onglets (ceux de F.onglets), et ses formules avec includeGridData */
+      if ((m = p.match(/^\/sheets\/v4\/spreadsheets\/([^/]+)$/)) && req.method === 'GET') {
+        const noms = Object.keys(F.onglets || {});
+        if (!q.includeGridData) return send(res, 200, {sheets: noms.map((n) => ({properties: {title: n}}))});
+        return send(res, 200, {sheets: noms.map((n) => { const rowData = [];
+          for (const [a1, f] of (F.formules || {})[n] || []) { const x = a1.match(/^([A-Z]+)(\d+)$/), r = +x[2] - 1, c = colN(x[1]); while (rowData.length <= r) rowData.push({}); const rd = rowData[r]; rd.values = rd.values || []; while (rd.values.length <= c) rd.values.push({}); rd.values[c] = {userEnteredValue: {formulaValue: f}}; }
+          return {properties: {title: n}, data: [{rowData}]}; })});
+      }
+      /* 0.88.0 : les copies chiffrées de Pilotage (fichiers créés par JARVIS, marqués appProperties « jarvis ») */
+      if (p === '/drive/files' && req.method === 'GET' && /appProperties has/.test(q.q || '')) {
+        const v = (q.q.match(/value='([^']+)'/) || [])[1], par = (q.q.match(/'([^']+)' in parents/) || [])[1];
+        const files = F.sav.filter((f) => !f.trashed && (f.appProperties || {}).jarvis === v && (!par || f.parents.includes(par))).sort((a, b) => a.name.localeCompare(b.name));
+        return send(res, 200, {files: files.map((f) => ({id: f.id, name: f.name, parents: f.parents, createdTime: f.createdTime, size: String(f.octets ? f.octets.length : 0)}))});
+      }
+      if (p === '/drive/files' && req.method === 'POST') {
+        if (F.refusDriveFile) return send(res, 403, {error: {code: 403, message: 'Request had insufficient authentication scopes.'}});
+        if (F.refusParent && (body.parents || []).length) return send(res, 404, {error: {code: 404, message: 'File not found: ' + body.parents[0]}});
+        const f = {id: 'sav' + (++F.savSeq) + 'x', name: body.name, mimeType: body.mimeType, parents: body.parents || ['root'], appProperties: body.appProperties || {}, createdTime: new Date().toISOString()}; F.sav.push(f);
+        return send(res, 200, {id: f.id, parents: f.parents});
+      }
+      if (p === '/upload/drive/files' && req.method === 'POST') {
+        if (F.refusDriveFile) return send(res, 403, {error: {code: 403, message: 'Request had insufficient authentication scopes.'}});
+        const b = ((req.headers['content-type'] || '').match(/boundary=(.+)$/) || [])[1] || '', parts = raw.split('--' + b).slice(1, -1).map((x) => x.replace(/^\r\n/, '').replace(/\r\n$/, '')), corps = (x) => x.slice(x.indexOf('\r\n\r\n') + 4);
+        const meta = JSON.parse(corps(parts[0])), f = {id: 'sav' + (++F.savSeq) + 'x', name: meta.name, mimeType: meta.mimeType, parents: meta.parents, appProperties: meta.appProperties, createdTime: new Date().toISOString(), octets: Buffer.from(corps(parts[1]), 'utf8'), type: req.headers['content-type']};
+        F.sav.push(f); return send(res, 200, {id: f.id, name: f.name});
+      }
+      if ((m = p.match(/^\/drive\/files\/([^/]+)$/)) && F.sav.some((f) => f.id === m[1])) {
+        const f = F.sav.find((x) => x.id === m[1]);
+        if (req.method === 'PATCH') { Object.assign(f, body); return send(res, 200, {id: f.id, trashed: !!f.trashed}); }
+        if (q.alt === 'media') { res.writeHead(200, {'content-type': 'application/octet-stream'}); return res.end(f.octets || Buffer.alloc(0)); }
+        return send(res, 200, {id: f.id, name: f.name});
+      }
       if ((m = p.match(/^\/sheets\/v4\/spreadsheets\/([^/]+)\/values\/(.+?)(:append)?$/)) && F.onglets && plage(m[2]) && F.onglets[plage(m[2]).nom]) {
         const g = plage(m[2]), T = F.onglets[g.nom];
         if (req.method === 'GET') { const v = T.slice(g.l1 - 1, g.l2).map((r) => (r || []).slice(g.c1, g.c2 + 1)); while (v.length && !v[v.length - 1].some((x) => String(x ?? '') !== '')) v.pop(); return send(res, 200, {range: m[2], majorDimension: 'ROWS', values: v}); }
