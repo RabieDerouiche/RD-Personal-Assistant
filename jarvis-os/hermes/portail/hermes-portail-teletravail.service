@@ -1,0 +1,13 @@
+# JARVIS OS — la note de télétravail du mois, À BLANC (docs/hermes-portail.md ; sa décision du 26/11/2026 : Hermes la prépare le dernier jour
+# du mois, Chronos la crée le 1er, on compare, puis bascule). Posé par install.sh ; lancé chaque jour par hermes-portail-teletravail.timer :
+# la commande ne fait rien sans /etc/hermes-portail/teletravail.conf (root, jamais dans le dépôt), hors du dernier jour du mois ou avant
+# midi (heure de Paris), ni deux fois pour un même mois. Le compte rendu (sans montant) est posé pour JARVIS, qui le lui notifie.
+[Unit]
+Description=Note de télétravail du mois, à blanc, par le Hermes portail (dernier jour du mois)
+After=network-online.target hermes-portail-filtre.service hermes-portail-sortie.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/hermes-portail teletravail-auto
+TimeoutStartSec=3000
+Nice=5

@@ -13,6 +13,7 @@
 #   sudo hermes-portail cra <adresse> --semaine <lundi AAAA-MM-JJ> --jours <AAAA-MM-JJ,…> [--a-blanc]   (la feuille de temps d'UNE semaine : « 1 » ces jours-là, Save, Submit ; --a-blanc : rien de tapé)
 #   sudo hermes-portail cra-mois <adresse> --mois <AAAA-MM> --conges <AAAA-MM-JJ[:matin|:apres-midi],…> --feries <AAAA-MM-JJ,…> [--a-blanc]   (le compte rendu d'activité du MOIS : complète les jours vides, contrôle, puis « Valider » ; --a-blanc : rien de tapé)
 #   sudo hermes-portail teletravail [--mois AAAA-MM] [--electricite <facture.pdf>] [--sans-depense] [--diagnostic]   (la note de télétravail du mois, À BLANC : jours de JARVIS, pièces, calcul, PDF unique, dépense remplie puis annulée ; « teletravail drive <id> --vers <dossier> » : un PDF du Drive)
+#   sudo hermes-portail teletravail-auto           (la minuterie du dernier jour du mois, 12 h 15 : la note de télétravail À BLANC ; compte rendu pour JARVIS ; rien sans teletravail.conf)
 #   sudo hermes-portail cra-auto                   (la minuterie : une semaine confirmée dans JARVIS, saisie et soumise ; compte rendu pour JARVIS ; rien sans /etc/hermes-portail/cra.conf)
 #   sudo hermes-portail notes [ajouter <hôte> "<texte>" | oublier <hôte> [numéro]]   (ce qu'Hermes a appris d'un portail, relu à chaque passage)
 #   sudo hermes-portail cle                        (remet la clé du coffre d'Hermes en mémoire vive, depuis jarvis-coffre)
@@ -49,7 +50,7 @@ if [ "$SYSTEMD" = 0 ]; then   # banc seulement (pas de systemd) : un faux JARVIS
 fi
 HOTE='^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$'
 
-usage() { sed -n '4,20p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,3\}//'; exit "${1:-1}"; }
+usage() { sed -n '4,21p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,3\}//'; exit "${1:-1}"; }
 [ "$(id -u)" = 0 ] || { echo "À lancer en root : sudo hermes-portail ${1:-etat}"; exit 1; }
 id "$U" >/dev/null 2>&1 && [ -x "$H/.local/bin/hermes" ] || { echo "Hermes « portail » n'est pas installé : sudo bash /opt/rd/jarvis-os/hermes/portail/install.sh"; exit 1; }
 terminal() { [ -t 0 ] || { echo "À lancer dans un vrai terminal (Termius) : cette commande demande une saisie."; exit 1; }; }
@@ -779,6 +780,41 @@ PY
     propre < "$D/depense-a-blanc.txt" | grep -v '^session_id:' | tail -30
     [ $rc = 0 ] && echo "Résultat télétravail : blanc" || echo "Résultat télétravail : echec (dépense à blanc, code $rc)"
     exit $rc ;;
+  teletravail-auto)
+    # La minuterie du dernier jour du mois, 12 h 15 (après le raccourci de présence de 11 h ; sa précision du 25/11/2026) : la note du mois,
+    # À BLANC (sa décision du 26/11/2026 : Hermes la prépare le dernier jour, Chronos la crée le 1er, on compare, puis bascule). Une
+    # tentative par mois (notée avant le passage). Le compte rendu pour JARVIS, sans aucun montant : résultat, jours, raisons d'un arrêt.
+    [ -f "$ETC/teletravail.conf" ] || exit 0
+    aujourdhui=$(TZ=Europe/Paris date +%F); heure=$(TZ=Europe/Paris date +%H%M)
+    if [ "$SYSTEMD" = 0 ] && [ -n "${HERMES_BANC_AUJOURDHUI:-}" ]; then aujourdhui=$HERMES_BANC_AUJOURDHUI; heure=1300; fi
+    [ "$(date -d "$aujourdhui + 1 day" +%d)" = 01 ] && [ $((10#$heure)) -ge 1200 ] || exit 0
+    mois=${aujourdhui:0:7}
+    install -d -o root -g root -m 0700 "$VAR/teletravail"; touch "$VAR/teletravail/tentes.txt"; chmod 0600 "$VAR/teletravail/tentes.txt"
+    exec 9> "$VAR/teletravail/.verrou"; flock -n 9 || exit 0
+    grep -qx "$mois" "$VAR/teletravail/tentes.txt" && exit 0
+    echo "$mois" >> "$VAR/teletravail/tentes.txt"
+    out=$(mktemp); chmod 0600 "$out"
+    "$0" teletravail --mois "$mois" > "$out" 2>&1
+    res=$(sed -n 's/^Résultat télétravail : //p' "$out" | tail -1); res=${res%% *}; res=${res:-echec}
+    groupe=$(id -gn "$JARVIS_U" 2>/dev/null) || groupe=root
+    install -d -o root -g "$groupe" -m 0750 "$RETOURS"; chown root:"$groupe" "$RETOURS"; chmod 0750 "$RETOURS"
+    python3 -I -c '
+import json, os, re, sys, time
+src, resultat, dest, mois, res = sys.argv[1:6]
+jours = None
+try: jours = json.load(open(resultat)).get("jours_tt")
+except (OSError, ValueError): pass
+lignes = [re.sub(r"\x1b\[[0-9;?]*[A-Za-z]", "", l).strip() for l in open(src, encoding="utf-8", errors="replace")]
+raisons = [l for l in lignes if l.startswith(("Arrêt", "Refus"))][:4]
+texte = " ".join(raisons) if raisons else {"blanc": "Note préparée, dépense remplie puis annulée sur le portail.", "prete": "Note préparée, dépense pas essayée."}.get(res, "Le passage n’a pas abouti : voir le journal du serveur.")
+tmp = dest + ".tmp"
+fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o640)
+os.write(fd, json.dumps({"mois": mois, "resultat": res, "jours": jours if isinstance(jours, (int, float)) else None, "texte": texte[:500], "a_blanc": True, "at": int(time.time() * 1000)}, ensure_ascii=False).encode()); os.close(fd)
+os.replace(tmp, dest)
+' "$out" "$VAR/teletravail/$mois/resultat.json" "$RETOURS/teletravail-$mois.json" "$mois" "$res"
+    chown root:"$groupe" "$RETOURS/teletravail-$mois.json"; chmod 0640 "$RETOURS/teletravail-$mois.json"
+    cat "$out"; rm -f "$out"
+    exit 0 ;;
   texte)
     [ $# = 1 ] && [ -f "$1" ] && [ "$(wc -c < "$1")" -le 10000000 ] || { echo "Fichier PDF attendu (10 Mo au plus)."; exit 1; }
     id "$JARVIS_U" >/dev/null 2>&1 && [ -f "$JARVIS_SRV/pdf.mjs" ] || { echo "JARVIS n'est pas installé ici (utilisateur $JARVIS_U, $JARVIS_SRV)."; exit 1; }

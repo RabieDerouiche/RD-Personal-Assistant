@@ -217,6 +217,14 @@ fs.rmSync(DIR, {recursive: true, force: true});
   fs.writeFileSync(path.join(RT2, 'mois-2026-11.json'), JSON.stringify({resultat: 'validee', fin: '2026-12-31', at: Tm})); M2.deja.add('CRA Novembre 2026');
   await JN.lire('2026-11'); const e3 = JN.etat('2026-11'); JN.confirmer('2026-11', e3.bilan.empreinte); const n0 = M2.crees.length; await JN.tic();
   ok('mails du mois : un mail du même objet déjà envoyé (Gmail) n’est jamais refait ; fin le mois suivant : une alerte, pas de mail', M2.crees.length === n0 && JN.brut().mois['2026-11'].mailCra.envoye && M2.push.some((x) => x.title === 'Fin de mission le 31/12/2026'), JSON.stringify(M2.push.slice(-2)));
+  /* la note de télétravail à blanc (Hermes, le dernier jour) : compte rendu sans montant, notifié une fois */
+  fs.writeFileSync(path.join(RT2, 'teletravail-2026-11.json'), JSON.stringify({mois: '2026-11', resultat: 'blanc', jours: 10.5, texte: 'Note préparée, dépense remplie puis annulée sur le portail.', a_blanc: true, at: Tm}));
+  const np2 = M2.push.length; await JM.tic(); await JM.tic();
+  const ptt = M2.push.slice(np2);
+  ok('télétravail : le compte rendu d’Hermes gardé (résultat, jours) et notifié une seule fois, sans montant', ptt.length === 1 && /Note de télétravail de novembre : prête à blanc/.test(ptt[0].title) && /10,5 jours/.test(ptt[0].body) && !/€/.test(ptt[0].body) && JM.brut().teletravail['2026-11'].resultat === 'blanc', JSON.stringify(ptt));
+  fs.writeFileSync(path.join(RT2, 'teletravail-2026-11.json'), JSON.stringify({mois: '2026-11', resultat: 'arret', jours: null, texte: 'Arrêt : un jour ouvré n’a ni lieu ni congé noté.', at: Tm + 1000}));
+  await JM.tic();
+  ok('télétravail : un arrêt est notifié avec sa raison (Chronos le fera le 1er)', /arrêtée/.test(M2.push[M2.push.length - 1].title) && /ni lieu ni congé/.test(M2.push[M2.push.length - 1].body), JSON.stringify(M2.push.slice(-1)));
   const JO = createJours({file: path.join(DIR, 'jo.json'), agenda: ag2, retours: RT2, mails: {...mails, modeles: () => ({})}, push: async () => [], now: () => Tm});
   await JO.lire('2026-11'); JO.confirmer('2026-11', JO.etat('2026-11').bilan.empreinte); const n1 = M2.crees.length; await JO.tic();
   ok('mails du mois : sans modèle sur le serveur, rien n’est préparé', M2.crees.length === n1); }

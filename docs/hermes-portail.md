@@ -89,6 +89,7 @@ tenu par la commande) : pas encore faite.
 | `politique.yaml` | Sa politique (`/etc/hermes-portail/config.yaml`, root) : outils `browser`, `terminal`, `skills` seulement ; Sonnet ; profil de navigateur gardé ; navigateur envoyé vers le relais, lancé sans son bac à sable (dit en clair, voir « Durcissement »), remplissage automatique et heure réseau coupés. |
 | `teletravail.mjs` | La note de télétravail, ce que seul JARVIS sait lire (26/11/2026) : lancé par `hermes-portail teletravail` sous l'utilisateur `jarvis`, en lecture seule. `--jours AAAA-MM` : le bilan du mois par le module de JARVIS lui-même (`jours.mjs` : agendas reconnus, ses règles, ses corrections), refait sur une copie de `jours.json` effacée ensuite ; `--drive <id>` : UN PDF du Drive (outil `file_pdf` de `google.mjs`, 0.85.0). |
 | `teletravail.py` | La note de télétravail, sans réseau (root) : montants lus par règles dans le texte des pièces, garde-fous, calcul du classeur, page de synthèse en HTML, champs de la dépense. Aucune valeur personnelle : tout vient de `/etc/hermes-portail/teletravail.conf`. |
+| `hermes-portail-teletravail.service`, `hermes-portail-teletravail.timer` | La note de télétravail (26/11/2026) : chaque jour à 12 h 20, `hermes-portail teletravail-auto`, qui ne fait rien hors du dernier jour du mois avant midi (Paris), sans `teletravail.conf`, ni deux fois pour un mois ; à blanc ; compte rendu sans montant `teletravail-<AAAA-MM>.json` dans le dossier de root pour JARVIS (notification, carte « Note de télétravail » de l'espace Travail). |
 | `facture.mjs` | Va chercher UNE facture PDF dans ses mails : lancé par `hermes-portail facture` sous l'utilisateur `jarvis`, avec l'accès Google et le code de JARVIS (`google.mjs`, `pdf.mjs`), en lecture seule ; l'état de JARVIS n'est jamais réécrit. Rend le PDF et son texte à root. |
 | `navigateur-regles.json` | Règles d'administrateur du navigateur (`/etc/opt/chrome_for_testing/policies/managed/hermes-portail.json`, root) : pas de gestionnaire de mots de passe, pas de vérification de fuite, pas de compte Google, pas de mesures. |
 | `skills/portail/portail/SKILL.md` | Sa marche à suivre : se connecter par le coffre, lecture seule, ne jamais taper un mot de passe, ne rien soumettre, s'arrêter si un code est demandé, attente finale, réponse sans donnée personnelle. |
@@ -360,6 +361,13 @@ crée la note le 1er ; on compare, puis bascule en décembre si elle est identiq
 - *la dépense* : champs tirés d'un modèle à root (réglage `champs`, avec `{DATE}` au dernier jour du mois, `{MONTANT}`,
   `{MOIS}`, `{MOIS_NOM}`, `{ANNEE}`, `{JOURS}`), puis `brouillon --sans-creer` : remplie jusqu'au dernier écran,
   justificatif joint, puis annulée. Rien n'est créé. Fin : « Résultat télétravail : blanc | arret | echec | prete ».
+**Le déclenchement (26/11/2026)** : `hermes-portail-teletravail.timer` lance chaque jour `teletravail-auto`, qui ne fait la
+note que le dernier jour du mois après midi (heure de Paris ; le raccourci a noté le dernier jour à 11 h), une seule fois par
+mois (`tentes.txt`, noté avant le passage), toujours à blanc. Son compte rendu pour JARVIS (`/var/lib/hermes-portail-retours/
+teletravail-<AAAA-MM>.json`, root, groupe de JARVIS, 640) ne porte aucun montant : le résultat (`blanc`, `prete`, `arret`,
+`echec`), le nombre de jours, les raisons d'un arrêt. JARVIS le notifie une fois (« Note de télétravail de novembre : prête à
+blanc » ou « arrêtée », avec la raison : Chronos la fait alors le 1er) et le montre sur la carte de l'espace Travail.
+
 Tout reste à root dans `/var/lib/hermes-portail/teletravail/<mois>/` (700). `teletravail drive <id> --vers <dossier>` rend
 un PDF du Drive à root (pour lire un justificatif fixe ou l'exemple d'un mois, et en tirer les réglages).
 

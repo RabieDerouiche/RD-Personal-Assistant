@@ -96,7 +96,13 @@ export function createTravail({file, jours, retours = '/var/lib/hermes-portail-r
     for (const N0 of NOTES) {
       const N = Object.assign({}, N0, ((C.notes || {})[N0.id]) || {}), jr = N.jour === 'dernier' ? dernierJour(y, m) : +N.jour;
       const ce = ymdDe(y, m, Math.min(jr, dernierJour(y, m))), suiv = auj <= ce ? ce : (() => { const y2 = m === 12 ? y + 1 : y, m2 = m === 12 ? 1 : m + 1; return ymdDe(y2, m2, N.jour === 'dernier' ? dernierJour(y2, m2) : Math.min(jr, dernierJour(y2, m2))); })();
-      routines.push({id: N.id, bloc: 'frais', titre: titre(C, N.id), qui: N.qui, quiDit: N.quiDit, prochaine: court(suiv), etapes: N.etapes, derniere: derChronos(N.journal), ouvrir: 'note'});
+      let etapes = N.etapes, derniere = derChronos(N.journal), toi = '';
+      if (N.id === 'teletravail') {   /* la note préparée à blanc par Hermes le dernier jour (compte rendu de root, lu par jours.mjs) */
+        const TT = (jours.brut() || {}).teletravail || {}, k = Object.keys(TT).filter((x) => x <= ym).sort().pop(), tt = k ? TT[k] : null, okT = tt && ['blanc', 'prete'].includes(tt.resultat);
+        etapes = [['Jours (JARVIS)', 'fait'], ['Pièces et calcul', tt ? (okT ? 'fait' : 'bloque') : ''], ['PDF unique', okT ? 'fait' : ''], ['À blanc', tt && tt.resultat === 'blanc' ? 'fait' : ''], ['Comparé à Chronos', '']];
+        if (tt) { const hd = jjmm(new Date(tt.at).toISOString().slice(0, 10)); const hermes = {quand: hd, quoi: (okT ? 'à blanc' : 'arrêtée') + (tt.jours != null ? ', ' + String(tt.jours).replace('.', ',') + ' j' : ''), par: 'Hermes', ok: okT}; if (!derniere || tt.at > Date.parse(plusJour(auj, -40))) derniere = hermes; if (!okT) toi = 'Hermes s’est arrêté : ' + tt.texte; }
+      }
+      routines.push({id: N.id, bloc: 'frais', titre: titre(C, N.id), qui: N.qui, quiDit: N.quiDit, prochaine: court(suiv), etapes, derniere, toi, ouvrir: 'note'});
       ev(suiv, titre(C, N.id), N.quiDit);
     }
     frise.sort((x, z) => (x.date < z.date ? -1 : 1));

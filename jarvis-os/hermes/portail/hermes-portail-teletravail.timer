@@ -1,0 +1,11 @@
+# JARVIS OS — chaque jour à 12 h 20 (heure du serveur) : est-ce le dernier jour du mois, après midi à Paris ? (hermes-portail-teletravail.service)
+[Unit]
+Description=Note de télétravail : vérifier chaque jour si c'est le dernier jour du mois
+
+[Timer]
+OnCalendar=*-*-* 12:20:00
+Persistent=true
+AccuracySec=1min
+
+[Install]
+WantedBy=timers.target

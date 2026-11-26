@@ -439,7 +439,9 @@ export function createJours({file, agenda, claude = null, push = async () => [],
      ferait écraser un fichier du système) ; JARVIS ne peut pas les effacer : il garde ceux déjà lus (nom et heure) dans D.retoursLus */
   if (!D.retoursLus || typeof D.retoursLus !== 'object' || Array.isArray(D.retoursLus)) D.retoursLus = {};
   async function lireRetours() {
-    let noms = []; try { noms = fs.readdirSync(retours).filter((n) => /^cra-\d{4}-\d{2}-\d{2}\.json$/.test(n)); } catch { return; }
+    let tous = []; try { tous = fs.readdirSync(retours); } catch { return; }
+    await lireTeletravail(tous.filter((n) => /^teletravail-\d{4}-\d{2}\.json$/.test(n)));
+    const noms = tous.filter((n) => /^cra-\d{4}-\d{2}-\d{2}\.json$/.test(n));
     for (const n of noms.sort()) {
       const f = path.join(retours, n); let r = null;
       try { if (fs.lstatSync(f).isFile() && fs.statSync(f).size < 200000) r = JSON.parse(fs.readFileSync(f, 'utf8')); } catch { /* illisible : ignoré */ }
@@ -455,6 +457,24 @@ export function createJours({file, agenda, claude = null, push = async () => [],
       if (res === 'soumise') await push({title: s.retour.premiere ? 'Première exécution d’Hermes : CRA de la semaine soumis' : 'CRA de la semaine soumis', body: TXT('Semaine ' + L + '. ' + (s.retour.premiere ? 'Vérifie sur le portail ce qu’Hermes a saisi, et corrige si besoin. ' : '') + s.retour.texte, 230), url, tag}).catch(() => {});
       else if (res === 'deja') await push({title: 'CRA de la semaine : déjà soumis', body: TXT('Semaine ' + L + ' : Hermes n’a rien changé. ' + s.retour.texte, 230), url, tag}).catch(() => {});
       else if (res !== 'blanc') await push({title: 'CRA de la semaine : pas soumis', body: TXT('Semaine ' + L + ' : ' + s.retour.texte + ' À faire à la main.', 230), url, tag}).catch(() => {});
+    }
+  }
+
+  /* 0.85.0 : la note de télétravail du mois, préparée À BLANC par Hermes le dernier jour (sa décision du 26/11/2026) : le compte rendu de
+     root (résultat, jours, raisons d'un arrêt ; jamais de montant), gardé pour l'espace « Travail » et notifié une fois */
+  if (!D.teletravail || typeof D.teletravail !== 'object' || Array.isArray(D.teletravail)) D.teletravail = {};
+  async function lireTeletravail(noms) {
+    for (const n of noms.sort()) {
+      const f = path.join(retours, n); let r = null;
+      try { if (fs.lstatSync(f).isFile() && fs.statSync(f).size < 100000) r = JSON.parse(fs.readFileSync(f, 'utf8')); } catch { /* illisible : ignoré */ }
+      const ym = n.slice(12, 19); if (!r || typeof r !== 'object' || !okMois(ym)) continue;
+      const cle = String(+r.at || 0); if (D.retoursLus[n] === cle) continue;
+      D.retoursLus[n] = cle;
+      const res = ['blanc', 'prete', 'arret', 'echec'].includes(r.resultat) ? r.resultat : 'echec', j = typeof r.jours === 'number' ? r.jours : null;
+      D.teletravail[ym] = {resultat: res, jours: j, texte: TXT(r.texte, 500), at: +r.at || now()}; noter();
+      const L = MOIS[+ym.slice(5, 7) - 1], jd = j == null ? '' : String(j).replace('.', ',') + ' jour' + (j > 1 ? 's' : '') + ' de télétravail. ';
+      if (res === 'blanc' || res === 'prete') await push({title: 'Note de télétravail de ' + L + ' : prête à blanc', body: TXT(jd + 'Hermes l’a préparée et remplie sans la créer. Chronos la crée le 1er : on comparera.', 230), url: '/#travail', tag: 'tt-' + ym}).catch(() => {});
+      else await push({title: 'Note de télétravail de ' + L + ' : arrêtée', body: TXT(D.teletravail[ym].texte + ' Chronos la fera le 1er comme d’habitude.', 230), url: '/#travail', tag: 'tt-' + ym}).catch(() => {});
     }
   }
 

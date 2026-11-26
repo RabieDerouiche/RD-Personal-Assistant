@@ -9,7 +9,7 @@ try {
   const bilan = {totaux: {travailles: 15, teletravail: 8, surSite: 5, aVenir: 2, conges: 5, feries: 1, aConfirmer: 0}};
   const jours = {etat: () => ({mois: '2026-11', etat: 'valide', demande: false, bilan, valide: {at: Date.parse('2026-11-24T11:05:00Z')}}),
     etatSemaine: (l) => (l === '2026-11-23' ? {lundi: l, etat: 'a_valider', demande: false, jours: []} : l === '2026-11-16' ? {lundi: l, etat: 'soumise', retour: {resultat: 'soumise', at: Date.parse('2026-11-20T11:20:00Z'), premiere: true}} : null),
-    brut: () => ({semaines: {'2026-11-16': {}, '2026-11-23': {}}})};
+    brut: () => ({semaines: {'2026-11-16': {}, '2026-11-23': {}}, teletravail: {'2026-10': {resultat: 'blanc', jours: 9, texte: 'Note préparée.', at: Date.parse('2026-10-30T11:30:00Z')}}})};
   const appels = {gmail: [], journal: 0};
   const gmail = async (q) => { appels.gmail.push(q);
     if (/in:sent subject:"CRA Novembre 2026"/.test(q)) return {threads: [{id: 't1', messages: [{subject: 'CRA Novembre 2026', internalDate: String(Date.parse('2026-11-26T08:00:00Z'))}]}]};
@@ -33,7 +33,8 @@ try {
   fs.writeFileSync(path.join(RET, 'mois-2026-11.json'), JSON.stringify({resultat: 'validee', fin: '2026-11-30', at: Date.parse('2026-11-26T05:30:00Z')}));
   e = await TR.etat();
   ok('mois avec le compte rendu d’Hermes : CRA validé, Hermes en réel, fin de mission dite avec la date du mail de prolongation', r('mois').etapes[2][1] === 'fait' && r('mois').quiDit === 'Hermes · réel' && /Fin de mission le 30\/11\/2026\. Mail de prolongation envoyé le 26\/11/.test(r('mois').alerte) && r('mois').derniere.quoi === 'validé', r('mois').alerte);
-  ok('notes : dernière exécution de Chronos lue dans le Journal (pas celle d’un autre bot), échec signalé ; prochaines dates', r('claude').derniere.quand === '21/11' && r('claude').derniere.ok && r('box').derniere.quand === '15/11' && r('teletravail').derniere.ok === false && r('box').prochaine === 'mar. 15/12' && r('teletravail').prochaine === 'lun. 30/11' && r('grok').prochaine === 'ven. 04/12', JSON.stringify([r('claude').derniere, r('teletravail').derniere, r('box').prochaine]));
+  ok('notes : dernière exécution de Chronos lue dans le Journal (pas celle d’un autre bot), échec signalé ; prochaines dates', r('claude').derniere.quand === '21/11' && r('claude').derniere.ok && r('box').derniere.quand === '15/11' && r('box').prochaine === 'mar. 15/12' && r('teletravail').prochaine === 'lun. 30/11' && r('grok').prochaine === 'ven. 04/12', JSON.stringify([r('claude').derniere, r('teletravail').derniere, r('box').prochaine]));
+  ok('note de télétravail : le dernier passage à blanc d’Hermes (étapes, « à blanc, 9 j »)', r('teletravail').etapes[3][1] === 'fait' && r('teletravail').etapes[1][1] === 'fait' && r('teletravail').derniere.par === 'Hermes' && r('teletravail').derniere.quoi === 'à blanc, 9 j', JSON.stringify([r('teletravail').etapes, r('teletravail').derniere]));
   ok('frise : les 14 prochains jours, dans l’ordre, le CRA de la semaine marqué « à toi »', e.frise.length >= 3 && e.frise.every((x, i, a) => !i || a[i - 1].date <= x.date) && e.frise.some((x) => x.toi && x.date === '2026-11-27') && !e.frise.some((x) => x.date > '2026-12-10'), JSON.stringify(e.frise.map((x) => x.date + ' ' + x.quoi)));
   ok('Gmail et le Journal relus au plus toutes les 10 minutes', appels.journal === 1 && appels.gmail.filter((q) => /CRA Novembre/.test(q)).length === 1, JSON.stringify(appels));
   let x = await TR.traiter('POST', '/api/travail/titre', async () => ({id: 'semaine', titre: 'CRA du client (hebdo)'}));
