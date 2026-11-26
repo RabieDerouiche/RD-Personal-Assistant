@@ -505,6 +505,23 @@
     travail: {
       lire: () => req('/api/travail').then((r) => (r.status === 200 ? r.j : null)).catch(() => null),
       renommer: (id, titre) => req('/api/travail/titre', {id, titre}).then((r) => ({...r.j, ok: r.status === 200})).catch(() => ({ok: false, error: 'Serveur JARVIS injoignable.'}))},
+    /* 0.91.0 : rangement des papiers par JARVIS. Le fichier part tel quel (son nom dans l'adresse, jamais un chemin) ; le serveur le garde,
+       propose le dossier et le nom ; « valider » est son oui : la seule demande qui écrit dans Drive. etat() rend {absent: true} si le
+       serveur est trop ancien (pas encore mis à jour), null s'il ne répond pas. */
+    depot: {
+      etat: () => req('/api/depot').then((r) => (r.status === 200 && r.j && Array.isArray(r.j.attente) ? r.j : r.status === 404 ? {absent: true} : null)).catch(() => null),
+      envoyer: async (fichier, nom, source) => {
+        let r;
+        try { r = await fetch(BASE + '/api/depot?nom=' + encodeURIComponent(String(nom || (fichier && fichier.name) || '').slice(0, 200)) + (source === 'partage' ? '&source=partage' : ''), {method: 'POST', headers: {'content-type': 'application/octet-stream', authorization: 'Bearer ' + token()}, body: fichier}); }
+        catch (e) { return {ok: false, error: 'Serveur JARVIS injoignable.'}; }
+        let j = {}; try { j = await r.json(); } catch (e) { j = {}; }
+        if (r.status === 423 && j && j.verrou) montrerVerrou();
+        if (r.status === 401 && j && j.error === 'Appareil non relié.') montrerPorte();
+        return r.status === 200 && j.fichier ? {ok: true, fichier: j.fichier} : {ok: false, status: r.status, error: (j && j.error) || (r.status === 413 ? 'Fichier trop gros : 25 Mo au plus.' : r.status >= 500 ? 'Serveur JARVIS indisponible (' + r.status + ') : réessaie dans un moment.' : 'Dépôt refusé.')};
+      },
+      corriger: (id, dossier, nom) => req('/api/depot/corriger', {id, dossier, nom}).then((r) => ({...r.j, ok: r.status === 200})).catch(() => ({ok: false, error: 'Serveur JARVIS injoignable.'})),
+      valider: (id, dossier, nom) => req('/api/depot/valider', {id, dossier, nom}).then((r) => ({...r.j, ok: r.status === 200})).catch(() => ({ok: false, error: 'Serveur JARVIS injoignable.'})),
+      retirer: (id) => req('/api/depot/retirer', {id}).then((r) => ({...r.j, ok: r.status === 200})).catch(() => ({ok: false, error: 'Serveur JARVIS injoignable.'}))},
     memoire: {
       liste: () => req('/api/memoire').then((r) => (r.status === 200 ? r.j : null)).catch(() => null),
       ajouter: (texte, source) => req('/api/memoire', {texte, source}).then((r) => r.j).catch(() => ({ok: false, error: 'Serveur injoignable.'})),

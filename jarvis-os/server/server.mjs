@@ -35,6 +35,7 @@ import {createCoffreLien} from './coffre-lien.mjs';   /* 0.74.0 : le coffre en m
 import {createVerrou} from './verrou.mjs';   /* 0.75.0 : le verrou de l'app par passkey */
 import {createPilotageLocal, createCopieDrive} from './pilotage-local.mjs';   /* 0.88.0 : Pilotage hébergé par JARVIS (son choix du 26/11/2026) */
 import {cliPilotage} from './pilotage-cli.mjs';
+import {createDepot} from './depot.mjs';   /* 0.91.0 : rangement des papiers par JARVIS */
 import {limiteDe, estLimite, heureParis, ecritureFaite, createAvisRelance} from './limite.mjs';   /* 0.89.0 : la relance automatique après la limite du forfait */
 const ACT = createActivite();   /* 0.33.0 : ce que fait Claude à l'instant */
 
@@ -415,7 +416,7 @@ function guardSettings(mode) {
   const f = path.join(DATA, 'guard-' + mode + '.json');
   /* 0.16.0 : le garde-fou voit aussi les outils de fichiers, et Claude Code refuse lui-même les chemins secrets (deux protections indépendantes) */
   const abs = (p) => '//' + path.resolve(p).replace(/^\/+/, ''), H = os.homedir();
-  const secrets = [abs(DATA) + '/*.json', abs(DATA) + '/*.json.tmp', abs(DATA) + '/*.corrompu-*', abs(DATA) + '/sauvegardes/**', abs(H) + '/.claude/**', abs(H) + '/.claude.json', abs(H) + '/.ssh/**', abs(H) + '/.config/**', abs(H) + '/.gnupg/**', '//proc/**', '//etc/**'];
+  const secrets = [abs(DATA) + '/*.json', abs(DATA) + '/*.json.tmp', abs(DATA) + '/*.corrompu-*', abs(DATA) + '/sauvegardes/**', abs(DATA) + '/depot/**' /* 0.91.0 : les papiers en attente de rangement */, abs(H) + '/.claude/**', abs(H) + '/.claude.json', abs(H) + '/.ssh/**', abs(H) + '/.config/**', abs(H) + '/.gnupg/**', '//proc/**', '//etc/**'];
   const txt = JSON.stringify({permissions: {deny: secrets.flatMap((x) => ['Read(' + x + ')', 'Edit(' + x + ')'])},
     hooks: {PreToolUse: [{matcher: 'mcp__.*|Read|Glob|Grep|LS|Edit|MultiEdit|Write|NotebookEdit|NotebookRead', hooks: [{type: 'command', command: process.execPath + ' ' + JSON.stringify(GUARD) + ' ' + mode}]}]}});
   /* 0.73.0 : réécrit seulement s'il a changé (ou disparu), et d'un coup (fichier à côté, puis renommé) : un Claude qui démarre pendant
@@ -1198,6 +1199,7 @@ const SANTE = createSante({S, save, push: PUSH, checks: {
     if (e.avertissement) return {nom: 'Pilotage hébergé par JARVIS', ok: false, detail: 'pas encore importé : Pilotage reste dans Google en attendant.', pousser: false};
     return e.mode === 'local' ? {nom: 'Pilotage hébergé par JARVIS', ok: true, detail: Object.keys(e.onglets).length + ' onglets'} : null; },
   copieDrive: async () => COPIE_DRIVE.sante(),
+  depot: async () => DEPOT.sante(),   /* 0.91.0 : rangement des papiers (portée « drive » à relier, fichiers en attente) ; fait aussi le ménage des 30 jours */
   pilotage: async () => { if (!pilLie()) return null; const k = S.pilErr || 0; return {nom: 'Lecture de Pilotage', ok: k < 3, detail: k < 3 ? 'lisible' : 'illisible ' + k + ' fois de suite : ' + String(S.pilErrMsg || '').slice(0, 120)}; },
   /* 0.89.0 : la limite du forfait Claude et les relances automatiques (JARVIS et root) ; une ligne d'information, jamais une notification */
   forfait: async () => {
@@ -1854,6 +1856,16 @@ const TRAVAIL = createTravail({file: path.join(DATA, 'travail.json'), jours: JOU
     return v.slice(1).slice(-800).map((row) => { const d = String(row[iD] || ''), m = d.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\D+(\d{1,2})[:h](\d{2}))?/); if (!m) return null;
       const ymd = m[3] + '-' + m[2].padStart(2, '0') + '-' + m[1].padStart(2, '0'); return {bot: String(row[iB] || ''), ymd, at: Date.parse(ymd + 'T' + (m[4] || '12').padStart(2, '0') + ':' + (m[5] || '00') + ':00'), sujet: String(row[iS] || ''), detail: String(row[iT] || '')}; }).filter(Boolean);
   }});
+/* 0.91.0 : rangement des papiers par JARVIS (depot.mjs). Il dépose un PDF ou une image (Papiers › Déposer, ou le Raccourci « Partager » de
+   l'iPhone) ; JARVIS propose le dossier de « RD Assistant/Papiers » et le nom ; après son oui seulement, le serveur écrit dans Drive.
+   Jamais dans « Papiers privés » (hors RD Assistant), jamais de partage. Aucun outil MCP, aucune mission et aucun Claude n'y écrit : Claude
+   ne fait que proposer, sans aucun outil ; seule la route /api/depot/valider, réservée à un appareil relié, appelle l'envoi. */
+const PAPIERS_PRIVES = process.env.JARVIS_PAPIERS_PRIVES_ID || '13nqA3G6noT67bIneaxBhiJ4TzEWHMHSN';
+const DEPOT = createDepot({dir: path.join(DATA, 'depot'), fichier: path.join(DATA, 'depot.json'), racine: PAPIERS, prives: PAPIERS_PRIVES, drive: GOOGLE.papiers, now, log: (t) => console.log(t),
+  claude: (prompt, system) => { const box = path.join(DATA, 'depot-claude'); fs.mkdirSync(box, {recursive: true, mode: 0o700});
+    return runClaude({kind: 'depot', titre: 'Papiers : proposition de rangement', prompt, system, model: MODELS.rapide, cwd: box, timeoutMs: 90000, effort: 'low', settings: guardSettings('chat'),
+      tools: {allow: [], deny: ['Bash', 'Read', 'Edit', 'Write', 'Glob', 'Grep', 'NotebookEdit', 'WebFetch', 'WebSearch', 'Task']}}); },
+  push: (msg) => (S.push && S.push.subs.length ? PUSH.send(msg, {urgency: 'normal'}) : Promise.resolve([]))});
 const COMP = createComparatifs({S, save, DATA, runClaude, onIdee: ideeFinie, model: MODELS.equilibre, ideesModel: process.env.JARVIS_IDEES_MODELE || MODELS.profond, visionModel: MODELS.rapide,   /* 0.29.0 : Opus pour les idées (bien meilleur à chercher), JARVIS_IDEES_MODELE pour changer */
   steamBase: process.env.JARVIS_STEAM_URL || undefined, settings: guardSettings('chat'), now, log: (t) => { S.compErr = {at: now(), t: String(t).slice(0, 300)}; }});
 function installEcoute() {
@@ -2257,6 +2269,19 @@ const server = http.createServer(async (req, res) => {
       }
       res.writeHead(200, {'content-type': type.mime, 'content-length': raw.length, 'content-disposition': 'inline; filename="message-vocal.' + type.ext + '"', 'cache-control': 'no-store'}); res.end(raw); return;
     }
+    /* 0.91.0 : le menu Partager de l'iPhone (Safari n'offre pas le partage vers une app web : un Raccourci « Partager » le remplace). Il
+       poste le PDF ou l'image ici avec la clé de son Raccourci (corps « Fichier », ou « Formulaire »). Le fichier est seulement GARDÉ en
+       attente : rien ne part dans Drive sans son oui dans JARVIS (Papiers › Déposer, appareil relié). La réponse est une phrase. */
+    if (p === '/api/raccourci/depot' && req.method === 'POST') {
+      const say = (st, t) => { res.writeHead(st, {'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store'}); res.end(t); };
+      if (!racOk(req) && !authed(req)) { req.resume(); return say(401, 'Clé du Raccourci refusée : recrée-la dans JARVIS, Réglages, Siri et bouton Action.'); }
+      const r = await DEPOT.duRaccourci(req, url, readRaw);
+      if (r.status === 200) { S.usage.depots = (S.usage.depots || 0) + 1; if (S.raccourci && racOk(req)) { S.raccourci.uses = (S.raccourci.uses || 0) + 1; S.raccourci.last = now(); } save(); }
+      return say(r.status, r.texte);
+    }
+    /* 0.91.0 : le partage du système vers l'app installée (Web Share Target, Android) est reçu par le service worker de l'app, qui garde le
+       fichier et l'envoie ensuite avec le jeton de l'appareil. Arrivé jusqu'ici (service pas encore installé), rien n'est gardé : l'app le dit. */
+    if (p === '/partage' && req.method === 'POST') { req.resume(); res.writeHead(303, {location: '/#voir-papiers-partage-vide', 'cache-control': 'no-store'}); res.end(); return; }
     /* Raccourcis de l'iPhone : leur propre clé (POST /api/raccourci/cle depuis Réglages), qui n'ouvre que cette adresse ; réponse en texte, à lire à voix haute */
     if (p === '/api/raccourci' && req.method === 'POST') {
       const say = (st, t) => { res.writeHead(st, {'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store'}); res.end(t); };
@@ -2353,6 +2378,8 @@ const server = http.createServer(async (req, res) => {
       }
       if (!authed(req)) return appareil(req) ? json(res, 423, {error: 'JARVIS est verrouillé.', verrou: true}) : json(res, 401, {error: 'Appareil non relié.'});
       if (p.startsWith('/api/radar')) { const r = await RADAR.traiter(req.method, p, () => readBody(req)); if (r) return json(res, r.status, r.body); }   /* Radar (21/11/2026) */
+      /* 0.91.0 : rangement des papiers par JARVIS. Derrière `authed` : un appareil relié, verrou passé (ni invité, ni jeton MCP, ni Raccourci) */
+      if (p === '/api/depot' || p.startsWith('/api/depot/')) { const r = await DEPOT.traiter(req, p, url, {readBody, readRaw}); return json(res, r.status, r.body); }
       if (p === '/api/travail' || p.startsWith('/api/travail/')) { const r = await TRAVAIL.traiter(req.method, p, () => readBody(req)); return json(res, r.status, r.body); }   /* 0.85.0 : l'espace « Travail » */
       if (p === '/api/jours' || p.startsWith('/api/jours/')) { const r = await JOURS.traiter(req.method, p, () => readBody(req), url.searchParams); if (r) return json(res, r.status, r.body); }   /* 0.83.0 : les jours du mois */
       if (p === '/api/google') return json(res, 200, GG.status(googleRedirect(req)));

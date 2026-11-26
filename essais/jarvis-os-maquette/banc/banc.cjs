@@ -1646,7 +1646,7 @@ srv.listen(0, async () => {
       const ch = await q.evaluate(() => { const c = document.getElementById('chat'), s = getComputedStyle(c), hd = getComputedStyle(c.querySelector('.chat-head'), '::before'); return {open: !c.hidden, top: c.getBoundingClientRect().top, rad: s.borderTopLeftRadius, poignee: hd.content !== 'none' && hd.width === '40px', bas: Math.round(c.getBoundingClientRect().bottom) === innerHeight}; });
       ok('0.87 : étape 7 : la discussion est une feuille du bas plein écran (bord arrondi, poignée, jusqu’en bas)', ch.open && ch.top >= 8 && ch.rad === '24px' && ch.poignee && ch.bas, JSON.stringify(ch));
       await q.context().close(); }
-    { const q = await pageWith({grokOff: true}, '#demandes');
+    { const q = await pageWith({grokOff: true, depot: false}, '#demandes');   /* 0.91.0 : « depot: false » = serveur pas encore à jour : Papiers › Déposer garde la carte « À trier » vérifiée plus bas */
       await q.waitForTimeout(2500);
       const r = await q.evaluate(() => { const atoi = (window.__G['À toi'] || []).slice(3).filter((x) => x[2] && x[3] && /^(Iris|Kairos|Ulysse|Athéna|Argus|Plutus)\b/.test(x[1]) && !/^Ton oui dans le chat/.test(x[3])), rep = window.__G.Canal.filter((x) => x[2] === 'Hermes' && x[3] === 'Reprise');   /* « À toi » : Depuis le, Bot, Sujet, Ce qu'on attend de toi */
         return {atoi: atoi.length, rep: rep.length, sujets: atoi.every((x) => rep.some((y) => y[7] === x[2])), forme: rep.every((y) => y[1] === 'Rabie' && y[5] === 'À faire' && /^À faire : reprends la demande d(’|e )\S+ à Rabie \(« .+ »\) : .+ \| Pourquoi : Grok Bot est arrêté/.test(y[4]) && /rien de sortant sans son oui/.test(y[4])), elision: rep.some((y) => /demande d’Iris/.test(y[4])),
@@ -1683,6 +1683,82 @@ srv.listen(0, async () => {
       await q.evaluate(() => { location.hash = ''; }); await q.waitForTimeout(1500);
       ok('0.87 : Grok arrêté : la phrase de l’accueil ne dit plus « Tes bots sont au travail » ; « En ce moment » sans les lignes « Reprise »', await q.evaluate(() => /Hermes et JARVIS font tes routines\./.test(document.querySelector('.hud-say').textContent) && !/Tes bots sont au travail/.test(document.querySelector('.hud-say').textContent) && !/reprends la demande/.test(document.getElementById('view').textContent)));
       await q.context().close(); }
+    /* ================= 0.91.0 : rangement des papiers par JARVIS (Papiers › Déposer ; données inventées de window.__DEPOT) ================= */
+    { const versDepot = async (q) => { await q.evaluate(() => document.querySelector('#view .dm-seg [data-f="depot"]').click()); await q.waitForTimeout(900); };
+      const lu = (q) => q.evaluate(() => { const pn = [...document.querySelectorAll('#view .panel')].find((x) => /Déposer un document/.test(x.querySelector('h2').textContent)), c = [...document.querySelectorAll('.dep-item')];
+        return {txt: pn ? pn.innerText.replace(/\s+/g, ' ') : '', champ: (() => { const f = document.querySelector('.dep-jarvis input[type=file]'); return f ? f.accept : ''; })(), puce: (document.querySelector('#view .dm-seg [data-f="depot"] b') || {}).textContent || '',
+          cartes: c.map((x) => ({nom: x.querySelector('.dep-recu-t b').textContent, dossier: x.querySelector('.dep-dossier').selectedOptions[0].textContent, fichier: x.querySelector('.dep-nom').value + x.querySelector('.dep-ext').textContent, raison: x.querySelector('.dep-raison').textContent, meta: x.querySelector('.dep-recu-t small').textContent})),
+          options: c[0] ? [...c[0].querySelectorAll('.dep-dossier option')].map((o) => o.textContent) : [], ranges: [...document.querySelectorAll('.dep-ranges .pf')].map((x) => x.innerText.replace(/\s+/g, ' ')), toasts: [...document.querySelectorAll('#toasts .toast')].map((x) => x.textContent).join(' || ')}; });
+      const sansToasts = (q) => q.evaluate(() => document.querySelectorAll('#toasts .toast').forEach((t) => t.remove()));
+      const q = await page('#papiers'); await versDepot(q);
+      const d0 = await lu(q);
+      ok('0.91 : Papiers › Déposer : « JARVIS range tes papiers », un vrai champ fichier (PDF, images), rien ne part avant son oui ; plus aucun bot nommé ; le filtre porte le nombre en attente', /JARVIS range tes papiers/.test(d0.txt) && /Rien ne part dans ton Drive avant ton oui/.test(d0.txt) && /application\/pdf/.test(d0.champ) && /image\/heic/.test(d0.champ)
+        && !/\b(Iris|Chronos|Kairos|Ulysse|Athéna|Argus|Plutus|Grok|Canal)\b/.test(d0.txt) && !/Range-le toi-même/.test(d0.txt) && d0.puce === '2' && /Gardé 30 jours sur ton serveur, puis effacé/.test(d0.txt), JSON.stringify([d0.txt.slice(0, 260), d0.champ, d0.puce]));
+      ok('0.91 : ce qui attend : le dossier proposé (choisi dans l’arbre de Papiers, sans « Papiers privés »), le nom modifiable avec l’extension fixe, la raison, la date limite ; un dépôt par le Raccourci est dit',
+        d0.cartes.length === 2 && d0.cartes[0].nom === 'Quittance novembre.pdf' && d0.cartes[0].dossier === 'Logement' && d0.cartes[0].fichier === 'Quittance de loyer 2026-11.pdf' && /Reconnu : quittance de loyer/.test(d0.cartes[0].raison) && /gardé jusqu’au \d\d\/\d\d/.test(d0.cartes[0].meta)
+        && d0.cartes[1].dossier === 'À trier' && /par le Raccourci/.test(d0.cartes[1].meta) && /image n’est pas lue/.test(d0.cartes[1].raison) && d0.options.includes('Lui › Identité et séjour') && d0.options.includes('Papiers') && !d0.options.some((o) => /priv|Impôts|Banque|Salaires/i.test(o)), JSON.stringify([d0.cartes, d0.options.length]));
+      await q.setInputFiles('.dep-jarvis input[type=file]', [{name: 'Passeport scan.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4 exemple inventé')}, {name: 'notes.txt', mimeType: 'text/plain', buffer: Buffer.from('pas un papier')}]); await q.waitForTimeout(1500);
+      const d1 = await lu(q);
+      ok('0.91 : déposer un PDF par le champ fichier : il s’ajoute à la liste avec sa proposition (« Lui › Identité et séjour », « Passeport Lui.pdf ») ; un fichier qui n’est ni PDF ni image est refusé et le dit',
+        d1.cartes.length === 3 && d1.cartes[0].nom === 'Passeport scan.pdf' && d1.cartes[0].dossier === 'Lui › Identité et séjour' && d1.cartes[0].fichier === 'Passeport Lui.pdf' && d1.puce === '3' && /Pas déposé/.test(d1.toasts) && /notes\.txt/.test(d1.toasts) && /ni un PDF ni une image/.test(d1.toasts), JSON.stringify([d1.cartes.map((x) => x.nom), d1.puce, d1.toasts]));
+      /* il corrige (dossier dans l'arbre, nom), puis son oui */
+      await sansToasts(q);
+      await q.evaluate(() => { const c = [...document.querySelectorAll('.dep-item')].find((x) => /Quittance novembre/.test(x.textContent)), s = c.querySelector('.dep-dossier'); s.value = [...s.options].find((o) => o.textContent === 'Logement › Locations 2018-2022').value; s.dispatchEvent(new Event('change', {bubbles: true})); });
+      await q.fill('.dep-item:nth-of-type(2) .dep-nom', 'Quittance corrigée 2026-11'); await q.waitForTimeout(200);
+      const avantOui = await q.evaluate(() => window.__DEPOT.etat().then((e) => e.ranges.length));
+      await q.evaluate(() => [...document.querySelectorAll('.dep-item')].find((x) => /Quittance novembre/.test(x.textContent)).querySelector('.dep-oui').click()); await q.waitForTimeout(1500);
+      const d2 = await lu(q);
+      ok('0.91 : il corrige le dossier et le nom, puis « Oui, ranger ici » : rien n’était parti avant ; le fichier est rangé là où il a dit, sous son nom, sort de la liste et passe dans « Rangés récemment »',
+        avantOui === 0 && d2.cartes.length === 2 && !d2.cartes.some((x) => /Quittance novembre/.test(x.nom)) && /Rangé dans ton Drive/.test(d2.toasts) && /Quittance corrigée 2026-11\.pdf/.test(d2.toasts) && /Logement › Locations 2018-2022/.test(d2.toasts) && d2.ranges.length === 1 && /Quittance corrigée 2026-11/.test(d2.ranges[0]) && /Locations 2018-2022/.test(d2.ranges[0]) && d2.puce === '2', JSON.stringify([d2.cartes.map((x) => x.nom), d2.toasts, d2.ranges]));
+      await q.evaluate(() => document.querySelector('#view .dm-seg [data-f="themes"]').click()); await q.waitForTimeout(900);
+      await q.fill('.pap-search', 'Quittance corrigée'); await q.waitForTimeout(700);
+      ok('0.91 : le fichier rangé apparaît dans Papiers (l’arbre est relu)', await q.evaluate(() => [...document.querySelectorAll('.pap-res .pf')].some((x) => /Quittance corrigée 2026-11/.test(x.textContent) && /Locations 2018-2022/.test(x.textContent))));
+      await q.fill('.pap-search', ''); await q.waitForTimeout(300); await versDepot(q); await sansToasts(q);
+      await q.evaluate(() => [...document.querySelectorAll('.dep-item')].find((x) => /IMG_4521/.test(x.textContent)).querySelector('.dep-non').click()); await q.waitForTimeout(400);
+      const conf = await q.evaluate(() => ({b: [...document.querySelectorAll('.dep-item')].find((x) => /IMG_4521/.test(x.textContent)).querySelector('.dep-non').textContent, n: document.querySelectorAll('.dep-item').length}));
+      await q.evaluate(() => [...document.querySelectorAll('.dep-item')].find((x) => /IMG_4521/.test(x.textContent)).querySelector('.dep-non').click()); await q.waitForTimeout(1200);
+      const d3 = await lu(q);
+      ok('0.91 : « Retirer » demande un second appui (« Retirer pour de bon ? »), puis efface le fichier en attente sans rien ranger', conf.b === 'Retirer pour de bon ?' && conf.n === 2 && d3.cartes.length === 1 && /Retiré/.test(d3.toasts) && /rien n’est parti dans ton Drive/.test(d3.toasts) && d3.ranges.length === 1, JSON.stringify([conf, d3.cartes.map((x) => x.nom), d3.toasts]));
+      const aide = await q.evaluate(() => { const a = document.querySelector('.dep-aide'); a.querySelector('summary').click(); return a.innerText.replace(/\s+/g, ' '); });
+      ok('0.91 : « Depuis le menu Partager de l’iPhone » : le Raccourci (Safari n’offre pas le partage aux apps de l’écran d’accueil), son adresse /api/raccourci/depot, et la réserve sur les noms de menus', /Safari sur iPhone ne laisse pas/.test(aide) && /Raccourci/.test(aide) && /\/api\/raccourci\/depot/.test(aide) && /peuvent changer selon la version d’iOS/.test(aide) && /Android/.test(aide), aide.slice(0, 300));
+      await q.context().close();
+      /* la portée « drive » pas accordée : il peut déposer, la validation dit quoi faire */
+      const r = await pageWith({depotPortee: 'non'}, '#papiers'); await versDepot(r);
+      const p0 = await lu(r);
+      await r.evaluate(() => document.querySelector('.dep-item .dep-oui').click()); await r.waitForTimeout(1200);
+      const p1 = await lu(r);
+      ok('0.91 : sans la portée Google « drive » : l’écran dit « Reconnecte Google une fois » (Réglages, Google, Reconnecter), le dépôt reste possible ; « Oui, ranger ici » le redit et le fichier attend toujours', /Reconnecte Google une fois/.test(p0.txt) && /Réglages, Google, Reconnecter/.test(p0.txt) && /Tu peux déjà déposer/.test(p0.txt) && !!p0.champ && p0.cartes.length === 2 && /Reconnecte Google une fois/.test(p1.toasts) && p1.cartes.length === 2 && !p1.ranges.length, JSON.stringify([p0.txt.slice(0, 300), p1.toasts]));
+      await r.context().close();
+      /* serveur pas encore à jour, Grok PAS arrêté : la carte « À trier » de la 0.87.0, jamais l'ancien « Iris range » (chemin cassé depuis l'arrêt de Grok) */
+      const s = await pageWith({depot: false}, '#papiers'); await versDepot(s);
+      const v0 = await lu(s);
+      ok('0.91 : serveur pas encore à jour (pas de dépôt), même sans arrêt de Grok : la carte « À trier » ; plus aucun chemin par Iris ni par le Canal', /Le fichier va dans « À trier »/.test(v0.txt) && !/\b(Iris|Canal|sonnette)\b/.test(v0.txt) && !/Envoyer à Iris|Iris range/.test(v0.txt) && !v0.champ, v0.txt.slice(0, 300));
+      await s.context().close();
+      /* l'adresse d'une notification ou du partage : « /#voir-papiers-depot » ouvre Papiers › Déposer */
+      const u = await page('#voir-papiers-depot'); await u.waitForTimeout(1500);
+      const h0 = await u.evaluate(() => ({hash: location.hash, on: (document.querySelector('#view .dm-seg [aria-pressed="true"]') || {dataset: {}}).dataset.f, vu: !!document.querySelector('.dep-jarvis') && document.querySelector('.dep-jarvis').offsetParent !== null}));
+      await u.evaluate(() => { location.hash = '#accueil'; }); await u.waitForTimeout(900); await u.evaluate(() => { location.hash = '#voir-papiers-partage-vide'; }); await u.waitForTimeout(1500);
+      const h1 = await u.evaluate(() => ({hash: location.hash, toasts: [...document.querySelectorAll('#toasts .toast')].map((x) => x.textContent).join(' || ')}));
+      ok('0.91 : « #voir-papiers-depot » (notification du Raccourci, retour du partage) ouvre Papiers › Déposer ; « #voir-papiers-partage-vide » dit que le partage n’est pas arrivé', h0.hash === '#papiers' && h0.on === 'depot' && h0.vu && h1.hash === '#papiers' && /Partage pas reçu/.test(h1.toasts), JSON.stringify([h0, h1]));
+      await u.context().close();
+      /* le service worker : le partage du système (POST multipart sur « partage ») est gardé dans un cache à part puis renvoyé à l'app ; hors navigateur */
+      { const vm = require('vm'), H = {}, mis = []; let skips = 0, vides = 0;
+        const self3 = {addEventListener: (t, f) => { H[t] = f; }, registration: {scope: 'https://jarvis.essai/'}, clients: {claim: () => Promise.resolve()}, skipWaiting: () => { skips++; return Promise.resolve(); }};
+        const cachesF = {open: (n) => Promise.resolve({add: () => Promise.resolve(), put: (rq, rp) => { mis.push({cache: n, url: rq.url || String(rq), nom: rp.headers.get('x-nom'), type: rp.headers.get('content-type')}); return Promise.resolve(); }}), keys: () => Promise.resolve(['jarvis-os-partage', 'jarvis-os-app-v1']), delete: (k) => { if (k === 'jarvis-os-partage') vides++; return Promise.resolve(true); }, match: () => Promise.resolve(null)};
+        vm.runInNewContext(fs.readFileSync(path.join(ROOT, 'sw.js'), 'utf8'), {self: self3, caches: cachesF, fetch: () => Promise.reject(new Error('réseau')), URL, Promise, Request, Response, Date, encodeURIComponent, location: {origin: 'https://jarvis.essai'}});
+        const w = []; H.install({waitUntil: (x) => w.push(x)}); H.activate({waitUntil: (x) => w.push(x)}); await Promise.all(w);
+        const fichier = new File([Buffer.from('%PDF-1.4 exemple')], 'Reçu crèche.pdf', {type: 'application/pdf'}), gros = {name: 'gros.pdf', type: 'application/pdf', size: 26 * 1024 * 1024};
+        let rendu = null; const ev = (method, url, files) => ({request: {method, url, mode: 'navigate', formData: () => Promise.resolve({getAll: (k) => (k === 'fichiers' ? files : [])}), clone: () => ({})}, respondWith: (x) => { rendu = x; }});
+        H.fetch(ev('POST', 'https://jarvis.essai/partage', [fichier, 'du texte', gros])); const rp = await rendu;
+        rendu = null; H.fetch(ev('POST', 'https://jarvis.essai/partage', [])); const rv = await rendu;
+        rendu = null; H.fetch(ev('POST', 'https://jarvis.essai/api/depot', [fichier])); const api = rendu;
+        rendu = null; H.fetch(ev('POST', 'https://jarvis.essai/courses/partage', [fichier])); const courses = rendu;
+        ok('0.91 : service worker : le partage du système est gardé dans le cache « jarvis-os-partage » (nom et type, un fichier de plus de 25 Mo écarté), puis l’app est rouverte sur Papiers › Déposer ; sans fichier : « partage vide » ; /api/ et /courses ne sont pas touchés ; ni skipWaiting à l’installation, ni cache du partage effacé à l’activation',
+          mis.length === 1 && mis[0].cache === 'jarvis-os-partage' && /^https:\/\/jarvis\.essai\/partage-recu\//.test(mis[0].url) && decodeURIComponent(mis[0].nom) === 'Reçu crèche.pdf' && mis[0].type === 'application/pdf' && rp.status === 303 && rp.headers.get('location') === 'https://jarvis.essai/#voir-papiers-depot'
+          && rv.status === 303 && rv.headers.get('location') === 'https://jarvis.essai/#voir-papiers-partage-vide' && api === null && courses === null && skips === 0 && vides === 0, JSON.stringify([mis, rp.status, rp.headers.get('location'), rv.headers.get('location'), api, courses, skips, vides]));
+        const mf = JSON.parse(fs.readFileSync(path.join(ROOT, 'manifest.webmanifest'), 'utf8')), st = mf.share_target || {};
+        ok('0.91 : manifeste : « share_target » en POST multipart vers « ./partage », fichiers PDF et images sous le nom « fichiers »', st.action === './partage' && st.method === 'POST' && st.enctype === 'multipart/form-data' && st.params.files[0].name === 'fichiers' && st.params.files[0].accept.includes('application/pdf') && st.params.files[0].accept.includes('image/heic') && mf.start_url === './' && mf.scope === './', JSON.stringify(st)); }
+    }
   } catch (e) { ok('exception', false, e.stack); }
   ok('aucune erreur de page', !errs.length, errs.join(' | '));
   console.log(out.join('\n')); console.log(fails ? fails + ' échec(s)' : 'Tout passe (' + out.length + ' vérifications). Captures : ' + SH);

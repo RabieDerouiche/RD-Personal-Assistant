@@ -44,10 +44,14 @@ export function startFakeGoogle() {
   /* 0.88.0 : les fichiers créés par JARVIS dans Drive (copies chiffrées de Pilotage) ; refusDriveFile : la portée drive.file pas accordée ;
      refusParent : le dossier RD Assistant hors de portée (le dossier des copies va à la racine) ; F.formules : les formules du classeur */
   F.sav = []; F.savSeq = 0; F.refusDriveFile = false; F.refusParent = false; F.formules = {};
+  /* 0.91.0 : les papiers rangés par JARVIS (envoi en deux temps, « resumable ») : F.depots, ajoutés aussi à l'arbre F.drive ;
+     refusDrive : la portée drive pas accordée ; adresseAilleurs : l'adresse d'envoi rendue n'est pas chez Google */
+  F.depots = []; F.depotSeq = 0; F.sessions = {}; F.refusDrive = false; F.adresseAilleurs = false;
   F.brouillons = []; F.fils = {};   /* brouillons créés (jamais envoyés) ; fils Gmail posés par le banc, au format de l'API */
   const send = (res, st, body) => { res.writeHead(st, {'content-type': 'application/json'}); res.end(st === 204 ? '' : JSON.stringify(body)); };
   const server = http.createServer((req, res) => {
-    let raw = ''; req.on('data', (d) => { raw += d; }); req.on('end', () => {
+    const morceaux = []; req.on('data', (d) => { morceaux.push(d); }); req.on('end', () => {
+      const octets = Buffer.concat(morceaux), raw = octets.toString('utf8');   /* 0.91.0 : les octets tels quels aussi (un fichier envoyé) */
       const u = new URL(req.url, 'http://x'), p = decodeURIComponent(u.pathname), q = Object.fromEntries(u.searchParams), auth = (req.headers.authorization || '').replace('Bearer ', '');
       let body = {}; try { body = raw ? (req.headers['content-type'] || '').includes('json') ? JSON.parse(raw) : Object.fromEntries(new URLSearchParams(raw)) : {}; } catch { body = {}; }
       F.calls.push({method: req.method, path: p, q, body, auth});
@@ -80,6 +84,18 @@ export function startFakeGoogle() {
         if (F.refusParent && (body.parents || []).length) return send(res, 404, {error: {code: 404, message: 'File not found: ' + body.parents[0]}});
         const f = {id: 'sav' + (++F.savSeq) + 'x', name: body.name, mimeType: body.mimeType, parents: body.parents || ['root'], appProperties: body.appProperties || {}, createdTime: new Date().toISOString()}; F.sav.push(f);
         return send(res, 200, {id: f.id, parents: f.parents});
+      }
+      if (p === '/upload/drive/files' && req.method === 'POST' && q.uploadType === 'resumable') {
+        if (F.refusDrive) return send(res, 403, {error: {code: 403, message: 'Request had insufficient authentication scopes.'}});
+        const id = 'ses' + (++F.depotSeq); F.sessions[id] = {meta: body, type: req.headers['x-upload-content-type'] || '', taille: +req.headers['x-upload-content-length'] || 0};
+        res.writeHead(200, {'content-type': 'application/json', location: (F.adresseAilleurs ? 'http://ailleurs.example' : F.url) + '/upload/drive/files?uploadType=resumable&upload_id=' + id}); return res.end('{}');
+      }
+      if (p === '/upload/drive/files' && req.method === 'PUT' && F.sessions[q.upload_id]) {
+        const s = F.sessions[q.upload_id]; delete F.sessions[q.upload_id];
+        if (s.taille !== octets.length) return send(res, 400, {error: {code: 400, message: 'taille inattendue'}});
+        const f = {id: 'dep' + (++F.depotSeq) + 'x', name: s.meta.name, mimeType: s.meta.mimeType, parents: s.meta.parents || ['root'], appProperties: s.meta.appProperties || {}, modifiedTime: new Date().toISOString(), size: String(octets.length), octets, type: req.headers['content-type'] || ''};
+        F.depots.push(f); F.drive.push(f);
+        return send(res, 200, {id: f.id, name: f.name, parents: f.parents, webViewLink: 'https://drive.example/' + f.id});
       }
       if (p === '/upload/drive/files' && req.method === 'POST') {
         if (F.refusDriveFile) return send(res, 403, {error: {code: 403, message: 'Request had insufficient authentication scopes.'}});

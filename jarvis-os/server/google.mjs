@@ -16,7 +16,12 @@ export const SCOPES = ['https://www.googleapis.com/auth/spreadsheets', 'https://
    copie chiffrée de chaque nuit. Demandée à chaque « Connecter Google », mais FACULTATIVE : un lien qui ne l'a pas fait tout le reste ; seule
    la copie dans Drive attend, et la santé du serveur le dit (« à relier »). Elle ne compte pas dans les droits manquants. */
 export const SCOPE_DRIVE_FILE = 'https://www.googleapis.com/auth/drive.file';
-export const SCOPES_OPTION = [SCOPE_DRIVE_FILE];
+/* 0.91.0 (rangement des papiers par JARVIS) : drive, la portée complète, FACULTATIVE elle aussi. drive.file ne suffit pas au rangement :
+   les dossiers de « RD Assistant/Papiers » n'ont pas été créés par JARVIS. Sans elle tout le reste marche ; seul le rangement d'un papier
+   attend, et l'écran du dépôt comme la santé le disent (« Reconnecte Google une fois »). Accordée, elle suffit aussi aux copies chiffrées.
+   Rien de ce module ne partage un fichier (aucun appel « permissions »). */
+export const SCOPE_DRIVE = 'https://www.googleapis.com/auth/drive';
+export const SCOPES_OPTION = [SCOPE_DRIVE_FILE, SCOPE_DRIVE];
 const portees = (s) => String(s || '').split(/\s+/).filter((x) => /^https:\/\/www\.googleapis\.com\/auth\//.test(x));
 const TZ = 'Europe/Paris';
 
@@ -127,16 +132,19 @@ export function createGoogle({S, save, log = () => {}}) {
   const DELAI = +process.env.JARVIS_GOOGLE_DELAI_MS || 30000;
   const estDelai = (e) => !!e && (e.name === 'TimeoutError' || e.name === 'AbortError');
   const errDelai = () => new ToolError('tool_error', 'Google ne répond pas (' + Math.round(DELAI / 1000) + ' s) : réessaie dans un moment.');
-  const gfetch = async (url, o = {}) => {
-    try { return await fetch(url, {...o, signal: AbortSignal.timeout(DELAI)}); }
+  const gfetch = async (url, o = {}, delai = DELAI) => {   /* 0.91.0 : un délai à part pour l'envoi d'un fichier (25 Mo) */
+    try { return await fetch(url, {...o, signal: AbortSignal.timeout(delai)}); }
     catch (e) { if (estDelai(e)) throw errDelai(); if (e instanceof TypeError && /fetch failed/i.test(e.message)) throw new ToolError('tool_error', 'Google est injoignable pour l’instant (réseau) : réessaie dans un moment.'); throw e; }
   };
   const lireJson = async (r) => { try { return await r.json(); } catch (e) { if (estDelai(e)) throw errDelai(); return {}; } };
 
   const status = (redirect) => ({configured: !!(G.clientId && G.clientSecret), linked: !!G.refresh, account: G.account || '', linkedAt: G.linkedAt || 0,
-    clientId: G.clientId ? G.clientId.slice(0, 12) + '…' : '', redirect, scopes: SCOPES, driveCopies: drivePortee()});
+    clientId: G.clientId ? G.clientId.slice(0, 12) + '…' : '', redirect, scopes: SCOPES, driveCopies: drivePortee(), driveDepot: depotPortee()});
   /* 0.88.0 : drive.file accordée ? « inconnue » pour un lien d'avant la 0.88.0, jusqu'au premier renouvellement du jeton (Google y redit les portées) */
-  function drivePortee() { if (!G.refresh) return 'non'; return Array.isArray(G.portees) ? (G.portees.includes(SCOPE_DRIVE_FILE) ? 'oui' : 'non') : 'inconnue'; }
+  /* 0.91.0 : la portée complète « drive » suffit aussi aux copies (elle contient drive.file) */
+  function drivePortee() { if (!G.refresh) return 'non'; return Array.isArray(G.portees) ? (G.portees.includes(SCOPE_DRIVE_FILE) || G.portees.includes(SCOPE_DRIVE) ? 'oui' : 'non') : 'inconnue'; }
+  /* 0.91.0 : « drive » accordée (ranger un papier dans un dossier que JARVIS n'a pas créé) ? Mêmes réponses que drivePortee */
+  function depotPortee() { if (!G.refresh) return 'non'; return Array.isArray(G.portees) ? (G.portees.includes(SCOPE_DRIVE) ? 'oui' : 'non') : 'inconnue'; }
   function configure(b) {
     const id = String(b.clientId || '').trim(), sec = String(b.clientSecret || '').trim();
     if (!/^[\w.-]+\.apps\.googleusercontent\.com$/.test(id)) return {ok: false, error: "L'identifiant client doit finir par .apps.googleusercontent.com."};
@@ -468,6 +476,41 @@ export function createGoogle({S, save, log = () => {}}) {
     jeter: (id) => api('PATCH', `${URLS.drive}/files/${enc(idSur(id))}`, {trashed: true}),   /* à la corbeille (vidée par Google au bout de 30 jours), jamais effacé d'un coup */
     lire: (id) => apiOctets(`${URLS.drive}/files/${enc(idSur(id))}?alt=media`, 64 * 1024 * 1024)
   };
+  /* ---------- 0.91.0 : rangement des papiers par JARVIS (depot.mjs). Hors de T comme `drive` : jamais par l'app (/api/tool), jamais par un
+     outil MCP ni par Claude ; seule la route du dépôt, validée par un appareil relié, appelle `envoyer`. Le dossier choisi est vérifié par
+     depot.mjs (dans l'arbre de « RD Assistant/Papiers », jamais « Papiers privés »). Aucun partage : aucun appel « permissions ». ---------- */
+  const DELAI_ENVOI = +process.env.JARVIS_GOOGLE_ENVOI_MS || 120000;
+  const refusGoogle = async (r) => { const j = await lireJson(r), msg = (j.error && (j.error.message || j.error)) || 'HTTP ' + r.status;
+    return new ToolError(r.status === 401 ? 'needs_reauth' : r.status === 403 && /scope|insufficient/i.test(JSON.stringify(j)) ? 'not_granted' : 'tool_error', String(msg), r.status); };
+  const papiers = {
+    portee: () => depotPortee(),
+    lie: () => !!G.refresh,
+    /* les dossiers de l'arbre, en lecture seule (le même outil que l'écran Papiers) */
+    arbre: (racine) => T['Google Drive'].folder_tree({roots: [{id: idSur(racine), key: 'papiers'}], foldersOnly: true}),
+    /* un fichier de ce nom est-il déjà dans ce dossier ? */
+    existe: async (dossier, nom) => {
+      const qs = (v) => "'" + String(v).replace(/\\/g, '\\\\').replace(/'/g, "\\'") + "'";
+      const j = await api('GET', `${URLS.drive}/files?` + new URLSearchParams({q: `name = ${qs(nom)} and ${qs(idSur(dossier))} in parents and trashed = false`, fields: 'files(id)', pageSize: '1'}));
+      return !!(j.files || []).length;
+    },
+    /* l'envoi en deux temps de Google (« resumable », fait pour un fichier de plus de 5 Mo) : les métadonnées, puis les octets à l'adresse
+       rendue. Cette adresse doit être chez Google (même origine que l'adresse d'envoi) : sinon rien ne part. Le fichier créé est marqué « jarvis ». */
+    envoyer: async ({dossier, nom, mime, octets}, retry = true) => {
+      const t = await token(), meta = {name: String(nom).slice(0, 200), parents: [idSur(dossier)], mimeType: String(mime), appProperties: {jarvis: 'depot'}};
+      const r = await gfetch(`${URLS.upload}/files?uploadType=resumable&fields=${enc('id,name,parents,webViewLink')}`, {method: 'POST', headers: {authorization: 'Bearer ' + t, 'content-type': 'application/json; charset=UTF-8',
+        'x-upload-content-type': String(mime), 'x-upload-content-length': String(octets.length)}, body: JSON.stringify(meta)});
+      if (r.status === 401 && retry) { if (access.token === t) access = {token: '', exp: 0}; return papiers.envoyer({dossier, nom, mime, octets}, false); }
+      if (!r.ok) throw await refusGoogle(r);
+      const ou = r.headers.get('location') || ''; let chezGoogle = false;
+      try { chezGoogle = new URL(ou).origin === new URL(URLS.upload).origin; } catch { chezGoogle = false; }
+      if (!chezGoogle) throw new ToolError('tool_error', 'Google n’a pas donné d’adresse d’envoi : rien n’est parti.', 502);
+      const r2 = await gfetch(ou, {method: 'PUT', headers: {authorization: 'Bearer ' + t, 'content-type': String(mime)}, body: octets}, DELAI_ENVOI);
+      if (!r2.ok) throw await refusGoogle(r2);
+      const j = await lireJson(r2);
+      if (!j.id) throw new ToolError('tool_error', 'Google n’a pas confirmé le fichier : regarde dans le dossier avant de réessayer.', 502);
+      return {id: String(j.id), name: String(j.name || nom), parents: Array.isArray(j.parents) ? j.parents.map(String) : [], lien: j.webViewLink || 'https://drive.google.com/file/d/' + j.id + '/view'};
+    }
+  };
   async function tool(server, name, input) {
     const fn = T[server] && T[server][name];
     if (!fn) throw new ToolError('not_in_manifest', `${server} · ${name} : pas encore relié à l'accès Google direct.`);
@@ -475,5 +518,5 @@ export function createGoogle({S, save, log = () => {}}) {
     catch (e) { if (e instanceof ToolError) throw e; throw new ToolError('tool_error', e.message || String(e)); }
   }
   const tools = () => Object.entries(T).map(([name, t]) => ({name, tools: Object.keys(t)}));
-  return {status, configure, link, callback, unlink, tool, tools, ToolError, interne, drive};
+  return {status, configure, link, callback, unlink, tool, tools, ToolError, interne, drive, papiers};
 }

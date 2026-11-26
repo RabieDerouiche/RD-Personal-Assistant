@@ -105,6 +105,11 @@ try {
   const fB = await c('/api/state', {headers: B}), coffreB = await c('/api/coffre', {headers: B}), racB = (await fetch(BASE + '/api/raccourci/vocal', {headers: B})).status, vB = await c('/api/verrou', {headers: B});
   ok('l\'autre appareil relié, sans preuve : 423 « JARVIS est verrouillé. » partout (état, coffre), 401 sur le Raccourci, et il le sait (ouvert = false)',
     fB.status === 423 && fB.body.verrou === true && coffreB.status === 423 && racB === 401 && vB.status === 200 && vB.body.actif === true && vB.body.ouvert === false, JSON.stringify([fB, coffreB.status, racB, vB.body]));
+  /* 0.91.0 : le dépôt de papiers est derrière le verrou comme le reste : lire, déposer, valider, retirer */
+  { const pdf = Buffer.from('%PDF-1.4\n% papier inventé du banc\n%%EOF\n'), brut = (u) => fetch(BASE + u, {method: 'POST', headers: {...B, 'content-type': 'application/octet-stream'}, body: pdf}).then((x) => x.status);
+    const dB = [(await c('/api/depot', {headers: B})).status, await brut('/api/depot?nom=a.pdf'), (await post('/api/depot/valider', B, {id: 'x', dossier: 'y'})).status, (await post('/api/depot/retirer', B, {id: 'x'})).status, await brut('/api/raccourci/depot?nom=a.pdf')];
+    ok('0.91 : appareil verrouillé : le dépôt de papiers répond 423 (lire, déposer, valider, retirer), 401 par l\'adresse du Raccourci ; rien n\'est gardé ; l\'appareil ouvert, lui, lit le dépôt (200)',
+      dB.join() === '423,423,423,423,401' && !fs.existsSync(path.join(DATA, 'depot')) && (await c('/api/depot', {headers: A})).status === 200, dB.join()); }
   ok('un appareil verrouillé ne peut ni créer une passkey, ni désactiver le verrou, ni retirer une passkey',
     (await c('/api/verrou/creer', {headers: B})).status === 423 && (await post('/api/verrou/desactiver', B)).status === 423 && (await post('/api/verrou/retirer', B, {id: act.body.cles[0].id})).status === 423);
   const oB = await prouver(B, K);
