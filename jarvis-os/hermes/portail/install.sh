@@ -25,10 +25,10 @@ BANC=${HERMES_BANC:-0}   # 1 = banc d'essai (conteneur sans systemd) : ni servic
 
 dire() { printf '\n== %s\n' "$*"; }
 [ "$(id -u)" = 0 ] || { echo "À lancer en root : sudo bash $0"; exit 1; }
-for f in politique.yaml hermes-portail filtre.py sortie.nft hermes-portail-sortie.service hermes-portail-filtre.service hermes-portail-essai.service hermes-portail-cra.service hermes-portail-cra.timer domaines.defaut navigateur-regles.json justificatif-essai.pdf facture.mjs skills/portail/portail/SKILL.md; do
+for f in politique.yaml hermes-portail filtre.py sortie.nft hermes-portail-sortie.service hermes-portail-filtre.service hermes-portail-essai.service hermes-portail-cra.service hermes-portail-cra.timer domaines.defaut navigateur-regles.json justificatif-essai.pdf facture.mjs teletravail.mjs teletravail.py skills/portail/portail/SKILL.md; do
   [ -f "$ICI/$f" ] || { echo "Fichier manquant : $ICI/$f"; exit 1; }
 done
-bash -n "$ICI/hermes-portail" && python3 -I -c "import ast,sys; ast.parse(open(sys.argv[1]).read())" "$ICI/filtre.py" && python3 -I -c "import json,sys; json.load(open(sys.argv[1]))" "$ICI/navigateur-regles.json" || { echo "Le code du dépôt ne passe pas le contrôle de syntaxe : rien n'a été posé."; exit 1; }
+bash -n "$ICI/hermes-portail" && python3 -I -c "import ast,sys; ast.parse(open(sys.argv[1]).read())" "$ICI/filtre.py" && python3 -I -c "import ast,sys; ast.parse(open(sys.argv[1]).read())" "$ICI/teletravail.py" &&python3 -I -c "import json,sys; json.load(open(sys.argv[1]))" "$ICI/navigateur-regles.json" || { echo "Le code du dépôt ne passe pas le contrôle de syntaxe : rien n'a été posé."; exit 1; }
 
 NPM_DIR=$(dirname "$(command -v npm 2>/dev/null || echo /usr/bin/npm)")
 passe=()
@@ -50,7 +50,7 @@ command -v npm >/dev/null || { echo "npm introuvable (installé par setup.sh de 
 
 dire "Paquets du système"
 if [ "$BANC" != 1 ]; then systemctl stop hermes-portail-sortie.service 2>/dev/null || true; apt-get update -q; fi   # règles levées le temps d'installer
-apt-get install -y -q git curl tar coreutils ca-certificates libatomic1 nftables python3 >/dev/null
+apt-get install -y -q git curl tar coreutils ca-certificates libatomic1 nftables python3 poppler-utils >/dev/null   # poppler-utils : pdfunite, qui assemble le justificatif de la note de télétravail (26/11/2026)
 
 dire "Utilisateur $U (sans mot de passe, sans shell, sans sudo)"
 id "$U" >/dev/null 2>&1 || useradd --system --create-home --home-dir "$H" --shell /usr/sbin/nologin "$U"
@@ -137,6 +137,9 @@ dire "Commande et relais (copies root)"
 install -o root -g root -m 0755 "$ICI/hermes-portail" /usr/local/sbin/hermes-portail
 install -o root -g root -m 0644 "$ICI/filtre.py" "$LIB/filtre.py"
 install -o root -g root -m 0644 "$ICI/facture.mjs" "$LIB/facture.mjs"   # lancé sous l'utilisateur jarvis par « hermes-portail facture »
+install -o root -g root -m 0644 "$ICI/teletravail.mjs" "$LIB/teletravail.mjs"   # note de télétravail : jours et Drive, sous l'utilisateur jarvis
+install -o root -g root -m 0644 "$ICI/teletravail.py" "$LIB/teletravail.py"     # note de télétravail : calcul, garde-fous, synthèse (root, sans réseau)
+install -d -o root -g root -m 0700 "$VAR/teletravail"              # ses dossiers par mois et l'historique des montants (jamais dans le dépôt)
 install -o root -g root -m 0644 "$ICI/justificatif-essai.pdf" "$LIB/justificatif-essai.pdf"   # facture inventée, pour un brouillon d'essai
 install -d -o root -g root -m 0700 "$VAR/notes"                    # ce qu'Hermes apprend de chaque portail (jamais dans le dépôt)
 install -d -o root -g "$U" -m 0750 /var/lib/hermes-portail-depot   # le fichier remis à Hermes le temps d'un passage
