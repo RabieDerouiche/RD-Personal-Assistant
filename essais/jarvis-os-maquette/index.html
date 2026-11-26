@@ -6477,7 +6477,7 @@ void main(){
   }});
   /* 0.86.0 : Grok Bot arrêté (onglet Faits, « Grok Bot arrêté le ») : une demande à un bot devient une ligne pour Hermes, lue à son prochain
      passage, sans sonnette (docs/hermes-deroule.md) ; Claude garde la sienne */
-  const opCanal = (bot, type, msg, objet) => GOFF.on && bot !== 'claude' ? ({label: 'une ligne pour Hermes dans le Canal, lue à son prochain passage', ring: null, bot: 'hermes', msg, sig: 'canal|hermes|' + msg, src: 'canal', server: LV.SHEETS,
+  const opCanal = (bot, type, msg, objet) => (GOFF.on || bot === 'hermes') && bot !== 'claude' ? ({   /* 0.87.0 : une carte d'Hermes lui répond, sans sonnette, même avant l'arrêt */label: 'une ligne pour Hermes dans le Canal, lue à son prochain passage', ring: null, bot: 'hermes', msg, sig: 'canal|hermes|' + msg, src: 'canal', server: LV.SHEETS,
     run: () => lvCall(LV.SHEETS, 'append_values', {spreadsheetId: LV.SHEET, range: 'Canal!A1', values: [[lvToday(), 'Rabie', 'Hermes', type, msg, 'À faire', '', objet || '']]})}) : ({label: 'une ligne pour ' + lvName(bot) + ' dans le Canal', ring: bot, bot, msg, sig: 'canal|' + bot + '|' + msg, src: 'canal', server: LV.SHEETS,
     run: () => lvCall(LV.SHEETS, 'append_values', {spreadsheetId: LV.SHEET, range: 'Canal!A1', values: [[lvToday(), 'Rabie', lvName(bot), type, msg, 'À faire', '', objet || '']]})});
   const opEchStatus = (it, statut) => ({label: 'statut « ' + statut + ' » dans Échéances', sig: 'ech|' + it._row + '|' + statut, src: 'ech', server: LV.SHEETS, run: async () => {
@@ -11561,6 +11561,39 @@ void main(){
     {
       const GROK_IDS = ['hydra', 'medusa', 'unicorn', 'mermaid', 'griffon', 'cyclops', 'plutus'];
       const grokId = (name) => { const id = idOf(lvLow(name).split(/[\s,(]/)[0]); return GROK_IDS.includes(id) ? id : null; };
+      /* 0. Hermes est reconnu partout où un nom de Pilotage est lu (lvBot) : avant, un nom inconnu revenait à Iris, et une ligne pour Hermes
+         s'affichait « Iris » (Équipe › Demandes, son État, son Journal). Il n'entre pas dans l'équipe des bots de Grok (BOTS). */
+      BOT.hermes = {id: 'hermes', name: 'Hermes', role: 'Routines sur ton serveur', obj: '', room: '', c: '#38bdf8', d: '#bae6fd', s: 'rgba(56,189,248,.13)', short: 'Routines · serveur', title: 'Routines sur ton serveur', myth: 'le messager', why: 'tes routines, sur ton serveur', mission: 'Fait tes routines sur ton serveur JARVIS, à la place des bots de Grok Bot.'};
+      NAME2ID.hermes = 'hermes'; ORB_PAL.hermes = ['#0e7490', '#38bdf8', '#e0f2fe', 5.3]; EMB.hermes = ['M5 15c3-1 6-4 7-9 1 5 4 8 7 9', 'M12 6v13'];
+      NAMES.hermes = ['Hermes', 'le messager', 'tes routines, sur ton serveur']; OLDNAME.hermes = 'Hermes'; ROUTINES.hermes = []; PRESETS.hermes = [['Où en es-tu ?', 'Point fait.']]; LOGS.hermes = []; BOTJOB.hermes = 'routines'; LV_FOLLOW.hermes = [];
+      S.doing.hermes = ''; S.last.hermes = '…'; S.next.hermes = '…';
+      /* les cartes de Chronos (CRA, notes de frais) : Grok arrêté, elles quittent « Pour moi » (hermes-portail les fait déjà, espace Travail) ;
+         une seule ligne « CRA et notes de frais : voir Travail » les remplace. Elles ne sont pas confiées à Hermes. */
+      const CHR = {n: 0};
+      const sansChronos = () => {
+        if (!GOFF.on) { CHR.n = 0; return; }
+        const all = S.demandes || [], c = all.filter((d) => d && d.bot === 'medusa');
+        if (c.length) S.demandes = all.filter((d) => !(d && d.bot === 'medusa'));
+        const rows = LV.t && LV.t.atoi && LV.t.atoi.rows;
+        CHR.n = rows ? rows.filter((r) => r['Sujet'] && r['Ce qu\'on attend de toi'] && grokId(r['Bot']) === 'medusa').length : (c.length || CHR.n);
+      };
+      const CA87 = coteApply; coteApply = function () { const r = CA87.apply(this, arguments); sansChronos(); return r; };
+      const GP87 = grokPause; grokPause = function () { const r = GP87.apply(this, arguments); sansChronos(); return r; };
+      /* ce qui dit qui fait quoi aujourd'hui (« Iris s'en occupe », « Kairos suit », « Athéna · à faire », « Écrire à Iris ») dit « Hermes » ;
+         l'historique (« Fait par Chronos », une réponse datée d'un bot, « proposée par Ulysse ») garde son nom */
+      const QUI_RE = /\b(Iris|Chronos|Kairos|Ulysse|Athéna|Argus|Plutus)(?=( s’en occupe| s'en occupe| suit\b| · (à faire|en cours|en retard|aujourd|demain|dans \d)))|(?<=\b(Écrire à|Répondre à|Demander à|Dis-le à|Préparer avec|Demande à) )(Iris|Chronos|Kairos|Ulysse|Athéna|Argus|Plutus)\b/g;
+      const QUI_T = new RegExp(QUI_RE.source);
+      const QUI_NOM = /^\s*(Iris|Chronos|Kairos|Ulysse|Athéna|Argus|Plutus)\s*$/;
+      const quiHermes = (root) => {
+        if (!GOFF.on || !root) return;
+        const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT), ts = [];
+        const seul = root.id === 'view' && TAB === 'agenda';   /* l'Agenda : le nom seul à côté d'une échéance = qui la suit aujourd'hui */
+        for (let n = w.nextNode(); n; n = w.nextNode()) if (QUI_T.test(n.nodeValue) || (seul && QUI_NOM.test(n.nodeValue))) ts.push(n);
+        ts.forEach((n) => { n.nodeValue = seul && QUI_NOM.test(n.nodeValue) ? n.nodeValue.replace(/\S+/, 'Hermes') : n.nodeValue.replace(QUI_RE, 'Hermes'); });
+      };
+      const RV87 = renderView; renderView = function () { const r = RV87.apply(this, arguments); quiHermes($('view')); return r; };
+      const OS87 = openSheet; openSheet = function () { const r = OS87.apply(this, arguments); quiHermes($('sheet')); return r; };
+      const AR87 = actRows; actRows = function () { const r = AR87.apply(this, arguments); (Array.isArray(r) ? r : [r]).forEach((x) => { if (x && x.nodeType) quiHermes(x); }); return r; };
       /* 1. chaque demande encore ouverte d'un ancien bot (onglet « À toi ») devient une ligne « Reprise » pour Hermes, lue à son prochain passage
          (le serveur le réveille pour une ligne du Canal) ; jamais deux fois la même : les lignes « Reprise » du Canal, et la liste gardée ici.
          Une demande qu'Hermes pose lui-même (Bot = Hermes) n'est jamais reprise. */
@@ -11577,7 +11610,7 @@ void main(){
         const rows = [], cles = [];
         (LV.t.atoi.rows || []).forEach((r) => {
           const sub = String(r['Sujet'] || '').trim(), raw = String(r['Ce qu\'on attend de toi'] || '').trim(), id = grokId(r['Bot']), dep = lvFrIso(r['Depuis le']) || '', cle = sub + '|' + dep;
-          if (!sub || !raw || !id || /^Ton oui dans le chat/i.test(raw) || (sub in deja && deja[sub] >= dep) || REP.has(cle)) return;
+          if (!sub || !raw || !id || id === 'medusa' || /^Ton oui dans le chat/i.test(raw) || (sub in deja && deja[sub] >= dep) || REP.has(cle)) return;
           const who = lvName(id), ask = String(lvParse(raw).body || raw).replace(/\s+/g, ' ').trim().slice(0, 400);
           rows.push([lvToday(), 'Rabie', 'Hermes', 'Reprise', 'À faire : reprends la demande ' + de(who) + ' à Rabie (« ' + sub + ' ») : ' + ask
             + ' | Pourquoi : Grok Bot est arrêté ; ses demandes encore ouvertes te sont confiées. | Comment : elle reste dans « Pour moi » de JARVIS et sa réponse t’arrivera par le Canal ; fais alors ce '
@@ -11614,6 +11647,28 @@ void main(){
         c.kicker = sw(c.kicker); (c.actions || []).forEach((a) => { if (a) a.label = sw(a.label); });
         if (Array.isArray(c.facts)) c.facts = c.facts.map((f) => (Array.isArray(f) ? [f[0], sw(f[1])] : f));
         return c;
+      };
+      /* « Pour moi », Grok arrêté : à la place des cartes de Chronos, une seule ligne vers l'espace Travail */
+      const VD87 = VIEWS.demandes;
+      VIEWS.demandes = (el) => {
+        VD87(el);
+        if (!GOFF.on || !CHR.n) return;
+        const f = (el.querySelector('.ux-seg [aria-pressed="true"]') || {dataset: {}}).dataset.f || 'tout';
+        if (f === 'infos') return;
+        const ln = h('button', {type: 'button', class: 'card pm-travail', onclick: () => go('travail')}, h('span', {text: 'CRA et notes de frais : voir Travail'}), h('span', {class: 'pm-travail-go', text: '›'}));
+        const seg = el.querySelector(':scope > .ux-seg'), st = seg && seg.nextElementSibling && seg.nextElementSibling.matches('.fc-start, .fc-line') ? seg.nextElementSibling : seg;
+        if (st) st.after(ln); else el.prepend(ln);
+      };
+      /* Papiers › Déposer, Grok arrêté : plus d'« Iris range » ; le fichier va dans « À trier » et il le range lui-même pour l'instant */
+      const SDEP87 = SCREEN.depot;
+      SCREEN.depot = function (el) {
+        if (!GOFF.on) return SDEP87.apply(this, arguments);
+        const D = PT.data, root = D && D.roots.find((r) => r.key === 'papiers'), at = root ? (D.kids[root.id] || []).find((t) => /\ba trier\b/.test(papNorm(t.name))) : null;
+        el.append(h('div', {class: 'card depot dep-atrier'},
+          h('b', {class: 'dep-t', text: 'Le fichier va dans « À trier »'}),
+          h('p', {class: 'muted', text: 'Sur l’iPhone : ouvre la photo ou le PDF, touche Partager, puis Drive, dossier RD Assistant › Papiers › À trier. Range-le toi-même pour l’instant : le rangement par JARVIS viendra plus tard.'}),
+          at ? h('div', {class: 'row-actions'}, h('button', {type: 'button', class: 'btn main', onclick: () => { PAPS.open = at.id; renderView(false); }}, 'Ouvrir « À trier »')) : null,
+          h('p', {class: 'muted', text: 'Pas de relevé bancaire, de RIB, de bulletin de paie ni d’avis d’imposition ici : ils vont dans tes papiers privés.'})));
       };
       /* 3. Équipe › Routines, après Grok : celles d'Hermes et de JARVIS seulement (onglet Routines de Pilotage, lignes Bot = Hermes ou JARVIS ;
          celles du serveur, brief du matin compris) */
@@ -11726,6 +11781,8 @@ void main(){
         + '.dm-plus{margin:4px 0 14px;padding:0!important}.dm-plus>summary{list-style:none;display:flex;align-items:center;gap:8px;padding:14px 16px;cursor:pointer;font:600 15px var(--sans);color:var(--fg)}.dm-plus>summary::-webkit-details-marker{display:none}'
         + '.dm-plus>summary b{font:600 12px var(--display);color:var(--muted)}.dm-plus>summary::after{content:"";margin-left:auto;width:8px;height:8px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:rotate(45deg);transition:transform .2s}.dm-plus[open]>summary::after{transform:rotate(-135deg)}'
         + '.dm-plus-b{display:grid;gap:12px;padding:0 12px 14px}.dm-plus-b>.panel{margin:0}'
+        + '.pm-travail{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;margin:0 0 12px;padding:13px 16px;font:600 15px var(--sans);color:var(--fg);text-align:left;cursor:pointer}.pm-travail-go{color:var(--muted);font-size:20px}'
+        + '.dep-atrier{display:grid;gap:8px;padding:16px}.dep-atrier .dep-t{font:700 17px var(--display)}.dep-atrier p{margin:0}'
         + '.card.hero.pap-hero{display:grid;grid-template-columns:minmax(0,1fr);justify-items:stretch;align-items:start;text-align:left;gap:10px;padding:14px 14px 12px}.pap-hero .pap-k{font:600 11px var(--sans);letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}.pap-hero .pap-top,.pap-hero .pap-quick{margin:0}'
         /* la discussion : une feuille du bas plein écran (bord arrondi, poignée, la page assombrie derrière) ; elle monte du bas */
         + 'html .chat{top:calc(var(--sat, 0px) + 10px);border-radius:24px 24px 0 0;border-top:1px solid rgba(var(--c1),.35);box-shadow:0 0 0 100vmax rgba(0,0,0,.55),0 -14px 40px rgba(0,0,0,.6);overflow:hidden}'

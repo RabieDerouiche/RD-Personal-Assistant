@@ -736,6 +736,7 @@ try {
   /* 0.24.0 : chercher un produit à partir d'une idée, par le serveur (faux Claude) */
   { await p.goto(BASE + '/?serveur#achats'); await p.waitForTimeout(3500);
     await p.evaluate(() => document.querySelectorAll('#toasts .toast').forEach((t) => t.remove()));
+    await p.evaluate(() => { const x = document.querySelector('#view .dm-seg [data-f="idees"]'); if (x) x.click(); }); await p.waitForTimeout(400);   /* 0.87.0 : « Trouver une idée » est sous le filtre « Idées » */
     await p.fill('#ix-idee', 'maison de poupée'); await p.fill('#ix-pour', 'fille de 3 ans'); await p.fill('#ix-max', '60'); await p.selectOption('#ix-n', '4');
     await p.tap('.idee-go'); await p.waitForTimeout(1500);
     const w = await p.evaluate(() => document.querySelector('.view-title').textContent);
