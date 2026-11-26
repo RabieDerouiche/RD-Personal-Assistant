@@ -706,6 +706,37 @@ HERMES_BANC_AUJOURDHUI=2027-01-14 bash /usr/local/sbin/hermes-portail notes-auto
 verif "notes-auto : la box attend le 15 ; la facture Claude pas encore dans Gmail → réessayée demain (aucune tentative notée)" bash -c "[ $rc = 0 ] && ! grep -q '^box 2027-01' $NDFV/tentes.txt 2>/dev/null && ! grep -q '^claude' $NDFV/tentes.txt 2>/dev/null && grep -q 'Résultat note : attente' $T/na.log"
 bash /usr/local/sbin/hermes-portail ndf etat > $T/ndf-etat.log 2>&1
 verif "ndf etat : les notes et le registre des notes créées" bash -c "grep -q 'teletravail-2026-11 : creee' $T/ndf-etat.log && grep -q 'box 2026-12' $T/ndf-etat.log"
+# l'abonnement Grok Bot (facture de xAI inventée) : le contrôle de TVA de la routine de Chronos, puis posée à valider
+python3 -I - $T <<'PY'
+import sys
+def pdf(chemin, lignes):
+    flux = 'BT /F1 11 Tf 50 780 Td 14 TL ' + ' '.join('(%s) Tj T*' % l.replace('(', '\\(').replace(')', '\\)') for l in lignes) + ' ET'
+    objs = ['<< /Type /Catalog /Pages 2 0 R >>', '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+            '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>',
+            '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>',
+            '<< /Length %d >>\nstream\n%s\nendstream' % (len(flux.encode('latin-1')), flux)]
+    out = b'%PDF-1.4\n'; pos = []
+    for i, o in enumerate(objs, 1):
+        pos.append(len(out)); out += ('%d 0 obj\n%s\nendobj\n' % (i, o)).encode('latin-1')
+    x = len(out)
+    out += ('xref\n0 %d\n0000000000 65535 f \n' % (len(objs) + 1)).encode() + b''.join(('%010d 00000 n \n' % p).encode() for p in pos)
+    out += ('trailer\n<< /Size %d /Root 1 0 R >>\nstartxref\n%d\n%%%%EOF\n' % (len(objs) + 1, x)).encode()
+    open(chemin, 'wb').write(out)
+d = sys.argv[1]
+pdf(d + '/grok-nov.pdf', ['INVOICE (inventee)', 'Date of issue November 4, 2026', 'Subtotal 25.00', 'VAT 20% 5.00', 'Total 30.00'])
+pdf(d + '/grok-tva.pdf', ['INVOICE (inventee)', 'Date of issue November 4, 2026', 'Subtotal 25.00', 'VAT 20% 2.00', 'Total 27.00'])
+PY
+chmod 0600 $T/grok-*.pdf
+printf 'champs=/etc/hermes-portail/note-box-champs.txt\nsource=mail\nfacture_requete=subject:xai-invente has:attachment\nfacture_nom=\\.pdf$\nht_motif=Subtotal\ntva_motif=VAT\ntva_controle=taux:20\n' > /etc/hermes-portail/note-grok.conf; chmod 0600 /etc/hermes-portail/note-grok.conf
+HERMES_BANC_AUJOURDHUI=2026-11-26 bash /usr/local/sbin/hermes-portail note grok --mois 2026-11 --facture $T/grok-tva.pdf > $T/grok1.log 2>&1; rc=$?
+verif "note grok : le contrôle de TVA de la routine de Chronos (20 % du HT) arrête une facture fausse, sans montant affiché" bash -c "[ $rc = 2 ] && grep -q 'contrôle de TVA' $T/grok1.log && ! grep -qE '27[.,]00|25[.,]00' $T/grok1.log"
+HERMES_BANC_AUJOURDHUI=2026-11-26 bash /usr/local/sbin/hermes-portail note grok --mois 2026-11 --facture $T/grok-nov.pdf > $T/grok2.log 2>&1; rc=$?
+verif "note grok : TVA juste → posée à valider (la première de sa sorte) ; compte rendu pour JARVIS" bash -c "[ $rc = 0 ] && grep -q 'Résultat note : a_valider' $T/grok2.log && python3 -I -c \"import json,sys; r=json.load(open('/var/lib/hermes-portail-retours/ndf-grok-2026-11.json')); sys.exit(0 if r['etat']=='a_valider' and r['montant']==30.0 else 1)\""
+# le rodage du télétravail sur les jours de JARVIS notés jusqu'ici (le 30, à venir, ignoré)
+ttconf; touch $FT/serveur/sans-30; chmod a+r $FT/serveur/sans-30
+HERMES_BANC_AUJOURDHUI=2026-11-26 bash /usr/local/sbin/hermes-portail teletravail --mois 2026-11 --jours-rodage jarvis --electricite $T/elec.pdf --sans-depense > $T/ttr.log 2>&1; rc=$?
+verif "teletravail --jours-rodage jarvis : les jours notés jusqu'ici, le jour à venir sans lieu ignoré ; la note se prépare" bash -c "[ $rc = 0 ] && grep -q 'RODAGE, jours de JARVIS' $T/ttr.log && grep -q '1 jour(s) à venir ignoré' $T/ttr.log && grep -q 'Résultat télétravail : prete' $T/ttr.log"
+rm -f $FT/serveur/sans-30 /etc/hermes-portail/teletravail.conf /etc/hermes-portail/note-grok.conf
 rm -rf $NDFV; rm -f /etc/hermes-portail/notes.conf /etc/hermes-portail/note-box.conf /etc/hermes-portail/note-claude.conf /etc/hermes-portail/note-box-champs.txt
 rm -rf /var/lib/hermes-portail-retours
 unset HERMES_BANC_JARVIS_U HERMES_BANC_JARVIS_SRV HERMES_BANC_JARVIS_DATA

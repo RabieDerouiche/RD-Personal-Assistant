@@ -12,7 +12,7 @@
 #   sudo hermes-portail facture --requete "<recherche Gmail>" --nom "<expression du nom>" --vers <dossier>   (va chercher UNE facture PDF dans ses mails, par l'accès Google de JARVIS ; lecture seule)
 #   sudo hermes-portail cra <adresse> --semaine <lundi AAAA-MM-JJ> --jours <AAAA-MM-JJ,…> [--a-blanc]   (la feuille de temps d'UNE semaine : « 1 » ces jours-là, Save, Submit ; --a-blanc : rien de tapé)
 #   sudo hermes-portail cra-mois <adresse> --mois <AAAA-MM> --conges <AAAA-MM-JJ[:matin|:apres-midi],…> --feries <AAAA-MM-JJ,…> [--a-blanc]   (le compte rendu d'activité du MOIS : complète les jours vides, contrôle, puis « Valider » ; --a-blanc : rien de tapé)
-#   sudo hermes-portail teletravail [--mois AAAA-MM] [--electricite <facture.pdf>] [--sans-depense] [--diagnostic]   (la note de télétravail du mois, À BLANC : jours de JARVIS, pièces, calcul, PDF unique, dépense remplie puis annulée ; « teletravail drive <id> --vers <dossier> » : un PDF du Drive)
+#   sudo hermes-portail teletravail [--mois AAAA-MM] [--electricite <facture.pdf>] [--sans-depense] [--diagnostic] [--jours-rodage <jours|jarvis> [--comparer JJ/MM/AAAA]]   (la note de télétravail du mois, À BLANC : jours de JARVIS, pièces, calcul, PDF unique, dépense remplie puis annulée ; « teletravail drive <id> --vers <dossier> » : un PDF du Drive)
 #   sudo hermes-portail teletravail-auto           (le dernier jour du mois, après midi : la note de télétravail préparée, puis posée pour sa validation ; rien sans teletravail.conf)
 #   sudo hermes-portail note <box|claude|grok> [--mois AAAA-MM] [--facture <pdf>] [--comparer <JJ/MM/AAAA>] [--diagnostic]   (une note à facture : préparée, à blanc, posée pour sa validation ; --comparer : à blanc comparée à une dépense existante, rien posé)
 #   sudo hermes-portail notes-auto                 (la minuterie de chaque jour : télétravail le dernier jour, box à partir du 15, Claude et Grok Bot dès leur facture)
@@ -826,7 +826,7 @@ os.replace(tmp, dest)
     mois=""; elec=""; sans_depense=0; diag=""; rodage=""; comparer=""
     while [ $# -gt 0 ]; do case "$1" in
       --mois) mois=${2:-}; shift 2 ;; --electricite) elec=${2:-}; shift 2 ;; --sans-depense) sans_depense=1; shift ;; --diagnostic) diag=--diagnostic; shift ;;
-      --jours-rodage) rodage=${2:-}; shift 2 ;;   # rodage : les jours de télétravail donnés (ceux d'une note acceptée), jamais posée pour être créée
+      --jours-rodage) rodage=${2:-}; shift 2 ;;   # rodage : les jours donnés (ceux d'une note acceptée), ou « jarvis » (les jours notés jusqu'ici) ; jamais posée
       --comparer) comparer=${2:-}; shift 2 ;;     # rodage : la dépense à blanc comparée à la dépense existante de ce jour-là (JJ/MM/AAAA)
       --reel) echo "La note se crée pour de vrai après son oui dans JARVIS (ndf-auto), puis seule les mois suivants : pas d'option --reel."; exit 1 ;;
       *) usage ;; esac; done
@@ -860,7 +860,18 @@ os.replace(tmp, dest)
       echo "  $n : introuvable ($(head -c 200 "$D/$n.erreur" | tr '\n' ' '))."; return 1
     }
     # 1. les jours du mois, par JARVIS (ou, en rodage, ceux d'une note acceptée : l'agenda n'avait pas encore les lieux)
-    if [ -n "$rodage" ]; then
+    if [ "$rodage" = jarvis ]; then   # rodage : les jours de JARVIS notés jusqu'ici ; les jours à venir (sans lieu) ne comptent pas
+      par_tt --jours "$mois" "${banc_jour[@]}" > "$D/jours.brut.json" 2> "$D/jours.erreur" || { echo "  jours : illisibles ($(head -c 200 "$D/jours.erreur" | tr '\n' ' '))."; rm -f "$tmp"; exit 1; }
+      python3 -I -c '
+import json, sys
+J = json.load(open(sys.argv[1])); auj = sys.argv[2]
+venir = [d for d in J.get("aConfirmer", []) if d >= auj]
+J["aConfirmer"] = [d for d in J.get("aConfirmer", []) if d < auj]; J["etat"] = "rodage"
+J["texte"] = "rodage : " + str(len(venir)) + " jour(s) à venir ignoré(s) ; " + (J.get("texte") or "")
+print(json.dumps(J))
+' "$D/jours.brut.json" "$aujourdhui" > "$D/jours.json"; rm -f "$D/jours.brut.json"
+      echo "  jours : RODAGE, jours de JARVIS notés jusqu'ici (rien ne sera posé pour être créé)."
+    elif [ -n "$rodage" ]; then
       python3 -I -c '
 import calendar, datetime, json, sys
 ym, l = sys.argv[1], sys.argv[2]
