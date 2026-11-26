@@ -28,6 +28,7 @@ dire() { printf '\n== %s\n' "$*"; }
 for f in politique.yaml hermes-portail filtre.py sortie.nft hermes-portail-sortie.service hermes-portail-filtre.service hermes-portail-essai.service hermes-portail-cra.service hermes-portail-cra.timer hermes-portail-teletravail.service hermes-portail-teletravail.timer hermes-portail-ndf.service hermes-portail-ndf.timer domaines.defaut navigateur-regles.json justificatif-essai.pdf facture.mjs teletravail.mjs teletravail.py note.py skills/portail/portail/SKILL.md; do
   [ -f "$ICI/$f" ] || { echo "Fichier manquant : $ICI/$f"; exit 1; }
 done
+[ -f "$ICI/../limite.py" ] && python3 -I -c "import ast,sys; ast.parse(open(sys.argv[1]).read())" "$ICI/../limite.py" || { echo "Fichier manquant ou illisible : $ICI/../limite.py"; exit 1; }
 bash -n "$ICI/hermes-portail" && python3 -I -c "import ast,sys; ast.parse(open(sys.argv[1]).read())" "$ICI/filtre.py" && python3 -I -c "import ast,sys; ast.parse(open(sys.argv[1]).read())" "$ICI/teletravail.py" && python3 -I -c "import ast,sys; ast.parse(open(sys.argv[1]).read())" "$ICI/note.py" &&python3 -I -c "import json,sys; json.load(open(sys.argv[1]))" "$ICI/navigateur-regles.json" || { echo "Le code du dépôt ne passe pas le contrôle de syntaxe : rien n'a été posé."; exit 1; }
 
 NPM_DIR=$(dirname "$(command -v npm 2>/dev/null || echo /usr/bin/npm)")
@@ -140,6 +141,11 @@ install -o root -g root -m 0644 "$ICI/facture.mjs" "$LIB/facture.mjs"   # lancé
 install -o root -g root -m 0644 "$ICI/teletravail.mjs" "$LIB/teletravail.mjs"   # note de télétravail : jours et Drive, sous l'utilisateur jarvis
 install -o root -g root -m 0644 "$ICI/teletravail.py" "$LIB/teletravail.py"     # note de télétravail : calcul, garde-fous, synthèse (root, sans réseau)
 install -o root -g root -m 0644 "$ICI/note.py" "$LIB/note.py"                   # notes à facture (box, Claude) : montant et date par règles, champs (root, sans réseau)
+# 26/11/2026 : la limite du forfait Claude (le même fichier que le kit d'Hermes) et les hôtes de Claude : un passage coupé par la limite
+# n'est relancé que si le relais prouve qu'aucun autre hôte (le portail) n'a été joint
+install -o root -g root -m 0644 "$ICI/../limite.py" "$LIB/limite.py"
+install -o root -g root -m 0644 "$ICI/domaines.defaut" "$LIB/domaines.defaut"
+install -d -o root -g root -m 0700 "$VAR/limite"
 install -d -o root -g root -m 0700 "$VAR/ndf"                                   # les notes préparées, le registre des notes créées (jamais dans le dépôt)
 install -d -o root -g root -m 0700 "$VAR/teletravail"              # ses dossiers par mois et l'historique des montants (jamais dans le dépôt)
 install -o root -g root -m 0644 "$ICI/justificatif-essai.pdf" "$LIB/justificatif-essai.pdf"   # facture inventée, pour un brouillon d'essai

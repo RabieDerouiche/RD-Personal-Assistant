@@ -160,6 +160,15 @@ install -o root -g root -m 0755 "$ICI/reveil.sh" /usr/local/sbin/hermes-reveil
 install -o root -g root -m 0644 "$ICI/hermes-reveil.service" /etc/systemd/system/hermes-reveil.service
 install -o root -g root -m 0644 "$ICI/hermes-reveil.path" /etc/systemd/system/hermes-reveil.path
 if id jarvis >/dev/null 2>&1; then install -d -o jarvis -g jarvis -m 0755 /var/lib/jarvis-reveil; else install -d -m 0755 /var/lib/jarvis-reveil; fi
+# la relance après la limite du forfait Claude (26/11/2026, « Fais en sorte que la relance soit automatique ») : copies root,
+# état de root (700), avis pour JARVIS dans un dossier de root lisible par son groupe (750, fichiers 640)
+install -d -o root -g root -m 0755 /usr/local/lib/hermes-relance
+install -o root -g root -m 0644 "$ICI/limite.py" /usr/local/lib/hermes-relance/limite.py
+install -o root -g root -m 0755 "$ICI/relance.sh" /usr/local/sbin/hermes-relance
+install -o root -g root -m 0644 "$ICI/hermes-relance.service" /etc/systemd/system/hermes-relance.service
+install -o root -g root -m 0644 "$ICI/hermes-relance.timer" /etc/systemd/system/hermes-relance.timer
+install -d -o root -g root -m 0700 /var/lib/hermes-relance
+if id jarvis >/dev/null 2>&1; then install -d -o root -g "$(id -gn jarvis)" -m 0750 /var/lib/hermes-relance-avis; else install -d -o root -g root -m 0750 /var/lib/hermes-relance-avis; fi
 nft -c -f /etc/hermes/sortie.nft 2>/dev/null && echo "Règles réseau : syntaxe vérifiée." || [ "$BANC" = 1 ] || { echo "Règles réseau refusées par nft : arrêt."; exit 1; }
 if [ "$BANC" != 1 ]; then
   systemctl daemon-reload
@@ -173,6 +182,7 @@ if [ "$BANC" != 1 ]; then
     systemctl enable --now hermes-garde.timer   # toutes les 10 min : Hermes s'arrête au-delà de $SEUIL_FORFAIT % de la semaine
   fi
   systemctl enable --now hermes-reveil.path     # le réveil d'Hermes par JARVIS
+  systemctl enable --now hermes-relance.timer   # toutes les 10 min : relance UNE fois ce que la limite du forfait a coupé, après sa levée
   if [ -f /var/lib/hermes-garde/arret ]; then
     # en pause par le garde : c'est lui qui décide, avec ses nouvelles règles (il relance Hermes si le forfait le permet)
     echo "Hermes est en pause par le garde du forfait : je relance le garde, qui le redémarre si le forfait le permet."

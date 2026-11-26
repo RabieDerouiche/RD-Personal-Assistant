@@ -60,6 +60,7 @@ nouveau n'était noté dans Pilotage ; c'est sa décision de faire l'essai quand
 | Politique (root) | `/etc/hermes/config.yaml` (copie de `politique.yaml`), `/etc/hermes/.env` (identifiant Telegram autorisé, interdictions) |
 | Service | `hermes-gateway.service` (et `hermes-sortie.service` pour les règles réseau, `/etc/hermes/sortie.nft`) |
 | Garde du forfait | `hermes-garde.timer` et `hermes-garde.service`, script `/usr/local/sbin/hermes-garde-forfait` (copie root), seuil et fenêtres comptées dans `/etc/hermes/garde.conf`, état dans `/var/lib/hermes-garde/` |
+| Relance après la limite (26/11/2026) | `hermes-relance.timer` (toutes les 10 minutes, à :02, rattrapée) et `hermes-relance.service`, commande `/usr/local/sbin/hermes-relance` (copie root, `--a-blanc` : dit ce qu'elle ferait), code `/usr/local/lib/hermes-relance/limite.py` (copie root de `jarvis-os/hermes/limite.py`), état de root `/var/lib/hermes-relance/` (700), avis pour JARVIS `/var/lib/hermes-relance-avis/` (root et groupe de JARVIS, 750, fichiers 640) |
 
 JARVIS, Panier, Caddy et ufw ne changent pas. Rien n'est ouvert vers Internet : Telegram est interrogé en
 sortie (polling). Hermes ouvre seulement une petite API locale pour ses propres clients (127.0.0.1, port
@@ -191,6 +192,43 @@ interdites), mémoire, API locale seulement sur 127.0.0.1 et fermée sans jeton.
 Non vérifiable au banc : le vrai plugin avec son abonnement, le vrai Telegram, l'enfermement sous un vrai
 systemd (vérifié par `systemd-analyze` seulement), `runuser` et `sudo-rs` d'Ubuntu 26.04, les règles réseau à
 côté d'ufw, Claude Code sous le filtre d'appels système. `diagnostic.sh` contrôle tout cela sur le serveur.
+
+### Relance automatique après la limite du forfait (26/11/2026)
+
+Le 26/11/2026 au matin, la limite de 5 heures du forfait partagé a coupé en même temps Hermes, JARVIS et les
+sessions. Sa demande : « Fais en sorte que la relance soit automatique ». Trois morceaux, une seule règle de
+reconnaissance (`limite.py` côté Hermes et hermes-portail, `jarvis-os/server/limite.mjs` côté JARVIS, mêmes
+exemples aux bancs : « resets 10:40am (UTC) », « resets Dec 2, 7pm (Europe/Paris) », « usage limit reached|<époque> »,
+« retry-after: 120s » ; sans heure : 30 minutes après l'échec).
+
+- **Routines d'Hermes** (`hermes-relance.timer`, toutes les 10 minutes) : une routine `jarvis-…` dont le dernier
+  passage (moins de 24 heures) a échoué par la limite est relancée **une fois**, dans son mode actuel (`hermes cron
+  run`, comme `routines.sh --lancer`), quand la limite est levée : heure annoncée passée, et aucune fenêtre du
+  forfait à 100 % (celle de 5 heures comprise ; la semaine d'un autre modèle ne compte pas, comme pour le garde).
+  - (certain, code d'Hermes v0.23.3, `cron/jobs.py`) L'erreur d'un passage est écrite dans `jobs.json` :
+    `last_status` = `error`, `last_error` (le texte, nettoyé) et l'empreinte durable `last_failure` `{at, detail}`.
+    Le script lit les deux.
+  - (certain, même code) Hermes a ses propres reprises : `unreachable_retry` (réseau coupé, aucun appel au
+    modèle) et `quota_hold_until` (une `AuthError` avec « retry after », écrite pour Codex). Une routine qu'Hermes
+    reprend lui-même n'est pas relancée en plus. (Likely) La limite du plugin de l'abonnement Claude n'entre
+    pas dans ces deux cas : d'où ce script.
+  - Jamais deux fois le même échec (état de root), jamais une erreur qui n'est pas la limite, pas de relance si
+    le prochain passage normal tombe moins d'une heure après la reprise, Hermes arrêté (à la main ou par le
+    garde) : la relance attend. Plafond de 12 relances par jour (un avis quand il est atteint).
+  - Sans rien de coupé, le script ne lit même pas l'usage (pas de sonde inutile).
+  - Le passage relancé est suivi : réussi, une ligne dans la santé de JARVIS ; de nouveau en échec, ou aucun
+    passage au bout de 3 heures : un **avis** pour JARVIS, qui le pousse une fois sur ses appareils (« relance-la à
+    la main : routines.sh --lancer <nom> »).
+- **Passerelle d'Hermes** : redémarrée seulement si systemd la dit `failed` (plantée), deux fois par jour au plus ;
+  jamais si elle a été arrêtée exprès (`inactive`) ni si le garde l'a arrêtée (`/var/lib/hermes-garde/arret`), ni
+  pendant la coupure du garde (`/etc/hermes/garde.coupe`, jusqu'au 3/12) : JARVIS est alors prévenu une fois par jour.
+  (Likely) Avec `Restart=always` dans l'unité, systemd la relance déjà lui-même : « failed » n'arrive guère que sur
+  un réglage refusé (code 78), qu'un redémarrage ne répare pas ; d'où deux essais par jour au plus.
+- **Tâches d'hermes-portail** : voir `docs/hermes-portail.md`, « La limite du forfait ». Le script relance l'unité
+  demandée (`systemctl start --no-block`, liste fermée : CRA de la semaine, notes validées, notes du jour), une fois.
+- **JARVIS** : voir `docs/jarvis-os.md`, 0.89.0.
+
+Banc : `bash essais/hermes/relance.test.sh` (usage, `jobs.json`, systemctl et lanceur simulés).
 
 ## Étapes
 
