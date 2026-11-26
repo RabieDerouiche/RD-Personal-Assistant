@@ -1246,6 +1246,27 @@ srv.listen(0, async () => {
       const s = await q.evaluate(() => ({titre: document.getElementById('sheet-title').textContent, mails: document.querySelectorAll('#sheet .trv-mails > div').length, acts: [...document.querySelectorAll('#sheet .sheet-actions .btn')].map((x) => x.firstChild.textContent.trim())}));
       ok('Travail : le détail en feuille du bas (étapes, mails envoyés, « Voir mes jours du mois »)', s.titre === 'CRA de la société de portage' && s.mails === 1 && s.acts[0] === 'Voir mes jours du mois', JSON.stringify(s));
       await q.context().close(); }
+    /* 0.94.0 : les réponses aux deux mails du mois (scénario « reponses ») : la carte « CRA du mois », sa feuille, la ligne de « Pour moi » */
+    { const q = await pageWith({reponses: true}, '#travail'); await q.waitForTimeout(1200);
+      const c = await q.evaluate(() => { const k = document.querySelector('.trv-card[data-trv="mois"]'); return {fait: k.querySelectorAll('.trv-et .fait').length, encours: (k.querySelector('.trv-et .encours') || {}).textContent || '', toi: k.classList.contains('toi'), alerte: [...k.querySelectorAll('.trv-alerte')].map((x) => x.textContent), mails: [...k.querySelectorAll('.trv-mails > .trv-mail')].map((m) => ({t: m.querySelector('.trv-mail-t').textContent, rep: [...m.querySelectorAll('.trv-rep')].map((x) => x.textContent)})), liens: k.querySelectorAll('a').length}; });
+      ok('0.94 : carte « CRA du mois » : 4 étapes faites, « Rattaché » en cours, « CRA signé reçu : à rattacher » en « À toi », l’alerte de fin de mission dit « réponse reçue … : à lire »', c.fait === 4 && /Rattaché/.test(c.encours) && c.toi && c.alerte.some((x) => /Fin de mission le 30\/11\/2026\. Réponse à ton mail de prolongation reçue le 26\/11 à 16 h 20 : à lire\./.test(x)) && c.alerte.some((x) => /^À toi : CRA signé reçu : à rattacher sur le portail/.test(x)), JSON.stringify(c));
+      ok('0.94 : carte : chaque mail « envoyé le … », puis « Réponse de <nom> le … », PDF signalé, extrait de 160 caractères au plus ; aucun lien dans la carte (c’est un bouton)', c.mails.length === 2 && /CRA Novembre 2026 » · envoyé le 26\/11 à 09 h 02/.test(c.mails[0].t) && /CRA signé reçu$/.test(c.mails[0].t) && /^Réponse de Contact Client le 26\/11 à 14 h 05PDF« Bonjour, ci-joint le CRA signé/.test(c.mails[0].rep[0]) && /^Réponse de Équipe Missions le 26\/11 à 16 h 20« /.test(c.mails[1].rep[0]) && (c.mails[1].rep[0].match(/« (.*) »$/) || ['', ''])[1].length === 160 && c.liens === 0, JSON.stringify(c.mails));
+      await q.evaluate(() => document.querySelector('.trv-card[data-trv="mois"]').click()); await q.waitForTimeout(700);
+      const s = await q.evaluate(() => ({acts: [...document.querySelectorAll('#sheet .sheet-actions .btn')].map((x) => x.firstChild.textContent.trim()), liens: [...document.querySelectorAll('#sheet .trv-mails a.trv-ouvrir')].map((a) => a.textContent + ' ' + a.getAttribute('href') + ' ' + a.target + ' ' + a.rel), rep: document.querySelectorAll('#sheet .trv-rep').length}));
+      ok('0.94 : feuille : « C’est rattaché » en premier ; « Ouvrir le mail » sur la réponse (le fil dans Gmail, nouvel onglet) ; une adresse qui n’est pas http(s) ne donne aucun bouton', s.acts[0] === 'C’est rattaché' && s.rep === 2 && s.liens.length === 1 && s.liens[0] === 'Ouvrir le mail https://mail.google.com/mail/#all/filcra0001 _blank noopener', JSON.stringify(s));
+      await q.evaluate(() => [...document.querySelectorAll('#sheet .sheet-actions .btn')].find((x) => /^C’est rattaché/.test(x.textContent)).click()); await q.waitForTimeout(900);
+      const r = await q.evaluate(() => { const k = document.querySelector('.trv-card[data-trv="mois"]'); return {fait: k.querySelectorAll('.trv-et .fait').length, toasts: [...document.querySelectorAll('#toasts .toast')].map((x) => x.textContent).join(' || ')}; });
+      ok('0.94 : « C’est rattaché » : l’étape « Rattaché » passe à faite (5 sur 5)', r.fait === 5 && /CRA signé rattaché/.test(r.toasts), JSON.stringify(r));
+      await q.context().close(); }
+    { const q = await pageWith({reponses: true}, '#demandes'); await q.waitForTimeout(2600);
+      const l = await q.evaluate(() => [...document.querySelectorAll('.pm-travail')].map((x) => ({t: x.firstElementChild.textContent, toi: x.classList.contains('toi')})));
+      ok('0.94 : « Pour moi » : la ligne de Travail dit ce qui attend (« CRA signé reçu : à rattacher », la réponse à lire), une seule ligne', l.length === 1 && l[0].toi && l[0].t === 'CRA signé reçu : à rattacher · Réponse à ton mail de prolongation : à lire', JSON.stringify(l));
+      await q.evaluate(() => document.querySelector('.pm-travail').click()); await q.waitForTimeout(900);
+      ok('0.94 : cette ligne ouvre l’espace Travail', await q.evaluate(() => location.hash === '#travail' && !!document.querySelector('.trv-card[data-trv="mois"]')));
+      await q.context().close(); }
+    { const q = await page('#demandes'); await q.waitForTimeout(2400);
+      ok('0.94 : sans rien qui attend dans Travail, « Pour moi » n’a pas de ligne de Travail en plus', await q.evaluate(() => document.querySelectorAll('.pm-travail.toi').length === 0));
+      await q.context().close(); }
     /* 0.86.0 : une note de frais d'Hermes à valider (la première de sa sorte) : dans « Pour moi », la note entière, « Valider et créer » */
     { const q = await pageWith({notes: true}, '#demandes');
       await q.waitForTimeout(800);

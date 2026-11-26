@@ -1768,7 +1768,7 @@ const JMCP = createMcp({S, save, now, version: VERSION, base: mcpBase, outils: M
 /* routines de Grok Bot reprises (26/11/2026) : le réveil d'Hermes (un fichier que root surveille, hermes-reveil.path) et le courrier
    des expéditeurs « Immédiat » relevé toutes les 5 minutes, sans IA, tant que Google est relié et qu'un exécutant non suspendu existe */
 const reveilHermes = createReveil({fichier: process.env.JARVIS_REVEIL || '/var/lib/jarvis-reveil/sonnette', fs, now, log: (t) => console.log(t)});
-const COURRIER = createCourrier({S, save, now, log: (t) => console.log(t), reveiller: reveilHermes,
+const COURRIER = createCourrier({S, save, now, log: (t) => console.log(t), reveiller: reveilHermes, moi: () => GG.status('').account || '',
   actif: () => GG.status('').linked && ((S.mcp && S.mcp.jetons) || []).some((j) => j && j.type === 'fixe' && j.profil === 'executant' && !j.suspendu),
   chercher: (q) => GG.tool('Gmail', 'search_threads', {query: q, pageSize: 25}),
   lireExpediteurs: () => sheetRead(exePlage('Expéditeurs', 'A1:H200'))});

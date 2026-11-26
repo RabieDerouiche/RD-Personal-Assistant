@@ -9,7 +9,7 @@ try {
   const T = Date.parse('2026-11-26T09:00:00Z');   /* jeudi 26, 10 h à Paris */
   const bilan = {totaux: {travailles: 15, teletravail: 8, surSite: 5, aVenir: 2, conges: 5, feries: 1, aConfirmer: 0}};
   /* 0.94.0 : des fils entiers inventés (comme get_thread les rend), lus message par message */
-  const MOI = 'moi@exemple.invalid', PDF = {filename: 'CRA signé.pdf', mimeType: 'application/pdf'}, IMG = {filename: 'image.png', mimeType: 'image/png'};
+  const MOI = 'moi@exemple.invalid', PDF = {filename: 'CRA signé.pdf', mimeType: 'application/pdf', size: 48213, attachmentId: 'ANGjdJ-piece-inventee'}, IMG = {filename: 'image.png', mimeType: 'image/png', size: 900, attachmentId: 'ANGjdJ-image'};
   const msg = (id, de, nom, objet, quand, labelIds, attachments = [], snippet = '') => ({id, sender: de, addressDisplayNames: [{displayName: nom, emailAddress: de}], subject: objet, internalDate: String(Date.parse(quand)), labelIds, snippet, attachments});
   const FIL_CRA = {id: 'fil-cra-0001', messages: [
     msg('m1', MOI, 'Moi', 'CRA Novembre 2026', '2026-11-26T06:00:00Z', ['SENT']),
@@ -23,6 +23,7 @@ try {
   const NOV = {depuis: Date.UTC(2026, 10, 1) - 864e5, jusqua: Date.UTC(2026, 11, 21)};
   { const a = lireEchange({...NOV, fils: [FIL_CRA], objet: 'CRA Novembre 2026'}), r = a.reponses[0] || {};
     ok('réponse dans le même fil avec PDF : le mail envoyé est son message (date de l’envoi, pas celle du dernier message du fil), la réponse porte le PDF', a.envoi && a.envoi.id === 'm1' && a.envoi.at === Date.parse('2026-11-26T06:00:00Z') && a.reponses.length === 1 && r.id === 'm2' && r.pdf === true && r.pieces === 2 && r.voie === 'fil' && r.nom === 'Contact Client' && r.lu === false && r.at === Date.parse('2026-11-26T07:35:00Z'), JSON.stringify(a));
+    ok('le PDF de la réponse : de quoi le retrouver sans le télécharger (message, pièce jointe, nom, taille, type) ; l’image de signature n’y est pas', r.pdfs.length === 1 && JSON.stringify(r.pdfs[0]) === JSON.stringify({message: 'm2', piece: 'ANGjdJ-piece-inventee', nom: 'CRA signé.pdf', taille: 48213, type: 'application/pdf'}), JSON.stringify(r.pdfs));
     ok('son propre message et son brouillon dans le fil ne sont jamais une réponse ; l’extrait est décodé, sur une ligne', !a.reponses.some((x) => x.id === 'm3' || x.id === 'm4') && r.extrait === 'Bonjour, ci-joint le CRA sign&é : c\'est bon pour moi.', r.extrait);
     const b = lireEchange({...NOV, fils: [FIL_OCT, FIL_VIEUX, FIL_PRO2, FIL_PRO], objet: 'Prolongation mission'}), q = b.reponses[0] || {};
     ok('réponse dans un autre fil, d’une autre adresse, objet « Re :objet » : reconnue par l’objet nettoyé, quel que soit l’expéditeur', b.envoi && b.envoi.id === 'p1' && b.envoi.fil === 'fil-pro-0001' && b.reponses.length === 1 && q.id === 'p2' && q.fil === 'fil-pro-0002' && q.voie === 'objet' && q.de === 'equipe@exemple.invalid', JSON.stringify(b));

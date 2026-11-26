@@ -504,7 +504,9 @@
     /* 0.85.0 : l'espace « Travail » (une carte par routine : qui, étapes, dates, données prévues) ; « Renommer » garde le titre sur le serveur */
     travail: {
       lire: () => req('/api/travail').then((r) => (r.status === 200 ? r.j : null)).catch(() => null),
-      renommer: (id, titre) => req('/api/travail/titre', {id, titre}).then((r) => ({...r.j, ok: r.status === 200})).catch(() => ({ok: false, error: 'Serveur JARVIS injoignable.'}))},
+      renommer: (id, titre) => req('/api/travail/titre', {id, titre}).then((r) => ({...r.j, ok: r.status === 200})).catch(() => ({ok: false, error: 'Serveur JARVIS injoignable.'})),
+      /* 0.94.0 : « C’est rattaché » (le CRA signé reçu, déposé sur le portail) */
+      rattache: (mois) => req('/api/travail/rattache', {mois}).then((r) => ({...r.j, ok: r.status === 200})).catch(() => ({ok: false, error: 'Serveur JARVIS injoignable.'}))},
     memoire: {
       liste: () => req('/api/memoire').then((r) => (r.status === 200 ? r.j : null)).catch(() => null),
       ajouter: (texte, source) => req('/api/memoire', {texte, source}).then((r) => r.j).catch(() => ({ok: false, error: 'Serveur injoignable.'})),

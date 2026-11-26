@@ -578,11 +578,12 @@ export function createJours({file, agenda, claude = null, push = async () => [],
      arrivé après l'envoi (seconde recherche, tant qu'aucun PDF n'est reçu). 4 recherches par passage au plus ; un quota de Gmail atteint
      met le suivi en pause 15 minutes, et c'est écrit au journal du serveur.
      Chaque réponse vue est gardée dans jours.json (mois du mail : `suivi.cra`, `suivi.prolongation` : qui, quand, message, fil, PDF ou
-     non, extrait de 160 caractères, lue ou non dans Gmail ; `historique`), puis notifiée UNE fois (elle est enregistrée avant l'envoi de
+     non, extrait de 160 caractères, lue ou non dans Gmail ; `pdfs` : de quoi retrouver chaque PDF sans le télécharger : message, pièce
+     jointe, nom du fichier, taille, type ; `historique`), puis notifiée UNE fois (elle est enregistrée avant l'envoi de
      la notification : un redémarrage ne la renotifie jamais) et notée dans le Journal de Pilotage (sans nom ni adresse). L'espace Travail
      lit cet état tel quel : aucun cache à vider. Un mail envoyé à la main (sans brouillon de JARVIS) est suivi pareil. */
   const SUIVI_MS = 5 * 60e3, SUIVI_FRAIS = 4 * 60e3, SUIVI_JOURS = 45, REP_MAX = 8, QUOTA_MS = 15 * 60e3, SORTES = ['cra', 'prolongation'];
-  const suiviPret = () => !!(mails && mails.chercher && mails.fil);
+  const suiviPret = () => !!(mails && mails.chercher && mails.fil) && agenda.lie();   /* Google pas relié : rien n'est cherché */
   const moisAvant = (ym) => plusJour(ym + '-01', -1).slice(0, 7);
   const finDe = (ym) => ymdDe(+ym.slice(0, 4), +ym.slice(5, 7), dernierJour(+ym.slice(0, 4), +ym.slice(5, 7)));
   const quandDit = (at) => { const p = paris(new Date(at)); return p.ymd.slice(8) + '/' + p.ymd.slice(5, 7) + ' à ' + p.hm; };
@@ -644,7 +645,7 @@ export function createJours({file, agenda, claude = null, push = async () => [],
     const connues = new Map(s.reponses.map((r) => [r.id, r])), neuves = [];
     for (const r of lu.reponses) {
       const c = connues.get(r.id);
-      if (c) { c.lu = r.lu; continue; }                                          /* déjà notée : seul « lue dans Gmail » peut changer */
+      if (c) { c.lu = r.lu; if (r.pdfs && r.pdfs.length) c.pdfs = r.pdfs; continue; }   /* déjà notée : « lue dans Gmail » peut changer, et l'identifiant de pièce jointe que Gmail donne (rafraîchi à chaque lecture du fil) */
       if (s.reponses.length >= REP_MAX && !(sorte === 'cra' && r.pdf)) continue;   /* un long échange : les 8 premières réponses, et toujours le CRA en PDF */
       const rep = {...r, vu: now(), notifie: now()}; s.reponses.push(rep); neuves.push(rep);
       x.historique.push({at: now(), quoi: (sorte === 'cra' ? (r.pdf ? 'CRA signé reçu' : 'réponse au mail du CRA, sans le CRA') : 'réponse au mail de prolongation') + ' : ' + TXT(r.nom, 60) + ', le ' + quandDit(r.at)});

@@ -26,10 +26,14 @@ export const estBrouillon = (m) => etiq(m).includes('DRAFT');
 /* son message à lui : l'étiquette SENT (posée par Gmail sur tout ce qu'il envoie, JARVIS compris), ou son adresse en expéditeur */
 export const estDeLui = (m, moi = '') => etiq(m).includes('SENT') || (!!moi && sansAccent(m.sender).trim() === sansAccent(moi).trim());
 /* une pièce jointe PDF (le CRA signé) ; une image de signature (« image.png ») n'en est pas une */
-export const aPdf = (m) => (m.attachments || []).some((p) => /^application\/(x-)?pdf$/i.test(String(p.mimeType || '')) || /\.pdf$/i.test(String(p.filename || '').trim()));
+const estPdf = (p) => /^application\/(x-)?pdf$/i.test(String((p && p.mimeType) || '')) || /\.pdf$/i.test(String((p && p.filename) || '').trim());
+export const aPdf = (m) => (m.attachments || []).some(estPdf);
+/* de quoi retrouver les PDF d'un message sans les télécharger (le CRA signé qu'Hermes déposera sur le portail, après son oui) : le message,
+   l'identifiant de la pièce jointe tel que Gmail le donne à cette lecture, le nom du fichier, sa taille, son type ; 4 au plus */
+export const pdfsDe = (m) => (m.attachments || []).filter(estPdf).slice(0, 4).map((p) => ({message: String(m.id || ''), piece: String(p.attachmentId || '').slice(0, 2000), nom: String(p.filename || '').replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, 200), taille: +p.size || 0, type: String(p.mimeType || '').slice(0, 80)}));
 const nomDe = (m) => { const d = (m.addressDisplayNames || [])[0] || {}; return extraitDe(d.displayName || '', 60).replace(/^["'«\s]+|["'»\s]+$/g, '') || String(m.sender || '').split('@')[0].slice(0, 60); };
 const reponseDe = (m, fil, voie) => ({id: String(m.id || ''), fil: String(fil || m.threadId || ''), at: quand(m), de: String(m.sender || '').toLowerCase().slice(0, 120), nom: nomDe(m),
-  pdf: aPdf(m), pieces: (m.attachments || []).length, extrait: extraitDe(m.snippet), lu: !etiq(m).includes('UNREAD'), voie});
+  pdf: aPdf(m), pdfs: pdfsDe(m), pieces: (m.attachments || []).length, extrait: extraitDe(m.snippet), lu: !etiq(m).includes('UNREAD'), voie});
 
 /* Le mail envoyé et ses réponses.
    - fils : les fils trouvés par l'objet (get_thread : [{id, messages}]) ;
