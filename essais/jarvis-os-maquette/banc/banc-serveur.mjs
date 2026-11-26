@@ -91,7 +91,7 @@ try {
   ok('papiers en direct : arborescence demandée au Drive (lecture seule)', FG.calls.some((c) => c.path === '/drive/files') && FG.calls.filter((c) => c.path.startsWith('/drive')).every((c) => c.method === 'GET') && await p.evaluate(() => !!document.querySelector('.pap-n')));
   /* outils de Claude dans la discussion et « Confier à la tâche Claude », sur le serveur (16/11/2026) */
   await p.goto(BASE + '/?serveur'); await p.waitForTimeout(4000);
-  await p.evaluate(() => [...document.querySelectorAll('.hud-act button')].find((x) => /Parler à JARVIS/.test(x.textContent)).click()); await p.waitForTimeout(800);   /* refonte UX : « Parler à JARVIS » sur l'écran de JARVIS */
+  await p.evaluate(() => document.querySelector('.talk-slot .jv-btn').click()); await p.waitForTimeout(800);   /* 0.87.0 : l'orbe de la barre (plus de bouton « Parler à JARVIS ») */
   await p.fill('#chat-in', 'Fais un ordre de test pour Kairos'); await p.click('#chat .chat-row .btn.main'); await p.waitForTimeout(2500);
   ok('discussion : Claude propose un ordre, la page l\'affiche avec son bouton', await p.evaluate(() => { const c = document.getElementById('chat'); return !c.hidden && /Ordre proposé à Kairos/.test(c.textContent) && /Relève le prix du robot cuiseur/.test(c.textContent) && !/⟦|outil preparer_ordre/.test(c.textContent); }));
   await p.screenshot({path: SH + 'discussion-ordre.png'});
