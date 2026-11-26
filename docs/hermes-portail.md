@@ -605,6 +605,31 @@ tant qu'une routine n'est pas basculée) :
    disponibles (2,6 Go juste après chaque passage), 0,65 Go d'échange utilisés, 22 Go de disque libres, aucun
    processus tué en 14 jours, aucune retenue de JARVIS en 7 jours, diagnostic « Confortable ».
 
+**Le mois, au complet (ses précisions et QCM du 26/11/2026, nuit)** : la validation du 24 et le CRA du 26 de Chronos
+font aussi deux mails et un rattachement, pas encore chez Hermes ; ces deux routines de Chronos ne se mettent pas en
+pause avant que tout ceci marche :
+- *Le 24, après son oui sur les congés* : un mail à son contact du client (« CRA <Mois> <Année> », dans le fil de son
+  dernier mail de ce titre ; paragraphes : bonjour, « J'ai <N> jours sur ce mois. J'étais en congés <dates>. »,
+  demande du CRA du mois, merci, signature ; N sans arrondir les demi-journées ; congés omis s'il n'y en a pas). Puis
+  guetter sa réponse, qui porte le CRA du client en PDF.
+- *Le 26* : CRA mensuel saisi et validé sur l'intranet (statut « en attente ») ; date de fin de mission relevée. Fin
+  dans le mois (ou avant) : un mail à sa chargée de mission (« Prolongation mission <client> », style amical, date
+  exacte constatée, au moins 3 mois) ; fin le mois suivant : simple alerte.
+- *Le CRA du client reçu* : le rattacher au CRA mensuel pour la validation définitive. **Son explication** : sur la
+  page de saisie du CRA, un onglet en haut mène à une page qui montre le statut et des boutons pour déposer le CRA
+  du client.
+- **Les mails (son choix, QCM)** : JARVIS prépare le brouillon dans Gmail et montre un bouton « Envoyer » dans sa
+  carte ; son appui l'envoie (c'est sa confirmation) ; sinon il l'envoie lui-même depuis Gmail.
+- Les règles exactes (adresses, objets, corps) sont dans Pilotage (« Textes des routines », Chronos) : jamais ici.
+- Vu le 25/11/2026 sur l'intranet : la mission finit le 30/11/2026. Chronos prépare le mail de prolongation le 26.
+
+**Où voir tout ça (son choix, QCM du 26/11/2026)** : un espace **« Travail »** dans JARVIS (tuile d'Espaces), séparé
+de « Pour moi » (qui ne garde que ce qui attend son oui) : CRA (la semaine, le mois avec ses mails et le CRA du
+client), notes de frais (abonnement d'IA, box, télétravail), jours du mois ; pour chaque routine, qui la fait
+(Chronos, Hermes à blanc, Hermes en réel), ses étapes et leur avancement, la dernière exécution (date, résultat),
+la prochaine date et les données prévues d'un coup d'œil. Maquette d'abord (données inventées), après la mise en
+service du CRA de la semaine.
+
 **Dettes connues**
 - Un passage dont le navigateur ne démarre pas rend quand même le code 0 : juger à la réponse.
 - Deux notes dites autrement ne sont pas reconnues comme un doublon ; une note fausse reste jusqu'à son retrait.
