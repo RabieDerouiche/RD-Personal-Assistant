@@ -83,7 +83,8 @@ tenu par la commande) : pas encore faite.
 | Fichier | Rôle |
 |---|---|
 | `install.sh` | Root, relançable. Utilisateur `hermes-portail`, Hermes à la version figée du Hermes principal (lue dans `../install.sh`) avec son navigateur, plugin de l'abonnement Claude et Claude Code à lui, politique, skill, copies root de la commande et du relais, lien de la clé, règles réseau et relais. Ne démarre aucun agent. |
-| `hermes-portail` | La commande (`/usr/local/sbin/hermes-portail`) : `etat`, `connexion-claude`, `enregistrer`, `domaines`, `essai` (et `--code-mail`, `--telecharger`), `brouillon` (et `--sans-creer`), `facture`, `texte`, `notes`, `cle`, `fermer`, `oublier`. Un essai lance l'unité `hermes-portail-essai`. |
+| `hermes-portail` | La commande (`/usr/local/sbin/hermes-portail`) : `etat`, `connexion-claude`, `enregistrer`, `domaines`, `essai` (et `--code-mail`, `--telecharger`), `brouillon` (et `--sans-creer`), `facture`, `texte`, `cra` (et `--a-blanc`), `cra-auto`, `notes`, `cle`, `fermer`, `oublier`. Un essai lance l'unité `hermes-portail-essai`. |
+| `hermes-portail-cra.service`, `hermes-portail-cra.timer` | Le CRA de la semaine (26/11/2026) : toutes les 5 minutes, `hermes-portail cra-auto` ; rien sans `/etc/hermes-portail/cra.conf` (root : `adresse=` la feuille de temps, `jarvis_donnees=` le dossier de JARVIS ; jamais dans le dépôt). |
 | `hermes-portail-essai.service` | Un passage, enfermé (mêmes lignes que `hermes-gateway.service`, mémoire sans échange ; depuis le 25/11/2026, filtre d'appels système et espaces de noms interdits). Une vraie unité, pas `systemd-run` : au premier essai sur le serveur, `systemd-run -p IPAddressDeny=link-local` a été refusé alors que la même ligne est valable dans une unité. Consigne dans `/home/hermes-portail/.consigne`, réponse dans `/var/lib/hermes-portail/essais/`. |
 | `politique.yaml` | Sa politique (`/etc/hermes-portail/config.yaml`, root) : outils `browser`, `terminal`, `skills` seulement ; Sonnet ; profil de navigateur gardé ; navigateur envoyé vers le relais, lancé sans son bac à sable (dit en clair, voir « Durcissement »), remplissage automatique et heure réseau coupés. |
 | `facture.mjs` | Va chercher UNE facture PDF dans ses mails : lancé par `hermes-portail facture` sous l'utilisateur `jarvis`, avec l'accès Google et le code de JARVIS (`google.mjs`, `pdf.mjs`), en lecture seule ; l'état de JARVIS n'est jamais réécrit. Rend le PDF et son texte à root. |
@@ -110,7 +111,7 @@ le serveur). Faux portail `essais/hermes/faux_portail.py`, faux terminal `essais
 
 ## Ce que le banc prouve, et ce qu'il ne prouve pas
 
-Prouvé (107 vérifications, 25/11/2026) : installation ; outils réduits et politique figée ; clé seulement en ramfs,
+Prouvé (117 vérifications, 26/11/2026, dont le CRA de la semaine) : installation ; outils réduits et politique figée ; clé seulement en ramfs,
 nulle part en clair sur le disque, gardée par jarvis-coffre ; enregistrement dans un faux terminal sans que le mot de
 passe s'affiche ; connexion au faux portail par le coffre, tableau lu, formulaire ouvert, rien de soumis ; mot de
 passe et clé jamais envoyés au modèle ; session gardée au second passage ; coffre verrouillé : refus propre ;
@@ -569,6 +570,30 @@ tant qu'une routine n'est pas basculée) :
    soumissions d'une même semaine. À construire : le mode « CRA » de la skill et de la commande (saisie, Save,
    Submit, à blanc d'abord), la semaine dans JARVIS (carte et oui, comme les jours du mois), le déclenchement par
    root depuis le oui donné dans JARVIS, le compte rendu et la notification de première exécution.
+   **Le CRA de la semaine, construit le 26/11/2026 (sa décision : en réel dès le vendredi 27/11)** :
+   - *JARVIS 0.84.0* : le vendredi à midi, la semaine (« 1 » chaque journée travaillée, rien pour un congé ou un
+     férié ; demi-journée de congé ou conflit : bloqué, à la main) et la notification ; son oui dans la carte « CRA
+     de la semaine » de « Pour moi », gardé dans `jours.json`. Détail : `docs/jarvis-os.md`, 0.84.0.
+   - *Kit* : `hermes-portail cra <adresse> --semaine <lundi> --jours <dates> [--a-blanc]` écrit la consigne « MODE
+     CRA » (la skill n'ouvre ce mode que sur cette ligne) ; garde-fous hors du modèle : un lundi, des jours de la
+     semaine, jamais avant son vendredi, jamais une semaine déjà soumise par Hermes (`/var/lib/hermes-portail/cra/
+     soumises.txt`, root). La skill (section « CRA de la semaine ») : ouvrir la semaine, s'arrêter si elle est déjà
+     soumise, choisir la ligne du code (celle du projet de la dernière semaine approuvée), garder une saisie juste et
+     s'arrêter sur un écart, « 1 » sur les jours dits, « Save », relecture, un seul « Submit », état relu ; la
+     réponse finit par « Résultat : … », que la commande lit. `cra-auto` (minuterie root de 5 minutes) : la plus
+     ancienne semaine confirmée dans JARVIS et pas encore tentée pour ce oui-là (une tentative par oui, notée avant
+     le passage), puis le compte rendu dans `~/.jarvis/portail-retours/cra-<lundi>.json` (à l'utilisateur de JARVIS,
+     600) : « soumise » (première exécution signalée), « déjà soumise », « rien saisi », « enregistrée, pas soumise ».
+   - *Banc* : 117 vérifications (10 nouvelles : fausse feuille de temps avec Save et Submit, faux `jours.json`).
+     Défaut trouvé par le banc avant le serveur : le compte rendu supposait un groupe du nom de l'utilisateur.
+   - *Pas prouvé avant le vendredi 27/11* : le vrai modèle sur la vraie feuille de temps (choix de la ligne, cases
+     de quantité, « Save », « Submit ») ; d'où un passage à blanc sur la vraie semaine en cours à l'installation, et
+     sa vérification à lui après la première exécution réelle (sa règle).
+   - *Mise en service (jeudi 26/11)* : JARVIS mis à jour par lui (« Mettre à jour »), puis une demande à la session du
+     serveur : copies d'avant, `install.sh`, `cra.conf`, contrôle de la minuterie, passage à blanc ; retour arrière :
+     minuterie arrêtée, `cra.conf` retiré, copies remises. Puis une ligne du Canal pour Chronos : sa routine du CRA
+     hebdomadaire en pause (jamais supprimée). Filet si la pause n'est pas faite à temps : la routine de Chronos
+     attend son oui avant de saisir et ne soumet jamais une semaine déjà soumise.
    **Résultat du relevé (25/11/2026, 23h20, lecture seule, aucune question)** : Hermes entre sans code, change de
    semaine par le champ « Date » du cadre (MM/JJ/AAAA) et son bouton d'actualisation (les liens s'appellent
    « Previous Period » / « Next Period ») ; l'état se lit dans « Reported Time Status », un par jour. Les trois
@@ -579,6 +604,34 @@ tant qu'une routine n'est pas basculée) :
    de téléchargement par ligne, « Tout télécharger ») ; 1 min 38, 1,2 Go. Mesure du serveur : 3,8 Go, 2,1 Go
    disponibles (2,6 Go juste après chaque passage), 0,65 Go d'échange utilisés, 22 Go de disque libres, aucun
    processus tué en 14 jours, aucune retenue de JARVIS en 7 jours, diagnostic « Confortable ».
+
+**Le mois, au complet (ses précisions et QCM du 26/11/2026, nuit)** : la validation du 24 et le CRA du 26 de Chronos
+font aussi deux mails et un rattachement, pas encore chez Hermes ; ces deux routines de Chronos ne se mettent pas en
+pause avant que tout ceci marche :
+- *Le 24, après son oui sur les congés* : un mail à son contact du client (« CRA <Mois> <Année> », dans le fil de son
+  dernier mail de ce titre ; paragraphes : bonjour, « J'ai <N> jours sur ce mois. J'étais en congés <dates>. »,
+  demande du CRA du mois, merci, signature ; N sans arrondir les demi-journées ; congés omis s'il n'y en a pas). Puis
+  guetter sa réponse, qui porte le CRA du client en PDF.
+- *Le 26* : CRA mensuel saisi et validé sur l'intranet (statut « en attente ») ; date de fin de mission relevée. Fin
+  dans le mois (ou avant) : un mail à sa chargée de mission (« Prolongation mission <client> », style amical, date
+  exacte constatée, au moins 3 mois) ; fin le mois suivant : simple alerte.
+- *Le CRA du client reçu* : le rattacher au CRA mensuel pour la validation définitive. **Son explication** : sur la
+  page de saisie du CRA, un onglet en haut mène à une page qui montre le statut et des boutons pour déposer le CRA
+  du client.
+- **Les mails (son choix, QCM)** : JARVIS prépare le brouillon dans Gmail et montre un bouton « Envoyer » dans sa
+  carte ; son appui l'envoie (c'est sa confirmation) ; sinon il l'envoie lui-même depuis Gmail.
+- Les règles exactes (adresses, objets, corps) sont dans Pilotage (« Textes des routines », Chronos) : jamais ici.
+- Vu le 25/11/2026 sur l'intranet : la mission finit le 30/11/2026. Chronos prépare le mail de prolongation le 26.
+
+**Où voir tout ça (son choix, QCM du 26/11/2026)** : un espace **« Travail »** dans JARVIS (tuile d'Espaces), séparé
+de « Pour moi » (qui ne garde que ce qui attend son oui) : CRA (la semaine, le mois avec ses mails et le CRA du
+client), notes de frais (abonnement d'IA, box, télétravail), jours du mois ; pour chaque routine, qui la fait
+(Chronos, Hermes à blanc, Hermes en réel), ses étapes et leur avancement, la dernière exécution (date, résultat),
+la prochaine date et les données prévues d'un coup d'œil. **Maquette faite le 26/11/2026** (`essais/jarvis-travail/`,
+données inventées, aucun nom réel) : filtres Tout, CRA, Notes de frais, Jours ; « Ce qui vient » en frise ; une carte
+par routine (qui, étapes reliées et barre d'avancement, prochaine et dernière exécution, données prévues, « À toi »
+en ambre) ; le détail dans une feuille du bas (déroulé daté, brouillon de mail avec « Envoyer » et « Modifier »,
+dernières exécutions). En attente de son avis avant de l'appliquer à l'app.
 
 **Dettes connues**
 - Un passage dont le navigateur ne démarre pas rend quand même le code 0 : juger à la réponse.

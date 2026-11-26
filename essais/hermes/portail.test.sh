@@ -274,6 +274,62 @@ verif "téléchargement : la consigne l'annonce, et le dossier d'Hermes est vid�
 verif "téléchargement : un dossier de destination qui n'est pas à root est refusé ; brouillon ne l'accepte pas" bash -c "! bash /usr/local/sbin/hermes-portail essai 'http://127.0.0.1:$PP/tableau' --telecharger $T/recu-pas-root >/dev/null 2>&1 && ! bash /usr/local/sbin/hermes-portail brouillon 'http://127.0.0.1:$PP/tableau' --champs-fichier $T/champs.txt --telecharger $T/recu >/dev/null 2>&1"
 verif "sans --telecharger, la consigne n'annonce aucun téléchargement" bash -c "! grep -q 'Téléchargement permis' $T/essai2.log && ! grep -rq 'Téléchargement permis' $T/blanc.log"
 
+echo "== CRA de la semaine (25/11/2026 : Hermes à la place de Chronos)"
+FC=http://127.0.0.1:$PP/feuille; rm -rf /var/lib/hermes-portail/cra
+cra_suite() {  # cra_suite <fichier> <date MM/JJ/AAAA> <q1> … <q5> <phrase finale> : la suite d'appels du faux modèle (saisie, Save, Submit)
+  local f=$1 d=$2; shift 2; local q="['$1', '$2', '$3', '$4', '$5']"; shift 5
+  cat > "$f" <<FIN
+SUITE: [
+ {"nom": "browser_exec", "args": {"code": "# Feuille de temps\nnew_tab('$FC?date=$d')\nwait_for_load()\nfor k, v in enumerate($q):\n    if v: fill_input('#QTY_DAY%d' % (k + 1), v)\njs(\"document.querySelector('#save').click()\")\nwait_for_load()\nprint(js(\"document.querySelector('#etat').innerText\"))"}},
+ {"nom": "browser_exec", "args": {"code": "# Submit\njs(\"document.querySelector('#submit').click()\")\nwait_for_load()\nprint(js(\"document.querySelector('#etat').innerText\"))"}}
+]
+DIRE: "$1"
+FIN
+}
+verif "cra : une semaine qui ne commence pas un lundi, un jour hors de la semaine : refusés" bash -c "bash /usr/local/sbin/hermes-portail cra $FC --semaine 2026-11-24 --jours 2026-11-24 2>&1 | grep -q 'son lundi' && bash /usr/local/sbin/hermes-portail cra $FC --semaine 2026-11-23 --jours 2026-11-30 2>&1 | grep -q 'hors de la semaine'"
+verif "cra : jamais avant le vendredi de la semaine" bash -c "HERMES_BANC_AUJOURDHUI=2026-11-26 bash /usr/local/sbin/hermes-portail cra $FC --semaine 2026-11-23 --jours 2026-11-24 2>&1 | grep -q 'à partir de son vendredi'"
+cra_suite $T/cra-suite.txt 11/23/2026 '' 1 1 '' 1 'lundi 23/11 : rien ; mardi 24/11 : 1 ; mercredi 25/11 : 1 ; jeudi 26/11 : rien ; vendredi 27/11 : 1\nÉtat : Submitted\nRésultat : soumise'
+: > $T/traces/portail.jsonl; : > $T/traces/modele.jsonl
+HERMES_BANC_AUJOURDHUI=2026-11-27 HERMES_BANC_CONSIGNE_EN_PLUS=$T/cra-suite.txt bash /usr/local/sbin/hermes-portail cra $FC --semaine 2026-11-23 --jours 2026-11-24,2026-11-25,2026-11-27 > $T/cra.log 2>&1; rc=$?
+verif "cra : la consigne commence par « MODE CRA », donne la semaine (date de la page), le code et les jours" bash -c "python3 -I - $T/traces/modele.jsonl <<'PY'
+import json, sys
+c = [json.loads(l) for l in open(sys.argv[1])][0]['corps']
+t = ' '.join(m['content'] if isinstance(m['content'], str) else ' '.join(x.get('text', '') for x in m['content']) for m in c['messages'] if m['role'] == 'user')
+sys.exit(0 if t.lstrip().startswith('MODE CRA, ') and '11/23/2026' in t and 'R002 - Regular Day' in t and 'mardi 24/11/2026 : 1' in t and 'lundi 23/11/2026 : rien' in t and 'jeudi 26/11/2026 : rien' in t else 1)
+PY"
+verif "cra : saisie (1 les mardi, mercredi, vendredi), Save puis un seul Submit ; « Résultat CRA : soumise », semaine notée à root" bash -c "[ $rc = 0 ] && grep -q 'Résultat CRA : soumise' $T/cra.log && [ \"\$(grep -c CRA-SUBMIT $T/traces/portail.jsonl)\" = 1 ] && grep CRA-SUBMIT $T/traces/portail.jsonl | grep -q '\"qty\": \[\"\", \"1\", \"1\", \"\", \"1\"\]' && grep -q '^2026-11-23 .* soumise$' /var/lib/hermes-portail/cra/soumises.txt && [ \"\$(stat -c '%U %a' /var/lib/hermes-portail/cra/soumises.txt)\" = 'root 600' ]"
+n0=$(wc -l < $T/traces/portail.jsonl)
+HERMES_BANC_AUJOURDHUI=2026-11-27 HERMES_BANC_CONSIGNE_EN_PLUS=$T/cra-suite.txt bash /usr/local/sbin/hermes-portail cra $FC --semaine 2026-11-23 --jours 2026-11-24 > $T/cra2.log 2>&1; rc=$?
+verif "cra : une semaine déjà soumise par Hermes ne repart jamais (refus avant tout passage)" bash -c "[ $rc != 0 ] && grep -q 'déjà été soumise' $T/cra2.log && [ \"\$(wc -l < $T/traces/portail.jsonl)\" = $n0 ]"
+cat > $T/cra-blanc.txt <<FIN
+SUITE: [
+ {"nom": "browser_exec", "args": {"code": "# Lecture\nnew_tab('$FC?date=11/30/2026')\nwait_for_load()\nprint(js(\"document.querySelector('#etat').innerText\") or 'vide')"}}
+]
+DIRE: "lundi 30/11 : j'inscrirais 1\nÉtat : vide\nRésultat : à blanc"
+FIN
+: > $T/traces/modele.jsonl
+HERMES_BANC_AUJOURDHUI=2026-11-26 HERMES_BANC_CONSIGNE_EN_PLUS=$T/cra-blanc.txt bash /usr/local/sbin/hermes-portail cra $FC --semaine 2026-11-30 --jours 2026-11-30 --a-blanc > $T/cra-blanc.log 2>&1; rc=$?
+verif "cra --a-blanc : « MODE CRA À BLANC », possible avant le vendredi, rien d'enregistré sur le portail ni chez root" bash -c "[ $rc = 0 ] && grep -q 'Résultat CRA : blanc' $T/cra-blanc.log && grep -q 'MODE CRA À BLANC' $T/traces/modele.jsonl && ! grep -q '2026-11-30' /var/lib/hermes-portail/cra/soumises.txt && ! grep -q 'CRA-SAVE.*11/30' $T/traces/portail.jsonl"
+echo "== CRA de la semaine : la minuterie (une semaine confirmée dans JARVIS)"
+FJD=$T/jarvis-donnees; rm -rf $FJD; install -d -m 0755 $FJD; rm -f /var/lib/hermes-portail/cra/soumises.txt /var/lib/hermes-portail/cra/tentees.txt
+rm -f /etc/hermes-portail/cra.conf
+verif "cra-auto sans cra.conf : ne fait rien (code 0)" bash -c "bash /usr/local/sbin/hermes-portail cra-auto > /dev/null 2>&1 && [ ! -e $FJD/portail-retours ]"
+printf 'adresse=%s\njarvis_donnees=%s\n' "$FC" "$FJD" > /etc/hermes-portail/cra.conf; chmod 0600 /etc/hermes-portail/cra.conf
+cat > $FJD/jours.json <<'FIN'
+{"version": 1, "mois": {}, "semaines": {"2026-11-30": {"etat": "valide", "valide": {"at": 1796000000000, "jours": [{"date": "2026-11-30", "q": 1}, {"date": "2026-12-01", "q": 0}, {"date": "2026-12-02", "q": 1}, {"date": "2026-12-03", "q": 1}, {"date": "2026-12-04", "q": 1}]}},
+  "2026-11-16": {"etat": "a_valider", "jours": []}}}
+FIN
+cra_suite $T/cra-auto.txt 11/30/2026 1 '' 1 1 1 'État : Submitted\nRésultat : soumise'
+n0=$(grep -c CRA-SUBMIT $T/traces/portail.jsonl)
+HERMES_BANC_AUJOURDHUI=2026-12-03 HERMES_BANC_JARVIS_U=nobody HERMES_BANC_CONSIGNE_EN_PLUS=$T/cra-auto.txt bash /usr/local/sbin/hermes-portail cra-auto > $T/cra-auto0.log 2>&1
+verif "cra-auto : une semaine confirmée attend son vendredi (rien avant)" bash -c "[ \"\$(grep -c CRA-SUBMIT $T/traces/portail.jsonl)\" = $n0 ] && [ ! -s /var/lib/hermes-portail/cra/tentees.txt ]"
+HERMES_BANC_AUJOURDHUI=2026-12-04 HERMES_BANC_JARVIS_U=nobody HERMES_BANC_CONSIGNE_EN_PLUS=$T/cra-auto.txt bash /usr/local/sbin/hermes-portail cra-auto > $T/cra-auto.log 2>&1; rc=$?
+R=$FJD/portail-retours/cra-2026-11-30.json
+verif "cra-auto : la semaine confirmée (lun, mer, jeu, ven) est saisie et soumise ; compte rendu pour JARVIS (« soumise », première exécution), à l'utilisateur de JARVIS, 600" bash -c "[ $rc = 0 ] && [ \"\$(grep -c CRA-SUBMIT $T/traces/portail.jsonl)\" = $((n0 + 1)) ] && grep CRA-SUBMIT $T/traces/portail.jsonl | tail -1 | grep -q '\"qty\": \[\"1\", \"\", \"1\", \"1\", \"1\"\]' && python3 -I -c \"import json,sys; r=json.load(open('$R')); sys.exit(0 if r['resultat']=='soumise' and r['premiere'] is True and r['semaine']=='2026-11-30' and 'Submitted' in r['texte'] else 1)\" && [ \"\$(stat -c '%U %a' $R)\" = 'nobody 600' ]"
+HERMES_BANC_AUJOURDHUI=2026-12-04 HERMES_BANC_JARVIS_U=nobody HERMES_BANC_CONSIGNE_EN_PLUS=$T/cra-auto.txt bash /usr/local/sbin/hermes-portail cra-auto > $T/cra-auto2.log 2>&1
+verif "cra-auto : une seule tentative par oui ; une semaine soumise ne repart pas ; une semaine pas confirmée n'est pas touchée" bash -c "[ \"\$(grep -c CRA-SUBMIT $T/traces/portail.jsonl)\" = $((n0 + 1)) ] && [ \"\$(wc -l < /var/lib/hermes-portail/cra/tentees.txt)\" = 1 ] && ! grep -q '2026-11-16' /var/lib/hermes-portail/cra/tentees.txt"
+rm -f /etc/hermes-portail/cra.conf
+
 echo "== Ce qu'Hermes apprend d'un portail"
 N=/var/lib/hermes-portail/notes/127.0.0.1.txt
 verif "les deux notes utiles du passage sont gardées, à root seul" bash -c "[ \"\$(stat -c '%U %a' $N)\" = 'root 600' ] && [ \"\$(wc -l < $N)\" = 2 ] && grep -q 'Enregistrer sans envoyer' $N && grep -q '/depense/nouvelle' $N"

@@ -1,0 +1,11 @@
+# JARVIS OS — toutes les 5 minutes : une semaine confirmée dans JARVIS attend-elle Hermes ? (hermes-portail-cra.service)
+[Unit]
+Description=CRA de la semaine : vérifier toutes les 5 minutes si une semaine confirmée attend
+
+[Timer]
+OnBootSec=3min
+OnUnitInactiveSec=5min
+AccuracySec=30s
+
+[Install]
+WantedBy=timers.target

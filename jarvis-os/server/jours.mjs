@@ -13,6 +13,7 @@
    seulement pour ce qu'elles ne lisent pas), puis le bilan corrigé lui est remontré.
    Gardé à part, dans jours.json (600). Aucun outil MCP ne le lit encore : le CRA d'Hermes le lira (étape 3). */
 import fs from 'node:fs';
+import path from 'node:path';
 import {feries} from './radar.mjs';
 import {paris} from './notify.mjs';
 
@@ -165,19 +166,20 @@ const fractionsDe = (p) => { const ma = /\bmatin(ee)?s?\b/.test(p), ap = /\b(apr
 function datesDe(p, b) {
   const [y, m] = b.mois.split('-').map(Number), n = dernierJour(y, m), out = new Set(), refus = [];
   let q = ' ' + p + ' ';
-  const parJour = (d, mo) => { if (mo && +mo !== m) { refus.push('le ' + d + '/' + mo + ' n’est pas en ' + libelleMois(b.mois)); return; } if (d >= 1 && d <= n) out.add(ymdDe(y, m, d)); else refus.push('il n’y a pas de ' + d + ' en ' + libelleMois(b.mois)); };
+  const parJour = (d, mo) => { if (b.resoudre) { const r = b.resoudre(+d, mo && +mo); if (r) out.add(r); else refus.push('le ' + d + (mo ? '/' + mo : '') + ' n’est pas dans la semaine'); return; }   /* une semaine (0.84.0) : le jour du mois est unique sur cinq jours */
+    if (mo && +mo !== m) { refus.push('le ' + d + '/' + mo + ' n’est pas en ' + libelleMois(b.mois)); return; } if (d >= 1 && d <= n) out.add(ymdDe(y, m, d)); else refus.push('il n’y a pas de ' + d + ' en ' + libelleMois(b.mois)); };
   if (/\b(le reste( du mois)?|tout le reste|les autres jours|les jours restants|(tous )?les jours a confirmer|reste du mois)\b/.test(q)) { b.aConfirmer.forEach((d) => out.add(d)); q = q.replace(/\b(le reste( du mois)?|tout le reste|les autres jours|les jours restants|(tous )?les jours a confirmer|reste du mois)\b/g, ' '); }
   if (/\btout le mois\b/.test(q)) { b.jours.filter((d) => d.ouvre && !d.ferie).forEach((d) => out.add(d.date)); q = q.replace(/\btout le mois\b/g, ' '); }
   const sem = new RegExp('\\b(?:tous les|les|chaque) (' + SEM_NRM.join('|') + ')s?\\b', 'g');
   q = q.replace(sem, (_, j) => { const k = SEM_NRM.indexOf(j); b.jours.filter((d) => dowDe(d.date) === k).forEach((d) => out.add(d.date)); return ' '; });
   q = q.replace(/\b(?:du|de|entre le|entre)\s+(\d{1,2})(?:er)?(?:\/(\d{1,2}))?(?:\s+[a-z]+)?\s+(?:au|a|et le|et)\s+(\d{1,2})(?:\/(\d{1,2}))?\b/g, (_, a, ma, z, mz) => {
-    if ((ma && +ma !== m) || (mz && +mz !== m)) { refus.push('une période hors de ' + libelleMois(b.mois)); return ' '; }
+    if (!b.resoudre && ((ma && +ma !== m) || (mz && +mz !== m))) { refus.push('une période hors de ' + libelleMois(b.mois)); return ' '; }
     for (let d = +a; d <= +z; d++) parJour(d); return ' ';
   });
   q = q.replace(/\b(\d{1,2})(?:er)?\s*(?:-|à|a)\s*(\d{1,2})\b(?!\s*h)/g, (_, a, z) => { for (let d = +a; d <= +z; d++) parJour(d); return ' '; });
   q.replace(/\b(\d{1,2})(?:er)?(?:\/(\d{1,2})(?:\/\d{2,4})?)?\b(?!\s*(?:h\b|heures?|jours?\b|demi))/g, (_, d, mo) => { parJour(+d, mo); return ' '; });
   const moisNom = MOIS.map(nrm).findIndex((x) => new RegExp('\\b' + x + '\\b').test(q));
-  if (moisNom >= 0 && moisNom !== m - 1) refus.push('« ' + MOIS[moisNom] + ' » n’est pas le mois du bilan');
+  if (moisNom >= 0 && moisNom !== m - 1 && !b.resoudre) refus.push('« ' + MOIS[moisNom] + ' » n’est pas le mois du bilan');
   return {dates: [...out].sort(), refus};
 }
 /* lit sa phrase : {changements: [{dates, fractions, code}], nonLu: [morceaux], refus: [textes]} ; rien n'est appliqué ici */
@@ -316,6 +318,109 @@ export function createJours({file, agenda, claude = null, push = async () => [],
   }
   async function effacer(ym) { const x = M(ym); x.corrections = {}; x.historique.push({at: now(), quoi: 'corrections effacées'}); noter(); await lire(ym); if (x.etat === 'a_revoir') x.etat = 'a_valider'; noter(); return x; }
 
+  /* ---------- 0.84.0 : le CRA de la semaine (sa décision du 25/11/2026 : Hermes à la place de Chronos dès le vendredi 27/11) ----------
+     Le vendredi à midi (le raccourci a noté le jour à 11 h), le bilan de la semaine : 1 pour chaque journée travaillée (télétravail, sur site,
+     ou lieu pas noté : seule compte l'absence de congé), rien pour un congé ou un férié ; une demi-journée de congé ou un conflit bloquent la
+     saisie automatique (règle de Chronos : ne pas inventer une quantité). Son oui dans JARVIS ; root le lit dans jours.json (`hermes-portail
+     cra-auto`), fait saisir et soumettre par Hermes, et pose le compte rendu dans portail-retours/ : JARVIS le lui notifie. */
+  if (!D.semaines || typeof D.semaines !== 'object' || Array.isArray(D.semaines)) D.semaines = {};
+  const S7 = (l) => (D.semaines[l] = D.semaines[l] || {etat: 'a_valider', historique: []});
+  const lundiDe = (s) => plusJour(s, -((dowDe(s) + 6) % 7));
+  const okLundi = (l) => /^\d{4}-\d{2}-\d{2}$/.test(String(l || '')) && !isNaN(Date.parse(l)) && dowDe(l) === 1;
+  const libelleSemaine = (l) => { const v = plusJour(l, 4); return 'du ' + jourDit(l) + ' au ' + jourDit(v) + ' ' + MOIS[+v.slice(5, 7) - 1]; };
+  function quantite(d) {
+    const tr = (c) => c === 'T' || c === 'S' || c === '?', nt = (c) => c === 'C' || c === 'F';
+    if (d.M === 'X' || d.A === 'X') return {q: null, bloque: 'resoudre'};
+    if (tr(d.M) && tr(d.A)) return {q: 1, lieu: d.M === d.A ? d.M : 'mixte'};
+    if (nt(d.M) && nt(d.A)) return {q: 0, lieu: d.M === 'F' || d.A === 'F' ? 'F' : 'C'};
+    return {q: null, bloque: 'demi'};
+  }
+  async function joursDeSemaine(lundi) {
+    if (!agenda.lie()) throw new Error('Google n’est pas relié à JARVIS : relie-le dans Réglages.');
+    const ag = await agendas(), samedi = plusJour(lundi, 5);
+    const [presence, feriesAgenda] = await Promise.all([agenda.evenements(ag.presence.id, lundi, samedi), agenda.evenements(ag.feries.id, lundi, samedi)]);
+    const parDate = {}, raisons = {};
+    for (const ym of [...new Set([lundi.slice(0, 7), plusJour(lundi, 4).slice(0, 7)])]) {
+      const b = bilan({ym, presence: presence || [], feriesAgenda: feriesAgenda || [], corrections: M(ym).corrections});
+      b.jours.forEach((d) => { parDate[d.date] = d; }); b.aResoudre.forEach((r) => { raisons[r.date] = r.raison; });
+    }
+    return {parDate, raisons};
+  }
+  async function lireSemaine(lundi) {
+    const s = S7(lundi);
+    try {
+      const {parDate, raisons} = await joursDeSemaine(lundi);
+      s.jours = [0, 1, 2, 3, 4].map((k) => {
+        const date = plusJour(lundi, k), d = parDate[date], qq = quantite(d);
+        return {date, jour: jourDit(date), M: d.M, A: d.A, ferie: d.ferie || null, corrige: !!d.corrige, q: qq.q, lieu: qq.lieu || '',
+          bloque: qq.bloque === 'resoudre' ? (raisons[date] || 'à résoudre') : qq.bloque === 'demi' ? 'demi-journée de congé : la quantité d’une demi-journée n’est pas définie, à saisir à la main' : ''};
+      });
+      s.empreinte = s.jours.map((d) => d.date.slice(8) + (d.q === null ? 'x' : d.q)).join('');
+      s.lu = now(); s.erreur = '';
+      if (s.etat === 'valide' && s.valide && s.valide.empreinte !== s.empreinte) { s.etat = 'a_valider'; s.historique.push({at: now(), quoi: 'changé depuis ton oui, avant la saisie'}); }
+    } catch (e) { s.erreur = TXT((e && e.message) || e, 200); }
+    noter(); return s;
+  }
+  function etatSemaine(l) {
+    const s = D.semaines[l]; if (!s) return null;
+    const auj = paris(new Date(now())).ymd, ven = plusJour(l, 4);
+    return {lundi: l, libelle: libelleSemaine(l), etat: s.etat, demande: !!s.notif && s.etat === 'a_valider', confirmable: auj >= ven, jours: s.jours || [], empreinte: s.empreinte || '',
+      bloque: (s.jours || []).some((d) => d.bloque), erreur: s.erreur || '', valide: s.valide ? {at: s.valide.at} : null, retour: s.retour || null};
+  }
+  const semaineRecente = () => Object.keys(D.semaines).filter(okLundi).sort().reverse().find((l) => D.semaines[l].notif || D.semaines[l].etat !== 'a_valider') || null;
+  function confirmerSemaine(l, empreinte) {
+    const s = D.semaines[l];
+    if (!s || !s.jours) return {ok: false, error: 'Semaine pas encore lue.'};
+    if (!['a_valider', 'valide', 'a_la_main'].includes(s.etat)) return {ok: false, error: 'Cette semaine est déjà soumise.'};   /* « à la main » : un nouveau oui relance Hermes (une tentative par oui) */
+    if (paris(new Date(now())).ymd < plusJour(l, 4)) return {ok: false, error: 'Le oui se donne à partir du vendredi : ton raccourci note chaque jour à 11 h.'};
+    if (s.jours.some((d) => d.bloque)) return {ok: false, error: 'Un jour bloque la saisie automatique : corrige-le, ou saisis cette semaine à la main.'};
+    if (String(empreinte || '') !== s.empreinte) return {ok: false, error: 'La semaine a changé depuis son affichage : relis-la.'};
+    s.etat = 'valide'; s.valide = {at: now(), empreinte: s.empreinte, jours: s.jours.map((d) => ({date: d.date, q: d.q}))};
+    s.historique.push({at: now(), quoi: 'validée'}); noter();
+    return {ok: true};
+  }
+  async function corrigerSemaine(l, texte) {
+    const s = S7(l);
+    if (['soumise', 'deja'].includes(s.etat)) return {ok: false, error: 'Cette semaine est déjà soumise : corrige-la sur le portail.'};
+    const t = TXT(texte, 800); if (t.length < 2) return {ok: false, error: 'Écris ce qui change, par exemple « jeudi 26 : congé ».'};
+    const {parDate} = await joursDeSemaine(l);
+    const jours = [0, 1, 2, 3, 4].map((k) => parDate[plusJour(l, k)]);
+    const pseudo = {mois: l.slice(0, 7), jours, aConfirmer: jours.filter((d) => d.M === '?' || d.A === '?').map((d) => d.date),
+      resoudre: (d, mo) => (jours.find((j) => +j.date.slice(8) === d && (!mo || +j.date.slice(5, 7) === mo)) || {}).date || null};
+    let lu = lireCorrections(t, pseudo), par = 'règles';
+    if (lu.nonLu.length && claude) { const c = await parClaude(t, pseudo).catch(() => null); if (c && c.changements.length) { lu = {changements: c.changements, nonLu: c.incompris ? [c.incompris] : [], refus: lu.refus}; par = 'Claude'; } }
+    if (!lu.changements.length) return {ok: false, error: lu.refus.length ? lu.refus.join(' ; ') + '.' : 'Je n’ai pas compris : écris par exemple « jeudi 26 : congé » ou « mardi : télétravail ».', nonLu: lu.nonLu};
+    const refus = [];
+    for (const ym of [...new Set(lu.changements.flatMap((c) => c.dates.map((d) => d.slice(0, 7))))]) {
+      const ap = appliquer(M(ym).corrections, lu.changements.map((c) => ({...c, dates: c.dates.filter((d) => d.slice(0, 7) === ym)})).filter((c) => c.dates.length), pseudo);
+      M(ym).corrections = ap.corrections; refus.push(...ap.refus);
+    }
+    const compris = comprisDit(lu.changements);
+    if (s.etat === 'valide') s.etat = 'a_valider';
+    s.historique.push({at: now(), quoi: 'corrigée : ' + TXT(compris, 200)}); noter();
+    await lireSemaine(l);
+    return {ok: true, compris, par, nonLu: lu.nonLu, refus: [...lu.refus, ...refus]};
+  }
+  const dirRetours = path.join(path.dirname(file), 'portail-retours');
+  /* les comptes rendus d'Hermes, posés par root : l'état de la semaine, et une notification (la première exécution, pour qu'il vérifie) */
+  async function lireRetours() {
+    let noms = []; try { noms = fs.readdirSync(dirRetours).filter((n) => /^cra-\d{4}-\d{2}-\d{2}\.json$/.test(n)); } catch { return; }
+    for (const n of noms) {
+      const f = path.join(dirRetours, n); let r = null;
+      try { r = JSON.parse(fs.readFileSync(f, 'utf8')); } catch { /* illisible : ignoré, puis retiré */ }
+      try { fs.unlinkSync(f); } catch { /* rien */ }
+      const l = n.slice(4, 14); if (!r || !okLundi(l)) continue;
+      const res = ['soumise', 'deja', 'rien', 'echec', 'blanc'].includes(r.resultat) ? r.resultat : 'echec', s = S7(l);
+      s.retour = {resultat: res, texte: TXT(r.texte, 700), premiere: r.premiere === true, at: +r.at || now()};
+      s.etat = res === 'soumise' ? 'soumise' : res === 'deja' ? 'deja' : res === 'blanc' ? s.etat : 'a_la_main';
+      s.historique.push({at: now(), quoi: 'Hermes : ' + res}); noter();
+      const L = libelleSemaine(l), url = '/#voir-cra-' + l, tag = 'cra-' + l;
+      if (res === 'soumise') await push({title: s.retour.premiere ? 'Première exécution d’Hermes : CRA de la semaine soumis' : 'CRA de la semaine soumis', body: TXT('Semaine ' + L + '. ' + (s.retour.premiere ? 'Vérifie sur le portail ce qu’Hermes a saisi, et corrige si besoin. ' : '') + s.retour.texte, 230), url, tag}).catch(() => {});
+      else if (res === 'deja') await push({title: 'CRA de la semaine : déjà soumis', body: TXT('Semaine ' + L + ' : Hermes n’a rien changé. ' + s.retour.texte, 230), url, tag}).catch(() => {});
+      else if (res !== 'blanc') await push({title: 'CRA de la semaine : pas soumis', body: TXT('Semaine ' + L + ' : ' + s.retour.texte + ' À faire à la main.', 230), url, tag}).catch(() => {});
+    }
+  }
+
   /* le 24 à midi (rattrapé jusqu'à la fin du mois si le serveur était arrêté) ; le dernier jour à midi, relu */
   const avertir = (ym, title, corps) => push({title, body: TXT(corps, 230), url: '/#voir-jours-' + ym, tag: 'jours-' + ym}).catch(() => {});
   let enTic = false;
@@ -323,6 +428,18 @@ export function createJours({file, agenda, claude = null, push = async () => [],
     if (enTic || !agenda.lie()) return; enTic = true;
     try {
       const t = paris(new Date(now())), ym = t.ymd.slice(0, 7), x = M(ym), dern = dernierJour(t.y, t.m);
+      await lireRetours();
+      if (dowDe(t.ymd) === 5 && t.hm >= heure) {   /* le vendredi à midi : la semaine, une notification */
+        const l = lundiDe(t.ymd), s = S7(l);
+        if (!s.notif) {
+          s.notif = t.ymd; noter(); await lireSemaine(l);
+          if (s.jours) {
+            const tr = s.jours.filter((d) => d.q === 1), rien = s.jours.filter((d) => d.q === 0), bl = s.jours.filter((d) => d.bloque);
+            const corps = (bl.length ? 'À voir : ' + bl.map((d) => d.jour + ' (' + d.bloque + ')').join(', ') + '. ' : '') + tr.length + ' jour' + (tr.length > 1 ? 's' : '') + ' travaillé' + (tr.length > 1 ? 's' : '') + (rien.length ? ' ; rien : ' + rien.map((d) => d.jour + (d.lieu === 'F' ? ' (férié)' : ' (congé)')).join(', ') : '') + '. ' + (bl.length ? 'Corrige dans JARVIS, ou saisis-la à la main.' : 'Confirme dans JARVIS : Hermes saisit et soumet ensuite.');
+            await push({title: 'CRA de la semaine ' + libelleSemaine(l), body: TXT(corps, 230), url: '/#voir-cra-' + l, tag: 'cra-' + l}).catch(() => {});
+          }
+        }
+      }
       if (t.d >= 24 && t.hm >= heure && !x.envoye24) {
         x.envoye24 = t.ymd; noter(); await lire(ym);
         if (x.bilan && x.etat !== 'valide') await avertir(ym, 'Tes jours de ' + MOIS[t.m - 1], resume(x.bilan) + ' Ton oui sur tes congés sert au CRA du 26.');
@@ -346,9 +463,23 @@ export function createJours({file, agenda, claude = null, push = async () => [],
     if (p === '/api/jours' && method === 'GET') {
       const ym = okMois(q && q.get('mois')) ? q.get('mois') : moisCourant(), x = M(ym);
       if (agenda.lie() && (!x.bilan || now() - (x.lu || 0) > 120e3)) await Promise.race([lire(ym), new Promise((z) => setTimeout(z, 20000))]);
-      return {status: 200, body: etat(ym)};
+      const l = semaineRecente();
+      return {status: 200, body: {...etat(ym), semaine: l ? etatSemaine(l) : null}};
+    }
+    if (p === '/api/jours/semaine' && method === 'GET') {   /* 0.84.0 : une semaine (le lien de sa notification) */
+      const l = okLundi(q && q.get('lundi')) ? q.get('lundi') : lundiDe(paris(new Date(now())).ymd), s = S7(l);
+      if (agenda.lie() && !['soumise', 'deja'].includes(s.etat) && (!s.jours || now() - (s.lu || 0) > 120e3)) await Promise.race([lireSemaine(l), new Promise((z) => setTimeout(z, 20000))]);
+      return {status: 200, body: etatSemaine(l)};
     }
     if (!p.startsWith('/api/jours/') || method !== 'POST') return null;
+    if (p.startsWith('/api/jours/semaine/')) {
+      const b = await lu(), l = okLundi(b.lundi) ? b.lundi : null;
+      if (!l) return {status: 400, body: {ok: false, error: 'Semaine attendue (son lundi, AAAA-MM-JJ).'}};
+      if (p === '/api/jours/semaine/confirmer') { const r = confirmerSemaine(l, b.empreinte); return {status: r.ok ? 200 : 409, body: r.ok ? etatSemaine(l) : r}; }
+      if (p === '/api/jours/semaine/corriger') { const r = await corrigerSemaine(l, b.texte); return {status: r.ok ? 200 : 400, body: r.ok ? {...etatSemaine(l), compris: r.compris, par: r.par, nonLu: r.nonLu, refus: r.refus} : r}; }
+      if (p === '/api/jours/semaine/relire') { await lireSemaine(l); return {status: 200, body: etatSemaine(l)}; }
+      return null;
+    }
     const b = await lu(), ym = okMois(b.mois) ? b.mois : moisCourant();
     if (p === '/api/jours/confirmer') { const r = confirmer(ym, b.empreinte); return {status: r.ok ? 200 : 409, body: r.ok ? etat(ym) : r}; }
     if (p === '/api/jours/corriger') { const r = await corriger(ym, b.texte); return {status: r.ok ? 200 : 400, body: r.ok ? {...etat(ym), compris: r.compris, par: r.par, nonLu: r.nonLu, refus: r.refus} : r}; }
@@ -358,5 +489,5 @@ export function createJours({file, agenda, claude = null, push = async () => [],
   }
   /* les jours validés d'un mois (pour le CRA d'Hermes, étape 3) : rien tant qu'il n'a pas dit oui */
   const valides = (ym) => { const x = D.mois[ym]; return x && x.etat === 'valide' && x.valide ? x.valide : null; };
-  return {etat, lire, confirmer, corriger, effacer, tic, demarrer, traiter, valides, brut: () => D};
+  return {etat, lire, confirmer, corriger, effacer, tic, demarrer, traiter, valides, lireSemaine, etatSemaine, confirmerSemaine, corrigerSemaine, lireRetours, brut: () => D};
 }
