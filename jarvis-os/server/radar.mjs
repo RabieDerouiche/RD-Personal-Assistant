@@ -104,6 +104,36 @@ export function courantes(liste, a, b) {
 export const courantDuMois = (c, Y, M) => courantes([{...c, faits: [], reels: []}], J(Y, M, 1), J(Y, M, dim(Y, M)))[0].montant;
 export const RANG_COURANT = {courses: 'Alimentation', boucherie: 'Alimentation', marche: 'Alimentation', restaurant: 'Restaurants et repas livrés', livraison: 'Restaurants et repas livrés', essence: 'Voiture', parking: 'Voiture',
   menage: 'Maison', coiffeur: 'Soin et santé', pharmacie: 'Soin et santé'};
+/* 0.93.0 (sa demande du 26/11/2026 : « déjà dépensé ce mois » et un historique) : ce qui est parti entre deux dates comprises.
+   - ses dépenses fixes dont le jour est passé (`occurrences` : une dépense qui commence plus tard, finie ou résiliée, la facture du mois,
+     le montant du mois d'un contrat ; une dépense retirée de sa liste n'est plus comptée) ;
+   - les échéances de ses paiements en plusieurs fois (comptées à part : `plans`) : celles dont la date est passée, ou qu'un mail dit
+     payées ; un paiement dit « plus à payer » (achat annulé, remboursé) ne compte pas du tout ;
+   - ce qu'il a noté de ses dépenses courantes (`reels`), jusqu'à `notesJusqua` ; une dépense « une fois par mois » cochée « Fait ce
+     mois-ci » sans note compte pour son montant prévu.
+   Rend les totaux, les postes (catégorie des dépenses fixes, rangement des dépenses courantes) et le détail ligne par ligne. */
+export function depenseEntre({fixes = [], courantes: cr = [], plans = {}, plansRetires = []} = {}, a, b, {notesJusqua = b} = {}) {
+  const lignes = [], da = ymd(a), db = ymd(b), dn = ymd(notesJusqua), moisA = da.slice(0, 7), ret = new Set(plansRetires || []);
+  if (b >= a) for (const f of fixes || []) for (const o of occurrences(f, a, b)) lignes.push({date: ymd(o.le), service: o.f.service, montant: cents(o.f.montant) / 100, poste: o.f.cat || 'Autres', sorte: 'fixe', ...(o.f.estime ? {estime: true} : {})});
+  for (const p of Object.values(plans || {})) {
+    if (!p || ret.has(p.id) || !Array.isArray(p.echeances)) continue;
+    const nom = (p.fois ? 'Paiement en ' + p.fois + ' fois : ' : 'Paiement en plusieurs fois : ') + (p.service || '');
+    for (const e of p.echeances) if (e && e.date >= da && (e.date <= db || (e.payee && e.date.slice(0, 7) === moisA && e.date <= dn))) lignes.push({date: e.date, service: nom, montant: cents(e.montant) / 100, poste: 'Paiements en plusieurs fois', sorte: 'plan'});
+  }
+  for (const c of cr || []) {
+    const poste = RANG_COURANT[c.type] || 'Autres dépenses courantes';
+    for (const r of c.reels || []) if (r && r.d >= da && r.d <= dn) lignes.push({date: r.d, service: c.service, montant: cents(r.m) / 100, poste, sorte: 'courante'});
+    if (c.mode === 'mois') for (const ym of c.faits || []) if (ym >= moisA && ym <= dn.slice(0, 7) && !(c.reels || []).some((r) => String(r.d).slice(0, 7) === ym)) lignes.push({date: ym + '-01', service: c.service, montant: cents(c.montant) / 100, poste, sorte: 'courante', fait: true});
+  }
+  lignes.sort((x, y) => (x.date < y.date ? -1 : x.date > y.date ? 1 : cents(y.montant) - cents(x.montant)));
+  const som = (k) => lignes.reduce((t, l) => t + (l.sorte === k ? cents(l.montant) : 0), 0) / 100, nb = (k) => lignes.filter((l) => l.sorte === k).length;
+  const fx = som('fixe'), pl = som('plan'), co = som('courante'), par = new Map();
+  for (const l of lignes) { const k = (l.sorte === 'courante' ? 'c|' : 'f|') + l.poste, x = par.get(k) || {label: l.poste, montant: 0, n: 0, ...(l.sorte === 'courante' ? {courant: true} : {})}; x.montant += cents(l.montant); x.n++; par.set(k, x); }
+  const postes = [...par.values()].map((x) => ({...x, montant: x.montant / 100})).sort((x, y) => y.montant - x.montant || String(x.label).localeCompare(String(y.label), 'fr'));
+  return {fixes: fx, plans: pl, courantes: co, total: Math.round((fx + pl + co) * 100) / 100, nFixes: nb('fixe'), nPlans: nb('plan'), nNotes: nb('courante'), postes, lignes};
+}
+/* 0.93.0 : l'historique garde au moins 24 mois (36 ici) */
+export const HISTO_MOIS = 36;
 export const eur = (n) => Number(n).toLocaleString('fr-FR', {minimumFractionDigits: 2, maximumFractionDigits: 2}).replace(/ /g, ' ') + ' €';
 export const jourCourt = (x) => new Intl.DateTimeFormat('fr-FR', {timeZone: 'UTC', weekday: 'short'}).format(x) + ' ' + String(x.getUTCDate()).padStart(2, '0') + '/' + String(x.getUTCMonth() + 1).padStart(2, '0');
 const MOIS_L = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
@@ -1111,6 +1141,7 @@ export function createRadar({file, gmail, claude = async () => ({ok: false, erro
       const t = paris(new Date(now()));
       if (t.hm >= matin && R.jours.matin !== t.ymd && gmail.lie()) { R.jours.matin = t.ymd; noter(); if (R.scan && R.scan.fini) lancer(quotidien).catch(() => {}); }
       if (t.hm >= soir && R.jours.soir !== t.ymd) { R.jours.soir = t.ymd; noter(); veille().catch(() => {}); }
+      if (cloturer(auj())) noter();   /* 0.93.0 : le premier tic d'un mois nouveau garde le bilan du mois clos (aucune notification) */
     } catch (e) { log('radar : tic impossible (' + TXT((e && e.message) || e, 200) + ')'); }
   }
   let timer = null;
@@ -1120,7 +1151,35 @@ export function createRadar({file, gmail, claude = async () => ({ok: false, erro
   /* le mois : ses dépenses fixes par catégorie. 0.81.0 (ses choix du 24/11/2026) : avec ses dépenses courantes (le mois entier, estimé), ce
      qu'il a noté avoir dépensé, le reste à vivre s'il a donné le montant de sa paie, et les six derniers mois. Le total des dépenses courantes
      de chaque mois est retenu au fil de l'eau (`R.evolution`) : un mois d'avant leur saisie n'en a pas. */
+  /* 0.93.0 (sa demande du 26/11/2026) : l'historique mois par mois. À la fin de chaque mois (au premier calcul du mois suivant : le tic de
+     minuit, ou la première ouverture du Radar si le serveur était arrêté), le bilan du mois clos est gardé dans `R.historique.mois` et ne
+     bouge plus : dépenses fixes passées, échéances de ses paiements en plusieurs fois, dépenses courantes notées, par poste, le budget des
+     dépenses courantes retenu au fil de l'eau (`R.evolution`), et le reste à vivre s'il avait donné le montant de sa paie. `suivi` = le mois
+     que le Radar suivait à son dernier calcul : un mois clos sans avoir été suivi (serveur arrêté plusieurs mois) est dit « reconstitué ».
+     Sur ce serveur seulement, comme le reste de radar.json : ni Pilotage, ni mémoire, ni serveur MCP, ni notification, ni journal. */
+  const arr2 = (n) => Math.round(n * 100) / 100;
+  function bilanDe(ym, t, reconstitue) {
+    const [Y, M] = ym.split('-').map(Number), a = J(Y, M - 1, 1), b = J(Y, M - 1, dim(Y, M - 1));
+    const d = depenseEntre({fixes: R.fixes, courantes: R.courantes, plans: vue().plans, plansRetires: R.plansRetires}, a, b), paie = (R.revenus && R.revenus.montant) || null;
+    return {mois: ym, fixes: d.fixes, plans: d.plans, courantes: d.courantes, total: d.total, ...(R.evolution && ym in R.evolution ? {prevu: R.evolution[ym]} : {}), postes: d.postes,
+      ...(paie ? {paie, resteAVivre: arr2(paie - d.total)} : {}), clos: ymd(t), ...(reconstitue ? {reconstitue: true} : {})};
+  }
+  function cloturer(t) {
+    const cur = ymd(t).slice(0, 7);
+    if (!R.historique || typeof R.historique !== 'object' || Array.isArray(R.historique) || !R.historique.mois || typeof R.historique.mois !== 'object') R.historique = {mois: {}, suivi: null};
+    const H = R.historique;
+    if (H.suivi === cur || (H.suivi && H.suivi > cur)) return false;   /* déjà fait ce mois-ci ; une horloge qui recule ne clôt ni n'efface rien */
+    const aClore = [];
+    if (/^\d{4}-\d{2}$/.test(String(H.suivi || ''))) { const p = depuisYmd(H.suivi + '-01'); for (let k = 0; k < 60; k++) { const ym = ymd(J(p.getUTCFullYear(), p.getUTCMonth() + k, 1)).slice(0, 7); if (ym >= cur) break; aClore.push(ym); } }
+    /* première fois (fichier d'avant 0.93.0) : les mois dont le budget des dépenses courantes avait été retenu (0.81.0) sont clos, « reconstitués » */
+    else aClore.push(...Object.keys(R.evolution || {}).filter((k) => /^\d{4}-\d{2}$/.test(k) && k < cur).sort());
+    for (const ym of aClore) if (!H.mois[ym]) H.mois[ym] = bilanDe(ym, t, ym !== H.suivi);
+    H.suivi = cur;
+    for (const k of Object.keys(H.mois).sort().slice(0, -HISTO_MOIS)) delete H.mois[k];
+    return true;
+  }
   function moisDe(t) {
+    if (cloturer(t)) sauver();
     const Y0 = t.getUTCFullYear(), M0 = t.getUTCMonth(), occ = (a, b) => R.fixes.flatMap((f) => occurrences(f, a, b)), som = (l) => l.reduce((s, o) => s + cents(o.f.montant), 0) / 100;
     const bornes = (k) => { const p = J(Y0, M0 - k, 1); return {Y: p.getUTCFullYear(), M: p.getUTCMonth(), a: p, b: J(p.getUTCFullYear(), p.getUTCMonth(), dim(p.getUTCFullYear(), p.getUTCMonth())), ym: ymd(p).slice(0, 7)}; };
     const cr = R.courantes || [], m = bornes(0), p = bornes(1), ce = occ(m.a, m.b), cats = [...new Set(ce.map((o) => o.f.cat || 'Autres'))];
@@ -1128,12 +1187,24 @@ export function createRadar({file, gmail, claude = async () => ({ok: false, erro
     const parts = cr.map((c) => ({c, montant: courantDuMois(c, m.Y, m.M), label: RANG_COURANT[c.type] || 'Autres dépenses courantes'})), totalCourantes = parts.reduce((s, x) => s + cents(x.montant), 0) / 100, totalFixes = som(ce);
     R.evolution = R.evolution || {};
     if (cr.length ? R.evolution[m.ym] !== totalCourantes : m.ym in R.evolution) { if (cr.length) R.evolution[m.ym] = totalCourantes; else delete R.evolution[m.ym]; for (const k of Object.keys(R.evolution).sort().slice(0, -24)) delete R.evolution[k]; sauver(); }
-    const avant = (k) => { const b = bornes(k), f = som(occ(b.a, b.b)), c = k === 0 ? (cr.length ? totalCourantes : null) : (b.ym in R.evolution ? R.evolution[b.ym] : null); return {mois: b.ym, libelle: MOIS_L[b.M] + ' ' + b.Y, fixes: f, courantes: c, reel: reelDe(b.ym), total: Math.round((f + (c || 0)) * 100) / 100}; };
+    /* 0.93.0 : un mois clos garde son bilan (dépenses fixes, budget retenu, notes) : il ne bouge plus quand ses dépenses fixes changent */
+    const HM = R.historique.mois, lib = (ym) => MOIS_L[+ym.slice(5, 7) - 1] + ' ' + ym.slice(0, 4);
+    const avant = (k) => { const b = bornes(k), g = k > 0 ? HM[b.ym] : null; if (g) return {mois: b.ym, libelle: lib(b.ym), fixes: g.fixes, courantes: g.prevu ?? null, reel: g.courantes, total: arr2(g.fixes + (g.prevu || 0))};
+      const f = som(occ(b.a, b.b)), c = k === 0 ? (cr.length ? totalCourantes : null) : (b.ym in R.evolution ? R.evolution[b.ym] : null); return {mois: b.ym, libelle: MOIS_L[b.M] + ' ' + b.Y, fixes: f, courantes: c, reel: reelDe(b.ym), total: Math.round((f + (c || 0)) * 100) / 100}; };
     const evolution = [5, 4, 3, 2, 1, 0].map(avant), total = Math.round((totalFixes + totalCourantes) * 100) / 100, paie = (R.revenus && R.revenus.montant) || null;
     const postes = cats.map((c) => { const l = ce.filter((o) => (o.f.cat || 'Autres') === c); return {id: plat(c), label: c, montant: som(l), n: l.length}; })
       .concat([...new Set(parts.map((x) => x.label))].map((lb) => { const l = parts.filter((x) => x.label === lb); return {id: 'c-' + plat(lb), label: lb, montant: l.reduce((s, x) => s + cents(x.montant), 0) / 100, courant: true, note: l.map((x) => x.c.service).join(', ') + ' · estimé'}; }))
       .sort((a, b) => b.montant - a.montant);
-    return {libelle: MOIS_L[M0] + ' ' + Y0, precedentLibelle: MOIS_L[p.M] + ' ' + p.Y, total, precedent: evolution[4].total, fixes: true, totalFixes, totalCourantes, reel: reelDe(m.ym), postes, evolution,
+    /* 0.93.0 : « déjà dépensé ce mois » : ses dépenses fixes passées (jusqu'à hier : celles d'aujourd'hui sont encore dans le reste à payer),
+       les échéances passées de ses paiements en plusieurs fois, et ce qu'il a noté de ses dépenses courantes ce mois-ci */
+    const hier = plus(t, -1), dep = depenseEntre({fixes: R.fixes, courantes: cr, plans: vue().plans, plansRetires: R.plansRetires}, m.a, hier, {notesJusqua: m.b});
+    const depense = {mois: m.ym, jusqua: hier >= m.a ? ymd(hier) : '', total: dep.total, fixes: dep.fixes, plans: dep.plans, courantes: dep.courantes, nFixes: dep.nFixes, nPlans: dep.nPlans, nNotes: dep.nNotes, postes: dep.postes, lignes: dep.lignes.slice(-120)};
+    /* l'historique, du plus récent au plus ancien : les mois clos (gardés), puis, tant qu'ils ne sont pas clos, les mois d'avant des « six mois »
+       (recalculés d'après ses dépenses fixes d'aujourd'hui : « estimé ») */
+    const historique = Object.values(HM).map((g) => ({...g, libelle: lib(g.mois)}))
+      .concat([1, 2, 3, 4, 5].map((k) => bornes(k)).filter((b) => !HM[b.ym]).map((b) => { const f = som(occ(b.a, b.b)), r = reelDe(b.ym); return {mois: b.ym, libelle: lib(b.ym), fixes: f, plans: 0, courantes: r, total: arr2(f + r), ...(b.ym in R.evolution ? {prevu: R.evolution[b.ym]} : {}), estime: true}; }))
+      .sort((x, y) => (x.mois < y.mois ? 1 : -1));
+    return {libelle: MOIS_L[M0] + ' ' + Y0, precedentLibelle: MOIS_L[p.M] + ' ' + p.Y, total, precedent: evolution[4].total, fixes: true, totalFixes, totalCourantes, reel: reelDe(m.ym), postes, evolution, depense, historique,
       ...(paie ? {paie, resteAVivre: Math.round((paie - total) * 100) / 100} : {})};
   }
   /* 0.66.0 : l'historique d'une dépense : un prélèvement par mois (le mail le plus récent du mois, complété par les autres), le plus récent d'abord */
