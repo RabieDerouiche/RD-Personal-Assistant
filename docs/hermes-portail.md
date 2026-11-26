@@ -627,8 +627,11 @@ pause avant que tout ceci marche :
 de « Pour moi » (qui ne garde que ce qui attend son oui) : CRA (la semaine, le mois avec ses mails et le CRA du
 client), notes de frais (abonnement d'IA, box, télétravail), jours du mois ; pour chaque routine, qui la fait
 (Chronos, Hermes à blanc, Hermes en réel), ses étapes et leur avancement, la dernière exécution (date, résultat),
-la prochaine date et les données prévues d'un coup d'œil. Maquette d'abord (données inventées), après la mise en
-service du CRA de la semaine.
+la prochaine date et les données prévues d'un coup d'œil. **Maquette faite le 26/11/2026** (`essais/jarvis-travail/`,
+données inventées, aucun nom réel) : filtres Tout, CRA, Notes de frais, Jours ; « Ce qui vient » en frise ; une carte
+par routine (qui, étapes reliées et barre d'avancement, prochaine et dernière exécution, données prévues, « À toi »
+en ambre) ; le détail dans une feuille du bas (déroulé daté, brouillon de mail avec « Envoyer » et « Modifier »,
+dernières exécutions). En attente de son avis avant de l'appliquer à l'app.
 
 **Dettes connues**
 - Un passage dont le navigateur ne démarre pas rend quand même le code 0 : juger à la réponse.
