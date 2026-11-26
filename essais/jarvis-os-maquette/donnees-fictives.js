@@ -155,6 +155,12 @@
   ];
   if (SCEN.bells) G['Faits'].push(['Assistants', 'Sonnette Kairos', 'bots+kairos@mail.grokbot.com', '', ''], ['Assistants', 'Lien Grok Argus', 'https://grok.com/bots/abc123', '', ''], ['Assistants', 'Sonnette Pirate', 'x@evil.example', '', '']);
   if (SCEN.pauseUntil) G['Faits'].push(['Grok Bot', "Grok en pause jusqu'au", SCEN.pauseUntil, '', 'Jarvis']);
+  /* 0.86.0 : Grok Bot arrêté (l'interrupteur de l'app) ; Hermes a ses routines et sa ligne d'État (données inventées) */
+  if (SCEN.grokOff) {
+    G['Faits'].push(['Grok Bot', 'Grok Bot arrêté le', fr(D(-1)), fr(D(-1)), 'Claude']);
+    G['Routines'].push(['Hermes', 'Veille du matin', 'Horaire (serveur de JARVIS)', 'Lun-ven 7h40', 'x', 'x', 'En place'], ['Hermes', 'Semaine à venir', 'Horaire (serveur de JARVIS)', 'Dim 18h10', 'x', 'x', 'En place'], ['Hermes', 'Prix suivis', 'Horaire (serveur de JARVIS)', 'Dim 17h', 'x', 'x', 'En place']);
+    G['État'].push(['Hermes', fr(D(0)) + ' 07:42', 'Veille du matin faite', fr(D(1)) + ' 07:40 (Veille du matin)', '']);
+  }
   G['Papiers'] = [
     ['Document', 'Personne', 'Où il est (lien Drive, ou « papier »)', "Valable jusqu'au", 'Sert pour', 'Mis à jour le', 'Remarque'],
     ['Passeport', 'Rabie', 'papier, tiroir', fr(D(210)), 'voyage', '', ''],

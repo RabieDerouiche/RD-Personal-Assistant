@@ -154,7 +154,7 @@ srv.listen(0, async () => {
       await p.evaluate(() => document.querySelector('.ux-seg [data-f="decider"]').click()); await p.waitForTimeout(400);
       ok('Pour moi : filtres Tout, Décider, À faire, Infos ; « Décider » ne garde que « À décider »', segs === 'tout,decider,faire,infos' && await p.evaluate(() => !document.getElementById('pm-dec').hidden && [...document.querySelectorAll('.pm-sec')].filter((x) => !x.hidden).length === 1 && !document.querySelector('.pm-sum:not([hidden])')), segs);
       await p.tap('.tab[data-tab="accueil"]'); await p.waitForTimeout(400); await p.tap('.tab[data-tab="demandes"]'); await p.waitForTimeout(500);
-      ok('Pour moi rouvert : de nouveau sur « Tout »', await p.evaluate(() => document.querySelector('.ux-seg [aria-pressed="true"]').dataset.f === 'tout' && [...document.querySelectorAll('.pm-sec')].every((x) => !x.hidden))); }
+      ok('Pour moi rouvert : de nouveau sur « Tout » (0.86 : tout ce qui attend ta réponse ; les réponses des bots restent sous « Infos »)', await p.evaluate(() => document.querySelector('.ux-seg [aria-pressed="true"]').dataset.f === 'tout' && [...document.querySelectorAll('.pm-sec')].every((x) => x.id === 'pm-rep' ? x.hidden : !x.hidden))); }
     // 0.73.0 — B3-page-5-pont
     /* Pour moi en filtres, recherche, Équipe, Athéna sans accent, brief, langue, CSS du menu « Tout », page d'un proche */
     { const ctxF = async (init) => { const c = await b.newContext({...devices['iPhone 15 Pro Max']}); await c.addInitScript(PAUSE_INIT); if (init) await c.addInitScript(init); const q = await c.newPage(); q.on('pageerror', (e) => errs.push('0.70 : ' + e.message)); return q; };
@@ -437,7 +437,7 @@ srv.listen(0, async () => {
       /* fermeture de crèche : la décision attend « en rappel » jusqu'à 1 mois avant ; « Mettre de côté » */
       ok('décision liée à une fermeture de crèche : en rappel jusqu\'à 1 mois avant, avec ses paliers', await p.evaluate(() => ![...document.querySelectorAll('article')].some((x) => /Garde pendant la fermeture/.test(x.textContent)) && [...document.querySelectorAll('.cote-it')].some((x) => /Garde pendant la fermeture/.test(x.textContent) && /En rappel · revient le/.test(x.textContent) && /vendredi d'avant/.test(x.textContent))));
       await open('Passeport'); const lt = await p.evaluate(() => { const b = [...document.querySelectorAll('#sheet .sheet-actions > div:not(.sa-more) .btn')].find((x) => /^Plus tard/.test(x.textContent)); const c = b && b.querySelector('.cost'); b.click(); return c ? c.textContent : ''; }); await p.waitForTimeout(600);
-      ok('« Plus tard » est gratuit (aucun bot réveillé) et dans les gestes principaux ; plus de « Mettre de côté » en double', lt === 'gratuit' && await p.evaluate(() => !!document.querySelector('#sheet .sheet-pick') && !/Mettre de côté/.test(document.getElementById('sheet').textContent)), lt);
+      ok('« Plus tard » ne réveille aucun bot (0.86 : plus de badge « gratuit ») et dans les gestes principaux ; plus de « Mettre de côté » en double', lt === '' && await p.evaluate(() => !!document.querySelector('#sheet .sheet-pick') && !/Mettre de côté/.test(document.getElementById('sheet').textContent)), lt);
       await p.evaluate(() => [...document.querySelectorAll('#sheet .sheet-pick .btn')].find((x) => /Sans date/.test(x.textContent)).click()); await p.waitForTimeout(800);
       const c1 = await p.evaluate(() => ({card: [...document.querySelectorAll('article')].some((x) => /^IrisÀ faire/.test(x.textContent) && /Passeport/.test(x.textContent)), cote: [...document.querySelectorAll('.cote-it')].map((x) => x.textContent)}));
       ok('« Plus tard » sans date : la carte quitte Pour moi pour « En attente, plus tard, en rappel », sans ligne pour un bot', !c1.card && c1.cote.some((x) => /^Passeport/.test(x) && /Plus tard, sans date · rappel chaque dimanche à 18 h/.test(x)), JSON.stringify(c1));
@@ -1567,6 +1567,40 @@ srv.listen(0, async () => {
       }
       const e0 = errs.length, r = await page('#demandes');
       ok('jours : sans bilan (maquette de base), rien de nouveau dans « Pour moi »', await r.evaluate(() => !document.getElementById('pm-jours')) && errs.length === e0, errs.slice(e0).join(' | ')); }
+    /* 0.86.0 : refonte UX du 26/11 (« encombré, pas super simple ni intuitif ») et la fin de Grok Bot (interrupteur « Grok Bot arrêté le » de Faits) */
+    { const q = await page('#demandes');
+      const u = await q.evaluate(() => ({rep: (document.getElementById('pm-rep') || {}).hidden, gratuit: [...document.querySelectorAll('#view .cost')].filter((x) => /gratuit/.test(x.textContent)).length,
+        fc: (() => { const b = document.getElementById('fc-start'); return b ? Math.round(b.getBoundingClientRect().height) : 0; })(), aide: /un appui ouvre le détail/.test(document.getElementById('view').textContent)}));
+      ok('0.86 : Pour moi « Tout » : ce qui attend ta réponse (les réponses des bots sous « Infos »), plus de badge « gratuit », « Traiter une par une » sur une ligne, plus de phrase d’aide', u.rep === true && u.gratuit === 0 && u.fc > 0 && u.fc < 56 && !u.aide, JSON.stringify(u));
+      await q.evaluate(() => document.querySelector('.ux-seg [data-f="infos"]').click()); await q.waitForTimeout(500);
+      ok('0.86 : Pour moi « Infos » : les réponses des bots', await q.evaluate(() => { const r = document.getElementById('pm-rep'); return !!r && !r.hidden && !!r.offsetParent; }));
+      await q.evaluate(() => document.querySelector('.ux-seg [data-f="faire"]').click()); await q.waitForTimeout(500);
+      const t = await q.evaluate(() => { const d = document.querySelector('#pm-taches details.nt-fold'); return d ? {open: d.open, sum: d.querySelector('summary').textContent} : null; });
+      ok('0.86 : Mes tâches : « Nouvelle tâche » replié derrière un bouton', !!t && t.open === false && /Nouvelle tâche/.test(t.sum), JSON.stringify(t));
+      await q.context().close(); }
+    { const q = await page('#espaces');
+      const e = await q.evaluate(() => ({lead: !!document.querySelector('#view .esp-lead'), eqRow: !!document.querySelector('.esp-row[data-go="equipe"]'), eqTile: !!document.querySelector('.esp-tile[data-go="equipe"]'), reg: !!document.querySelector('.esp-row[data-go="reglages"]')}));
+      ok('0.86 : Espaces : une seule porte vers Équipe (la tuile), Réglages gardé, plus de phrase d’introduction', !e.lead && !e.eqRow && e.eqTile && e.reg, JSON.stringify(e));
+      await q.evaluate(() => { location.hash = '#equipe'; }); await q.waitForTimeout(1200);
+      ok('0.86 : Grok actif : Équipe inchangée (les bots, le filtre Coût)', await q.evaluate(() => /Les bots/.test(document.querySelector('.view-title').textContent) && !!document.querySelector('.ux-seg [data-f="cout"]')));
+      await q.context().close(); }
+    { const q = await pageWith({grokOff: true}, '#equipe');
+      const g = await q.evaluate(() => ({titre: document.querySelector('.view-title').textContent, seg: [...document.querySelectorAll('#view .ux-seg button')].map((x) => x.firstChild.textContent), routines: [...document.querySelectorAll('.hmh-r li b')].map((x) => x.textContent), pause: /Grok en pause/.test(document.getElementById('status') ? document.getElementById('status').textContent : '')}));
+      ok('0.86 : Grok arrêté : Équipe devient « Hermes et ses routines » (sa carte, ses routines lues dans Pilotage), plus de coût de Grok, plus de « Grok en pause »', g.titre === 'Hermes et ses routines' && g.seg.join() === 'Hermes,Demandes,Routines' && g.routines.join() === 'Veille du matin,Semaine à venir,Prix suivis' && !g.pause, JSON.stringify(g));
+      await q.evaluate(() => { location.hash = '#espaces'; }); await q.waitForTimeout(1200);
+      ok('0.86 : Grok arrêté : la tuile d’Espaces dit Hermes et ses routines', await q.evaluate(() => { const t = document.querySelector('.esp-tile[data-go="equipe"]'); return !!t && /Hermes/.test(t.textContent) && /3 routines/.test(t.textContent); }));
+      await q.evaluate(() => { location.hash = '#demandes'; }); await q.waitForTimeout(1500);
+      const d = await q.evaluate(() => ({oui: /dans son chat|Tes oui à donner dans Grok/i.test(document.getElementById('view').textContent), couts: [...document.querySelectorAll('#view .cost')].map((x) => x.textContent).filter((x) => /passage|chat Grok|reprise/.test(x))}));
+      ok('0.86 : Grok arrêté : Pour moi sans « oui à donner dans Grok » ni badge de passage, de chat ou de reprise', !d.oui && !d.couts.length, JSON.stringify(d));
+      await q.evaluate(() => { document.querySelectorAll('#toasts .toast').forEach((t) => t.remove()); const c = [...document.querySelectorAll('article')].find((x) => /Dates du voyage/.test(x.textContent) && /Plus…|Ouvrir ›/.test(x.textContent)); [...c.querySelectorAll('button')].find((x) => /^(Plus…|Ouvrir ›)$/.test(x.textContent.trim())).click(); }); await q.waitForTimeout(900);
+      await q.evaluate(() => [...document.querySelectorAll('#sheet .sheet-actions .btn')].find((x) => /^Répondre/.test(x.textContent)).click()); await q.waitForTimeout(500);
+      const avant = await q.evaluate(() => ({canal: window.__G.Canal.length, sends: (window.__calls || []).filter((c) => c.tool === 'send_message').length}));
+      await q.evaluate(() => { const t = document.querySelector('#sheet .sheet-pick textarea'); t.value = 'Plutôt début avril.'; t.closest('form').requestSubmit(); }); await q.waitForTimeout(900);
+      const eff = await q.evaluate(() => document.getElementById('sheet').textContent + ' || ' + [...document.querySelectorAll('#toasts .toast')].map((x) => x.textContent).join(' || '));
+      await q.waitForTimeout(6000);
+      const apres = await q.evaluate(() => ({ligne: (window.__G.Canal[window.__G.Canal.length - 1] || []).join(' ¦ '), canal: window.__G.Canal.length, sends: (window.__calls || []).filter((c) => c.tool === 'send_message').length}));
+      ok('0.86 : Grok arrêté : répondre à un bot écrit une ligne pour Hermes, lue à son prochain passage, sans sonnette', apres.canal === avant.canal + 1 && / ¦ Rabie ¦ Hermes ¦ /.test(apres.ligne) && /Plutôt début avril/.test(apres.ligne) && apres.sends === avant.sends && /pour Hermes/.test(eff) && !/sonnette/.test(eff), JSON.stringify([apres, eff.slice(0, 200)]));
+      await q.context().close(); }
   } catch (e) { ok('exception', false, e.stack); }
   ok('aucune erreur de page', !errs.length, errs.join(' | '));
   console.log(out.join('\n')); console.log(fails ? fails + ' échec(s)' : 'Tout passe (' + out.length + ' vérifications). Captures : ' + SH);
