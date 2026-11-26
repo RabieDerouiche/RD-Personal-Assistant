@@ -11904,8 +11904,9 @@ void main(){
      2. Agenda, Grok arrêté : la feuille d'un jour, la fiche d'un événement ou d'une échéance et la légende disent JARVIS ou Hermes
         (avatar, « Écrire à Hermes », « Voir Travail » pour le CRA et les notes de frais, « Hermes suit » pour un prix) ; avant l'arrêt,
         rien ne change. L'historique garde le nom d'origine (« Fait par Chronos »).
-     3. Pour moi : une seule carte par sujet. Le dossier, ses demandes venues du Canal, la réponse reçue et ses échéances tiennent dans
-        une carte ; la plus urgente décide de la place et de la couleur ; chaque élément garde sa feuille et ses actions. ================= */
+     3. Pour moi : une seule carte par sujet. Le dossier, ses demandes venues du Canal, son brouillon prêt, la réponse reçue et ses
+        échéances tiennent dans une carte ; la plus urgente décide de la place et de la couleur ; chaque élément garde sa feuille et ses
+        actions. ================= */
   {
     const GROK93 = ['hydra', 'medusa', 'unicorn', 'mermaid', 'griffon', 'cyclops', 'plutus'];
     const estGrok = (id) => GROK93.includes(id);
@@ -12007,8 +12008,8 @@ void main(){
     Object.keys(SHEETCFG).forEach((type) => {
       if (SANS93.has(type)) return;
       const P = SHEETCFG[type];
-      SHEETCFG[type] = (item) => {
-        const c = P(item);
+      SHEETCFG[type] = (item, ...reste) => {
+        const c = P(item, ...reste);
         if (!GOFF.on || !c) return c;
         const ech = type === 'echeance' && item ? item : null, fait = !!(ech && ech.doneBy), chronos = !!(ech && ech.bot === 'medusa'), kairos = !!(ech && ech.bot === 'unicorn');
         if (!fait) {
@@ -12081,8 +12082,8 @@ void main(){
 
     /* ---------- 3. Pour moi : une seule carte par sujet lié ----------
        Un sujet = un dossier de Pilotage encore ouvert (qu'il attende sa réponse ou celle de quelqu'un d'autre). Un élément de « Pour moi »
-       (une demande venue du Canal ou d'un dossier, une réponse reçue sur un dossier) ou une échéance lui est rattaché par cette règle,
-       dans cet ordre ; à chaque niveau, deux dossiers possibles = aucun (dans le doute, on ne réunit pas) :
+       (une demande venue du Canal ou d'un dossier, un brouillon Gmail sans carte, une réponse reçue sur un dossier) ou une échéance lui
+       est rattaché par cette règle, dans cet ordre ; à chaque niveau, deux dossiers possibles = aucun (dans le doute, on ne réunit pas) :
        1. lien explicite : l'Objet de la ligne du Canal, le libellé lui-même, ou un nom entre « » ou entre parenthèses est le nom d'un
           dossier (sans la casse, les accents ni la ponctuation ; le nom du dossier avec ou sans sa propre parenthèse) ;
        2. un nom raccourci entre parenthèses : tous ses mots significatifs sont dans le nom d'un seul dossier (« (rachat Expresso) » pour
@@ -12093,7 +12094,9 @@ void main(){
        l'autre : « la garde du 12 au 16/04 » ne va pas avec le dossier de « la garde du 15 au 19/02 ».
        Un mot significatif : 3 lettres au moins, sans accent, pas un nombre, ni un mot vide, ni un mot trop commun des suivis (dossier,
        relance, rappel, demande, réponse…). Sans dossier, deux demandes ne se réunissent que par un lien explicite (même Objet, même libellé).
-       Ne sont jamais réunis : un « oui » à donner dans le chat d'un bot, les cartes du CRA et des notes de frais, un brouillon Gmail sans carte. */
+       Un brouillon Gmail est lu par son objet, puis par son objet et le début de son texte ; une réponse reçue appartient au dossier où
+       JARVIS l'a repérée. Ne sont jamais réunis : un « oui » à donner dans le chat d'un bot, les cartes du CRA et des notes de frais, les
+       brouillons des mails du mois pour le travail (CRA, prolongation : espace Travail). */
     const sjPlat = (t) => String(t == null ? '' : t).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
     const sjCle = (t) => sjPlat(t).replace(/[^a-z0-9]+/g, ' ').trim();
     const SJ_VIDES = new Set('les des une aux sur par pour avec sans dans que qui ses son mes mon ton tes nos vos leur leurs est pas plus chez vers sous entre depuis pendant avant apres cette ces cet votre notre tout tous toute toutes the and for from'.split(' '));
@@ -12128,9 +12131,11 @@ void main(){
       return un(D.filter((d) => d.coeur.size >= 2 && sjLong(d.coeur, 5) && sjDans(d.coeur, B) && sjNumsOk(nums, d.nums)));
     }
     const sjCanalDe = (d) => (S.canal || []).find((l) => l.subject === d.title && (['toi', 'rabie'].includes(l.to) || /^attend ton oui/i.test(String(l.status || '')))) || null;
+    /* les mails du mois pour le travail (CRA, prolongation) ont leur carte dans l'espace Travail : ils ne sont pas rangés ici */
+    const SJ_TRAVAIL = /\bcra\b|prolongation|feuille de temps|timesheet|compte[- ]rendu d.activit/i;
     function sujets() {
       const D = sjDossiers(), G = new Map();
-      const grp = (cle, nom) => { let g = G.get(cle); if (!g) { g = {cle, nom, dem: [], rep: [], ech: []}; G.set(cle, g); } return g; };
+      const grp = (cle, nom) => { let g = G.get(cle); if (!g) { g = {cle, nom, dem: [], rep: [], br: [], ech: []}; G.set(cle, g); } return g; };
       (S.demandes || []).forEach((d) => {
         if (!d || d.kind === 'oui' || d.bot === 'medusa' || isCraDem(d)) return;
         const ln = /^Dossier «/.test(String(d.src || '')) ? null : sjCanalDe(d), objet = (ln && ln.objet) || '', k = sjLier(d.title, objet, D, d.ask);
@@ -12138,20 +12143,25 @@ void main(){
         else if (sjCle(objet)) grp('o|' + sjCle(objet), String(objet).trim()).dem.push(d);
         else grp('t|' + sjCle(d.title), d.title).dem.push(d);
       });
-      (S.dosReplies || []).forEach((x) => { const g = x && x.k && G.get('d|' + sjCle(x.k.title)); if (g) g.rep.push(x); });
-      /* les échéances : rattachées à un dossier qui a une carte, ou à une demande sans dossier (même règle, son libellé comme nom) */
+      /* une réponse reçue : le dossier où JARVIS l'a repérée ; un brouillon Gmail sans carte : son objet, puis son objet et le début de son texte */
+      (S.dosReplies || []).forEach((x) => { if (x && x.k && sjCle(x.k.title)) grp('d|' + sjCle(x.k.title), x.k.title).rep.push(x); });
+      (S.drafts || []).forEach((x) => { if (!x || demandeOfDraft(x) || SJ_TRAVAIL.test(String(x.subject || ''))) return; const k = sjLier(x.subject || '', '', D, x.body) || sjLier(String(x.subject || '') + ' ' + String(x.body || '').slice(0, 300), '', D); if (k) grp('d|' + k.cle, k.nom).br.push(x); });
+      /* les échéances : rattachées à un sujet qui a une carte (un dossier, ou une demande sans dossier : même règle, son libellé comme nom) */
       const noms = [...G.values()].map((g) => Object.assign(sjSujet(g.nom), {g}));
       (S.echeances || []).forEach((e) => { if (!e || e.doneBy) return; const k = sjLier(e.title, '', noms); if (k) k.g.ech.push(e); });
       const X = {tetes: new Map(), absorbe: new Set(), de: new Map()};
       for (const g of G.values()) {
-        if (!g.dem.length || g.dem.length + g.rep.length + g.ech.length < 2) continue;
+        const cartes = g.dem.length + g.rep.length + g.br.length;
+        if (!cartes || cartes + g.ech.length < 2) continue;
         const urg = (d) => (d.due == null ? 9999 : d.due), sien = (d) => (sjCle(d.title) === sjCle(g.nom) ? 0 : 1);
-        const tri = g.dem.map((d, i) => ({d, i})).sort((a, b) => urg(a.d) - urg(b.d) || (a.d.kind === 'afaire') - (b.d.kind === 'afaire') || sien(a.d) - sien(b.d) || a.i - b.i).map((x) => x.d);
-        g.tete = tri[0]; g.autres = tri.slice(1); g.ech.sort((a, b) => a.n - b.n);
+        g.dem = g.dem.map((d, i) => ({d, i})).sort((a, b) => urg(a.d) - urg(b.d) || (a.d.kind === 'afaire') - (b.d.kind === 'afaire') || sien(a.d) - sien(b.d) || a.i - b.i).map((x) => x.d);
+        g.ech.sort((a, b) => a.n - b.n);
+        /* en tête : la demande la plus urgente ; sans demande, la réponse reçue, sinon le brouillon */
+        g.tete = g.dem[0] || g.rep[0] || g.br[0];
         /* la plus urgente : une demande, ou une échéance qui le concerne (pas celle qu'Hermes ou un bot suit seul) */
         g.due = [...g.dem.map((d) => d.due), ...g.ech.filter((e) => !['bot', 'suivi'].includes(e.nature) && e.n >= -30).map((e) => e.n)].filter((n) => n != null).reduce((a, b) => (a == null || b < a ? b : a), null);
         X.tetes.set(g.tete, g); g.dem.forEach((d) => X.de.set(d, g));
-        g.autres.forEach((d) => X.absorbe.add(d)); g.rep.forEach((x) => X.absorbe.add(x));
+        g.dem.concat(g.rep, g.br).forEach((x) => { if (x !== g.tete) X.absorbe.add(x); });
       }
       return X;
     }
@@ -12160,8 +12170,9 @@ void main(){
     /* ce qui est lié au sujet, sauf l'élément déjà affiché : chaque ligne ouvre la feuille de l'élément, avec ses actions */
     function sjLies(g, sauf) {
       const qui = (d) => (GOFF.on && estGrok(d.bot) ? 'Hermes' : lvName(d.bot)), kd = (d) => PM_KIND[d.kind] || PM_KIND.afaire, rows = [];
-      [g.tete].concat(g.autres).filter((d) => d !== sauf).forEach((d) => rows.push(sjRow(kd(d)[1], sjCle(d.title) === sjCle(g.nom) ? (cap1(pmAsk(d)) || d.title) : d.title, kd(d)[0] + ' · ' + qui(d) + (d.due != null ? ' · ' + dueTxt(d.due) : ''), d.due != null && d.due <= 3, () => openItem('demande', d), d.id)));
-      g.rep.forEach((x) => rows.push(sjRow('inbox', 'Réponse reçue de ' + x.mail.from, x.mail.subject, true, () => openSheet({bot: GOFF.on && estGrok(x.k.bot) ? 'hermes' : x.k.bot, kicker: 'Réponse reçue · ' + x.k.title, title: x.mail.subject, say: x.mail.snippet || 'Une réponse est arrivée sur ce dossier.', extra: () => dosReplyCard(x), actions: []}), x.id)));
+      g.dem.filter((d) => d !== sauf).forEach((d) => rows.push(sjRow(kd(d)[1], sjCle(d.title) === sjCle(g.nom) ? (cap1(pmAsk(d)) || d.title) : d.title, kd(d)[0] + ' · ' + qui(d) + (d.due != null ? ' · ' + dueTxt(d.due) : ''), d.due != null && d.due <= 3, () => openItem('demande', d), d.id)));
+      g.rep.filter((x) => x !== sauf).forEach((x) => rows.push(sjRow('inbox', 'Réponse reçue de ' + x.mail.from, x.mail.subject, true, () => openSheet({bot: GOFF.on && estGrok(x.k.bot) ? 'hermes' : x.k.bot, kicker: 'Réponse reçue · ' + x.k.title, title: x.mail.subject, say: x.mail.snippet || 'Une réponse est arrivée sur ce dossier.', extra: () => dosReplyCard(x), actions: []}), x.id)));
+      g.br.filter((x) => x !== sauf).forEach((x) => rows.push(sjRow('send', x.subject || 'Brouillon sans objet', 'Brouillon prêt' + ((x.to || []).length ? ' · à ' + x.to[0] : ' · sans destinataire'), false, () => openItem('draft', x), 'b:' + x.id)));
       g.ech.forEach((e) => rows.push(sjRow('cal', e.title, NATURE[e.nature] + ' · ' + late(e.n), e.n <= 3 && !['bot', 'suivi'].includes(e.nature), () => openItem('echeance', e), e.id)));
       return rows.length ? h('div', {class: 'pm-lies'}, h('small', {class: 'pm-lies-t', text: 'Aussi dans ce sujet · ' + rows.length}), rows) : null;
     }
@@ -12171,25 +12182,28 @@ void main(){
     const avecSujets = (fn) => {
       if (SJ.X) return fn();
       const X = sujets(); if (!X.tetes.size) return fn();
-      const dem0 = S.demandes, rep0 = S.dosReplies, dem1 = (dem0 || []).filter((d) => !X.absorbe.has(d)), rep1 = (rep0 || []).filter((x) => !X.absorbe.has(x));
-      S.demandes = dem1; S.dosReplies = rep1; SJ.X = X;
-      try { return fn(); } finally { if (S.demandes === dem1) S.demandes = dem0; if (S.dosReplies === rep1) S.dosReplies = rep0; SJ.X = null; }
+      const garde = (l) => (l || []).filter((x) => !X.absorbe.has(x)), dem0 = S.demandes, rep0 = S.dosReplies, br0 = S.drafts, dem1 = garde(dem0), rep1 = garde(rep0), br1 = garde(br0);
+      S.demandes = dem1; S.dosReplies = rep1; S.drafts = br1; SJ.X = X;
+      try { return fn(); } finally { if (S.demandes === dem1) S.demandes = dem0; if (S.dosReplies === rep1) S.dosReplies = rep0; if (S.drafts === br1) S.drafts = br0; SJ.X = null; }
     };
-    const PMC93 = pmCard;
-    pmCard = function (d) {
-      const card = PMC93.apply(this, arguments), g = SJ.X && SJ.X.tetes.get(d);
+    /* la carte du sujet : celle de l'élément en tête, au nom du sujet, avec la pastille de ce qui presse le plus et la liste du reste */
+    const sjPastille = (n) => h('span', {class: 'pill is-amber', text: n < 0 ? 'En retard' : n === 0 ? "Aujourd'hui" : 'Dans ' + n + ' j'});
+    function sjHabille(card, g, tete) {
       if (!g || !card) return card;
-      card.classList.add('pm-sujet'); card.dataset.sujet = g.nom; card.dataset.n = String(g.dem.length + g.rep.length + g.ech.length);
-      const t = card.querySelector('.pm-title');
-      if (t && sjCle(d.title) !== sjCle(g.nom)) { t.textContent = g.nom; t.after(h('p', {class: 'pm-sj-de', text: d.title})); }
-      const head = card.querySelector('.pm-head');
-      if (head && g.due != null && g.due <= 3 && !head.querySelector('.st-exp') && (d.due == null || g.due < d.due)) {
-        const old = head.querySelector('.pill.is-amber'); if (old) old.remove();
-        head.append(h('span', {class: 'pill is-amber', text: g.due < 0 ? 'En retard' : g.due === 0 ? "Aujourd'hui" : 'Dans ' + g.due + ' j'}));
-      }
-      const box = sjLies(g, d); if (box) card.append(box);
+      card.classList.add('pm-sujet'); card.dataset.sujet = g.nom; card.dataset.n = String(g.dem.length + g.rep.length + g.br.length + g.ech.length);
+      const dem = g.dem.includes(tete), t = card.querySelector(dem ? '.pm-title' : '.item-title'), head = card.querySelector(dem ? '.pm-head' : '.item-head');
+      if (t && dem && sjCle(tete.title) !== sjCle(g.nom)) { t.textContent = g.nom; t.after(h('p', {class: 'pm-sj-de', text: tete.title})); }
+      else if (t && !dem && sjCle(t.textContent) !== sjCle(g.nom)) t.before(h('p', {class: 'pm-sj-de pm-sj-nom', text: g.nom}));
+      if (head && g.due != null && g.due <= 3 && !head.querySelector('.st-exp') && (!dem || tete.due == null || g.due < tete.due)) { const old = head.querySelector('.pill.is-amber'); if (old) old.remove(); head.append(sjPastille(g.due)); }
+      const box = sjLies(g, tete); if (box) card.append(box);
       return card;
-    };
+    }
+    const PMC93 = pmCard;
+    pmCard = function (d) { return sjHabille(PMC93.apply(this, arguments), SJ.X && SJ.X.tetes.get(d), d); };
+    const DRC93 = dosReplyCard;
+    dosReplyCard = function (x) { return sjHabille(DRC93.apply(this, arguments), SJ.X && SJ.X.tetes.get(x), x); };
+    const DC93 = draftCard;
+    draftCard = function (x) { return sjHabille(DC93.apply(this, arguments), SJ.X && SJ.X.tetes.get(x), x); };
     const SD93 = SHEETCFG.demande;
     SHEETCFG.demande = (d) => {
       const c = SD93(d); if (!c) return c;
@@ -12217,7 +12231,7 @@ void main(){
       + '.rad-hm-p{list-style:none;margin:0;padding:8px 0 0;display:grid;gap:4px;border-top:1px solid rgba(255,255,255,.08)}.rad-hm-p li{display:flex;justify-content:space-between;gap:10px;font-size:13.5px}.rad-hm-p li span{color:var(--muted)}'
       + '.rad-hm-n{margin:0;font-size:12.5px}.rad-hist-plus{justify-self:start}'
       + '.talk-travail .talk-ic{display:inline-flex;color:var(--muted)}'
-      + '.pm-sujet .pm-sj-de{margin:-4px 0 0;font:600 13.5px var(--sans);color:var(--muted)}'
+      + '.pm-sujet .pm-sj-de{margin:-4px 0 0;font:600 13.5px var(--sans);color:var(--muted)}.pm-sujet .pm-sj-nom{margin:0}'
       + '.pm-lies{display:grid;gap:6px;margin-top:4px;padding-top:10px;border-top:1px solid rgba(255,255,255,.08)}.pm-lies-t{font:600 11px var(--sans);letter-spacing:.08em;text-transform:uppercase;color:var(--dim)}'
       + '.pm-lie{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:10px;width:100%;min-height:44px;padding:8px 10px;border-radius:12px;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.03);color:var(--fg);text-align:left;cursor:pointer;font:inherit}'
       + '.pm-lie-tx{display:grid;gap:1px;min-width:0}.pm-lie-tx b{font:600 14px var(--sans);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.pm-lie-tx small{color:var(--muted);font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}'

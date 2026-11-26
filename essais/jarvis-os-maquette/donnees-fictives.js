@@ -168,7 +168,8 @@
       ['Sinistre infiltrations (appartement)', 'En attente', "Déclarer le sinistre à l'assureur depuis son appli", fr(D(9)), 'Rabie', fr(D(-6)), 'Référence inventée 123', 'Iris', fr(D(-6)), "À faire : Déclarer le sinistre à l'assureur depuis son appli | Pourquoi : le syndic renvoie vers ton assurance | Temps : 15 min"],
       ['Rachat du crédit Expresso (organisme Alpha)', 'En cours', "Attendre l'appel du conseiller", fr(D(4)), 'Organisme Beta (conseiller)', fr(D(-8)), '', 'Iris', fr(D(-7)), ''],
       ['Assurance habitation', 'En attente', "Envoyer l'attestation de l'ancien assureur", '', 'Rabie', fr(D(-3)), '', 'Iris', fr(D(-3)), "À faire : Envoyer l'attestation de l'ancien assureur | Pourquoi : le nouveau contrat l'attend"],
-      ['Assurance auto', 'En attente', 'Choisir la formule', '', 'Rabie', fr(D(-3)), '', 'Iris', fr(D(-3)), 'Choix : Quelle formule ? | Options : Tiers / Tous risques | Pourquoi : le contrat se renouvelle bientôt']);
+      ['Assurance auto', 'En attente', 'Choisir la formule', '', 'Rabie', fr(D(-3)), '', 'Iris', fr(D(-3)), 'Choix : Quelle formule ? | Options : Tiers / Tous risques | Pourquoi : le contrat se renouvelle bientôt'],
+      ['Remboursement de la caution (ancien logement)', 'En cours', "Attendre la réponse du bailleur", '', 'Bailleur Delta', fr(D(-9)), '', 'Iris', fr(D(-9)), '']);
     G['À toi'].push(
       [fr(D(-6)), 'Iris', 'Sinistre infiltrations (appartement)', "Déclarer le sinistre à l'assureur depuis son appli"],
       [fr(D(-1)), 'Hermes', 'Devis du plombier', 'Oui/Non : Tu acceptes le devis du plombier ? | Pourquoi : il doit passer avant la fin du mois | Si oui : je confirme le passage | Si non : je demande un autre devis | Avant le : ' + fr(D(2))],
@@ -187,7 +188,9 @@
       [fr(D(30)), "Passage de l'expert (sinistre infiltrations)", 'Logement', '', 'À venir', 'Iris', '', 'Date à retenir'],
       [fr(D(5)), "Fin de l'offre de prêt Gamma (rachat Expresso)", 'Finances', '3 jours avant', 'À venir', 'Iris', '', 'Offre'],
       [fr(D(20)), "Renouvellement de l'assurance auto", 'Contrats', '', 'À venir', 'Iris', '', 'Fin de validité'],
-      [fr(D(25)), "Assurance : point annuel", 'Contrats', '', 'À venir', 'Iris', '', 'Date à retenir']);
+      [fr(D(25)), "Assurance : point annuel", 'Contrats', '', 'À venir', 'Iris', '', 'Date à retenir'],
+      [fr(D(8)), "Passage de l'expert (Dégât des eaux)", 'Logement', '', 'À venir', 'Iris', '', 'Date à retenir'],
+      [fr(D(12)), 'Point sur le remboursement de la caution', 'Logement', '', 'À venir', 'Iris', '', 'À faire par moi']);
   }
   G['Papiers'] = [
     ['Document', 'Personne', 'Où il est (lien Drive, ou « papier »)', "Valable jusqu'au", 'Sert pour', 'Mis à jour le', 'Remarque'],
@@ -275,6 +278,10 @@
     ]
   };
 
+  /* 0.93.0, scénario « sujets » : trois brouillons Gmail sans carte (inventés) : un pour le sinistre, deux pour un dossier qui n'attend pas sa réponse */
+  if (SCEN.sujets) MAIL.drafts.push({id: 'DRAFT93', threadId: 'dth93', toRecipients: ['sinistres@assureur.example'], ccRecipients: [], date: new Date(now - 3600000 * 3).toISOString(), subject: "Déclaration de sinistre : infiltrations dans l'appartement", plaintextBody: 'Bonjour,\nJe déclare un sinistre : des infiltrations sont apparues au plafond du salon.'},
+    {id: 'DRAFT94', threadId: 'dth94', toRecipients: ['bailleur@delta.example'], ccRecipients: [], date: new Date(now - 3600000 * 4).toISOString(), subject: 'Relance : remboursement de la caution', plaintextBody: "Bonjour,\nSans nouvelle de votre part depuis l'état des lieux, je vous relance."},
+    {id: 'DRAFT95', threadId: 'dth95', toRecipients: ['bailleur@delta.example'], ccRecipients: [], date: new Date(now - 3600000 * 2).toISOString(), subject: 'Dernier courrier avant recours', plaintextBody: "Bonjour,\nLe remboursement de la caution de l'ancien logement n'est toujours pas arrivé."});
   if (SCEN.draftPj) MAIL.drafts.push({id: 'DRAFT9', threadId: 'dth9', toRecipients: ['agence@example.org'], ccRecipients: [], date: new Date(now - 3600000).toISOString(), subject: 'Dossier location', plaintextBody: 'Bonjour,\nVoici le dossier.', pieces: ['dossier.pdf']});   /* 0.85.0 : un brouillon avec pièce jointe */
 
   /* plages A1 */
