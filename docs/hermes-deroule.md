@@ -136,6 +136,14 @@ exécution réelle de chaque routine lui est notifiée** pour qu'il vérifie et 
   dans la colonne Réponse. Ses questions arrivent dans « À toi » (`Pour = Rabie`).
 - À venir, sur sa demande : voir et lancer les routines d'Hermes depuis JARVIS ; un réveil local d'Hermes par
   JARVIS (sans mail) quand une ligne lui est adressée.
+- **Pilotage hébergé par JARVIS (0.88.0, son QCM du 26/11/2026 : « JARVIS seule source »)** : après la bascule, Pilotage
+  n'est plus le classeur Google mais le magasin du serveur JARVIS (`pilotage.json`), le classeur devenant une archive. Pour
+  Hermes rien ne change : mêmes outils (`pilotage_lire`, `pilotage_ajouter`, `pilotage_modifier`, `pilotage_etat`,
+  `canal_repondre`, `prix_relever`…), mêmes onglets, mêmes droits et mêmes filtres (rien de bancaire, colonnes bornées, son nom
+  imposé), mais sans aller-retour chez Google (plus rapide, et Pilotage se lit même si Google est déconnecté). Le Canal reste la
+  file des demandes (une ligne `Pour = Hermes` le réveille localement), sans sonnette. Claude lit l'état courant par
+  `jarvis_pilotage_lire`. Mode, commandes, copies chiffrées et retour arrière : `docs/jarvis-os-reprise.md`, « Pilotage hébergé
+  par JARVIS ».
 
 ## Mettre en service (ordre)
 

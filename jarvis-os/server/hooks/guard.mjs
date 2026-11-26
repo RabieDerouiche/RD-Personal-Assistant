@@ -58,6 +58,7 @@ process.stdin.on('end', () => {
     process.exit(0);
   }
   if (!name.startsWith('mcp__') || (LECTURE.test(verb) && !ACTION.test(verb.replace(LECTURE, '_')))) process.exit(0);   /* lecture : permise */
+  if (verb === 'jarvis_pilotage_lire') process.exit(0);   /* 0.88.0 : Pilotage hébergé par JARVIS, lu par son connecteur (lecture seule) */
   if (MODE === 'mission' && /create_draft|update_draft/.test(verb) && /gmail/i.test(name)) process.exit(0);
   if (MODE === 'bot') {
     if (/append_values$/.test(verb) && /sheet/i.test(name)) {

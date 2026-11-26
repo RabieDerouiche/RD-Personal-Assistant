@@ -10,7 +10,7 @@ export const ONGLETS = [['Canal', 'A1:H3000'], ['Dossiers', 'A1:J500'], ['Éché
   ['État', 'A1:E30'], ['Expéditeurs', 'A1:F100'], ['Autonomie', 'A1:C100'], ['Journal', 'A1:E5000'], ['Déploiement', 'A1:Z300'], ['Textes des routines', 'A1:Z300'], ['Sources', 'A1:Z200']];
 const KEEP = 30;
 
-export function createSauvegarde({S, save, read, linked, dir, now = () => Date.now(), heure = '03:00'}) {
+export function createSauvegarde({S, save, read, linked, dir, now = () => Date.now(), heure = '03:00', apres = null}) {
   fs.mkdirSync(dir, {recursive: true, mode: 0o700});
   S.sauvegarde = Object.assign({last: '', at: 0, error: ''}, S.sauvegarde || {});
   const files = () => fs.readdirSync(dir).filter((f) => /^\d{4}-\d{2}-\d{2}\.json$/.test(f)).sort();
@@ -30,7 +30,9 @@ export function createSauvegarde({S, save, read, linked, dir, now = () => Date.n
     fs.writeFileSync(tmp, JSON.stringify(copy), {mode: 0o600}); fs.renameSync(tmp, f);
     files().slice(0, -KEEP).forEach((x) => fs.rmSync(path.join(dir, x), {force: true}));
     Object.assign(S.sauvegarde, {last: t.ymd, at: now(), error: manque.length ? 'Onglets illisibles : ' + manque.join(', ') + '.' : ''}); save();
-    return {ok: true, date: t.ymd, onglets: Object.keys(copy.onglets).length, manque};
+    /* 0.88.0 : Pilotage hébergé par JARVIS, ensuite la copie chiffrée dans Drive (son échec n'empêche pas la copie du serveur) */
+    let drive = null; if (apres) { try { drive = await apres(); } catch (e) { drive = {ok: false, error: String(e && e.message || e).slice(0, 200)}; } }
+    return {ok: true, date: t.ymd, onglets: Object.keys(copy.onglets).length, manque, ...(drive ? {drive: {ok: !!drive.ok, nom: drive.nom || '', error: drive.error || ''}} : {})};
   }
   /* chaque minute : une copie par jour, après l'heure prévue, si Google est relié */
   async function tick() {
@@ -58,6 +60,7 @@ export function createSauvegarde({S, save, read, linked, dir, now = () => Date.n
     }
     return {dates: [a.slice(0, 10), b.slice(0, 10)], onglets: out};
   }
-  const status = () => ({last: S.sauvegarde.last, at: S.sauvegarde.at, error: S.sauvegarde.error, copies: files().map((x) => x.slice(0, 10)), heure});
+  const status = () => ({last: S.sauvegarde.last, at: S.sauvegarde.at, error: S.sauvegarde.error, copies: files().map((x) => x.slice(0, 10)), heure,
+    ...(S.sauvegarde.drive ? {drive: (({at, nom, error, copies, racine}) => ({at: at || 0, nom: nom || '', error: error || '', copies: copies || 0, racine: !!racine}))(S.sauvegarde.drive)} : {})});   /* 0.88.0 : la copie chiffrée dans Drive */
   return {run, tick, diff, status};
 }
