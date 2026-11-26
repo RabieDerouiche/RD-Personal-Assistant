@@ -35,4 +35,5 @@ s'arrête) : seulement tes propres routines.
   rendu entier), `pilotage_etat`, puis `[SILENT]`.
 - **en réel** : Journal (`Type` ETAT, `Sujet` « Bilan de la semaine », `Détail` : le compte rendu entier),
   `jarvis_notifier` toujours (c'est un bilan : titre « Bilan de la semaine », texte : la première ligne et le
-  forfait), `pilotage_etat`, puis `[SILENT]`. Première exécution réelle : la notification le dit (skill `pilotage`).
+  forfait), `pilotage_etat`, `routine_fin` (`routine` « bilan-hebdo » ; skill `pilotage` : JARVIS signale lui-même
+  la première exécution réelle), puis `[SILENT]`.

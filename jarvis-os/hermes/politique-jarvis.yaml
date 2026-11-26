@@ -36,5 +36,7 @@ mcp_servers:
         - courrier_a_traiter
         - courrier_traite
         - hermes_usage
+        # 0.91.0 (suite) : fin d'un passage réel ; JARVIS signale lui-même la première exécution réelle
+        - routine_fin
       resources: false
       prompts: false

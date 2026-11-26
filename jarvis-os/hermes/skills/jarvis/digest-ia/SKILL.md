@@ -12,7 +12,7 @@ metadata:
 But : dire en un message ce qui, cette semaine, change ce qu'il peut faire avec ses outils d'IA ou en .NET.
 Cette routine lit le web : elle n'a donc accès ni à ses mails, ni à son agenda, ni à ses dossiers. Elle n'a de
 JARVIS que les outils du jeton « Veilleur » : `pilotage_lire` (Sources, Prix, Relevés, Sorties, Routines),
-`pilotage_ajouter` (Journal, Relevés, Sorties), `pilotage_etat`, `jarvis_notifier`, `jarvis_meteo`.
+`pilotage_ajouter` (Journal, Relevés, Sorties), `pilotage_etat`, `jarvis_notifier`, `jarvis_meteo`, `routine_fin`.
 
 ## Règles
 
@@ -45,10 +45,10 @@ JARVIS que les outils du jeton « Veilleur » : `pilotage_lire` (Sources, Prix, 
      `Détail` : le compte rendu entier, 1 800 caractères au plus), `pilotage_etat`, puis `[SILENT]` ;
    - **en réel** : Journal (`Type` ETAT s'il y a des points, PASSAGE sinon ; `Sujet` « Digest IA et .NET » ;
      `Détail` : le compte rendu entier), `jarvis_notifier` s'il y a au moins un point (titre « Digest IA et
-     .NET », texte : le nombre de points et le plus important), `pilotage_etat`, puis `[SILENT]`.
-   - **Première exécution réelle** (pas de clé « en réel : digest-ia » dans ta mémoire) : notifie toujours,
-     même sans point (« Première exécution réelle : Digest IA et .NET, à vérifier dans JARVIS »), puis retiens
-     la clé avec la date.
+     .NET », texte : le nombre de points et le plus important), `pilotage_etat`, puis `routine_fin` (`routine`
+     « digest-ia », `resume` : le nombre de points et le plus important, en une phrase), puis `[SILENT]`.
+     La première fois, JARVIS signale lui-même au propriétaire « Première exécution réelle » ; ne retiens rien
+     dans ta mémoire pour ça. Jamais `routine_fin` en double.
 
 ## Ce qu'Athéna faisait et que tu ne fais pas
 

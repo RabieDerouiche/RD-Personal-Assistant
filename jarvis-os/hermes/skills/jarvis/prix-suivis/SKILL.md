@@ -12,7 +12,7 @@ metadata:
 But : qu'il sache, sans rien lire, quand un produit qu'il veut acheter passe sous son seuil chez un vendeur fiable.
 Cette routine lit le web : elle n'a ni ses mails, ni son agenda détaillé, ni ses dossiers. De JARVIS, elle n'a que
 les outils du jeton « Veilleur » : `pilotage_lire` (Sources, Prix, Relevés, Sorties, Routines), `pilotage_ajouter`
-(Journal, Relevés, Sorties), `prix_relever`, `pilotage_etat`, `jarvis_notifier`, `jarvis_meteo`.
+(Journal, Relevés, Sorties), `prix_relever`, `pilotage_etat`, `jarvis_notifier`, `jarvis_meteo`, `routine_fin`.
 
 **Quel jour** : jusqu'au 01/12/2026 inclus, chaque jour ; ensuite le dimanche seulement. Un autre jour : réponds
 exactement `[SILENT]` sans appeler aucun outil.
@@ -49,5 +49,6 @@ exactement `[SILENT]` sans appeler aucun outil.
 - **en réel** : Journal (`Type` ALERTE s'il y a un nouveau 🔴, ETAT pour un nouveau 🟡, PASSAGE sinon ;
   `Sujet` « Prix suivis » ; `Détail` : le compte rendu), `jarvis_notifier` pour un nouveau 🔴 ou 🟡 seulement
   (titre : « 🔴 Achat : <produit> » ; texte : le prix total, le vendeur, le seuil), `pilotage_etat`, puis
-  `[SILENT]`. Première exécution réelle (pas de clé « en réel : prix-suivis » dans ta mémoire) : notifie
-  toujours, puis retiens la clé avec la date.
+  `routine_fin` (`routine` « prix-suivis », `resume` : le compte rendu en une phrase), puis `[SILENT]`. La
+  première fois, JARVIS signale lui-même au propriétaire « Première exécution réelle » ; ne retiens rien dans ta
+  mémoire pour ça. Jamais `routine_fin` en double, ni un jour sans passage.

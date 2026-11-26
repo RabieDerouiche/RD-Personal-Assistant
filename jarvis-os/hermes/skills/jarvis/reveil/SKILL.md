@@ -38,5 +38,6 @@ tu lis toi-même. Charge d'abord la skill `pilotage` (règles de chaque passage,
   « Aurait écrit : … ») ; tu marques quand même chaque courrier traité (`courrier_traite`, « en double : … »),
   pour ne pas le reprendre au réveil suivant. Pas de `canal_repondre`. Puis `[SILENT]`.
 - **en réel** : Journal (`Sujet` « Réveil »), `jarvis_notifier` pour un 🔴 Achat, une décision ou une échéance
-  sous 2 jours ouvrés (titre : le sujet exact ; texte : ce qui est prêt et ce qu'il doit décider), puis `[SILENT]`.
+  sous 2 jours ouvrés (titre : le sujet exact ; texte : ce qui est prêt et ce qu'il doit décider), `routine_fin`
+  (`routine` « reveil » ; skill `pilotage`), puis `[SILENT]`.
   Dossiers, Échéances et agenda : seulement après son « Oui » (skill `pilotage`, écritures à valider).
