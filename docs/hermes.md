@@ -230,6 +230,28 @@ exemples aux bancs : « resets 10:40am (UTC) », « resets Dec 2, 7pm (Europe/Pa
 
 Banc : `bash essais/hermes/relance.test.sh` (usage, `jobs.json`, systemctl et lanceur simulés).
 
+### La première exécution réelle, suivie par JARVIS (0.91.0, suite ; 26/11/2026)
+
+Le 26/11, chaque routine devait retenir dans la mémoire d'Hermes une clé « en réel : <routine> » et notifier « Première
+exécution réelle » tant qu'elle ne l'avait pas. Constat du serveur après la bascule : les six routines ont bien notifié,
+mais deux titres sont partis sans le préfixe (Digest IA, Sorties du week-end) et **une seule** routine a écrit sa clé
+(veille-du-matin) : les cinq autres auraient renvoyé « Première exécution réelle » à chaque passage (chaque jour pour
+prix-suivis). Désormais :
+- chaque passage **en réel** qui écrit sa ligne du Journal finit par l'outil `routine_fin` (`routine`, `resume`) de
+  JARVIS, ouvert aux deux jetons d'Hermes (exécutant et « Hermes Web », qui signe Hermes) ; jamais en double ni à blanc ;
+- JARVIS garde la liste des routines déjà signalées (`S.mcp.premieres` dans son état) ; la première fois, il envoie
+  lui-même « Hermes : Première exécution réelle : <routine> » (le libellé « Routine « … » » de `routines.conf`) avec le
+  résumé, « À vérifier dans JARVIS » ; ensuite il répond « déjà signalée » et n'envoie rien ;
+- liste fermée : les routines de `jarvis-os/hermes/routines.conf` (le serveur relit le kit du dépôt) ; résumé filtré
+  comme Pilotage (rien de bancaire) ; plafond de notifications du jour (12) ; aucun appareil abonné : rien n'est noté,
+  le passage suivant réessaie ;
+- les skills n'emploient plus la mémoire pour ça ; leurs notifications ordinaires gardent leur titre ;
+- politiques : 22 outils pour le serveur « jarvis », 9 pour « jarvis-web ».
+Les notifications du 26/11 étaient parties vers un ancien abonnement de son téléphone (remplacé vers 14 h 30, à la
+réouverture de l'app en 0.89.0) : **rien n'est marqué d'avance**, chaque routine lui envoie donc une fois sa « Première
+exécution réelle » sur le nouvel abonnement, à son prochain passage réel. Banc : `server.test.mjs` (première fois, puis
+rien ; hors liste ; jeton en lecture ; résumé vide ou bancaire ; veilleur).
+
 ## Étapes
 
 | Étape | Qui, où | Commande |

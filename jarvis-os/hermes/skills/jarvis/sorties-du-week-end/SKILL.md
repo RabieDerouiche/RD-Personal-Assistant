@@ -13,7 +13,7 @@ But : qu'il ait, le jeudi soir, 3 à 5 idées vérifiées pour le week-end, prê
 Cette routine lit le web : elle n'a ni ses mails, ni ses dossiers, ni le détail de son agenda. De JARVIS, elle
 n'a que les outils du jeton « Veilleur » : `pilotage_lire` (Sources, Prix, Relevés, Sorties, Routines),
 `pilotage_ajouter` (Journal, Relevés, Sorties), `sorties_contexte`, `agenda_libre`, `pilotage_etat`,
-`jarvis_notifier`, `jarvis_meteo`.
+`jarvis_notifier`, `jarvis_meteo`, `routine_fin`.
 
 ## Règles
 
@@ -43,6 +43,8 @@ n'a que les outils du jeton « Veilleur » : `pilotage_lire` (Sources, Prix, Rel
   week-end », `Détail` : les idées, une par ligne), `pilotage_etat`, puis `[SILENT]`.
 - **en réel** : Journal (`Type` ETAT, `Sujet` « Sorties du week-end », `Détail` : le compte rendu),
   `jarvis_notifier` dès qu'il y a au moins une idée (titre « Sorties du week-end » ; texte : le nombre d'idées
-  et la meilleure, « à choisir dans JARVIS »), `pilotage_etat`, puis `[SILENT]`. Rien de pertinent : PASSAGE,
-  aucune notification. Première exécution réelle (pas de clé « en réel : sorties-du-week-end » dans ta
-  mémoire) : notifie toujours, puis retiens la clé avec la date.
+  et la meilleure, « à choisir dans JARVIS »), `pilotage_etat`. Rien de pertinent : PASSAGE, aucune
+  notification. Dans les deux cas, en dernier : `routine_fin` (`routine` « sorties-du-week-end »,
+  `resume` : le nombre d'idées et la meilleure, en une phrase), puis `[SILENT]`. La première fois, JARVIS signale
+  lui-même au propriétaire « Première exécution réelle » ; ne retiens rien dans ta mémoire pour ça. Jamais
+  `routine_fin` en double.

@@ -70,9 +70,12 @@ avec ta mémoire, Pilotage a raison. Tu n'y accèdes que par les outils de JARVI
   dans JARVIS, pas sur Telegram (Telegram sert à discuter) : ta ligne du Journal (`Sujet` : le nom de la
   routine, `Détail` : le compte rendu), et `jarvis_notifier` seulement s'il y a une action, une décision ou
   une alerte (titre : la routine ; texte : l'essentiel en une ou deux phrases). Puis réponds `[SILENT]`.
-- **Première exécution réelle** : ta mémoire n'a pas encore la clé « en réel : <routine> ». Notifie toujours
-  (« Première exécution réelle : <routine> », ce que tu as fait, « à vérifier dans JARVIS »), même s'il n'y a
-  rien d'autre à dire, puis retiens la clé avec la date.
+- **Fin d'un passage en réel** (chaque passage qui écrit sa ligne du Journal) : en dernier, juste avant `[SILENT]`,
+  `routine_fin` (`routine` : le nom de la routine, ex. « veille-du-matin » ; `resume` : ce que tu as fait, une ou
+  deux phrases, sans montant bancaire). La première fois, JARVIS envoie lui-même au propriétaire « Première
+  exécution réelle : <routine> » avec ton résumé, et le note ; ensuite il ne fait rien. Ne t'en occupe pas
+  autrement : aucune clé « en réel : … » dans ta mémoire, et tes notifications gardent leur titre habituel.
+  Jamais `routine_fin` en double ni à blanc.
 - **Écritures à valider** (Dossiers, Échéances, agenda « Échéances ») : tant que le Canal n'a pas sa réponse
   « Oui » à ta ligne « Oui/Non : Hermes écrit lui-même dans Dossiers, Échéances et l'agenda Échéances ? »,
   tu prépares sans écrire : une seule ligne `Pour = Rabie` (pas de doublon tant qu'elle est ouverte), qui

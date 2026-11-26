@@ -1387,6 +1387,21 @@ const exeLisibles = (client) => (client.profil === 'executant' ? EXE_ONGLETS : V
 const exeAjoutables = (client) => (client.profil === 'executant' ? EXE_AJOUT : VEI_AJOUT);
 /* le nom écrit dans Pilotage, dans les gestes et devant une notification : celui que le jeton signe (le sien par défaut) */
 const exeNom = (client) => client.signe || client.name;
+/* 0.91.0 (suite) : les routines d'Hermes (nom → libellé), lues dans le kit du dépôt (routines.conf), relues au plus une fois par minute */
+const ROUTINES_CONF = process.env.JARVIS_ROUTINES_CONF || path.join(HERE, '..', 'hermes', 'routines.conf');
+let routinesCache = {at: 0, r: {}};
+function routinesHermes() {
+  if (now() - routinesCache.at < 60000 && Object.keys(routinesCache.r).length) return routinesCache.r;
+  const r = {};
+  try {
+    for (const l of fs.readFileSync(ROUTINES_CONF, 'utf8').split('\n')) {
+      if (/^\s*(#|$)/.test(l)) continue;
+      const c = l.split('|').map((x) => x.trim()); if (c.length < 6 || !/^[a-z0-9][a-z0-9-]{0,40}$/.test(c[0])) continue;
+      const m = c.slice(5).join('|').match(/Routine «\s*([^»]{2,60}?)\s*»/); r[c[0]] = m ? m[1] : c[0];
+    }
+  } catch { /* kit absent : aucune routine */ }
+  routinesCache = {at: now(), r}; return r;
+}
 const EXE_ENTETES = {'À toi': 3, Prix: 3};                             /* la ligne des en-têtes (1 ailleurs) */
 const EXE_LIGNES = {Journal: 5000, Canal: 3000, 'Relevés': 3000};      /* jusqu'où lire (1000 ailleurs) */
 const EXE_JOURNAL = ['ETAT', 'DECISION', 'DEMANDE', 'ALERTE', 'PASSAGE'], EXE_STATUTS = ['À faire', 'Fait', 'En cours', 'Attend ton oui'];
@@ -1558,6 +1573,25 @@ MCP_OUTILS.push(...[
       if (!(S.push && S.push.subs.length)) throw new Error('Aucun appareil du propriétaire n’a activé les notifications de JARVIS : rien n’est parti.');
       const n = await exeEcrire(client, 'jarvis_notifier', 'Notification : ' + titre + ' — ' + texte, async () => { const r = await PUSH.send({title: exeNom(client) + ' : ' + titre, body: texte, url: '/'}, {urgency: 'high'}), ok = r.filter((x) => x.ok).length; if (!ok) throw new Error('Le service de notifications a refusé l’envoi.'); return ok; }, {cle: 'notifs', max: EXE_NOTIFS_JOUR, dit: 'notifications'});
       return 'Notification envoyée (' + n + ' appareil' + (n > 1 ? 's' : '') + ').';
+    }},
+  /* 0.91.0 (suite) : la première exécution réelle d'une routine d'Hermes, suivie par JARVIS. Le 26/11/2026, Hermes devait retenir dans sa
+     mémoire une clé « en réel : <routine> » : une seule routine sur six l'a écrite (chaque passage suivant aurait renvoyé « Première exécution
+     réelle »), et deux titres sont partis sans ce préfixe. Désormais la routine appelle routine_fin à la fin de chaque passage EN RÉEL ; JARVIS
+     garde la liste des routines déjà signalées (S.mcp.premieres) et envoie lui-même, la première fois seulement, « Hermes : Première exécution
+     réelle : <routine> ». Liste fermée : les routines de jarvis-os/hermes/routines.conf (nom et libellé « Routine « … » » de leur consigne). */
+  {name: 'routine_fin', title: 'Fin d’un passage réel d’une routine', description: 'À appeler à la fin de CHAQUE passage EN RÉEL d’une de tes routines (jamais « en double » ni à blanc) : « routine » = son nom (' + Object.keys(routinesHermes()).join(', ') + '), « resume » = ce que tu as fait, en une ou deux phrases. La première fois, JARVIS envoie lui-même au propriétaire « Première exécution réelle : <routine> » avec ce résumé, et le note ; les fois suivantes, il ne fait rien. Tes notifications ordinaires (jarvis_notifier) ne changent pas.',
+    inputSchema: {type: 'object', properties: {routine: {type: 'string', description: 'Le nom de la routine (ex. « prix-suivis »)'}, resume: {type: 'string', description: 'Ce que tu as fait, une ou deux phrases'}}, required: ['routine', 'resume']}, annotations: {...EXE_ECRIT, openWorldHint: true}, profils: EXE_ET_VEILLEUR,
+    run: async (a, client) => {
+      const r = routinesHermes(), nom = exeCle(a.routine).replace(/^jarvis-/, '').trim(), lib = r[nom];
+      if (!lib) throw new Error('Routine inconnue : ' + clip(a.routine, 40) + '. Tes routines : ' + Object.keys(r).join(', ') + '.');
+      const resume = clip(a.resume, 300); if (resume.length < 2) throw new Error('« resume » est demandé : ce que tu as fait, en une ou deux phrases.');
+      exeSain(resume);
+      if (!S.mcp.premieres || typeof S.mcp.premieres !== 'object') S.mcp.premieres = {};
+      const deja = S.mcp.premieres[nom]; if (deja) return 'Première exécution réelle de « ' + lib + ' » déjà signalée le ' + exeQuand(deja.at) + ' : rien à faire.';
+      if (!(S.push && S.push.subs.length)) throw new Error('Aucun appareil du propriétaire n’a activé les notifications de JARVIS : la première exécution réelle n’est pas signalée (elle le sera au prochain passage).');
+      const n = await exeEcrire(client, 'routine_fin', 'Première exécution réelle : ' + lib + ' — ' + resume, async () => { const x = await PUSH.send({title: exeNom(client) + ' : Première exécution réelle : ' + lib, body: resume + ' À vérifier dans JARVIS.', url: '/'}, {urgency: 'high'}), ok = x.filter((y) => y.ok).length; if (!ok) throw new Error('Le service de notifications a refusé l’envoi.'); return ok; }, {cle: 'notifs', max: EXE_NOTIFS_JOUR, dit: 'notifications'});
+      S.mcp.premieres[nom] = {at: now(), par: exeNom(client)}; save();
+      return 'Première exécution réelle de « ' + lib + ' » signalée au propriétaire (' + n + ' appareil' + (n > 1 ? 's' : '') + ') et notée par JARVIS : les prochains passages n’enverront rien de plus.';
     }}
 ].map((o) => exeOutil(o, {google: o.name === 'jarvis_notifier' ? false : ['pilotage_lire', 'pilotage_ajouter', 'pilotage_etat', 'canal_repondre'].includes(o.name) ? 'pilotage' : true})));
 /* 0.88.0 : Pilotage hébergé par JARVIS, le classeur Google n'est plus qu'une archive : Claude (app Claude, profil « Lecture et propositions »)
