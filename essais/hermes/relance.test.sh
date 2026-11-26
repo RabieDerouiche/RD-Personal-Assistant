@@ -81,6 +81,7 @@ mkdir -p "$T/portail"; jobs "$T/jobs.json"; usage 100 40
 relancer() { : > "$T/appels"; env HERMES_RELANCE_JOBS="$T/jobs.json" HERMES_RELANCE_ETAT="$T/etat" HERMES_RELANCE_AVIS="$T/avis" HERMES_RELANCE_PORTAIL="$T/portail" \
   HERMES_GARDE_ETAT="$T/garde-arret" HERMES_RELANCE_GARDE_COUPE="$T/garde-coupe" HERMES_GARDE_POLITIQUE="$T/politique.yaml" HERMES_RELANCE_SYSTEMCTL="$T/systemctl" HERMES_RELANCE_LANCER="$T/lancer" \
   HERMES_RELANCE_USAGE_CMD="${CMD:-touch $T/lu; cat $T/usage.json}" HERMES_RELANCE_MAINTENANT="${QUAND:-$N}" HERMES_RELANCE_JARVIS_U=nobody HERMES_RELANCE_PLAFOND="${PLAF:-12}" \
+  HERMES_RELANCE_RESUME="${RESUME:-$T/resume}" HERMES_RELANCE_CONF="${CONF:-$T/routines.conf}" HERMES_RELANCE_MODES="$T/routines.mode" \
   python3 -I "$L" relancer "$@" > "$T/sortie" 2>&1; }
 lances() { cat "$T/lances" 2>/dev/null | wc -l; }
 QUAND=$((Q + 600)) relancer
@@ -170,12 +171,84 @@ verif "… une demande pour une unité hors liste (la passerelle) : ignorée" ba
 rm -f "$T/portail/relance-ndf.json"; relancer
 verif "… second passage : rien de relancé de nouveau" bash -c "! grep -q '^start' '$T/appels'"
 
+echo "== Le résumé des routines pour JARVIS (0.92.0 : « Hermes et ses routines » en direct)"
+rm -rf "$T/etat" "$T/avis" "$T/lances" "$T/portail" "$T/resume"; mkdir -p "$T/portail"; rm -f "$T/garde-arret" "$T/garde-coupe" "$T/etat-passerelle" "$T/echec-passerelle" "$T/lu"
+cp "$KIT/routines.conf" "$T/routines.conf"; printf 'veille-du-matin reel\nprix-suivis double\nprix-suivis reel\npirate reel\n' > "$T/routines.mode"
+PIEGE="/home/hermes/.hermes/secret-chemin sk-ant-JETONPIEGE123 portail.exemple.invalid « Objet du mail : facture de novembre »"
+resume_jobs() {   # resume_jobs <heure des erreurs> : une routine saine, trois en erreur (limite, réseau, autre), une en pause, une pas posée, des intrus
+  py "
+import json, sys
+f, quand, piege = sys.argv[1:4]
+J = [dict(id='a1', name='jarvis-veille-du-matin', enabled=True, state='scheduled', schedule=dict(kind='cron', expr='40 7 * * 1-5', display='40 7 * * 1-5'),
+          last_status='ok', last_run_at='2026-11-26T07:40:12+01:00', last_error=None, next_run_at='2026-11-27T07:40:00+01:00'),
+     dict(id='b2', name='jarvis-prix-suivis', enabled=True, state='scheduled', last_status='error', last_run_at=quand,
+          last_error=\"RuntimeError: You've hit your 5-hour limit · resets 10:40am (UTC) \" + piege, next_run_at='2026-11-27T09:00:00+01:00'),
+     dict(id='c3', name='jarvis-digest-ia', enabled=True, state='scheduled', last_status='error', last_run_at=quand, last_error='ValueError: ' + piege,
+          last_failure=dict(at=quand, detail=piege), next_run_at='demain <script>alert(1)</script> /etc/passwd'),
+     dict(id='d4', name='jarvis-reveil', enabled=True, state='scheduled', last_status='error', last_run_at=quand, last_error='ConnectionError: DNS ' + piege, next_run_at='2026-11-26T18:15:00+01:00'),
+     dict(id='e5', name='jarvis-bilan-hebdo', enabled=False, state='paused', paused_at='2026-11-26T08:00:00+01:00', last_status=None, last_run_at=None, next_run_at=None),
+     dict(id='p1', name='jarvis-pirate', enabled=True, state='scheduled', last_status='ok', last_run_at=quand, prompt=piege, next_run_at=quand),
+     dict(id='p2', name='jarvis-veille-du-matin/../../etc', enabled=True, state='scheduled', last_status='ok', last_run_at=quand),
+     dict(id='f6', name='autre-chose', enabled=True, state='scheduled', last_status='error', last_run_at=quand, last_error=piege)]
+json.dump({'jobs': J, 'updated_at': quand}, open(f, 'w'))" "$T/jobs.json" "$1" "$PIEGE"
+}
+res() { py "
+import json, sys
+d = json.load(open(sys.argv[1])); r = {x['nom']: x for x in d['routines']}
+sys.exit(0 if eval(sys.argv[2]) else 1)" "${RES:-$T/resume/routines.json}" "$1"; }
+resume_jobs "$(iso $((N - 30 * 3600)))"; relancer; code=$?
+verif "rien à relancer (erreurs de plus de 24 heures) : le résumé est écrit quand même, sans lire l'usage du forfait" bash -c "[ $code = 0 ] && grep -q 'Rien à relancer' '$T/sortie' && [ ! -f '$T/lu' ] && [ -f '$T/resume/routines.json' ]"
+verif "… dossier 750, fichier 640 (root et groupe de JARVIS), écrit d'un coup (aucun fichier temporaire laissé)" bash -c "[ \"\$(stat -c %a '$T/resume')\" = 750 ] && [ \"\$(stat -c %a '$T/resume/routines.json')\" = 640 ] && [ \"\$(ls '$T/resume')\" = routines.json ]"
+verif "… les six routines de routines.conf, dans l'ordre, avec leur libellé et leur horaire lisible" res "d['v'] == 1 and d['at'] == $N and d['liste'] is True and d['cron'] is True and list(r) == ['veille-du-matin', 'bilan-hebdo', 'reveil', 'digest-ia', 'prix-suivis', 'sorties-du-week-end'] and r['veille-du-matin']['libelle'] == 'Veille du matin' and r['digest-ia']['libelle'] == 'Digest IA et .NET' and r['veille-du-matin']['moment'] == 'du lundi au vendredi à 7 h 40' and r['reveil']['moment'] == 'chaque jour à 9 h 15, 13 h 15 et 18 h 15' and r['bilan-hebdo']['moment'] == 'le lundi à 8 h 50' and r['prix-suivis']['moment'] == 'chaque jour à 9 h' and r['sorties-du-week-end']['moment'] == 'le jeudi à 19 h'"
+verif "… le mode noté sur le serveur l'emporte (routines.mode, la dernière ligne gagne) ; sinon celui de routines.conf" res "r['veille-du-matin']['mode'] == 'réel' and r['prix-suivis']['mode'] == 'réel' and r['digest-ia']['mode'] == 'double' and r['reveil']['mode'] == 'double'"
+verif "… routine saine : ok, dernier et prochain passage en dates ISO refaites (UTC)" res "r['veille-du-matin'] == dict(nom='veille-du-matin', libelle='Veille du matin', moment='du lundi au vendredi à 7 h 40', mode='réel', posee=True, active=True, dernier='2026-11-26T06:40:12Z', resultat='ok', cause=None, prochain='2026-11-27T06:40:00Z')"
+verif "… une erreur devient une catégorie courte : limite du forfait, réseau, ou « erreur »" res "[r[n]['resultat'] + ':' + str(r[n]['cause']) for n in ('prix-suivis', 'reveil', 'digest-ia')] == ['erreur:limite du forfait', 'erreur:réseau', 'erreur:erreur']"
+verif "… assaini : ni le texte d'une erreur, ni un chemin, ni un jeton, ni un nom de portail, ni un contenu de mail, ni une date piégée" bash -c "! grep -qiE 'hit your|RuntimeError|ValueError|ConnectionError|/home|secret|JETONPIEGE|sk-ant|exemple|invalid|facture|Objet|script|passwd|demain' '$T/resume/routines.json'"
+verif "… une date qui n'en est pas une : rien (jamais recopiée)" res "r['digest-ia']['prochain'] is None and r['digest-ia']['dernier'] == '$(py "import datetime,sys; print(datetime.datetime.fromtimestamp(int(sys.argv[1]), datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'))" $((N - 30 * 3600)))'"
+verif "… routine inconnue de routines.conf (jarvis-pirate, un nom piégé) ou hors « jarvis- » : ignorée, seulement comptée" bash -c "! grep -qE 'pirate|autre-chose|\\.\\./' '$T/resume/routines.json'"
+verif "… (deux ignorées, six décrites)" res "d['inconnues'] == 2 and len(d['routines']) == 6"
+verif "… en pause : pas active, jamais passée ; pas posée chez Hermes : dite « pas posée »" res "r['bilan-hebdo']['posee'] is True and r['bilan-hebdo']['active'] is False and r['bilan-hebdo']['resultat'] == 'jamais' and r['bilan-hebdo']['prochain'] is None and r['sorties-du-week-end']['posee'] is False and r['sorties-du-week-end']['resultat'] == 'jamais'"
+verif "… passerelle en marche, garde du forfait actif" res "d['passerelle'] == 'active' and d['garde'] == dict(etat='actif', jusqua=None)"
+verif "… seuls des appels « is-active » et « is-failed » à systemd : rien n'est lancé ni redémarré" bash -c "! grep -qvE '^(is-active|is-failed) ' '$T/appels'"
+echo failed > "$T/etat-passerelle"; echo "coupé jusqu'au 2026-12-03" > "$T/garde-coupe"; relancer
+verif "passerelle plantée, garde coupé jusqu'à une date : dits tels quels" res "d['passerelle'] == 'plantée' and d['garde'] == dict(etat='coupé', jusqua='2026-12-03')"
+echo inactive > "$T/etat-passerelle"; echo "coupé jusqu'au 2026-11-20" > "$T/garde-coupe"; touch "$T/garde-arret"; relancer
+verif "passerelle arrêtée, coupure finie, Hermes arrêté par le garde : « a arrêté Hermes »" res "d['passerelle'] == 'arrêtée' and d['garde'] == dict(etat='a arrêté Hermes', jusqua=None)"
+rm -f "$T/etat-passerelle" "$T/garde-coupe" "$T/garde-arret"
+rm -rf "$T/resume"; relancer --a-blanc
+verif "à blanc : aucun résumé écrit (rien n'est touché)" bash -c "[ ! -e '$T/resume' ] && grep -q 'Rien à relancer' '$T/sortie'"
+echo "contenu à ne pas toucher" > "$T/cible"; mkdir -p "$T/resume"; ln -s "$T/cible" "$T/resume/routines.json"; ln -s "$T/cible" "$T/resume/routines.json.tmp"; relancer
+verif "le résumé (ou son fichier temporaire) remplacé par un lien : jamais écrit à travers, le lien est remplacé par un vrai fichier" bash -c "[ \"\$(cat '$T/cible')\" = 'contenu à ne pas toucher' ] && [ ! -L '$T/resume/routines.json' ] && [ -f '$T/resume/routines.json' ] && [ ! -e '$T/resume/routines.json.tmp' ]"
+CONF="$T/absente.conf" relancer
+verif "copie root de routines.conf absente : résumé écrit sans aucune routine, et il le dit (« liste » fausse)" res "d['liste'] is False and d['routines'] == [] and d['inconnues'] == 7"
+printf '{pas du json' > "$T/jobs.json"; relancer
+verif "jobs.json illisible : le résumé le dit (« cron » faux), les routines connues restent « pas posées »" res "d['cron'] is False and len(d['routines']) == 6 and not any(x['posee'] for x in d['routines'])"
+# l'écriture du résumé impossible ne change rien à la relance : mêmes relances, même code de sortie
+rm -rf "$T/etat" "$T/avis" "$T/lances"; jobs "$T/jobs.json"; usage 3 40; echo "un fichier, pas un dossier" > "$T/bouche"
+RESUME="$T/bouche/resume" relancer; code=$?
+verif "résumé impossible à écrire : la relance se fait quand même (deux routines relancées, code 0), l'erreur est dite dans le journal sans détail" bash -c "[ $code = 0 ] && [ \"\$(sort '$T/lances' | paste -sd,)\" = 'a1,b2' ] && grep -q 'Résumé des routines pour JARVIS : pas écrit (NotADirectoryError)' '$T/sortie' && ! grep -q 'bouche' '$T/sortie'"
+relancer
+verif "… et avec une relance en cours, le résumé dit la routine en erreur par la limite (jamais son texte)" res "r['veille-du-matin']['resultat'] == 'erreur' and r['veille-du-matin']['cause'] == 'limite du forfait' and r['digest-ia']['cause'] == 'réseau' and r['bilan-hebdo']['resultat'] == 'ok'"
+verif "horaires : cas simples lisibles, cas tordus rendus tels quels (« cron … »)" py "
+import importlib.util, sys
+s = importlib.util.spec_from_file_location('limite', sys.argv[1]); m = importlib.util.module_from_spec(s); s.loader.exec_module(m)
+f = m.moment_lisible
+assert f('0 19 * * 4') == 'le jeudi à 19 h' and f('30 8 * * 6,0') == 'le samedi et le dimanche à 8 h 30' and f('5 6 * * 1-5') == 'du lundi au vendredi à 6 h 05'
+assert f('*/10 * * * *') == 'cron */10 * * * *' and f('0 9 1 * *') == 'cron 0 9 1 * *' and f('0 9 * * 5-1') == 'cron 0 9 * * 5-1'" "$L"
+
 echo "== Le kit"
 verif "relance.sh : syntaxe, et refuse une option inconnue" bash -c "bash -n '$KIT/relance.sh' && grep -q 'limite.py\" relancer' '$KIT/relance.sh'"
 verif "install.sh pose la copie root, la minuterie (toutes les 10 minutes, rattrapée) et les dossiers (700, avis 750)" bash -c "grep -q 'hermes-relance/limite.py' '$KIT/install.sh' && grep -q 'enable --now hermes-relance.timer' '$KIT/install.sh' && grep -q 'OnCalendar=\*-\*-\* \*:02/10:00' '$KIT/hermes-relance.timer' && grep -q 'Persistent=true' '$KIT/hermes-relance.timer' && grep -q 'hermes-relance-avis' '$KIT/install.sh'"
 verif "l'unité n'exécute que la copie root (jamais le dépôt), sans variable du banc" bash -c "grep -q '^ExecStart=/usr/local/sbin/hermes-relance$' '$KIT/hermes-relance.service' && ! grep -q 'HERMES_RELANCE' '$KIT/hermes-relance.service'"
 verif "le kit portail installe le même limite.py et les hôtes de Claude" bash -c "grep -q '../limite.py\" \"\$LIB/limite.py\"' '$KIT/portail/install.sh' && grep -q 'domaines.defaut\" \"\$LIB/domaines.defaut\"' '$KIT/portail/install.sh'"
 verif "desinstaller.sh retire la relance" grep -q 'hermes-relance.timer' "$KIT/desinstaller.sh"
+verif "0.92.0 : install.sh pose la copie root de routines.conf et le dossier du résumé (root et groupe de JARVIS, 750) ; routines.sh rafraîchit la copie ; desinstaller.sh retire le dossier" bash -c "grep -q 'routines.conf\" /usr/local/lib/hermes-relance/routines.conf' '$KIT/install.sh' && grep -q 'id -gn jarvis)\" -m 0750 /var/lib/hermes-relance-etat' '$KIT/install.sh' && grep -q 'RELANCE_LIB/routines.conf' '$KIT/routines.sh' && grep -q '/var/lib/hermes-relance-etat' '$KIT/desinstaller.sh'"
+verif "0.92.0 : le résumé n'ajoute ni lecture d'usage ni lancement d'Hermes (le code du résumé n'appelle que systemctl is-active)" py "
+import re, sys
+t = open(sys.argv[1], encoding='utf-8').read()
+bloc = t[t.index('le résumé des routines, pour JARVIS'):t.index('def cmd_minuterie')]
+assert 'lire_usage' not in bloc and 'lancer_routine' not in bloc and 'subprocess' not in bloc and 'HX' not in bloc
+assert set(re.findall(r'sctl\(\"([a-z-]+)\"', bloc)) == {'is-active'}" "$L"
 
 echo
 echo "Relance après la limite : $ok vérifications réussies, $ko en échec."
