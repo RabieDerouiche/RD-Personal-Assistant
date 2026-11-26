@@ -11896,6 +11896,336 @@ void main(){
     if (notesOn()) setTimeout(() => notesLoad(true), 1300);
   }
 
+  /* ================= 0.93.0 : trois retours de l'app (ses remarques du 26/11/2026). Comme 0.86.0 et 0.87.0, ce bloc range ce qui existe :
+     aucune fonction d'avant n'est réécrite.
+     1. Argent : « Déjà dépensé ce mois » (ses dépenses fixes déjà passées, les échéances passées de ses paiements en plusieurs fois, ce qu'il
+        a noté de ses dépenses courantes), à côté du reste à payer et du reste à vivre, et l'historique mois par mois (au moins 24 mois,
+        gardés par le serveur à la fin de chaque mois ; il remplace « Six derniers mois »). Les montants restent sur son serveur.
+     2. Agenda, Grok arrêté : la feuille d'un jour, la fiche d'un événement ou d'une échéance et la légende disent JARVIS ou Hermes
+        (avatar, « Écrire à Hermes », « Voir Travail » pour le CRA et les notes de frais, « Hermes suit » pour un prix) ; avant l'arrêt,
+        rien ne change. L'historique garde le nom d'origine (« Fait par Chronos »).
+     3. Pour moi : une seule carte par sujet. Le dossier, ses demandes venues du Canal, la réponse reçue et ses échéances tiennent dans
+        une carte ; la plus urgente décide de la place et de la couleur ; chaque élément garde sa feuille et ses actions. ================= */
+  {
+    const GROK93 = ['hydra', 'medusa', 'unicorn', 'mermaid', 'griffon', 'cyclops', 'plutus'];
+    const estGrok = (id) => GROK93.includes(id);
+
+    /* ---------- 1. Argent : déjà dépensé ce mois, et l'historique ---------- */
+    const MOIS_C = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
+    const moisCourt = (ym) => (MOIS_C[+String(ym).slice(5, 7) - 1] || String(ym)) + ' ' + String(ym).slice(2, 4);
+    const moisLong = (ym) => RAD_MOIS[+String(ym).slice(5, 7) - 1] || '';
+    const leJour = (iso) => radDate(iso) + '/' + String(iso).slice(0, 4);
+    const RH = {tout: false, ouvert: ''};
+    function radDepense(m) {
+      const d = m.depense; if (!d) return null;
+      const parts = [[d.fixes, 'de dépenses fixes déjà passées', d.nFixes], [d.plans, 'd’échéances de paiements en plusieurs fois', d.nPlans], [d.courantes, 'de dépenses courantes notées', d.nNotes]].filter((x) => x[0] > 0 || x[2] > 0);
+      const dits = parts.map(([v, l, n]) => radEur(v) + ' ' + l + ' (' + n + ')');
+      const phrase = dits.length ? 'Soit ' + (dits.length > 1 ? dits.slice(0, -1).join(', ') + ' et ' : '') + dits[dits.length - 1] + '.' : 'Rien de passé ni de noté pour l’instant.';
+      const jq = d.jusqua ? ' Les dépenses fixes sont comptées jusqu’à hier (' + radDate(d.jusqua) + ') : celles d’aujourd’hui sont encore dans le reste à payer.' : ' Aucune dépense fixe n’est encore passée ce mois-ci.';
+      const lignes = (d.lignes || []).slice().reverse();
+      const sorte = (l) => (l.sorte === 'courante' ? (l.fait ? 'Dépense courante · cochée « Fait ce mois-ci »' : 'Dépense courante · notée') : l.sorte === 'plan' ? 'Paiement en plusieurs fois' : (l.poste || 'Dépense fixe')) + (l.estime ? ' · montant estimé' : '');
+      return h('section', {class: 'card rad-depense'}, h('small', {class: 'rad-k', text: 'Déjà dépensé en ' + moisLong(d.mois)}), h('b', {class: 'rad-big', text: radEur(d.total)}),
+        h('p', {class: 'muted'}, radNw(phrase + jq)),
+        lignes.length ? h('details', {class: 'rad-dep-det'}, h('summary', {text: 'Le détail (' + lignes.length + ')'}), h('div', {class: 'rad-dep-l'}, lignes.map((l) => h('div', {class: 'rad-dep-r'},
+          h('span', {class: 'rad-evo-m', text: radDate(l.date)}), h('span', {class: 'rad-dep-s'}, h('b', {text: l.service}), h('small', {text: sorte(l)})), h('b', {class: 'rad-evo-v nw', text: radEur(l.montant)}))))) : null);
+    }
+    /* un mois de l'historique, ouvert : ses totaux, ses postes, son reste à vivre, et d'où vient le chiffre */
+    function radHistDetail(g) {
+      const l = [['Dépenses fixes ' + (g.cours ? 'déjà passées' : 'payées'), radEur(g.fixes)]];
+      if (g.plans) l.push(['Paiements en plusieurs fois', radEur(g.plans)]);
+      l.push(['Dépenses courantes notées', radEur(g.courantes) + (g.prevu != null ? ' sur ' + radEur(g.prevu) + ' prévus' : '')]);
+      if (g.paie) l.push(['Reste à vivre', radEur(g.resteAVivre) + ' (paie de ' + radEur(g.paie) + ')']);
+      const postes = g.postes || [];
+      const note = g.cours ? 'Mois en cours : calculé en direct. Son bilan sera gardé à la fin du mois.' : g.estime ? 'Estimé d’après tes dépenses fixes d’aujourd’hui : ce mois-là n’avait pas été gardé.'
+        : g.reconstitue ? 'Reconstitué le ' + leJour(g.clos) + ' : le Radar ne suivait pas encore ce mois-là.' : 'Bilan gardé le ' + leJour(g.clos) + ' : il ne change plus.';
+      return h('div', {class: 'rad-hm-b'}, h('dl', {class: 'rad-hm-l'}, l.map(([k, v]) => h('div', {}, h('dt', {text: k}), h('dd', {}, radNw(v))))),
+        postes.length ? h('ul', {class: 'rad-hm-p'}, postes.map((p) => h('li', {}, h('span', {text: p.label + (p.courant ? ' (noté)' : '')}), h('b', {class: 'nw', text: radEur(p.montant)})))) : null,
+        h('p', {class: 'muted rad-hm-n', text: note}));
+    }
+    function radHisto(m) {
+      const H = m.historique || [], d = m.depense;
+      const tous = (d ? [{cours: true, mois: d.mois, fixes: d.fixes, plans: d.plans, courantes: d.courantes, total: d.total, postes: d.postes, prevu: m.totalCourantes != null ? m.totalCourantes : null}] : []).concat(H);
+      const vus = RH.tout ? tous : tous.slice(0, 13), max = Math.max(1, ...tous.map((g) => g.total || 0)), gardes = H.filter((g) => !g.estime).length;
+      const ligne = (g) => {
+        const det = h('details', {class: 'rad-hm' + (g.cours ? ' is-cours' : '') + (g.estime ? ' is-estime' : ''), 'data-mois': g.mois},
+          h('summary', {class: 'rad-evo', 'data-mois': g.mois}, h('span', {class: 'rad-evo-m', title: moisLong(g.mois) + ' ' + String(g.mois).slice(0, 4), text: moisCourt(g.mois)}),
+            h('div', {class: 'rad-bar-t'}, h('i', {style: 'width:' + Math.max(2, Math.round((g.total || 0) / max * 100)) + '%'})),
+            h('b', {class: 'rad-evo-v'}, h('span', {class: 'nw', text: (g.estime ? '≈ ' : '') + radEur(g.total)}), g.cours ? h('small', {text: 'en cours'}) : g.reconstitue ? h('small', {text: 'reconstitué'}) : null)),
+          radHistDetail(g));
+        det.open = RH.ouvert === g.mois;
+        det.addEventListener('toggle', () => { if (det.open) RH.ouvert = g.mois; else if (RH.ouvert === g.mois) RH.ouvert = ''; });
+        return det;
+      };
+      return h('section', {class: 'panel rad-hist'}, h('header', {class: 'panel-h'}, h('h2', {text: 'Historique'}), h('span', {class: 'aside', text: gardes ? gardes + ' mois gardé' + (gardes > 1 ? 's' : '') : 'mois par mois'})),
+        h('div', {class: 'card rad-evo-box'}, vus.map(ligne)),
+        tous.length > 13 ? h('button', {type: 'button', class: 'link rad-hist-plus', onclick: () => { RH.tout = !RH.tout; renderView(true); }}, RH.tout ? 'Seulement les 12 derniers mois' : 'Tous les mois (' + (tous.length - 1) + ')') : null,
+        h('p', {class: 'muted rad-evo-note', text: 'Ce qui est vraiment parti chaque mois : dépenses fixes passées, paiements en plusieurs fois, dépenses courantes notées. À la fin de chaque mois, ton serveur garde son bilan (24 mois au moins) ; touche un mois pour son détail.'
+          + (H.some((g) => g.estime) ? ' « ≈ » : un mois d’avant ce suivi, estimé d’après tes dépenses fixes d’aujourd’hui.' : '')}));
+    }
+    const RM93 = radMois;
+    radMois = function (m) {
+      const el = RM93.apply(this, arguments);
+      if (!m || !el) return el;
+      const dep = radDepense(m);
+      if (dep) { const pres = el.querySelector(':scope > .rad-vivre') || el.querySelector(':scope > .rad-mois-dont') || el.querySelector(':scope > .lead'); if (pres) pres.after(dep); else el.prepend(dep); }
+      if (m.historique) {   /* l'historique prend la place de « Six derniers mois » (un serveur d'avant garde ses six mois) */
+        const box = el.querySelector('.rad-evo-box'), six = box && box.closest('.panel'), neuf = radHisto(m), fin = el.lastElementChild;
+        if (six) six.replaceWith(neuf); else if (fin) fin.before(neuf); else el.append(neuf);
+      }
+      return el;
+    };
+    /* dans la grande carte, sous « Déjà prélevé » : le total du mois, qui ouvre « Le mois » */
+    const RHO93 = radHero;
+    radHero = function (R, d) {
+      const el = RHO93.apply(this, arguments), dep = d && d.mois && d.mois.depense, pl = el && el.querySelector('.rad-prog-l');
+      if (dep && pl) pl.after(h('button', {type: 'button', class: 'rad-deja-mois', onclick: () => { RAD.f = 'mois'; renderView(true); setTimeout(() => { const e = document.querySelector('.rad-depense'); if (e) e.scrollIntoView({block: 'center', behavior: 'smooth'}); }, 80); }},
+        radNw('Déjà dépensé en ' + moisLong(dep.mois) + ' : ' + radEur(dep.total)), h('span', {'aria-hidden': 'true', text: ' ›'})));
+      return el;
+    };
+
+    /* ---------- 2. Agenda, Grok arrêté : JARVIS ou Hermes à la place des bots ---------- */
+    const NAT93 = {bot: NATURE.bot, suivi: NATURE.suivi}, KL93 = {'e-bot': KLABEL['e-bot'], 'e-suivi': KLABEL['e-suivi']};
+    const GP93 = grokPause;
+    grokPause = function () {
+      const r = GP93.apply(this, arguments);
+      Object.assign(NATURE, GOFF.on ? {bot: "Hermes s'en occupe", suivi: 'Hermes suit'} : NAT93);
+      Object.assign(KLABEL, GOFF.on ? {'e-bot': "Hermes s'en occupe", 'e-suivi': 'Hermes suit'} : KL93);
+      return r;
+    };
+    /* « Écrire à Hermes » depuis une fiche : comme celui d'Équipe (0.86.0), avec le sujet de la fiche dans l'Objet de la ligne */
+    const ecrireHermes93 = (sujet) => openSheet({bot: 'hermes', kicker: 'Hermes', title: 'Écrire à Hermes', say: 'Une ligne pour lui dans le Canal : il la lit à son prochain passage et répond dans la colonne Réponse.',
+      actions: [act('Écrire', {tone: 'main', pick: {kind: 'text', label: 'Ton message pour Hermes', placeholder: 'Écris, ou dicte avec le micro du clavier'},
+        go: (v) => ({title: 'Message à Hermes', bot: 'hydra', objet: sujet || '', order: (sujet ? 'À propos de « ' + sujet + ' » : ' : '') + v.txt, effect: 'Une ligne pour Hermes dans le Canal : « ' + v.txt + ' », lue à son prochain passage.', say: 'Noté pour Hermes.'})})]});
+    const btnHermes = (sujet) => h('button', {type: 'button', class: 'btn talk-bot talk-hermes', style: botVars('hermes'), onclick: () => ecrireHermes93(sujet)}, C('hermes', 26).el,
+      h('span', {}, h('b', {text: 'Écrire à Hermes'}), h('small', {text: 'une ligne dans le Canal, lue à son prochain passage'})));
+    const btnTravail = () => h('button', {type: 'button', class: 'btn talk-bot talk-travail', onclick: () => { closeSheet(true); go('travail'); }}, h('span', {class: 'talk-ic', html: icon('cal', 20)}),
+      h('span', {}, h('b', {text: 'Voir Travail'}), h('small', {text: 'CRA et notes de frais : Hermes les fait sur le portail'})));
+    /* les fiches : l'avatar (JARVIS pour ce que la page et le serveur font eux-mêmes : présence, événement, anniversaire ; Hermes pour ce
+       que suivait un bot), « Suivi par », et « Écrire à Hermes » à la place de « Écrire à <bot> par le Canal ». Les fiches qui racontent
+       le passé (un ordre donné à un bot, la page d'un bot) et celles qui ont déjà leur version d'après Grok ne sont pas touchées. */
+    const SANS93 = new Set(['ordre', 'bot', 'demande', 'note', 'travail', 'draft']), JARVIS93 = new Set(['jour', 'evenement', 'anniv']);
+    Object.keys(SHEETCFG).forEach((type) => {
+      if (SANS93.has(type)) return;
+      const P = SHEETCFG[type];
+      SHEETCFG[type] = (item) => {
+        const c = P(item);
+        if (!GOFF.on || !c) return c;
+        const ech = type === 'echeance' && item ? item : null, fait = !!(ech && ech.doneBy), chronos = !!(ech && ech.bot === 'medusa'), kairos = !!(ech && ech.bot === 'unicorn');
+        if (!fait) {
+          if (JARVIS93.has(type)) c.bot = 'claude'; else if (estGrok(c.bot)) c.bot = 'hermes';
+          if (ech && estGrok(ech.bot) && Array.isArray(c.facts)) c.facts = c.facts.map((f) => (Array.isArray(f) && f[0] === 'Suivi par' ? ['Suivi par', chronos ? 'Hermes, sur le portail (espace Travail)' : kairos ? 'Hermes suit' : 'Hermes'] : f));
+          if (type === 'prix' && typeof c.kicker === 'string') c.kicker = c.kicker.replace(/Kairos/, 'Hermes suit');
+          if (ech && Array.isArray(c.actions)) {
+            c.actions = c.actions.filter((a) => !(a && a.label === 'Confier à un autre bot'));   /* il n'y a plus d'autre bot */
+            if (chronos) c.actions = [act('Voir Travail', {tone: 'main', cost: 'free', stay: true, go: () => { closeSheet(true); go('travail'); }})].concat(c.actions.map((a) => (a && a.tone === 'main' ? Object.assign({}, a, {tone: 'main2'}) : a)));
+          }
+        }
+        if (c.after) {
+          const A = c.after, sujet = String(c.title || '').slice(0, 120);
+          c.after = () => { const n = A(); if (n && n.querySelectorAll) { const tb = n.querySelectorAll('.talk-bot'); if (tb.length) tb.forEach((x) => x.replaceWith(btnHermes(sujet))); else if (n.querySelector('.talk-claude')) n.append(btnHermes(sujet));
+            if (chronos || type === 'jour') n.append(btnTravail()); } return n; };
+        }
+        return c;
+      };
+    });
+    /* ce qu'une action répond : la présence sert au CRA d'Hermes, les rappels sont ceux de JARVIS ; une action sans ordre ne montre plus le bot d'avant */
+    const QUI93 = '(Iris|Chronos|Kairos|Ulysse|Athéna|Argus|Plutus)';
+    const FIN93 = finish;
+    finish = function (e, ctx) {
+      if (GOFF.on && e && typeof e === 'object') {
+        if (typeof e.effect === 'string') e.effect = e.effect.replace(/ ; Chronos en tient compte\./, ' ; Hermes en tient compte pour le CRA (espace Travail).')
+          .replace(new RegExp('\\b' + QUI93 + '(?= (retire ses rappels|replanifie les rappels|te le rappelle|te la rappelle))', 'g'), 'JARVIS')
+          .replace(new RegExp('\\b' + QUI93 + '(?= (annule la relance|la suit|le suit))', 'g'), 'Hermes').replace(/confiée à Iris\./, 'confiée à Hermes.');
+        if (!e.order && estGrok(e.bot)) e.bot = ctx && JARVIS93.has(ctx.type) ? 'claude' : 'hermes';
+      }
+      return FIN93.apply(this, arguments);
+    };
+    const AS93 = applySmart;
+    applySmart = function (cfg) {
+      const r = AS93.apply(this, arguments);
+      if (GOFF.on && cfg && cfg.smart && typeof cfg.smart.text === 'string') cfg.smart.text = cfg.smart.text.replace(new RegExp('\\b' + QUI93 + '(?= te l[ea] rappelle)', 'g'), 'JARVIS');
+      return r;
+    };
+    /* les jours : ce que suivait un bot porte l'emblème et le nom d'Hermes (mois, semaine, aujourd'hui, feuille du jour) ; ce qu'un bot a
+       déjà fait garde son nom */
+    const DI93 = dayItems;
+    dayItems = function () {
+      const l = DI93.apply(this, arguments);
+      if (!GOFF.on) return l;
+      return l.map((x) => (x && estGrok(x.bot) && !/· fait ✓$/.test(String(x.label || '')) ? Object.assign({}, x, {bot0: x.bot, bot: 'hermes', k: /^b-/.test(x.k) ? 'b-hermes' : x.k}) : x));
+    };
+    const DE93 = dayExtra;
+    dayExtra = function (iso) {
+      const el = DE93.apply(this, arguments);
+      if (!GOFF.on || !el) return el;
+      const its = dayItems(iso).filter((x) => x.k !== 'pr'), rows = el.querySelectorAll('.day-list .dl-row');
+      its.forEach((x, i) => { const sm = rows[i] && rows[i].querySelector('small'); if (!sm) return;
+        if (x.bot0 === 'unicorn') sm.textContent = 'Hermes suit'; else if (x.bot0 === 'medusa') sm.textContent = 'Hermes · voir Travail'; else if (!x.bot0 && estGrok(x.bot)) sm.textContent = 'fait par ' + lvName(x.bot); });
+      return el;
+    };
+    /* la légende : une seule ligne « Hermes » à la place des sept bots */
+    const CAL93 = calendar;
+    calendar = function () {
+      if (GOFF.on && /^b-/.test(CAL.filter || '') && CAL.filter !== 'b-hermes') CAL.filter = 'b-hermes';
+      const box = CAL93.apply(this, arguments);
+      if (!GOFF.on || !box) return box;
+      const t = [...box.querySelectorAll('.cal-legend .lg-t')].find((x) => /^Fait par un bot/.test(x.textContent)), row = t && t.nextElementSibling;
+      if (t && row) {
+        let n = 0; for (let d = 1, nd = new Date(CAL.y, CAL.m + 1, 0).getDate(); d <= nd; d++) n += dayItems(CAL.y + '-' + pad2(CAL.m + 1) + '-' + pad2(d)).filter((x) => x.k === 'b-hermes').length;
+        t.textContent = 'Fait par Hermes, rien à faire pour toi';
+        row.replaceChildren(h('button', {type: 'button', class: 'lg-chip' + (CAL.filter === 'b-hermes' ? ' is-on' : ''), 'aria-pressed': String(CAL.filter === 'b-hermes'), onclick: () => { CAL.filter = CAL.filter === 'b-hermes' ? null : 'b-hermes'; renderView(true); }},
+          kIcon('b-hermes', 14), h('span', {text: 'Hermes · relances, prix suivis, CRA et notes de frais'}), n ? h('b', {text: String(n)}) : null));
+      }
+      return box;
+    };
+
+    /* ---------- 3. Pour moi : une seule carte par sujet lié ----------
+       Un sujet = un dossier de Pilotage encore ouvert (qu'il attende sa réponse ou celle de quelqu'un d'autre). Un élément de « Pour moi »
+       (une demande venue du Canal ou d'un dossier, une réponse reçue sur un dossier) ou une échéance lui est rattaché par cette règle,
+       dans cet ordre ; à chaque niveau, deux dossiers possibles = aucun (dans le doute, on ne réunit pas) :
+       1. lien explicite : l'Objet de la ligne du Canal, le libellé lui-même, ou un nom entre « » ou entre parenthèses est le nom d'un
+          dossier (sans la casse, les accents ni la ponctuation ; le nom du dossier avec ou sans sa propre parenthèse) ;
+       2. un nom raccourci entre parenthèses : tous ses mots significatifs sont dans le nom d'un seul dossier (« (rachat Expresso) » pour
+          « Rachat du crédit Expresso (organisme) ») ; deux mots au moins, ou un seul d'au moins 6 lettres ;
+       3. rapprochement prudent : tous les mots significatifs du nom du dossier (sans sa parenthèse) sont dans le libellé ; deux mots au
+          moins, dont un d'au moins 5 lettres. Un libellé plus court que le nom du dossier ne suffit pas.
+       Aux niveaux 2 et 3, si le libellé et le dossier portent tous deux des nombres (des dates), ceux de l'un doivent tous être dans
+       l'autre : « la garde du 12 au 16/04 » ne va pas avec le dossier de « la garde du 15 au 19/02 ».
+       Un mot significatif : 3 lettres au moins, sans accent, pas un nombre, ni un mot vide, ni un mot trop commun des suivis (dossier,
+       relance, rappel, demande, réponse…). Sans dossier, deux demandes ne se réunissent que par un lien explicite (même Objet, même libellé).
+       Ne sont jamais réunis : un « oui » à donner dans le chat d'un bot, les cartes du CRA et des notes de frais, un brouillon Gmail sans carte. */
+    const sjPlat = (t) => String(t == null ? '' : t).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+    const sjCle = (t) => sjPlat(t).replace(/[^a-z0-9]+/g, ' ').trim();
+    const SJ_VIDES = new Set('les des une aux sur par pour avec sans dans que qui ses son mes mon ton tes nos vos leur leurs est pas plus chez vers sous entre depuis pendant avant apres cette ces cet votre notre tout tous toute toutes the and for from'.split(' '));
+    const SJ_COMMUNS = new Set(('dossier dossiers demande demandes demander relance relancer relances rappel rappels rappeler reponse reponses repondre question questions point suivi suite attente brouillon mail mails message messages courrier appel appeler '
+      + 'rendez vous etape prochaine faire envoyer prendre choisir verifier representer confirmer decision choix info infos ordre reprise urgent nouveau nouvelle date premier premiere dernier derniere').split(' '));
+    const sjMots = (t) => new Set((sjPlat(t).match(/[a-z0-9]+/g) || []).filter((w) => w.length >= 3 && !/^\d+$/.test(w) && !SJ_VIDES.has(w) && !SJ_COMMUNS.has(w)));
+    const sjDans = (a, b) => { for (const w of a) if (!b.has(w)) return false; return true; };
+    const sjLong = (a, n) => [...a].some((w) => w.length >= n);
+    const sjSansPar = (t) => String(t || '').replace(/\s*\([^)]*\)\s*/g, ' ').trim();
+    const sjEntre = (t) => [...String(t || '').matchAll(/\(([^)]{2,80})\)|«\s*([^»]{2,120}?)\s*»/g)].map((m) => ({par: m[1] != null, txt: m[1] != null ? m[1] : m[2]}));
+    const sjNums = (t) => new Set(sjPlat(t).match(/\d+/g) || []);
+    const sjNumsOk = (a, b) => !a.size || !b.size || sjDans(a, b) || sjDans(b, a);
+    const sjSujet = (nom) => { const tout = sjMots(nom), sans = sjMots(sjSansPar(nom)); return {nom: String(nom).trim(), cle: sjCle(nom), cleSans: sjCle(sjSansPar(nom)), mots: tout, coeur: sans.size >= 2 ? sans : tout, nums: sjNums(nom)}; };
+    function sjDossiers() {
+      const out = [], vu = new Set(), add = (n) => { const c = sjCle(n); if (c && !vu.has(c)) { vu.add(c); out.push(sjSujet(n)); } };
+      const rows = LV.t && LV.t.dos && LV.t.dos.rows;
+      if (rows) rows.forEach((r) => { if (r['Dossier'] && !/^(fait|transf|clos|annul|trait)/.test(lvLow(r['Statut']))) add(r['Dossier']); });
+      else { (S.dossiers || []).forEach((k) => add(k.title)); (S.demandes || []).forEach((d) => { if (/^Dossier «/.test(String(d.src || ''))) add(d.title); }); }
+      return out;
+    }
+    function sjLier(label, objet, D, texte) {
+      const un = (l) => (l.length === 1 ? l[0] : null), entre = sjEntre(label).concat(sjEntre(objet));
+      /* 1. explicite (dans un message, seul un nom entre « » compte) */
+      const cles = [sjCle(objet), sjCle(label)].concat(entre.map((x) => sjCle(x.txt)), sjEntre(texte).filter((x) => !x.par).map((x) => sjCle(x.txt))).filter(Boolean);
+      let l = D.filter((d) => cles.includes(d.cle)); if (l.length) return un(l);
+      l = D.filter((d) => d.cleSans && d.cleSans !== d.cle && cles.includes(d.cleSans)); if (l.length) return un(l);
+      /* 2. un nom raccourci entre parenthèses */
+      const nums = sjNums(label + ' ' + (objet || ''));
+      for (const x of entre.filter((y) => y.par)) { const P = sjMots(x.txt); if (!(P.size >= 2 || (P.size === 1 && sjLong(P, 6)))) continue; l = D.filter((d) => sjDans(P, d.mots) && sjNumsOk(nums, d.nums)); if (l.length) return un(l); }
+      /* 3. rapprochement prudent */
+      const B = sjMots(label + ' ' + (objet || ''));
+      return un(D.filter((d) => d.coeur.size >= 2 && sjLong(d.coeur, 5) && sjDans(d.coeur, B) && sjNumsOk(nums, d.nums)));
+    }
+    const sjCanalDe = (d) => (S.canal || []).find((l) => l.subject === d.title && (['toi', 'rabie'].includes(l.to) || /^attend ton oui/i.test(String(l.status || '')))) || null;
+    function sujets() {
+      const D = sjDossiers(), G = new Map();
+      const grp = (cle, nom) => { let g = G.get(cle); if (!g) { g = {cle, nom, dem: [], rep: [], ech: []}; G.set(cle, g); } return g; };
+      (S.demandes || []).forEach((d) => {
+        if (!d || d.kind === 'oui' || d.bot === 'medusa' || isCraDem(d)) return;
+        const ln = /^Dossier «/.test(String(d.src || '')) ? null : sjCanalDe(d), objet = (ln && ln.objet) || '', k = sjLier(d.title, objet, D, d.ask);
+        if (k) grp('d|' + k.cle, k.nom).dem.push(d);
+        else if (sjCle(objet)) grp('o|' + sjCle(objet), String(objet).trim()).dem.push(d);
+        else grp('t|' + sjCle(d.title), d.title).dem.push(d);
+      });
+      (S.dosReplies || []).forEach((x) => { const g = x && x.k && G.get('d|' + sjCle(x.k.title)); if (g) g.rep.push(x); });
+      /* les échéances : rattachées à un dossier qui a une carte, ou à une demande sans dossier (même règle, son libellé comme nom) */
+      const noms = [...G.values()].map((g) => Object.assign(sjSujet(g.nom), {g}));
+      (S.echeances || []).forEach((e) => { if (!e || e.doneBy) return; const k = sjLier(e.title, '', noms); if (k) k.g.ech.push(e); });
+      const X = {tetes: new Map(), absorbe: new Set(), de: new Map()};
+      for (const g of G.values()) {
+        if (!g.dem.length || g.dem.length + g.rep.length + g.ech.length < 2) continue;
+        const urg = (d) => (d.due == null ? 9999 : d.due), sien = (d) => (sjCle(d.title) === sjCle(g.nom) ? 0 : 1);
+        const tri = g.dem.map((d, i) => ({d, i})).sort((a, b) => urg(a.d) - urg(b.d) || (a.d.kind === 'afaire') - (b.d.kind === 'afaire') || sien(a.d) - sien(b.d) || a.i - b.i).map((x) => x.d);
+        g.tete = tri[0]; g.autres = tri.slice(1); g.ech.sort((a, b) => a.n - b.n);
+        /* la plus urgente : une demande, ou une échéance qui le concerne (pas celle qu'Hermes ou un bot suit seul) */
+        g.due = [...g.dem.map((d) => d.due), ...g.ech.filter((e) => !['bot', 'suivi'].includes(e.nature) && e.n >= -30).map((e) => e.n)].filter((n) => n != null).reduce((a, b) => (a == null || b < a ? b : a), null);
+        X.tetes.set(g.tete, g); g.dem.forEach((d) => X.de.set(d, g));
+        g.autres.forEach((d) => X.absorbe.add(d)); g.rep.forEach((x) => X.absorbe.add(x));
+      }
+      return X;
+    }
+    const sjRow = (ic, titre, sous, urgent, open, k) => h('button', {type: 'button', class: 'pm-lie' + (urgent ? ' is-urgent' : ''), 'data-k': k, onclick: (ev) => { ev.stopPropagation(); open(); }},
+      h('span', {class: 'pm-lie-ic', html: icon(ic, 15)}), h('span', {class: 'pm-lie-tx'}, h('b', {text: titre}), h('small', {text: sous})), h('span', {class: 'pm-lie-go', 'aria-hidden': 'true', text: '›'}));
+    /* ce qui est lié au sujet, sauf l'élément déjà affiché : chaque ligne ouvre la feuille de l'élément, avec ses actions */
+    function sjLies(g, sauf) {
+      const qui = (d) => (GOFF.on && estGrok(d.bot) ? 'Hermes' : lvName(d.bot)), kd = (d) => PM_KIND[d.kind] || PM_KIND.afaire, rows = [];
+      [g.tete].concat(g.autres).filter((d) => d !== sauf).forEach((d) => rows.push(sjRow(kd(d)[1], sjCle(d.title) === sjCle(g.nom) ? (cap1(pmAsk(d)) || d.title) : d.title, kd(d)[0] + ' · ' + qui(d) + (d.due != null ? ' · ' + dueTxt(d.due) : ''), d.due != null && d.due <= 3, () => openItem('demande', d), d.id)));
+      g.rep.forEach((x) => rows.push(sjRow('inbox', 'Réponse reçue de ' + x.mail.from, x.mail.subject, true, () => openSheet({bot: GOFF.on && estGrok(x.k.bot) ? 'hermes' : x.k.bot, kicker: 'Réponse reçue · ' + x.k.title, title: x.mail.subject, say: x.mail.snippet || 'Une réponse est arrivée sur ce dossier.', extra: () => dosReplyCard(x), actions: []}), x.id)));
+      g.ech.forEach((e) => rows.push(sjRow('cal', e.title, NATURE[e.nature] + ' · ' + late(e.n), e.n <= 3 && !['bot', 'suivi'].includes(e.nature), () => openItem('echeance', e), e.id)));
+      return rows.length ? h('div', {class: 'pm-lies'}, h('small', {class: 'pm-lies-t', text: 'Aussi dans ce sujet · ' + rows.length}), rows) : null;
+    }
+    /* pendant l'affichage de « Pour moi » et de l'accueil, la liste ne garde qu'une demande par sujet (la plus urgente) ; les autres sont
+       dans sa carte. Rien n'est retiré pour de bon : les feuilles, les notifications (#voir-<ligne>) et « une par une » voient tout. */
+    const SJ = {X: null};
+    const avecSujets = (fn) => {
+      if (SJ.X) return fn();
+      const X = sujets(); if (!X.tetes.size) return fn();
+      const dem0 = S.demandes, rep0 = S.dosReplies, dem1 = (dem0 || []).filter((d) => !X.absorbe.has(d)), rep1 = (rep0 || []).filter((x) => !X.absorbe.has(x));
+      S.demandes = dem1; S.dosReplies = rep1; SJ.X = X;
+      try { return fn(); } finally { if (S.demandes === dem1) S.demandes = dem0; if (S.dosReplies === rep1) S.dosReplies = rep0; SJ.X = null; }
+    };
+    const PMC93 = pmCard;
+    pmCard = function (d) {
+      const card = PMC93.apply(this, arguments), g = SJ.X && SJ.X.tetes.get(d);
+      if (!g || !card) return card;
+      card.classList.add('pm-sujet'); card.dataset.sujet = g.nom; card.dataset.n = String(g.dem.length + g.rep.length + g.ech.length);
+      const t = card.querySelector('.pm-title');
+      if (t && sjCle(d.title) !== sjCle(g.nom)) { t.textContent = g.nom; t.after(h('p', {class: 'pm-sj-de', text: d.title})); }
+      const head = card.querySelector('.pm-head');
+      if (head && g.due != null && g.due <= 3 && !head.querySelector('.st-exp') && (d.due == null || g.due < d.due)) {
+        const old = head.querySelector('.pill.is-amber'); if (old) old.remove();
+        head.append(h('span', {class: 'pill is-amber', text: g.due < 0 ? 'En retard' : g.due === 0 ? "Aujourd'hui" : 'Dans ' + g.due + ' j'}));
+      }
+      const box = sjLies(g, d); if (box) card.append(box);
+      return card;
+    };
+    const SD93 = SHEETCFG.demande;
+    SHEETCFG.demande = (d) => {
+      const c = SD93(d); if (!c) return c;
+      const g = sujets().de.get(d); if (!g) return c;
+      const E = c.extra; c.extra = () => h('div', {class: 'stack'}, sjLies(g, d), E ? E() : null);
+      return c;
+    };
+    const VD93 = VIEWS.demandes;
+    VIEWS.demandes = (el) => (typeof FOCUS === 'object' && FOCUS && FOCUS.on ? VD93(el) : avecSujets(() => VD93(el)));
+    const VA93 = VIEWS.accueil;
+    VIEWS.accueil = (el) => avecSujets(() => VA93(el));
+    /* le compte « pour toi » (en-tête, pastille, accueil) compte les sujets */
+    const PMN93 = pourMoiN;
+    pourMoiN = function () { const n = PMN93.apply(this, arguments); return SJ.X ? n : Math.max(0, n - sujets().absorbe.size); };
+
+    document.head.append(h('style', {id: 'ux-0930', text: ''
+      + '.rad-depense{display:grid;gap:6px;padding:16px}.rad-depense p{margin:0}.rad-dep-det>summary{cursor:pointer;color:var(--muted);font-size:13.5px;padding:6px 0}'
+      + '.rad-dep-l{display:grid;gap:9px;padding-top:6px}.rad-dep-r{display:grid;grid-template-columns:3.2em minmax(0,1fr) auto;gap:10px;align-items:center}'
+      + '.rad-dep-s{display:grid;min-width:0}.rad-dep-s b{font:600 14px var(--sans);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.rad-dep-s small{color:var(--muted);font-size:12.5px}'
+      + '.rad-deja-mois{display:block;margin:8px 0 0;padding:4px 0;background:none;border:0;color:rgb(var(--c2));font:600 13.5px var(--sans);text-align:left;cursor:pointer}'
+      + '.rad-hist .rad-evo-box{gap:3px}.rad-hm>summary{list-style:none;cursor:pointer;min-height:38px}.rad-hm>summary::-webkit-details-marker{display:none}'
+      + '.rad-hm .rad-evo-v{text-align:right}.rad-hm .rad-evo-v small{display:block;font:500 11px var(--sans);color:var(--muted)}.rad-hm.is-estime .rad-evo-v{color:var(--muted)}'
+      + '.rad-hm-b{display:grid;gap:8px;margin:8px 0 6px;padding:10px 12px;border-radius:12px;background:rgba(255,255,255,.04)}'
+      + '.rad-hm-l{margin:0;display:grid;gap:5px}.rad-hm-l div{display:flex;justify-content:space-between;gap:10px}.rad-hm-l dt{color:var(--muted);font-size:13.5px}.rad-hm-l dd{margin:0;font:600 14px var(--display);text-align:right}'
+      + '.rad-hm-p{list-style:none;margin:0;padding:8px 0 0;display:grid;gap:4px;border-top:1px solid rgba(255,255,255,.08)}.rad-hm-p li{display:flex;justify-content:space-between;gap:10px;font-size:13.5px}.rad-hm-p li span{color:var(--muted)}'
+      + '.rad-hm-n{margin:0;font-size:12.5px}.rad-hist-plus{justify-self:start}'
+      + '.talk-travail .talk-ic{display:inline-flex;color:var(--muted)}'
+      + '.pm-sujet .pm-sj-de{margin:-4px 0 0;font:600 13.5px var(--sans);color:var(--muted)}'
+      + '.pm-lies{display:grid;gap:6px;margin-top:4px;padding-top:10px;border-top:1px solid rgba(255,255,255,.08)}.pm-lies-t{font:600 11px var(--sans);letter-spacing:.08em;text-transform:uppercase;color:var(--dim)}'
+      + '.pm-lie{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:10px;width:100%;min-height:44px;padding:8px 10px;border-radius:12px;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.03);color:var(--fg);text-align:left;cursor:pointer;font:inherit}'
+      + '.pm-lie-tx{display:grid;gap:1px;min-width:0}.pm-lie-tx b{font:600 14px var(--sans);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.pm-lie-tx small{color:var(--muted);font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}'
+      + '.pm-lie.is-urgent{border-color:rgba(251,191,36,.45)}.pm-lie.is-urgent small{color:#fbbf24}.pm-lie-ic{display:inline-flex;color:var(--muted)}.pm-lie-go{color:var(--muted);font-size:18px}'}));
+    /* pour le banc : la règle de rapprochement, seule */
+    window.__sujets93 = {lier: (label, objet, noms, texte) => { const k = sjLier(label, objet, (noms || []).map(sjSujet), texte); return k ? k.nom : null; }, mots: (t) => [...sjMots(t)]};
+  }
+
   boot();
 })();
 </script>
