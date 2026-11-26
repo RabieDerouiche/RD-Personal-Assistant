@@ -171,3 +171,7 @@ Suite de la demande « ajoute tout ce qui en fait un vrai centre de commandes »
 ## 24/11/2026 : les anciennes pages de ce compte sont supprimées
 
 À sa demande (QCM « Pages Jarvis de claude.ai », suppression définitive annoncée, chaque suppression confirmée par lui), six pages de ce compte ont été supprimées : « Jarvis v17 essai » (`UDFVL3TQ2RUeYMq1JBtT4m`), « Jarvis Centre de commandes » (`MkEikk1274eMYvkW5TzbiS`), « Jarvis en direct » (`E7D6vwifB22mZ7dqR5TfnK`), « Maquettes Jarvis vivantes » (`FnRzXuxTGXx9ZRsSSC6Hf4`), « Jarvis vivant » (`WdyHi7YdW3F4kx6YFgoCa9`), « Maquettes Jarvis » (`EvVoK1NPEpweuyS94Q9LfK`). Leurs liens ne marchent plus. Restent, sur ses autres comptes : la Salle de contrôle (`QwLf64Ggstzu4p3uznZrr8`) et la copie v17.15. Les sources des versions publiées restent dans Drive. Le banc `essais/jarvis/` n'a plus de page à tester : à retirer s'il le demande.
+
+## 26/11/2026 : JARVIS OS, refonte UX et fin de Grok Bot
+
+L'app de JARVIS OS (`essais/jarvis-os-maquette/index.html`), qui a remplacé ces pages, est désencombrée (badges « gratuit », grand bouton « Traiter une par une », réponses des bots hors de « Tout », formulaire de tâche replié, aide des en-têtes, doublon Équipe d'Espaces) et reçoit l'interrupteur « Grok Bot arrêté le » (onglet Faits) : Équipe devient « Hermes et ses routines », une demande à un bot devient une ligne pour Hermes sans sonnette. Détail : `docs/jarvis-os.md`, « Refonte UX du 26/11/2026 ». Captures avant et après : dans le scratchpad de la session (non versionnées).
