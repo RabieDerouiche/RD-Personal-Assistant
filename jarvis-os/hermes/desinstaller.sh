@@ -7,10 +7,12 @@
 set -euo pipefail
 [ "$(id -u)" = 0 ] || { echo "À lancer en root : sudo bash $0"; exit 1; }
 systemctl disable --now hermes-garde.timer 2>/dev/null || true
+systemctl disable --now hermes-reveil.path 2>/dev/null || true
 systemctl disable --now hermes-gateway.service 2>/dev/null || true
 systemctl disable --now hermes-sortie.service 2>/dev/null || true
 nft delete table inet hermes_sortie 2>/dev/null || true
 rm -f /etc/systemd/system/hermes-gateway.service /etc/systemd/system/hermes-sortie.service /etc/systemd/system/hermes-garde.service /etc/systemd/system/hermes-garde.timer
+rm -f /etc/systemd/system/hermes-reveil.service /etc/systemd/system/hermes-reveil.path /usr/local/sbin/hermes-reveil
 rm -f /usr/local/sbin/hermes-garde-forfait; rm -rf /var/lib/hermes-garde
 systemctl daemon-reload
 rm -rf /etc/hermes

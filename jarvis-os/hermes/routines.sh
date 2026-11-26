@@ -52,6 +52,27 @@ lister() {
   [ "$n" -gt 0 ] || echo "  aucune routine posée"
 }
 if [ "${1:-}" = "--liste" ]; then lister; exit 0; fi
+# Routines de Grok Bot reprises (26/11/2026) : le mode de chaque routine, sans toucher au dépôt du serveur.
+#   routines.sh --reel <nom>     la routine passe « en réel » (le bot l'a mise en pause), puis tout est reposé
+#   routines.sh --double <nom>   retour arrière : de nouveau « en double » (n'écrit que le Journal et l'État)
+#   routines.sh --lancer <nom>   un passage tout de suite, hors de son horaire (hermes cron run)
+# Le mode écrit ici remplace « en double » ou « en réel » dans la consigne de routines.conf.
+MODES=${HERMES_ROUTINES_MODES:-/etc/hermes/routines.mode}
+mode_de() { [ -f "$MODES" ] && awk -v n="$1" '$1 == n {m = $2} END {if (m) print m}' "$MODES"; }
+case "${1:-}" in
+  --reel|--double)
+    [[ "${2:-}" =~ ^[a-z0-9-]{2,40}$ ]] || { echo "Usage : $0 $1 <nom de la routine>"; exit 1; }
+    grep -q "^${2} *|" "$CONF" 2>/dev/null || { echo "Routine inconnue dans $CONF : $2"; exit 1; }
+    touch "$MODES" && chmod 0644 "$MODES"
+    { grep -v "^${2} " "$MODES"; echo "$2 ${1#--}"; } > "$MODES.tmp" && mv "$MODES.tmp" "$MODES" && chmod 0644 "$MODES"
+    echo "  $2 : mode « $([ "$1" = --reel ] && echo 'en réel' || echo 'en double') » noté dans $MODES" ;;
+  --lancer)
+    [[ "${2:-}" =~ ^[a-z0-9-]{2,40}$ ]] || { echo "Usage : $0 --lancer <nom de la routine>"; exit 1; }
+    ident=$(poses | awk -F'\t' -v n="jarvis-$2" '$2 == n {print $1}' | head -1)
+    [ -n "$ident" ] || { echo "Routine non posée : $2 (sudo bash $0)"; exit 1; }
+    if hx hermes cron run "$ident" >/dev/null 2>&1; then echo "  ▶ $2 : passage lancé (mode $(mode_de "$2" || true))"; exit 0; fi
+    echo "  ✗ $2 : Hermes a refusé le passage (hermes cron run $ident)"; exit 1 ;;
+esac
 
 [ -f "$CONF" ] || { echo "Liste des routines introuvable : $CONF"; exit 1; }
 [ -d "$SKILLS" ] || { echo "Skills du dépôt absentes ($SKILLS) : relance d'abord install.sh."; exit 1; }
@@ -68,6 +89,10 @@ while IFS= read -r ligne || [ -n "$ligne" ]; do
   IFS='|' read -r nom etat horaire skills outils consigne <<< "$ligne"
   nom=$(echo $nom); etat=$(echo $etat); horaire=$(echo "$horaire" | sed 's/^ *//; s/ *$//'); skills=$(echo $skills | tr -d ' '); outils=$(echo $outils | tr -d ' ')
   consigne=$(printf '%s' "$consigne" | sed 's/^ *//; s/ *$//')
+  case "$(mode_de "$nom")" in   # le mode noté par --reel ou --double l'emporte sur celui de routines.conf
+    reel) consigne=${consigne//« en double »/« en réel »} ;;
+    double) consigne=${consigne//« en réel »/« en double »} ;;
+  esac
   if ! [[ "$nom" =~ ^[a-z0-9-]{2,40}$ ]] || ! [[ "$etat" =~ ^(actif|pause)$ ]] || [ "$(echo "$horaire" | wc -w)" != 5 ] \
      || ! [[ "$horaire" =~ ^[0-9*,/\ -]+$ ]] || ! [[ "$outils" =~ ^(-|[a-z0-9_,-]{2,120})$ ]] || [ "${#consigne}" -lt 10 ]; then
     echo "  ✗ ligne refusée (nom | actif ou pause | cron à 5 champs | skills | outils | consigne) : ${ligne:0:70}"; erreurs=$((erreurs + 1)); continue
@@ -88,7 +113,7 @@ while IFS= read -r ligne || [ -n "$ligne" ]; do
     options+=(--skill "$s")
   done
   voulues="$voulues jarvis-$nom "
-  empreinte=$(printf '%s|%s' "$ligne" "$qui" | sha256sum | cut -c1-16)
+  empreinte=$(printf '%s|%s|%s' "$ligne" "$qui" "$consigne" | sha256sum | cut -c1-16)
   ident=$(poses | awk -F'\t' -v n="jarvis-$nom" '$2 == n {print $1}' | head -1)
   if [ -n "$ident" ] && grep -qx "jarvis-$nom $empreinte" "$ETAT"; then
     echo "  = $nom : inchangée"; echo "jarvis-$nom $empreinte" >> "$nouvel_etat"; continue

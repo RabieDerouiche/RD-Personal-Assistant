@@ -11,7 +11,7 @@ set -uo pipefail
 [ "$(id -u)" = 0 ] || { echo "En root."; exit 1; }
 [ -e /run/systemd/system ] && { echo "Systemd tourne ici : ce n'est pas un conteneur de banc. Arrêt."; exit 1; }
 ICI=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd); RACINE=$(cd "$ICI/../.." && pwd); KIT=$RACINE/jarvis-os/hermes
-T=/tmp/hermes-banc; HH=/home/hermes/.hermes; PM=40080; PT=40081; PJ=40082   # ports éphémères : permis par sortie.nft (faux modèle, faux Telegram, faux JARVIS)
+T=/tmp/hermes-banc; HH=/home/hermes/.hermes; PM=40180; PT=40181; PJ=40182   # ports éphémères (pas ceux du banc des portails, 40080 et 40081, qui peut tourner à côté) : permis par sortie.nft (faux modèle, faux Telegram, faux JARVIS)
 ok=0; ko=0
 verif() { local nom=$1; shift; if "$@"; then ok=$((ok + 1)); echo "  ✓ $nom"; else ko=$((ko + 1)); echo "  ✗ $nom"; fi; }
 hx() { (cd /home/hermes && runuser -u hermes -- env -i HOME=/home/hermes USER=hermes LOGNAME=hermes LANG=C.UTF-8 \
@@ -65,9 +65,9 @@ verif "réglages d'Hermes toujours lisibles après cette tentative" runuser -u h
 
 echo "== Skills du dépôt, pas encore relié à JARVIS"
 verif "sans jeton : aucun serveur MCP dans la politique (no_mcp partout)" bash -c "! grep -q '^mcp_servers:' /etc/hermes/config.yaml && grep -q 'telegram: \[.*no_mcp\]' /etc/hermes/config.yaml && grep -q 'cron: \[.*no_mcp\]' /etc/hermes/config.yaml"
-verif "skills du dépôt : 3, à root, lues mais pas modifiables par hermes" bash -c "[ \$(find /etc/hermes/skills -name SKILL.md | wc -l) = 3 ] && [ \"\$(stat -c %U /etc/hermes/skills/jarvis/pilotage/SKILL.md)\" = root ] && runuser -u hermes -- test -r /etc/hermes/skills/jarvis/pilotage/SKILL.md && ! runuser -u hermes -- test -w /etc/hermes/skills/jarvis/pilotage/SKILL.md && ! runuser -u hermes -- test -w /etc/hermes/skills/jarvis"
+verif "skills du dépôt : 7, à root, lues mais pas modifiables par hermes" bash -c "[ \$(find /etc/hermes/skills -name SKILL.md | wc -l) = 7 ] && [ \"\$(stat -c %U /etc/hermes/skills/jarvis/pilotage/SKILL.md)\" = root ] && runuser -u hermes -- test -r /etc/hermes/skills/jarvis/pilotage/SKILL.md && ! runuser -u hermes -- test -w /etc/hermes/skills/jarvis/pilotage/SKILL.md && ! runuser -u hermes -- test -w /etc/hermes/skills/jarvis"
 actives=$(hx hermes skills list 2>/dev/null | grep ' enabled ' | awk '{print $2}' | sort | tr '\n' ' ')
-verif "skills actives : celles du dépôt et hermes-agent ($actives)" [ "$actives" = "digest-ia hermes-agent pilotage veille-du-matin " ]
+verif "skills actives : celles du dépôt et hermes-agent ($actives)" [ "$actives" = "bilan-hebdo digest-ia hermes-agent pilotage prix-suivis reveil sorties-du-week-end veille-du-matin " ]
 verif "routines.conf du dépôt : $(bash "$ICI/routines-conf.test.sh" 2>&1 | tail -1)" bash -c "bash '$ICI/routines-conf.test.sh' >/dev/null 2>&1"
 verif "routines.sh refuse tant qu'Hermes n'est pas relié à JARVIS" bash -c "bash '$KIT/routines.sh' 2>&1 | grep -q 'relier-jarvis.sh'"
 verif "relier-jarvis.sh refuse hors d'un terminal" bash -c "bash '$KIT/relier-jarvis.sh' < /dev/null 2>&1 | grep -q 'vrai terminal'"
@@ -100,7 +100,7 @@ relier "jvf_faux-jeton-du-banc-0123456789"
 verif "bon jeton, vérifié depuis l'utilisateur hermes : liaison posée" grep -Eq "JARVIS répond à Hermes : [0-9]+ outils, profil « Exécutant »" $T/relier.log
 verif "jarvis.env : root, 0600 (illisible pour hermes sur le disque)" bash -c "[ \"\$(stat -c '%U %a' /etc/hermes/jarvis.env)\" = 'root 600' ] && ! runuser -u hermes -- cat /etc/hermes/jarvis.env >/dev/null 2>&1"
 verif "le jeton n'est écrit ni dans la politique ni dans un journal lisible" bash -c "! grep -rqs 'jvf_faux-jeton-du-banc-0123456789' /etc/hermes/config.yaml /var/log/hermes-relier.log $HH/config.yaml $HH/logs"
-verif "politique reliée : serveur MCP « jarvis », 16 outils retenus, ouvert à Telegram et aux routines" bash -c "grep -q '^mcp_servers:' /etc/hermes/config.yaml && [ \$(sed -n '/include:/,/resources:/p' /etc/hermes/config.yaml | grep -c '^        - ') = 16 ] && grep -q 'telegram: \[.*skills, jarvis\]' /etc/hermes/config.yaml && grep -q 'cron: \[.*skills, jarvis\]' /etc/hermes/config.yaml"
+verif "politique reliée : serveur MCP « jarvis », 21 outils retenus (16, et 5 pour les routines de Grok Bot reprises le 26/11/2026), ouvert à Telegram et aux routines" bash -c "grep -q '^mcp_servers:' /etc/hermes/config.yaml && [ \$(sed -n '/include:/,/resources:/p' /etc/hermes/config.yaml | grep -c '^        - ') = 21 ] && grep -q 'telegram: \[.*skills, jarvis\]' /etc/hermes/config.yaml && grep -q 'cron: \[.*skills, jarvis\]' /etc/hermes/config.yaml"
 
 echo "== Second jeton, pour la routine du web (relier-jarvis.sh --web)"
 relier_web() { printf '%s\n' "$1" | HERMES_BANC=1 script -qec "bash '$KIT/relier-jarvis.sh' --web" /dev/null > $T/relier-web.log 2>&1; }
@@ -108,7 +108,7 @@ relier_web "jvf_faux-jeton-du-banc-0123456789"
 verif "jeton « Exécutant » donné pour le web : refusé (il voit les mails), rien n'est ajouté" bash -c "grep -q 'il voit tes mails' $T/relier-web.log && ! grep -q '^JARVIS_MCP_TOKEN_WEB=' /etc/hermes/jarvis.env && ! grep -q '^  jarvis-web:' /etc/hermes/config.yaml"
 relier_web "jvf_faux-jeton-veilleur-0123456789"
 verif "jeton « Veilleur » : posé à côté du premier (jarvis.env : root, 0600, trois lignes)" bash -c "grep -q 'profil « Veilleur »' $T/relier-web.log && [ \"\$(stat -c '%U %a' /etc/hermes/jarvis.env)\" = 'root 600' ] && [ \$(grep -c . /etc/hermes/jarvis.env) = 3 ] && grep -q '^JARVIS_MCP_TOKEN=jvf_faux-jeton-du-banc' /etc/hermes/jarvis.env && grep -q '^JARVIS_MCP_TOKEN_WEB=jvf_faux-jeton-veilleur' /etc/hermes/jarvis.env"
-verif "politique : serveur « jarvis-web » à 5 outils, absent de Telegram et des routines par défaut ; « web » dans aucune liste" bash -c "grep -q '^  jarvis-web:' /etc/hermes/config.yaml && [ \$(sed -n '/^  jarvis-web:/,\$p' /etc/hermes/config.yaml | grep -c '^        - ') = 5 ] && ! grep -E '^  (cli|telegram|cron): ' /etc/hermes/config.yaml | grep -Eq 'jarvis-web|web[],]'"
+verif "politique : serveur « jarvis-web » à 8 outils, absent de Telegram et des routines par défaut ; « web » dans aucune liste" bash -c "grep -q '^  jarvis-web:' /etc/hermes/config.yaml && [ \$(sed -n '/^  jarvis-web:/,\$p' /etc/hermes/config.yaml | grep -c '^        - ') = 8 ] && ! grep -E '^  (cli|telegram|cron): ' /etc/hermes/config.yaml | grep -Eq 'jarvis-web|web[],]'"
 
 echo "== Telegram et modèle simulés"
 sed -e 's/^  provider: "claude-subscription-directsdk-experimental"/  provider: "custom"/' -e 's/^  default: "opus" .*/  default: "faux-modele"/' \

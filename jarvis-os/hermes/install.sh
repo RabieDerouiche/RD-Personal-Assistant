@@ -155,12 +155,24 @@ install -o root -g root -m 0755 "$ICI/garde-forfait.sh" /usr/local/sbin/hermes-g
 printf 'HERMES_SEUIL_FORFAIT=%s\nHERMES_GARDE_CINQ_HEURES=%s\n' "$SEUIL_FORFAIT" "$GARDE_CINQ_HEURES" > /etc/hermes/garde.conf && chmod 0644 /etc/hermes/garde.conf
 install -o root -g root -m 0644 "$ICI/hermes-garde.service" /etc/systemd/system/hermes-garde.service
 install -o root -g root -m 0644 "$ICI/hermes-garde.timer" /etc/systemd/system/hermes-garde.timer
+# le réveil d'Hermes par JARVIS (routines de Grok Bot reprises, 26/11/2026) : JARVIS touche un fichier, root lance la routine « reveil »
+install -o root -g root -m 0755 "$ICI/reveil.sh" /usr/local/sbin/hermes-reveil
+install -o root -g root -m 0644 "$ICI/hermes-reveil.service" /etc/systemd/system/hermes-reveil.service
+install -o root -g root -m 0644 "$ICI/hermes-reveil.path" /etc/systemd/system/hermes-reveil.path
+if id jarvis >/dev/null 2>&1; then install -d -o jarvis -g jarvis -m 0755 /var/lib/jarvis-reveil; else install -d -m 0755 /var/lib/jarvis-reveil; fi
 nft -c -f /etc/hermes/sortie.nft 2>/dev/null && echo "Règles réseau : syntaxe vérifiée." || [ "$BANC" = 1 ] || { echo "Règles réseau refusées par nft : arrêt."; exit 1; }
 if [ "$BANC" != 1 ]; then
   systemctl daemon-reload
   systemctl enable --now hermes-sortie.service
   systemctl enable hermes-gateway.service
-  systemctl enable --now hermes-garde.timer   # toutes les 10 min : Hermes s'arrête au-delà de $SEUIL_FORFAIT % de la semaine
+  if [ -f /etc/hermes/garde.coupe ]; then
+    # garde coupé à sa demande (26/11/2026 : « période de mise en place, ignore les limites ») : une réinstallation ne le rallume pas
+    systemctl disable --now hermes-garde.timer 2>/dev/null; rm -f /var/lib/hermes-garde/arret
+    echo "Garde du forfait coupé (/etc/hermes/garde.coupe) : minuterie laissée arrêtée."
+  else
+    systemctl enable --now hermes-garde.timer   # toutes les 10 min : Hermes s'arrête au-delà de $SEUIL_FORFAIT % de la semaine
+  fi
+  systemctl enable --now hermes-reveil.path     # le réveil d'Hermes par JARVIS
   if [ -f /var/lib/hermes-garde/arret ]; then
     # en pause par le garde : c'est lui qui décide, avec ses nouvelles règles (il relance Hermes si le forfait le permet)
     echo "Hermes est en pause par le garde du forfait : je relance le garde, qui le redémarre si le forfait le permet."

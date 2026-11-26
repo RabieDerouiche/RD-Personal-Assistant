@@ -1,0 +1,11 @@
+# JARVIS OS — le réveil d'Hermes par JARVIS (routines de Grok Bot reprises, 26/11/2026 ; posé par install.sh).
+# JARVIS (utilisateur jarvis) touche ce fichier ; root lance hermes-reveil.service, qui lance la routine « reveil ».
+[Unit]
+Description=Réveil d'Hermes par JARVIS (courrier à son arrivée, lignes du Canal)
+
+[Path]
+PathModified=/var/lib/jarvis-reveil/sonnette
+Unit=hermes-reveil.service
+
+[Install]
+WantedBy=multi-user.target

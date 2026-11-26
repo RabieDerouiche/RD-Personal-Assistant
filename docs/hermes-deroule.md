@@ -56,19 +56,32 @@ Ouvrir un accès direct plus tard reste possible : c'est sa décision, par QCM.
 
 ## Les routines de Grok Bot : où elles vont
 
-24 routines dans l'onglet Routines le 23/11/2026 (hors passages lancés par la plateforme).
+**Refait le 26/11/2026** (sa décision : « toutes les routines de Grok Bot sont soit arrêtées, soit remplacées par une
+routine d'Hermes bien testée et simulée, avec la première vraie exécution validée par moi », le jour même ; Grok Bot
+s'arrête de toute façon le 3/12/2026). Ses choix par QCM du 26/11 : Argus et Plutus → un bilan hebdo par Hermes ;
+le courrier à son arrivée → JARVIS surveille et réveille Hermes ; le web → Hermes, jeton « Veilleur » à part ; les
+comptes rendus → dans JARVIS (notification quand il y a une action), Telegram ne sert qu'à discuter. Chronos : une
+autre copie de la session s'en charge (`docs/hermes-portail.md`).
 
-| Routines | Destination | Quand, à quelle condition |
+| Routine (bot) | Destination | Comment |
 |---|---|---|
-| Argus : Supervision (lun, mer, ven) | Reste chez Grok Bot | Essayée en double le 23/11/2026, retirée le 24/11 à sa demande : surveiller les bots de Grok Bot n'a de sens que chez Grok Bot (et JARVIS repère déjà seul une pause de Grok). |
-| Iris : Semaine à venir (dim) | **Hermes, en double** | Phase 1, maintenant. |
-| Iris : Veille du matin (lun-ven) | **Hermes, en double** (7h40) | Depuis le 24/11/2026. En double il n'écrit rien dans Dossiers ni Échéances : il note au Journal ce qu'il aurait écrit. Pour la bascule : outils de JARVIS à ajouter, bornés à ces colonnes. |
-| Athéna : Digest IA et .NET | **Hermes, en double, avec le web** (lundi 9h10) | Depuis le 24/11/2026 (son choix : essai du web sur cette seule routine). Elle a l'outil web et le serveur « jarvis-web » (jeton « Veilleur ») ; jamais les mails. Posée dès qu'il a créé le second jeton. |
-| Ulysse : Sorties du week-end ; Kairos : Liste du mois, Prix suivis | Après l'essai du web | Phase 3, son choix (QCM). Le web d'Hermes marche sans clé (services gratuits, limités) ; il exige un jeton à part, sans Gmail, pour qu'une page piégée ne puisse rien lire de privé. Les sites marchands et de crédit bloquent souvent la lecture automatique : Prix suivis en dernier. |
-| Iris : Courrier prioritaire ; Kairos : Signal prix ; Chronos : Facture reçue | Restent chez Grok Bot | Phase 4 seulement s'il le demande : il faut que JARVIS repère le mail à son arrivée et réveille Hermes (écarté le 17/11 tant que les alias de Grok Bot existent). |
-| Chronos : notes de frais, validation des jours, CRA (8 routines) | **Restent chez Grok Bot** | Trois portails avec connexion, codes et sessions qui expirent ; un navigateur ne tient pas sur le VPS-1 à côté de JARVIS (Likely). C'est le verrou du remplacement complet. |
-| Argus : Bilan du lundi | Reste chez Grok Bot | Il lit la consommation de Grok dans l'app de Grok. |
-| Sonnettes (6) | Restent tant que le bot garde une routine | Hermes n'a pas besoin de sonnette par mail : ses lignes du Canal sont lues à chaque passage ; un réveil local par JARVIS viendra s'il le faut. |
+| Veille du matin (Iris) | **Hermes** `veille-du-matin`, lun-ven 7h40 | En double depuis le 24/11 (3 passages comparés : au niveau, une fois meilleur). En réel : Dossiers, Échéances et l'agenda « Échéances » par `pilotage_ajouter`, `pilotage_modifier`, `echeance_agenda` ; la première fois, « préparé, à valider » dans le Canal jusqu'à son « Oui » |
+| Courrier prioritaire (Iris), Sonnette Jarvis (Iris) | **JARVIS + Hermes** `reveil` | JARVIS cherche toutes les 5 minutes, sans IA, les mails des expéditeurs « Immédiat » d'Iris (onglet Expéditeurs) et touche le fichier de réveil ; root lance la routine `reveil` (aussi à 9h15, 13h15, 18h15 en filet). Les lignes du Canal pour Hermes réveillent aussi Hermes ; après l'arrêt de Grok Bot (Faits « Grok Bot arrêté le »), celles des bots (sauf Chronos) sont à lui |
+| Semaine à venir (Iris) | **Arrêt** | Retirée d'Hermes le 24/11 à sa demande (il ne lit pas ce message) ; la Veille du lundi couvre les échéances des 7 jours |
+| Passages lancés par Grok Bot (Iris) | **Arrêt** | Propres à la plateforme de Grok Bot |
+| Digest IA et .NET (Athéna), Sonnette Athéna | **Hermes** `digest-ia` (web), lundi 9h10 | Jeton « Veilleur ». Les cinq astuces pour Iris et le signalement à Argus s'arrêtent |
+| Supervision, Bilan du lundi, Sonnette (Argus) ; Plutus | **Hermes** `bilan-hebdo`, lundi 8h50 | Ses propres routines seulement : passages, échecs, usage du forfait (`hermes_usage`, lu par le garde) |
+| Prix suivis (Kairos), Sonnette Kairos | **Hermes** `prix-suivis` (web), chaque jour 9h jusqu'au 01/12 puis le dimanche | `prix_relever` et Relevés ; notification pour un nouveau 🔴 ou 🟡. Après le 3/12 : horaire à repasser à `0 17 * * 0` |
+| Signal prix (Kairos) | **Arrêt proposé** (son choix) | Les alertes Keepa, Idealo et Dealabs arrivent sur les adresses des bots, qui disparaissent avec Grok Bot. Les reprendre : les comptes d'alerte passés sur son Gmail, les domaines dans Expéditeurs (Kairos, « Immédiat ») ; `reveil` sait les traiter |
+| Liste du mois (Kairos) | **Arrêt proposé** (son choix) | Prix suivis signale déjà un vendeur ou une référence à revoir |
+| Sorties du week-end (Ulysse), Sonnette Ulysse | **Hermes** `sorties-du-week-end` (web), jeudi 19h | `sorties_contexte` (âge calculé), `agenda_libre` (créneaux pris sans titre), lignes de Sorties. Le bloc Voyages et les lettres d'information d'Ulysse s'arrêtent (les sites des Sources restent) |
+| Chronos (9 routines) | Autre copie | `docs/hermes-portail.md` |
+
+Méthode, pour chaque routine remplacée : à blanc (`en double`, rien d'écrit hors du Journal, compte rendu entier
+dans le Détail) comparé à la dernière sortie du bot ; puis sa mise en pause chez le bot par une ligne du Canal ;
+puis `routines.sh --reel <nom>` et `routines.sh --lancer <nom>` : la première exécution réelle, hors de son horaire,
+notifiée dans JARVIS pour qu'il la valide. Retour arrière : `routines.sh --double <nom>` et la reprise de la routine
+chez le bot (tant que Grok Bot tourne).
 
 ## La méthode de bascule (pas de compromis sur la qualité)
 
@@ -227,6 +240,20 @@ Termius) ; le geste d'après le squelette qu'elle rapporte ; les décisions à b
   Telegram n'a ni le web ni « jarvis-web » ; la routine du web lit Sources par le jeton « Veilleur », n'a pas
   l'outil des mails, a `web_search` et `web_extract`). **Non vérifié** : la recherche web sans clé elle-même
   (services gratuits d'Exa, Parallel, Firecrawl, Keenable, d'après la doc d'Hermes) : premier vrai passage.
+- 26/11/2026 : **routines de Grok Bot reprises** (hors Chronos), sa décision du jour. JARVIS : `courrier.mjs` (le
+  courrier des expéditeurs « Immédiat » relevé toutes les 5 minutes, sans IA ; le réveil d'Hermes par un fichier,
+  `/var/lib/jarvis-reveil/sonnette`, une fois par minute au plus, sans consigne) ; outils `pilotage_modifier`
+  (Dossiers, Échéances, Prix, colonnes bornées, clé vérifiée), `echeance_agenda` (l'agenda « Échéances » seul),
+  `courrier_a_traiter`, `courrier_traite`, `hermes_usage` pour l'exécutant ; `prix_relever`, `sorties_contexte`,
+  `agenda_libre` pour l'exécutant et le veilleur ; `pilotage_ajouter` ouvert à Dossiers et Échéances (exécutant), à
+  Relevés et Sorties (veilleur, qui lit aussi Prix, Relevés, Sorties et Routines) ; `canal_repondre` sur une ligne
+  d'un bot une fois Grok Bot arrêté ; une ligne du Canal écrite par l'app pour Hermes le réveille. Kit : skills
+  `reveil`, `bilan-hebdo`, `prix-suivis`, `sorties-du-week-end`, modes « en double » et « en réel » dans `pilotage`,
+  `routines.sh --reel`, `--double`, `--lancer` (le mode noté dans `/etc/hermes/routines.mode`, sans toucher au dépôt du
+  serveur), `hermes-reveil.path` et `.service` (root), garde coupable par `/etc/hermes/garde.coupe` et `usage.json`.
+  Bancs : serveur 365 sur 365, courrier 9 sur 9, garde 21 sur 21, routines du dépôt 6 lignes sans erreur. **Banc
+  d'Hermes non relancé** : le banc des portails d'une autre copie tournait dans le même conteneur (même utilisateur
+  hermes) ; ses compteurs sont mis à jour (21 et 8 outils, 7 skills, ports 40180 à 40182).
 
 ## Autres workflows étudiés pour Hermes (sa question du 24/11/2026)
 
