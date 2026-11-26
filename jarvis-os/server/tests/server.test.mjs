@@ -49,7 +49,9 @@ Object.assign(env, {JARVIS_STEAM_URL: VB, JARVIS_STT_HELPER: path.join(HERE, 'fa
   /* 0.64.0 : message vocal (faux convertisseur à la place de PyAV, pas de ffmpeg) et rappels toutes les 0,7 s au lieu de 5 min */
   JARVIS_AUDIO_PY: process.execPath, JARVIS_AUDIO_HELPER: path.join(HERE, 'fake-audio.mjs'), JARVIS_FFMPEG: '', JARVIS_RAPPEL_MS: '700', JARVIS_RAPPEL_TICK_MS: '150', JARVIS_TACHES_CACHE_MS: '0',
   /* 0.89.0 : la relance après la limite du forfait : tic de 0,3 s, sans la minute de marge ; les avis de root dans un dossier du banc */
-  JARVIS_LIMITE_TICK_MS: '300', JARVIS_LIMITE_MARGE_MS: '0', JARVIS_RELANCE_AVIS: path.join(DATA, 'avis-relance')});
+  JARVIS_LIMITE_TICK_MS: '300', JARVIS_LIMITE_MARGE_MS: '0', JARVIS_RELANCE_AVIS: path.join(DATA, 'avis-relance'),
+  /* 0.92.0 : le résumé des routines d'Hermes écrit par root, dans un dossier du banc (absent au départ : Hermes « pas installé ») */
+  JARVIS_HERMES_ROUTINES: path.join(DATA, 'hermes-etat', 'routines.json')});
 const sansN = (u) => String(u || '').replace(/\?n=[0-9a-f]{12}(?=#|$)/, '');   /* 0.69.0 : l'adresse d'une notification sans son identifiant */
 const results = []; let fails = 0;
 { const H = ['Domaine', 'Fait', 'Valeur'], v = (x) => pauseDepuisFaits([H, ['Grok Bot', "Grok en pause jusqu'au", x]]);
@@ -728,6 +730,43 @@ try {
       ok('santé (0.89.0) : une ligne « Forfait Claude » d’information (en attente de la levée, relances du jour), jamais une notification', it('forfait').ok === true && /en attente de la levée : digest-ia/.test(it('forfait').detail) && /relancés? automatiquement depuis hier/.test(it('forfait').detail), JSON.stringify(it('forfait')));
       FG.refreshOk = true; r = await G('/api/google/link', {}); await fetch(BASE + '/api/google/callback?state=' + new URL(r.body.url).searchParams.get('state') + '&code=CODE-OK');
       n0 = got.length; r = await G('/api/sante/maintenant', {}); ok('santé : retour à la normale noté, sans notification', it('google').ok === true && got.length === n0, JSON.stringify(r.body.items));
+      /* 0.92.0 : « Hermes et ses routines » en direct : le résumé assaini de root (ici un dossier du banc), relu et revalidé par JARVIS */
+      { const HD = path.join(DATA, 'hermes-etat'), HF = path.join(HD, 'routines.json'), sec = () => Math.floor(Date.now() / 1000);
+        const lire = async () => (await G('/api/hermes/routines')).body, ligne = async () => ((await G('/api/sante/maintenant', {})).body.items || []).find((x) => x.cle === 'hermesRoutines');
+        const resume = (plus = {}) => ({v: 1, at: sec(), liste: true, cron: true, passerelle: 'active', garde: {etat: 'coupé', jusqua: '2026-12-03'}, inconnues: 1, secret: 'PIEGE', routines: [
+          {nom: 'veille-du-matin', libelle: 'Veille du matin', moment: 'du lundi au vendredi à 7 h 40', mode: 'réel', posee: true, active: true, dernier: '2026-11-26T06:40:12Z', resultat: 'ok', cause: null, prochain: '2026-11-27T06:40:00Z'},
+          {nom: 'prix-suivis', libelle: 'Prix suivis', moment: 'chaque jour à 9 h', mode: 'réel', posee: true, active: true, dernier: '2026-11-26T08:00:03Z', resultat: 'erreur', cause: 'limite du forfait', prochain: '2026-11-27T08:00:00Z'},
+          {nom: 'digest-ia', libelle: '<img src=x onerror=alert(1)>', moment: 'voir /home/hermes/.hermes/PIEGE', mode: 'root', posee: true, active: true, dernier: 'hier, jeton sk-PIEGE', resultat: 'erreur', cause: 'RuntimeError: portail.exemple.invalid a refusé (PIEGE)', prochain: '2026-13-45T99:00:00Z', last_error: 'texte brut PIEGE', prompt: 'PIEGE'},
+          {nom: 'bilan-hebdo', libelle: 'Bilan de la semaine', moment: 'le lundi à 8 h 50', mode: 'double', posee: true, active: false, dernier: '2026-11-23T07:50:00Z', resultat: 'jamais', cause: 'erreur', prochain: '2026-11-30T07:50:00Z'},
+          {nom: '../../etc/passwd', libelle: 'PIEGE', resultat: 'ok'}, 'PIEGE', null, {nom: 'veille-du-matin', libelle: 'Doublon PIEGE'}], ...plus});
+        const pose = (o) => fs.writeFileSync(HF, typeof o === 'string' ? o : JSON.stringify(o), {mode: 0o640});
+        r = await call('/api/hermes/routines'); ok('routines d’Hermes (0.92.0) : refusé sans appareil relié', r.status === 401);
+        let h = await lire(), l = await ligne();
+        ok('… dossier du résumé absent (Hermes pas installé) : « indisponible » avec la raison ; rien dans la santé', h.disponible === false && h.code === 'dossier' && /n’existe pas sur ce serveur/.test(h.raison) && !('routines' in h) && !l, JSON.stringify([h, l]));
+        fs.mkdirSync(HD, {mode: 0o750}); n0 = got.length; h = await lire(); l = await ligne();
+        ok('… résumé pas encore écrit : « indisponible » ; la santé le dit (« résumé indisponible »), sans notification', h.disponible === false && h.code === 'absent' && /pas encore écrit/.test(h.raison) && l && l.ok === false && /^résumé indisponible : /.test(l.detail) && got.length === n0, JSON.stringify([h, l]));
+        const bon = resume(); pose(bon); h = await lire(); const noms = (h.routines || []).map((x) => x.nom), di = (h.routines || []).find((x) => x.nom === 'digest-ia') || {}, bh = (h.routines || []).find((x) => x.nom === 'bilan-hebdo') || {};
+        ok('… résumé frais : les routines en direct (libellé, moment, mode, dernier passage et résultat, prochain passage), la passerelle, le garde', h.disponible === true && h.at === bon.at * 1000 && h.passerelle === 'active' && h.garde.etat === 'coupé' && h.garde.jusqua === '2026-12-03'
+          && noms.join() === 'veille-du-matin,prix-suivis,digest-ia,bilan-hebdo' && JSON.stringify(h.routines[0]) === JSON.stringify(bon.routines[0]) && h.routines[1].resultat === 'erreur' && h.routines[1].cause === 'limite du forfait', JSON.stringify(h));
+        ok('… résumé piégé : chaque champ repasse par la liste blanche (libellé, moment, mode, dates, cause ramenés à du sûr ; champs en trop, nom piégé, doublon écartés)', di.libelle === 'digest-ia' && di.moment === '' && di.mode === 'double' && di.dernier === null && di.prochain === null && di.cause === 'erreur'
+          && bh.dernier === null && bh.cause === null && bh.prochain === null && !/PIEGE|exemple|onerror|passwd|hermes\/|sk-|last_error|prompt|secret|inconnues/.test(JSON.stringify(h)) && Object.keys(h).sort().join() === 'at,disponible,garde,passerelle,routines', JSON.stringify(h));
+        n0 = got.length; l = await ligne();
+        ok('… santé : une ligne « Routines d’Hermes » (nombre, dernière écriture, ce qui est en erreur par sa catégorie), jamais une notification', l && l.ok === true && l.nom === 'Routines d’Hermes' && /^4 routines en direct \(1 pas active\) ; dernière écriture à \d\d h \d\d ; en erreur au dernier passage : Prix suivis \(limite du forfait\), digest-ia \(erreur\)\.$/.test(l.detail) && got.length === n0, JSON.stringify(l));
+        pose(resume({passerelle: 'rm -rf /', garde: {etat: 'PIEGE', jusqua: 'demain'}})); h = await lire();
+        ok('… passerelle ou garde hors de la liste des mots connus : « inconnue », « inconnu », pas de date', h.disponible === true && h.passerelle === 'inconnue' && h.garde.etat === 'inconnu' && h.garde.jusqua === null, JSON.stringify(h));
+        pose(resume({at: sec() - 31 * 60})); h = await lire(); l = await ligne();
+        ok('… résumé de plus de 30 minutes : « indisponible » (dernière écriture dite), jamais la liste périmée', h.disponible === false && h.code === 'vieux' && /dernière écriture du résumé à \d\d h \d\d : plus de 30 minutes/.test(h.raison) && !('routines' in h) && l.ok === false && /plus de 30 minutes/.test(l.detail), JSON.stringify([h, l]));
+        pose(resume({at: sec() + 3600})); const futur = await lire(); pose('{"v": 1, "at": '); const coupe = await lire(); pose(resume({v: 2})); const autre = await lire(); pose(JSON.stringify(resume()) + ' '.repeat(40000)); const gros = await lire(); pose('[]'); const liste = await lire();
+        ok('… résumé illisible (JSON coupé, autre version, date à venir, pas un objet) ou trop gros : « indisponible », rien n’en sort', [futur, coupe, autre, liste].every((x) => x.disponible === false && x.code === 'illisible' && !('routines' in x)) && gros.disponible === false && gros.code === 'gros', JSON.stringify([futur, coupe, autre, gros, liste].map((x) => x.code)));
+        pose(resume({liste: false, routines: []})); const sl = await lire(); pose(resume({cron: false})); const sc = await lire();
+        ok('… root n’a pas pu lire sa liste ou le cron d’Hermes : « indisponible » avec la raison (la passerelle et le garde restent dits)', sl.disponible === false && sl.code === 'liste' && /install\.sh/.test(sl.raison) && sc.disponible === false && sc.code === 'cron' && sc.passerelle === 'active' && !('routines' in sc), JSON.stringify([sl, sc]));
+        fs.rmSync(HF); fs.writeFileSync(path.join(DATA, 'ailleurs.json'), JSON.stringify(resume())); fs.symlinkSync(path.join(DATA, 'ailleurs.json'), HF); h = await lire();
+        ok('… résumé remplacé par un lien : refusé, jamais suivi', h.disponible === false && h.code === 'lien' && !('routines' in h), JSON.stringify(h));
+        fs.rmSync(HF); fs.renameSync(HD, HD + '-vrai'); fs.symlinkSync(HD + '-vrai', HD); pose(resume()); h = await lire(); fs.rmSync(HD); fs.renameSync(HD + '-vrai', HD);
+        ok('… dossier du résumé remplacé par un lien : refusé aussi', h.disponible === false && h.code === 'lien', JSON.stringify(h));
+        const avant = fs.readdirSync(HD).join(), m0 = fs.statSync(HF).mtimeMs; pose(resume()); const m1 = fs.statSync(HF).mtimeMs; await lire(); await ligne();
+        ok('… JARVIS n’écrit jamais dans ce dossier (lecture seule : ni fichier en plus, ni résumé touché)', fs.readdirSync(HD).join() === avant && avant === 'routines.json' && fs.statSync(HF).mtimeMs === m1 && m1 >= m0);
+        fs.rmSync(HD, {recursive: true, force: true}); }
       const gs = JSON.parse(fs.readFileSync(path.join(DATA, 'guard-mission.json'), 'utf8'));
       ok('missions : Claude Code refuse les chemins secrets (état du serveur, ~/.claude, /proc) et le garde-fou voit les outils de fichiers', /Read/.test(gs.hooks.PreToolUse[0].matcher) && gs.permissions.deny.includes('Read(//' + path.resolve(DATA).replace(/^\/+/, '') + '/*.json)') && gs.permissions.deny.some((x) => /^Read\(\/\/.*\/\.claude\/\*\*\)$/.test(x)) && gs.permissions.deny.includes('Read(//proc/**)'), JSON.stringify(gs.permissions.deny.slice(0, 4)));
       ok('0.73.0 : la copie d’un state.json abîmé (state.json.corrompu-<ms>) est aussi refusée à Claude Code (lecture et écriture)', ['Read', 'Edit'].every((v) => gs.permissions.deny.includes(v + '(//' + path.resolve(DATA).replace(/^\/+/, '') + '/*.corrompu-*)')), JSON.stringify(gs.permissions.deny.filter((x) => /corrompu/.test(x))));

@@ -50,6 +50,7 @@ verif "garde du forfait : copie root 0755, jamais le fichier du dépôt" [ "$(st
 verif "garde du forfait : seuil de 85 %" grep -qx 'HERMES_SEUIL_FORFAIT=85' /etc/hermes/garde.conf
 verif "garde du forfait : semaine seulement (fenêtre de 5 heures ignorée)" grep -qx 'HERMES_GARDE_CINQ_HEURES=0' /etc/hermes/garde.conf
 verif "Claude Code d'Hermes trouvé par son PATH (~/.local/bin/claude)" [ -L /home/hermes/.local/bin/claude ]
+verif "0.92.0 : copie root de routines.conf (644) et dossier du résumé des routines pour JARVIS (root, 750)" bash -c "[ \"\$(stat -c '%U %a' /usr/local/lib/hermes-relance/routines.conf)\" = 'root 644' ] && cmp -s '$KIT/routines.conf' /usr/local/lib/hermes-relance/routines.conf && [ \"\$(stat -c '%U %a' /var/lib/hermes-relance-etat)\" = 'root 750' ]"
 
 echo "== Politique figée"
 outils=$(hx hermes tools list --platform telegram 2>/dev/null | grep '✓ enabled' | awk '{print $3}' | sort | tr '\n' ' ')
@@ -191,6 +192,23 @@ for l in open('$T/traces/modele.jsonl'):
     if isinstance(c, dict) and 'scheduled cron job' in json.dumps(c.get('messages') or ''):
         sys.exit(0 if sorted(t['function']['name'] for t in c.get('tools') or []) == ['memory', 'skill_manage', 'skill_view', 'skills_list', 'tool_call', 'tool_describe', 'tool_search'] else 1)
 sys.exit(1)"
+# 0.92.0 : le résumé des routines pour JARVIS, écrit par la copie root de la relance à partir du VRAI jobs.json d'Hermes (faux systemctl,
+# aucune lecture d'usage : rien n'est à relancer) ; la liste vient de la copie root de routines.conf, rafraîchie par routines.sh
+printf '#!/bin/bash\ncase "$1" in is-active|is-failed) echo active ;; esac\n' > $T/faux-systemctl; chmod +x $T/faux-systemctl
+verif "routines.sh a rafraîchi la copie root de routines.conf (celle que la relance résume)" bash -c "grep -q '^lecture | actif | 15 9 ' /usr/local/lib/hermes-relance/routines.conf && grep -q '^dormante ' /usr/local/lib/hermes-relance/routines.conf"
+env HERMES_RELANCE_JOBS=$HH/cron/jobs.json HERMES_RELANCE_ETAT=$T/relance-etat HERMES_RELANCE_AVIS=$T/relance-avis HERMES_RELANCE_PORTAIL=$T/relance-portail HERMES_RELANCE_RESUME=$T/resume \
+  HERMES_RELANCE_MODES=$T/routines.mode HERMES_GARDE_ETAT=$T/garde-arret HERMES_RELANCE_GARDE_COUPE=$T/garde-coupe HERMES_RELANCE_SYSTEMCTL=$T/faux-systemctl HERMES_RELANCE_LANCER=/bin/false \
+  HERMES_RELANCE_USAGE_CMD="touch $T/usage-lu; echo '{}'" HERMES_RELANCE_JARVIS_U=nobody python3 -I /usr/local/lib/hermes-relance/limite.py relancer > $T/relance.log 2>&1
+verif "résumé des routines écrit à partir du vrai jobs.json d'Hermes : la routine passée (ok, dates, horaire lisible), la routine en pause, rien d'autre ; sans lecture d'usage" python3 -I -c "
+import json, re, sys
+d = json.load(open('$T/resume/routines.json')); r = {x['nom']: x for x in d['routines']}
+iso = re.compile(r'\\d{4}-\\d\\d-\\d\\dT\\d\\d:\\d\\d:\\d\\dZ')
+l, p = r['lecture'], r['dormante']
+ok = (sorted(r) == ['dormante', 'lecture'] and d['cron'] is True and d['liste'] is True and d['passerelle'] == 'active'
+      and l['posee'] and l['active'] and l['resultat'] == 'ok' and l['moment'] == 'le lundi à 9 h 15' and iso.fullmatch(l['dernier'] or '') and iso.fullmatch(l['prochain'] or '')
+      and p['posee'] and not p['active'] and p['resultat'] == 'jamais' and p['prochain'] is None and p['moment'] == 'le dimanche à 18 h 30')
+sys.exit(0 if ok else 1)"
+verif "… droits du résumé (750 et 640), aucune lecture d'usage, rien dit d'autre que « Rien à relancer »" bash -c "[ \"\$(stat -c %a $T/resume)\" = 750 ] && [ \"\$(stat -c %a $T/resume/routines.json)\" = 640 ] && [ ! -e $T/usage-lu ] && [ \"\$(cat $T/relance.log)\" = 'Rien à relancer.' ]"
 wait 2>/dev/null; pic=$(sort -n $T/rss-routine.log | tail -1)
 echo "  mémoire d'Hermes pendant une routine : $pic Mo au plus (plus environ 250 Mo pour son Claude Code)"
 verif "mémoire pendant une routine sous 550 Mo" [ "${pic:-999}" -lt 550 ]

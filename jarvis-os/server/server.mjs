@@ -36,6 +36,7 @@ import {createVerrou} from './verrou.mjs';   /* 0.75.0 : le verrou de l'app par 
 import {createPilotageLocal, createCopieDrive} from './pilotage-local.mjs';   /* 0.88.0 : Pilotage hébergé par JARVIS (son choix du 26/11/2026) */
 import {cliPilotage} from './pilotage-cli.mjs';
 import {limiteDe, estLimite, heureParis, ecritureFaite, createAvisRelance} from './limite.mjs';   /* 0.89.0 : la relance automatique après la limite du forfait */
+import {createHermesRoutines} from './hermes-routines.mjs';   /* 0.92.0 : « Hermes et ses routines » en direct (le résumé de root, lu sans rien écrire) */
 const ACT = createActivite();   /* 0.33.0 : ce que fait Claude à l'instant */
 
 const VERSION = '0.89.0';
@@ -1179,6 +1180,9 @@ setInterval(() => { coteTick().catch(() => {}); }, +process.env.JARVIS_NOTIFY_TI
 /* 0.89.0 : les avis de root (routine d'Hermes ou tâche d'hermes-portail restée en échec après sa relance après la limite) : poussés une fois */
 const AVIS_RELANCE = createAvisRelance({dir: process.env.JARVIS_RELANCE_AVIS || '/var/lib/hermes-relance-avis', S, save, push: PUSH, log: (t) => console.log(t)});
 setInterval(() => { AVIS_RELANCE.tick().catch(() => {}); }, +process.env.JARVIS_LIMITE_TICK_MS || 60000).unref();
+/* 0.92.0 : les routines d'Hermes en direct : le résumé assaini que root (hermes-relance) écrit toutes les 10 minutes, relu et revalidé à
+   chaque demande (GET /api/hermes/routines, ligne « Routines d'Hermes » de la santé) ; JARVIS n'écrit jamais dans ce dossier */
+const HERMES_ROUT = createHermesRoutines({fichier: process.env.JARVIS_HERMES_ROUTINES || '/var/lib/hermes-relance-etat/routines.json', now});
 /* veilleur de santé (0.16.0) : toutes les 10 minutes, sans Claude ; prévient une fois de ce qui casse sans bruit */
 if (GG.status('').linked && !S.googleVu) { S.googleVu = true; save(); }
 const SANTE = createSante({S, save, push: PUSH, checks: {
@@ -1209,6 +1213,8 @@ const SANTE = createSante({S, save, push: PUSH, checks: {
     const d = [jusqua ? 'limite atteinte, reprise vers ' + heureParis(jusqua, t) : '', att.length ? 'en attente de la levée : ' + att.slice(0, 4).join(', ') : '', faites.length ? faites.length + ' relancé' + (faites.length > 1 ? 's' : '') + ' automatiquement depuis hier' : ''].filter(Boolean);
     return {nom: 'Forfait Claude', ok: true, detail: d.join(' ; ') + '.', pousser: false};
   },
+  /* 0.92.0 : les routines d'Hermes en direct (nombre, dernière écriture du résumé de root), ou « résumé indisponible » ; une information */
+  hermesRoutines: async () => HERMES_ROUT.sante(),
   notifications: async () => { const l = S.push && S.push.last; if (!l || !l.total) return null; return {nom: 'Notifications', ok: l.ok > 0, detail: l.ok > 0 ? 'reçues' : 'refusées par le service (' + (l.detail || '?') + ') : Réglages, Notifications.', pousser: false}; }
 }});
 { const ms = +process.env.JARVIS_SANTE_TICK_MS || 600000; setTimeout(() => { SANTE.tick().catch(() => {}); setInterval(() => { SANTE.tick().catch(() => {}); }, ms).unref(); }, Math.min(ms, 120000)).unref(); }
@@ -2419,6 +2425,7 @@ const server = http.createServer(async (req, res) => {
         return json(res, r.error ? 400 : 200, {...r, ...mcpEtat(req)});
       }
       /* 0.41.0 : les routines planifiées et le brief du matin */
+      if (p === '/api/hermes/routines' && req.method === 'GET') return json(res, 200, HERMES_ROUT.lire());   /* 0.92.0 : les routines d'Hermes en direct, ou « indisponible » et pourquoi */
       if (p === '/api/routines' && req.method === 'GET') return json(res, 200, {routines: ROUT.liste(), brief: S.brief || null});
       if (p === '/api/routines/lire' && req.method === 'POST') { const b = await readBody(req), l = lirePhrase(b.phrase); return json(res, 200, {lu: l, quand: l.erreur ? '' : quandDit(l)}); }
       if (p === '/api/routines' && req.method === 'POST') { const r = ROUT.ajouter(await readBody(req)); return json(res, r.ok ? 200 : 400, {...r, routines: ROUT.liste()}); }
