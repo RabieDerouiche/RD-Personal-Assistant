@@ -301,6 +301,11 @@ try {
     ok('Drive search_text : Papiers privés seulement quand ils sont demandés', sn === 'd5', sn);
     r = await T('Google Drive', 'search_text', {query: 'qu', roots: [{id: 'pap'}]}); ok('Drive search_text : moins de 3 lettres, aucune requête', r.status === 200 && r.body.payload.files.length === 0);
     ok('Drive folder_tree : requêtes en lecture seule', FG.calls.filter((x) => x.path.startsWith('/drive')).every((x) => x.method === 'GET'));
+    /* 0.85.0 : un PDF du Drive par son identifiant (justificatif fixe de la note de télétravail), en lecture seule */
+    r = await T('Google Drive', 'file_pdf', {fileId: 'pdf-taxe-0001'});
+    ok('Drive file_pdf : le PDF rendu en base64 avec son nom, par deux lectures (métadonnées, contenu)', r.status === 200 && Buffer.from(r.body.payload.data, 'base64').subarray(0, 5).toString() === '%PDF-' && r.body.payload.name === 'Avis inventé.pdf' && FG.calls.some((x) => x.path === '/drive/files/pdf-taxe-0001' && x.method === 'GET'), JSON.stringify(r.body).slice(0, 200));
+    { const r1 = await T('Google Drive', 'file_pdf', {fileId: 'texte-00001'}), r2 = await T('Google Drive', 'file_pdf', {fileId: "x' or 1=1"}), r3 = await T('Google Drive', 'file_pdf', {fileId: 'inconnu-00001'});
+      ok('Drive file_pdf : un fichier qui n’est pas un PDF, un identifiant invalide, un fichier absent : refusés', r1.status !== 200 && /pas un PDF/.test(r1.body.error.message) && r2.status !== 200 && /invalide/.test(r2.body.error.message) && r3.status !== 200, JSON.stringify([r1.body, r2.body, r3.body]).slice(0, 300)); }
     r = await T('Gmail', 'search_threads', {query: 'in:inbox category:primary newer_than:7d', pageSize: 50, view: 'THREAD_VIEW_SUMMARY'}); const m0 = r.body.payload.threads[0].messages[0];
     ok('Gmail search_threads : forme du connecteur (expéditeur, nom, objet, date)', m0.sender === 'gestion@syndic.example' && m0.addressDisplayNames[0].displayName === 'Syndic Dupont' && m0.subject === 'RE: Dégât des eaux' && m0.internalDate === '1763290000000' && m0.labelIds.includes('INBOX'), JSON.stringify(m0).slice(0, 160));
     r = await T('Gmail', 'search_threads', {query: 'in:sent newer_than:14d'}); ok('Gmail search_threads vide : réponse vide', r.status === 200 && !r.body.payload.threads);

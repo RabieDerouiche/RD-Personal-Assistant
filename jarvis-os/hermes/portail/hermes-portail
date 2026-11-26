@@ -12,6 +12,7 @@
 #   sudo hermes-portail facture --requete "<recherche Gmail>" --nom "<expression du nom>" --vers <dossier>   (va chercher UNE facture PDF dans ses mails, par l'accès Google de JARVIS ; lecture seule)
 #   sudo hermes-portail cra <adresse> --semaine <lundi AAAA-MM-JJ> --jours <AAAA-MM-JJ,…> [--a-blanc]   (la feuille de temps d'UNE semaine : « 1 » ces jours-là, Save, Submit ; --a-blanc : rien de tapé)
 #   sudo hermes-portail cra-mois <adresse> --mois <AAAA-MM> --conges <AAAA-MM-JJ[:matin|:apres-midi],…> --feries <AAAA-MM-JJ,…> [--a-blanc]   (le compte rendu d'activité du MOIS : complète les jours vides, contrôle, puis « Valider » ; --a-blanc : rien de tapé)
+#   sudo hermes-portail teletravail [--mois AAAA-MM] [--electricite <facture.pdf>] [--sans-depense] [--diagnostic]   (la note de télétravail du mois, À BLANC : jours de JARVIS, pièces, calcul, PDF unique, dépense remplie puis annulée ; « teletravail drive <id> --vers <dossier> » : un PDF du Drive)
 #   sudo hermes-portail cra-auto                   (la minuterie : une semaine confirmée dans JARVIS, saisie et soumise ; compte rendu pour JARVIS ; rien sans /etc/hermes-portail/cra.conf)
 #   sudo hermes-portail notes [ajouter <hôte> "<texte>" | oublier <hôte> [numéro]]   (ce qu'Hermes a appris d'un portail, relu à chaque passage)
 #   sudo hermes-portail cle                        (remet la clé du coffre d'Hermes en mémoire vive, depuis jarvis-coffre)
@@ -48,7 +49,7 @@ if [ "$SYSTEMD" = 0 ]; then   # banc seulement (pas de systemd) : un faux JARVIS
 fi
 HOTE='^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$'
 
-usage() { sed -n '4,19p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,3\}//'; exit "${1:-1}"; }
+usage() { sed -n '4,20p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,3\}//'; exit "${1:-1}"; }
 [ "$(id -u)" = 0 ] || { echo "À lancer en root : sudo hermes-portail ${1:-etat}"; exit 1; }
 id "$U" >/dev/null 2>&1 && [ -x "$H/.local/bin/hermes" ] || { echo "Hermes « portail » n'est pas installé : sudo bash /opt/rd/jarvis-os/hermes/portail/install.sh"; exit 1; }
 terminal() { [ -t 0 ] || { echo "À lancer dans un vrai terminal (Termius) : cette commande demande une saisie."; exit 1; }; }
@@ -174,6 +175,21 @@ par_jarvis() {   # par_jarvis <arguments de facture.mjs…>
   local noeud; noeud=$(command -v node) || { echo "Node est introuvable." >&2; return 1; }
   (cd / && runuser -u "$JARVIS_U" -- env -i HOME="$(getent passwd "$JARVIS_U" | cut -d: -f6)" PATH=/usr/local/bin:/usr/bin:/bin ${JARVIS_DONNEES:+JARVIS_DATA="$JARVIS_DONNEES"} \
     "$noeud" "$LIB/facture.mjs" "$@" --serveur "$JARVIS_SRV")
+}
+# La note de télétravail (26/11/2026) : les jours du mois et un PDF du Drive, par le code de JARVIS sous son utilisateur (lecture seule)
+par_tt() {   # par_tt <arguments de teletravail.mjs…>
+  local noeud; noeud=$(command -v node) || { echo "Node est introuvable." >&2; return 1; }
+  (cd / && runuser -u "$JARVIS_U" -- env -i HOME="$(getent passwd "$JARVIS_U" | cut -d: -f6)" PATH=/usr/local/bin:/usr/bin:/bin ${JARVIS_DONNEES:+JARVIS_DATA="$JARVIS_DONNEES"} \
+    "$noeud" "$LIB/teletravail.mjs" "$@" --serveur "$JARVIS_SRV")
+}
+json_vers_pdf() {   # json_vers_pdf <fichier JSON {pdf, texte}> <préfixe> : <préfixe>.pdf et <préfixe>.txt, à root seul, sans suivre de lien
+  python3 -I - "$1" "$2" <<'PY'
+import base64, json, os, sys
+j = json.load(open(sys.argv[1])); pdf = base64.b64decode(j.get('pdf', ''))
+if pdf[:5] != b'%PDF-' or len(pdf) > 10000000: sys.exit("Le fichier reçu n'est pas un PDF de 10 Mo au plus.")
+for ext, contenu in (('.pdf', pdf), ('.txt', j.get('texte', '').encode())):
+    fd = os.open(sys.argv[2] + ext, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o600); os.write(fd, contenu); os.close(fd)
+PY
 }
 # Un site qui envoie son code de connexion par mail : pendant le passage, root guette ce mail (dix minutes au plus) et
 # pose le code dans le dépôt, où Hermes le lit pour le saisir. Le code ne passe ni par la consigne ni par le modèle
@@ -646,6 +662,123 @@ os.replace(tmp, dest)
     find "$RETOURS" -maxdepth 1 -type f -name '*.json' -mtime +40 -delete 2>/dev/null   # ménage : 40 jours
     cat "$out"; rm -f "$out"
     exit 0 ;;
+  teletravail)
+    # La note de frais de télétravail (26/11/2026, sa décision : Hermes la prépare le dernier jour du mois). À BLANC seulement tant que
+    # Chronos la crée le 1er : on compare, puis bascule. Les jours viennent de JARVIS (ses règles et ses corrections, sous son utilisateur) ;
+    # les pièces de Gmail et du Drive par l'accès Google de JARVIS ; la facture d'électricité par un passage d'Hermes sur l'espace client
+    # (téléchargement permis) ; montants, garde-fous, calcul, synthèse et champs par teletravail.py (root, sans réseau) ; la synthèse en
+    # PDF par le Chromium d'Hermes, sous son utilisateur ; l'assemblage par pdfunite ; la dépense remplie puis annulée (brouillon --sans-creer).
+    # Les valeurs fixes (nom, surfaces, montants annuels, recherches, repères) : /etc/hermes-portail/teletravail.conf, jamais dans le dépôt.
+    conf="$ETC/teletravail.conf"; TTP="$H/.teletravail"
+    id "$JARVIS_U" >/dev/null 2>&1 && [ -f "$JARVIS_SRV/google.mjs" ] && [ -f "$JARVIS_SRV/jours.mjs" ] || { echo "JARVIS n'est pas installé ici (utilisateur $JARVIS_U, $JARVIS_SRV)."; exit 1; }
+    if [ "${1:-}" = drive ]; then   # teletravail drive <identifiant> --vers <dossier de root> : un PDF du Drive (un justificatif fixe, l'exemple d'un mois)
+      [ $# = 4 ] && [ "$3" = --vers ] || usage
+      [[ "$2" =~ ^[A-Za-z0-9_-]{10,120}$ ]] || { echo "Identifiant Drive attendu."; exit 1; }
+      [ -d "$4" ] && [ ! -L "$4" ] && [ "$(stat -c %U "$4")" = root ] || { echo "Dossier de destination attendu, à root (exemple : /root/teletravail)."; exit 1; }
+      tmp=$(mktemp); chmod 0600 "$tmp"
+      par_tt --drive "$2" > "$tmp"; rc=$?; [ $rc = 0 ] && { json_vers_pdf "$tmp" "$4/fichier"; rc=$?; }
+      rm -f "$tmp"; [ $rc = 0 ] || exit $rc
+      echo "Fichier du Drive : $(wc -c < "$4/fichier.pdf") octets dans $4/fichier.pdf ; son texte ($(wc -c < "$4/fichier.txt") octets) dans $4/fichier.txt. À root seul."
+      exit 0
+    fi
+    mois=""; elec=""; sans_depense=0; diag=""
+    while [ $# -gt 0 ]; do case "$1" in
+      --mois) mois=${2:-}; shift 2 ;; --electricite) elec=${2:-}; shift 2 ;; --sans-depense) sans_depense=1; shift ;; --diagnostic) diag=--diagnostic; shift ;;
+      --reel) echo "Refus : la note de télétravail ne se crée pas encore en réel (Chronos la crée le 1er ; bascule après comparaison à blanc)."; exit 1 ;;
+      *) usage ;; esac; done
+    [ -f "$conf" ] && [ ! -L "$conf" ] && [ "$(stat -c '%U %a' "$conf")" = 'root 600' ] || { echo "Réglages attendus : $conf (root, 600 ; voir docs/hermes-portail.md)."; exit 1; }
+    reglage() { sed -n "s/^$1=//p" "$conf" | head -1; }
+    champs_modele=$(reglage champs)
+    [ -n "$champs_modele" ] && [ -f "$champs_modele" ] && [ ! -L "$champs_modele" ] && [ "$(stat -c %U "$champs_modele")" = root ] || { echo "Modèle des champs de la dépense attendu (réglage « champs », fichier de root)."; exit 1; }
+    aujourdhui=$(TZ=Europe/Paris date +%F); banc_jour=()
+    [ "$SYSTEMD" = 0 ] && [ -n "${HERMES_BANC_AUJOURDHUI:-}" ] && { aujourdhui=$HERMES_BANC_AUJOURDHUI; banc_jour=(--aujourdhui "$aujourdhui"); }
+    mois=${mois:-${aujourdhui:0:7}}
+    [[ "$mois" =~ ^[0-9]{4}-(0[1-9]|1[0-2])$ ]] && [[ ! "$mois" > "${aujourdhui:0:7}" ]] || { echo "Mois attendu : AAAA-MM, pas dans le futur."; exit 1; }
+    command -v pdfunite >/dev/null || { echo "pdfunite est absent (paquet poppler-utils) : relance install.sh."; exit 1; }
+    chrome=$(ls "$HH"/tools/chromium-*/chrome-linux*/chrome 2>/dev/null | tail -1); [ -n "$chrome" ] || { echo "Chromium d'Hermes introuvable sous $HH/tools."; exit 1; }
+    elec_copie=""   # la facture donnée par root est mise de côté avant le ménage du dossier du mois (elle peut venir d'un passage précédent)
+    if [ -n "$elec" ]; then
+      [ -f "$elec" ] && [ ! -L "$elec" ] && [ "$(stat -c %U "$elec")" = root ] && [ "$(wc -c < "$elec")" -le 10000000 ] && [ "$(head -c 5 "$elec")" = "%PDF-" ] \
+        || { echo "Facture d'électricité refusée : un PDF de root, 10 Mo au plus."; exit 1; }
+      elec_copie=$(mktemp); install -o root -g root -m 0600 "$elec" "$elec_copie"
+    fi
+    install -d -o root -g root -m 0700 "$VAR/teletravail"; D="$VAR/teletravail/$mois"; rm -rf "$D"; install -d -o root -g root -m 0700 "$D"
+    echo "== Note de télétravail de $mois, à blanc ($(date '+%d/%m/%Y %H:%M')) : dossier $D (root seul)"
+    tmp=$(mktemp); chmod 0600 "$tmp"
+    mise_en_page() {   # mise_en_page <fichier.pdf> <fichier.layout.txt> : la seconde lecture (pdftotext -layout), par un utilisateur sans droits
+      runuser -u nobody -- timeout 60 pdftotext -layout -q - - < "$1" > "$2" 2>/dev/null; chmod 0600 "$2"
+    }
+    piece() {   # piece <nom> <commande…> : le JSON {pdf, texte} de la commande → $D/<nom>.pdf, .txt (pdf.mjs) et .layout.txt (pdftotext)
+      local n=$1; shift
+      "$@" > "$tmp" 2> "$D/$n.erreur" && json_vers_pdf "$tmp" "$D/$n" && { mise_en_page "$D/$n.pdf" "$D/$n.layout.txt"; echo "  $n : trouvé ($(wc -c < "$D/$n.pdf") octets)."; rm -f "$D/$n.erreur"; return 0; }
+      echo "  $n : introuvable ($(head -c 200 "$D/$n.erreur" | tr '\n' ' '))."; return 1
+    }
+    # 1. les jours du mois, par JARVIS
+    par_tt --jours "$mois" "${banc_jour[@]}" > "$D/jours.json" 2> "$D/jours.erreur" || { echo "  jours : illisibles ($(head -c 200 "$D/jours.erreur" | tr '\n' ' '))."; rm -f "$tmp"; exit 1; }
+    rm -f "$D/jours.erreur"; echo "  jours : $(python3 -I -c 'import json,sys; j=json.load(open(sys.argv[1])); print(j["texte"][:240] or "bilan lu")' "$D/jours.json")"
+    # 2. les pièces fixes et trimestrielles : avis de taxe foncière (Drive), appel de charges et attestation d'assurance (Gmail)
+    manque=0
+    piece taxe par_tt --drive "$(reglage taxe_fonciere_drive)" || manque=1
+    piece charges par_jarvis --requete "$(reglage charges_requete)" --nom "$(reglage charges_nom)" || manque=1
+    piece assurance par_jarvis --requete "$(reglage assurance_requete)" --nom "$(reglage assurance_nom)" || manque=1
+    # 3. la facture d'électricité du mois : donnée par root (--electricite), ou rapportée de l'espace client par un passage d'Hermes
+    if [ -n "$elec_copie" ]; then
+      mv "$elec_copie" "$D/electricite.pdf"; chmod 0600 "$D/electricite.pdf"
+    else
+      adr_elec=$(reglage electricite_adresse)
+      [[ "$adr_elec" =~ ^https?://[A-Za-z0-9._:/?=%\&~+-]+$ ]] || { echo "Réglage « electricite_adresse » attendu (https://…)."; rm -f "$tmp"; exit 1; }
+      nom_mois=$(python3 -I -c 'import sys; m=["janvier","février","mars","avril","mai","juin","juillet","août","septembre","octobre","novembre","décembre"]; print(m[int(sys.argv[1][5:7])-1] + " " + sys.argv[1][:4])' "$mois")
+      { cat <<FIN
+Essai en lecture seule, selon ta skill « portail ». Adresse : $adr_elec
+Ouvre cette adresse ; connecte-toi avec l'identifiant du coffre si une page de connexion s'affiche. Va à la liste de tes factures (tes
+notes disent où). Télécharge UNE facture : celle émise en $nom_mois (sa date d'émission, pas sa période de consommation), selon ta skill
+(« Télécharger un fichier »). S'il n'y en a pas encore pour ce mois, ne télécharge rien et dis-le. Ne crée, ne modifie, ne paie rien.
+FIN
+        [ "$SYSTEMD" = 0 ] && [ -n "${HERMES_BANC_CONSIGNE_EN_PLUS:-}" ] && cat "$HERMES_BANC_CONSIGNE_EN_PLUS"   # banc seulement : la suite d'appels du faux modèle
+        echo "Termine par l'étape « Avant de finir » de ta skill (l'attente qui enregistre la session), puis réponds."
+      } > "$D/consigne-electricite.txt"
+      install -d -o root -g root -m 0700 "$D/recu"
+      "$0" essai "$adr_elec" --consigne-fichier "$D/consigne-electricite.txt" --telecharger "$D/recu" > "$D/electricite-passage.txt" 2>&1
+      grep -E '^== Essai|^Fichier (rapporté|écarté)|^Aucun fichier' "$D/electricite-passage.txt" | sed 's/^/  /'
+      [ -f "$D/recu/telecharge.pdf" ] && mv "$D/recu/telecharge.pdf" "$D/electricite.pdf"
+    fi
+    if [ -f "$D/electricite.pdf" ]; then par_jarvis --texte-de-l-entree < "$D/electricite.pdf" > "$D/electricite.txt" 2>/dev/null; chmod 0600 "$D/electricite.txt"; mise_en_page "$D/electricite.pdf" "$D/electricite.layout.txt"; echo "  electricite : trouvée ($(wc -c < "$D/electricite.pdf") octets)."
+    else echo "  electricite : pas de facture rapportée."; manque=1; fi
+    rm -f "$tmp"
+    [ $manque = 0 ] || { echo "Arrêt : une pièce manque (ci-dessus). Rien n'est préparé."; echo "Résultat télétravail : arret"; exit 2; }
+    # 4. montants, garde-fous, calcul, synthèse et champs (root, sans réseau)
+    python3 -I "$LIB/teletravail.py" preparer --conf "$conf" --dossier "$D" --mois "$mois" --historique "$VAR/teletravail/historique.json" $diag; rc=$?
+    [ $rc = 0 ] || { [ $rc = 2 ] && echo "Résultat télétravail : arret"; exit $rc; }
+    # 5. la synthèse en PDF par le Chromium d'Hermes, sous son utilisateur, dans un dossier à lui vidé avant et après
+    rm -rf "$TTP"; install -d -o "$U" -g "$U" -m 0700 "$TTP"; install -o "$U" -g "$U" -m 0600 "$D/synthese.html" "$TTP/synthese.html"
+    comme_portail timeout 120 "$chrome" --headless=new --no-sandbox --disable-gpu --no-first-run --no-default-browser-check --disable-extensions \
+      --disable-background-networking --disable-sync --user-data-dir="$TTP/profil" --no-pdf-header-footer --print-to-pdf-no-header \
+      --print-to-pdf="$TTP/synthese.pdf" "file://$TTP/synthese.html" > "$D/chromium.txt" 2>&1
+    if [ -f "$TTP/synthese.pdf" ] && [ ! -L "$TTP/synthese.pdf" ] && [ "$(wc -c < "$TTP/synthese.pdf")" -le 3000000 ] && [ "$(head -c 5 "$TTP/synthese.pdf")" = "%PDF-" ]; then
+      install -o root -g root -m 0600 "$TTP/synthese.pdf" "$D/synthese.pdf"; rm -rf "$TTP"
+    else rm -rf "$TTP"; echo "Arrêt : la page de synthèse n'a pas pu être mise en PDF (journal : $D/chromium.txt)."; exit 1; fi
+    # 6. le justificatif unique, dans l'ordre de l'exemple accepté : synthèse, appel de charges, avis de taxe foncière, attestation, électricité
+    pdfunite "$D/synthese.pdf" "$D/charges.pdf" "$D/taxe.pdf" "$D/assurance.pdf" "$D/electricite.pdf" "$D/note-$mois.pdf" 2> "$D/pdfunite.txt" \
+      || { echo "Arrêt : l'assemblage du PDF a échoué ($(head -c 200 "$D/pdfunite.txt"))."; exit 1; }
+    chmod 0600 "$D/note-$mois.pdf"
+    [ "$(wc -c < "$D/note-$mois.pdf")" -le 5000000 ] || { echo "Arrêt : le PDF assemblé dépasse 5 Mo (le portail le refuserait)."; echo "Résultat télétravail : arret"; exit 2; }
+    echo "  justificatif : $D/note-$mois.pdf ($(wc -c < "$D/note-$mois.pdf") octets, synthèse + 4 pièces)."
+    python3 -I - "$D/resultat.json" "$VAR/teletravail/historique.json" "$mois" <<'PY'   # le mois gardé pour le garde-fou du mois suivant (root seul)
+import json, os, sys, time
+r = json.load(open(sys.argv[1])); f = sys.argv[2]
+try: H = json.load(open(f))
+except (OSError, ValueError): H = {}
+H[sys.argv[3]] = dict({k: r[k] for k in ('charges', 'electricite', 'total', 'jours_tt')}, a_blanc=True, at=int(time.time()))
+fd = os.open(f + '.tmp', os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o600); os.write(fd, json.dumps(H).encode()); os.close(fd); os.replace(f + '.tmp', f)
+PY
+    # 7. la dépense, à blanc : remplie jusqu'au dernier écran, puis annulée (rien n'est créé)
+    if [ $sans_depense = 1 ]; then echo "Résultat télétravail : prete (dépense non essayée : --sans-depense)"; exit 0; fi
+    adr_ndf=$(reglage ndf_adresse)
+    [[ "$adr_ndf" =~ ^https?://[A-Za-z0-9._:/?=%\&~+-]+$ ]] || { echo "Réglage « ndf_adresse » attendu (https://…)."; exit 1; }
+    "$0" brouillon "$adr_ndf" --champs-fichier "$D/champs.txt" --justificatif "$D/note-$mois.pdf" --sans-creer > "$D/depense-a-blanc.txt" 2>&1; rc=$?
+    propre < "$D/depense-a-blanc.txt" | grep -v '^session_id:' | tail -30
+    [ $rc = 0 ] && echo "Résultat télétravail : blanc" || echo "Résultat télétravail : echec (dépense à blanc, code $rc)"
+    exit $rc ;;
   texte)
     [ $# = 1 ] && [ -f "$1" ] && [ "$(wc -c < "$1")" -le 10000000 ] || { echo "Fichier PDF attendu (10 Mo au plus)."; exit 1; }
     id "$JARVIS_U" >/dev/null 2>&1 && [ -f "$JARVIS_SRV/pdf.mjs" ] || { echo "JARVIS n'est pas installé ici (utilisateur $JARVIS_U, $JARVIS_SRV)."; exit 1; }

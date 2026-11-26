@@ -83,10 +83,12 @@ tenu par la commande) : pas encore faite.
 | Fichier | Rôle |
 |---|---|
 | `install.sh` | Root, relançable. Utilisateur `hermes-portail`, Hermes à la version figée du Hermes principal (lue dans `../install.sh`) avec son navigateur, plugin de l'abonnement Claude et Claude Code à lui, politique, skill, copies root de la commande et du relais, lien de la clé, règles réseau et relais. Ne démarre aucun agent. |
-| `hermes-portail` | La commande (`/usr/local/sbin/hermes-portail`) : `etat`, `connexion-claude`, `enregistrer`, `domaines`, `essai` (et `--code-mail`, `--telecharger`), `brouillon` (et `--sans-creer`), `facture`, `texte`, `cra` (et `--a-blanc`), `cra-mois` (et `--a-blanc`), `cra-auto`, `notes`, `cle`, `fermer`, `oublier`. Un essai lance l'unité `hermes-portail-essai`. |
+| `hermes-portail` | La commande (`/usr/local/sbin/hermes-portail`) : `etat`, `connexion-claude`, `enregistrer`, `domaines`, `essai` (et `--code-mail`, `--telecharger`), `brouillon` (et `--sans-creer`), `facture`, `texte`, `cra` (et `--a-blanc`), `cra-mois` (et `--a-blanc`), `teletravail` (et `drive`), `cra-auto`, `notes`, `cle`, `fermer`, `oublier`. Un essai lance l'unité `hermes-portail-essai`. |
 | `hermes-portail-cra.service`, `hermes-portail-cra.timer` | Le CRA de la semaine (26/11/2026) : toutes les 5 minutes, `hermes-portail cra-auto` ; rien sans `/etc/hermes-portail/cra.conf` (root : `adresse=` la feuille de temps, `jarvis_donnees=` le dossier de JARVIS ; jamais dans le dépôt). Compte rendu dans `/var/lib/hermes-portail-retours/` (root, lisible par le groupe de JARVIS, depuis le 26/11/2026). |
 | `hermes-portail-essai.service` | Un passage, enfermé (mêmes lignes que `hermes-gateway.service`, mémoire sans échange ; depuis le 25/11/2026, filtre d'appels système et espaces de noms interdits). Une vraie unité, pas `systemd-run` : au premier essai sur le serveur, `systemd-run -p IPAddressDeny=link-local` a été refusé alors que la même ligne est valable dans une unité. Consigne dans `/home/hermes-portail/.consigne`, réponse dans `/var/lib/hermes-portail/essais/`. |
 | `politique.yaml` | Sa politique (`/etc/hermes-portail/config.yaml`, root) : outils `browser`, `terminal`, `skills` seulement ; Sonnet ; profil de navigateur gardé ; navigateur envoyé vers le relais, lancé sans son bac à sable (dit en clair, voir « Durcissement »), remplissage automatique et heure réseau coupés. |
+| `teletravail.mjs` | La note de télétravail, ce que seul JARVIS sait lire (26/11/2026) : lancé par `hermes-portail teletravail` sous l'utilisateur `jarvis`, en lecture seule. `--jours AAAA-MM` : le bilan du mois par le module de JARVIS lui-même (`jours.mjs` : agendas reconnus, ses règles, ses corrections), refait sur une copie de `jours.json` effacée ensuite ; `--drive <id>` : UN PDF du Drive (outil `file_pdf` de `google.mjs`, 0.85.0). |
+| `teletravail.py` | La note de télétravail, sans réseau (root) : montants lus par règles dans le texte des pièces, garde-fous, calcul du classeur, page de synthèse en HTML, champs de la dépense. Aucune valeur personnelle : tout vient de `/etc/hermes-portail/teletravail.conf`. |
 | `facture.mjs` | Va chercher UNE facture PDF dans ses mails : lancé par `hermes-portail facture` sous l'utilisateur `jarvis`, avec l'accès Google et le code de JARVIS (`google.mjs`, `pdf.mjs`), en lecture seule ; l'état de JARVIS n'est jamais réécrit. Rend le PDF et son texte à root. |
 | `navigateur-regles.json` | Règles d'administrateur du navigateur (`/etc/opt/chrome_for_testing/policies/managed/hermes-portail.json`, root) : pas de gestionnaire de mots de passe, pas de vérification de fuite, pas de compte Google, pas de mesures. |
 | `skills/portail/portail/SKILL.md` | Sa marche à suivre : se connecter par le coffre, lecture seule, ne jamais taper un mot de passe, ne rien soumettre, s'arrêter si un code est demandé, attente finale, réponse sans donnée personnelle. |
@@ -327,7 +329,66 @@ documents avec un avis de taxes foncières, JARVIS lui crée une tâche « envoi
 on le range dans le dossier Drive. À brancher sur la veille du matin d'Hermes (ou une règle du Radar) : pas avant
 l'été prochain.
 
-**Ce qu'il faut construire** (rien n'existe encore) :
+**Construit le 26/11/2026** (sa décision du jour, QCM : « Hermes le 30/11 ») : `sudo hermes-portail teletravail [--mois
+AAAA-MM] [--electricite <facture.pdf>] [--sans-depense] [--diagnostic]`, À BLANC seulement (`--reel` est refusé : Chronos
+crée la note le 1er ; on compare, puis bascule en décembre si elle est identique). Dans l'ordre :
+- *les jours* : `teletravail.mjs --jours` sous l'utilisateur de JARVIS (module `jours.mjs` lui-même, ses corrections
+  comprises ; rien n'est réécrit chez JARVIS) ; un jour ouvré sans lieu ni congé, ou un conflit, arrête tout ; une
+  demi-journée de télétravail compte 0,5 (« 0,5 » dans la case) ; aucun jour de télétravail : aucune dépense ;
+- *les pièces* : l'avis de taxe foncière du Drive (`teletravail.mjs --drive`, outil `file_pdf` ajouté à `google.mjs`,
+  JARVIS 0.85.0) ; l'appel de charges et l'attestation d'assurance de Gmail (`facture.mjs`) ; la facture d'électricité
+  du mois rapportée de l'espace client par un passage d'Hermes en lecture seule (`essai --telecharger`, consigne :
+  « celle émise en <mois> <année> »), ou donnée par root (`--electricite`) ;
+- *deux lectures de chaque pièce* : par `pdf.mjs` de JARVIS, puis par `pdftotext -layout` (paquet `poppler-utils`, lancé
+  par l'utilisateur `nobody`) ; chaque règle prend la première qui lui répond. Vu sur les vraies pièces d'octobre : `pdf.mjs`
+  colle les cellules d'un tableau (« TOTAL DU LOT » suivi des deux montants sans espace) et met la date de la facture
+  d'électricité sur la ligne d'après ; `pdftotext` ne lit pas la somme de l'avis. Les règles en tiennent compte ;
+- *montants, garde-fous, calcul* (`teletravail.py`, root, sans réseau) : total du lot de l'appartement (repère du lot
+  dans les réglages) sur une période qui couvre le mois, divisé par trois ; montant de l'avis égal au réglage (sinon :
+  nouvel avis, réglage à revoir) ; attestation valable tout le mois (sinon : renouvelée, montant annuel à revoir) ;
+  facture d'électricité émise dans le mois, montant TTC lu ; charges et électricité à moins de 50 % du mois d'avant
+  (historique à root, `/var/lib/hermes-portail/teletravail/historique.json`, amorcé par les réglages `precedent_*`).
+  Toute pièce manquante ou règle non vérifiée arrête tout (code 2, la raison dite sans montant ; `--diagnostic` dit
+  ce qui a été trouvé, oui ou non). Formule du classeur, arrondi au centime. **Contrôle sur les vraies pièces de
+  l'exemple accepté d'octobre** (séparées de son PDF, lues des deux façons, hors du dépôt) : toutes les règles trouvent
+  leur valeur, et la commande retrouve ses charges, son électricité et **son total au centime** ;
+- *le justificatif* : la page de synthèse (tableau recréé : semaines, jours, « 1 » ou « 0,5 » sous chaque jour
+  télétravaillé, surfaces, charges, total) rendue en PDF par le Chromium d'Hermes, sous son utilisateur, dans un dossier
+  à lui vidé avant et après ; puis `pdfunite` (paquet `poppler-utils`, le plus léger ; ajouté à `install.sh`) dans
+  l'ordre de l'exemple : synthèse, appel de charges, avis de taxe foncière, attestation, facture d'électricité ; 5 Mo
+  au plus (limite du portail) ;
+- *la dépense* : champs tirés d'un modèle à root (réglage `champs`, avec `{DATE}` au dernier jour du mois, `{MONTANT}`,
+  `{MOIS}`, `{MOIS_NOM}`, `{ANNEE}`, `{JOURS}`), puis `brouillon --sans-creer` : remplie jusqu'au dernier écran,
+  justificatif joint, puis annulée. Rien n'est créé. Fin : « Résultat télétravail : blanc | arret | echec | prete ».
+Tout reste à root dans `/var/lib/hermes-portail/teletravail/<mois>/` (700). `teletravail drive <id> --vers <dossier>` rend
+un PDF du Drive à root (pour lire un justificatif fixe ou l'exemple d'un mois, et en tirer les réglages).
+
+**Les réglages** (`/etc/hermes-portail/teletravail.conf`, root 600, posés sur le serveur, jamais dans le dépôt ; une
+ligne `clé=valeur`) : `nom`, `debut_mission` (JJ/MM/AAAA), `surface_logement`, `surface_bureau`, `taxe_fonciere_an`,
+`taxe_habitation_an`, `autres_taxes_mois`, `assurance_an`, `eau_mois` (vide si sans), `taxe_fonciere_drive` (l'identifiant
+du PDF de l'avis), `charges_requete` et `charges_nom` (recherche Gmail et nom du PDF de l'appel de charges), `charges_lot`
+(le repère du lot de l'appartement dans l'appel, avant son « TOTAL DU LOT »), `assurance_requete` et `assurance_nom`,
+`electricite_adresse` (la page des factures de l'espace client), `ndf_adresse` (le portail de notes de frais),
+`champs` (le chemin du modèle des champs, à root), `precedent_charges` et `precedent_electricite` (le mois d'avant, pour
+le premier garde-fou). Facultatifs, pour une pièce dont le texte sort autrement : `charges_periode_motif`,
+`assurance_motif`, `taxe_motif`, `electricite_montant_motif`, `electricite_date_motif` (expressions régulières), et
+`ecart_max` (0.5 par défaut).
+
+**Banc** (données inventées) : faux JARVIS (agenda « Présence » et fériés de novembre inventés, demi-journée comprise,
+deux mails avec PDF, un PDF du Drive), trois PDF inventés ; jours, pièces, calcul au centime, PDF de 5 pages dans
+l'ordre, synthèse lisible (« 0,5 », total), état de JARVIS jamais réécrit, trois garde-fous (écart avec le mois d'avant,
+avis différent, jour sans lieu), passage complet avec la facture rapportée par Hermes et la dépense remplie puis
+annulée sur le faux portail.
+
+**Pas prouvé avant le 30/11** : les pièces telles que Gmail et le Drive les rendent sur le serveur (celles du contrôle
+venaient du PDF assemblé d'octobre : `--diagnostic` dit quelle règle échoue, et les `*_motif` des réglages permettent
+d'ajuster sans toucher au code) ; la vraie facture d'électricité rapportée de l'espace client ; la dépense à blanc sur
+le vrai portail (le modèle des champs se tire de la dépense de télétravail d'octobre, lue en lecture seule). D'où un
+essai sur octobre dès l'installation : sa note acceptée est la référence.
+**Reste** : le déclenchement le dernier jour (minuterie, après le raccourci de 11 h), le compte rendu dans JARVIS (sa
+notification), la comparaison avec la note de Chronos du 1/12, puis la création réelle et la pause de sa routine.
+
+**Ce qui était à construire** (25/11/2026) :
 1. *Télécharger un fichier depuis un portail* (la facture d'électricité ; sert aussi à la facture de la box) :
    **sur le serveur depuis le 25/11/2026, prouvé sur la facture de la box.** `essai … --telecharger <dossier de root>` :
    la consigne annonce « Téléchargement permis », Hermes range UN fichier dans son dossier
