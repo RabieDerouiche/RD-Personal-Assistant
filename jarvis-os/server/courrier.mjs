@@ -9,7 +9,7 @@ const BOTS_SURVEILLES = ['iris', 'kairos'];
 const low = (s) => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
 const clip = (s, n) => { const t = String(s ?? '').replace(/\s+/g, ' ').trim(); return t.length > n ? t.slice(0, n - 1) + '…' : t; };
 
-/* les adresses et domaines d'une case « Adresse ou domaine » (« noreply@x.ai ; citya.com (filtre…) ») */
+/* les adresses et domaines d'une case « Adresse ou domaine » (« noreply@exemple.fr ; agence-exemple.com (filtre…) ») */
 export function adressesDe(cellule) {
   const t = String(cellule || '').toLowerCase(), out = new Set();
   for (const m of t.matchAll(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/g)) out.add(m[0]);
