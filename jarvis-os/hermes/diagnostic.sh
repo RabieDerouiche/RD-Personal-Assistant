@@ -71,6 +71,8 @@ if id hermes >/dev/null 2>&1; then
   echo "  garde du forfait : $(systemctl is-active hermes-garde.timer 2>/dev/null || echo absent) (seuil ${seuil:-?} %, $fenetres)$([ -f /var/lib/hermes-garde/arret ] && echo ' ; HERMES EN PAUSE : forfait au-dessus du seuil')"
   journalctl -u hermes-garde -n 30 --utc --no-pager -o short-iso 2>/dev/null | grep -E ': (Forfait|Hermes|Usage) ' | tail -1 | sed -E 's/^([0-9T:-]+)[^ ]* [^ ]+ [^ ]+: /\1 UTC : /; s/T/ /; s/^/    dernier contrôle : /'
   [ -f /etc/hermes/garde.coupe ] && echo "    garde COUPÉ à sa demande (/etc/hermes/garde.coupe), jusqu'au 3/12/2026"
+  echo "  relance après la limite du forfait : $(systemctl is-active hermes-relance.timer 2>/dev/null || echo absente)"
+  journalctl -u hermes-relance --since "-24h" --no-pager -o cat 2>/dev/null | grep -E 'relancée|redémarrée|AVIS|en attente' | tail -3 | sed 's/^/    /'
   echo "  réveil par JARVIS : $(systemctl is-active hermes-reveil.path 2>/dev/null || echo absent)"
   echo "  dernières lignes utiles du journal :"
   grep -E "telegram connected|Connected to Telegram|ERROR|Traceback|plan limit|extra usage|denied" /home/hermes/.hermes/logs/gateway.log 2>/dev/null | tail -5 | cut -c1-160 | sed -E 's/[0-9]{6,}/<n>/g; s/^/    /'

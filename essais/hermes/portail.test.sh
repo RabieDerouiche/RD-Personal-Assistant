@@ -335,7 +335,41 @@ verif "cra-auto : compte rendu dans le dossier de root (root et groupe de JARVIS
 verif "cra-auto : la semaine confirmée (lun, mer, jeu, ven) est saisie et soumise ; compte rendu pour JARVIS (« soumise », première exécution)" bash -c "[ $rc = 0 ] && [ \"\$(grep -c CRA-SUBMIT $T/traces/portail.jsonl)\" = $((n0 + 1)) ] && grep CRA-SUBMIT $T/traces/portail.jsonl | tail -1 | grep -q '\"qty\": \[\"1\", \"\", \"1\", \"1\", \"1\"\]' && python3 -I -c \"import json,sys; r=json.load(open('$R')); sys.exit(0 if r['resultat']=='soumise' and r['premiere'] is True and r['semaine']=='2026-11-30' and 'Submitted' in r['texte'] else 1)\""
 HERMES_BANC_AUJOURDHUI=2026-12-04 HERMES_BANC_JARVIS_U=nobody HERMES_BANC_CONSIGNE_EN_PLUS=$T/cra-auto.txt bash /usr/local/sbin/hermes-portail cra-auto > $T/cra-auto2.log 2>&1
 verif "cra-auto : une seule tentative par oui ; une semaine soumise ne repart pas ; une semaine pas confirmée n'est pas touchée" bash -c "[ \"\$(grep -c CRA-SUBMIT $T/traces/portail.jsonl)\" = $((n0 + 1)) ] && [ \"\$(wc -l < /var/lib/hermes-portail/cra/tentees.txt)\" = 1 ] && ! grep -q '2026-11-16' /var/lib/hermes-portail/cra/tentees.txt"
-rm -f /etc/hermes-portail/cra.conf $FJD/portail-retours; rm -rf /var/lib/hermes-portail-retours
+echo "== La limite du forfait Claude (26/11/2026 : « Fais en sorte que la relance soit automatique »)"
+LIMV=/var/lib/hermes-portail/limite; rm -rf $LIMV
+printf "Erreur du passage : You've hit your 5-hour limit · resets 10:40am (UTC)\n" > $T/passage-limite
+printf '2026-12-11 12:00:01 permis api.anthropic.com\n2026-12-11 12:00:02 permis claude.ai\n' > $T/relais-claude
+printf '2026-12-11 12:00:01 permis api.anthropic.com\n2026-12-11 12:00:05 permis 127.0.0.1\n' > $T/relais-portail
+python3 -I - $FJD/jours.json <<'PY'   # trois semaines de plus, confirmées dans JARVIS (données inventées)
+import json, sys, datetime
+f = sys.argv[1]; D = json.load(open(f))
+for lundi, at in (("2026-12-07", 1796100000000), ("2026-12-14", 1796200000000), ("2026-12-21", 1796300000000)):
+    l = datetime.date.fromisoformat(lundi)
+    D["semaines"][lundi] = {"etat": "valide", "valide": {"at": at, "jours": [{"date": (l + datetime.timedelta(days=k)).isoformat(), "q": 1} for k in range(5)]}}
+json.dump(D, open(f, "w"))
+PY
+cra_auto_lim() { HERMES_BANC_AUJOURDHUI=$1 HERMES_BANC_JARVIS_U=nobody HERMES_BANC_PASSAGE=${2:-} HERMES_BANC_FILTRE_JOURNAL=${3:-} HERMES_BANC_CONSIGNE_EN_PLUS=${4:-$T/cra-auto.txt} bash /usr/local/sbin/hermes-portail cra-auto; }
+n0=$(grep -c CRA-SUBMIT $T/traces/portail.jsonl)
+cra_auto_lim 2026-12-11 $T/passage-limite $T/relais-claude > $T/lim1.log 2>&1; rc=$?
+verif "limite, seuls les hôtes de Claude joints (relais) : rien saisi, la semaine pas comptée comme tentée, une relance prévue (root 700/600), aucun compte rendu d'échec" bash -c "[ $rc = 0 ] && [ \"\$(grep -c CRA-SUBMIT $T/traces/portail.jsonl)\" = $n0 ] && ! grep -q '^2026-12-07:' /var/lib/hermes-portail/cra/tentees.txt && [ \"\$(stat -c %a $LIMV)\" = 700 ] && [ \"\$(stat -c %a $LIMV/relance-cra.json)\" = 600 ] && grep -q hermes-portail-cra.service $LIMV/relance-cra.json && grep -q 'relancé automatiquement' $T/lim1.log && [ ! -e /var/lib/hermes-portail-retours/cra-2026-12-07.json ]"
+python3 -I -c "import json,sys,time; json.dump({'reprise': int(time.time()) + 3600}, open(sys.argv[1], 'w'))" $LIMV/attente.json
+cra_auto_lim 2026-12-11 > $T/lim2.log 2>&1
+verif "tant que la limite tient (reprise dans une heure) : la minuterie ne tente rien" bash -c "grep -q 'Limite du forfait Claude jusqu' $T/lim2.log && [ \"\$(grep -c CRA-SUBMIT $T/traces/portail.jsonl)\" = $n0 ] && ! grep -q '^2026-12-07:' /var/lib/hermes-portail/cra/tentees.txt"
+python3 -I -c "import json,sys,time; json.dump({'reprise': int(time.time()) - 60}, open(sys.argv[1], 'w'))" $LIMV/attente.json
+cra_suite $T/cra-auto-1207.txt 12/07/2026 1 1 1 1 1 'État : Submitted\nRésultat : soumise'
+cra_auto_lim 2026-12-11 '' '' $T/cra-auto-1207.txt > $T/lim3.log 2>&1
+verif "la limite levée : la semaine repart (une fois) et part pour de vrai" bash -c "grep -q 'Résultat CRA : soumise' $T/lim3.log && [ \"\$(grep -c CRA-SUBMIT $T/traces/portail.jsonl)\" = $((n0 + 1)) ] && grep -q '^2026-12-07:' /var/lib/hermes-portail/cra/tentees.txt"
+n0=$(grep -c CRA-SUBMIT $T/traces/portail.jsonl)
+cra_auto_lim 2026-12-18 $T/passage-limite $T/relais-claude > $T/lim4.log 2>&1
+python3 -I -c "import json,sys,time; json.dump({'reprise': int(time.time()) - 60}, open(sys.argv[1], 'w'))" $LIMV/attente.json
+cra_auto_lim 2026-12-18 $T/passage-limite $T/relais-claude > $T/lim5.log 2>&1
+R14=/var/lib/hermes-portail-retours/cra-2026-12-14.json
+verif "coupée une seconde fois pour le même oui : plus de relance ; comptée, et le compte rendu le dit (« à relancer à la main »)" bash -c "grep -q '^2026-12-14:' /var/lib/hermes-portail/cra/tentees.txt && python3 -I -c \"import json,sys; r=json.load(open('$R14')); sys.exit(0 if r['resultat']=='echec' and 'deux fois' in r['texte'] and 'main' in r['texte'] else 1)\" && [ \"\$(grep -c CRA-SUBMIT $T/traces/portail.jsonl)\" = $n0 ]"
+rm -f $LIMV/relance-cra.json
+cra_auto_lim 2026-12-25 $T/passage-limite $T/relais-portail > $T/lim6.log 2>&1
+R21=/var/lib/hermes-portail-retours/cra-2026-12-21.json
+verif "limite, mais le portail joint avant la coupure : jamais relancée, comptée, le compte rendu dit de vérifier le portail" bash -c "grep -q '^2026-12-21:' /var/lib/hermes-portail/cra/tentees.txt && [ ! -e $LIMV/relance-cra.json ] && python3 -I -c \"import json,sys; r=json.load(open('$R21')); sys.exit(0 if r['resultat']=='echec' and 'vérifie' in r['texte'] else 1)\""
+rm -f /etc/hermes-portail/cra.conf $FJD/portail-retours; rm -rf /var/lib/hermes-portail-retours $LIMV
 
 echo "== CRA du mois (26/11/2026 : Hermes à la place de Chronos, le 26)"
 FA=http://127.0.0.1:$PP/activite; rm -f /var/lib/hermes-portail/cra/mois-valides.txt
@@ -641,6 +675,14 @@ DIRE: "État : Non envoyée\nRésultat : créée"
 FIN
 : > $T/traces/modele.jsonl
 oui teletravail:2026-11 "$(python3 -I -c "import json; print(json.load(open('$NDFV/teletravail-2026-11/prepare.json'))['empreinte'])")"
+# 26/11/2026 : la création coupée par la limite du forfait avant tout contact avec le portail : pas tentée, reprise après la levée
+LIMV=/var/lib/hermes-portail/limite; rm -rf $LIMV
+HERMES_BANC_PASSAGE=$T/passage-limite HERMES_BANC_FILTRE_JOURNAL=$T/relais-claude bash /usr/local/sbin/hermes-portail ndf-auto > $T/ndf-lim.log 2>&1
+verif "ndf-auto, création coupée par la limite avant tout contact (relais) : rien créé, pas comptée comme tentée, la note attend toujours, une relance prévue, pas de compte rendu d'échec" bash -c "grep -q 'Résultat note : limite' $T/ndf-lim.log && [ \"\$(grep -c ENREGISTREE $T/traces/portail.jsonl)\" = $n0 ] && [ ! -s $NDFV/creees.txt ] && ! grep -q '^teletravail 2026-11 ' $NDFV/tentees.txt && [ \"\$(cat $NDFV/teletravail-2026-11/etat)\" = a_valider ] && grep -q hermes-portail-ndf.service $LIMV/relance-ndf.json && python3 -I -c \"import json,sys; sys.exit(0 if json.load(open('$RN'))['etat']=='a_valider' else 1)\""
+python3 -I -c "import json,sys,time; json.dump({'reprise': int(time.time()) + 3600}, open(sys.argv[1], 'w'))" $LIMV/attente.json
+bash /usr/local/sbin/hermes-portail ndf-auto > $T/ndf-lim2.log 2>&1
+verif "… tant que la limite tient : ndf-auto ne tente rien" bash -c "grep -q 'Limite du forfait Claude jusqu' $T/ndf-lim2.log && [ \"\$(grep -c ENREGISTREE $T/traces/portail.jsonl)\" = $n0 ]"
+rm -f $LIMV/attente.json
 HERMES_BANC_NOTE_EN_PLUS=$T/note-suite.txt bash /usr/local/sbin/hermes-portail ndf-auto > $T/ndf2.log 2>&1
 verif "ndf-auto : son oui sur cette empreinte → la note créée pour de vrai (MODE NOTE, justificatif joint), une fois ; registre de root ; compte rendu « créée », première exécution" bash -c "grep -q 'Résultat note : creee' $T/ndf2.log && [ \"\$(grep -c ENREGISTREE $T/traces/portail.jsonl)\" = $((n0 + 1)) ] && grep -q 'MODE NOTE' $T/traces/modele.jsonl && grep -q 'justificatif.pdf' $T/traces/modele.jsonl && grep -q '^teletravail 2026-11 .* creee$' $NDFV/creees.txt && [ \"\$(stat -c '%U %a' $NDFV/creees.txt)\" = 'root 600' ] && python3 -I -c \"import json,sys; r=json.load(open('$RN')); sys.exit(0 if r['etat']=='creee' and r['premiere'] is True else 1)\""
 HERMES_BANC_NOTE_EN_PLUS=$T/note-suite.txt bash /usr/local/sbin/hermes-portail ndf-auto > $T/ndf3.log 2>&1
@@ -695,6 +737,22 @@ n1=$(grep -c ENREGISTREE $T/traces/portail.jsonl)
 oui box:2026-11 "$(python3 -I -c "import json; print(json.load(open('$NDFV/box-2026-11/prepare.json'))['empreinte'])")"
 HERMES_BANC_NOTE_EN_PLUS=$T/note-suite.txt bash /usr/local/sbin/hermes-portail ndf-auto > $T/box5.log 2>&1
 verif "note box : son oui → créée (première exécution)" bash -c "grep -q 'Résultat note : creee' $T/box5.log && [ \"\$(grep -c ENREGISTREE $T/traces/portail.jsonl)\" = $((n1 + 1)) ] && python3 -I -c \"import json,sys; r=json.load(open('$RB')); sys.exit(0 if r['etat']=='creee' and r['premiere'] is True else 1)\""
+# 26/11/2026 : la création d'une sorte déjà validée, coupée par la limite avant tout contact : reprise par ndf-auto, sans nouveau oui
+rm -rf $LIMV
+HERMES_BANC_AUJOURDHUI=2026-12-16 HERMES_BANC_NOTE_EN_PLUS=$T/note-suite.txt HERMES_BANC_PASSAGE=$T/passage-limite HERMES_BANC_PASSAGE_SI='MODE NOTE,' HERMES_BANC_FILTRE_JOURNAL=$T/relais-claude bash /usr/local/sbin/hermes-portail note box --mois 2026-12 --facture $T/box-dec.pdf > $T/box6l.log 2>&1; rc=$?
+verif "note box du mois suivant, création coupée par la limite avant tout contact : code 5, rien créé, la note marquée « auto_limite », relance par ndf-auto prévue" bash -c "[ $rc = 5 ] && grep -q 'Résultat note : limite' $T/box6l.log && [ \"\$(grep -c ENREGISTREE $T/traces/portail.jsonl)\" = $((n1 + 1)) ] && [ \"\$(cat $NDFV/box-2026-12/etat)\" = auto_limite ] && grep -q hermes-portail-ndf.service $LIMV/relance-ndf.json && ! grep -q '^box 2026-12 ' $NDFV/creees.txt"
+rm -f $LIMV/attente.json
+HERMES_BANC_NOTE_EN_PLUS=$T/note-suite.txt bash /usr/local/sbin/hermes-portail ndf-auto > $T/box6r.log 2>&1
+verif "… la limite levée : ndf-auto la reprend sans nouveau oui (sorte déjà validée) et la crée, une fois" bash -c "grep -q 'coupée par la limite du forfait : reprise de la création' $T/box6r.log && grep -q 'Résultat note : creee' $T/box6r.log && [ \"\$(grep -c ENREGISTREE $T/traces/portail.jsonl)\" = $((n1 + 2)) ] && grep -q '^box 2026-12 .* creee$' $NDFV/creees.txt"
+HERMES_BANC_NOTE_EN_PLUS=$T/note-suite.txt bash /usr/local/sbin/hermes-portail ndf-auto > /dev/null 2>&1
+verif "… et ne repart jamais une seconde fois" bash -c "[ \"\$(grep -c ENREGISTREE $T/traces/portail.jsonl)\" = $((n1 + 2)) ]"
+rm -rf $LIMV
+python3 -I - $NDFV/creees.txt $NDFV/tentees.txt <<'PY'   # la suite du banc attend la note de décembre pas encore créée : registres remis comme avant
+import sys
+for f in sys.argv[1:]:
+    L = [l for l in open(f) if not l.startswith("box 2026-12 ")]; open(f, "w").writelines(L)
+PY
+n1=$((n1 + 1))
 HERMES_BANC_AUJOURDHUI=2026-12-16 HERMES_BANC_NOTE_EN_PLUS=$T/note-suite.txt bash /usr/local/sbin/hermes-portail note box --mois 2026-12 --facture $T/box-dec.pdf > $T/box6.log 2>&1; rc=$?
 verif "note box du mois suivant : la sorte a été validée une fois, elle part seule (créée sans attendre), compte rendu « créée », pas « première »" bash -c "[ $rc = 0 ] && grep -q 'elle part seule' $T/box6.log && grep -q 'Résultat note : creee' $T/box6.log && [ \"\$(grep -c ENREGISTREE $T/traces/portail.jsonl)\" = $((n1 + 2)) ] && grep -q '^box 2026-12 .* creee$' $NDFV/creees.txt && python3 -I -c \"import json,sys; r=json.load(open('/var/lib/hermes-portail-retours/ndf-box-2026-12.json')); sys.exit(0 if r['etat']=='creee' and r['premiere'] is False else 1)\""
 HERMES_BANC_AUJOURDHUI=2026-12-16 bash /usr/local/sbin/hermes-portail note box --mois 2026-12 --facture $T/box-dec.pdf > $T/box7.log 2>&1; rc=$?

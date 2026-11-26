@@ -47,7 +47,9 @@ const PORT = 18000 + Math.floor(Math.random() * 1000), BASE = 'http://127.0.0.1:
 const env = {...process.env, JARVIS_HUMOUR: '0' /* réponses exactes : la pique a son propre banc (humour.test.mjs) */, JARVIS_ESSAIS: ESSAIS_BANC, JARVIS_MAQUETTES: JSON.stringify({banc: {dossier: 'maquette-banc', titre: 'Maquette du banc'}, 'pas bon': {dossier: '../..', titre: 'x'}}), JARVIS_PUSH_ALLOW_HTTP: '1', JARVIS_NOTIFY_TICK_MS: '3600000', JARVIS_SANTE_TICK_MS: '3600000', JARVIS_PAUSE_CACHE_MS: '0', JARVIS_PAPIERS_ID: 'pap', JARVIS_BELL_DEDUP_MS: '0', JARVIS_GOOGLE_FAKE: FG.url, PORT: String(PORT), JARVIS_DATA: DATA, JARVIS_RETOURS_CRA: path.join(DATA, 'retours-cra'), JARVIS_REVEIL: path.join(DATA, 'reveil-hermes'), JARVIS_HERMES_USAGE: path.join(DATA, 'usage-hermes.json'), JARVIS_COURRIER: '0', JARVIS_GROK_ARRET_MS: '0', CLAUDE_BIN: path.join(HERE, 'fake-claude.mjs'), ANTHROPIC_API_KEY: 'sk-ant-faux-pour-le-test', ANTHROPIC_BASE_URL: 'https://exemple.invalid', JARVIS_ORIGINS: 'https://rabiederouiche.github.io', JARVIS_REPO: os.tmpdir(), JARVIS_OS_DIR: path.join(HERE, '..', '..', '..', 'essais', 'jarvis-os-maquette'), JARVIS_TTS_HELPER: path.join(HERE, 'fake-tts.mjs'), JARVIS_VOICE_MODEL: path.join(HERE, 'fake-tts.mjs'), JARVIS_VOICE_SCRIPT: path.join(DATA, 'fausse-install.sh')};
 Object.assign(env, {JARVIS_STEAM_URL: VB, JARVIS_STT_HELPER: path.join(HERE, 'fake-stt.mjs'), JARVIS_TOUR_HELPER: path.join(HERE, 'fake-tour.mjs'), JARVIS_PREP_MEM: '1', JARVIS_RD_RACINE: 'rda', JARVIS_VOIX_GOOGLE_URL: GURL, JARVIS_VOIX_GOOGLE_PLAFOND: '220', JARVIS_ROUTINES_MS: '400', JARVIS_METEO_URL: 'http://127.0.0.1:' + MET.address().port + '/v1/forecast', JARVIS_ECOUTE_SCRIPT: path.join(DATA, 'fausse-install.sh'),
   /* 0.64.0 : message vocal (faux convertisseur à la place de PyAV, pas de ffmpeg) et rappels toutes les 0,7 s au lieu de 5 min */
-  JARVIS_AUDIO_PY: process.execPath, JARVIS_AUDIO_HELPER: path.join(HERE, 'fake-audio.mjs'), JARVIS_FFMPEG: '', JARVIS_RAPPEL_MS: '700', JARVIS_RAPPEL_TICK_MS: '150', JARVIS_TACHES_CACHE_MS: '0'});
+  JARVIS_AUDIO_PY: process.execPath, JARVIS_AUDIO_HELPER: path.join(HERE, 'fake-audio.mjs'), JARVIS_FFMPEG: '', JARVIS_RAPPEL_MS: '700', JARVIS_RAPPEL_TICK_MS: '150', JARVIS_TACHES_CACHE_MS: '0',
+  /* 0.89.0 : la relance après la limite du forfait : tic de 0,3 s, sans la minute de marge ; les avis de root dans un dossier du banc */
+  JARVIS_LIMITE_TICK_MS: '300', JARVIS_LIMITE_MARGE_MS: '0', JARVIS_RELANCE_AVIS: path.join(DATA, 'avis-relance')});
 const sansN = (u) => String(u || '').replace(/\?n=[0-9a-f]{12}(?=#|$)/, '');   /* 0.69.0 : l'adresse d'une notification sans son identifiant */
 const results = []; let fails = 0;
 { const H = ['Domaine', 'Fait', 'Valeur'], v = (x) => pauseDepuisFaits([H, ['Grok Bot', "Grok en pause jusqu'au", x]]);
@@ -598,6 +600,29 @@ try {
       nm = await until(() => got.length > n1 ? open(got[got.length - 1]) : null, 3000);
       ok('missions : interrompue par un arrêt du serveur, reprise à la relance et notifiée', mk0 && mk0.status === 'envoyee' && mk && mk.essais === 2 && mk.result === 'Compte rendu repris.' && nm && nm.title === 'Mission terminée', JSON.stringify([mk0 && mk0.status, mk]));
       ok('relances : gardées sur disque malgré un arrêt brutal du serveur', rp.status === 200 && ((await G('/api/relances')).body.prevues || []).some((x) => x.id === rp.body.relance.id));
+      /* 0.89.0 (26/11/2026, « Fais en sorte que la relance soit automatique ») : une mission coupée par la limite du forfait Claude attend sa
+         levée (l'heure de reprise est dite), puis repart seule, une fois ; coupée de nouveau : en échec, notifiée ; après un brouillon : jamais relancée */
+      { const tag = 'banc' + Date.now().toString(36), nL = got.length, liste = async () => (await G('/api/missions')).body.missions || [];
+        r = await G('/api/mission', {texte: 'limite une fois ' + tag}); const lid1 = r.body.id;
+        const lm0 = await until(async () => (await liste()).find((x) => x.id === lid1 && x.status === 'attente_limite'), 5000);
+        const lm1 = await until(async () => (await liste()).find((x) => x.id === lid1 && x.status === 'terminee'), 10000);
+        const nmL = got.slice(nL).map((b) => open(b));
+        ok('limite du forfait : la mission coupée passe « en attente de la limite » (heure de reprise de Paris), sans notification d’échec', lm0 && /^En attente de la limite du forfait Claude : reprise vers \d\d h \d\d, puis relancée automatiquement, une fois\.$/.test(lm0.result) && lm0.reprise > Date.now() - 60000 && !nmL.some((x) => x.title === 'Mission en échec'), JSON.stringify([lm0, nmL.map((x) => x.title)]));
+        ok('limite du forfait : la limite levée, elle repart seule une fois et aboutit (l’essai coupé ne compte pas comme une reprise)', lm1 && lm1.result === 'Compte rendu après la limite.' && lm1.relanceLimite === 1 && lm1.essais === 1 && nmL.some((x) => x.title === 'Mission terminée'), JSON.stringify(lm1));
+        const nT = got.length; r = await G('/api/mission', {texte: 'limite toujours : une recherche coupée'}); const lid2 = r.body.id;
+        const lt = await until(async () => (await liste()).find((x) => x.id === lid2 && x.status === 'echouee'), 10000);
+        const ntT = await until(() => got.length > nT ? open(got[got.length - 1]) : null, 3000);
+        ok('limite du forfait : de nouveau coupée après sa relance → en échec (une seule relance) ; la notification dit de la relancer à la main', lt && lt.relanceLimite === 1 && /Relancée une fois après la limite du forfait, de nouveau en échec : relance-la à la main/.test(lt.result) && ntT && ntT.title === 'Mission en échec' && /relance-la à la main/.test(ntT.body), JSON.stringify([lt, ntT]));
+        r = await G('/api/mission', {texte: 'limite après brouillon : prépare la réponse'}); const lid3 = r.body.id;
+        const lb = await until(async () => (await liste()).find((x) => x.id === lid3 && ['echouee', 'attente_limite'].includes(x.status)), 6000);
+        ok('limite du forfait : coupée après avoir écrit un brouillon → jamais relancée seule (en échec, il regarde avant de relancer)', lb && lb.status === 'echouee' && !lb.relanceLimite && /après avoir commencé à écrire/.test(lb.result), JSON.stringify(lb));
+        /* les avis de root (routine d'Hermes en échec après sa relance) : poussés une fois ; un lien n'est jamais suivi */
+        const AV = path.join(DATA, 'avis-relance'); fs.mkdirSync(AV, {recursive: true});
+        fs.writeFileSync(path.join(AV, 'avis-1796000000-routine-prix-suivis.json'), JSON.stringify({cle: 'routine-prix-suivis', titre: 'Hermes : « prix-suivis » en échec après la relance', texte: 'Coupée par la limite du forfait Claude, relancée, de nouveau en échec.', at: 1796000000}));
+        fs.writeFileSync(path.join(DATA, 'secret-banc.json'), JSON.stringify({titre: 'SECRET'})); fs.symlinkSync(path.join(DATA, 'secret-banc.json'), path.join(AV, 'avis-1796000001-lien.json'));
+        fs.writeFileSync(path.join(AV, 'etat.json'), JSON.stringify({at: 1796000000, ouvert: true, attente: [{nom: 'digest-ia', reprise: 1796000600}], relances: [{nom: 'veille-du-matin', at: Math.floor(Date.now() / 1000), resultat: 'réussie'}]}));
+        const nA = got.length, nav = await until(() => got.length > nA ? open(got[got.length - 1]) : null, 3000); await new Promise((z) => setTimeout(z, 900));
+        ok('limite du forfait : un avis de root (routine d’Hermes restée en échec) poussé une fois, vers la santé du serveur ; un avis en lien ignoré', nav && nav.title === 'Hermes : « prix-suivis » en échec après la relance' && sansN(nav.navigate) === '/#voir-sante' && got.length === nA + 1 && !got.slice(nA).map((b) => open(b)).some((x) => /SECRET/.test(x.title)), JSON.stringify([nav, got.length - nA])); }
       /* 0.18.0 : relances vérifiées par le serveur (ligne du Canal lue directement, zéro jeton), rappels simples, annulation */
       FG.sheet['Canal!A1:H1'] = [['Date', 'De', 'Pour', 'Type', 'Message', 'Statut', 'Réponse', 'Objet']]; FG.sheet['Canal!A2:H2'] = [['17/11/2026', 'Rabie', 'Kairos', 'Ordre', 'Relève le prix de la carte', 'Fait', 'Prix relevé : sous ton seuil.', 'Prix : Carte']];
       FG.sheet['Canal!A3:H3'] = [['17/11/2026', 'Rabie', 'Ulysse', 'Ordre', 'Propose deux sorties', 'À faire', '', 'Sorties']];
@@ -700,6 +725,7 @@ try {
       let n0 = got.length; r = await G('/api/sante/maintenant', {}); const it = (k) => (r.body.items || []).find((x) => x.cle === k) || {};
       ok('santé : accès Google retiré signalé par une notification, Claude connecté', it('google').ok === false && /Reconnecter/.test(it('google').detail) && it('claude').ok === true && got.length === n0 + 1, JSON.stringify(r.body.items));
       n0 = got.length; await G('/api/sante/maintenant', {}); ok('santé : pas de seconde notification pour le même problème', got.length === n0);
+      ok('santé (0.89.0) : une ligne « Forfait Claude » d’information (en attente de la levée, relances du jour), jamais une notification', it('forfait').ok === true && /en attente de la levée : digest-ia/.test(it('forfait').detail) && /relancés? automatiquement depuis hier/.test(it('forfait').detail), JSON.stringify(it('forfait')));
       FG.refreshOk = true; r = await G('/api/google/link', {}); await fetch(BASE + '/api/google/callback?state=' + new URL(r.body.url).searchParams.get('state') + '&code=CODE-OK');
       n0 = got.length; r = await G('/api/sante/maintenant', {}); ok('santé : retour à la normale noté, sans notification', it('google').ok === true && got.length === n0, JSON.stringify(r.body.items));
       const gs = JSON.parse(fs.readFileSync(path.join(DATA, 'guard-mission.json'), 'utf8'));

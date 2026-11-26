@@ -475,6 +475,41 @@ Le Hermes de Telegram, lui, a sa mémoire et propose des skills, validées par `
 - **Un passage peut rendre le code 0 sans navigateur** : si Chromium ne démarre pas, Hermes le dit dans sa réponse
   mais sort en 0. Juger un passage à sa réponse (ligne « Connexion »), pas à son code. À corriger.
 
+## La limite du forfait Claude (26/11/2026, sa demande : « Fais en sorte que la relance soit automatique »)
+
+Le Hermes portail tourne sur le même forfait que JARVIS et Hermes : la limite de 5 heures peut couper un passage.
+Sur le portail de notes de frais, créer = soumettre : **une tâche coupée n'est relancée que si l'on prouve qu'elle
+n'a rien saisi**.
+
+- **La preuve** : après chaque passage, `limite.py passage` (copie root, `$LIB/limite.py`) note dans
+  `/var/lib/hermes-portail/limite/derniere.json` (root 600) si la limite a coupé le passage et si le portail a été
+  joint. Le relais filtrant écrit `permis <hôte>` dans son journal pour chaque hôte qu'il laisse passer ; tout hôte
+  qui n'est pas celui de Claude (`domaines.defaut`, copié dans `$LIB`) compte comme le portail. Relais illisible :
+  pas de preuve, donc « portail joint ». Aucune adresse n'est gardée, seulement oui ou non.
+- **Coupée avant tout contact** (le cas courant : la limite tombe au premier appel du modèle) : la tentative ne
+  compte pas (la ligne de `tentees.txt` ou `tentes.txt` est retirée), `attente.json` garde l'heure de reprise
+  (les minuteries `cra-auto`, `ndf-auto`, `notes-auto` et `teletravail-auto` ne tentent rien avant), et
+  `relance-<tâche>.json` demande **une** relance à `hermes-relance` (Hermes principal, `docs/hermes.md`), qui
+  démarre l'unité après la levée. Les minuteries de 5 minutes la reprennent aussi d'elles-mêmes : le verrou et
+  le registre empêchent tout doublon. Aucun compte rendu d'échec n'est posé pour JARVIS.
+- **Coupée une seconde fois pour la même clé** (même oui, même mois) : plus de relance (`relancees.txt`, root) ; la
+  tentative compte, le compte rendu pour JARVIS dit « coupé deux fois… à relancer à la main » (JARVIS le notifie).
+- **Coupée après avoir joint le portail, ou sans preuve** : jamais relancée ; la tentative compte, le compte rendu
+  dit de vérifier le portail avant de relancer à la main.
+- **Création d'une note** (`ndf_creer`) : coupée avant tout contact, une note « à valider » attend toujours son oui
+  (même empreinte) et `ndf-auto` la reprend ; une note d'une sorte déjà validée une fois passe à `auto_limite`, que
+  `ndf-auto` reprend sans nouveau oui (la règle de `ndf_poser`). Code de sortie 5 (« Résultat note : limite »).
+- **Préparation** (`notes-auto` → `note`, `teletravail-auto` → `teletravail`) : facture rapportée ou dépense à blanc
+  coupées avant tout contact avec le portail de notes de frais : la note du mois repart une fois (`notes-auto`).
+- `cra-mois` n'est lancé par aucune minuterie : un passage coupé se relance à la main (la session du serveur).
+- (Likely) Une coupure après le 1er du mois pour la note de télétravail (préparée le dernier jour) n'est pas
+  rattrapée par `teletravail-auto` (il ne tourne que le dernier jour) : elle se fait alors à la main.
+- Au banc : `HERMES_BANC_PASSAGE` (un passage coupé, sans lancer Hermes), `HERMES_BANC_PASSAGE_SI` (seulement si la
+  consigne contient ce texte) et `HERMES_BANC_FILTRE_JOURNAL` (le journal du relais), lus seulement sans systemd.
+- Locale fixée (`LC_ALL=C.UTF-8`) dans la commande : sans LANG, `R[ée]sultat` ne reconnaissait plus « Résultat » et
+  un CRA soumis était compté « echec » (vu au banc le 26/11/2026 ; (Likely) sans effet jusque-là sur le serveur, dont
+  les unités reçoivent la locale du système).
+
 ## État
 
 - 24/11/2026 (nuit) : kit écrit. Banc 56 sur 56, avec le Hermes principal installé sur la même machine (comme sur le

@@ -31,6 +31,9 @@
 set +x
 set -uo pipefail
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+# 26/11/2026 : une locale UTF-8 fixe. Sans elle (minuterie lancée sans LANG), « R[ée]sultat » ne reconnaît plus « Résultat » dans sed :
+# un CRA soumis était compté « echec » (vu au banc dans un shell sans LANG).
+export LANG=C.UTF-8 LC_ALL=C.UTF-8
 U=hermes-portail
 H=/home/$U
 HH=$H/hermes               # pas ~/.hermes : Hermes cherche alors une unité « hermes-gateway » au nom nu, celle du Hermes principal
@@ -43,6 +46,7 @@ JARVIS_U=jarvis; JARVIS_SRV=/opt/rd/jarvis-os/server; JARVIS_DONNEES=""   # qui 
 RECU=/home/hermes-portail/telechargements   # où Hermes dépose le fichier qu'un passage l'autorise à télécharger (vidé avant et après)
 DEPOT=/var/lib/hermes-portail-depot    # le fichier remis à Hermes pour un passage (root, lisible par lui, effacé ensuite)
 RETOURS=/var/lib/hermes-portail-retours   # 26/11/2026 : les comptes rendus des CRA pour JARVIS (root, lisibles par le groupe de JARVIS)
+LIM=$VAR/limite                        # 26/11/2026 : la limite du forfait Claude (dernier passage, attente, relances ; root 700)
 COFFRE=/usr/local/sbin/jarvis-coffre
 PRISE=/run/jarvis-coffre/service.sock
 NOM_CLE=hermes-portail-cle
@@ -211,7 +215,12 @@ guetter_code() {  # guetter_code <recherche Gmail> : à lancer en arrière-plan
 # se note « en marche » et le passage suivant l'attend jusqu'à l'échéance (« Gateway starting: deadline », vu au banc).
 PASSAGE='"$0" chat -Q --oneshot --max-turns 40 -s portail --query-file "$1"; rc=$?; "$0" gateway stop >/dev/null 2>&1; exit $rc'
 lancer_agent() {   # lancer_agent <fichier de consigne> <fichier de sortie> : un passage sans personne, enfermé
-  local consigne=$1 sortie=$2 rc
+  local consigne=$1 sortie=$2 rc debut_passage
+  debut_passage=$(date +%s)
+  # banc seulement : un passage coupé (la limite du forfait), sans lancer Hermes ; HERMES_BANC_PASSAGE_SI : seulement si la consigne le contient
+  if [ "$SYSTEMD" = 0 ] && [ -n "${HERMES_BANC_PASSAGE:-}" ] && { [ -z "${HERMES_BANC_PASSAGE_SI:-}" ] || grep -qF -- "$HERMES_BANC_PASSAGE_SI" "$consigne"; }; then
+    cat "$HERMES_BANC_PASSAGE" > "$sortie"; limite_noter "$sortie" "$debut_passage" 1; return 1
+  fi
   if [ "$SYSTEMD" = 1 ]; then
     # l'unité hermes-portail-essai (posée par install.sh) lit $H/.consigne et écrit $VAR/essais/courant.txt
     : > "$VAR/essais/courant.txt"; chmod 0600 "$VAR/essais/courant.txt"
@@ -230,8 +239,40 @@ lancer_agent() {   # lancer_agent <fichier de consigne> <fichier de sortie> : un
     rc=$?
     sleep 1; pkill -u "$U" 2>/dev/null   # sous systemd, la fin de l'unité arrête ce qui reste (le pilote du navigateur) ; ici, à la main
   fi
+  limite_noter "$sortie" "$debut_passage" "$rc"
   return $rc
 }
+
+# ---- 26/11/2026 : la limite du forfait Claude (ce matin-là, la limite de 5 heures a tout coupé ; sa demande : « Fais en sorte que la
+# relance soit automatique »). Après chaque passage, limite.py note si la limite l'a coupé, et si le portail a été joint : le relais
+# filtrant écrit « permis <hôte> » pour chaque hôte qu'il laisse passer ; un hôte qui n'est pas celui de Claude (domaines.defaut) est
+# le portail. Une tâche automatique coupée AVANT tout contact avec le portail ne compte pas comme tentée : elle attend la levée
+# (attente.json), puis repart UNE fois (hermes-relance, ou sa minuterie). Coupée après, ou sans preuve (relais illisible) : jamais
+# relancée, son compte rendu pour JARVIS le dit (« à relancer à la main »). Sur le portail de notes de frais, créer = soumettre.
+journal_relais() {   # journal_relais <début> <fin> : ce que le relais a laissé passer pendant le passage ; « ERREUR » s'il est illisible
+  if [ "$SYSTEMD" = 1 ]; then journalctl -u hermes-portail-filtre.service --since "@$1" --until "@$(( $2 + 1 ))" -o cat --no-pager 2>/dev/null || echo ERREUR
+  elif [ -n "${HERMES_BANC_FILTRE_JOURNAL:-}" ]; then cat "$HERMES_BANC_FILTRE_JOURNAL"   # banc seulement
+  else echo ERREUR; fi
+}
+limite_noter() {   # limite_noter <sortie> <début> <code> : $LIM/derniere.json (root 600)
+  local j fin; fin=$(date +%s); install -d -o root -g root -m 0700 "$LIM"; j=$(mktemp); chmod 0600 "$j"
+  journal_relais "$2" "$fin" > "$j"
+  python3 -I "$LIB/limite.py" passage --sortie "$1" --debut "$2" --fin "$fin" --code "$3" --journal "$j" --claude "$LIB/domaines.defaut" --vers "$LIM/derniere.json" 2>/dev/null
+  rm -f "$j"
+}
+limite_verdict() { python3 -I "$LIB/limite.py" verdict --fichier "$LIM/derniere.json" --debut "$1" 2>/dev/null || echo non; }   # avant | apres | non
+limite_attente() {   # 0 (et un message) tant que la limite annoncée tient : les minuteries ne tentent rien
+  local h; h=$(python3 -I "$LIB/limite.py" attente --dossier "$LIM" 2>/dev/null) || return 1
+  echo "Limite du forfait Claude jusqu'au $h (heure de Paris) : rien tenté avant."; return 0
+}
+limite_planifier() {   # limite_planifier <tâche> <clé> <unité> : 0 = une relance prévue après la levée ; 3 = déjà relancée une fois
+  python3 -I "$LIB/limite.py" planifier --dossier "$LIM" --tache "$1" --cle "$2" --unite "$3" --depuis "$LIM/derniere.json"
+}
+oter_ligne() {   # oter_ligne <fichier> <ligne exacte> : la tentative coupée par la limite n'est plus comptée
+  local tmp; tmp=$(mktemp); chmod 0600 "$tmp"; grep -vxF -- "$2" "$1" > "$tmp"; cat "$tmp" > "$1"; rm -f "$tmp"
+}
+LIMITE_DEUX="Coupé deux fois par la limite du forfait Claude, avant tout contact avec le portail : rien saisi. À relancer à la main."
+LIMITE_APRES="Coupé par la limite du forfait Claude après avoir commencé sur le portail (ou sans preuve du contraire) : vérifie le portail avant de relancer à la main ; pas de relance automatique."
 
 # ---- 26/11/2026 : les notes de frais d'Hermes, EN RÉEL (sa décision du jour : Chronos s'arrête ; « valide avec moi la première fois,
 # c'est tout »). Une note préparée et vérifiée à blanc est POSÉE (dossier de root $NDF/<sorte>-<mois>) avec son compte rendu pour JARVIS :
@@ -322,15 +363,29 @@ ndf_creer() {   # ndf_creer <sorte> <mois> : la création réelle (une seule foi
   [[ "$adr" =~ ^https?://[A-Za-z0-9._:/?=%\&~+-]+$ ]] || { echo "Réglage « ndf_adresse » attendu (notes.conf)."; ndf_retour "$s" "$m" echec "Adresse du portail de notes de frais absente des réglages."; return 1; }
   ndf_validee_une_fois "$s" || premiere=true
   out="$D/creation.txt"
+  local debut_creer limite_txt=""; debut_creer=$(date +%s)
   "$0" brouillon "$adr" --champs-fichier "$D/champs.txt" --justificatif "$D/justificatif.pdf" --creer > "$out" 2>&1
   res=$(propre < "$out" | sed -nE 's/^[[:space:]*•-]*R[ée]sultat[[:space:]]*:[[:space:]]*(.+)$/\1/p' | tail -1 | tr '[:upper:]' '[:lower:]')
   case "$res" in *"déjà présente"*|*"deja presente"*) res=deja ;; *"rien créé"*|*"rien cree"*) res=echec ;; *"créée"*|*"creee"*) res=creee ;; *) res=echec ;; esac
+  if [ "$res" = echec ]; then   # 26/11/2026 : coupée par la limite avant tout contact avec le portail → reprise par ndf-auto après la levée
+    case "$(limite_verdict "$debut_creer")" in
+      avant)
+        if limite_planifier ndf "$s $m $emp" hermes-portail-ndf.service; then
+          oter_ligne "$NDF/tentees.txt" "$s $m $emp"
+          # une sorte déjà validée une fois : ndf-auto la reprend sans nouveau oui (comme ndf_poser l'aurait fait)
+          [ "$(cat "$D/etat" 2>/dev/null)" = auto ] && { echo auto_limite > "$D/etat"; chmod 0600 "$D/etat"; }
+          echo "Résultat note : limite"; return 5
+        fi
+        limite_txt=$LIMITE_DEUX ;;
+      apres) limite_txt=$LIMITE_APRES ;;
+    esac
+  fi
   [ "$res" = creee ] || premiere=false
   if [ "$res" = creee ] || [ "$res" = deja ]; then echo "$s $m $(date '+%d/%m/%Y_%H:%M') $res" >> "$NDF/creees.txt"; echo "$res" > "$D/etat"; fi
   case "$res" in
     creee) ndf_retour "$s" "$m" creee "Créée sur le portail de notes de frais, avec son justificatif." "$premiere" ;;
     deja) ndf_retour "$s" "$m" deja "Une dépense pareille existait déjà : rien de créé en double." ;;
-    *) ndf_retour "$s" "$m" echec "Pas créée : $(propre < "$out" | grep -iE 'alerte|erreur|annul|refus' | head -2 | tr '\n' ' ' | cut -c1-300)" ;;
+    *) ndf_retour "$s" "$m" echec "${limite_txt:-Pas créée : $(propre < "$out" | grep -iE 'alerte|erreur|annul|refus' | head -2 | tr '\n' ' ' | cut -c1-300)}" ;;
   esac
   propre < "$out" | grep -v '^session_id:' | tail -20
   echo "Résultat note : $res"
@@ -749,6 +804,7 @@ os.replace(tmp, dest)
     [ -n "$adresse" ] || { echo "cra.conf sans adresse."; exit 1; }
     install -d -o root -g root -m 0700 "$VAR/cra"; touch "$VAR/cra/soumises.txt" "$VAR/cra/tentees.txt"; chmod 0600 "$VAR/cra/soumises.txt" "$VAR/cra/tentees.txt"
     exec 9> "$VAR/cra/.verrou"; flock -n 9 || exit 0
+    limite_attente && exit 0   # 26/11/2026 : la limite du forfait tient encore : rien tenté avant sa levée
     aujourdhui=$(TZ=Europe/Paris date +%F); [ "$SYSTEMD" = 0 ] && [ -n "${HERMES_BANC_AUJOURDHUI:-}" ] && aujourdhui=$HERMES_BANC_AUJOURDHUI
     choix=$(python3 -I -c '
 import datetime, json, os, sys
@@ -782,24 +838,34 @@ for lundi in sorted(sem.keys() if isinstance(sem, dict) else []):
     echo "$cle_essai" >> "$VAR/cra/tentees.txt"   # une tentative par oui, notée avant le passage
     premiere=false; grep -q ' soumise$' "$VAR/cra/soumises.txt" || premiere=true
     out=$(mktemp); chmod 0600 "$out"
+    debut_cra=$(date +%s); limite_txt=""
     "$0" cra "$adresse" --semaine "$semaine" --jours "$jours" > "$out" 2>&1
     res=$(sed -n 's/^Résultat CRA : //p' "$out" | tail -1); res=${res%% *}; res=${res:-echec}
+    case "$res" in soumise|deja|rien) ;; *)   # 26/11/2026 : coupé par la limite du forfait avant toute saisie → la semaine repart une fois après la levée
+      case "$(limite_verdict "$debut_cra")" in
+        avant) if limite_planifier cra "$cle_essai" hermes-portail-cra.service; then
+                 oter_ligne "$VAR/cra/tentees.txt" "$cle_essai"; cat "$out"; rm -f "$out"; exit 0
+               fi
+               limite_txt="$LIMITE_DEUX Confirme de nouveau la semaine dans JARVIS." ;;
+        apres) limite_txt="$LIMITE_APRES Regarde la feuille de temps sur le portail avant de confirmer de nouveau la semaine dans JARVIS." ;;
+      esac ;;
+    esac
     # 26/11/2026 (faille vue par la session du serveur) : root n'écrit jamais dans un dossier de l'utilisateur de JARVIS (un lien y
     # ferait écraser ou changer de propriétaire un fichier du système). Le compte rendu va dans $RETOURS, à root, lisible par son groupe.
     groupe=$(id -gn "$JARVIS_U" 2>/dev/null) || groupe=root
     install -d -o root -g "$groupe" -m 0750 "$RETOURS"; chown root:"$groupe" "$RETOURS"; chmod 0750 "$RETOURS"
     python3 -I -c '
 import json, os, re, sys, time
-src, dest, semaine, res, premiere = sys.argv[1:6]
+src, dest, semaine, res, premiere, limite = sys.argv[1:7]
 lignes = [re.sub(r"\x1b\[[0-9;?]*[A-Za-z]", "", l).strip() for l in open(src, encoding="utf-8", errors="replace")]
 corps = [l for l in lignes if l and not l.startswith(("==", "(gardé", "Notes gardées", "Résultat CRA", "session_id")) and not re.match(r"^[-*•]?\s*Appris\s*:", l)]
 refus = [l for l in lignes if l.startswith("Refus") or "verrouillé" in l]
-texte = (" ".join(refus) if refus else " ".join(corps))[-650:] or "Le passage n’a rien rendu."
+texte = limite[:650] or (" ".join(refus) if refus else " ".join(corps))[-650:] or "Le passage n’a rien rendu."
 tmp = dest + ".tmp"
 fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o640)
 os.write(fd, json.dumps({"semaine": semaine, "resultat": res, "texte": texte, "premiere": premiere == "true" and res == "soumise", "at": int(time.time() * 1000)}, ensure_ascii=False).encode()); os.close(fd)
 os.replace(tmp, dest)
-' "$out" "$RETOURS/cra-$semaine.json" "$semaine" "$res" "$premiere"
+' "$out" "$RETOURS/cra-$semaine.json" "$semaine" "$res" "$premiere" "$limite_txt"
     chown root:"$groupe" "$RETOURS/cra-$semaine.json"; chmod 0640 "$RETOURS/cra-$semaine.json"
     find "$RETOURS" -maxdepth 1 -type f -name '*.json' -mtime +40 -delete 2>/dev/null   # ménage : 40 jours
     cat "$out"; rm -f "$out"
@@ -966,26 +1032,37 @@ PY
     install -d -o root -g root -m 0700 "$VAR/teletravail"; touch "$VAR/teletravail/tentes.txt"; chmod 0600 "$VAR/teletravail/tentes.txt"
     exec 9> "$VAR/teletravail/.verrou"; flock -n 9 || exit 0
     grep -qx "$mois" "$VAR/teletravail/tentes.txt" && exit 0
+    limite_attente && exit 0   # 26/11/2026 : la limite du forfait tient encore : rien tenté avant sa levée
     echo "$mois" >> "$VAR/teletravail/tentes.txt"
     out=$(mktemp); chmod 0600 "$out"
+    debut_tt=$(date +%s); limite_txt=""
     "$0" teletravail --mois "$mois" > "$out" 2>&1
     res=$(sed -n 's/^Résultat télétravail : //p' "$out" | tail -1); res=${res%% *}; res=${res:-echec}
+    case "$res" in blanc|prete) ;; *)   # 26/11/2026 : coupée par la limite avant tout contact avec le portail → repart une fois après la levée
+      case "$(limite_verdict "$debut_tt")" in
+        avant) if limite_planifier teletravail "$mois" hermes-portail-teletravail.service; then
+                 oter_ligne "$VAR/teletravail/tentes.txt" "$mois"; cat "$out"; rm -f "$out"; exit 0
+               fi
+               limite_txt=$LIMITE_DEUX ;;
+        apres) limite_txt=$LIMITE_APRES ;;
+      esac ;;
+    esac
     groupe=$(id -gn "$JARVIS_U" 2>/dev/null) || groupe=root
     install -d -o root -g "$groupe" -m 0750 "$RETOURS"; chown root:"$groupe" "$RETOURS"; chmod 0750 "$RETOURS"
     python3 -I -c '
 import json, os, re, sys, time
-src, resultat, dest, mois, res = sys.argv[1:6]
+src, resultat, dest, mois, res, limite = sys.argv[1:7]
 jours = None
 try: jours = json.load(open(resultat)).get("jours_tt")
 except (OSError, ValueError): pass
 lignes = [re.sub(r"\x1b\[[0-9;?]*[A-Za-z]", "", l).strip() for l in open(src, encoding="utf-8", errors="replace")]
 raisons = [l for l in lignes if l.startswith(("Arrêt", "Refus"))][:4]
-texte = " ".join(raisons) if raisons else {"blanc": "Note préparée, dépense remplie puis annulée sur le portail.", "prete": "Note préparée, dépense pas essayée."}.get(res, "Le passage n’a pas abouti : voir le journal du serveur.")
+texte = limite if limite else " ".join(raisons) if raisons else {"blanc": "Note préparée, dépense remplie puis annulée sur le portail.", "prete": "Note préparée, dépense pas essayée."}.get(res, "Le passage n’a pas abouti : voir le journal du serveur.")
 tmp = dest + ".tmp"
 fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o640)
 os.write(fd, json.dumps({"mois": mois, "resultat": res, "jours": jours if isinstance(jours, (int, float)) else None, "texte": texte[:500], "a_blanc": True, "at": int(time.time() * 1000)}, ensure_ascii=False).encode()); os.close(fd)
 os.replace(tmp, dest)
-' "$out" "$VAR/teletravail/$mois/resultat.json" "$RETOURS/teletravail-$mois.json" "$mois" "$res"
+' "$out" "$VAR/teletravail/$mois/resultat.json" "$RETOURS/teletravail-$mois.json" "$mois" "$res" "$limite_txt"
     chown root:"$groupe" "$RETOURS/teletravail-$mois.json"; chmod 0640 "$RETOURS/teletravail-$mois.json"
     cat "$out"; rm -f "$out"
     exit 0 ;;
@@ -1079,6 +1156,7 @@ fd = os.open(f + ".tmp", os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 
     mois=${aujourdhui:0:7}; jour=$((10#${aujourdhui:8:2}))
     install -d -o root -g root -m 0700 "$NDF"; touch "$NDF/tentes.txt"; chmod 0600 "$NDF/tentes.txt"
     exec 8> "$NDF/.verrou-auto"; flock -n 8 || exit 0
+    limite_attente && exit 0   # 26/11/2026 : la limite du forfait tient encore : rien tenté avant sa levée
     for s in box claude grok; do
       [ -f "$ETC/note-$s.conf" ] || continue
       grep -qx "$s $mois" "$NDF/tentes.txt" && continue
@@ -1086,7 +1164,19 @@ fd = os.open(f + ".tmp", os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 
       j=$(sed -n 's/^jour=//p' "$ETC/note-$s.conf" | head -1); j=${j:-1}
       [ "$jour" -ge "$((10#$j))" ] || continue
       out=$(mktemp); chmod 0600 "$out"
+      debut_note=$(date +%s)
       "$0" note "$s" --mois "$mois" > "$out" 2>&1; rc=$?
+      # 26/11/2026 : la préparation coupée par la limite du forfait (facture, dépense à blanc) avant tout contact avec le portail de
+      # notes de frais n'est pas comptée comme tentée : elle repart une fois après la levée. Une création coupée (code 5) est reprise
+      # par ndf-auto ; une création en échec (code 4) a déjà son compte rendu (ndf_creer). Coupée après, ou une seconde fois :
+      # comptée, et son compte rendu le dit.
+      if [ $rc != 0 ] && [ $rc != 2 ] && [ $rc != 3 ] && [ $rc != 4 ] && [ $rc != 5 ] && [ $rc != 6 ]; then
+        case "$(limite_verdict "$debut_note")" in
+          avant) if limite_planifier note "$s $mois" hermes-portail-teletravail.service; then cat "$out"; rm -f "$out"; continue; fi
+                 ndf_retour "$s" "$mois" echec "$LIMITE_DEUX" ;;
+          apres) ndf_retour "$s" "$mois" echec "$LIMITE_APRES" ;;
+        esac
+      fi
       [ $rc = 6 ] || echo "$s $mois" >> "$NDF/tentes.txt"   # facture pas encore arrivée : on réessaie demain
       cat "$out"; rm -f "$out"
     done
@@ -1096,11 +1186,18 @@ fd = os.open(f + ".tmp", os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 
     # de vrai, une seule fois. Rien sans le portail de notes de frais dans les réglages.
     [ -d "$NDF" ] || exit 0
     exec 9> "$NDF/.verrou"; flock -n 9 || exit 0
+    limite_attente && exit 0   # 26/11/2026 : la limite du forfait tient encore : rien tenté avant sa levée
     for d in "$NDF"/*-[0-9][0-9][0-9][0-9]-[0-9][0-9]; do
       [ -d "$d" ] && [ ! -L "$d" ] && [ -f "$d/etat" ] || continue
       b=$(basename "$d"); s=${b%-*-*}; m=${b#"$s"-}
       [[ "$s" =~ ^(teletravail|box|claude|grok)$ ]] || continue
-      [ "$(cat "$d/etat")" = a_valider ] || continue
+      e=$(cat "$d/etat")
+      if [ "$e" = auto_limite ]; then   # 26/11/2026 : une sorte déjà validée une fois, sa création coupée par la limite avant tout contact
+        ndf_validee_une_fois "$s" || continue
+        echo "== Note $s de $m (sorte déjà validée), coupée par la limite du forfait : reprise de la création"
+        echo auto > "$d/etat"; ndf_creer "$s" "$m"; continue
+      fi
+      [ "$e" = a_valider ] || continue
       emp=$(python3 -I -c 'import json,sys; print(json.load(open(sys.argv[1]))["empreinte"])' "$d/prepare.json" 2>/dev/null) || continue
       ndf_oui "$s" "$m" "$emp" || continue
       echo "== Son oui dans JARVIS pour la note $s de $m : création réelle"

@@ -1,0 +1,12 @@
+# JARVIS OS — toutes les 10 minutes, la relance de ce que la limite du forfait Claude a coupé (hermes-relance.service).
+# Sans rien à relancer, elle ne lit même pas l'usage du forfait (aucune sonde inutile).
+[Unit]
+Description=Relance après la limite du forfait Claude, toutes les 10 minutes (JARVIS OS)
+
+[Timer]
+OnCalendar=*-*-* *:02/10:00
+Persistent=true
+AccuracySec=1min
+
+[Install]
+WantedBy=timers.target
