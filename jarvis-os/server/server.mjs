@@ -27,13 +27,14 @@ import {createFlux, SECOURS} from './flux.mjs';
 import {createActivite, outilNom} from './activite.mjs';
 import {createRadar} from './radar.mjs';
 import {createJours} from './jours.mjs';
+import {createTravail} from './travail.mjs';
 import {pique, PERSO_ORAL} from './humour.mjs';   /* 21/11/2026 : sa personnalité à l'oral (« sarcastique assumé ») */
 import {createAudio, typeSon, silence} from './audio.mjs';   /* 0.64.0 : le message vocal d'un proche, mis au format de l'écoute */
 import {createCoffreLien} from './coffre-lien.mjs';   /* 0.74.0 : le coffre en mémoire, ouvert depuis l'app */
 import {createVerrou} from './verrou.mjs';   /* 0.75.0 : le verrou de l'app par passkey */
 const ACT = createActivite();   /* 0.33.0 : ce que fait Claude à l'instant */
 
-const VERSION = '0.84.1';
+const VERSION = '0.85.0';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PORT = +(process.env.PORT || 8787);
 const HOST = process.env.HOST || '127.0.0.1';
@@ -1551,12 +1552,27 @@ const RADAR = createRadar({file: path.join(DATA, 'radar.json'), now, log: (t) =>
    IA, envoyé le 24 à midi et relu le dernier jour ; son oui dans JARVIS (0.83.1 : sur ses congés, pour le CRA du 26). Gardé à part, dans jours.json ; Claude ne lit qu'une correction
    que les règles n'ont pas comprise, sans aucun outil. */
 const JOURS = createJours({file: path.join(DATA, 'jours.json'), now, retours: process.env.JARVIS_RETOURS_CRA || '/var/lib/hermes-portail-retours', log: (t) => console.log(t),
+  /* 0.85.0 : les mails du mois (CRA, prolongation), en brouillon dans sa boîte, envoyés par lui depuis JARVIS ; modèles dans travail.json */
+  mails: {modeles: () => { try { return TRAVAIL.conf().mails || {}; } catch { return {}; } },
+    brouillon: (m) => GG.tool('Gmail', 'create_draft', {to: m.to, subject: m.subject, body: m.body}),
+    majBrouillon: (m) => GG.tool('Gmail', 'update_draft', {draftId: m.draftId, to: m.to, subject: m.subject, body: m.body}),
+    envoye: async (objet) => { const r = await GG.tool('Gmail', 'search_threads', {query: 'in:sent subject:"' + String(objet).replace(/"/g, '') + '" newer_than:40d', pageSize: 3}); return !!((r && r.threads) || []).length; }},
   agenda: {lie: () => GG.status('').linked, calendriers: async () => ((await GG.tool('Google Calendar', 'list_calendars', {})) || {}).calendars || [],
     evenements: async (calendarId, debut, fin) => ((await GG.tool('Google Calendar', 'list_events', {calendarId, startTime: debut + 'T00:00:00', endTime: fin + 'T00:00:00', pageSize: 250})) || {}).events || []},
   claude: (prompt, system) => { const box = path.join(DATA, 'jours'); fs.mkdirSync(box, {recursive: true, mode: 0o700});
     return runClaude({kind: 'jours', titre: 'Jours du mois : lecture d’une correction', prompt, system, model: MODELS.rapide, cwd: box, timeoutMs: 90000,
       tools: {allow: [], deny: ['Bash', 'Read', 'Edit', 'Write', 'Glob', 'Grep', 'NotebookEdit', 'WebFetch', 'WebSearch', 'Task']}}); },
   push: (msg) => (S.push && S.push.subs.length ? PUSH.send(msg, {urgency: 'high'}) : Promise.resolve([]))});
+/* 0.85.0 : l'espace « Travail » : les passages de Chronos lus dans l'onglet Journal de Pilotage, les mails dans Gmail (lecture seule) */
+const TRAVAIL = createTravail({file: path.join(DATA, 'travail.json'), jours: JOURS, retours: process.env.JARVIS_RETOURS_CRA || '/var/lib/hermes-portail-retours', now, log: (t) => console.log(t),
+  gmail: (q) => (GG.status('').linked ? GG.tool('Gmail', 'search_threads', {query: q, pageSize: 10}) : Promise.resolve(null)),
+  journal: async () => {
+    if (!GG.status('').linked) return [];
+    const r = await GG.tool('Google Sheets', 'get_values', {spreadsheetId: PILOTAGE, range: "'Journal'!A1:H"}), v = (r && r.values) || [], hd = (v[0] || []).map((x) => String(x).trim());
+    const col = (re) => hd.findIndex((x) => re.test(x)), iB = col(/^bot$/i), iD = col(/^date/i), iS = col(/^sujet$/i), iT = col(/^d[ée]tail/i);
+    return v.slice(1).slice(-800).map((row) => { const d = String(row[iD] || ''), m = d.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\D+(\d{1,2})[:h](\d{2}))?/); if (!m) return null;
+      const ymd = m[3] + '-' + m[2].padStart(2, '0') + '-' + m[1].padStart(2, '0'); return {bot: String(row[iB] || ''), ymd, at: Date.parse(ymd + 'T' + (m[4] || '12').padStart(2, '0') + ':' + (m[5] || '00') + ':00'), sujet: String(row[iS] || ''), detail: String(row[iT] || '')}; }).filter(Boolean);
+  }});
 const COMP = createComparatifs({S, save, DATA, runClaude, onIdee: ideeFinie, model: MODELS.equilibre, ideesModel: process.env.JARVIS_IDEES_MODELE || MODELS.profond, visionModel: MODELS.rapide,   /* 0.29.0 : Opus pour les idées (bien meilleur à chercher), JARVIS_IDEES_MODELE pour changer */
   steamBase: process.env.JARVIS_STEAM_URL || undefined, settings: guardSettings('chat'), now, log: (t) => { S.compErr = {at: now(), t: String(t).slice(0, 300)}; }});
 function installEcoute() {
@@ -2056,6 +2072,7 @@ const server = http.createServer(async (req, res) => {
       }
       if (!authed(req)) return appareil(req) ? json(res, 423, {error: 'JARVIS est verrouillé.', verrou: true}) : json(res, 401, {error: 'Appareil non relié.'});
       if (p.startsWith('/api/radar')) { const r = await RADAR.traiter(req.method, p, () => readBody(req)); if (r) return json(res, r.status, r.body); }   /* Radar (21/11/2026) */
+      if (p === '/api/travail' || p.startsWith('/api/travail/')) { const r = await TRAVAIL.traiter(req.method, p, () => readBody(req)); return json(res, r.status, r.body); }   /* 0.85.0 : l'espace « Travail » */
       if (p === '/api/jours' || p.startsWith('/api/jours/')) { const r = await JOURS.traiter(req.method, p, () => readBody(req), url.searchParams); if (r) return json(res, r.status, r.body); }   /* 0.83.0 : les jours du mois */
       if (p === '/api/google') return json(res, 200, GG.status(googleRedirect(req)));
       if (p === '/api/google/config' && req.method === 'POST') { const r = GG.configure(await readBody(req)); return json(res, r.ok ? 200 : 400, {...r, google: GG.status(googleRedirect(req))}); }

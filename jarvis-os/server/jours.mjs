@@ -220,7 +220,40 @@ export function appliquer(corrections, changements, b) {
 }
 
 /* ---------- le module : jours.json, l'agenda, la notification du 24 et du dernier jour ---------- */
-export function createJours({file, agenda, claude = null, push = async () => [], now = Date.now, log = () => {}, heure = '12:00', retours = '/var/lib/hermes-portail-retours'}) {
+/* 0.85.0 (sa remarque du 26/11/2026 sur le mail du CRA : « le 30 est un congé pas encore arrivé, il ne doit pas dire « j'étais » ; gère-le
+   une fois pour toutes ») : les phrases variables du mail qui demande le CRA du client. Le nombre de jours (demi-journées comprises, sans
+   arrondir) et les congés au bon temps selon le jour d'envoi : passés → « J’étais en congés … », à partir du jour d'envoi → « Je suis /
+   Je serai en congé(s) … ». Des journées de congé qui se suivent (week-end sauté, un férié coupe) font une période « du 9 au 10 » ; une
+   demi-journée est dite « le 12 (matin) ». Le modèle du mail (destinataire, salutation, signature) n'est pas ici : il est sur son serveur. */
+const MOIS_MAJ = (m) => MOIS[m - 1].charAt(0).toUpperCase() + MOIS[m - 1].slice(1);
+const nbDit = (n) => (Number.isInteger(n) ? String(n) : String(n).replace('.', ','));
+const etListe = (l) => (l.length < 2 ? l.join('') : l.slice(0, -1).join(', ') + ' et ' + l[l.length - 1]);
+export function mailCraPhrases(jours, envoi) {
+  const ouv = (jours || []).filter((d) => d && d.M !== 'W' && dowDe(d.date) >= 1 && dowDe(d.date) <= 5);
+  const tr = (c) => c === 'T' || c === 'S' || c === '?';
+  let n = 0; for (const d of ouv) n += (tr(d.M) ? 0.5 : 0) + (tr(d.A) ? 0.5 : 0);
+  const conges = ouv.filter((d) => d.M === 'C' || d.A === 'C').map((d) => ({date: d.date, demi: d.M === 'C' && d.A === 'C' ? '' : d.M === 'C' ? 'matin' : 'après-midi'}));
+  const suivant = (s) => { let x = plusJour(s, 1); while (dowDe(x) === 0 || dowDe(x) === 6) x = plusJour(x, 1); return x; };
+  const groupes = [];
+  for (const c of conges) {
+    const g = groupes[groupes.length - 1], passe = c.date < envoi;
+    if (g && !c.demi && !g.demi && g.passe === passe && suivant(g.fin) === c.date) { g.fin = c.date; g.n += 1; continue; }
+    groupes.push({debut: c.date, fin: c.date, demi: c.demi, passe, n: c.demi ? 0.5 : 1});
+  }
+  const dit = (g) => (g.debut === g.fin ? 'le ' + (+g.debut.slice(8) === 1 ? '1er' : +g.debut.slice(8)) + (g.demi ? ' (' + g.demi + ')' : '') : 'du ' + (+g.debut.slice(8) === 1 ? '1er' : +g.debut.slice(8)) + ' au ' + +g.fin.slice(8));
+  const phrase = (gs, debut) => { if (!gs.length) return ''; const tot = gs.reduce((s, g) => s + g.n, 0), m = +gs[0].debut.slice(5, 7); return debut + ' en ' + (tot > 1 ? 'congés ' : 'congé ') + etListe(gs.map(dit)) + ' ' + MOIS_MAJ(m) + '.'; };
+  const avant = groupes.filter((g) => g.passe), apres = groupes.filter((g) => !g.passe);
+  const phrases = [phrase(avant, 'J’étais'), phrase(apres, apres.length && apres[0].debut === envoi ? 'Je suis' : 'Je serai')].filter(Boolean);
+  return {jours: n, joursDit: nbDit(n), conges: conges.length ? conges.reduce((s, c) => s + (c.demi ? 0.5 : 1), 0) : 0, phrases, texte: 'J’ai ' + nbDit(n) + ' jours sur ce mois.' + (phrases.length ? '\n' + phrases.join('\n') : '')};
+}
+/* le mail rempli à partir de son modèle (sur le serveur) : {JOURS} {CONGES} {MOIS} {ANNEE} ; {CONGES} et son retour à la ligne disparaissent s'il
+   n'a pas de congé (écrire « {CONGES}\n\n » pour garder une ligne vide après) */
+export function mailCraRempli(modele, ym, jours, envoi) {
+  const p = mailCraPhrases(jours, envoi), m = +ym.slice(5, 7), y = ym.slice(0, 4);
+  const sub = (s) => String(s || '').replace(/\{JOURS\}/g, p.joursDit).replace(/\{MOIS\}/g, MOIS_MAJ(m)).replace(/\{ANNEE\}/g, y).replace(/\{CONGES\}\n?/g, p.phrases.length ? p.phrases.join('\n') + '\n' : '');
+  return {a: [].concat((modele && modele.a) || []), objet: sub((modele && modele.objet) || 'CRA {MOIS} {ANNEE}'), corps: sub((modele && modele.corps) || 'Bonjour,\n\nJ’ai {JOURS} jours sur ce mois.\n{CONGES}\n\nPeux-tu me transmettre le CRA du mois ?\n\nMerci d’avance.'), ...p};
+}
+export function createJours({file, agenda, claude = null, push = async () => [], now = Date.now, log = () => {}, heure = '12:00', retours = '/var/lib/hermes-portail-retours', mails = null}) {
   const lireFichier = () => {
     try { const j = JSON.parse(fs.readFileSync(file, 'utf8')); if (j && typeof j === 'object' && !Array.isArray(j)) return j; } catch (e) { if (e && e.code === 'ENOENT') return {}; }
     const cote = file.replace(/\.json$/, '') + '-illisible-' + new Date(now()).toISOString().slice(0, 19).replace(/[:T]/g, '-') + '.json';
@@ -425,6 +458,53 @@ export function createJours({file, agenda, claude = null, push = async () => [],
     }
   }
 
+  /* 0.85.0 (sa règle du 26/11/2026 : « les mails générés ne passent pas par Iris : JARVIS ou Hermes les envoient directement ») : les deux
+     mails du mois, préparés par JARVIS en brouillon dans sa boîte, montrés dans JARVIS avec « Envoyer ce mail » (son choix du 26/11 :
+     brouillon + bouton) :
+     - le mail du CRA à son contact du client, dès son oui sur ses congés à partir du 24 (avant : Chronos le 24) ; ses congés changent
+       ensuite : le brouillon est mis à jour ; déjà parti : il est prévenu ;
+     - le mail de prolongation à sa chargée de mission, quand le compte rendu du CRA du mois (Hermes, le 26) lit une fin de mission dans
+       le mois ; une fin le mois suivant : une simple alerte (règle de Chronos).
+     Les modèles (destinataire, objet, texte) sont sur son serveur (`travail.json`), jamais ici ; sans modèle, rien n'est préparé. Un mail
+     du même objet déjà envoyé (par lui, par Claude, depuis Gmail) n'est jamais refait. */
+  const retourMois = (ym) => { try { const f = path.join(retours, 'mois-' + ym + '.json'); if (!fs.lstatSync(f).isFile()) return null; const r = JSON.parse(fs.readFileSync(f, 'utf8')); return r && typeof r === 'object' ? r : null; } catch { return null; } };
+  const remplir = (s, v) => String(s || '').replace(/\{(\w+)\}/g, (m, k) => (Object.prototype.hasOwnProperty.call(v, k) ? v[k] : m));
+  async function mailCra(ym, auj) {
+    const x = M(ym), mod = ((mails && mails.modeles()) || {}).cra_client;
+    if (!mod || ![].concat(mod.a || []).length || x.etat !== 'valide' || !x.valide || !x.valide.jours) return;
+    const emp = x.valide.empreinte;
+    if (x.mailCra && (x.mailCra.empreinte === emp || x.mailCra.envoye)) {
+      if (x.mailCra.envoye && x.mailCra.empreinte !== emp && !x.mailCra.prevenu) { x.mailCra.prevenu = emp; noter(); await push({title: 'Tes congés ont changé après le mail du CRA', body: 'Le mail est déjà parti : préviens ton contact du client si le nombre de jours change.', url: '/#voir-jours-' + ym, tag: 'mail-cra-' + ym}).catch(() => {}); }
+      return;
+    }
+    const r = mailCraRempli(mod, ym, x.valide.jours, auj);
+    if (!x.mailCra && mails.envoye && await mails.envoye(r.objet).catch(() => false)) { x.mailCra = {envoye: true, empreinte: emp, at: now()}; x.historique.push({at: now(), quoi: 'mail du CRA déjà envoyé (Gmail)'}); noter(); return; }
+    let id = '';
+    if (x.mailCra && x.mailCra.draftId) {
+      try { await mails.majBrouillon({draftId: x.mailCra.draftId, to: r.a, subject: r.objet, body: r.corps}); id = x.mailCra.draftId; }
+      catch { x.mailCra = {...x.mailCra, envoye: true, prevenu: emp}; noter(); await push({title: 'Tes congés ont changé après le mail du CRA', body: 'Le brouillon n’existe plus (envoyé ?) : préviens ton contact du client si le nombre de jours change.', url: '/#voir-jours-' + ym, tag: 'mail-cra-' + ym}).catch(() => {}); return; }
+    } else { const d = await mails.brouillon({to: r.a, subject: r.objet, body: r.corps}); id = (d && d.id) || ''; }
+    if (!id) return;
+    x.mailCra = {draftId: id, empreinte: emp, at: now()}; x.historique.push({at: now(), quoi: 'mail du CRA préparé'}); noter();
+    await push({title: 'Mail du CRA prêt : ' + r.objet, body: TXT('À ' + r.a.join(', ') + '. ' + r.texte.replace(/\n/g, ' ') + ' Relis-le et envoie-le depuis JARVIS.', 230), url: '/#voir-brouillon-' + id, tag: 'mail-cra-' + ym}).catch(() => {});
+  }
+  async function mailProlongation(ym, t, dern) {
+    const x = M(ym), R = retourMois(ym), fin = R && /^\d{4}-\d{2}-\d{2}$/.test(String(R.fin || '')) ? R.fin : '';
+    if (!fin || x.mailProlong) return;
+    const finMois = ym + '-' + String(dern).padStart(2, '0'), suivant = plusJour(finMois, 1).slice(0, 7), finDit = fin.split('-').reverse().join('/');
+    if (fin > finMois) {
+      if (fin.slice(0, 7) === suivant && !x.alerteFin) { x.alerteFin = fin; noter(); await push({title: 'Fin de mission le ' + finDit, body: 'C’est le mois prochain : pense à la prolongation. Le mail sera préparé le 26 du mois prochain si rien ne change.', url: '/#travail', tag: 'fin-' + ym}).catch(() => {}); }
+      return;
+    }
+    const mod = ((mails && mails.modeles()) || {}).prolongation;
+    if (!mod || ![].concat(mod.a || []).length) return;
+    const v = {FIN: finDit, MOIS: MOIS[t.m - 1], ANNEE: String(t.y)}, objet = remplir(mod.objet || 'Prolongation mission', v), corps = remplir(mod.corps || '', v), a = [].concat(mod.a);
+    if (mails.envoye && await mails.envoye(objet).catch(() => false)) { x.mailProlong = {envoye: true, fin, at: now()}; noter(); return; }
+    const d = await mails.brouillon({to: a, subject: objet, body: corps}), id = (d && d.id) || ''; if (!id) return;
+    x.mailProlong = {draftId: id, fin, at: now()}; x.historique.push({at: now(), quoi: 'mail de prolongation préparé'}); noter();
+    await push({title: 'Fin de mission le ' + finDit + ' : mail de prolongation prêt', body: TXT('À ' + a.join(', ') + '. Relis-le et envoie-le depuis JARVIS.', 230), url: '/#voir-brouillon-' + id, tag: 'fin-' + ym}).catch(() => {});
+  }
+
   /* le 24 à midi (rattrapé jusqu'à la fin du mois si le serveur était arrêté) ; le dernier jour à midi, relu */
   const avertir = (ym, title, corps) => push({title, body: TXT(corps, 230), url: '/#voir-jours-' + ym, tag: 'jours-' + ym}).catch(() => {});
   let enTic = false;
@@ -448,6 +528,7 @@ export function createJours({file, agenda, claude = null, push = async () => [],
         x.envoye24 = t.ymd; noter(); await lire(ym);
         if (x.bilan && x.etat !== 'valide') await avertir(ym, 'Tes jours de ' + MOIS[t.m - 1], resume(x.bilan) + ' Ton oui sur tes congés sert au CRA du 26.');
       }
+      if (mails && t.d >= 24 && t.hm >= heure) { await mailCra(ym, t.ymd).catch((e) => log('jours : mail du CRA impossible (' + TXT((e && e.message) || e, 160) + ')')); await mailProlongation(ym, t, dern).catch((e) => log('jours : mail de prolongation impossible (' + TXT((e && e.message) || e, 160) + ')')); }
       if (t.d === dern && t.hm >= heure && x.verifFin !== t.ymd) {
         x.verifFin = t.ymd; noter(); await lire(ym);
         /* le raccourci a noté le dernier jour à 11 h : tout est connu, sauf oubli ; rien à dire si tout va bien (la note de télétravail part seule) */

@@ -90,7 +90,9 @@ export function startFakeGoogle() {
       if (p === '/gmail/users/me/drafts' && req.method === 'GET') return send(res, 200, {drafts: [{id: 'r-1', message: {id: 'm9', threadId: 'th9'}}]});
       if ((m = p.match(/^\/gmail\/users\/me\/drafts\/([^/]+)$/))) {
         if (req.method === 'DELETE') return send(res, 204);
-        return send(res, 200, {id: m[1], message: full({id: 'm9', threadId: 'th9', internalDate: '1763290000000', payload: {headers: [{name: 'To', value: 'Syndic <gestion@syndic.example>, autre@example.org'}, {name: 'Cc', value: 'copie@example.org'}, {name: 'Subject', value: 'Relance syndic'}]}}, 'Bonjour,\nJe me permets de vous relancer.')});
+        if (req.method === 'PUT') { F.brouillonsMaj = (F.brouillonsMaj || []).concat([{id: m[1], raw: (body.message || {}).raw || '', threadId: (body.message || {}).threadId || ''}]); return send(res, 200, {id: m[1], message: {id: 'mb-maj', threadId: (body.message || {}).threadId || '', labelIds: ['DRAFT']}}); }
+        if (m[1] === 'r-pj') return send(res, 200, {id: m[1], message: {id: 'm8', threadId: 'th8', internalDate: '1763290000000', payload: {mimeType: 'multipart/mixed', headers: [{name: 'To', value: 'x@example.org'}, {name: 'Subject', value: 'Avec pièce'}], parts: [{mimeType: 'text/plain', body: {data: b64u('Texte')}}, {mimeType: 'application/pdf', filename: 'devis.pdf', body: {attachmentId: 'a1', size: 1000}}]}}});
+        return send(res, 200, {id: m[1], message: full({id: 'm9', threadId: 'th9', internalDate: '1763290000000', payload: {headers: [{name: 'To', value: 'Syndic <gestion@syndic.example>, autre@example.org'}, {name: 'Cc', value: 'copie@example.org'}, {name: 'Subject', value: 'Relance syndic'}, {name: 'In-Reply-To', value: '<prec@syndic.example>'}, {name: 'References', value: '<debut@syndic.example> <prec@syndic.example>'}]}}, 'Bonjour,\nJe me permets de vous relancer.')});
       }
       if (p === '/gmail/users/me/drafts/send') return send(res, 200, {id: 'sent1', threadId: 'th9', labelIds: ['SENT']});
       if (p === '/gmail/users/me/messages/send') return send(res, 200, {id: 'sent2', threadId: 'th10', labelIds: ['SENT']});

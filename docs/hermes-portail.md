@@ -647,6 +647,35 @@ tant qu'une routine n'est pas basculée) :
   client (onglet du haut de la page de saisie) ; les mails par JARVIS (brouillon et bouton « Envoyer »). Pour
   novembre, les deux brouillons ont été préparés à la main dans Gmail le 26/11 au matin.
 
+**Le 26/11/2026 au matin, sur le serveur (une demande, son oui)** : dépôt `5b78104`, JARVIS 0.84.0 → 0.84.1, kit à jour
+(faille corrigée : le compte rendu n'est plus écrit chez JARVIS), **`cra.conf` posé** (le CRA de la semaine partira après
+son oui du vendredi 27/11). Feuille de la semaine, de nouveau à blanc : « Résultat CRA : blanc », la première des trois
+lignes identiques choisie, « 1 » du lundi au vendredi, rien tapé (1 min 41, 1,2 Go). **CRA du mois de novembre : à blanc
+propre** (statut « Saisie en cours », chaque jour déjà inscrit comme la consigne : 15 de mission, 5 congés, 1 absence
+fériée, rien à compléter ; fin de mission 30/11/2026), **puis validé en réel** : une validation, une confirmation, statut lu
+« Validé par vous » (et non « en attente » : la skill accepte les deux depuis), 2 min 31, 1 Go. Hermes n'a pas pu lire
+le motif de l'absence du 11 (non affiché). C'est la première exécution réelle d'Hermes à la place de Chronos : il la
+vérifie sur l'intranet. Les mails de novembre (à son contact du client : 15 jours, congés passés et à venir ; à sa
+chargée de mission : prolongation d'au moins 3 mois) sont partis de sa boîte le 26/11 au matin, après son oui (QCM),
+envoyés par Claude, sans Grok Bot. Depuis : `cra-mois` pose aussi son compte rendu (`mois-<AAAA-MM>.json` : résultat,
+fin de mission) dans le dossier de root pour l'espace « Travail » de JARVIS (en réel seulement) ; banc 127.
+**Sa règle du 26/11/2026** : les mails générés (demande du CRA, prolongation) ne passent jamais par Iris : JARVIS ou
+Hermes les envoient directement (« on remplace Grok Bot, on n'ajoute pas de dépendance »). Les congés à venir s'écrivent
+au futur (`mailCraPhrases` de JARVIS, 0.85.0).
+
+**Les routines de Chronos, une par une (26/11/2026, 8 h)** :
+
+| Routine de Chronos | Qui la fait maintenant | Reste |
+|---|---|---|
+| Validation des jours (le 24) | En pause chez Chronos ; JARVIS (bilan, son oui) | Rien |
+| CRA mensuel (le 26) | En pause chez Chronos ; Hermes, en réel (novembre validé le 26/11) | Déclenchement seul le 26 après son oui (`cra-mois` à brancher sur une minuterie, comme `cra-auto`) ; dépôt du CRA du client |
+| Mails du mois (le 24 et le 26) | JARVIS prépare le brouillon, il l'envoie depuis JARVIS (0.85.0) | Modèles à poser sur le serveur (`travail.json`) |
+| CRA hebdomadaire (vendredi) | En pause chez Chronos ; Hermes, en réel dès son oui du 27/11 | Sa vérification après la première exécution |
+| Note de télétravail (le 1er) | Chronos ; Hermes à blanc le 30/11 (en construction) | Comparer avec Chronos le 1/12, puis bascule |
+| Note de la box (le 15) | Chronos ; Hermes à blanc identique (25/11) | Déclenchement seul, champs par règles, puis bascule |
+| Note de l'abonnement Claude (le 21 et « Facture reçue ») | Chronos ; Hermes à blanc identique (25/11) | Déclenchement à la facture, puis bascule |
+| Note Grok Bot (le 4) | Chronos, jusqu'à l'arrêt de Grok (son choix) | Rien |
+
 **Le mois, au complet (ses précisions et QCM du 26/11/2026, nuit)** : la validation du 24 et le CRA du 26 de Chronos
 font aussi deux mails et un rattachement, pas encore chez Hermes ; ces deux routines de Chronos ne se mettent pas en
 pause avant que tout ceci marche :

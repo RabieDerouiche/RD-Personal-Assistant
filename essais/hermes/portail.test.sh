@@ -365,6 +365,8 @@ ok = ok and 'mercredi 11/11/2026 : férié' in t and 'lundi 23/11/2026 : congé'
 sys.exit(0 if ok else 1)
 PY"
 verif "cra-mois : jours vides complétés (journée, demi-journées), une seule validation ; « validee », fin de mission lue, mois noté à root" bash -c "[ $rc = 0 ] && grep -q 'Résultat CRA du mois : validee' $T/mois.log && grep -q 'Fin de mission lue : 2026-11-30' $T/mois.log && [ \"\$(grep -c CRA-MOIS-VALIDER $T/traces/portail.jsonl)\" = 1 ] && [ \"\$(grep -c CRA-MOIS-CASE $T/traces/portail.jsonl)\" = 7 ] && grep CRA-MOIS-VALIDER $T/traces/portail.jsonl | grep -q '\"2026-11-24\": \[\"Congé payé\", \"Mission\"\]' && grep -q '^2026-11 .* validee$' /var/lib/hermes-portail/cra/mois-valides.txt && [ \"\$(stat -c '%U %a' /var/lib/hermes-portail/cra/mois-valides.txt)\" = 'root 600' ]"
+RM=/var/lib/hermes-portail-retours/mois-2026-11.json
+verif "cra-mois : compte rendu pour l'espace Travail de JARVIS (dossier de root, 640 : validé, fin de mission), rien chez JARVIS" bash -c "[ \"\$(stat -c '%U %a' $RM)\" = 'root 640' ] && python3 -I -c \"import json,sys; r=json.load(open('$RM')); sys.exit(0 if r['resultat']=='validee' and r['fin']=='2026-11-30' and r['mois']=='2026-11' else 1)\""
 n0=$(wc -l < $T/traces/portail.jsonl)
 HERMES_BANC_AUJOURDHUI=2026-11-26 HERMES_BANC_CONSIGNE_EN_PLUS=$T/mois-suite.txt bash /usr/local/sbin/hermes-portail cra-mois $FA --mois 2026-11 --conges 2026-11-23 > $T/mois2.log 2>&1; rc=$?
 verif "cra-mois : un mois déjà validé par Hermes ne repart jamais (refus avant tout passage)" bash -c "[ $rc != 0 ] && grep -q 'déjà été validé' $T/mois2.log && [ \"\$(wc -l < $T/traces/portail.jsonl)\" = $n0 ]"
@@ -377,7 +379,8 @@ FIN
 : > $T/traces/modele.jsonl; n0=$(wc -l < $T/traces/portail.jsonl)
 HERMES_BANC_AUJOURDHUI=2026-10-05 HERMES_BANC_CONSIGNE_EN_PLUS=$T/mois-blanc.txt bash /usr/local/sbin/hermes-portail cra-mois $FA --mois 2026-10 --a-blanc > $T/mois-blanc.log 2>&1; rc=$?
 verif "cra-mois --a-blanc : « MODE CRA DU MOIS À BLANC », possible avant le 24 ; un « validé » à blanc compte pour un échec ; rien noté chez root ni cliqué" bash -c "[ $rc = 4 ] && grep -q 'Résultat CRA du mois : echec' $T/mois-blanc.log && grep -q 'MODE CRA DU MOIS À BLANC' $T/traces/modele.jsonl && ! grep -q '^2026-10' /var/lib/hermes-portail/cra/mois-valides.txt && ! tail -n +\$(( $n0 + 1 )) $T/traces/portail.jsonl | grep -q 'CRA-MOIS-'"
-rm -f /var/lib/hermes-portail/cra/mois-valides.txt
+verif "cra-mois --a-blanc : aucun compte rendu pour JARVIS" bash -c "[ ! -e /var/lib/hermes-portail-retours/mois-2026-10.json ]"
+rm -f /var/lib/hermes-portail/cra/mois-valides.txt; rm -rf /var/lib/hermes-portail-retours
 
 echo "== Ce qu'Hermes apprend d'un portail"
 N=/var/lib/hermes-portail/notes/127.0.0.1.txt

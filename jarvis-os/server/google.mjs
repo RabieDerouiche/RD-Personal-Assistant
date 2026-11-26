@@ -280,7 +280,7 @@ export function createGoogle({S, save, log = () => {}}) {
         const j = await api('GET', `${URLS.gmail}/users/me/drafts?${q}`);
         if (!(j.drafts || []).length) return {};
         const drafts = await pool(j.drafts, 8, async (d) => { const x = await api('GET', `${URLS.gmail}/users/me/drafts/${enc(d.id)}?format=full`), m = x.message || {}; const o = mailMsg(m, true);
-          return {id: x.id, threadId: m.threadId, toRecipients: o.toRecipients, ccRecipients: addrs(hdr(m, 'Cc')).map((a) => a.emailAddress), date: o.date, subject: o.subject, plaintextBody: o.plaintextBody, viewUrl: 'https://mail.google.com/mail/#drafts?compose=' + m.id}; });
+          return {id: x.id, threadId: m.threadId, toRecipients: o.toRecipients, ccRecipients: addrs(hdr(m, 'Cc')).map((a) => a.emailAddress), date: o.date, subject: o.subject, plaintextBody: o.plaintextBody, pieces: (o.attachments || []).map((a) => a.filename), viewUrl: 'https://mail.google.com/mail/#drafts?compose=' + m.id}; });
         return {drafts};
       },
       send_message: (i) => i.draftId ? api('POST', `${URLS.gmail}/users/me/drafts/send`, {id: i.draftId}) : api('POST', `${URLS.gmail}/users/me/messages/send`, {raw: rawMail(i)}),
@@ -293,6 +293,21 @@ export function createGoogle({S, save, log = () => {}}) {
         }
         const x = await api('POST', `${URLS.gmail}/users/me/drafts`, {message: {raw: rawMail({...i, ...suite}), ...(i.threadId ? {threadId: String(i.threadId)} : {})}}), m = x.message || {};
         return {id: x.id || '', messageId: m.id || '', threadId: m.threadId || '', viewUrl: m.id ? 'https://mail.google.com/mail/#drafts?compose=' + m.id : ''};
+      },
+      /* 0.85.0 (sa demande du 26/11/2026 : « modifier les brouillons dans JARVIS et les envoyer après ») : destinataires, objet et texte
+         remplacés, le fil et ses en-têtes de réponse gardés. Un brouillon avec pièce jointe se modifie dans Gmail (le texte seul la perdrait) */
+      update_draft: async (i) => {
+        const adr = (v) => [].concat(v == null ? [] : v).map((x) => String(x).trim()).filter(Boolean);
+        const x = await api('GET', `${URLS.gmail}/users/me/drafts/${enc(i.draftId)}?format=full`), m = x.message || {};
+        if (piecesDe(m.payload).length) { const e = new Error('Ce brouillon a une pièce jointe : modifie-le dans Gmail, pour ne pas la perdre.'); e.code = 'pieces_jointes'; e.status = 409; throw e; }
+        const o = mailMsg(m, true), to = i.to != null ? adr(i.to) : o.toRecipients, cc = i.cc != null ? adr(i.cc) : addrs(hdr(m, 'Cc')).map((a) => a.emailAddress);
+        const mauvaise = [...to, ...cc].find((a) => !/^[^\s@<>(),;:"\\]+@[^\s@<>(),;:"\\]+\.[a-z]{2,}$/i.test(a));
+        if (mauvaise) { const e = new Error('Adresse invalide : ' + mauvaise.slice(0, 80)); e.code = 'adresse'; e.status = 400; throw e; }
+        if (to.length > 20 || cc.length > 20) { const e = new Error('Trop de destinataires (20 au plus).'); e.code = 'adresse'; e.status = 400; throw e; }
+        const subject = uneLigne(i.subject != null ? String(i.subject) : o.subject).slice(0, 300), body = (i.body != null ? String(i.body) : o.plaintextBody || '').replace(/\r\n?/g, '\n').slice(0, 60000);
+        const irt = hdr(m, 'In-Reply-To'), refs = String(hdr(m, 'References') || '').split(/\s+/).filter((r) => r && r !== irt).join(' ');
+        const y = await api('PUT', `${URLS.gmail}/users/me/drafts/${enc(i.draftId)}`, {id: i.draftId, message: {raw: rawMail({to, cc, subject, body, inReplyTo: irt, references: refs}), ...(m.threadId ? {threadId: m.threadId} : {})}}), n = y.message || {};
+        return {id: y.id || i.draftId, messageId: n.id || '', threadId: n.threadId || m.threadId || '', toRecipients: to, ccRecipients: cc, subject, plaintextBody: body};
       },
       delete_draft: (i) => api('DELETE', `${URLS.gmail}/users/me/drafts/${enc(i.draftId)}`),
       unlabel_thread: (i) => api('POST', `${URLS.gmail}/users/me/threads/${enc(i.threadId)}/modify`, {removeLabelIds: [].concat(i.labelIds || [])})
