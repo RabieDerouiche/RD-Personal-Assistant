@@ -606,7 +606,6 @@ HERMES_BANC_AUJOURDHUI=2026-11-30 HERMES_BANC_CONSIGNE_EN_PLUS=$T/tt-suite-elec.
 verif "teletravail complet : facture rapportée par Hermes (consigne : la facture émise en novembre 2026, lecture seule), dépense à blanc, « Résultat télétravail : blanc »" bash -c "[ $rc = 0 ] && grep -q 'Résultat télétravail : blanc' $T/tt5.log && grep -q 'Fichier rapporté' $T/tt5.log && grep -q 'celle émise en novembre 2026' $T/traces/modele.jsonl && grep -q 'Téléchargement permis' $T/traces/modele.jsonl"
 verif "teletravail complet : la dépense est remplie avec le justificatif unique puis annulée ; le portail n'a rien enregistré ni soumis" bash -c "grep -q 'MODE À BLANC' $T/traces/modele.jsonl && grep -q 'Montant TTC : 14,44' $T/traces/modele.jsonl && grep -q '\"evenement\": \"formulaire\"' $T/traces/portail.jsonl && ! grep -q 'ENREGISTREE\|SOUMISSION' $T/traces/portail.jsonl && [ ! -e /var/lib/hermes-portail-depot/justificatif.pdf ]"
 verif "teletravail : le mois est gardé à root pour le garde-fou du mois suivant (600)" bash -c "[ \"\$(stat -c '%U %a' /var/lib/hermes-portail/teletravail/historique.json)\" = 'root 600' ] && python3 -I -c \"import json; h=json.load(open('/var/lib/hermes-portail/teletravail/historique.json')); assert h['2026-11']['a_blanc'] is True\""
-unset HERMES_BANC_JARVIS_U HERMES_BANC_JARVIS_SRV HERMES_BANC_JARVIS_DATA
 echo "== Note de télétravail : la minuterie du dernier jour (à blanc, compte rendu pour JARVIS)"
 rm -rf /var/lib/hermes-portail-retours; rm -f /var/lib/hermes-portail/teletravail/tentes.txt
 HERMES_BANC_AUJOURDHUI=2026-11-29 bash /usr/local/sbin/hermes-portail teletravail-auto > $T/tta0.log 2>&1; rc=$?
@@ -621,6 +620,7 @@ verif "teletravail-auto : une seule tentative par mois" bash -c "[ $rc = 0 ] && 
 rm -f /etc/hermes-portail/teletravail.conf
 verif "teletravail-auto : sans teletravail.conf, rien" bash -c "HERMES_BANC_AUJOURDHUI=2026-12-31 bash /usr/local/sbin/hermes-portail teletravail-auto > /dev/null 2>&1 && ! grep -q 2026-12 /var/lib/hermes-portail/teletravail/tentes.txt"
 rm -rf /var/lib/hermes-portail-retours
+unset HERMES_BANC_JARVIS_U HERMES_BANC_JARVIS_SRV HERMES_BANC_JARVIS_DATA
 rm -f /etc/hermes-portail/teletravail.conf /etc/hermes-portail/teletravail-champs.txt; rm -rf /var/lib/hermes-portail/teletravail
 
 echo "== Garde-fous de la commande"
