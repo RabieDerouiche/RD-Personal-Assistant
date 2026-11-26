@@ -521,6 +521,24 @@
   /* 0.23.0 : la météo de l'accueil (en vrai : Open-Meteo, à la position de l'iPhone) */
   window.__METEO = {current: {temperature_2m: 9.4, apparent_temperature: 6.2, weather_code: 3}, daily: {time: [fr(D(0)), fr(D(1))], weather_code: [3, 61], temperature_2m_min: [4, 2], temperature_2m_max: [11, 7], precipitation_probability_max: [10, 70]}};
   window.__G = G; window.__MAIL = MAIL; window.__CAL = CAL;
+  /* 0.92.0 : les routines d'Hermes en direct (données inventées, même forme que GET /api/hermes/routines) ; elles ne sont pas celles de
+     l'onglet Routines plus haut (« Semaine à venir » n'y est plus) : la page ne doit montrer que celles-ci. SCEN.hermesIndispo : résumé indisponible */
+  if (SCEN.grokOff) {
+    /* la dernière occurrence passée (sens -1) ou la prochaine (sens 1) d'un horaire : jours de la semaine (0 = dimanche ; null = tous), heures */
+    const hrOcc = (jours, heures, sens) => { for (let k = 0; k < 9; k++) { const c = [];
+      heures.forEach(([hh, mi]) => { const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + sens * k, hh, mi); if ((!jours || jours.includes(d.getDay())) && (sens < 0 ? d <= now : d > now)) c.push(+d); });
+      if (c.length) return new Date(sens < 0 ? Math.max(...c) : Math.min(...c)).toISOString().slice(0, 19) + 'Z'; } return null; };
+    const hr = (nom, libelle, moment, mode, jours, heures, plus) => Object.assign({nom, libelle, moment, mode, posee: true, active: true, dernier: hrOcc(jours, heures, -1), resultat: 'ok', cause: null, prochain: hrOcc(jours, heures, 1)}, plus || {});
+    window.__HERMES_ROUTINES = SCEN.hermesIndispo
+      ? {disponible: false, code: 'vieux', raison: 'dernière écriture du résumé à 07 h 52 : plus de 30 minutes (la relance d’Hermes, hermes-relance, ne passe plus)'}
+      : {disponible: true, at: +now - 4 * 60000, passerelle: 'active', garde: {etat: 'coupé', jusqua: '2026-12-03'}, routines: [
+        hr('veille-du-matin', 'Veille du matin', 'du lundi au vendredi à 7 h 40', 'réel', [1, 2, 3, 4, 5], [[7, 40]]),
+        hr('bilan-hebdo', 'Bilan de la semaine', 'le lundi à 8 h 50', 'réel', [1], [[8, 50]]),
+        hr('reveil', 'Réveil', 'chaque jour à 9 h 15, 13 h 15 et 18 h 15', 'réel', null, [[9, 15], [13, 15], [18, 15]]),
+        hr('digest-ia', 'Digest IA et .NET', 'le lundi à 9 h 10', 'double', [1], [[9, 10]], {active: false, dernier: null, resultat: 'jamais', prochain: null}),
+        hr('prix-suivis', 'Prix suivis', 'chaque jour à 9 h', 'réel', null, [[9, 0]], {resultat: 'erreur', cause: 'limite du forfait'}),
+        hr('sorties-du-week-end', 'Sorties du week-end', 'le jeudi à 19 h', 'réel', [4], [[19, 0]])]};
+  }
   /* 0.85.0 : l'espace « Travail » de la maquette (données inventées, même forme que GET /api/travail) */
   /* 0.86.0 : une note de frais d'Hermes à valider (données inventées, même forme que GET /api/jours/notes) */
   if (SCEN.notes) window.__NOTES = {notes: [{cle: 'box:2026-11', sorte: 'box', mois: '2026-11', nom: 'Note de la box', etat: 'a_valider', valide: false, montant: 39, date: '2026-11-05', jours: null,

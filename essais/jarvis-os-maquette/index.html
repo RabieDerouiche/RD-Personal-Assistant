@@ -11552,6 +11552,118 @@ void main(){
         + '.hmh-r{list-style:none;margin:0;padding:0;display:grid;gap:8px}.hmh-r li{display:grid;gap:2px;padding:11px 14px;border-radius:16px;border:1px solid rgba(var(--c1),.2);background:rgba(255,255,255,.03)}.hmh-r small{color:var(--muted);font-size:13px}'}));
     }
 
+    /* ================= 0.92.0 : Hermes et ses routines en direct (sa remarque du 26/11/2026 : la page ne montrait qu'une ligne périmée de
+       l'onglet Routines de Pilotage). Les vraies routines sont dans le cron d'Hermes : sur le serveur, root en écrit un résumé assaini toutes
+       les 10 minutes, JARVIS le relit (GET /api/hermes/routines) et l'app le montre : la page « Hermes et ses routines », la tuile d'Espaces
+       et Équipe › Routines. Résumé absent, illisible ou de plus de 30 minutes : « indisponible » avec la raison, jamais une liste périmée
+       (Grok arrêté, plus aucun repli sur les lignes Bot = Hermes de l'onglet Routines de Pilotage). Les « Routines de JARVIS » (celles du
+       serveur) ne changent pas. Comme 0.86.0 et 0.87.0, rien n'est réécrit : ce bloc range ce qui existe. Il suit le bloc 0.86.0, dont il
+       remplace la lecture de Pilotage ; le bloc 0.87.0, plus bas, continue d'envelopper Équipe. ================= */
+    {
+      const HR = {data: null, at: 0, loading: null};
+      const hrAPI = () => (SRV_OS && window.JarvisServeur && window.JarvisServeur.hermesRoutines ? window.JarvisServeur.hermesRoutines : null);
+      const HR_SANS = {disponible: false, code: 'serveur', raison: 'le serveur de JARVIS ne répond pas'};
+      /* lu au plus toutes les 30 secondes ; la page n'est redessinée que si le résumé a changé, jamais pendant une saisie */
+      function hrLoad(force) {
+        const api = hrAPI();
+        if (!GOFF.on || HR.loading || (!force && HR.data && Date.now() - HR.at < 30000)) return HR.loading;
+        if (SRV_OS ? !api : !window.__HERMES_ROUTINES) { HR.data = {disponible: false, code: 'source', raison: 'cette page n’a pas de quoi lire les routines d’Hermes'}; HR.at = Date.now(); return null; }
+        const avant = JSON.stringify(HR.data);
+        HR.loading = (api ? api() : Promise.resolve(JSON.parse(JSON.stringify(window.__HERMES_ROUTINES))))
+          .then((d) => { HR.data = d && typeof d === 'object' && typeof d.disponible === 'boolean' ? d : HR_SANS; }).catch(() => { HR.data = HR_SANS; })
+          .finally(() => { HR.at = Date.now(); HR.loading = null; const a = document.activeElement;
+            if (JSON.stringify(HR.data) !== avant && (TAB === 'equipe' || TAB === 'espaces') && !(a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName))) renderView(true); });
+        return HR.loading;
+      }
+      setInterval(() => { if (GOFF.on && !document.hidden && (TAB === 'equipe' || TAB === 'espaces')) hrLoad(); }, 60000);
+      /* ce que la page montre : le résumé s'il est frais, sinon « indisponible » et pourquoi ; null = première lecture en cours */
+      const hrVue = () => { const d = HR.data; if (!d) return null;
+        if (d.disponible && (!Array.isArray(d.routines) || Date.now() - d.at > 35 * 60000)) return {disponible: false, code: 'vieux', raison: 'le résumé lu a plus de 30 minutes'};
+        return d; };
+      const hrQuand = (iso) => { const d = iso ? new Date(iso) : null; if (!d || isNaN(d)) return '';
+        const n = new Date(), k = Math.round((new Date(d.getFullYear(), d.getMonth(), d.getDate()) - new Date(n.getFullYear(), n.getMonth(), n.getDate())) / 864e5);
+        return (k === 0 ? 'aujourd’hui' : k === -1 ? 'hier' : k === 1 ? 'demain' : fmt(d, {weekday: 'short', day: 'numeric', month: 'short'}).replace(/\./g, '')) + ' à ' + hm(d); };
+      const hrRes = (r) => (!r.posee ? ['pas posée chez Hermes', 'is-demande'] : r.resultat === 'ok' ? ['réussi', 'is-ok'] : r.resultat === 'erreur' ? ['en erreur' + (r.cause && r.cause !== 'erreur' ? ' : ' + r.cause : ''), 'is-demande'] : ['jamais passée', '']);
+      const hrProchain = (r) => (!r.posee ? 'aucun' : !r.active ? 'en pause' : r.prochain ? hrQuand(r.prochain) : 'pas encore calculé');
+      const hrMaj = (m) => String(m || '').replace(/^./, (c) => c.toUpperCase());
+      const HR_PAS = {active: 'en marche', 'arrêtée': 'arrêtée', 'plantée': 'plantée', 'démarre': 'en train de démarrer', inconnue: 'état inconnu'};
+      const hrGarde = (g) => (!g ? '' : g.etat === 'coupé' ? 'coupé' + (g.jusqua ? ' jusqu’au ' + fmt(new Date(g.jusqua + 'T12:00:00'), {day: 'numeric', month: 'long'}) : '') : g.etat === 'a arrêté Hermes' ? 'a arrêté Hermes (forfait au-dessus du seuil)' : g.etat === 'actif' ? 'actif' : g.etat === 'arrêté' ? 'arrêté' : 'état inconnu');
+      const hrDernier = (v) => v.routines.filter((r) => r.dernier).sort((a, b) => (a.dernier < b.dernier ? 1 : -1))[0];
+      const hrSuivant = (v) => v.routines.filter((r) => r.active && r.prochain).sort((a, b) => (a.prochain < b.prochain ? -1 : 1))[0];
+      const hrIndispo = (v) => h('p', {class: 'empty hr-indispo', text: v ? 'Routines d’Hermes indisponibles : ' + v.raison + '.' : 'Lecture des routines d’Hermes…'});
+      /* 1. la page « Hermes et ses routines » : sa carte (passerelle, garde du forfait, dernier et prochain passage) et ses routines, en direct */
+      const hrLigne = (r) => { const [res, cls] = hrRes(r);
+        return h('li', {class: 'hr-li' + (r.resultat === 'erreur' || !r.posee ? ' ko' : ''), 'data-hr': r.nom},
+          h('div', {class: 'hr-t'}, h('b', {text: r.libelle}), h('span', {class: 'pill hr-mode' + (r.mode === 'réel' ? ' is-ok' : ''), text: r.mode === 'réel' ? 'réel' : 'en double'})),
+          h('small', {class: 'hr-m', text: hrMaj(r.moment)}),
+          h('small', {class: 'hr-d'}, 'Dernier passage : ' + (r.dernier ? hrQuand(r.dernier) + ' · ' : ''), h('span', {class: 'hr-res ' + cls, text: res})),
+          h('small', {class: 'hr-p', text: 'Prochain passage : ' + hrProchain(r)})); };
+      function hrPage(el) {
+        const hero = el.querySelector('.hm-hermes'); if (!hero) return;
+        const v = hrVue(), dl = hero.querySelector('.hmh-l'), lignes = [];
+        /* de Pilotage, seule sa dernière note reste (datée) : le dernier et le prochain passage viennent du direct */
+        const note = {}; if (dl) dl.querySelectorAll('div').forEach((d) => { const k = d.querySelector('dt'), x = d.querySelector('dd'); if (k && x) note[k.textContent] = x.textContent; });
+        if (!v) lignes.push(['En direct', 'lecture en cours…']);
+        else if (!v.disponible) { lignes.push(['En direct', 'indisponible : ' + v.raison]); if (v.passerelle) lignes.push(['Passerelle', HR_PAS[v.passerelle] || 'état inconnu']); if (v.garde) lignes.push(['Garde du forfait', hrGarde(v.garde)]); }
+        else { const d = hrDernier(v), s = hrSuivant(v);
+          lignes.push(['Passerelle', HR_PAS[v.passerelle] || 'état inconnu'], ['Garde du forfait', hrGarde(v.garde)],
+            ['Dernier passage', d ? hrQuand(d.dernier) + ' · ' + d.libelle + ' · ' + hrRes(d)[0] : 'aucun pour le moment'], ['Prochain', s ? hrQuand(s.prochain) + ' · ' + s.libelle : 'aucun de prévu']); }
+        if (note['Ce qu’il a fait']) lignes.push(['Sa dernière note', note['Ce qu’il a fait'] + (note['Dernier passage'] ? ' (Pilotage, ' + note['Dernier passage'] + ')' : '')]);
+        const neuf = h('dl', {class: 'hmh-l hr-dl'}, lignes.filter((x) => x[1]).map(([k, t]) => h('div', {}, h('dt', {text: k}), h('dd', {text: t}))));
+        if (dl) dl.replaceWith(neuf); else hero.querySelector('.hmh-t').after(neuf);
+        const pn = [...el.querySelectorAll('section.panel')].find((x) => { const t = x.querySelector('.panel-h h2'); return !!t && t.textContent.trim() === 'Ses routines'; }); if (!pn) return;
+        [...pn.children].forEach((n) => { if (!n.classList.contains('panel-h')) n.remove(); });
+        const as = pn.querySelector('.panel-h .aside'), ok = !!v && v.disponible;
+        if (as) as.textContent = ok ? v.routines.length + ' · à jour à ' + hm(new Date(v.at)) : v ? 'indisponible' : '';
+        pn.id = 'hr-routines';
+        pn.append(ok ? (v.routines.length ? h('ul', {class: 'hmh-r hr-list'}, v.routines.map(hrLigne)) : h('p', {class: 'empty', text: 'Aucune routine posée chez Hermes.'})) : hrIndispo(v));
+      }
+      /* 2. Équipe › Routines : les lignes d'Hermes viennent du direct (un panneau « Hermes »), plus jamais de Pilotage ; celles de JARVIS restent */
+      const hrPas = (label, txt, cls) => h('li', {class: 'trk ' + cls}, h('span', {class: 'trk-dot'}), h('div', {}, h('b', {text: label}), h('small', {text: txt})));
+      function hrRoutines(el) {
+        const v = hrVue(), ok = !!v && v.disponible, nav = el.querySelector('.auto-jump'), lead = el.querySelector('p.lead');
+        if (lead && /^Aucune routine lue dans Pilotage/.test(lead.textContent)) lead.remove();
+        const s = ok ? hrSuivant(v) : null;
+        const puce = h('button', {type: 'button', class: 'aj hr-aj', onclick: () => { const t = document.getElementById('auto-hermes'); if (t) t.scrollIntoView({behavior: 'smooth', block: 'start'}); }},
+          h('span', {}, h('b', {text: 'Hermes'}), h('small', {text: ok ? (v.routines.length > 1 ? v.routines.length + ' routines · ' : '') + (s ? hrQuand(s.prochain) : 'en direct') : v ? 'indisponible' : 'lecture…'})));
+        const cartes = ok ? v.routines.map((r) => { const [res] = hrRes(r), bon = r.posee && r.active;
+          return h('article', {class: 'auto card', 'data-hr': r.nom},
+            h('div', {class: 'auto-h'}, h('b', {text: r.libelle}), h('span', {class: 'pill' + (bon ? ' is-ok' : ' is-demande'), text: !r.posee ? 'Pas posée' : !r.active ? 'En pause' : r.mode === 'réel' ? 'En réel' : 'En double'})),
+            h('ol', {class: 'track'}, hrPas('Programmée', hrMaj(r.moment) || 'horaire inconnu', 'done'),
+              hrPas('Dernier passage', (r.dernier ? hrQuand(r.dernier) + ' · ' : '') + res, r.resultat === 'ok' ? 'done' : 'todo'),
+              hrPas('Prochain passage', hrProchain(r), 'next'))); }) : [hrIndispo(v)];
+        const pn = Object.assign(panel('Hermes', h('span', {class: 'aside', text: ok ? 'en direct · à jour à ' + hm(new Date(v.at)) : v ? 'indisponible' : ''}), cartes), {id: 'auto-hermes'});
+        if (nav) { nav.prepend(puce); nav.after(pn); } else el.append(pn);
+      }
+      const VEQ92 = VIEWS.equipe;
+      VIEWS.equipe = (el) => {
+        if (!GOFF.on || (typeof AGENT !== 'undefined' && AGENT)) { VEQ92(el); return; }
+        const tous = S.rout; S.rout = (tous || []).filter((r) => !/^hermes$/i.test(String(r['Bot'] || '').trim()));
+        try { VEQ92(el); } finally { S.rout = tous; }
+        hrLoad();
+        const on = el.querySelector('.ux-seg [aria-pressed="true"]'), k = on ? on.dataset.f : 'bots';
+        if (k === 'rout') hrRoutines(el); else if (k !== 'dem') hrPage(el);
+      };
+      /* 3. la tuile d'Espaces : le nombre de routines en direct et la prochaine, ce qui cloche d'abord ; ou « Indisponible » et pourquoi */
+      const VE92 = VIEWS.espaces;
+      VIEWS.espaces = (el) => {
+        VE92(el); if (!GOFF.on) return;
+        hrLoad();
+        const tl = el.querySelector('.esp-tile[data-go="equipe"]'), tv = tl && tl.querySelector('.esp-v'), ts = tl && tl.querySelector('.esp-s'); if (!tv || !ts) return;
+        const v = hrVue(); ts.classList.add('hr-clip');
+        if (!v) { tv.textContent = 'Hermes'; ts.textContent = 'lecture de ses routines…'; return; }
+        if (!v.disponible) { tv.textContent = 'Indisponible'; ts.textContent = v.raison; return; }
+        const n = v.routines.length, err = v.routines.filter((r) => r.resultat === 'erreur'), s = hrSuivant(v);
+        tv.textContent = n + (n > 1 ? ' routines' : ' routine');
+        ts.textContent = v.passerelle !== 'active' ? 'passerelle ' + (HR_PAS[v.passerelle] || 'état inconnu') : err.length ? 'en erreur : ' + err.map((r) => r.libelle).join(', ') : s ? 'prochaine : ' + s.libelle + ', ' + hrQuand(s.prochain) : 'en direct';
+      };
+      document.head.append(h('style', {id: 'ux-0920', text: ''
+        + '.hr-li .hr-t{display:flex;align-items:center;justify-content:space-between;gap:8px}.hr-li .hr-t b{min-width:0}.hr-li.ko{border-color:rgba(var(--warn),.5)}'
+        + '.hr-li .hr-mode{flex:0 0 auto}.hr-res.is-ok{color:var(--green);font-weight:600}.hr-res.is-demande{color:#fde68a;font-weight:600}'
+        + '.hr-indispo{padding:14px 16px;border-radius:16px;border:1px solid rgba(var(--warn),.45);background:rgba(var(--warn),.07);color:var(--fg);text-align:left}'
+        + '.esp-s.hr-clip{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}'}));
+    }
+
     /* ================= 0.87.0 : suite de la refonte UX (ses choix au QCM du 26/11/2026).
        Grok arrêté : les cartes de « Pour moi » des anciens bots sont confiées à Hermes (une ligne « Reprise » pour lui dans le Canal, une seule
        par demande ; elles disent « Hermes ») ; le filtre Routines d'Équipe ne montre que celles d'Hermes et de JARVIS.

@@ -394,6 +394,8 @@
     /* veilleur de santé du serveur (0.16.0) : accès Google, Claude, sauvegarde, lecture de Pilotage, notifications */
     sante: () => req('/api/sante').then((r) => (r.status === 200 ? r.j : null)).catch(() => null),
     santeMaintenant: () => req('/api/sante/maintenant', {}).then((r) => (r.status === 200 ? r.j : null)).catch(() => null),
+    /* 0.92.0 : « Hermes et ses routines » en direct (le résumé du cron d'Hermes écrit par root, relu par le serveur) ; null = pas de réponse */
+    hermesRoutines: () => req('/api/hermes/routines').then((r) => (r.status === 200 ? r.j : r.status === 404 ? {disponible: false, code: 'ancien', raison: 'le serveur de JARVIS n’est pas encore à jour (0.92.0)'} : null)).catch(() => null),
     /* missions de Claude (0.15.0) : lancer une mission longue, suivre les dernières ; notification à la fin */
     mission: (texte, parent) => req('/api/mission', parent ? {texte, parent} : {texte}).then((r) => { try { if (r.j && r.j.ok && window.JarvisActivite) setTimeout(window.JarvisActivite, 300); } catch (e) { /* rien */ } return r.j; }).catch(() => ({ok: false, error: 'Serveur injoignable.'})),   /* 0.33.0 : visible tout de suite dans l'activité */
     /* cartes mises de côté (0.20.0) : liste, ajout (avec ou sans date de retour), retrait */

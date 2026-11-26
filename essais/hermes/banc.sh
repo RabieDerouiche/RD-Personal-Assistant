@@ -265,6 +265,7 @@ pkill -f "faux_services.py $PM"
 cp -p $T/config.avant $HH/config.yaml; cp -p $T/env.avant $HH/.env
 rm -f /etc/hermes/jarvis.env; HERMES_BANC=1 bash "$KIT/install.sh" > $T/install-fin.log 2>&1   # le conteneur repart sans liaison
 nft delete table inet hermes_sortie 2>/dev/null
+rm -rf /var/lib/hermes-relance-etat   # 0.92.0 : sinon un serveur JARVIS lancé par un autre banc dans ce conteneur y verrait un Hermes installé sans résumé
 echo
 echo "Banc d'Hermes : $ok vérifications réussies, $ko en échec."
 [ $ko = 0 ]
