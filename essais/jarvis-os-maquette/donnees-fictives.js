@@ -535,4 +535,12 @@
       {id: 'box', bloc: 'frais', titre: 'Box internet', qui: 'chronos', quiDit: 'Chronos', prochaine: 'mar. 15/12', etapes: [['Facture téléchargée', 'fait'], ['Dépense à blanc', 'fait'], ['Identique à Chronos', 'fait'], ['Part seule', ''], ['Bascule', '']], derniere: {quand: '15/11', quoi: 'dépense créée', par: 'Chronos', ok: true}, ouvrir: 'note'},
       {id: 'teletravail', bloc: 'frais', titre: 'Télétravail', qui: 'chronos', quiDit: 'Chronos le 1er · Hermes à blanc le dernier jour', prochaine: 'lun. 30/11', etapes: [['Jours (JARVIS)', 'fait'], ['Électricité', ''], ['Charges et pièces', ''], ['PDF', ''], ['À blanc', '']], derniere: {quand: '01/11', quoi: 'octobre, remboursée', par: 'Chronos', ok: true}, ouvrir: 'note'},
       {id: 'grok', bloc: 'frais', titre: 'Grok Bot', qui: 'chronos', quiDit: 'Chronos', prochaine: 'ven. 04/12', etapes: [['Chronos jusqu’à l’arrêt de Grok', 'fait']], derniere: {quand: '04/11', quoi: 'dépense créée', par: 'Chronos', ok: true}, ouvrir: 'note'}]};
+  /* 0.94.0 : les réponses aux deux mails du mois sont arrivées (données inventées, même forme que GET /api/travail) */
+  if (SCEN.reponses) Object.assign(window.__TRAVAIL.routines.find((r) => r.id === 'mois'), {mois: '2026-11', etapes: [['Congés validés', 'fait'], ['Mail au client', 'fait'], ['CRA validé', 'fait'], ['CRA du client reçu', 'fait'], ['Rattaché', 'encours']],
+    alerte: 'Fin de mission le 30/11/2026. Réponse à ton mail de prolongation reçue le 26/11 à 16 h 20 : à lire.', attend: ['CRA signé reçu : à rattacher', 'Réponse à ton mail de prolongation : à lire'], rattachable: true,
+    toi: 'CRA signé reçu : à rattacher sur le portail (onglet du haut de la page du CRA). Réponse à ton mail de prolongation : à lire.',
+    mails: [{sorte: 'cra', quoi: 'Mail « CRA Novembre 2026 »', quand: '26/11', etat: 'CRA signé reçu', envoye: 'envoyé le 26/11 à 09 h 02', url: 'https://mail.google.com/mail/#all/filcra0001',
+      reponses: [{de: 'Contact Client', quand: 'le 26/11 à 14 h 05', extrait: 'Bonjour, ci-joint le CRA signé. Bonne journée.', pdf: true, lu: true, url: 'https://mail.google.com/mail/#all/filcra0001'}]},
+    {sorte: 'prolongation', quoi: 'Mail « Prolongation de mission »', quand: '26/11', etat: 'réponse reçue', envoye: 'envoyé le 26/11 à 09 h 03', url: 'https://mail.google.com/mail/#all/filpro0001',
+      reponses: [{de: 'Équipe Missions', quand: 'le 26/11 à 16 h 20', extrait: 'Bonjour, nous avons bien reçu ta demande et revenons vers toi. ' + 'x'.repeat(200), pdf: false, lu: false, url: 'javascript:alert(1)'}]}]});
 })();

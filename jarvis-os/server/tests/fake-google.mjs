@@ -115,6 +115,9 @@ export function startFakeGoogle() {
         if (req.method === 'PATCH') { Object.assign(ev, body); return send(res, 200, ev); }
         if (req.method === 'DELETE') { list.splice(list.indexOf(ev), 1); return send(res, 204); }
       }
+      /* 0.94.0 : un quota de Gmail atteint (F.quota réponses 429 de suite aux lectures) ; une recherche posée par le banc (F.recherche(q) → [{id, historyId}] ou null) */
+      if (F.quota > 0 && p.startsWith('/gmail/') && req.method === 'GET') { F.quota--; return send(res, 429, {error: {code: 429, message: "Quota exceeded for quota metric 'Queries' and limit 'Queries per minute per user'", status: 'RESOURCE_EXHAUSTED'}}); }
+      if (p === '/gmail/users/me/threads' && F.recherche) { const r = F.recherche(q.q || ''); if (r) return send(res, 200, r.length ? {threads: r, resultSizeEstimate: r.length} : {resultSizeEstimate: 0}); }
       if (p === '/gmail/users/me/threads' && /\(facture OR /.test(q.q || '')) return send(res, 200, {threads: Object.keys(F.radar).map((id) => ({id})), resultSizeEstimate: Object.keys(F.radar).length});   /* la requête du Radar */
       if (p === '/gmail/users/me/threads' && /"JARVIS Voix" OR \(subject:\(budget OR budgétaire\) Cloud\)/.test(q.q || '')) return send(res, 200, (F.budget || []).length ? {threads: F.budget.map((id) => ({id})), resultSizeEstimate: F.budget.length} : {resultSizeEstimate: 0});   /* 0.48.0 : alertes de budget de Google Cloud */
       if (p === '/gmail/users/me/threads') return send(res, 200, /in:sent/.test(q.q || '') ? {resultSizeEstimate: 0} : {threads: [{id: 'th1'}], resultSizeEstimate: 1});

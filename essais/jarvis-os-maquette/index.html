@@ -10925,7 +10925,11 @@ void main(){
       + '.trv-ch{padding:4px 8px;border-radius:10px;font:600 12px var(--display);background:rgba(var(--c1),.12);border:1px solid rgba(var(--c1),.2);white-space:nowrap}.trv-ch.non{background:none;color:var(--muted)}.trv-ch.amb{color:#fde68a;border-color:rgba(var(--warn),.5)}'
       + '.trv-alerte{margin:10px 0 0;padding:10px 12px;border-radius:14px;border:1px solid rgba(var(--warn),.5);background:rgba(var(--warn),.08);font-size:13.5px}.trv-alerte b{color:#fde68a}'
       + '.trv-der{margin:10px 0 0;padding-top:9px;border-top:1px solid rgba(var(--c1),.14);color:var(--muted);font-size:13px}.trv-der b{color:var(--fg);font-weight:600}.trv-der .ok{color:var(--green)}.trv-der .ko{color:var(--danger)}'
-      + '.trv-mails{display:grid;gap:6px;margin:10px 0 0}.trv-mails div{display:flex;justify-content:space-between;gap:8px;font-size:13.5px;padding:8px 10px;border-radius:12px;background:rgba(255,255,255,.04);border:1px solid rgba(var(--c1),.14)}.trv-mails em{font-style:normal;color:var(--green);font-weight:600}'}));
+      + '.trv-mails{display:grid;gap:6px;margin:10px 0 0}.trv-mails>div{font-size:13.5px;padding:8px 10px;border-radius:12px;background:rgba(255,255,255,.04);border:1px solid rgba(var(--c1),.14)}.trv-mails em{font-style:normal;color:var(--green);font-weight:600;white-space:nowrap}'
+      /* 0.94.0 : un mail du mois, « envoyé le … », puis chaque réponse (qui, quand, PDF, extrait) ; « Ouvrir le mail » dans la feuille */
+      + '.trv-mail-t{display:flex;justify-content:space-between;align-items:baseline;gap:8px}.trv-mail-t span{min-width:0;overflow-wrap:anywhere}'
+      + '.trv-rep{margin:8px 0 0;padding:8px 0 0;border-top:1px solid rgba(var(--c1),.14)}.trv-rep b{font-weight:600}.trv-rep.neuf b{color:#fde68a}.trv-rep .trv-ch{margin-left:6px}'
+      + '.trv-rep p{margin:4px 0 0;color:var(--muted);overflow-wrap:anywhere}.trv-rep .trv-ouvrir{display:inline-flex;margin:8px 0 2px}.trv-mail>.trv-ouvrir{display:inline-flex;margin:8px 0 2px}'}));
     const TRV = {data: null, at: 0, loading: null, f: 'tout'};
     const travailAPI = () => (SRV_OS && window.JarvisServeur && window.JarvisServeur.travail ? window.JarvisServeur.travail : null);
     const travailOn = () => (SRV_OS ? !!travailAPI() : !!window.__TRAVAIL);
@@ -10940,6 +10944,14 @@ void main(){
       return [h('div', {class: 'trv-et'}, (r.etapes || []).map((e, i) => h('div', {class: e[1] || ''}, h('i', {text: e[1] === 'fait' ? '✓' : e[1] === 'bloque' ? '!' : String(i + 1)}), e[0]))), h('div', {class: 'trv-barre', role: 'img', 'aria-label': n + ' étape' + (n > 1 ? 's' : '') + ' sur ' + tot}, h('i', {style: 'width:' + Math.round(100 * n / tot) + '%'}))]; };
     const trvPrevu = (r) => { const p = r.prevu; if (!p) return null; const puces = p.jours ? p.jours.map((j) => h('span', {class: 'trv-ch ' + (j[2] || ''), text: j[0] + ' · ' + j[1]})) : (p.puces || []).map((x) => h('span', {class: 'trv-ch ' + (x[1] || ''), text: x[0]})); return h('div', {class: 'trv-prevu'}, h('small', {text: p.texte + ' :'}), puces); };
     const trvDer = (r) => h('p', {class: 'trv-der'}, r.derniere ? ['Dernière : ', h('b', {text: r.derniere.quand}), ' · ' + r.derniere.quoi + ' ', h('span', {class: r.derniere.ok ? 'ok' : 'ko', text: '●'}), ' par ' + r.derniere.par] : 'Pas encore d’exécution connue.');
+    /* 0.94.0 : chaque mail du mois : « envoyé le … », puis ses réponses (qui, quand, PDF ou non, extrait de 160 caractères au plus). La carte est
+       un bouton : « Ouvrir le mail » (le fil dans Gmail, une adresse http(s) seulement) n'est que dans la feuille du bas. */
+    const trvLien = (u) => (/^https?:\/\//i.test(String(u || '')) ? h('a', {class: 'btn sm trv-ouvrir', href: String(u), target: '_blank', rel: 'noopener', text: 'Ouvrir le mail'}) : null);
+    const trvMails = (r, liens) => ((r.mails || []).length ? h('div', {class: 'trv-mails'}, r.mails.map((m) => h('div', {class: 'trv-mail', 'data-mail': m.sorte || ''},
+      h('div', {class: 'trv-mail-t'}, h('span', {text: m.quoi + ' · ' + (m.envoye || m.quand)}), h('em', {text: m.etat})),
+      (m.reponses || []).map((x) => h('div', {class: 'trv-rep' + (x.lu ? '' : ' neuf')}, h('b', {text: 'Réponse de ' + x.de + ' ' + x.quand}), x.pdf ? h('span', {class: 'trv-ch', text: 'PDF'}) : null,
+        x.extrait ? h('p', {text: '« ' + String(x.extrait).slice(0, 160) + ' »'}) : null, liens ? trvLien(x.url) : null)),
+      liens && !(m.reponses || []).length ? trvLien(m.url) : null))) : null);
     function trvCarte(r) {
       return h('button', {type: 'button', class: 'trv-card' + (r.toi ? ' toi' : ''), 'data-trv': r.id, onclick: () => openItem('travail', r)},
         h('div', {class: 'trv-tete'}, h('h3', {text: r.titre}), h('span', {class: 'trv-qui ' + (r.qui || ''), text: r.quiDit})),
@@ -10947,16 +10959,21 @@ void main(){
         trvEtapes(r), trvPrevu(r),
         r.alerte ? h('div', {class: 'trv-alerte', text: r.alerte}) : null,
         r.toi ? h('div', {class: 'trv-alerte'}, h('b', {text: 'À toi : '}), r.toi) : null,
-        trvDer(r));
+        trvMails(r, false), trvDer(r));
     }
     SHEETCFG.travail = (r) => {
       const api = travailAPI(), actions = [];
+      /* 0.94.0 : le CRA signé est reçu : « C’est rattaché » quand il l'a déposé sur le portail (l'étape « Rattaché » passe à faite) */
+      if (r.rattachable && r.mois) actions.push(act('C’est rattaché', {tone: 'main', cost: 'free', go: () => {
+        (api && api.rattache ? api.rattache(r.mois) : Promise.resolve().then(() => { const x = ((window.__TRAVAIL || {}).routines || []).find((y) => y.id === r.id); if (x) { x.rattachable = false; x.toi = ''; x.attend = (x.attend || []).filter((t) => !/rattacher/.test(t)); x.etapes = x.etapes.map((e) => (e[0] === 'Rattaché' ? [e[0], 'fait'] : e)); } return {ok: true}; }))
+          .then((x) => { toast(x && x.ok ? 'Noté' : 'Pas noté', x && x.ok ? 'CRA signé rattaché : l’étape est faite.' : ((x && x.error) || '')); travailLoad(true); });
+        return null; }}));
       if (r.ouvrir === 'semaine' && r.lundi) actions.push(act(r.toi ? 'Voir la semaine et répondre' : 'Voir la semaine', {tone: 'main', cost: 'free', go: () => { closeSheet(); setTimeout(() => voirUrl('#voir-cra-' + r.lundi), 60); return undefined; }, stay: true}));
       if (r.ouvrir === 'jours' || r.ouvrir === 'mois') actions.push(act(r.ouvrir === 'jours' ? 'Voir mes jours' : 'Voir mes jours du mois', {tone: r.toi ? 'main' : 'main2', cost: 'free', stay: true, go: () => { closeSheet(); setTimeout(() => voirUrl('#voir-jours'), 60); }}));
       if (api) actions.push(act('Renommer', {cost: 'free', pick: {kind: 'text', label: 'Le titre de cette carte', init: r.titre, submit: 'Renommer', placeholder: 'ex. le nom du client, du fournisseur'}, go: (v) => { api.renommer(r.id, v.txt).then((x) => { toast(x.ok ? 'Renommé' : 'Pas renommé', x.ok ? '« ' + x.titre + ' »' : (x.error || '')); travailLoad(true); }); return null; }}));
       return {kicker: 'Travail · ' + r.quiDit, title: r.titre, say: r.toi || (r.alerte ? r.alerte : 'Prochaine : ' + (r.prochaine || '—') + '.'),
         extraTop: () => h('div', {class: 'trv-sheet'}, trvEtapes(r), trvPrevu(r), r.alerte && r.toi ? h('div', {class: 'trv-alerte', text: r.alerte}) : null,
-          (r.mails || []).length ? h('div', {class: 'trv-mails'}, r.mails.map((m) => h('div', {}, h('span', {text: m.quoi + ' · ' + m.quand}), h('em', {text: m.etat})))) : null, trvDer(r)),
+          trvMails(r, true), trvDer(r)),
         actions};
     };
     VIEWS.travail = (el) => {
@@ -11894,6 +11911,42 @@ void main(){
       return true;
     };
     if (notesOn()) setTimeout(() => notesLoad(true), 1300);
+  }
+
+  /* ================= 0.94.0 — LES RÉPONSES AUX MAILS DU MOIS (bloc à part ; son constat du 26/11/2026 : « mes deux contacts ont répondu à nos
+     mails et je ne vois aucun impact, aucune trace »). Le serveur suit les réponses au mail du CRA et au mail de prolongation, les notifie et
+     tient la carte « CRA du mois » de Travail à jour (rendu : bloc 0.85.0, `trvMails`). Ici, seulement la ligne de Travail dans « Pour
+     moi » : elle dit ce qui attend (« CRA signé reçu : à rattacher », « Réponse à ton mail de prolongation : à lire ») au lieu de
+     « CRA et notes de frais : voir Travail », et elle apparaît dès que quelque chose attend, même sans carte de Chronos. ================= */
+  {
+    const api94 = () => (SRV_OS && window.JarvisServeur && window.JarvisServeur.travail ? window.JarvisServeur.travail : null);
+    const AT = {l: [], at: 0, en: null};
+    const lire94 = () => {
+      const a = api94();
+      if (AT.en || Date.now() - AT.at < 60000 || (!a && !window.__TRAVAIL)) return AT.en;
+      AT.en = (a ? a.lire() : Promise.resolve(window.__TRAVAIL)).then((d) => { if (!d || !d.routines) { AT.at = Date.now() - 50000; AT.en = null; return false; }   /* serveur pas encore joignable : nouvel essai 10 s plus tard */
+        AT.at = Date.now(); const l = []; d.routines.forEach((r) => (Array.isArray(r.attend) ? r.attend : []).forEach((x) => l.push(String(x).slice(0, 120)))); const ch = l.join('|') !== AT.l.join('|'); AT.l = l; return ch; })
+        .catch(() => { AT.at = Date.now() - 50000; return false; }).then((ch) => { AT.en = null; if (ch && TAB === 'demandes') renderView(true); });
+      return AT.en;
+    };
+    document.head.append(h('style', {text: '.pm-travail.toi{border-color:rgba(var(--warn),.6)}.pm-travail.toi>span:first-child{color:#fde68a}'}));
+    const VD94 = VIEWS.demandes;
+    VIEWS.demandes = (el) => {
+      VD94(el); lire94();
+      if (!AT.l.length) return;
+      const f = (el.querySelector('.ux-seg [aria-pressed="true"]') || {dataset: {}}).dataset.f || 'tout';
+      if (f === 'infos') return;
+      const txt = AT.l.join(' · ');
+      let ln = el.querySelector('.pm-travail');
+      if (ln) ln.firstElementChild.textContent = txt;
+      else {
+        ln = h('button', {type: 'button', class: 'card pm-travail', onclick: () => go('travail')}, h('span', {text: txt}), h('span', {class: 'pm-travail-go', text: '›'}));
+        const seg = el.querySelector(':scope > .ux-seg'), st = seg && seg.nextElementSibling && seg.nextElementSibling.matches('.fc-start, .fc-line') ? seg.nextElementSibling : seg;
+        if (st) st.after(ln); else el.prepend(ln);
+      }
+      ln.classList.add('toi');
+    };
+    setTimeout(() => { if (TAB === 'demandes') lire94(); }, 1700);
   }
 
   boot();
