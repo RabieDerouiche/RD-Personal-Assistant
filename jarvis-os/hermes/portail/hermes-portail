@@ -18,6 +18,7 @@
 #   sudo hermes-portail notes-auto                 (la minuterie de chaque jour : télétravail le dernier jour, box à partir du 15, Claude et Grok Bot dès leur facture)
 #   sudo hermes-portail ndf-auto | ndf etat        (la minuterie de 5 minutes : une note validée dans JARVIS, ou d'une sorte déjà validée une fois, créée pour de vrai)
 #   sudo hermes-portail cra-auto                   (la minuterie : une semaine confirmée dans JARVIS, saisie et soumise ; compte rendu pour JARVIS ; rien sans /etc/hermes-portail/cra.conf)
+#   sudo hermes-portail cra-mois-auto              (la minuterie : le 26 ou après, le mois validé dans JARVIS, complété et validé par Hermes ; rien sans « adresse_mois= » dans cra.conf)
 #   sudo hermes-portail notes [ajouter <hôte> "<texte>" | oublier <hôte> [numéro]]   (ce qu'Hermes a appris d'un portail, relu à chaque passage)
 #   sudo hermes-portail cle                        (remet la clé du coffre d'Hermes en mémoire vive, depuis jarvis-coffre)
 #   sudo hermes-portail fermer                     (efface la clé de la mémoire vive)
@@ -57,7 +58,7 @@ if [ "$SYSTEMD" = 0 ]; then   # banc seulement (pas de systemd) : un faux JARVIS
 fi
 HOTE='^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$'
 
-usage() { sed -n '4,24p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,3\}//'; exit "${1:-1}"; }
+usage() { sed -n '4,25p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,3\}//'; exit "${1:-1}"; }
 [ "$(id -u)" = 0 ] || { echo "À lancer en root : sudo hermes-portail ${1:-etat}"; exit 1; }
 id "$U" >/dev/null 2>&1 && [ -x "$H/.local/bin/hermes" ] || { echo "Hermes « portail » n'est pas installé : sudo bash /opt/rd/jarvis-os/hermes/portail/install.sh"; exit 1; }
 terminal() { [ -t 0 ] || { echo "À lancer dans un vrai terminal (Termius) : cette commande demande une saisie."; exit 1; }; }
@@ -697,9 +698,11 @@ print("VENDREDI " + semaine[4].isoformat()); print("PAGE " + l.strftime("%m/%d/%
     # (son oui sur ses congés dans JARVIS) ; la consigne est écrite ici. Garde-fous qui ne dépendent pas du modèle : un mois réel, des
     # jours de ce mois, ouvrés ; jamais avant le 24 du mois ; jamais un mois déjà validé par Hermes.
     [ $# -ge 1 ] || usage
-    adresse=$1; shift; mois=""; conges=""; feries=""; blanc=0
+    adresse=$1; shift; mois=""; conges=""; feries=""; blanc=0; minuterie=0
     while [ $# -gt 0 ]; do case "$1" in
-      --mois) mois=${2:-}; shift 2 ;; --conges) conges=${2:-}; shift 2 ;; --feries) feries=${2:-}; shift 2 ;; --a-blanc) blanc=1; shift ;; *) usage ;; esac; done
+      --mois) mois=${2:-}; shift 2 ;; --conges) conges=${2:-}; shift 2 ;; --feries) feries=${2:-}; shift 2 ;; --a-blanc) blanc=1; shift ;;
+      --par-la-minuterie) minuterie=1; shift ;;   # cra-mois-auto : c'est lui qui pose le compte rendu (pas de compte rendu d'échec si la limite l'a coupé avant tout contact)
+      *) usage ;; esac; done
     [[ "$adresse" =~ ^https?://[A-Za-z0-9._:/?=%\&~+-]+$ ]] || { echo "Adresse attendue (https://…)."; exit 1; }
     hote=$(hote_de "$adresse") || { echo "Adresse attendue (https://…)."; exit 1; }
     plan=$(python3 -I -c '
@@ -777,7 +780,7 @@ print("LE24 " + datetime.date(a, m, 24).isoformat()); print("LIBELLE " + ["janvi
     esac
     [ $blanc = 1 ] && { [ "$res" = validee ] || [ "$res" = enregistree ]; } && res=echec   # à blanc, rien ne peut avoir été validé ni enregistré
     if [ $blanc = 0 ] && { [ "$res" = validee ] || [ "$res" = deja ]; }; then echo "$mois $(date '+%d/%m/%Y %H:%M') $res" >> "$VAR/cra/mois-valides.txt"; fi
-    if [ $blanc = 0 ]; then   # 0.85.0 : le compte rendu pour l'espace « Travail » de JARVIS (dossier de root, lisible par son groupe ; jamais chez JARVIS)
+    if [ $blanc = 0 ] && [ $minuterie = 0 ]; then   # 0.85.0 : le compte rendu pour l'espace « Travail » de JARVIS (dossier de root, lisible par son groupe ; jamais chez JARVIS)
       groupe=$(id -gn "$JARVIS_U" 2>/dev/null) || groupe=root
       install -d -o root -g "$groupe" -m 0750 "$RETOURS"; chown root:"$groupe" "$RETOURS"; chmod 0750 "$RETOURS"
       python3 -I -c '
@@ -869,6 +872,131 @@ os.replace(tmp, dest)
     chown root:"$groupe" "$RETOURS/cra-$semaine.json"; chmod 0640 "$RETOURS/cra-$semaine.json"
     find "$RETOURS" -maxdepth 1 -type f -name '*.json' -mtime +40 -delete 2>/dev/null   # ménage : 40 jours
     cat "$out"; rm -f "$out"
+    exit 0 ;;
+  cra-mois-auto)
+    # La minuterie du CRA du mois (26/11/2026, son QCM : « CRA du mois seul » ; avant, Chronos le 26, puis la session du serveur à la main).
+    # Le 26 du mois ou après (jamais avant : le 24 est le garde-fou de cra-mois), un mois qu'il a validé dans JARVIS (jours.json,
+    # mois[AAAA-MM] : état « valide », ses jours en demi-journées) et qu'Hermes n'a pas encore validé (mois-valides.txt) → « cra-mois »
+    # avec ses congés (demi-journées comprises) et ses fériés, puis le compte rendu pour JARVIS (mois-<AAAA-MM>.json, l'espace « Travail »)
+    # et un avis sur ses appareils. Un oui = une tentative (mois-tentes.txt) : pour réessayer, il valide de nouveau ses jours dans JARVIS.
+    # Coupée par la limite du forfait avant tout contact avec le portail : elle repart une fois après la levée (hermes-relance ou la
+    # minuterie) ; après contact, ou sans preuve : « à relancer à la main ». Le mois en cours, et le mois d'avant s'il a été validé tard.
+    conf="$ETC/cra.conf"; [ -f "$conf" ] || exit 0
+    adresse=$(sed -n 's/^adresse_mois=//p' "$conf" | head -1); donnees=$(sed -n 's/^jarvis_donnees=//p' "$conf" | head -1); donnees=${donnees:-/home/$JARVIS_U/.jarvis}
+    [ -n "$adresse" ] || exit 0   # sans l'adresse du compte rendu d'activité : rien (le CRA de la semaine n'en dépend pas)
+    [[ "$adresse" =~ ^https?://[A-Za-z0-9._:/?=%\&~+-]+$ ]] || { echo "cra.conf : adresse_mois illisible."; exit 1; }
+    install -d -o root -g root -m 0700 "$VAR/cra"; touch "$VAR/cra/mois-valides.txt" "$VAR/cra/mois-tentes.txt"; chmod 0600 "$VAR/cra/mois-valides.txt" "$VAR/cra/mois-tentes.txt"
+    exec 9> "$VAR/cra/.verrou-mois"; flock -n 9 || exit 0
+    limite_attente && exit 0   # la limite du forfait tient encore : rien tenté avant sa levée
+    aujourdhui=$(TZ=Europe/Paris date +%F); [ "$SYSTEMD" = 0 ] && [ -n "${HERMES_BANC_AUJOURDHUI:-}" ] && aujourdhui=$HERMES_BANC_AUJOURDHUI
+    choix=$(python3 -I -c '
+import datetime, json, os, sys
+f, tentes, valides, auj = sys.argv[1:5]
+NOMS = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"]
+def dire(t): print("RIEN " + t); sys.exit(0)
+try:
+    a = datetime.date.fromisoformat(auj)
+except ValueError:
+    dire("date du jour illisible.")
+courant = "%04d-%02d" % (a.year, a.month)
+p = a.replace(day=1) - datetime.timedelta(days=1); precedent = "%04d-%02d" % (p.year, p.month)
+libelle = lambda ym: NOMS[int(ym[5:7]) - 1] + " " + ym[:4]
+try:
+    fd = os.open(f, os.O_RDONLY | os.O_NOFOLLOW)   # jamais un lien (posé par l’utilisateur de JARVIS vers un fichier de root)
+    st = os.fstat(fd)
+    if not (st.st_mode & 0o170000 == 0o100000) or st.st_size > 4000000: os.close(fd); dire("jours.json n’est pas un fichier ordinaire : ignoré.")
+    D = json.load(os.fdopen(fd, encoding="utf-8"))
+except Exception:
+    dire("jours.json absent ou illisible.")
+deja = {l.split()[0] for l in open(valides) if l.strip()}
+essayes = {l.strip() for l in open(tentes) if l.strip()}
+M = D.get("mois") if isinstance(D, dict) else None
+M = M if isinstance(M, dict) else {}
+raisons = []
+for ym in (precedent, courant):
+    if ym == courant and a.day < 26:
+        raisons.append(libelle(ym) + " : avant le 26"); continue
+    if ym in deja:
+        raisons.append(libelle(ym) + " : déjà validé par Hermes"); continue
+    if ym == precedent and a.day > 10:   # un mois validé tard : jusqu’au 10 du mois suivant ; ensuite, à la main
+        continue
+    x = M.get(ym)
+    if not isinstance(x, dict) or x.get("etat") != "valide" or not isinstance(x.get("valide"), dict):
+        raisons.append(libelle(ym) + " : pas validé dans JARVIS"); continue
+    v = x["valide"]; at = v.get("at"); js = v.get("jours")
+    if v.get("v") != 2 or not isinstance(at, (int, float)) or isinstance(at, bool) or not isinstance(js, list) or not js:
+        raisons.append(libelle(ym) + " : validation dans JARVIS d’un format inconnu"); continue
+    cle = "%s:%d" % (ym, int(at))
+    if cle in essayes:
+        raisons.append(libelle(ym) + " : déjà tenté pour ce oui (valide de nouveau tes jours dans JARVIS pour réessayer)"); continue
+    conges, feries, bon = [], [], True
+    for j in js:
+        d = j.get("date") if isinstance(j, dict) else None
+        try: dd = datetime.date.fromisoformat(str(d))
+        except ValueError: bon = False; break
+        if str(d)[:7] != ym or dd.weekday() > 4: bon = False; break
+        ma, ap = j.get("M"), j.get("A")
+        if ma == "X" or ap == "X" or not isinstance(ma, str) or not isinstance(ap, str): bon = False; break
+        if ma == "F" or ap == "F": feries.append(str(d))
+        elif ma == "C" and ap == "C": conges.append(str(d))
+        elif ma == "C": conges.append(str(d) + ":matin")
+        elif ap == "C": conges.append(str(d) + ":apres-midi")
+    if not bon:
+        raisons.append(libelle(ym) + " : jours validés illisibles ou en conflit"); continue
+    print(cle); print(ym); print(",".join(conges)); print(",".join(feries)); sys.exit(0)
+dire(" ; ".join(raisons) + ".")
+' "$donnees/jours.json" "$VAR/cra/mois-tentes.txt" "$VAR/cra/mois-valides.txt" "$aujourdhui")
+    if [ -z "$choix" ] || [[ "$choix" == RIEN* ]]; then
+      [ -z "${INVOCATION_ID:-}" ] && echo "CRA du mois : rien à faire (${choix#RIEN })"   # à la main seulement : la minuterie se tait
+      exit 0
+    fi
+    cle_essai=$(sed -n 1p <<< "$choix"); mois=$(sed -n 2p <<< "$choix"); conges=$(sed -n 3p <<< "$choix"); feries=$(sed -n 4p <<< "$choix")
+    premiere=false; [ -s "$VAR/cra/mois-tentes.txt" ] || premiere=true   # le premier mois fait par la minuterie : il vérifie sur le portail
+    echo "$cle_essai" >> "$VAR/cra/mois-tentes.txt"   # une tentative par oui, notée avant le passage
+    out=$(mktemp); chmod 0600 "$out"
+    debut_mois=$(date +%s); limite_txt=""
+    "$0" cra-mois "$adresse" --mois "$mois" --conges "$conges" --feries "$feries" --par-la-minuterie > "$out" 2>&1
+    res=$(sed -n 's/^Résultat CRA du mois : //p' "$out" | tail -1); res=${res%% *}; res=${res:-echec}
+    fin=$(sed -n 's/^Fin de mission lue : //p' "$out" | tail -1); [[ "$fin" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] || fin=""
+    case "$res" in validee|deja) ;; *)   # coupé par la limite avant toute saisie → le mois repart une fois après la levée
+      case "$(limite_verdict "$debut_mois")" in
+        avant) if limite_planifier cra-mois "$cle_essai" hermes-portail-cra-mois.service; then
+                 oter_ligne "$VAR/cra/mois-tentes.txt" "$cle_essai"; cat "$out"; rm -f "$out"; exit 0
+               fi
+               limite_txt="$LIMITE_DEUX Valide de nouveau tes jours du mois dans JARVIS." ;;
+        apres) limite_txt="$LIMITE_APRES Regarde le compte rendu d'activité sur le portail avant de valider de nouveau tes jours dans JARVIS." ;;
+      esac ;;
+    esac
+    # le compte rendu pour l'espace « Travail » de JARVIS (dossier de root, lisible par son groupe ; jamais chez JARVIS) : celui de cra-mois,
+    # refait ici pour les cas où cra-mois n'a rien posé (refus, coffre verrouillé) et pour la première exécution
+    groupe=$(id -gn "$JARVIS_U" 2>/dev/null) || groupe=root
+    install -d -o root -g "$groupe" -m 0750 "$RETOURS"; chown root:"$groupe" "$RETOURS"; chmod 0750 "$RETOURS"
+    python3 -I -c '
+import json, os, re, sys, time
+src, dest, mois, res, fin, premiere, limite = sys.argv[1:8]
+lignes = [re.sub(r"\x1b\[[0-9;?]*[A-Za-z]", "", l).strip() for l in open(src, encoding="utf-8", errors="replace")]
+corps = [l for l in lignes if l and not l.startswith(("==", "(gardé", "Notes gardées", "Résultat", "session_id", "Fin de mission")) and not re.match(r"^[-*•]?\s*Appris\s*:", l)]
+refus = [l for l in lignes if l.startswith("Refus") or "verrouillé" in l]
+texte = limite[:650] or (" ".join(refus) if refus else " ".join(corps))[-650:] or "Le passage n’a rien rendu."
+tmp = dest + ".tmp"
+fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o640)
+os.write(fd, json.dumps({"mois": mois, "resultat": res, "fin": fin, "texte": texte, "premiere": premiere == "true" and res == "validee", "auto": True, "at": int(time.time() * 1000)}, ensure_ascii=False).encode()); os.close(fd)
+os.replace(tmp, dest)
+' "$out" "$RETOURS/mois-$mois.json" "$mois" "$res" "$fin" "$premiere" "$limite_txt"
+    chown root:"$groupe" "$RETOURS/mois-$mois.json"; chmod 0640 "$RETOURS/mois-$mois.json"
+    # l'avis sur ses appareils (le même chemin que les relances après la limite : JARVIS le pousse une fois)
+    libelle=$(python3 -I -c 'import sys; m = sys.argv[1]; print(["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"][int(m[5:7]) - 1] + " " + m[:4])' "$mois")
+    findit=""; [ -n "$fin" ] && findit=" Fin de mission lue : $(date -d "$fin" +%d/%m/%Y)."
+    case "$res" in
+      validee) if [ "$premiere" = true ]; then titre="Première exécution d'Hermes : CRA de $libelle validé"; texte="Hermes l'a complété et validé seul sur le portail, d'après tes jours validés dans JARVIS. Vérifie-le sur le portail.$findit"
+               else titre="CRA de $libelle validé"; texte="Hermes l'a complété et validé sur le portail, d'après tes jours validés dans JARVIS.$findit"; fi ;;
+      deja) titre="CRA de $libelle : déjà validé"; texte="Le portail le disait déjà validé : Hermes n'a rien changé.$findit" ;;
+      *) titre="CRA de $libelle : à relancer à la main"
+         texte=$(python3 -I -c 'import json, sys; print(json.load(open(sys.argv[1])).get("texte", "")[:420])' "$RETOURS/mois-$mois.json" 2>/dev/null) ;;
+    esac
+    python3 -I "$LIB/limite.py" aviser --cle "cra-mois-$mois" --titre "$titre" --texte "$texte" > /dev/null 2>&1 || echo "Avis pour JARVIS pas posé."
+    cat "$out"; rm -f "$out"
+    echo "Avis pour JARVIS : $titre"
     exit 0 ;;
   teletravail)
     # La note de frais de télétravail (26/11/2026, sa décision : Hermes la prépare le dernier jour du mois). À BLANC seulement tant que

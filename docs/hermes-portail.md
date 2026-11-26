@@ -83,8 +83,9 @@ tenu par la commande) : pas encore faite.
 | Fichier | Rôle |
 |---|---|
 | `install.sh` | Root, relançable. Utilisateur `hermes-portail`, Hermes à la version figée du Hermes principal (lue dans `../install.sh`) avec son navigateur, plugin de l'abonnement Claude et Claude Code à lui, politique, skill, copies root de la commande et du relais, lien de la clé, règles réseau et relais. Ne démarre aucun agent. |
-| `hermes-portail` | La commande (`/usr/local/sbin/hermes-portail`) : `etat`, `connexion-claude`, `enregistrer`, `domaines`, `essai` (et `--code-mail`, `--telecharger`), `brouillon` (et `--sans-creer`), `facture`, `texte`, `cra` (et `--a-blanc`), `cra-mois` (et `--a-blanc`), `teletravail` (et `drive`), `cra-auto`, `notes`, `cle`, `fermer`, `oublier`. Un essai lance l'unité `hermes-portail-essai`. |
+| `hermes-portail` | La commande (`/usr/local/sbin/hermes-portail`) : `etat`, `connexion-claude`, `enregistrer`, `domaines`, `essai` (et `--code-mail`, `--telecharger`), `brouillon` (et `--sans-creer`), `facture`, `texte`, `cra` (et `--a-blanc`), `cra-mois` (et `--a-blanc`), `teletravail` (et `drive`), `cra-auto`, `cra-mois-auto`, `notes`, `cle`, `fermer`, `oublier`. Un essai lance l'unité `hermes-portail-essai`. |
 | `hermes-portail-cra.service`, `hermes-portail-cra.timer` | Le CRA de la semaine (26/11/2026) : toutes les 5 minutes, `hermes-portail cra-auto` ; rien sans `/etc/hermes-portail/cra.conf` (root : `adresse=` la feuille de temps, `jarvis_donnees=` le dossier de JARVIS ; jamais dans le dépôt). Compte rendu dans `/var/lib/hermes-portail-retours/` (root, lisible par le groupe de JARVIS, depuis le 26/11/2026). |
+| `hermes-portail-cra-mois.service`, `hermes-portail-cra-mois.timer` | Le CRA du mois (26/11/2026, son QCM « CRA du mois seul ») : toutes les 15 minutes, `hermes-portail cra-mois-auto` ; rien sans `adresse_mois=` (l'adresse du compte rendu d'activité) dans `/etc/hermes-portail/cra.conf`, rien avant le 26. Voir « Le CRA du mois, seul ». |
 | `hermes-portail-essai.service` | Un passage, enfermé (mêmes lignes que `hermes-gateway.service`, mémoire sans échange ; depuis le 25/11/2026, filtre d'appels système et espaces de noms interdits). Une vraie unité, pas `systemd-run` : au premier essai sur le serveur, `systemd-run -p IPAddressDeny=link-local` a été refusé alors que la même ligne est valable dans une unité. Consigne dans `/home/hermes-portail/.consigne`, réponse dans `/var/lib/hermes-portail/essais/`. |
 | `politique.yaml` | Sa politique (`/etc/hermes-portail/config.yaml`, root) : outils `browser`, `terminal`, `skills` seulement ; Sonnet ; profil de navigateur gardé ; navigateur envoyé vers le relais, lancé sans son bac à sable (dit en clair, voir « Durcissement »), remplissage automatique et heure réseau coupés. |
 | `teletravail.mjs` | La note de télétravail, ce que seul JARVIS sait lire (26/11/2026) : lancé par `hermes-portail teletravail` sous l'utilisateur `jarvis`, en lecture seule. `--jours AAAA-MM` : le bilan du mois par le module de JARVIS lui-même (`jours.mjs` : agendas reconnus, ses règles, ses corrections), refait sur une copie de `jours.json` effacée ensuite ; `--drive <id>` : UN PDF du Drive (outil `file_pdf` de `google.mjs`, 0.85.0). |
@@ -501,7 +502,9 @@ n'a rien saisi**.
   `ndf-auto` reprend sans nouveau oui (la règle de `ndf_poser`). Code de sortie 5 (« Résultat note : limite »).
 - **Préparation** (`notes-auto` → `note`, `teletravail-auto` → `teletravail`) : facture rapportée ou dépense à blanc
   coupées avant tout contact avec le portail de notes de frais : la note du mois repart une fois (`notes-auto`).
-- `cra-mois` n'est lancé par aucune minuterie : un passage coupé se relance à la main (la session du serveur).
+- **CRA du mois** (`cra-mois-auto`, 26/11/2026) : coupé avant tout contact avec le portail, le mois n'est pas compté comme tenté
+  et repart une fois après la levée (`hermes-portail-cra-mois.service`, connue de `hermes-relance`) ; après contact, ou coupé
+  deux fois : compté, compte rendu et avis « à relancer à la main ». `cra-mois` lancé à la main n'a pas de relance.
 - (Likely) Une coupure après le 1er du mois pour la note de télétravail (préparée le dernier jour) n'est pas
   rattrapée par `teletravail-auto` (il ne tourne que le dernier jour) : elle se fait alors à la main.
 - Au banc : `HERMES_BANC_PASSAGE` (un passage coupé, sans lancer Hermes), `HERMES_BANC_PASSAGE_SI` (seulement si la
@@ -767,12 +770,30 @@ fin de mission) dans le dossier de root pour l'espace « Travail » de JARVIS (e
 Hermes les envoient directement (« on remplace Grok Bot, on n'ajoute pas de dépendance »). Les congés à venir s'écrivent
 au futur (`mailCraPhrases` de JARVIS, 0.85.0).
 
+**Le CRA du mois, seul (26/11/2026, son QCM « CRA du mois seul »)** : `hermes-portail cra-mois-auto`, lancé toutes les
+15 minutes par `hermes-portail-cra-mois.timer` (posé et activé par `install.sh`). Il ne fait rien sans `adresse_mois=` dans
+`/etc/hermes-portail/cra.conf` (root 600, l'adresse du compte rendu d'activité, à côté de `adresse=` du CRA de la semaine ; jamais
+dans le dépôt). Ensuite, toutes ces conditions, sinon rien :
+- le 26 du mois ou après (jamais avant : `cra-mois` refuse avant le 24) ; le mois d'avant aussi, jusqu'au 10, s'il l'a validé tard ;
+- le mois validé dans JARVIS (`jours.json`, `mois[AAAA-MM]` : état « valide », validation v2 avec ses jours en demi-journées),
+  lu par root sans suivre de lien (O_NOFOLLOW, fichier ordinaire, comme `cra-auto`) ;
+- le mois pas encore validé par Hermes (`mois-valides.txt`) et ce oui pas encore tenté (`mois-tentes.txt`, `<mois>:<heure du oui>`) :
+  un oui = une tentative ; pour réessayer, il valide de nouveau ses jours dans JARVIS.
+
+Il passe alors à `cra-mois` ses congés (C : journée, matin ou après-midi) et ses fériés (F), tirés de ses jours validés ; un jour
+en conflit (X) bloque tout. Après le passage : le compte rendu `mois-<AAAA-MM>.json` (espace « Travail », comme avant, plus
+`premiere` et `auto`) et un avis poussé une fois sur ses appareils par JARVIS (le chemin des avis de `hermes-relance`,
+`/var/lib/hermes-relance-avis`, sous-commande `aviser` de `limite.py`) : « Première exécution d'Hermes : CRA de <mois> validé »
+(vérifie sur le portail), « CRA de <mois> validé », « déjà validé », ou « à relancer à la main ». Lancé à la main, il dit pourquoi il
+ne fait rien (« rien à faire (novembre 2026 : déjà validé par Hermes.) ») ; par la minuterie, il se tait. Le dépôt du CRA du
+client (le PDF reçu de son contact) reste à sa charge. Banc : section « CRA du mois : la minuterie » de `portail.test.sh`.
+
 **Les routines de Chronos, une par une (26/11/2026, 8 h)** :
 
 | Routine de Chronos | Qui la fait maintenant | Reste |
 |---|---|---|
 | Validation des jours (le 24) | En pause chez Chronos ; JARVIS (bilan, son oui) | Rien |
-| CRA mensuel (le 26) | En pause chez Chronos ; Hermes, en réel (novembre validé le 26/11) | Déclenchement seul le 26 après son oui (`cra-mois` à brancher sur une minuterie, comme `cra-auto`) ; dépôt du CRA du client |
+| CRA mensuel (le 26) | En pause chez Chronos ; Hermes, en réel (novembre validé le 26/11) ; **seul depuis le 26/11** (`cra-mois-auto`, le 26 ou après, sur son oui dans JARVIS) | `adresse_mois=` à poser dans `cra.conf` ; dépôt du CRA du client (le PDF de son contact) : à sa charge |
 | Mails du mois (le 24 et le 26) | JARVIS prépare le brouillon, il l'envoie depuis JARVIS (0.85.0) | Modèles à poser sur le serveur (`travail.json`) |
 | CRA hebdomadaire (vendredi) | En pause chez Chronos ; Hermes, en réel dès son oui du 27/11 | Sa vérification après la première exécution |
 | Note de télétravail (fin de mois) | Hermes, en réel (Chronos arrêté le 26/11, ligne 101) : préparée le 30/11, posée « à valider » | Son « Valider et créer » dans JARVIS (première exécution), puis sa vérification |

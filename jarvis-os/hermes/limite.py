@@ -228,7 +228,7 @@ def cmd_attente(a):
     sys.exit(1)
 
 
-UNITES = {"hermes-portail-cra.service", "hermes-portail-ndf.service", "hermes-portail-teletravail.service"}
+UNITES = {"hermes-portail-cra.service", "hermes-portail-cra-mois.service", "hermes-portail-ndf.service", "hermes-portail-teletravail.service"}
 
 
 def cmd_planifier(a):
@@ -371,6 +371,20 @@ def aviser(cle, titre, texte, a_blanc, sortie):
     slug = re.sub(r"[^a-z0-9-]", "-", cle.lower())[:60]
     ecrire_json(os.path.join(AVIS, "avis-%d-%s.json" % (maintenant(), slug)), {"cle": cle[:120], "titre": titre[:120], "texte": texte[:600], "at": maintenant()},
                 mode=0o640, groupe=g)
+
+
+def cmd_aviser(a):
+    """Un avis pour JARVIS posé par une tâche d'hermes-portail (le CRA du mois, 26/11/2026) : poussé une fois sur ses appareils."""
+    if not re.fullmatch(r"[A-Za-z0-9 :._-]{1,120}", a.cle):
+        print("Avis refusé : clé illisible.")
+        sys.exit(2)
+    titre = re.sub(r"\s+", " ", a.titre).strip()[:120]
+    texte = re.sub(r"\s+", " ", a.texte).strip()[:600]
+    if not titre:
+        sys.exit(2)
+    dit = []
+    aviser(a.cle, titre, texte, False, dit)
+    print("\n".join(dit))
 
 
 def menage_avis():
@@ -595,8 +609,9 @@ def main():
     x = s.add_parser("planifier"); x.add_argument("--dossier", required=True); x.add_argument("--tache", required=True); x.add_argument("--cle", required=True)
     x.add_argument("--unite", required=True); x.add_argument("--depuis", required=True)
     x = s.add_parser("relancer"); x.add_argument("--a-blanc", action="store_true")
+    x = s.add_parser("aviser"); x.add_argument("--cle", required=True); x.add_argument("--titre", required=True); x.add_argument("--texte", default="")
     a = p.parse_args()
-    {"texte": cmd_texte, "passage": cmd_passage, "verdict": cmd_verdict, "attente": cmd_attente, "planifier": cmd_planifier, "relancer": cmd_relancer}[a.cmd](a)
+    {"texte": cmd_texte, "passage": cmd_passage, "verdict": cmd_verdict, "attente": cmd_attente, "planifier": cmd_planifier, "relancer": cmd_relancer, "aviser": cmd_aviser}[a.cmd](a)
 
 
 if __name__ == "__main__":

@@ -416,6 +416,103 @@ verif "cra-mois --a-blanc : « MODE CRA DU MOIS À BLANC », possible avant le 2
 verif "cra-mois --a-blanc : aucun compte rendu pour JARVIS" bash -c "[ ! -e /var/lib/hermes-portail-retours/mois-2026-10.json ]"
 rm -f /var/lib/hermes-portail/cra/mois-valides.txt; rm -rf /var/lib/hermes-portail-retours
 
+echo "== CRA du mois : la minuterie (le 26 ou après, un mois validé dans JARVIS ; son QCM du 26/11/2026 « CRA du mois seul »)"
+FJM=$T/jarvis-mois; AV=$T/avis-cra-mois; rm -rf $FJM $AV /var/lib/hermes-portail-retours $LIMV; install -d -m 0755 $FJM
+rm -f /var/lib/hermes-portail/cra/mois-valides.txt /var/lib/hermes-portail/cra/mois-tentes.txt
+mois_suite() {   # mois_suite <fichier> <AAAA-MM> <date:moitié:activité,…> <fin JJ/MM/AAAA> : les cases vides, puis « Valider » (faux modèle)
+  python3 -I - "$FA" "$@" <<'PY'
+import json, sys
+fa, f, ym, cases, fin = sys.argv[1:6]
+code = "# Compléter les jours vides\nnew_tab('%s?mois=%s')\nwait_for_load()\n" % (fa, ym)
+for c in [x for x in cases.split(",") if x]:
+    d, mo, ac = c.split(":")
+    code += "js(\"document.querySelector('#c_date').value='%s'; document.querySelector('#c_moitie').value='%s'; document.querySelector('#c_activite').value='%s'; document.querySelector('#c_ok').click()\")\nwait_for_load()\n" % (d, mo, ac)
+code += "print(js(\"document.querySelector('#statut').innerText\"))"
+suite = [{"nom": "browser_exec", "args": {"code": code}}, {"nom": "browser_exec", "args": {"code": "# Valider\njs(\"document.querySelector('#valider').click()\")\nwait_for_load()\nprint(js(\"document.querySelector('#statut').innerText\"))"}}]
+open(f, "w").write("SUITE: " + json.dumps(suite, ensure_ascii=False) + "\nDIRE: " + json.dumps("Complété.\nStatut : En attente\nFin de mission : %s\nRésultat : validé" % fin, ensure_ascii=False) + "\n")
+PY
+}
+jours_mois() {   # jours_mois <fichier> <AAAA-MM> <état> <at> [date=M/A …] : un mois de jours.json comme JARVIS l'écrit (données inventées)
+  python3 -I - "$@" <<'PY'
+import calendar, datetime, json, os, sys
+f, ym, etat, at = sys.argv[1:5]; codes = dict(x.split("=") for x in sys.argv[5:])
+D = json.load(open(f)) if os.path.exists(f) else {"version": 1, "semaines": {}, "mois": {}}
+a, m = int(ym[:4]), int(ym[5:7])
+jours = []
+for j in range(1, calendar.monthrange(a, m)[1] + 1):
+    d = datetime.date(a, m, j)
+    if d.weekday() < 5:
+        ma, ap = codes.get(d.isoformat(), "T/T").split("/"); jours.append({"date": d.isoformat(), "M": ma, "A": ap})
+D["mois"][ym] = {"etat": etat, "corrections": {}, "historique": []}
+if etat == "valide": D["mois"][ym]["valide"] = {"v": 2, "at": int(at), "empreinte": "inventee", "jours": jours}
+json.dump(D, open(f, "w"))
+PY
+}
+cma() { HERMES_BANC_AUJOURDHUI=$1 HERMES_BANC_JARVIS_U=nobody HERMES_RELANCE_AVIS=$AV HERMES_RELANCE_JARVIS_U=nobody HERMES_BANC_PASSAGE=${2:-} HERMES_BANC_FILTRE_JOURNAL=${3:-} HERMES_BANC_CONSIGNE_EN_PLUS=${4:-$T/mois-auto.txt} bash /usr/local/sbin/hermes-portail cra-mois-auto; }
+valides_mois() { grep -c "\"evenement\": \"CRA-MOIS-VALIDER\", \"mois\": \"$1\"" $T/traces/portail.jsonl; }
+cases_mois() { grep -c "\"evenement\": \"CRA-MOIS-CASE\", \"mois\": \"$1\"" $T/traces/portail.jsonl; }
+attente() { python3 -I -c "import json,sys,time; json.dump({'reprise': int(time.time()) + int(sys.argv[2])}, open(sys.argv[1], 'w'))" $LIMV/attente.json "$1"; }
+MT=/var/lib/hermes-portail/cra/mois-tentes.txt; MV=/var/lib/hermes-portail/cra/mois-valides.txt
+mois_suite $T/mois-auto.txt 2026-12 '2026-12-21:journee:Congé payé,2026-12-22:matin:Congé payé,2026-12-22:apres-midi:Mission,2026-12-23:matin:Mission,2026-12-23:apres-midi:Congé payé,2026-12-24:journee:Mission,2026-12-25:journee:Absence (Jours fériés),2026-12-28:journee:Mission,2026-12-29:journee:Mission,2026-12-30:journee:Mission,2026-12-31:journee:Mission' 31/12/2026
+jours_mois $T/jours-mois.json 2026-12 valide 1797500000000 2026-12-21=C/C 2026-12-22=C/S 2026-12-23=T/C 2026-12-24=?/? 2026-12-25=F/F
+install -m 0644 $T/jours-mois.json $FJM/jours.json
+rm -f /etc/hermes-portail/cra.conf
+cma 2026-12-26 > $T/cma0.log 2>&1; rc=$?
+verif "cra-mois-auto sans cra.conf : ne fait rien (code 0, rien tenté)" bash -c "[ $rc = 0 ] && [ ! -s $T/cma0.log ] && [ \"$(valides_mois 2026-12)\" = 0 ] && [ ! -s $MT ]"
+printf 'adresse=%s\njarvis_donnees=%s\n' "$FC" "$FJM" > /etc/hermes-portail/cra.conf; chmod 0600 /etc/hermes-portail/cra.conf
+cma 2026-12-26 > $T/cma1.log 2>&1; rc=$?
+verif "cra-mois-auto avec le seul CRA de la semaine dans cra.conf (pas d'adresse_mois) : ne fait rien" bash -c "[ $rc = 0 ] && [ ! -s $T/cma1.log ] && [ \"$(valides_mois 2026-12)\" = 0 ] && [ ! -s $MT ]"
+printf 'adresse_mois=%s\n' "$FA" >> /etc/hermes-portail/cra.conf
+rm -f $FJM/jours.json; install -m 0600 $T/jours-mois.json $T/jours-mois-root.json; ln -s $T/jours-mois-root.json $FJM/jours.json
+cma 2026-12-26 > $T/cma2.log 2>&1; rc=$?
+verif "cra-mois-auto : un jours.json en lien n'est pas suivi (rien tenté, il le dit à la main)" bash -c "[ $rc = 0 ] && grep -q 'rien à faire (jours.json absent ou illisible' $T/cma2.log && [ \"$(valides_mois 2026-12)\" = 0 ] && [ ! -s $MT ]"
+rm -f $FJM/jours.json; install -m 0644 $T/jours-mois.json $FJM/jours.json
+cma 2026-12-24 > $T/cma3.log 2>&1
+verif "cra-mois-auto : un mois validé dans JARVIS attend le 26 (rien le 24)" bash -c "grep -q 'décembre 2026 : avant le 26' $T/cma3.log && [ \"$(valides_mois 2026-12)\" = 0 ] && [ ! -s $MT ]"
+cp $T/jours-mois.json $T/jours-mois-pas-valide.json; jours_mois $T/jours-mois-pas-valide.json 2026-12 a_valider 0; install -m 0644 $T/jours-mois-pas-valide.json $FJM/jours.json
+cma 2026-12-26 > $T/cma4.log 2>&1
+verif "cra-mois-auto : le 26, un mois pas validé dans JARVIS n'est pas touché" bash -c "grep -q 'décembre 2026 : pas validé dans JARVIS' $T/cma4.log && [ \"$(valides_mois 2026-12)\" = 0 ] && [ ! -s $MT ]"
+install -m 0644 $T/jours-mois.json $FJM/jours.json
+: > $T/traces/modele.jsonl
+cma 2026-12-26 > $T/cma5.log 2>&1; rc=$?
+verif "cra-mois-auto : la consigne du mois validé (congé, demi-journées, férié ; mission 20, congé 2, férié 1, sur 23 jours ouvrés)" bash -c "python3 -I - $T/traces/modele.jsonl <<'PY'
+import json, sys
+c = [json.loads(l) for l in open(sys.argv[1])][0]['corps']
+t = ' '.join(m['content'] if isinstance(m['content'], str) else ' '.join(x.get('text', '') for x in m['content']) for m in c['messages'] if m['role'] == 'user')
+ok = t.lstrip().startswith('MODE CRA DU MOIS, ') and 'décembre 2026' in t and 'mission 20 jour(s), congé payé 2 jour(s), absence pour jour férié 1 jour(s), sur 23 jours ouvrés' in t
+ok = ok and 'lundi 21/12/2026 : congé' in t and 'mardi 22/12/2026 : matin congé, après-midi mission' in t and 'mercredi 23/12/2026 : matin mission, après-midi congé' in t and 'vendredi 25/12/2026 : férié' in t and 'jeudi 24/12/2026 : mission' in t
+sys.exit(0 if ok else 1)
+PY"
+RMA=/var/lib/hermes-portail-retours/mois-2026-12.json
+verif "cra-mois-auto : une seule validation, mois noté à root (mois-valides et la tentative de ce oui)" bash -c "[ $rc = 0 ] && grep -q 'Résultat CRA du mois : validee' $T/cma5.log && [ \"$(valides_mois 2026-12)\" = 1 ] && grep -q '^2026-12 .* validee$' $MV && grep -qx '2026-12:1797500000000' $MT && [ \"\$(stat -c '%U %a' $MT)\" = 'root 600' ]"
+verif "cra-mois-auto : compte rendu pour l'espace Travail (root 640, « validee », première exécution, fin de mission lue, posé par la minuterie)" bash -c "[ \"\$(stat -c '%U %a' $RMA)\" = 'root 640' ] && python3 -I -c \"import json,sys; r=json.load(open('$RMA')); sys.exit(0 if r['resultat']=='validee' and r['premiere'] is True and r['auto'] is True and r['fin']=='2026-12-31' and r['mois']=='2026-12' else 1)\""
+verif "cra-mois-auto : un avis pour JARVIS, une fois (« Première exécution d'Hermes : CRA de décembre 2026 validé », fin de mission)" bash -c "[ \"\$(ls $AV | grep -c '^avis-.*-cra-mois-2026-12.json$')\" = 1 ] && python3 -I -c \"import json,sys,glob; a=json.load(open(glob.glob('$AV/avis-*-cra-mois-2026-12.json')[0])); sys.exit(0 if a['titre']=='Première exécution d\\'Hermes : CRA de décembre 2026 validé' and '31/12/2026' in a['texte'] and 'Vérifie' in a['texte'] else 1)\""
+cma 2026-12-27 > $T/cma6.log 2>&1
+verif "cra-mois-auto : un mois déjà validé par Hermes ne repart jamais (rien, pas de second avis)" bash -c "grep -q 'décembre 2026 : déjà validé par Hermes' $T/cma6.log && [ \"$(valides_mois 2026-12)\" = 1 ] && [ \"\$(ls $AV | wc -l)\" = 1 ]"
+# la limite du forfait : coupée avant tout contact avec le portail → repart une fois après la levée
+jours_mois $FJM/jours.json 2027-01 valide 1798000000000 2027-01-01=F/F
+mois_suite $T/mois-auto-01.txt 2027-01 '2027-01-21:journee:Mission,2027-01-22:journee:Mission,2027-01-25:journee:Mission,2027-01-26:journee:Mission,2027-01-27:journee:Mission,2027-01-28:journee:Mission,2027-01-29:journee:Mission' 31/01/2027
+n0=$(cases_mois 2027-01)
+cma 2027-01-26 $T/passage-limite $T/relais-claude $T/mois-auto-01.txt > $T/cma7.log 2>&1; rc=$?
+verif "cra-mois-auto, limite avant tout contact (relais : Claude seul) : rien saisi, pas compté comme tenté, une relance prévue sur sa minuterie, aucun compte rendu d'échec" bash -c "[ $rc = 0 ] && [ \"$(cases_mois 2027-01)\" = $n0 ] && [ \"$(valides_mois 2027-01)\" = 0 ] && ! grep -q '^2027-01:' $MT && grep -q hermes-portail-cra-mois.service $LIMV/relance-cra-mois.json && grep -q 'relancé automatiquement' $T/cma7.log && [ ! -e /var/lib/hermes-portail-retours/mois-2027-01.json ]"
+attente 3600; cma 2027-01-26 '' '' $T/mois-auto-01.txt > $T/cma8.log 2>&1
+verif "cra-mois-auto : tant que la limite tient, rien n'est tenté" bash -c "grep -q 'Limite du forfait Claude jusqu' $T/cma8.log && [ \"$(valides_mois 2027-01)\" = 0 ] && ! grep -q '^2027-01:' $MT"
+attente -60; cma 2027-01-26 '' '' $T/mois-auto-01.txt > $T/cma9.log 2>&1
+R01=/var/lib/hermes-portail-retours/mois-2027-01.json
+verif "cra-mois-auto : la limite levée, le mois repart une fois et est validé (pas une « première exécution »)" bash -c "grep -q 'Résultat CRA du mois : validee' $T/cma9.log && [ \"$(valides_mois 2027-01)\" = 1 ] && grep -q '^2027-01:' $MT && python3 -I -c \"import json,sys; r=json.load(open('$R01')); sys.exit(0 if r['resultat']=='validee' and r['premiere'] is False else 1)\" && ls $AV | grep -q 'cra-mois-2027-01'"
+rm -f $LIMV/relance-cra-mois.json
+jours_mois $FJM/jours.json 2027-02 valide 1798100000000
+attente -60; cma 2027-02-26 $T/passage-limite $T/relais-portail > $T/cma10.log 2>&1
+R02=/var/lib/hermes-portail-retours/mois-2027-02.json
+verif "cra-mois-auto, limite après contact avec le portail : jamais relancé, compté ; compte rendu et avis « à relancer à la main »" bash -c "grep -q '^2027-02:' $MT && [ ! -e $LIMV/relance-cra-mois.json ] && python3 -I -c \"import json,sys,glob; r=json.load(open('$R02')); a=json.load(open(sorted(glob.glob('$AV/avis-*-cra-mois-2027-02.json'))[-1])); sys.exit(0 if r['resultat']=='echec' and 'vérifie' in r['texte'] and a['titre']=='CRA de février 2027 : à relancer à la main' else 1)\" && ! grep -q '^2027-02 ' $MV"
+jours_mois $FJM/jours.json 2027-03 valide 1798200000000
+attente -60; cma 2027-03-26 $T/passage-limite $T/relais-claude > $T/cma11.log 2>&1
+attente -60; cma 2027-03-26 $T/passage-limite $T/relais-claude > $T/cma12.log 2>&1
+R03=/var/lib/hermes-portail-retours/mois-2027-03.json
+verif "cra-mois-auto, coupé deux fois avant contact pour le même oui : plus de relance, compté ; « deux fois », « à la main »" bash -c "grep -q '^2027-03:' $MT && python3 -I -c \"import json,sys; r=json.load(open('$R03')); sys.exit(0 if r['resultat']=='echec' and 'deux fois' in r['texte'] and 'main' in r['texte'] else 1)\" && [ \"$(valides_mois 2027-03)\" = 0 ]"
+verif "relance après la limite : l'unité du CRA du mois est connue (planifier l'accepte, une inconnue est refusée)" bash -c "d=\$(mktemp -d); echo '{}' > \$d/d.json; python3 -I /usr/local/lib/hermes-portail/limite.py planifier --dossier \$d --tache cra-mois --cle 'x:1' --unite hermes-portail-cra-mois.service --depuis \$d/d.json >/dev/null && ! python3 -I /usr/local/lib/hermes-portail/limite.py planifier --dossier \$d --tache cra-mois --cle 'x:2' --unite autre.service --depuis \$d/d.json >/dev/null; r=\$?; rm -rf \$d; [ \$r = 0 ]"
+rm -f /etc/hermes-portail/cra.conf $MV $MT; rm -rf /var/lib/hermes-portail-retours $LIMV $AV
+
 echo "== Ce qu'Hermes apprend d'un portail"
 N=/var/lib/hermes-portail/notes/127.0.0.1.txt
 verif "les deux notes utiles du passage sont gardées, à root seul" bash -c "[ \"\$(stat -c '%U %a' $N)\" = 'root 600' ] && [ \"\$(wc -l < $N)\" = 2 ] && grep -q 'Enregistrer sans envoyer' $N && grep -q '/depense/nouvelle' $N"
