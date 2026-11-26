@@ -32,6 +32,20 @@ DEPENSES = [('FRAIS-0001', 'Abonnement logiciel (inventé)', '20,00 €', 'Valid
 
 ETAPES = {}            # jeton d'étape (mot de passe accepté, code attendu) -> heure de fin
 FEUILLES = {}          # feuilles de temps du banc : date du lundi (MM/JJ/AAAA) -> quantités et état
+ACTIVITES = {}         # 26/11/2026 : comptes rendus d'activité du mois (AAAA-MM) -> {date: [matin, après-midi]}, statut
+
+
+def activite_du_mois(m):
+    # un mois du banc à moitié saisi (données inventées) : les jours ouvrés jusqu'au 20 sont en mission, sauf le 11 (férié)
+    if m not in ACTIVITES:
+        import calendar, datetime
+        a, mo = int(m[:4]), int(m[5:7]); cases = {}
+        for j in range(1, calendar.monthrange(a, mo)[1] + 1):
+            d = datetime.date(a, mo, j)
+            if d.weekday() < 5:
+                cases[d.isoformat()] = (['Absence (Jours fériés)'] * 2 if j == 11 else ['Mission'] * 2) if j <= 20 else ['', '']
+        ACTIVITES[m] = {'cases': cases, 'statut': 'Saisie en cours'}
+    return ACTIVITES[m]
 
 
 def totp(cle, instant):
@@ -142,6 +156,20 @@ class P(BaseHTTPRequestHandler):
                 '<table id="grille"><tr><th>Code</th><th>Lun</th><th>Mar</th><th>Mer</th><th>Jeu</th><th>Ven</th></tr><tr><td>R002 - Regular Day</td>%s</tr></table>'
                 '<button type="submit" id="save">Save</button> <button type="submit" formaction="/feuille/submit" id="submit">Submit</button></form>'
                 '<table id="statut"><tr><th>Reported Time Status</th></tr><tr><td id="etat">%s</td></tr></table>' % (html.escape(d), html.escape(d), cases, html.escape(f['etat'] or ''))))
+        if chemin == '/activite':   # 26/11/2026 : un compte rendu d'activité du mois, chaque clic s'enregistre, puis « Valider »
+            q = parse_qs(self.path.split('?', 1)[1]) if '?' in self.path else {}
+            m = (q.get('mois') or ['2026-11'])[0][:7]; A = activite_du_mois(m)
+            note(evenement='activite', mois=m, statut=A['statut'])
+            lignes = ''.join('<tr><td>%s</td><td class="matin">%s</td><td class="apres-midi">%s</td></tr>' % (d, html.escape(v[0]), html.escape(v[1])) for d, v in sorted(A['cases'].items()))
+            return self.rendre(200, page('Compte rendu d’activité (banc)',
+                '<p>Mois : %s · Statut : <b id="statut">%s</b> · Fin de mission : <span id="fin">30/11/2026</span></p>'
+                '<table id="mois"><tr><th>Jour</th><th>Matin</th><th>Après-midi</th></tr>%s</table>'
+                '<form method="post" action="/activite/case" id="case"><input name="mois" id="c_mois" value="%s"><input name="date" id="c_date">'
+                '<select name="moitie" id="c_moitie"><option>journee</option><option>matin</option><option>apres-midi</option></select>'
+                '<select name="activite" id="c_activite"><option>Mission</option><option>Congé payé</option><option>Absence (Jours fériés)</option></select>'
+                '<button type="submit" id="c_ok">OK</button></form>'
+                '<form method="post" action="/activite/valider"><input type="hidden" name="mois" value="%s"><button type="submit" id="valider">Valider ce compte rendu d’activité</button></form>'
+                % (html.escape(m), html.escape(A['statut']), lignes, html.escape(m), html.escape(m))))
         if chemin == '/deconnexion':
             SESSIONS.pop(s, None)
             note(evenement='deconnexion')
@@ -189,6 +217,20 @@ class P(BaseHTTPRequestHandler):
             f['etat'] = 'Submitted' if chemin.endswith('submit') else 'Saved'
             note(evenement='CRA-SUBMIT' if chemin.endswith('submit') else 'CRA-SAVE', date=d, qty=f['qty'])
             return self.vers('/feuille?date=' + d)
+        if chemin in ('/activite/case', '/activite/valider'):
+            if not self.session():
+                return self.vers('/connexion')
+            m = champs.get('mois', '')[:7]; A = activite_du_mois(m)
+            if A['statut'] != 'Saisie en cours':
+                note(evenement='CRA-MOIS-DEJA', mois=m); return self.vers('/activite?mois=' + m)
+            if chemin.endswith('valider'):
+                A['statut'] = 'En attente'
+                note(evenement='CRA-MOIS-VALIDER', mois=m, cases=A['cases']); return self.vers('/activite?mois=' + m)
+            d, moitie, act = champs.get('date', '')[:10], champs.get('moitie', 'journee'), champs.get('activite', '')[:40]
+            if d in A['cases']:
+                for k in ([0, 1] if moitie == 'journee' else [0] if moitie == 'matin' else [1]): A['cases'][d][k] = act
+            note(evenement='CRA-MOIS-CASE', mois=m, date=d, moitie=moitie, activite=act)
+            return self.vers('/activite?mois=' + m)
         if chemin == '/depense/enregistrer':
             if not self.session():
                 return self.vers('/connexion')

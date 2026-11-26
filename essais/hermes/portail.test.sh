@@ -311,24 +311,73 @@ FIN
 HERMES_BANC_AUJOURDHUI=2026-11-26 HERMES_BANC_CONSIGNE_EN_PLUS=$T/cra-blanc.txt bash /usr/local/sbin/hermes-portail cra $FC --semaine 2026-11-30 --jours 2026-11-30 --a-blanc > $T/cra-blanc.log 2>&1; rc=$?
 verif "cra --a-blanc : « MODE CRA À BLANC », possible avant le vendredi, rien d'enregistré sur le portail ni chez root" bash -c "[ $rc = 0 ] && grep -q 'Résultat CRA : blanc' $T/cra-blanc.log && grep -q 'MODE CRA À BLANC' $T/traces/modele.jsonl && ! grep -q '2026-11-30' /var/lib/hermes-portail/cra/soumises.txt && ! grep -q 'CRA-SAVE.*11/30' $T/traces/portail.jsonl"
 echo "== CRA de la semaine : la minuterie (une semaine confirmée dans JARVIS)"
-FJD=$T/jarvis-donnees; rm -rf $FJD; install -d -m 0755 $FJD; rm -f /var/lib/hermes-portail/cra/soumises.txt /var/lib/hermes-portail/cra/tentees.txt
+FJD=$T/jarvis-donnees; rm -rf $FJD /var/lib/hermes-portail-retours; install -d -m 0755 $FJD; rm -f /var/lib/hermes-portail/cra/soumises.txt /var/lib/hermes-portail/cra/tentees.txt
 rm -f /etc/hermes-portail/cra.conf
 verif "cra-auto sans cra.conf : ne fait rien (code 0)" bash -c "bash /usr/local/sbin/hermes-portail cra-auto > /dev/null 2>&1 && [ ! -e $FJD/portail-retours ]"
 printf 'adresse=%s\njarvis_donnees=%s\n' "$FC" "$FJD" > /etc/hermes-portail/cra.conf; chmod 0600 /etc/hermes-portail/cra.conf
-cat > $FJD/jours.json <<'FIN'
+cat > $T/jours-valide.json <<'FIN'
 {"version": 1, "mois": {}, "semaines": {"2026-11-30": {"etat": "valide", "valide": {"at": 1796000000000, "jours": [{"date": "2026-11-30", "q": 1}, {"date": "2026-12-01", "q": 0}, {"date": "2026-12-02", "q": 1}, {"date": "2026-12-03", "q": 1}, {"date": "2026-12-04", "q": 1}]}},
   "2026-11-16": {"etat": "a_valider", "jours": []}}}
 FIN
 cra_suite $T/cra-auto.txt 11/30/2026 1 '' 1 1 1 'État : Submitted\nRésultat : soumise'
 n0=$(grep -c CRA-SUBMIT $T/traces/portail.jsonl)
+# 26/11/2026 (faille vue par la session du serveur) : jours.json en lien (posé par l'utilisateur de JARVIS) n'est pas suivi par root
+install -m 0600 $T/jours-valide.json $T/jours-root.json; ln -s $T/jours-root.json $FJD/jours.json
+HERMES_BANC_AUJOURDHUI=2026-12-04 HERMES_BANC_JARVIS_U=nobody HERMES_BANC_CONSIGNE_EN_PLUS=$T/cra-auto.txt bash /usr/local/sbin/hermes-portail cra-auto > $T/cra-auto-lien.log 2>&1; rc=$?
+verif "cra-auto : un jours.json en lien n'est pas suivi (rien saisi, rien tenté)" bash -c "[ $rc = 0 ] && [ \"\$(grep -c CRA-SUBMIT $T/traces/portail.jsonl)\" = $n0 ] && [ ! -s /var/lib/hermes-portail/cra/tentees.txt ]"
+rm -f $FJD/jours.json; install -m 0644 $T/jours-valide.json $FJD/jours.json
+ln -s /etc $FJD/portail-retours   # l'ancien dossier des comptes rendus, piégé : root n'y écrit plus
 HERMES_BANC_AUJOURDHUI=2026-12-03 HERMES_BANC_JARVIS_U=nobody HERMES_BANC_CONSIGNE_EN_PLUS=$T/cra-auto.txt bash /usr/local/sbin/hermes-portail cra-auto > $T/cra-auto0.log 2>&1
 verif "cra-auto : une semaine confirmée attend son vendredi (rien avant)" bash -c "[ \"\$(grep -c CRA-SUBMIT $T/traces/portail.jsonl)\" = $n0 ] && [ ! -s /var/lib/hermes-portail/cra/tentees.txt ]"
 HERMES_BANC_AUJOURDHUI=2026-12-04 HERMES_BANC_JARVIS_U=nobody HERMES_BANC_CONSIGNE_EN_PLUS=$T/cra-auto.txt bash /usr/local/sbin/hermes-portail cra-auto > $T/cra-auto.log 2>&1; rc=$?
-R=$FJD/portail-retours/cra-2026-11-30.json
-verif "cra-auto : la semaine confirmée (lun, mer, jeu, ven) est saisie et soumise ; compte rendu pour JARVIS (« soumise », première exécution), à l'utilisateur de JARVIS, 600" bash -c "[ $rc = 0 ] && [ \"\$(grep -c CRA-SUBMIT $T/traces/portail.jsonl)\" = $((n0 + 1)) ] && grep CRA-SUBMIT $T/traces/portail.jsonl | tail -1 | grep -q '\"qty\": \[\"1\", \"\", \"1\", \"1\", \"1\"\]' && python3 -I -c \"import json,sys; r=json.load(open('$R')); sys.exit(0 if r['resultat']=='soumise' and r['premiere'] is True and r['semaine']=='2026-11-30' and 'Submitted' in r['texte'] else 1)\" && [ \"\$(stat -c '%U %a' $R)\" = 'nobody 600' ]"
+R=/var/lib/hermes-portail-retours/cra-2026-11-30.json; GN=$(id -gn nobody)
+verif "cra-auto : compte rendu dans le dossier de root (root et groupe de JARVIS, 750 et 640), rien écrit chez JARVIS ni par son ancien lien" bash -c "[ \"\$(stat -c '%U %G %a' /var/lib/hermes-portail-retours)\" = 'root $GN 750' ] && [ \"\$(stat -c '%U %G %a' $R)\" = 'root $GN 640' ] && [ ! -e /etc/cra-2026-11-30.json ] && [ -z \"\$(find $FJD -newer $T/jours-valide.json -mindepth 1 ! -name jours.json ! -name portail-retours 2>/dev/null)\" ]"
+verif "cra-auto : la semaine confirmée (lun, mer, jeu, ven) est saisie et soumise ; compte rendu pour JARVIS (« soumise », première exécution)" bash -c "[ $rc = 0 ] && [ \"\$(grep -c CRA-SUBMIT $T/traces/portail.jsonl)\" = $((n0 + 1)) ] && grep CRA-SUBMIT $T/traces/portail.jsonl | tail -1 | grep -q '\"qty\": \[\"1\", \"\", \"1\", \"1\", \"1\"\]' && python3 -I -c \"import json,sys; r=json.load(open('$R')); sys.exit(0 if r['resultat']=='soumise' and r['premiere'] is True and r['semaine']=='2026-11-30' and 'Submitted' in r['texte'] else 1)\""
 HERMES_BANC_AUJOURDHUI=2026-12-04 HERMES_BANC_JARVIS_U=nobody HERMES_BANC_CONSIGNE_EN_PLUS=$T/cra-auto.txt bash /usr/local/sbin/hermes-portail cra-auto > $T/cra-auto2.log 2>&1
 verif "cra-auto : une seule tentative par oui ; une semaine soumise ne repart pas ; une semaine pas confirmée n'est pas touchée" bash -c "[ \"\$(grep -c CRA-SUBMIT $T/traces/portail.jsonl)\" = $((n0 + 1)) ] && [ \"\$(wc -l < /var/lib/hermes-portail/cra/tentees.txt)\" = 1 ] && ! grep -q '2026-11-16' /var/lib/hermes-portail/cra/tentees.txt"
-rm -f /etc/hermes-portail/cra.conf
+rm -f /etc/hermes-portail/cra.conf $FJD/portail-retours; rm -rf /var/lib/hermes-portail-retours
+
+echo "== CRA du mois (26/11/2026 : Hermes à la place de Chronos, le 26)"
+FA=http://127.0.0.1:$PP/activite; rm -f /var/lib/hermes-portail/cra/mois-valides.txt
+python3 -I - "$FA" $T/mois-suite.txt validé <<'PY'
+import json, sys
+fa, f, fin = sys.argv[1:4]
+cases = [("2026-11-23", "journee", "Congé payé"), ("2026-11-24", "matin", "Congé payé"), ("2026-11-24", "apres-midi", "Mission")] + [(d, "journee", "Mission") for d in ("2026-11-25", "2026-11-26", "2026-11-27", "2026-11-30")]
+code = "# Compléter les jours vides\nnew_tab('%s?mois=2026-11')\nwait_for_load()\n" % fa
+for d, mo, ac in cases:
+    code += "js(\"document.querySelector('#c_date').value='%s'; document.querySelector('#c_moitie').value='%s'; document.querySelector('#c_activite').value='%s'; document.querySelector('#c_ok').click()\")\nwait_for_load()\n" % (d, mo, ac)
+code += "print(js(\"document.querySelector('#statut').innerText\"))"
+suite = [{"nom": "browser_exec", "args": {"code": code}}]
+if fin == "validé":
+    suite.append({"nom": "browser_exec", "args": {"code": "# Valider\njs(\"document.querySelector('#valider').click()\")\nwait_for_load()\nprint(js(\"document.querySelector('#statut').innerText\"))"}})
+open(f, "w").write("SUITE: " + json.dumps(suite, ensure_ascii=False) + "\nDIRE: " + json.dumps("Complété : 23 (congé), 24 (matin congé, après-midi mission), 25, 26, 27, 30 (mission).\nStatut : En attente\nFin de mission : 30/11/2026\nRésultat : validé", ensure_ascii=False) + "\n")
+PY
+verif "cra-mois : un mois mal écrit, un samedi, un jour d'un autre mois, une demi-journée inconnue : refusés" bash -c "bash /usr/local/sbin/hermes-portail cra-mois $FA --mois 2026-13 2>&1 | grep -q 'Mois attendu' && bash /usr/local/sbin/hermes-portail cra-mois $FA --mois 2026-11 --conges 2026-11-28 2>&1 | grep -q 'pas ouvré' && bash /usr/local/sbin/hermes-portail cra-mois $FA --mois 2026-11 --feries 2026-12-01 2>&1 | grep -q 'hors du mois' && bash /usr/local/sbin/hermes-portail cra-mois $FA --mois 2026-11 --conges 2026-11-24:soir 2>&1 | grep -q 'Demi-journée attendue'"
+verif "cra-mois : jamais validé avant le 24 du mois" bash -c "HERMES_BANC_AUJOURDHUI=2026-11-23 bash /usr/local/sbin/hermes-portail cra-mois $FA --mois 2026-11 --conges 2026-11-23 2>&1 | grep -q 'à partir du 24'"
+: > $T/traces/portail.jsonl; : > $T/traces/modele.jsonl
+HERMES_BANC_AUJOURDHUI=2026-11-26 HERMES_BANC_CONSIGNE_EN_PLUS=$T/mois-suite.txt bash /usr/local/sbin/hermes-portail cra-mois $FA --mois 2026-11 --conges 2026-11-23,2026-11-24:matin --feries 2026-11-11 > $T/mois.log 2>&1; rc=$?
+verif "cra-mois : la consigne commence par « MODE CRA DU MOIS », donne chaque jour et le total (mission 18,5, congé 1,5, férié 1, sur 21 jours ouvrés)" bash -c "python3 -I - $T/traces/modele.jsonl <<'PY'
+import json, sys
+c = [json.loads(l) for l in open(sys.argv[1])][0]['corps']
+t = ' '.join(m['content'] if isinstance(m['content'], str) else ' '.join(x.get('text', '') for x in m['content']) for m in c['messages'] if m['role'] == 'user')
+ok = t.lstrip().startswith('MODE CRA DU MOIS, ') and 'novembre 2026' in t and 'mission 18,5 jour(s), congé payé 1,5 jour(s), absence pour jour férié 1 jour(s), sur 21 jours ouvrés' in t
+ok = ok and 'mercredi 11/11/2026 : férié' in t and 'lundi 23/11/2026 : congé' in t and 'mardi 24/11/2026 : matin congé, après-midi mission' in t and 'lundi 02/11/2026 : mission' in t
+sys.exit(0 if ok else 1)
+PY"
+verif "cra-mois : jours vides complétés (journée, demi-journées), une seule validation ; « validee », fin de mission lue, mois noté à root" bash -c "[ $rc = 0 ] && grep -q 'Résultat CRA du mois : validee' $T/mois.log && grep -q 'Fin de mission lue : 2026-11-30' $T/mois.log && [ \"\$(grep -c CRA-MOIS-VALIDER $T/traces/portail.jsonl)\" = 1 ] && [ \"\$(grep -c CRA-MOIS-CASE $T/traces/portail.jsonl)\" = 7 ] && grep CRA-MOIS-VALIDER $T/traces/portail.jsonl | grep -q '\"2026-11-24\": \[\"Congé payé\", \"Mission\"\]' && grep -q '^2026-11 .* validee$' /var/lib/hermes-portail/cra/mois-valides.txt && [ \"\$(stat -c '%U %a' /var/lib/hermes-portail/cra/mois-valides.txt)\" = 'root 600' ]"
+n0=$(wc -l < $T/traces/portail.jsonl)
+HERMES_BANC_AUJOURDHUI=2026-11-26 HERMES_BANC_CONSIGNE_EN_PLUS=$T/mois-suite.txt bash /usr/local/sbin/hermes-portail cra-mois $FA --mois 2026-11 --conges 2026-11-23 > $T/mois2.log 2>&1; rc=$?
+verif "cra-mois : un mois déjà validé par Hermes ne repart jamais (refus avant tout passage)" bash -c "[ $rc != 0 ] && grep -q 'déjà été validé' $T/mois2.log && [ \"\$(wc -l < $T/traces/portail.jsonl)\" = $n0 ]"
+cat > $T/mois-blanc.txt <<FIN
+SUITE: [
+ {"nom": "browser_exec", "args": {"code": "# Lecture\nnew_tab('$FA?mois=2026-10')\nwait_for_load()\nprint(js(\"document.querySelector('#statut').innerText\"))"}}
+]
+DIRE: "Je compléterais le 21 au 30 en mission.\nStatut : Saisie en cours\nFin de mission : 30/11/2026\nRésultat : validé"
+FIN
+: > $T/traces/modele.jsonl; n0=$(wc -l < $T/traces/portail.jsonl)
+HERMES_BANC_AUJOURDHUI=2026-10-05 HERMES_BANC_CONSIGNE_EN_PLUS=$T/mois-blanc.txt bash /usr/local/sbin/hermes-portail cra-mois $FA --mois 2026-10 --a-blanc > $T/mois-blanc.log 2>&1; rc=$?
+verif "cra-mois --a-blanc : « MODE CRA DU MOIS À BLANC », possible avant le 24 ; un « validé » à blanc compte pour un échec ; rien noté chez root ni cliqué" bash -c "[ $rc = 4 ] && grep -q 'Résultat CRA du mois : echec' $T/mois-blanc.log && grep -q 'MODE CRA DU MOIS À BLANC' $T/traces/modele.jsonl && ! grep -q '^2026-10' /var/lib/hermes-portail/cra/mois-valides.txt && ! tail -n +\$(( $n0 + 1 )) $T/traces/portail.jsonl | grep -q 'CRA-MOIS-'"
+rm -f /var/lib/hermes-portail/cra/mois-valides.txt
 
 echo "== Ce qu'Hermes apprend d'un portail"
 N=/var/lib/hermes-portail/notes/127.0.0.1.txt
