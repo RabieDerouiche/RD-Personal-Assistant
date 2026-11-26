@@ -114,7 +114,7 @@ le serveur). Faux portail `essais/hermes/faux_portail.py`, faux terminal `essais
 
 ## Ce que le banc prouve, et ce qu'il ne prouve pas
 
-Prouvé (125 vérifications, 26/11/2026, dont le CRA de la semaine et le CRA du mois) : installation ; outils réduits et politique figée ; clé seulement en ramfs,
+Prouvé (145 vérifications, 26/11/2026, dont le CRA de la semaine, le CRA du mois et la note de télétravail avec sa minuterie) : installation ; outils réduits et politique figée ; clé seulement en ramfs,
 nulle part en clair sur le disque, gardée par jarvis-coffre ; enregistrement dans un faux terminal sans que le mot de
 passe s'affiche ; connexion au faux portail par le coffre, tableau lu, formulaire ouvert, rien de soumis ; mot de
 passe et clé jamais envoyés au modèle ; session gardée au second passage ; coffre verrouillé : refus propre ;
@@ -727,7 +727,7 @@ le motif de l'absence du 11 (non affiché). C'est la première exécution réell
 vérifie sur l'intranet. Les mails de novembre (à son contact du client : 15 jours, congés passés et à venir ; à sa
 chargée de mission : prolongation d'au moins 3 mois) sont partis de sa boîte le 26/11 au matin, après son oui (QCM),
 envoyés par Claude, sans Grok Bot. Depuis : `cra-mois` pose aussi son compte rendu (`mois-<AAAA-MM>.json` : résultat,
-fin de mission) dans le dossier de root pour l'espace « Travail » de JARVIS (en réel seulement) ; banc 127.
+fin de mission) dans le dossier de root pour l'espace « Travail » de JARVIS (en réel seulement) ; banc 145 (avec la note de télétravail).
 **Sa règle du 26/11/2026** : les mails générés (demande du CRA, prolongation) ne passent jamais par Iris : JARVIS ou
 Hermes les envoient directement (« on remplace Grok Bot, on n'ajoute pas de dépendance »). Les congés à venir s'écrivent
 au futur (`mailCraPhrases` de JARVIS, 0.85.0).
