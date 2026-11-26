@@ -365,6 +365,8 @@ ok = ok and 'mercredi 11/11/2026 : férié' in t and 'lundi 23/11/2026 : congé'
 sys.exit(0 if ok else 1)
 PY"
 verif "cra-mois : jours vides complétés (journée, demi-journées), une seule validation ; « validee », fin de mission lue, mois noté à root" bash -c "[ $rc = 0 ] && grep -q 'Résultat CRA du mois : validee' $T/mois.log && grep -q 'Fin de mission lue : 2026-11-30' $T/mois.log && [ \"\$(grep -c CRA-MOIS-VALIDER $T/traces/portail.jsonl)\" = 1 ] && [ \"\$(grep -c CRA-MOIS-CASE $T/traces/portail.jsonl)\" = 7 ] && grep CRA-MOIS-VALIDER $T/traces/portail.jsonl | grep -q '\"2026-11-24\": \[\"Congé payé\", \"Mission\"\]' && grep -q '^2026-11 .* validee$' /var/lib/hermes-portail/cra/mois-valides.txt && [ \"\$(stat -c '%U %a' /var/lib/hermes-portail/cra/mois-valides.txt)\" = 'root 600' ]"
+RM=/var/lib/hermes-portail-retours/mois-2026-11.json
+verif "cra-mois : compte rendu pour l'espace Travail de JARVIS (dossier de root, 640 : validé, fin de mission), rien chez JARVIS" bash -c "[ \"\$(stat -c '%U %a' $RM)\" = 'root 640' ] && python3 -I -c \"import json,sys; r=json.load(open('$RM')); sys.exit(0 if r['resultat']=='validee' and r['fin']=='2026-11-30' and r['mois']=='2026-11' else 1)\""
 n0=$(wc -l < $T/traces/portail.jsonl)
 HERMES_BANC_AUJOURDHUI=2026-11-26 HERMES_BANC_CONSIGNE_EN_PLUS=$T/mois-suite.txt bash /usr/local/sbin/hermes-portail cra-mois $FA --mois 2026-11 --conges 2026-11-23 > $T/mois2.log 2>&1; rc=$?
 verif "cra-mois : un mois déjà validé par Hermes ne repart jamais (refus avant tout passage)" bash -c "[ $rc != 0 ] && grep -q 'déjà été validé' $T/mois2.log && [ \"\$(wc -l < $T/traces/portail.jsonl)\" = $n0 ]"
@@ -377,7 +379,8 @@ FIN
 : > $T/traces/modele.jsonl; n0=$(wc -l < $T/traces/portail.jsonl)
 HERMES_BANC_AUJOURDHUI=2026-10-05 HERMES_BANC_CONSIGNE_EN_PLUS=$T/mois-blanc.txt bash /usr/local/sbin/hermes-portail cra-mois $FA --mois 2026-10 --a-blanc > $T/mois-blanc.log 2>&1; rc=$?
 verif "cra-mois --a-blanc : « MODE CRA DU MOIS À BLANC », possible avant le 24 ; un « validé » à blanc compte pour un échec ; rien noté chez root ni cliqué" bash -c "[ $rc = 4 ] && grep -q 'Résultat CRA du mois : echec' $T/mois-blanc.log && grep -q 'MODE CRA DU MOIS À BLANC' $T/traces/modele.jsonl && ! grep -q '^2026-10' /var/lib/hermes-portail/cra/mois-valides.txt && ! tail -n +\$(( $n0 + 1 )) $T/traces/portail.jsonl | grep -q 'CRA-MOIS-'"
-rm -f /var/lib/hermes-portail/cra/mois-valides.txt
+verif "cra-mois --a-blanc : aucun compte rendu pour JARVIS" bash -c "[ ! -e /var/lib/hermes-portail-retours/mois-2026-10.json ]"
+rm -f /var/lib/hermes-portail/cra/mois-valides.txt; rm -rf /var/lib/hermes-portail-retours
 
 echo "== Ce qu'Hermes apprend d'un portail"
 N=/var/lib/hermes-portail/notes/127.0.0.1.txt
@@ -475,6 +478,150 @@ verif "code par mail : un mail plus ancien que le passage ne compte pas (code 4)
 bash /usr/local/sbin/hermes-portail texte $T/recu/telecharge.pdf > $T/texte.log 2>&1; rc=$?
 verif "texte : le texte de la facture rapportée est lu par le code de JARVIS, sous son utilisateur" bash -c "[ $rc = 0 ] && grep -q 'Total TTC : 1,00 EUR' $T/texte.log"
 unset HERMES_BANC_JARVIS_U HERMES_BANC_JARVIS_SRV HERMES_BANC_JARVIS_DATA
+
+echo "== Note de télétravail (26/11/2026 : Hermes la prépare à blanc le dernier jour ; faux JARVIS, pièces inventées)"
+FT=$T/faux-jarvis-tt; rm -rf $FT; mkdir -p $FT/serveur $FT/donnees $T/tt-drive $T/tt-pas-root; chown $U: $T/tt-pas-root
+for f in jours.mjs radar.mjs notify.mjs pdf.mjs bots.mjs; do cp "$RACINE/jarvis-os/server/$f" $FT/serveur/; done
+# trois PDF inventés (texte simple, police standard), lisibles par pdf.mjs et assemblables par pdfunite
+python3 -I - $FT/serveur <<'PY'
+import sys
+def pdf(chemin, lignes):
+    flux = 'BT /F1 11 Tf 50 780 Td 14 TL ' + ' '.join('(%s) Tj T*' % l.replace('\\', '\\\\').replace('(', '\\(').replace(')', '\\)') for l in lignes) + ' ET'
+    objs = ['<< /Type /Catalog /Pages 2 0 R >>', '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+            '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>',
+            '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>',
+            '<< /Length %d >>\nstream\n%s\nendstream' % (len(flux.encode('latin-1')), flux)]
+    out = b'%PDF-1.4\n'; pos = []
+    for i, o in enumerate(objs, 1):
+        pos.append(len(out)); out += ('%d 0 obj\n%s\nendobj\n' % (i, o)).encode('latin-1')
+    x = len(out)
+    out += ('xref\n0 %d\n0000000000 65535 f \n' % (len(objs) + 1)).encode() + b''.join(('%010d 00000 n \n' % p).encode() for p in pos)
+    out += ('trailer\n<< /Size %d /Root 1 0 R >>\nstartxref\n%d\n%%%%EOF\n' % (len(objs) + 1, x)).encode()
+    open(chemin, 'wb').write(out)
+d = sys.argv[1]
+pdf(d + '/charges.pdf', ['APPEL PREVISIONNEL (document invente)', 'Periode du 01/10/2026 au 31/12/2026', 'Lot 0099 Parking', 'TOTAL DU LOT 30.00 20.00', '0042 Appartement', 'CHARGES GENERALES 300.00', 'TOTAL DU LOT 360.00 240.00'])
+pdf(d + '/taxe.pdf', ['AVIS DE TAXE FONCIERE (document invente)', 'Somme a payer 1 200,00 EUR'])
+pdf(d + '/assurance.pdf', ['ATTESTATION D ASSURANCE (document inventee)', 'Police valable du 01/09/2026 au 01/09/2027'])
+PY
+cat > $FT/serveur/google.mjs <<'FIN'
+// Faux Google du banc pour la note de télétravail : l'agenda « Présence » et les fériés (novembre 2026 inventé), deux mails avec PDF, un PDF du Drive.
+import fs from 'node:fs';
+const ici = (n) => new URL('./' + n, import.meta.url);
+const jour = (d, titre) => ({summary: titre, status: 'confirmed', start: {date: '2026-11-' + String(d).padStart(2, '0')}, end: {date: '2026-11-' + String(d + 1).padStart(2, '0')}});
+export function createGoogle() {
+  return {tool: async (serveur, nom, i) => {
+    if (nom === 'list_calendars') return {calendars: [{id: 'presence-banc', summary: 'Présence'}, {id: 'fr.french#holiday@group.v.calendar.google.com', summary: 'Jours fériés en France'}]};
+    if (nom === 'list_events' && /holiday/.test(i.calendarId)) return {events: [{summary: 'Armistice', description: 'Jour férié', status: 'confirmed', start: {date: '2026-11-11'}, end: {date: '2026-11-12'}}]};
+    if (nom === 'list_events') {
+      const T = [2, 4, 6, 9, 13, 18, 23, 25, 27, 30], S = [3, 5, 10, 12, 19, 24, 26];
+      const ev = [...T.filter((d) => !(d === 30 && fs.existsSync(ici('sans-30')))).map((d) => jour(d, 'Télétravail')), ...S.map((d) => jour(d, 'Hors Domicile')),
+        {summary: 'Congé', status: 'confirmed', start: {date: '2026-11-16'}, end: {date: '2026-11-18'}}, jour(20, 'Télétravail matin'), jour(20, 'Congé après-midi')];
+      return {events: ev};
+    }
+    if (nom === 'search_threads') return /charges/.test(i.query) ? {threads: [{id: 'tc'}]} : /assurance/.test(i.query) ? {threads: [{id: 'ta'}]} : {};
+    if (nom === 'get_thread') return {id: i.threadId, messages: [{id: 'm' + i.threadId, date: '2026-11-02T09:00:00.000Z', sender: 'expediteur@exemple.test',
+      attachments: [{filename: i.threadId === 'tc' ? 'appel-de-charges.pdf' : 'attestation.pdf', mimeType: 'application/octet-stream', size: 900, attachmentId: i.threadId}]}]};
+    if (nom === 'get_attachment') return {size: 900, data: fs.readFileSync(ici(i.attachmentId === 'tc' ? 'charges.pdf' : 'assurance.pdf')).toString('base64url')};
+    if (nom === 'file_pdf' && i.fileId === 'avis-invente-0001') return {id: i.fileId, name: 'avis.pdf', size: 600, data: fs.readFileSync(ici('taxe.pdf')).toString('base64')};
+    if (nom === 'file_pdf') throw new Error('File not found');
+    throw new Error('outil inattendu : ' + nom);   // toute écriture ferait échouer le banc
+  }};
+}
+FIN
+printf '{"google": {"refresh": "jeton-invente-du-banc", "clientId": "x", "clientSecret": "y"}}' > $FT/donnees/state.json
+printf '{"version": 1, "mois": {"2026-11": {"etat": "valide", "corrections": {}, "historique": []}}}' > $FT/donnees/jours.json
+chmod -R a+rX $FT; etat_avant=$(cat $FT/donnees/state.json $FT/donnees/jours.json | sha256sum)
+export HERMES_BANC_JARVIS_U=nobody HERMES_BANC_JARVIS_SRV=$FT/serveur HERMES_BANC_JARVIS_DATA=$FT/donnees
+rm -f /etc/hermes-portail/teletravail.conf; rm -rf /var/lib/hermes-portail/teletravail
+verif "teletravail : sans fichier de réglages, refus (rien n'est lu)" bash -c "bash /usr/local/sbin/hermes-portail teletravail 2>&1 | grep -q 'Réglages attendus'"
+verif "teletravail --reel : refusé (Chronos crée la note tant que la bascule n'est pas faite)" bash -c "bash /usr/local/sbin/hermes-portail teletravail --reel 2>&1 | grep -q 'pas encore en réel'"
+# le modèle des champs (au banc : avec la suite d'appels du faux modèle pour la dépense à blanc)
+cat > /etc/hermes-portail/teletravail-champs.txt <<FIN
+Vendeur : Vendeur invente
+Date : {DATE}
+Montant TTC : {MONTANT}
+Commentaire : Frais de télétravail {MOIS_NOM} {ANNEE} – {JOURS} jours
+SUITE: [
+ {"nom": "browser_exec", "args": {"code": "# Formulaire rempli, puis retour sans enregistrer\nnew_tab('http://127.0.0.1:$PP/depense/nouvelle')\nwait_for_load()\nupload_file('#justificatif', '/var/lib/hermes-portail-depot/justificatif.pdf')\nfill_input('#libelle', 'Frais de télétravail')\ngoto_url('http://127.0.0.1:$PP/tableau')\nwait_for_load()\nprint('annulé')"}}
+]
+FIN
+chmod 0600 /etc/hermes-portail/teletravail-champs.txt
+ttconf() { cat > /etc/hermes-portail/teletravail.conf <<FIN
+# réglages inventés du banc
+nom=Personne Inventee
+debut_mission=01/01/2025
+surface_logement=80.00
+surface_bureau=10.00
+taxe_fonciere_an=${1:-1200.00}
+taxe_habitation_an=0
+autres_taxes_mois=0
+assurance_an=120.00
+eau_mois=
+taxe_fonciere_drive=avis-invente-0001
+charges_requete=subject:charges has:attachment
+charges_nom=\.pdf$
+charges_lot=0042 Appartement
+assurance_requete=subject:assurance has:attachment
+assurance_nom=^attestation.*\.pdf$
+electricite_adresse=http://127.0.0.1:$PP/tableau
+electricite_montant_motif=Total\s+TTC\s*:\s*([0-9][0-9,]*)\s*EUR
+electricite_date_motif=Date\s*:\s*(\d{2})/(\d{2})/(\d{4})
+ndf_adresse=http://127.0.0.1:$PP/tableau
+champs=/etc/hermes-portail/teletravail-champs.txt
+precedent_charges=118.00
+precedent_electricite=1.10
+FIN
+chmod 0600 /etc/hermes-portail/teletravail.conf; }
+ttconf; chmod 0644 /etc/hermes-portail/teletravail.conf
+verif "teletravail : un fichier de réglages lisible par d'autres (pas 600) est refusé" bash -c "bash /usr/local/sbin/hermes-portail teletravail 2>&1 | grep -q 'Réglages attendus'"
+ttconf
+verif "teletravail drive : un PDF du Drive rendu à root (texte lisible) ; un dossier qui n'est pas à root est refusé" bash -c "bash /usr/local/sbin/hermes-portail teletravail drive avis-invente-0001 --vers $T/tt-drive >/dev/null 2>&1 && [ \"\$(stat -c '%U %a' $T/tt-drive/fichier.pdf)\" = 'root 600' ] && grep -q 'Somme a payer 1 200,00 EUR' $T/tt-drive/fichier.txt && ! bash /usr/local/sbin/hermes-portail teletravail drive avis-invente-0001 --vers $T/tt-pas-root >/dev/null 2>&1"
+# la facture d'électricité donnée par root (sans passage d'Hermes), sans essayer la dépense
+install -m 0600 /usr/local/lib/hermes-portail/justificatif-essai.pdf $T/elec.pdf
+HERMES_BANC_AUJOURDHUI=2026-11-30 bash /usr/local/sbin/hermes-portail teletravail --mois 2026-11 --electricite $T/elec.pdf --sans-depense --diagnostic > $T/tt1.log 2>&1; rc=$?
+N=/var/lib/hermes-portail/teletravail/2026-11
+verif "teletravail : jours de JARVIS (10,5 jours de télétravail, demi-journée comprise, sur 21 ouvrés, férié compté au dénominateur), pièces trouvées, aucune valeur affichée au diagnostic" bash -c "[ $rc = 0 ] && grep -q 'Jours de télétravail : 10,5 sur 21 jours ouvrés' $T/tt1.log && grep -q 'charges_total oui' $T/tt1.log && grep -q 'Résultat télétravail : prete' $T/tt1.log && ! grep -q '14,44\|120,00\|1 200,00' $T/tt1.log"
+verif "teletravail : calcul du classeur (total au centime : 14,44), champs de la dépense au dernier jour du mois" bash -c "python3 -I -c \"import json,sys; r=json.load(open('$N/resultat.json')); sys.exit(0 if r['total'] == 14.44 and r['charges'] == 120.0 and r['jours_tt'] == 10.5 else 1)\" && grep -q '^Date : 30/11/2026$' $N/champs.txt && grep -q '^Montant TTC : 14,44$' $N/champs.txt && grep -q 'Frais de télétravail novembre 2026 – 10,5 jours' $N/champs.txt"
+verif "teletravail : un seul PDF, synthèse puis les 4 pièces dans l'ordre, à root seul ; la synthèse (Chromium d'Hermes) porte le « 0,5 » et le total ; son dossier de travail effacé" bash -c "[ \"\$(stat -c '%U %a' $N/note-2026-11.pdf)\" = 'root 600' ] && [ \"\$(pdfinfo $N/note-2026-11.pdf | awk '/^Pages:/{print \$2}')\" = 5 ] && pdftotext -f 1 -l 1 $N/note-2026-11.pdf - | grep -q 'Total mensuel : 14,44' && pdftotext -f 1 -l 1 $N/note-2026-11.pdf - | grep -q '0,5' && pdftotext -f 2 -l 2 $N/note-2026-11.pdf - | grep -q 'APPEL PREVISIONNEL' && pdftotext -f 5 -l 5 $N/note-2026-11.pdf - | grep -q 'FACTURE D.ESSAI' && [ ! -e $H/.teletravail ]"
+verif "teletravail : l'état de JARVIS (state.json, jours.json) n'est jamais réécrit ; aucune copie laissée" bash -c "[ \"$etat_avant\" = \"\$(cat $FT/donnees/state.json $FT/donnees/jours.json | sha256sum)\" ] && ! ls -d /tmp/jarvis-tt-* >/dev/null 2>&1"
+# garde-fous
+printf '{"2026-10": {"charges": 118.0, "electricite": 5.00, "total": 9.99, "jours_tt": 8}}' > /var/lib/hermes-portail/teletravail/historique.json
+HERMES_BANC_AUJOURDHUI=2026-11-30 bash /usr/local/sbin/hermes-portail teletravail --mois 2026-11 --electricite $T/elec.pdf --sans-depense > $T/tt2.log 2>&1; rc=$?
+verif "garde-fou : électricité très différente du mois d'avant → arrêt (code 2), sans montant affiché" bash -c "[ $rc = 2 ] && grep -q 'electricite : écart de plus de 50 %' $T/tt2.log && grep -q 'Résultat télétravail : arret' $T/tt2.log && ! grep -q '5,00\|1,00' $T/tt2.log"
+rm -f /var/lib/hermes-portail/teletravail/historique.json; ttconf 1300.00
+HERMES_BANC_AUJOURDHUI=2026-11-30 bash /usr/local/sbin/hermes-portail teletravail --mois 2026-11 --electricite $T/elec.pdf --sans-depense > $T/tt3.log 2>&1; rc=$?
+verif "garde-fou : un avis de taxe foncière qui ne porte pas le montant des réglages (nouvel avis ?) → arrêt" bash -c "[ $rc = 2 ] && grep -q 'nouvel avis' $T/tt3.log"
+ttconf; touch $FT/serveur/sans-30; chmod a+r $FT/serveur/sans-30
+HERMES_BANC_AUJOURDHUI=2026-11-30 bash /usr/local/sbin/hermes-portail teletravail --mois 2026-11 --electricite $T/elec.pdf --sans-depense > $T/tt4.log 2>&1; rc=$?
+verif "garde-fou : un jour ouvré sans lieu ni congé noté (le 30) → arrêt, le jour est dit" bash -c "[ $rc = 2 ] && grep -q 'sans lieu ni congé noté (2026-11-30)' $T/tt4.log"
+rm -f $FT/serveur/sans-30
+# le passage complet : facture d'électricité rapportée de l'espace client par Hermes, puis la dépense remplie et annulée
+cat > $T/tt-suite-elec.txt <<FIN
+SUITE: [
+ {"nom": "browser_exec", "args": {"code": "# Téléchargement de la facture\nimport os, time\nd = '/home/hermes-portail/telechargements'\nnew_tab('http://127.0.0.1:$PP/tableau')\nwait_for_load()\ncdp('Browser.setDownloadBehavior', behavior='allow', downloadPath=d)\njs(\"document.querySelector('#telecharger').click()\")\nf = []\nfor _ in range(30):\n    f = [x for x in os.listdir(d) if not x.endswith('.crdownload')]\n    if f: break\n    time.sleep(1)\nprint('fichier reçu' if f else 'rien reçu')", "timeout_s": 120}}
+]
+FIN
+: > $T/traces/portail.jsonl; : > $T/traces/modele.jsonl
+HERMES_BANC_AUJOURDHUI=2026-11-30 HERMES_BANC_CONSIGNE_EN_PLUS=$T/tt-suite-elec.txt bash /usr/local/sbin/hermes-portail teletravail --mois 2026-11 > $T/tt5.log 2>&1; rc=$?
+verif "teletravail complet : facture rapportée par Hermes (consigne : la facture émise en novembre 2026, lecture seule), dépense à blanc, « Résultat télétravail : blanc »" bash -c "[ $rc = 0 ] && grep -q 'Résultat télétravail : blanc' $T/tt5.log && grep -q 'Fichier rapporté' $T/tt5.log && grep -q 'celle émise en novembre 2026' $T/traces/modele.jsonl && grep -q 'Téléchargement permis' $T/traces/modele.jsonl"
+verif "teletravail complet : la dépense est remplie avec le justificatif unique puis annulée ; le portail n'a rien enregistré ni soumis" bash -c "grep -q 'MODE À BLANC' $T/traces/modele.jsonl && grep -q 'Montant TTC : 14,44' $T/traces/modele.jsonl && grep -q '\"evenement\": \"formulaire\"' $T/traces/portail.jsonl && ! grep -q 'ENREGISTREE\|SOUMISSION' $T/traces/portail.jsonl && [ ! -e /var/lib/hermes-portail-depot/justificatif.pdf ]"
+verif "teletravail : le mois est gardé à root pour le garde-fou du mois suivant (600)" bash -c "[ \"\$(stat -c '%U %a' /var/lib/hermes-portail/teletravail/historique.json)\" = 'root 600' ] && python3 -I -c \"import json; h=json.load(open('/var/lib/hermes-portail/teletravail/historique.json')); assert h['2026-11']['a_blanc'] is True\""
+echo "== Note de télétravail : la minuterie du dernier jour (à blanc, compte rendu pour JARVIS)"
+rm -rf /var/lib/hermes-portail-retours; rm -f /var/lib/hermes-portail/teletravail/tentes.txt
+HERMES_BANC_AUJOURDHUI=2026-11-29 bash /usr/local/sbin/hermes-portail teletravail-auto > $T/tta0.log 2>&1; rc=$?
+verif "teletravail-auto : hors du dernier jour du mois, rien (code 0, aucune tentative, aucun compte rendu)" bash -c "[ $rc = 0 ] && [ ! -s /var/lib/hermes-portail/teletravail/tentes.txt ] && [ ! -e /var/lib/hermes-portail-retours/teletravail-2026-11.json ]"
+n0=$(grep -c ENREGISTREE $T/traces/portail.jsonl)
+HERMES_BANC_AUJOURDHUI=2026-11-30 HERMES_BANC_CONSIGNE_EN_PLUS=$T/tt-suite-elec.txt bash /usr/local/sbin/hermes-portail teletravail-auto > $T/tta1.log 2>&1; rc=$?
+RT=/var/lib/hermes-portail-retours/teletravail-2026-11.json
+verif "teletravail-auto : le dernier jour, la note à blanc ; compte rendu pour JARVIS (root 640 : « blanc », 10,5 jours, aucun montant) ; rien d'enregistré sur le portail" bash -c "[ $rc = 0 ] && grep -q 'Résultat télétravail : blanc' $T/tta1.log && [ \"\$(stat -c '%U %a' $RT)\" = 'root 640' ] && python3 -I -c \"import json,sys; r=json.load(open('$RT')); sys.exit(0 if r['resultat']=='blanc' and r['jours']==10.5 and r['a_blanc'] is True and 'total' not in r and '€' not in r['texte'] and not any(c.isdigit() for c in r['texte']) else 1)\" && [ \"\$(grep -c ENREGISTREE $T/traces/portail.jsonl)\" = $n0 ]"
+m0=$(stat -c %Y $RT)
+HERMES_BANC_AUJOURDHUI=2026-11-30 HERMES_BANC_CONSIGNE_EN_PLUS=$T/tt-suite-elec.txt bash /usr/local/sbin/hermes-portail teletravail-auto > $T/tta2.log 2>&1; rc=$?
+verif "teletravail-auto : une seule tentative par mois" bash -c "[ $rc = 0 ] && [ \"\$(wc -l < /var/lib/hermes-portail/teletravail/tentes.txt)\" = 1 ] && [ ! -s $T/tta2.log ] && [ \"\$(stat -c %Y $RT)\" = $m0 ]"
+rm -f /etc/hermes-portail/teletravail.conf
+verif "teletravail-auto : sans teletravail.conf, rien" bash -c "HERMES_BANC_AUJOURDHUI=2026-12-31 bash /usr/local/sbin/hermes-portail teletravail-auto > /dev/null 2>&1 && ! grep -q 2026-12 /var/lib/hermes-portail/teletravail/tentes.txt"
+rm -rf /var/lib/hermes-portail-retours
+unset HERMES_BANC_JARVIS_U HERMES_BANC_JARVIS_SRV HERMES_BANC_JARVIS_DATA
+rm -f /etc/hermes-portail/teletravail.conf /etc/hermes-portail/teletravail-champs.txt; rm -rf /var/lib/hermes-portail/teletravail
 
 echo "== Garde-fous de la commande"
 runuser -u $U -- bash -c "printf 'x' > $HH/vault/.essai" 2>/dev/null; rm -f $HH/vault/.essai

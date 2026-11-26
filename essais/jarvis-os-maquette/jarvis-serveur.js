@@ -498,6 +498,10 @@
       semaine: (lundi) => req('/api/jours/semaine' + (lundi ? '?lundi=' + encodeURIComponent(lundi) : '')).then((r) => (r.status === 200 ? r.j : null)).catch(() => null),
       semaineConfirmer: (lundi, empreinte) => req('/api/jours/semaine/confirmer', {lundi, empreinte}).then((r) => ({...r.j, ok: r.status === 200})).catch(() => ({ok: false, error: 'Serveur JARVIS injoignable.'})),
       semaineCorriger: (lundi, texte) => req('/api/jours/semaine/corriger', {lundi, texte}).then((r) => ({...r.j, ok: r.status === 200})).catch(() => ({ok: false, error: 'Serveur JARVIS injoignable.'}))},
+    /* 0.85.0 : l'espace « Travail » (une carte par routine : qui, étapes, dates, données prévues) ; « Renommer » garde le titre sur le serveur */
+    travail: {
+      lire: () => req('/api/travail').then((r) => (r.status === 200 ? r.j : null)).catch(() => null),
+      renommer: (id, titre) => req('/api/travail/titre', {id, titre}).then((r) => ({...r.j, ok: r.status === 200})).catch(() => ({ok: false, error: 'Serveur JARVIS injoignable.'}))},
     memoire: {
       liste: () => req('/api/memoire').then((r) => (r.status === 200 ? r.j : null)).catch(() => null),
       ajouter: (texte, source) => req('/api/memoire', {texte, source}).then((r) => r.j).catch(() => ({ok: false, error: 'Serveur injoignable.'})),

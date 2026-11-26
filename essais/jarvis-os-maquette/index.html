@@ -1413,6 +1413,35 @@
   .cost-t tr:last-child td { border-bottom: 0; }
   .draft-snip { margin: 0; font-size: 13px; color: var(--muted); overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
   .mailbox { display: flex; flex-direction: column; gap: 8px; }
+  /* 0.85.0 (son retour du 26/11/2026 : « pas assez en valeur, besoin d'un revamp ») : le brouillon montré comme un vrai mail, modifiable ici */
+  .mailx { position: relative; margin: 4px 0 14px; border-radius: 22px; padding: 16px 16px 14px; background: linear-gradient(180deg, rgba(255, 255, 255, .075), rgba(255, 255, 255, .03)); border: 1px solid rgba(180, 192, 255, .28); box-shadow: 0 18px 40px rgba(0, 0, 0, .35), inset 0 1px 0 rgba(255, 255, 255, .06); }
+  .mailx::before { content: ""; position: absolute; inset: 0 0 auto; height: 3px; border-radius: 22px 22px 0 0; background: var(--iris); opacity: .9; }
+  .mailx-top { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+  .mailx-badge { display: inline-flex; align-items: center; gap: 6px; font: 600 11px var(--sans); letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
+  .mailx-badge .ic { display: inline-flex; }
+  .mailx-when { font-size: 12px; color: var(--dim); }
+  .mailx-edit { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 14px; border-radius: 999px; border: 1px solid rgba(180, 192, 255, .45); background: rgba(180, 192, 255, .1); color: var(--fg); font: 600 13px var(--sans); }
+  .mailx-row { display: grid; grid-template-columns: 2.6rem minmax(0, 1fr); align-items: start; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--line); }
+  .mailx-k { font: 600 11px var(--sans); letter-spacing: .06em; text-transform: uppercase; color: var(--dim); padding-top: 5px; }
+  .mailx-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .mailx-chip { display: inline-flex; align-items: center; max-width: 100%; padding: 3px 10px; border-radius: 999px; background: rgba(180, 192, 255, .12); border: 1px solid rgba(180, 192, 255, .22); font-size: 13.5px; overflow-wrap: anywhere; }
+  .mailx-none { color: var(--amber); font-size: 13.5px; padding-top: 3px; }
+  .mailx-subj { margin: 12px 0 8px; font: 700 18px/1.3 var(--display); overflow-wrap: anywhere; }
+  .mailx-body { margin: 0; padding: 14px 15px; border-radius: 16px; background: rgba(0, 0, 0, .28); border: 1px solid var(--line); font: 400 15.5px/1.6 var(--sans); color: var(--fg); white-space: pre-wrap; overflow-wrap: anywhere; max-height: 46vh; overflow: auto; -webkit-user-select: text; user-select: text; }
+  .mailx-pj { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .mailx-pj span { font-size: 12.5px; padding: 3px 9px; border-radius: 8px; background: rgba(255, 255, 255, .06); border: 1px solid var(--line-2); }
+  .mailx-note { margin: 10px 0 0; font-size: 12.5px; color: var(--muted); }
+  .mailx-warn { margin: 0 0 10px; padding: 9px 12px; border-radius: 12px; background: rgba(var(--warn), .12); border: 1px solid rgba(var(--warn), .35); font-size: 13.5px; }
+  .mailx.is-edit { border-color: rgba(180, 192, 255, .55); }
+  .mailx-f { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
+  .mailx-f label { font: 600 11px var(--sans); letter-spacing: .06em; text-transform: uppercase; color: var(--dim); }
+  .mailx-ta { min-height: 220px; font: 400 15.5px/1.55 var(--sans); }
+  .mailx-err { margin: 0 0 10px; color: var(--danger); font-size: 13.5px; }
+  .mailx-btns { display: flex; flex-direction: column; gap: 8px; }
+  .mailx-btns .btn { width: 100%; justify-content: center; }
+  .draft-card { border-color: rgba(180, 192, 255, .3); }
+  .draft-card .item-title { font-size: 17px; }
+  .draft-to { margin: 2px 0 8px; display: flex; flex-wrap: wrap; gap: 6px; }
   .mail-body { margin: 0; max-height: 42vh; overflow: auto; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--line); background: rgba(0, 0, 0, .25); color: var(--fg); font: 400 13.5px/1.5 var(--sans); white-space: pre-wrap; overflow-wrap: anywhere; -webkit-user-select: text; user-select: text; }
   .yes-l { margin: 0; padding-left: 18px; font-size: 13.5px; color: var(--muted); }
   .yes-p { margin: 0; padding: 10px 12px; border-radius: 12px; border: 1px dashed var(--line-2); font: 400 12.5px/1.45 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; -webkit-user-select: text; user-select: text; }
@@ -2563,7 +2592,7 @@ void main(){
          de Claude suivent. Seul ce qui doit être vu avant de répondre (cfg.extraTop, ex. les jours du CRA) reste au-dessus. */
       if (cfg.smart && cfg.smart.text) s.append(h('p', {class: 'smart'}, h('span', {class: 'ic', html: icon('bolt', 15)}), h('span', {text: cfg.smart.text})));
       if (cfg.extraTop) s.append(cfg.extraTop());
-      s.append(renderActions(cfg.actions || [], (a) => (a.pick || a.confirm) ? renderSheet(a) : finish(a.go(), cfg.ctx)));
+      s.append(renderActions(cfg.actions || [], (a) => a.stay ? a.go() : (a.pick || a.confirm) ? renderSheet(a) : finish(a.go(), cfg.ctx)));
       const facts = (cfg.facts || []).filter((f) => f[1]);
       if (facts.length) {
         const dl = h('dl', {class: 'sheet-facts'}, facts.map(([k, v]) => h('div', {}, h('dt', {text: k}), h('dd', {text: v}))));
@@ -7180,7 +7209,7 @@ void main(){
     S.drafts = (((LV.t.drafts && LV.t.drafts.drafts) || [])).filter((d) => d && d.id && !hide.has(d.id) && !gone.has(d.id)).map((d) => {
       const at = Date.parse(d.date || '') || 0, subj = d.subject || '', key = reSubj(subj);
       const dup = sent.find((s) => s.at > at && ((d.threadId && s.th === d.threadId) || (key && s.subj === key)));
-      return {id: 'dr:' + d.id, draftId: d.id, th: d.threadId || '', to: d.toRecipients || [], cc: d.ccRecipients || [], subject: subj, body: d.plaintextBody || d.snippet || '', at, url: d.viewUrl || '', dup: dup ? dup.at : 0};
+      return {id: 'dr:' + d.id, draftId: d.id, th: d.threadId || '', to: d.toRecipients || [], cc: d.ccRecipients || [], subject: subj, body: d.plaintextBody || d.snippet || '', full: typeof d.plaintextBody === 'string', pieces: d.pieces || [], at, url: d.viewUrl || '', dup: dup ? dup.at : 0};
     }).sort((a, b) => b.at - a.at);
   }
   const mailBox = (to, cc, subject, body, dup) => h('div', {class: 'mailbox'},
@@ -7211,35 +7240,101 @@ void main(){
       if (lvCol('dos', 'Dernier contact')) ops.push(W('Dernier contact', when, 'le dernier contact (' + when + ')'));
       if (lvCol('dos', 'Mis à jour le')) ops.push(W('Mis à jour le', when, 'la date de mise à jour du dossier'));
     }
-    const msg = 'Brouillon envoyé par Rabie depuis JARVIS le ' + stampFr(new Date()) + ' : « ' + subj + ' » à ' + to + (d ? ' (« ' + d.title + ' »)' : '') + '.' + (k ? ' Dossier mis à jour par la page : en attente de ' + to + ', dernier contact le ' + when + '.' : '') + ' Suis la réponse et préviens Rabie quand elle arrive.';
-    return {title: 'Mail envoyé', bot, canalType: 'Réponse', order: msg, say: 'Parti. ' + who + ' suit la réponse.',
-      effect: '« ' + subj + ' » part de ta boîte à ' + to + ', tel quel, pièces jointes comprises.' + (k ? ' Le dossier passe en attente de la réponse.' : '') + ' ' + who + ' reçoit une ligne dans le Canal et sa sonnette.',
+    /* 0.85.0 (sa règle du 26/11/2026 : « les mails ne doivent pas être envoyés par Iris : JARVIS ou Hermes les envoient directement, on remplace
+       Grok Bot, on n'ajoute pas de dépendance ») : le mail part de sa boîte par JARVIS ; aucune ligne ni sonnette pour un bot. La demande liée
+       est close et le dossier passe en attente de la réponse (écritures de Pilotage, sans passage) */
+    void who;
+    return {title: 'Mail envoyé', bot, say: 'Parti, de ta boîte.',
+      effect: '« ' + subj + ' » part de ta boîte à ' + to + ', tel quel, pièces jointes comprises, envoyé par JARVIS : aucun bot n’est réveillé.' + (k ? ' Le dossier passe en attente de la réponse.' : '') + (ln ? ' La demande est close dans le Canal.' : ''),
       draftSend: dr || null, mailSend: tm || null, extraOps: ops, mutate: () => { if (d) drop('demandes', d.id); if (dr) { V17.sentIds.push(dr.draftId); buildDrafts(); } },
       onUndo: () => { if (dr) { V17.sentIds = V17.sentIds.filter((x) => x !== dr.draftId); buildDrafts(); } },
       /* 0.73.0 : envoi refusé par Gmail (brouillon déjà parti, réseau) : le brouillon et la demande reviennent, rien n'est clos */
       onSendFail: () => { if (dr) { V17.sentIds = V17.sentIds.filter((x) => x !== dr.draftId); buildDrafts(); } if (d && d.live) { repUnmark(d); if (!(S.demandes || []).some((x) => x.id === d.id)) S.demandes = (S.demandes || []).concat([d]); } refresh(); }};
   }
-  ACTIONS.draft = (d) => [
-    d.to.length ? act('Envoyer ce mail', {tone: 'main', confirm: true, showExtra: true, cost: 'bot', go: () => { const dem = demandeOfDraft(d); return sentEvent(dem, d, null, dem ? canalLineOf(dem) : null); }}) : null,
-    d.url ? act('Ouvrir dans Gmail', {tone: d.to.length ? 'main2' : 'main', cost: 'free', go: () => { try { window.open(d.url, '_blank'); } catch (e) { /* lien non pris en charge */ } return null; }}) : null,
-    act('Demander une correction à Iris', {pick: {kind: 'text', label: 'Ce qui doit changer', placeholder: 'ex. plus court, ajoute la référence du dossier'}, go: (v) => ({title: 'Correction demandée', bot: 'hydra', canalType: 'Brouillon',
-      order: 'Corrige le brouillon Gmail « ' + (d.subject || 'sans objet') + ' »' + (d.url ? ' (' + d.url + ')' : '') + ' : ' + v.txt + '. Remplace le brouillon dans Gmail, ne l\'envoie pas.', effect: 'Une ligne pour Iris dans le Canal, puis la sonnette.', say: 'Je le corrige.'})}),
+  /* 0.85.0 (son retour du 26/11/2026, capture : l'écran « pas assez en valeur », envoi par Iris, et « peut-on modifier les brouillons dans
+     JARVIS et les envoyer après ? ») : le brouillon en tête, comme un vrai mail (destinataires en pastilles, objet, texte lisible) ;
+     « Envoyer ce mail » le fait partir de sa boîte par JARVIS, sans bot ; « Modifier » ouvre À, Cc, Objet et Texte ici, enregistrés dans
+     Gmail (même brouillon, même fil), puis « Enregistrer et envoyer » demande la même confirmation. Une pièce jointe : à modifier dans Gmail. */
+  const DRED = new Map();   /* brouillon en cours de modification : draftId → {to, cc, subject, body, err, busy} */
+  const draftEdit = (d) => ({to: d.to.join(', '), cc: (d.cc || []).join(', '), subject: d.subject || '', body: d.body || '', err: '', busy: false});
+  const adrList = (s) => String(s || '').split(/[,;\s]+/).map((x) => x.trim()).filter(Boolean);
+  const draftEditable = (d) => !!d.full && !(d.pieces || []).length;
+  function draftRedraw(d) { if (!SH || !SH.cfg || !SH.cfg.ctx || SH.cfg.ctx.type !== 'draft') return; const c = SHEETCFG.draft(d); c.ctx = {type: 'draft', item: d}; SH.cfg = c; renderSheet(null); }
+  function draftCompose(d) {
+    const E = DRED.get(d.draftId);
+    if (!E) {
+      const chips = (l) => h('div', {class: 'mailx-chips'}, l.map((x) => h('span', {class: 'mailx-chip', text: x})));
+      return h('div', {class: 'mailx'},
+        h('div', {class: 'mailx-top'}, h('span', {class: 'mailx-badge'}, h('span', {class: 'ic', html: icon('send', 13)}), 'Brouillon Gmail'), d.at ? h('span', {class: 'mailx-when', text: dayFr(new Date(d.at)) + ' · ' + hmFr(new Date(d.at))}) : null,
+          draftEditable(d) ? h('button', {type: 'button', class: 'mailx-edit', onclick: () => { DRED.set(d.draftId, draftEdit(d)); draftRedraw(d); }}, '✎ Modifier') : null),
+        d.dup ? h('p', {class: 'mailx-warn', text: 'Un mail est déjà parti dans ce fil le ' + dayFr(new Date(d.dup)) + ' à ' + hmFr(new Date(d.dup)) + ' : vérifie avant d’envoyer.'}) : null,
+        h('div', {class: 'mailx-row'}, h('span', {class: 'mailx-k', text: 'À'}), d.to.length ? chips(d.to) : h('span', {class: 'mailx-none', text: 'Personne : ajoute un destinataire (« Modifier »).'})),
+        (d.cc || []).length ? h('div', {class: 'mailx-row'}, h('span', {class: 'mailx-k', text: 'Cc'}), chips(d.cc)) : null,
+        h('h3', {class: 'mailx-subj', text: d.subject || '(sans objet)'}),
+        h('pre', {class: 'mailx-body', text: d.body || '(texte vide)'}),
+        (d.pieces || []).length ? h('div', {class: 'mailx-pj'}, d.pieces.map((n) => h('span', {text: '📎 ' + n}))) : null,
+        !draftEditable(d) ? h('p', {class: 'mailx-note', text: (d.pieces || []).length ? 'Il a une pièce jointe : pour le modifier, ouvre-le dans Gmail (ici, elle serait perdue).' : 'Texte incomplet ici : pour le modifier, ouvre-le dans Gmail.'}) : null);
+    }
+    const inp = (k, label, o) => { const id = 'mx-' + k; const el = h(o && o.area ? 'textarea' : 'input', Object.assign({class: 'inp' + (o && o.area ? ' mailx-ta' : ''), id, oninput: (ev) => { E[k] = ev.target.value; }}, o && o.attrs || {})); el.value = E[k]; return h('div', {class: 'mailx-f'}, h('label', {for: id, text: label}), el); };
+    const save = async (envoyer) => {
+      const to = adrList(E.to), cc = adrList(E.cc), mauvaise = to.concat(cc).find((x) => !EMAIL.test(x));
+      E.err = !to.length ? 'Ajoute au moins un destinataire.' : mauvaise ? 'Adresse à corriger : ' + mauvaise : !String(E.body).trim() ? 'Le texte est vide.' : '';
+      if (E.err) { draftRedraw(d); return; }
+      E.busy = true; draftRedraw(d);
+      try {
+        await lvCall(LV.MAIL, 'update_draft', {draftId: d.draftId, to, cc, subject: E.subject, body: E.body});
+        Object.assign(d, {to, cc, subject: String(E.subject).replace(/[\r\n]+/g, ' ').trim(), body: E.body});
+        const raw = ((LV.t.drafts && LV.t.drafts.drafts) || []).find((x) => x.id === d.draftId);
+        if (raw) Object.assign(raw, {toRecipients: to, ccRecipients: cc, subject: d.subject, plaintextBody: d.body});
+        DRED.delete(d.draftId); buildDrafts(); refresh();
+        if (envoyer) { const a = ACTIONS.draft(d).find((x) => /^Envoyer ce mail/.test(x.label)); draftRedraw(d); if (a) renderSheet(a); }
+        else { draftRedraw(d); toast('Brouillon enregistré', 'Modifié dans Gmail : même brouillon, même fil. Rien n’est parti.'); }
+      } catch (err) { E.busy = false; E.err = 'Pas enregistré : ' + ((err && err.message) || (err && err.code) || 'erreur') + '.'; draftRedraw(d); }
+    };
+    return h('form', {class: 'mailx is-edit', novalidate: true, onsubmit: (ev) => { ev.preventDefault(); save(false); }},
+      h('div', {class: 'mailx-top'}, h('span', {class: 'mailx-badge'}, h('span', {class: 'ic', html: icon('send', 13)}), 'Modifier le brouillon')),
+      inp('to', 'À', {attrs: {type: 'email', multiple: true, autocomplete: 'off', autocapitalize: 'off', spellcheck: 'false', inputmode: 'email'}}),
+      inp('cc', 'Cc', {attrs: {type: 'email', multiple: true, autocomplete: 'off', autocapitalize: 'off', spellcheck: 'false', inputmode: 'email', placeholder: 'personne'}}),
+      inp('subject', 'Objet', {attrs: {type: 'text', maxlength: '300'}}),
+      inp('body', 'Texte', {area: true, attrs: {rows: String(Math.min(18, Math.max(8, String(E.body).split('\n').length + 2)))}}),
+      E.err ? h('p', {class: 'mailx-err', role: 'alert', text: E.err}) : null,
+      h('div', {class: 'mailx-btns'},
+        h('button', {type: 'button', class: 'btn main', disabled: E.busy, onclick: () => save(true)}, E.busy ? 'Enregistrement…' : 'Enregistrer et envoyer', costTag({cost: 'free'})),
+        h('button', {type: 'submit', class: 'btn main2', disabled: E.busy}, 'Enregistrer sans envoyer', costTag({cost: 'free'})),
+        h('button', {type: 'button', class: 'btn ghost', disabled: E.busy, onclick: () => { DRED.delete(d.draftId); draftRedraw(d); }}, 'Annuler les changements')));
+  }
+  ACTIONS.draft = (d) => DRED.has(d.draftId) ? [] : [
+    d.to.length ? act('Envoyer ce mail', {tone: 'main', confirm: true, showExtra: true, cost: 'free', go: () => { const dem = demandeOfDraft(d); return sentEvent(dem, d, null, dem ? canalLineOf(dem) : null); }}) : null,
+    draftEditable(d) ? act(d.to.length ? 'Modifier' : 'Ajouter un destinataire', {tone: d.to.length ? 'main2' : 'main', cost: 'free', stay: true, go: () => { DRED.set(d.draftId, draftEdit(d)); draftRedraw(d); }}) : null,
+    d.url ? act('Ouvrir dans Gmail', {cost: 'free', go: () => { try { window.open(d.url, '_blank'); } catch (e) { /* lien non pris en charge */ } return null; }}) : null,
+    act('Ne plus le montrer ici', {cost: 'free', go: () => { lsSet(DRAFT_HIDE, lsGet(DRAFT_HIDE, []).concat([d.draftId]).slice(-200)); buildDrafts(); refresh(); return null; }}),
     act('Supprimer ce brouillon', {tone: 'danger', confirm: true, showExtra: true, cost: 'free', go: () => ({title: 'Brouillon supprimé', work: false, say: 'Supprimé.',
-      effect: '« ' + (d.subject || 'sans objet') + " » est supprimé de tes brouillons Gmail, définitivement. Rien n'est envoyé.", draftDelete: d, mutate: () => { V17.sentIds.push(d.draftId); buildDrafts(); }, onUndo: () => { V17.sentIds = V17.sentIds.filter((y) => y !== d.draftId); buildDrafts(); }})}),
-    act('Ne plus le montrer ici', {cost: 'free', go: () => { lsSet(DRAFT_HIDE, lsGet(DRAFT_HIDE, []).concat([d.draftId]).slice(-200)); buildDrafts(); refresh(); return null; }})
+      effect: '« ' + (d.subject || 'sans objet') + " » est supprimé de tes brouillons Gmail, définitivement. Rien n'est envoyé.", draftDelete: d, mutate: () => { V17.sentIds.push(d.draftId); buildDrafts(); }, onUndo: () => { V17.sentIds = V17.sentIds.filter((y) => y !== d.draftId); buildDrafts(); }})})
   ].filter(Boolean);
-  SHEETCFG.draft = (d) => ({bot: 'hydra', kicker: 'Brouillon Gmail' + (d.at ? ' · ' + dayFr(new Date(d.at)) : ''), title: d.subject || '(sans objet)',
-    say: d.dup ? "Attention : un mail est déjà parti dans ce fil. Vérifie avant d'envoyer." : d.to.length ? "Relis-le : il part tel quel, de ta boîte, pièces jointes comprises." : "Il n'a pas de destinataire : complète-le dans Gmail.",
-    extra: () => mailBox(d.to, d.cc, d.subject, d.body, d.dup), actions: ACTIONS.draft(d)});
+  SHEETCFG.draft = (d) => ({kicker: 'Brouillon · ' + (d.at ? dayFr(new Date(d.at)) : 'Gmail'), title: d.subject || '(sans objet)',
+    say: DRED.has(d.draftId) ? 'Change ce qu’il faut : c’est enregistré dans Gmail, rien ne part sans ton appui.' : d.dup ? "Attention : un mail est déjà parti dans ce fil. Vérifie avant d'envoyer." : d.to.length ? 'Relis-le : il part de ta boîte, envoyé par JARVIS. Aucun bot n’est réveillé.' : 'Il n’a pas de destinataire : ajoute-le ici.',
+    extraTop: () => draftCompose(d), actions: ACTIONS.draft(d)});
   function draftCard(d) {
-    return h('article', {class: 'card item', style: botVars('hydra')},
-      h('div', {class: 'item-head'}, h('span', {class: 'item-bot', text: 'Brouillon Gmail'}), d.at ? h('span', {class: 'item-when', text: 'du ' + dayFr(new Date(d.at))}) : null, d.dup ? h('span', {class: 'kind', text: 'Déjà envoyé ?'}) : null),
-      h('h3', {class: 'item-title', text: d.subject || '(sans objet)'}), h('p', {class: 'item-ask', text: 'À : ' + (d.to.join(', ') || 'personne')}),
+    return h('article', {class: 'card item draft-card'},
+      h('div', {class: 'item-head'}, h('span', {class: 'item-bot', text: 'Brouillon prêt'}), d.at ? h('span', {class: 'item-when', text: 'du ' + dayFr(new Date(d.at))}) : null, d.dup ? h('span', {class: 'kind', text: 'Déjà envoyé ?'}) : null, (d.pieces || []).length ? h('span', {class: 'kind', text: '📎 ' + d.pieces.length}) : null),
+      h('h3', {class: 'item-title', text: d.subject || '(sans objet)'}),
+      h('div', {class: 'draft-to'}, d.to.length ? d.to.map((x) => h('span', {class: 'mailx-chip', text: x})) : h('span', {class: 'mailx-none', text: 'Sans destinataire'})),
       d.body ? h('p', {class: 'draft-snip', text: d.body.slice(0, 220)}) : null,
-      h('div', {class: 'row-actions'}, h('button', {type: 'button', class: 'btn main', onclick: () => openItem('draft', d)}, d.to.length ? 'Relire et envoyer' : 'Relire', costTag({cost: 'free'})),
-        d.url ? h('a', {class: 'btn', href: d.url, target: '_blank', rel: 'noopener'}, 'Ouvrir dans Gmail') : null,
+      h('div', {class: 'row-actions'}, h('button', {type: 'button', class: 'btn main', onclick: () => openItem('draft', d)}, d.to.length ? 'Relire et envoyer' : 'Compléter', costTag({cost: 'free'})),
+        draftEditable(d) ? h('button', {type: 'button', class: 'btn', onclick: () => { DRED.set(d.draftId, draftEdit(d)); openItem('draft', d); }}, 'Modifier') : null,
         h('button', {type: 'button', class: 'btn ghost danger', onclick: () => openItem('draft', d, ACTIONS.draft(d).find((a) => /^Supprimer/.test(a.label)))}, 'Supprimer')));
   }
+  /* 0.85.0 : la notification « Mail du CRA prêt » (ou de prolongation) ouvre son brouillon : #voir-brouillon-<id> */
+  const VU_BR = voirUrl;
+  voirUrl = function (hash) {
+    const m = String(hash || '').match(/^#voir-brouillon-([A-Za-z0-9_-]{1,80})$/);
+    if (!m) return VU_BR(hash);
+    try { history.replaceState(null, '', '#demandes'); } catch (e) { /* rien */ }
+    if (TAB !== 'demandes') go('demandes');
+    const ouvre = () => { try { buildDrafts(); } catch (e) { /* liste pas encore lue */ } const d = (S.drafts || []).find((x) => x.draftId === m[1]); if (d) { openItem('draft', d); return true; } return false; };
+    if (!ouvre()) { try { lvReread(['drafts']); } catch (e) { /* rien */ } let n = 0; const iv = setInterval(() => { if (ouvre() || ++n > 24) clearInterval(iv); }, 500); }
+    return true;
+  };
   /* un brouillon écrit en texte dans le Canal (« À : … | Objet : … | Texte : … »), quand le bot n'a pas pu le créer dans Gmail */
   const EMAIL = /^[^\s@<>(),;]+@[^\s@<>(),;]+\.[a-z]{2,}$/i;
   function textMail(d) { const f = d.f || {}; const to = String(f.a || '').split(/[,;\s]+/).filter((x) => EMAIL.test(x)); return to.length && f.texte ? {to, subject: f.objet || d.title, body: f.texte} : null; }
@@ -7268,7 +7363,8 @@ void main(){
     const dr = dr0, tm = dr ? null : textMail(d), ln = canalLineOf(d);
     if (!(dr && dr.to.length) && !tm) return list;
     list.forEach((a) => { if (a.tone === 'main') a.tone = 'main2'; if (a.label === "Je l'ai envoyé") a.more = true; });
-    list.unshift(act('Envoyer ce mail', {tone: 'main', confirm: true, showExtra: true, cost: 'bot', go: () => sentEvent(d, dr, tm, ln)}));
+    list.unshift(act('Envoyer ce mail', {tone: 'main', confirm: true, showExtra: true, cost: 'free', go: () => sentEvent(d, dr, tm, ln)}));
+    if (dr && dr.full && !(dr.pieces || []).length) list.splice(1, 0, act('Modifier le mail', {tone: 'main2', cost: 'free', stay: true, go: () => { DRED.set(dr.draftId, draftEdit(dr)); openItem('draft', dr); }}));
     return list;
   };
 
@@ -7520,7 +7616,7 @@ void main(){
     if (GP.on) el.append(pauseBanner());
     const dr = (S.drafts || []).filter((x) => !demandeOfDraft(x));   /* JARVIS OS (18/11/2026) : un brouillon qui a sa demande est dans sa carte */
     if (dr.length) el.append(panel('Brouillons prêts à partir', h('span', {class: 'aside', text: dr.length + ' · Gmail'}),
-      h('p', {class: 'muted', text: "Relis-le, puis « Envoyer ce mail » : il part tel quel, de ta boîte. Rien ne part sans ton appui."}), dr.slice(0, 6).map(draftCard)));
+      h('p', {class: 'muted', text: 'Relis-le, modifie-le ici si besoin, puis « Envoyer ce mail » : il part de ta boîte, envoyé par JARVIS. Rien ne part sans ton appui.'}), dr.slice(0, 6).map(draftCard)));
     const yg = yesGroups();
     if (yg.length) el.append(panel('Tes oui à donner dans Grok', h('span', {class: 'aside', text: 'un message par bot'}), yg.map(yesCard)));
     VD0(el);
@@ -10795,6 +10891,95 @@ void main(){
       return true;
     };
     if (joursOn()) setTimeout(() => joursLoad(true), 1200);
+
+    /* ================= 0.85.0 : l'espace « Travail » (sa demande du 26/11/2026, maquette validée ; « des titres précis, pas des titres de
+       catégories ») : une carte par routine (CRA, notes de frais, jours) : qui la fait, ses étapes et leur avancement, la prochaine date, les
+       données prévues, la dernière exécution. Ce qui attend son oui (le CRA de la semaine, ses congés) est en tête, avec les mêmes cartes que
+       « Pour moi ». Les titres se renomment ici et restent sur son serveur. ================= */
+    TITLES.travail = 'Travail'; NAVLBL.travail = 'Travail';
+    ICONS.brief = '<rect x="3.5" y="7" width="17" height="12.5" rx="2.5"/><path d="M9 7V5.5A1.5 1.5 0 0 1 10.5 4h3A1.5 1.5 0 0 1 15 5.5V7M3.5 12.5h17"/>';
+    document.head.append(h('style', {text: ''
+      + '.trv-lead{color:var(--muted);margin:0 0 12px}'
+      + '.trv-frise{display:flex;gap:10px;overflow-x:auto;scrollbar-width:none;margin:0 -16px 16px;padding:2px 16px 4px}.trv-frise::-webkit-scrollbar{display:none}'
+      + '.trv-ev{flex:0 0 auto;min-width:148px;max-width:200px;padding:10px 12px;border-radius:16px;border:1px solid rgba(var(--c1),.22);background:linear-gradient(180deg,rgba(var(--k7),.34),rgba(var(--k1),.78))}'
+      + '.trv-ev b{display:block;font:600 12.5px var(--display);letter-spacing:.04em;color:rgb(var(--c2))}.trv-ev span{display:block;font-weight:600;font-size:14px;line-height:1.25}.trv-ev small{display:block;color:var(--muted);font-size:12.5px;margin-top:2px}'
+      + '.trv-ev.toi{border-color:rgba(var(--warn),.6)}.trv-ev.toi b{color:#fde68a}'
+      + '.trv-h{margin:18px 2px 8px;font:600 12px var(--display);letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}'
+      + '.trv-card{display:block;width:100%;margin:0 0 12px;padding:15px;text-align:left;font:inherit;color:var(--fg);cursor:pointer;border-radius:20px;border:1px solid rgba(var(--c1),.24);background:linear-gradient(170deg,rgba(var(--k7),.42),rgba(var(--k1),.82));box-shadow:inset 0 1px 0 rgba(var(--c6),.1),0 10px 26px rgba(0,0,0,.3)}'
+      + '.trv-card:active{transform:scale(.985)}.trv-card.toi{border-color:rgba(var(--warn),.6)}'
+      + '.trv-tete{display:flex;align-items:center;gap:8px}.trv-tete h3{flex:1;min-width:0;margin:0;font:700 17.5px/1.25 var(--display);overflow-wrap:anywhere}'
+      + '.trv-qui{padding:3px 9px;border-radius:99px;font:600 11.5px var(--display);letter-spacing:.03em;white-space:nowrap;border:1px solid rgba(148,163,184,.45);color:#cbd5e1}'
+      + '.trv-qui.reel{color:rgb(var(--c2));border-color:rgba(var(--c1),.6);background:rgba(var(--c1),.1)}.trv-qui.blanc{color:#d8b4fe;border-color:rgba(168,85,247,.55)}'
+      + '.trv-quand{margin:6px 0 10px;color:var(--muted);font-size:13px}.trv-quand b{color:var(--fg);font-weight:600}'
+      + '.trv-et{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;align-items:start;margin:4px 0 8px}'
+      + '.trv-et>div{position:relative;display:flex;flex-direction:column;align-items:center;gap:5px;text-align:center;font-size:11px;line-height:1.2;color:var(--muted);min-width:0;padding:0 2px}'
+      + '.trv-et i{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font:700 11.5px var(--display);font-style:normal;border:2px solid rgba(var(--c1),.35);background:rgb(var(--k1));z-index:1}'
+      + '.trv-et>div::before{content:"";position:absolute;top:11px;left:calc(-50% + 11px);right:calc(50% + 11px);height:2px;background:rgba(var(--c1),.22)}.trv-et>div:first-child::before{display:none}'
+      + '.trv-et .fait i{border-color:var(--green);background:var(--green);color:#052e1c}.trv-et .fait::before{background:var(--green)}.trv-et .fait{color:var(--fg)}'
+      + '.trv-et .encours i{border-color:rgb(var(--warn));color:rgb(var(--warn))}.trv-et .encours{color:#fde68a;font-weight:600}.trv-et .bloque i{border-color:var(--danger);color:var(--danger)}.trv-et .bloque{color:var(--danger)}'
+      + '.trv-barre{height:6px;border-radius:99px;background:rgba(var(--c1),.13);overflow:hidden;margin:2px 0 10px}.trv-barre i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,rgb(var(--c1)),#a855f7)}'
+      + '.trv-prevu{display:flex;flex-wrap:wrap;gap:6px;align-items:center}.trv-prevu small{color:var(--muted);font-size:12.5px;margin-right:2px}'
+      + '.trv-ch{padding:4px 8px;border-radius:10px;font:600 12px var(--display);background:rgba(var(--c1),.12);border:1px solid rgba(var(--c1),.2);white-space:nowrap}.trv-ch.non{background:none;color:var(--muted)}.trv-ch.amb{color:#fde68a;border-color:rgba(var(--warn),.5)}'
+      + '.trv-alerte{margin:10px 0 0;padding:10px 12px;border-radius:14px;border:1px solid rgba(var(--warn),.5);background:rgba(var(--warn),.08);font-size:13.5px}.trv-alerte b{color:#fde68a}'
+      + '.trv-der{margin:10px 0 0;padding-top:9px;border-top:1px solid rgba(var(--c1),.14);color:var(--muted);font-size:13px}.trv-der b{color:var(--fg);font-weight:600}.trv-der .ok{color:var(--green)}.trv-der .ko{color:var(--danger)}'
+      + '.trv-mails{display:grid;gap:6px;margin:10px 0 0}.trv-mails div{display:flex;justify-content:space-between;gap:8px;font-size:13.5px;padding:8px 10px;border-radius:12px;background:rgba(255,255,255,.04);border:1px solid rgba(var(--c1),.14)}.trv-mails em{font-style:normal;color:var(--green);font-weight:600}'}));
+    const TRV = {data: null, at: 0, loading: null, f: 'tout'};
+    const travailAPI = () => (SRV_OS && window.JarvisServeur && window.JarvisServeur.travail ? window.JarvisServeur.travail : null);
+    const travailOn = () => (SRV_OS ? !!travailAPI() : !!window.__TRAVAIL);
+    function travailLoad(force) {
+      const api = travailAPI();
+      if (!travailOn() || TRV.loading || (!force && TRV.data && Date.now() - TRV.at < 30000)) return TRV.loading;
+      TRV.loading = (api ? api.lire() : Promise.resolve(JSON.parse(JSON.stringify(window.__TRAVAIL))))
+        .then((d) => { if (d && d.routines) TRV.data = d; }).catch(() => {}).finally(() => { TRV.at = Date.now(); TRV.loading = null; if (TAB === 'travail' || TAB === 'espaces') renderView(true); });
+      return TRV.loading;
+    }
+    const trvEtapes = (r) => { const n = (r.etapes || []).filter((e) => e[1] === 'fait').length, tot = (r.etapes || []).length || 1;
+      return [h('div', {class: 'trv-et'}, (r.etapes || []).map((e, i) => h('div', {class: e[1] || ''}, h('i', {text: e[1] === 'fait' ? '✓' : e[1] === 'bloque' ? '!' : String(i + 1)}), e[0]))), h('div', {class: 'trv-barre', role: 'img', 'aria-label': n + ' étape' + (n > 1 ? 's' : '') + ' sur ' + tot}, h('i', {style: 'width:' + Math.round(100 * n / tot) + '%'}))]; };
+    const trvPrevu = (r) => { const p = r.prevu; if (!p) return null; const puces = p.jours ? p.jours.map((j) => h('span', {class: 'trv-ch ' + (j[2] || ''), text: j[0] + ' · ' + j[1]})) : (p.puces || []).map((x) => h('span', {class: 'trv-ch ' + (x[1] || ''), text: x[0]})); return h('div', {class: 'trv-prevu'}, h('small', {text: p.texte + ' :'}), puces); };
+    const trvDer = (r) => h('p', {class: 'trv-der'}, r.derniere ? ['Dernière : ', h('b', {text: r.derniere.quand}), ' · ' + r.derniere.quoi + ' ', h('span', {class: r.derniere.ok ? 'ok' : 'ko', text: '●'}), ' par ' + r.derniere.par] : 'Pas encore d’exécution connue.');
+    function trvCarte(r) {
+      return h('button', {type: 'button', class: 'trv-card' + (r.toi ? ' toi' : ''), 'data-trv': r.id, onclick: () => openItem('travail', r)},
+        h('div', {class: 'trv-tete'}, h('h3', {text: r.titre}), h('span', {class: 'trv-qui ' + (r.qui || ''), text: r.quiDit})),
+        h('p', {class: 'trv-quand'}, 'Prochaine : ', h('b', {text: r.prochaine || '—'})),
+        trvEtapes(r), trvPrevu(r),
+        r.alerte ? h('div', {class: 'trv-alerte', text: r.alerte}) : null,
+        r.toi ? h('div', {class: 'trv-alerte'}, h('b', {text: 'À toi : '}), r.toi) : null,
+        trvDer(r));
+    }
+    SHEETCFG.travail = (r) => {
+      const api = travailAPI(), actions = [];
+      if (r.ouvrir === 'semaine' && r.lundi) actions.push(act(r.toi ? 'Voir la semaine et répondre' : 'Voir la semaine', {tone: 'main', cost: 'free', go: () => { closeSheet(); setTimeout(() => voirUrl('#voir-cra-' + r.lundi), 60); return undefined; }, stay: true}));
+      if (r.ouvrir === 'jours' || r.ouvrir === 'mois') actions.push(act(r.ouvrir === 'jours' ? 'Voir mes jours' : 'Voir mes jours du mois', {tone: r.toi ? 'main' : 'main2', cost: 'free', stay: true, go: () => { closeSheet(); setTimeout(() => voirUrl('#voir-jours'), 60); }}));
+      if (api) actions.push(act('Renommer', {cost: 'free', pick: {kind: 'text', label: 'Le titre de cette carte', init: r.titre, submit: 'Renommer', placeholder: 'ex. le nom du client, du fournisseur'}, go: (v) => { api.renommer(r.id, v.txt).then((x) => { toast(x.ok ? 'Renommé' : 'Pas renommé', x.ok ? '« ' + x.titre + ' »' : (x.error || '')); travailLoad(true); }); return null; }}));
+      return {kicker: 'Travail · ' + r.quiDit, title: r.titre, say: r.toi || (r.alerte ? r.alerte : 'Prochaine : ' + (r.prochaine || '—') + '.'),
+        extraTop: () => h('div', {class: 'trv-sheet'}, trvEtapes(r), trvPrevu(r), r.alerte && r.toi ? h('div', {class: 'trv-alerte', text: r.alerte}) : null,
+          (r.mails || []).length ? h('div', {class: 'trv-mails'}, r.mails.map((m) => h('div', {}, h('span', {text: m.quoi + ' · ' + m.quand}), h('em', {text: m.etat})))) : null, trvDer(r)),
+        actions};
+    };
+    VIEWS.travail = (el) => {
+      travailLoad();
+      const d = TRV.data;
+      el.append(h('p', {class: 'trv-lead', text: 'Tes CRA, tes notes de frais et tes jours : qui s’en occupe, où ça en est, ce qui vient.'}));
+      if (!d) { el.append(h('p', {class: 'empty', text: travailOn() ? 'Lecture de tes routines…' : 'L’espace Travail vient du serveur JARVIS.'})); return; }
+      const F = [['tout', 'Tout'], ['cra', 'CRA'], ['frais', 'Notes de frais'], ['jours', 'Jours']];
+      el.append(h('div', {class: 'seg ux-seg', role: 'group', 'aria-label': 'Filtre'}, F.map(([k, l]) => h('button', {type: 'button', 'aria-pressed': String(TRV.f === k), 'data-f': k, onclick: () => { TRV.f = k; renderView(true); }}, l))));
+      const vis = d.routines.filter((r) => TRV.f === 'tout' || r.bloc === TRV.f);
+      /* ce qui attend son oui : les cartes de « Pour moi », ici aussi */
+      if (TRV.f === 'tout' || TRV.f === 'cra' || TRV.f === 'jours') { const pm = [TRV.f !== 'jours' && JRS.data && JRS.data.semaine && JRS.data.semaine.demande ? craCard() : null, TRV.f !== 'cra' && JRS.data && JRS.data.demande ? joursCard() : null].filter(Boolean); if (pm.length) el.append(h('p', {class: 'trv-h', text: 'À toi'}), ...pm); }
+      const fr = (d.frise || []).filter((e) => TRV.f === 'tout' || vis.some((r) => e.quoi.indexOf(r.titre) === 0));
+      if (fr.length) el.append(h('p', {class: 'trv-h', text: 'Ce qui vient'}), h('div', {class: 'trv-frise'}, fr.map((e) => h('div', {class: 'trv-ev' + (e.toi ? ' toi' : '')}, h('b', {text: e.quand}), h('span', {text: e.quoi}), h('small', {text: e.qui})))));
+      el.append(h('p', {class: 'trv-h', text: 'Tes routines'}), ...vis.map(trvCarte));
+    };
+    { const VE_TRV = VIEWS.espaces;
+      VIEWS.espaces = (el) => {
+        VE_TRV(el); travailLoad();
+        const g = el.querySelector('.esp-grid'); if (!g || !travailOn()) return;
+        const d = TRV.data, toi = d ? d.routines.filter((r) => r.toi) : [], nx = d && d.frise && d.frise[0];
+        const b = h('button', {type: 'button', class: 'esp-tile' + (toi.length ? ' amb' : ''), 'data-go': 'travail', onclick: () => go('travail')}, h('span', {class: 'esp-ic', html: icon('brief', 18)}), h('span', {class: 'esp-n', text: 'Travail'}),
+          h('b', {class: 'esp-v', text: toi.length ? toi.length + ' à toi' : nx ? nx.quand.replace(/^\S+ /, '') : 'CRA et frais'}), h('span', {class: 'esp-s', html: toi.length ? '<b>' + escH(toi[0].titre) + '</b>' : nx ? escH(nx.quoi) : 'tes CRA, tes notes de frais'}));
+        g.prepend(b);
+      }; }
+    if (travailOn()) setTimeout(() => travailLoad(true), 1500);
   }
 
   /* ================= refonte UX (22/11/2026, maquette validée) : Équipe absorbe Suivi et Automatisations ; Pour moi en filtres =================

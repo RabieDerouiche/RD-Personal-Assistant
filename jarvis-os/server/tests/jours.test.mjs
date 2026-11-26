@@ -1,6 +1,6 @@
 /* Banc des jours du mois (0.83.0) : node tests/jours.test.mjs. Aucun vrai Google, aucun vrai Claude ; agendas et jours inventés. */
 import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path';
-import {lireTitre, bilan, resume, lireCorrections, appliquer, comprisDit, createJours, dernierJour} from '../jours.mjs';
+import {lireTitre, bilan, resume, lireCorrections, appliquer, comprisDit, createJours, dernierJour, mailCraPhrases, mailCraRempli} from '../jours.mjs';
 const results = []; let fails = 0;
 const ok = (name, cond, info) => { results.push((cond ? 'OK   ' : 'ÉCHEC') + ' ' + name + (info ? ' :: ' + info : '')); if (!cond) fails++; };
 const DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'jours-'));
@@ -187,6 +187,64 @@ try {
   ok('jours.json abîmé : mis de côté, pas écrasé', fs.readdirSync(DIR).some((f) => /^j8-illisible-/.test(f)) && J8.etat('2026-11').etat === 'a_valider');
 } catch (e) { ok('exception', false, (e && e.stack) || String(e)); }
 fs.rmSync(DIR, {recursive: true, force: true});
+/* ---------- 0.85.0 : les mails du mois préparés par JARVIS (jamais par Iris), en brouillon, avec son oui ---------- */
+{ const RT2 = path.join(DIR, 'retours-mails'); fs.mkdirSync(RT2, {recursive: true});
+  let Tm = Date.parse('2026-11-24T11:30:00Z');   /* mardi 24, 12 h 30 à Paris */
+  const CALS2 = [{id: 'p1@group.calendar.google.com', summary: 'Présence'}, {id: 'en-gb.french#holiday@group.v.calendar.google.com', summary: 'Holidays in France'}];
+  let pres2 = [...BASE];
+  const ag2 = {lie: () => true, calendriers: async () => CALS2, evenements: async (id) => (id === 'p1@group.calendar.google.com' ? pres2 : FER)};
+  const M2 = {crees: [], majs: [], push: [], deja: new Set(), modeles: {cra_client: {a: ['contact@exemple.invalid'], objet: 'CRA {MOIS} {ANNEE}', corps: 'Bonjour,\n\nJ’ai {JOURS} jours sur ce mois.\n{CONGES}\nMerci !'}, prolongation: {a: ['chargee@exemple.invalid'], objet: 'Prolongation de mission', corps: 'Ma mission se termine le {FIN} : peux-tu la prolonger ?'}}};
+  const mails = {modeles: () => M2.modeles, brouillon: async (m) => { M2.crees.push(m); return {id: 'r' + M2.crees.length}; }, majBrouillon: async (m) => { if (m.draftId === 'parti') throw new Error('introuvable'); M2.majs.push(m); return {}; }, envoye: async (objet) => M2.deja.has(objet)};
+  const JM = createJours({file: path.join(DIR, 'jm.json'), agenda: ag2, retours: RT2, mails, push: async (m) => { M2.push.push(m); return []; }, now: () => Tm});
+  await JM.lire('2026-11'); await JM.tic();
+  ok('mails du mois : rien avant son oui sur ses congés', M2.crees.length === 0);
+  let e2 = JM.etat('2026-11'); JM.confirmer('2026-11', e2.bilan.empreinte); await JM.tic();
+  const c0 = M2.crees[0] || {};
+  ok('mail du CRA : après son oui, à partir du 24 : un brouillon (destinataire, objet, congés passés et à venir), notification qui ouvre le brouillon', M2.crees.length === 1 && c0.to.join() === 'contact@exemple.invalid' && c0.subject === 'CRA Novembre 2026' && /J’étais en congés du 12 au 13 et le 23 Novembre\./.test(c0.body) && M2.push.some((x) => x.url === '/#voir-brouillon-r1' && /Mail du CRA prêt/.test(x.title)), JSON.stringify([c0, M2.push.slice(-1)]));
+  await JM.tic();
+  ok('mail du CRA : un seul brouillon pour un même oui', M2.crees.length === 1 && M2.majs.length === 0);
+  pres2 = [...BASE, jour(27, 'Congé')]; await JM.lire('2026-11'); e2 = JM.etat('2026-11'); const rc = JM.confirmer('2026-11', e2.bilan.empreinte); await JM.tic();
+  ok('mail du CRA : ses congés changent puis nouveau oui : le même brouillon mis à jour (« Je serai en congé le 27 »)', rc.ok && M2.crees.length === 1 && M2.majs.length === 1 && M2.majs[0].draftId === 'r1' && /Je serai en congé le 27 Novembre\./.test(M2.majs[0].body), JSON.stringify([rc, M2.majs[0]]));
+  JM.brut().mois['2026-11'].mailCra.draftId = 'parti'; pres2 = [...BASE]; await JM.lire('2026-11'); e2 = JM.etat('2026-11'); JM.confirmer('2026-11', e2.bilan.empreinte); const np = M2.push.length; await JM.tic();
+  ok('mail du CRA : brouillon déjà parti et congés changés : rien de refait, il est prévenu', M2.crees.length === 1 && M2.push.length === np + 1 && /ont changé après le mail du CRA/.test(M2.push[M2.push.length - 1].title), JSON.stringify(M2.push.slice(-1)));
+  /* la prolongation, d'après le compte rendu du CRA du mois (Hermes, le 26) */
+  Tm = Date.parse('2026-11-26T11:30:00Z'); fs.writeFileSync(path.join(RT2, 'mois-2026-11.json'), JSON.stringify({resultat: 'validee', fin: '2026-11-30', at: Tm}));
+  await JM.tic(); const pr = M2.crees[1] || {};
+  ok('prolongation : fin de mission dans le mois : un brouillon à sa chargée de mission (date remplie), notification', pr.subject === 'Prolongation de mission' && /se termine le 30\/11\/2026/.test(pr.body) && pr.to.join() === 'chargee@exemple.invalid' && M2.push.some((x) => /Fin de mission le 30\/11\/2026 : mail de prolongation prêt/.test(x.title)), JSON.stringify(pr));
+  await JM.tic(); ok('prolongation : un seul brouillon', M2.crees.length === 2);
+  /* un autre mois : fin le mois suivant = simple alerte ; mail déjà envoyé depuis Gmail = rien */
+  const JN = createJours({file: path.join(DIR, 'jn.json'), agenda: ag2, retours: RT2, mails, push: async (m) => { M2.push.push(m); return []; }, now: () => Tm});
+  fs.writeFileSync(path.join(RT2, 'mois-2026-11.json'), JSON.stringify({resultat: 'validee', fin: '2026-12-31', at: Tm})); M2.deja.add('CRA Novembre 2026');
+  await JN.lire('2026-11'); const e3 = JN.etat('2026-11'); JN.confirmer('2026-11', e3.bilan.empreinte); const n0 = M2.crees.length; await JN.tic();
+  ok('mails du mois : un mail du même objet déjà envoyé (Gmail) n’est jamais refait ; fin le mois suivant : une alerte, pas de mail', M2.crees.length === n0 && JN.brut().mois['2026-11'].mailCra.envoye && M2.push.some((x) => x.title === 'Fin de mission le 31/12/2026'), JSON.stringify(M2.push.slice(-2)));
+  /* la note de télétravail à blanc (Hermes, le dernier jour) : compte rendu sans montant, notifié une fois */
+  fs.writeFileSync(path.join(RT2, 'teletravail-2026-11.json'), JSON.stringify({mois: '2026-11', resultat: 'blanc', jours: 10.5, texte: 'Note préparée, dépense remplie puis annulée sur le portail.', a_blanc: true, at: Tm}));
+  const np2 = M2.push.length; await JM.tic(); await JM.tic();
+  const ptt = M2.push.slice(np2);
+  ok('télétravail : le compte rendu d’Hermes gardé (résultat, jours) et notifié une seule fois, sans montant', ptt.length === 1 && /Note de télétravail de novembre : prête à blanc/.test(ptt[0].title) && /10,5 jours/.test(ptt[0].body) && !/€/.test(ptt[0].body) && JM.brut().teletravail['2026-11'].resultat === 'blanc', JSON.stringify(ptt));
+  fs.writeFileSync(path.join(RT2, 'teletravail-2026-11.json'), JSON.stringify({mois: '2026-11', resultat: 'arret', jours: null, texte: 'Arrêt : un jour ouvré n’a ni lieu ni congé noté.', at: Tm + 1000}));
+  await JM.tic();
+  ok('télétravail : un arrêt est notifié avec sa raison (Chronos le fera le 1er)', /arrêtée/.test(M2.push[M2.push.length - 1].title) && /ni lieu ni congé/.test(M2.push[M2.push.length - 1].body), JSON.stringify(M2.push.slice(-1)));
+  const JO = createJours({file: path.join(DIR, 'jo.json'), agenda: ag2, retours: RT2, mails: {...mails, modeles: () => ({})}, push: async () => [], now: () => Tm});
+  await JO.lire('2026-11'); JO.confirmer('2026-11', JO.etat('2026-11').bilan.empreinte); const n1 = M2.crees.length; await JO.tic();
+  ok('mails du mois : sans modèle sur le serveur, rien n’est préparé', M2.crees.length === n1); }
+/* ---------- 0.85.0 : le mail du CRA du client, au bon temps (sa remarque du 26/11/2026) — jours inventés ---------- */
+{ const mois = (ym, codes) => { const [y, m] = ym.split('-').map(Number), out = []; for (let d = 1; d <= dernierJour(y, m); d++) { const s = ym + '-' + String(d).padStart(2, '0'), w = new Date(s + 'T12:00Z').getUTCDay(), c = codes[s]; out.push({date: s, M: w === 0 || w === 6 ? 'W' : c ? c[0] : 'T', A: w === 0 || w === 6 ? 'W' : c ? c[1] : 'T'}); } return out; };
+  /* octobre 2026 inventé : congés lun 5 - mar 6, ven 16 et lun 19 (week-end entre), jeu 22 matin, jeu 29 - ven 30 ; un férié inventé le mer 14 entre deux congés */
+  const J = mois('2026-10', {'2026-10-05': 'CC', '2026-10-06': 'CC', '2026-10-13': 'CC', '2026-10-14': 'FF', '2026-10-15': 'CC', '2026-10-16': 'CC', '2026-10-19': 'CC', '2026-10-22': 'CT', '2026-10-29': 'CC', '2026-10-30': 'CC'});
+  const a = mailCraPhrases(J, '2026-10-24');
+  ok('mail du CRA : jours travaillés sans arrondir (demi-journée), congés passés au passé, à venir au futur', a.joursDit === '12,5' && a.phrases[0] === 'J’étais en congés du 5 au 6, le 13, du 15 au 19 et le 22 (matin) Octobre.' && a.phrases[1] === 'Je serai en congés du 29 au 30 Octobre.', JSON.stringify(a));
+  ok('mail du CRA : un week-end ne coupe pas une période (du 15 au 19), un férié la coupe (le 13, puis du 15…)', /le 13, du 15 au 19/.test(a.phrases[0]));
+  const b = mailCraPhrases(J, '2026-10-29');
+  ok('mail du CRA : envoyé le premier jour d’un congé : « Je suis en congés… »', b.phrases[1] === 'Je suis en congés du 29 au 30 Octobre.', JSON.stringify(b.phrases));
+  const c = mailCraPhrases(J, '2026-11-02');
+  ok('mail du CRA : envoyé après le mois : tout au passé, une seule phrase', c.phrases.length === 1 && /^J’étais en congés .* et du 29 au 30 Octobre\.$/.test(c.phrases[0]), JSON.stringify(c.phrases));
+  const d = mailCraPhrases(mois('2026-10', {'2026-10-30': 'CC'}), '2026-10-24');
+  ok('mail du CRA : un seul jour à venir : « Je serai en congé le 30 » (singulier)', d.phrases.length === 1 && d.phrases[0] === 'Je serai en congé le 30 Octobre.', JSON.stringify(d.phrases));
+  const e = mailCraPhrases(mois('2026-10', {}), '2026-10-24');
+  ok('mail du CRA : sans congé, aucune phrase de congé', e.phrases.length === 0 && e.texte === 'J’ai 22 jours sur ce mois.', JSON.stringify(e));
+  const r = mailCraRempli({a: ['contact@exemple.invalid'], objet: 'CRA {MOIS} {ANNEE}', corps: 'Bonjour,\n\nJ’ai {JOURS} jours sur ce mois.\n{CONGES}\nMerci !'}, '2026-10', J, '2026-10-24');
+  ok('mail du CRA : le modèle rempli (objet, nombre, phrases à leur place ; sans congé, la ligne disparaît)', r.objet === 'CRA Octobre 2026' && r.corps === 'Bonjour,\n\nJ’ai 12,5 jours sur ce mois.\n' + a.phrases.join('\n') + '\nMerci !' && mailCraRempli({corps: 'A\n{CONGES}\nB'}, '2026-10', mois('2026-10', {}), '2026-10-24').corps === 'A\nB', JSON.stringify(r)); }
 console.log(results.join('\n'));
 console.log((fails ? 'ÉCHECS : ' + fails : 'Tout est bon') + ' (' + results.length + ' vérifications)');
 process.exit(fails ? 1 : 0);

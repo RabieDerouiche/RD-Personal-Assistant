@@ -83,10 +83,13 @@ tenu par la commande) : pas encore faite.
 | Fichier | Rôle |
 |---|---|
 | `install.sh` | Root, relançable. Utilisateur `hermes-portail`, Hermes à la version figée du Hermes principal (lue dans `../install.sh`) avec son navigateur, plugin de l'abonnement Claude et Claude Code à lui, politique, skill, copies root de la commande et du relais, lien de la clé, règles réseau et relais. Ne démarre aucun agent. |
-| `hermes-portail` | La commande (`/usr/local/sbin/hermes-portail`) : `etat`, `connexion-claude`, `enregistrer`, `domaines`, `essai` (et `--code-mail`, `--telecharger`), `brouillon` (et `--sans-creer`), `facture`, `texte`, `cra` (et `--a-blanc`), `cra-mois` (et `--a-blanc`), `cra-auto`, `notes`, `cle`, `fermer`, `oublier`. Un essai lance l'unité `hermes-portail-essai`. |
+| `hermes-portail` | La commande (`/usr/local/sbin/hermes-portail`) : `etat`, `connexion-claude`, `enregistrer`, `domaines`, `essai` (et `--code-mail`, `--telecharger`), `brouillon` (et `--sans-creer`), `facture`, `texte`, `cra` (et `--a-blanc`), `cra-mois` (et `--a-blanc`), `teletravail` (et `drive`), `cra-auto`, `notes`, `cle`, `fermer`, `oublier`. Un essai lance l'unité `hermes-portail-essai`. |
 | `hermes-portail-cra.service`, `hermes-portail-cra.timer` | Le CRA de la semaine (26/11/2026) : toutes les 5 minutes, `hermes-portail cra-auto` ; rien sans `/etc/hermes-portail/cra.conf` (root : `adresse=` la feuille de temps, `jarvis_donnees=` le dossier de JARVIS ; jamais dans le dépôt). Compte rendu dans `/var/lib/hermes-portail-retours/` (root, lisible par le groupe de JARVIS, depuis le 26/11/2026). |
 | `hermes-portail-essai.service` | Un passage, enfermé (mêmes lignes que `hermes-gateway.service`, mémoire sans échange ; depuis le 25/11/2026, filtre d'appels système et espaces de noms interdits). Une vraie unité, pas `systemd-run` : au premier essai sur le serveur, `systemd-run -p IPAddressDeny=link-local` a été refusé alors que la même ligne est valable dans une unité. Consigne dans `/home/hermes-portail/.consigne`, réponse dans `/var/lib/hermes-portail/essais/`. |
 | `politique.yaml` | Sa politique (`/etc/hermes-portail/config.yaml`, root) : outils `browser`, `terminal`, `skills` seulement ; Sonnet ; profil de navigateur gardé ; navigateur envoyé vers le relais, lancé sans son bac à sable (dit en clair, voir « Durcissement »), remplissage automatique et heure réseau coupés. |
+| `teletravail.mjs` | La note de télétravail, ce que seul JARVIS sait lire (26/11/2026) : lancé par `hermes-portail teletravail` sous l'utilisateur `jarvis`, en lecture seule. `--jours AAAA-MM` : le bilan du mois par le module de JARVIS lui-même (`jours.mjs` : agendas reconnus, ses règles, ses corrections), refait sur une copie de `jours.json` effacée ensuite ; `--drive <id>` : UN PDF du Drive (outil `file_pdf` de `google.mjs`, 0.85.0). |
+| `teletravail.py` | La note de télétravail, sans réseau (root) : montants lus par règles dans le texte des pièces, garde-fous, calcul du classeur, page de synthèse en HTML, champs de la dépense. Aucune valeur personnelle : tout vient de `/etc/hermes-portail/teletravail.conf`. |
+| `hermes-portail-teletravail.service`, `hermes-portail-teletravail.timer` | La note de télétravail (26/11/2026) : chaque jour à 12 h 20, `hermes-portail teletravail-auto`, qui ne fait rien hors du dernier jour du mois avant midi (Paris), sans `teletravail.conf`, ni deux fois pour un mois ; à blanc ; compte rendu sans montant `teletravail-<AAAA-MM>.json` dans le dossier de root pour JARVIS (notification, carte « Note de télétravail » de l'espace Travail). |
 | `facture.mjs` | Va chercher UNE facture PDF dans ses mails : lancé par `hermes-portail facture` sous l'utilisateur `jarvis`, avec l'accès Google et le code de JARVIS (`google.mjs`, `pdf.mjs`), en lecture seule ; l'état de JARVIS n'est jamais réécrit. Rend le PDF et son texte à root. |
 | `navigateur-regles.json` | Règles d'administrateur du navigateur (`/etc/opt/chrome_for_testing/policies/managed/hermes-portail.json`, root) : pas de gestionnaire de mots de passe, pas de vérification de fuite, pas de compte Google, pas de mesures. |
 | `skills/portail/portail/SKILL.md` | Sa marche à suivre : se connecter par le coffre, lecture seule, ne jamais taper un mot de passe, ne rien soumettre, s'arrêter si un code est demandé, attente finale, réponse sans donnée personnelle. |
@@ -111,7 +114,7 @@ le serveur). Faux portail `essais/hermes/faux_portail.py`, faux terminal `essais
 
 ## Ce que le banc prouve, et ce qu'il ne prouve pas
 
-Prouvé (125 vérifications, 26/11/2026, dont le CRA de la semaine et le CRA du mois) : installation ; outils réduits et politique figée ; clé seulement en ramfs,
+Prouvé (145 vérifications, 26/11/2026, dont le CRA de la semaine, le CRA du mois et la note de télétravail avec sa minuterie) : installation ; outils réduits et politique figée ; clé seulement en ramfs,
 nulle part en clair sur le disque, gardée par jarvis-coffre ; enregistrement dans un faux terminal sans que le mot de
 passe s'affiche ; connexion au faux portail par le coffre, tableau lu, formulaire ouvert, rien de soumis ; mot de
 passe et clé jamais envoyés au modèle ; session gardée au second passage ; coffre verrouillé : refus propre ;
@@ -327,7 +330,73 @@ documents avec un avis de taxes foncières, JARVIS lui crée une tâche « envoi
 on le range dans le dossier Drive. À brancher sur la veille du matin d'Hermes (ou une règle du Radar) : pas avant
 l'été prochain.
 
-**Ce qu'il faut construire** (rien n'existe encore) :
+**Construit le 26/11/2026** (sa décision du jour, QCM : « Hermes le 30/11 ») : `sudo hermes-portail teletravail [--mois
+AAAA-MM] [--electricite <facture.pdf>] [--sans-depense] [--diagnostic]`, À BLANC seulement (`--reel` est refusé : Chronos
+crée la note le 1er ; on compare, puis bascule en décembre si elle est identique). Dans l'ordre :
+- *les jours* : `teletravail.mjs --jours` sous l'utilisateur de JARVIS (module `jours.mjs` lui-même, ses corrections
+  comprises ; rien n'est réécrit chez JARVIS) ; un jour ouvré sans lieu ni congé, ou un conflit, arrête tout ; une
+  demi-journée de télétravail compte 0,5 (« 0,5 » dans la case) ; aucun jour de télétravail : aucune dépense ;
+- *les pièces* : l'avis de taxe foncière du Drive (`teletravail.mjs --drive`, outil `file_pdf` ajouté à `google.mjs`,
+  JARVIS 0.85.0) ; l'appel de charges et l'attestation d'assurance de Gmail (`facture.mjs`) ; la facture d'électricité
+  du mois rapportée de l'espace client par un passage d'Hermes en lecture seule (`essai --telecharger`, consigne :
+  « celle émise en <mois> <année> »), ou donnée par root (`--electricite`) ;
+- *deux lectures de chaque pièce* : par `pdf.mjs` de JARVIS, puis par `pdftotext -layout` (paquet `poppler-utils`, lancé
+  par l'utilisateur `nobody`) ; chaque règle prend la première qui lui répond. Vu sur les vraies pièces d'octobre : `pdf.mjs`
+  colle les cellules d'un tableau (« TOTAL DU LOT » suivi des deux montants sans espace) et met la date de la facture
+  d'électricité sur la ligne d'après ; `pdftotext` ne lit pas la somme de l'avis. Les règles en tiennent compte ;
+- *montants, garde-fous, calcul* (`teletravail.py`, root, sans réseau) : total du lot de l'appartement (repère du lot
+  dans les réglages) sur une période qui couvre le mois, divisé par trois ; montant de l'avis égal au réglage (sinon :
+  nouvel avis, réglage à revoir) ; attestation valable tout le mois (sinon : renouvelée, montant annuel à revoir) ;
+  facture d'électricité émise dans le mois, montant TTC lu ; charges et électricité à moins de 50 % du mois d'avant
+  (historique à root, `/var/lib/hermes-portail/teletravail/historique.json`, amorcé par les réglages `precedent_*`).
+  Toute pièce manquante ou règle non vérifiée arrête tout (code 2, la raison dite sans montant ; `--diagnostic` dit
+  ce qui a été trouvé, oui ou non). Formule du classeur, arrondi au centime. **Contrôle sur les vraies pièces de
+  l'exemple accepté d'octobre** (séparées de son PDF, lues des deux façons, hors du dépôt) : toutes les règles trouvent
+  leur valeur, et la commande retrouve ses charges, son électricité et **son total au centime** ;
+- *le justificatif* : la page de synthèse (tableau recréé : semaines, jours, « 1 » ou « 0,5 » sous chaque jour
+  télétravaillé, surfaces, charges, total) rendue en PDF par le Chromium d'Hermes, sous son utilisateur, dans un dossier
+  à lui vidé avant et après ; puis `pdfunite` (paquet `poppler-utils`, le plus léger ; ajouté à `install.sh`) dans
+  l'ordre de l'exemple : synthèse, appel de charges, avis de taxe foncière, attestation, facture d'électricité ; 5 Mo
+  au plus (limite du portail) ;
+- *la dépense* : champs tirés d'un modèle à root (réglage `champs`, avec `{DATE}` au dernier jour du mois, `{MONTANT}`,
+  `{MOIS}`, `{MOIS_NOM}`, `{ANNEE}`, `{JOURS}`), puis `brouillon --sans-creer` : remplie jusqu'au dernier écran,
+  justificatif joint, puis annulée. Rien n'est créé. Fin : « Résultat télétravail : blanc | arret | echec | prete ».
+**Le déclenchement (26/11/2026)** : `hermes-portail-teletravail.timer` lance chaque jour `teletravail-auto`, qui ne fait la
+note que le dernier jour du mois après midi (heure de Paris ; le raccourci a noté le dernier jour à 11 h), une seule fois par
+mois (`tentes.txt`, noté avant le passage), toujours à blanc. Son compte rendu pour JARVIS (`/var/lib/hermes-portail-retours/
+teletravail-<AAAA-MM>.json`, root, groupe de JARVIS, 640) ne porte aucun montant : le résultat (`blanc`, `prete`, `arret`,
+`echec`), le nombre de jours, les raisons d'un arrêt. JARVIS le notifie une fois (« Note de télétravail de novembre : prête à
+blanc » ou « arrêtée », avec la raison : Chronos la fait alors le 1er) et le montre sur la carte de l'espace Travail.
+
+Tout reste à root dans `/var/lib/hermes-portail/teletravail/<mois>/` (700). `teletravail drive <id> --vers <dossier>` rend
+un PDF du Drive à root (pour lire un justificatif fixe ou l'exemple d'un mois, et en tirer les réglages).
+
+**Les réglages** (`/etc/hermes-portail/teletravail.conf`, root 600, posés sur le serveur, jamais dans le dépôt ; une
+ligne `clé=valeur`) : `nom`, `debut_mission` (JJ/MM/AAAA), `surface_logement`, `surface_bureau`, `taxe_fonciere_an`,
+`taxe_habitation_an`, `autres_taxes_mois`, `assurance_an`, `eau_mois` (vide si sans), `taxe_fonciere_drive` (l'identifiant
+du PDF de l'avis), `charges_requete` et `charges_nom` (recherche Gmail et nom du PDF de l'appel de charges), `charges_lot`
+(le repère du lot de l'appartement dans l'appel, avant son « TOTAL DU LOT »), `assurance_requete` et `assurance_nom`,
+`electricite_adresse` (la page des factures de l'espace client), `ndf_adresse` (le portail de notes de frais),
+`champs` (le chemin du modèle des champs, à root), `precedent_charges` et `precedent_electricite` (le mois d'avant, pour
+le premier garde-fou). Facultatifs, pour une pièce dont le texte sort autrement : `charges_periode_motif`,
+`assurance_motif`, `taxe_motif`, `electricite_montant_motif`, `electricite_date_motif` (expressions régulières), et
+`ecart_max` (0.5 par défaut).
+
+**Banc** (données inventées) : faux JARVIS (agenda « Présence » et fériés de novembre inventés, demi-journée comprise,
+deux mails avec PDF, un PDF du Drive), trois PDF inventés ; jours, pièces, calcul au centime, PDF de 5 pages dans
+l'ordre, synthèse lisible (« 0,5 », total), état de JARVIS jamais réécrit, trois garde-fous (écart avec le mois d'avant,
+avis différent, jour sans lieu), passage complet avec la facture rapportée par Hermes et la dépense remplie puis
+annulée sur le faux portail.
+
+**Pas prouvé avant le 30/11** : les pièces telles que Gmail et le Drive les rendent sur le serveur (celles du contrôle
+venaient du PDF assemblé d'octobre : `--diagnostic` dit quelle règle échoue, et les `*_motif` des réglages permettent
+d'ajuster sans toucher au code) ; la vraie facture d'électricité rapportée de l'espace client ; la dépense à blanc sur
+le vrai portail (le modèle des champs se tire de la dépense de télétravail d'octobre, lue en lecture seule). D'où un
+essai sur octobre dès l'installation : sa note acceptée est la référence.
+**Reste** : le déclenchement le dernier jour (minuterie, après le raccourci de 11 h), le compte rendu dans JARVIS (sa
+notification), la comparaison avec la note de Chronos du 1/12, puis la création réelle et la pause de sa routine.
+
+**Ce qui était à construire** (25/11/2026) :
 1. *Télécharger un fichier depuis un portail* (la facture d'électricité ; sert aussi à la facture de la box) :
    **sur le serveur depuis le 25/11/2026, prouvé sur la facture de la box.** `essai … --telecharger <dossier de root>` :
    la consigne annonce « Téléchargement permis », Hermes range UN fichier dans son dossier
@@ -646,6 +715,35 @@ tant qu'une routine n'est pas basculée) :
 - *Pas fait* : le déclenchement automatique du 26 depuis son oui dans JARVIS (comme `cra-auto`) ; le dépôt du CRA du
   client (onglet du haut de la page de saisie) ; les mails par JARVIS (brouillon et bouton « Envoyer »). Pour
   novembre, les deux brouillons ont été préparés à la main dans Gmail le 26/11 au matin.
+
+**Le 26/11/2026 au matin, sur le serveur (une demande, son oui)** : dépôt `5b78104`, JARVIS 0.84.0 → 0.84.1, kit à jour
+(faille corrigée : le compte rendu n'est plus écrit chez JARVIS), **`cra.conf` posé** (le CRA de la semaine partira après
+son oui du vendredi 27/11). Feuille de la semaine, de nouveau à blanc : « Résultat CRA : blanc », la première des trois
+lignes identiques choisie, « 1 » du lundi au vendredi, rien tapé (1 min 41, 1,2 Go). **CRA du mois de novembre : à blanc
+propre** (statut « Saisie en cours », chaque jour déjà inscrit comme la consigne : 15 de mission, 5 congés, 1 absence
+fériée, rien à compléter ; fin de mission 30/11/2026), **puis validé en réel** : une validation, une confirmation, statut lu
+« Validé par vous » (et non « en attente » : la skill accepte les deux depuis), 2 min 31, 1 Go. Hermes n'a pas pu lire
+le motif de l'absence du 11 (non affiché). C'est la première exécution réelle d'Hermes à la place de Chronos : il la
+vérifie sur l'intranet. Les mails de novembre (à son contact du client : 15 jours, congés passés et à venir ; à sa
+chargée de mission : prolongation d'au moins 3 mois) sont partis de sa boîte le 26/11 au matin, après son oui (QCM),
+envoyés par Claude, sans Grok Bot. Depuis : `cra-mois` pose aussi son compte rendu (`mois-<AAAA-MM>.json` : résultat,
+fin de mission) dans le dossier de root pour l'espace « Travail » de JARVIS (en réel seulement) ; banc 145 (avec la note de télétravail).
+**Sa règle du 26/11/2026** : les mails générés (demande du CRA, prolongation) ne passent jamais par Iris : JARVIS ou
+Hermes les envoient directement (« on remplace Grok Bot, on n'ajoute pas de dépendance »). Les congés à venir s'écrivent
+au futur (`mailCraPhrases` de JARVIS, 0.85.0).
+
+**Les routines de Chronos, une par une (26/11/2026, 8 h)** :
+
+| Routine de Chronos | Qui la fait maintenant | Reste |
+|---|---|---|
+| Validation des jours (le 24) | En pause chez Chronos ; JARVIS (bilan, son oui) | Rien |
+| CRA mensuel (le 26) | En pause chez Chronos ; Hermes, en réel (novembre validé le 26/11) | Déclenchement seul le 26 après son oui (`cra-mois` à brancher sur une minuterie, comme `cra-auto`) ; dépôt du CRA du client |
+| Mails du mois (le 24 et le 26) | JARVIS prépare le brouillon, il l'envoie depuis JARVIS (0.85.0) | Modèles à poser sur le serveur (`travail.json`) |
+| CRA hebdomadaire (vendredi) | En pause chez Chronos ; Hermes, en réel dès son oui du 27/11 | Sa vérification après la première exécution |
+| Note de télétravail (le 1er) | Chronos ; Hermes à blanc le 30/11 (en construction) | Comparer avec Chronos le 1/12, puis bascule |
+| Note de la box (le 15) | Chronos ; Hermes à blanc identique (25/11) | Déclenchement seul, champs par règles, puis bascule |
+| Note de l'abonnement Claude (le 21 et « Facture reçue ») | Chronos ; Hermes à blanc identique (25/11) | Déclenchement à la facture, puis bascule |
+| Note Grok Bot (le 4) | Chronos, jusqu'à l'arrêt de Grok (son choix) | Rien |
 
 **Le mois, au complet (ses précisions et QCM du 26/11/2026, nuit)** : la validation du 24 et le CRA du 26 de Chronos
 font aussi deux mails et un rattachement, pas encore chez Hermes ; ces deux routines de Chronos ne se mettent pas en

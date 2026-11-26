@@ -1,0 +1,123 @@
+/* 0.85.0 — l'espace « Travail » (sa demande du 26/11/2026 : « repense comment visualiser ses routines dans JARVIS : les étapes faites,
+   l'avancement, les dates d'exécution, les données prévues d'un coup d'œil ; séparer le CRA des tâches normales » ; maquette validée le
+   26/11 avec une remarque : « des titres précis, pas des titres de catégories »).
+   Une carte par routine : qui la fait (Chronos, Hermes à blanc, Hermes en réel, JARVIS), ses étapes et leur état, la prochaine date, les
+   données prévues, la dernière exécution. Rien n'est inventé : les jours et le CRA de la semaine viennent de `jours.mjs`, le CRA du mois du
+   compte rendu d'Hermes (dossier de root), les mails de Gmail (envoyés, reçus), les passages de Chronos de l'onglet Journal de Pilotage.
+   Les titres précis (nom du client, du portail, du fournisseur) ne sont pas dans ce dépôt public : ils sont dans `travail.json` sur son
+   serveur, et il les renomme lui-même dans l'app (« Renommer »). Ce fichier garde aussi les modèles des mails (destinataire, texte). */
+import fs from 'node:fs';
+import path from 'node:path';
+import {MOIS, mailCraRempli} from './jours.mjs';
+
+const TITRES = {semaine: 'CRA de la semaine', mois: 'CRA du mois', jours: 'Jours du mois', claude: 'Abonnement Claude', box: 'Box internet', teletravail: 'Télétravail', grok: 'Grok Bot'};
+/* l'avancement du remplacement de Chronos par Hermes, note par note (état du chantier au 26/11/2026 ; `travail.json` peut le remplacer) */
+const NOTES = [
+  {id: 'claude', jour: 21, qui: 'chronos', quiDit: 'Chronos', journal: 'claude|anthropic', etapes: [['Facture lue', 'fait'], ['Dépense à blanc', 'fait'], ['Identique à Chronos', 'fait'], ['Part seule', ''], ['Bascule', '']]},
+  {id: 'box', jour: 15, qui: 'chronos', quiDit: 'Chronos', journal: 'box|internet|fibre', etapes: [['Facture téléchargée', 'fait'], ['Dépense à blanc', 'fait'], ['Identique à Chronos', 'fait'], ['Part seule', ''], ['Bascule', '']]},
+  {id: 'teletravail', jour: 'dernier', qui: 'chronos', quiDit: 'Chronos le 1er · Hermes à blanc le dernier jour', journal: 't[ée]l[ée]travail', etapes: [['Jours (JARVIS)', 'fait'], ['Électricité', ''], ['Charges et pièces', ''], ['PDF', ''], ['À blanc', '']]},
+  {id: 'grok', jour: 4, qui: 'chronos', quiDit: 'Chronos', journal: 'grok|xai', etapes: [['Chronos jusqu’à l’arrêt de Grok', 'fait']]}
+];
+const SEM = ['dim.', 'lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.'];
+const pad = (n) => String(n).padStart(2, '0');
+const ymdDe = (y, m, d) => y + '-' + pad(m) + '-' + pad(d);
+const dernierJour = (y, m) => new Date(Date.UTC(y, m, 0)).getUTCDate();
+const dowDe = (s) => new Date(Date.UTC(+s.slice(0, 4), +s.slice(5, 7) - 1, +s.slice(8, 10))).getUTCDay();
+const plusJour = (s, n) => new Date(Date.UTC(+s.slice(0, 4), +s.slice(5, 7) - 1, +s.slice(8, 10) + n)).toISOString().slice(0, 10);
+const court = (s) => SEM[dowDe(s)] + ' ' + s.slice(8, 10) + '/' + s.slice(5, 7);
+const jjmm = (s) => s.slice(8, 10) + '/' + s.slice(5, 7);
+const moisMaj = (m) => MOIS[m - 1].charAt(0).toUpperCase() + MOIS[m - 1].slice(1);
+const TXT = (s, n) => String(s == null ? '' : s).replace(/\s+/g, ' ').trim().slice(0, n);
+const paris = (d) => { const p = Object.fromEntries(new Intl.DateTimeFormat('en-CA', {timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false}).formatToParts(d).map((x) => [x.type, x.value])); return {ymd: p.year + '-' + p.month + '-' + p.day, hm: (p.hour === '24' ? '00' : p.hour) + ':' + p.minute}; };
+
+export function createTravail({file, jours, retours = '/var/lib/hermes-portail-retours', journal = async () => [], gmail = null, now = Date.now, log = () => {}}) {
+  const lireConf = () => { try { const j = JSON.parse(fs.readFileSync(file, 'utf8')); return j && typeof j === 'object' && !Array.isArray(j) ? j : {}; } catch { return {}; } };
+  const ecrireConf = (c) => { const tmp = file + '.tmp'; fs.writeFileSync(tmp, JSON.stringify(c, null, 2), {mode: 0o600}); fs.renameSync(tmp, file); };
+  const titre = (C, id) => TXT((C.titres || {})[id], 60) || TITRES[id];
+  /* le compte rendu du CRA du mois, posé par root (`hermes-portail cra-mois`) : résultat, fin de mission */
+  const retourMois = (ym) => { try { const f = path.join(retours, 'mois-' + ym + '.json'); if (!fs.lstatSync(f).isFile()) return null; const r = JSON.parse(fs.readFileSync(f, 'utf8')); return r && typeof r === 'object' ? r : null; } catch { return null; } };
+  /* Gmail et le Journal : relus au plus toutes les 10 minutes (le tableau s'ouvre souvent, ces lectures coûtent) */
+  const cache = new Map();
+  const memo = async (cle, fn) => { const c = cache.get(cle); if (c && now() - c.at < 600000) return c.v; let v = null; try { v = await fn(); } catch (e) { log('travail : ' + cle + ' : ' + ((e && e.message) || e)); v = c ? c.v : null; } cache.set(cle, {at: now(), v}); return v; };
+  const cherche = (q) => (gmail ? memo('g:' + q, async () => { const r = await gmail(q); return ((r && r.threads) || []).map((t) => { const m = (t.messages || []).slice(-1)[0] || {}; return {id: t.id, at: +m.internalDate || Date.parse(m.date || '') || 0, objet: m.subject || ''}; }); }) : Promise.resolve(null));
+  const passages = () => memo('journal', journal);
+
+  async function etat() {
+    const C = lireConf(), t = paris(new Date(now())), auj = t.ymd, y = +auj.slice(0, 4), m = +auj.slice(5, 7), ym = auj.slice(0, 7), dern = ymdDe(y, m, dernierJour(y, m));
+    const J = (await passages()) || [];
+    const derChronos = (re) => { const rx = new RegExp(re, 'i'); const l = J.filter((x) => /chronos|medusa/i.test(x.bot) && rx.test(x.sujet + ' ' + x.detail)).sort((a, b) => b.at - a.at)[0]; return l ? {quand: jjmm(l.ymd), quoi: TXT(l.sujet || l.detail, 60), par: 'Chronos', ok: !/échec|bloqu|ko\b|erreur/i.test(l.sujet + ' ' + l.detail)} : null; };
+    const routines = [], frise = [];
+    const ev = (date, quoi, qui, toi) => { if (date >= auj && date <= plusJour(auj, 14)) frise.push({date, quand: court(date), quoi, qui, toi: !!toi}); };
+
+    /* les jours du mois (JARVIS) */
+    const E = jours.etat(ym), b = E.bilan, T = b ? b.totaux : null, le24 = ymdDe(y, m, 24);
+    const ouiJours = E.etat === 'valide';
+    routines.push({id: 'jours', bloc: 'jours', titre: TXT((C.titres || {}).jours, 60) || 'Jours de ' + MOIS[m - 1], qui: 'reel', quiDit: 'JARVIS',
+      prochaine: auj < le24 ? court(le24) + ' · bilan' : auj < dern ? court(dern) + ' · relu' : 'mois prochain',
+      etapes: [['Bilan (24)', b && auj >= le24 ? 'fait' : ''], ['Ton oui', ouiJours ? 'fait' : auj >= le24 ? 'encours' : ''], ['Lieux notés', T && !T.aVenir && !T.aConfirmer ? 'fait' : ouiJours ? 'encours' : ''], ['Relu (' + dern.slice(8) + ')', auj >= dern && ouiJours ? 'fait' : '']],
+      prevu: T ? {texte: moisMaj(m), puces: [[T.travailles + ' jours travaillés', ''], [T.teletravail + ' en télétravail', ''], [T.conges + (T.conges > 1 ? ' congés' : ' congé'), 'non'], [T.feries + (T.feries > 1 ? ' fériés' : ' férié'), 'non']].concat(T.aVenir ? [[T.aVenir + ' lieu' + (T.aVenir > 1 ? 'x' : '') + ' à venir', 'amb']] : [])} : null,
+      derniere: E.valide ? {quand: jjmm(new Date(E.valide.at).toISOString().slice(0, 10)), quoi: 'congés validés', par: 'toi', ok: true} : null,
+      toi: E.demande ? 'Ton oui sur tes congés : il sert au CRA du mois.' : '', ouvrir: 'jours'});
+    ev(le24, 'Jours de ' + MOIS[m - 1] + ' : bilan', 'JARVIS, puis ton oui', true);
+
+    /* le CRA de la semaine : la semaine en cours (ou la dernière, le week-end) */
+    const lundi = plusJour(auj, -((dowDe(auj) + 6) % 7)), vendredi = plusJour(lundi, 4), S = jours.etatSemaine(lundi);
+    const st = S ? S.etat : 'a_valider', fait = (x) => (x ? 'fait' : '');
+    const semPasse = Object.keys(jours.brut().semaines || {}).filter((l) => l < lundi).sort().reverse().map((l) => ({l, s: jours.etatSemaine(l)})).find((x) => x.s && x.s.retour);
+    routines.push({id: 'semaine', bloc: 'cra', titre: titre(C, 'semaine'), qui: 'reel', quiDit: 'Hermes · réel',
+      prochaine: auj < vendredi || (auj === vendredi && t.hm < '12:00') ? court(vendredi) + ' · 12 h' : court(plusJour(vendredi, 7)) + ' · 12 h',
+      etapes: [['Bilan du vendredi', fait(S && S.jours && S.jours.length)], ['Ton oui', ['valide', 'soumise', 'deja'].includes(st) ? 'fait' : S && S.demande ? 'encours' : ''], ['Saisie et Submit', st === 'soumise' || st === 'deja' ? 'fait' : st === 'a_la_main' ? 'bloque' : st === 'valide' ? 'encours' : ''], ['Compte rendu', S && S.retour ? (['soumise', 'deja'].includes(S.retour.resultat) ? 'fait' : 'bloque') : '']],
+      prevu: S && S.jours && S.jours.length ? {texte: 'Semaine du ' + jjmm(lundi) + ' au ' + jjmm(vendredi), jours: S.jours.map((d) => [SEM[dowDe(d.date)].replace('.', ''), d.q === 1 ? '1' : d.q === 0 ? 'rien' : '?', d.q === 1 ? '' : d.q === 0 ? 'non' : 'amb'])} : {texte: 'Semaine du ' + jjmm(lundi) + ' au ' + jjmm(vendredi), puces: [['bilan le vendredi à midi', 'non']]},
+      derniere: S && S.retour ? {quand: jjmm(new Date(S.retour.at).toISOString().slice(0, 10)), quoi: {soumise: 'soumise', deja: 'déjà soumise', rien: 'rien saisi', echec: 'pas soumise'}[S.retour.resultat] || S.retour.resultat, par: 'Hermes', ok: ['soumise', 'deja'].includes(S.retour.resultat)}
+        : semPasse ? {quand: jjmm(new Date(semPasse.s.retour.at).toISOString().slice(0, 10)), quoi: semPasse.s.retour.resultat === 'soumise' ? 'soumise' : semPasse.s.retour.resultat, par: 'Hermes', ok: ['soumise', 'deja'].includes(semPasse.s.retour.resultat)} : derChronos(C.journalSemaine || 'cra.*(semaine|hebdo)|timesheet'),
+      toi: S && S.demande ? 'Ton oui attend : confirme la semaine, Hermes saisit et soumet.' : st === 'a_la_main' ? 'Hermes n’a pas pu soumettre : à faire à la main, ou « Relancer Hermes ».' : '', ouvrir: 'semaine', lundi});
+    ev(auj <= vendredi ? vendredi : plusJour(vendredi, 7), titre(C, 'semaine'), 'ton oui, puis Hermes', true);
+
+    /* le CRA du mois : jours validés (24), mail au client, CRA validé par Hermes (26), CRA du client reçu, rattaché */
+    const R = retourMois(ym), le26 = ymdDe(y, m, 26), MC = (C.mails || {}).cra_client || {}, objetCra = mailCraRempli(MC, ym, [], auj).objet;
+    const envoyes = (await cherche('in:sent subject:"' + objetCra.replace(/"/g, '') + '" newer_than:45d')) || [];
+    const mailCra = envoyes.sort((a, z) => z.at - a.at)[0] || null;
+    const a = [].concat(MC.a || []).filter(Boolean);
+    const recu = mailCra && a.length ? ((await cherche('from:(' + a.join(' OR ') + ') has:attachment newer_than:45d')) || []).filter((x) => x.at > mailCra.at).sort((x, z) => z.at - x.at)[0] || null : null;
+    const fin = R && /^\d{4}-\d{2}-\d{2}$/.test(String(R.fin || '')) ? R.fin : '';
+    const MP = (C.mails || {}).prolongation || {}, prolong = fin && fin <= dern ? ((await cherche('in:sent subject:"' + TXT(MP.objet || 'Prolongation mission', 80).replace(/"/g, '') + '" newer_than:45d')) || [])[0] || null : null;
+    const valideMois = R && ['validee', 'deja'].includes(R.resultat);
+    routines.push({id: 'mois', bloc: 'cra', titre: titre(C, 'mois'), qui: R ? 'reel' : 'blanc', quiDit: R ? 'Hermes · réel' : 'Hermes',
+      prochaine: valideMois ? '26/' + pad(m === 12 ? 1 : m + 1) : court(le26) + ' · 12 h',
+      etapes: [['Congés validés', ouiJours ? 'fait' : auj >= le24 ? 'encours' : ''], ['Mail au client', mailCra ? 'fait' : ouiJours ? 'encours' : ''], ['CRA validé', valideMois ? 'fait' : R && R.resultat !== 'blanc' ? 'bloque' : ''], ['CRA du client reçu', recu ? 'fait' : mailCra ? 'encours' : ''], ['Rattaché', R && R.rattache ? 'fait' : recu ? 'encours' : '']],
+      prevu: T ? {texte: moisMaj(m), puces: [[T.travailles + ' jours de mission', ''], [T.conges + (T.conges > 1 ? ' congés' : ' congé'), 'non'], [T.feries + (T.feries > 1 ? ' fériés' : ' férié'), 'non']]} : null,
+      alerte: fin && fin <= dern ? 'Fin de mission le ' + fin.split('-').reverse().join('/') + '. ' + (prolong ? 'Mail de prolongation envoyé le ' + jjmm(new Date(prolong.at).toISOString().slice(0, 10)) + '.' : 'Pas encore de mail de prolongation.') : '',
+      derniere: R ? {quand: jjmm(new Date(+R.at || now()).toISOString().slice(0, 10)), quoi: {validee: 'validé', deja: 'déjà validé', rien: 'rien saisi', enregistree: 'complété, pas validé', blanc: 'à blanc', echec: 'échec'}[R.resultat] || R.resultat, par: 'Hermes', ok: valideMois} : derChronos(C.journalMois || 'cra.*mois|compte rendu d.activit'),
+      mails: [mailCra ? {quoi: 'Mail « ' + mailCra.objet + ' »', quand: jjmm(new Date(mailCra.at).toISOString().slice(0, 10)), etat: 'envoyé'} : null, recu ? {quoi: 'CRA du client', quand: jjmm(new Date(recu.at).toISOString().slice(0, 10)), etat: 'reçu'} : null, prolong ? {quoi: 'Mail « ' + prolong.objet + ' »', quand: jjmm(new Date(prolong.at).toISOString().slice(0, 10)), etat: 'envoyé'} : null].filter(Boolean),
+      toi: recu && !(R && R.rattache) ? 'Le CRA du client est arrivé : à rattacher sur l’intranet (onglet du haut de la page du CRA).' : '', ouvrir: 'mois'});
+    if (!valideMois) ev(le26, titre(C, 'mois'), 'Hermes saisit et valide');
+
+    /* les notes de frais */
+    for (const N0 of NOTES) {
+      const N = Object.assign({}, N0, ((C.notes || {})[N0.id]) || {}), jr = N.jour === 'dernier' ? dernierJour(y, m) : +N.jour;
+      const ce = ymdDe(y, m, Math.min(jr, dernierJour(y, m))), suiv = auj <= ce ? ce : (() => { const y2 = m === 12 ? y + 1 : y, m2 = m === 12 ? 1 : m + 1; return ymdDe(y2, m2, N.jour === 'dernier' ? dernierJour(y2, m2) : Math.min(jr, dernierJour(y2, m2))); })();
+      let etapes = N.etapes, derniere = derChronos(N.journal), toi = '';
+      if (N.id === 'teletravail') {   /* la note préparée à blanc par Hermes le dernier jour (compte rendu de root, lu par jours.mjs) */
+        const TT = (jours.brut() || {}).teletravail || {}, k = Object.keys(TT).filter((x) => x <= ym).sort().pop(), tt = k ? TT[k] : null, okT = tt && ['blanc', 'prete'].includes(tt.resultat);
+        etapes = [['Jours (JARVIS)', 'fait'], ['Pièces et calcul', tt ? (okT ? 'fait' : 'bloque') : ''], ['PDF unique', okT ? 'fait' : ''], ['À blanc', tt && tt.resultat === 'blanc' ? 'fait' : ''], ['Comparé à Chronos', '']];
+        if (tt) { const hd = jjmm(new Date(tt.at).toISOString().slice(0, 10)); const hermes = {quand: hd, quoi: (okT ? 'à blanc' : 'arrêtée') + (tt.jours != null ? ', ' + String(tt.jours).replace('.', ',') + ' j' : ''), par: 'Hermes', ok: okT}; if (!derniere || tt.at > Date.parse(plusJour(auj, -40))) derniere = hermes; if (!okT) toi = 'Hermes s’est arrêté : ' + tt.texte; }
+      }
+      routines.push({id: N.id, bloc: 'frais', titre: titre(C, N.id), qui: N.qui, quiDit: N.quiDit, prochaine: court(suiv), etapes, derniere, toi, ouvrir: 'note'});
+      ev(suiv, titre(C, N.id), N.quiDit);
+    }
+    frise.sort((x, z) => (x.date < z.date ? -1 : 1));
+    return {maj: now(), aujourdhui: auj, routines, frise};
+  }
+  function renommer(id, nom) {
+    if (!Object.prototype.hasOwnProperty.call(TITRES, id)) return {ok: false, error: 'Routine inconnue.'};
+    const t = TXT(nom, 60); const C = lireConf(); C.titres = C.titres || {};
+    if (t) C.titres[id] = t; else delete C.titres[id];
+    ecrireConf(C); return {ok: true, titre: t || TITRES[id]};
+  }
+  async function traiter(method, p, lireCorps) {
+    if (p === '/api/travail' && method === 'GET') return {status: 200, body: await etat()};
+    if (p === '/api/travail/titre' && method === 'POST') { const b = await lireCorps(); const r = renommer(String(b.id || ''), b.titre); return {status: r.ok ? 200 : 400, body: r}; }
+    return {status: 404, body: {error: 'introuvable'}};
+  }
+  return {etat, renommer, traiter, conf: lireConf};
+}

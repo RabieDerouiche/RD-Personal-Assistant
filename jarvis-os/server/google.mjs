@@ -213,6 +213,16 @@ export function createGoogle({S, save, log = () => {}}) {
     if (!r.ok) throw new ToolError(r.status === 401 ? 'needs_reauth' : 'tool_error', 'HTTP ' + r.status, r.status);
     return tx;
   }
+  /* 0.85.0 (note de télétravail d'Hermes) : une réponse binaire (le contenu d'un fichier du Drive), avec un plafond */
+  async function apiOctets(url, max, retry = true) {
+    const t = await token();
+    const r = await gfetch(url, {headers: {authorization: 'Bearer ' + t}});
+    if (r.status === 401 && retry) { if (access.token === t) access = {token: '', exp: 0}; return apiOctets(url, max, false); }
+    if (!r.ok) throw new ToolError(r.status === 401 ? 'needs_reauth' : 'tool_error', 'HTTP ' + r.status, r.status);
+    let b; try { b = Buffer.from(await r.arrayBuffer()); } catch (e) { if (estDelai(e)) throw errDelai(); throw e; }
+    if (b.length > max) throw new ToolError('tool_error', 'Fichier trop gros.', 413);
+    return b;
+  }
 
   /* ---------- les outils de la page, un par un ---------- */
   const SEARCH_CACHE = new Map();
@@ -280,7 +290,7 @@ export function createGoogle({S, save, log = () => {}}) {
         const j = await api('GET', `${URLS.gmail}/users/me/drafts?${q}`);
         if (!(j.drafts || []).length) return {};
         const drafts = await pool(j.drafts, 8, async (d) => { const x = await api('GET', `${URLS.gmail}/users/me/drafts/${enc(d.id)}?format=full`), m = x.message || {}; const o = mailMsg(m, true);
-          return {id: x.id, threadId: m.threadId, toRecipients: o.toRecipients, ccRecipients: addrs(hdr(m, 'Cc')).map((a) => a.emailAddress), date: o.date, subject: o.subject, plaintextBody: o.plaintextBody, viewUrl: 'https://mail.google.com/mail/#drafts?compose=' + m.id}; });
+          return {id: x.id, threadId: m.threadId, toRecipients: o.toRecipients, ccRecipients: addrs(hdr(m, 'Cc')).map((a) => a.emailAddress), date: o.date, subject: o.subject, plaintextBody: o.plaintextBody, pieces: (o.attachments || []).map((a) => a.filename), viewUrl: 'https://mail.google.com/mail/#drafts?compose=' + m.id}; });
         return {drafts};
       },
       send_message: (i) => i.draftId ? api('POST', `${URLS.gmail}/users/me/drafts/send`, {id: i.draftId}) : api('POST', `${URLS.gmail}/users/me/messages/send`, {raw: rawMail(i)}),
@@ -294,10 +304,38 @@ export function createGoogle({S, save, log = () => {}}) {
         const x = await api('POST', `${URLS.gmail}/users/me/drafts`, {message: {raw: rawMail({...i, ...suite}), ...(i.threadId ? {threadId: String(i.threadId)} : {})}}), m = x.message || {};
         return {id: x.id || '', messageId: m.id || '', threadId: m.threadId || '', viewUrl: m.id ? 'https://mail.google.com/mail/#drafts?compose=' + m.id : ''};
       },
+      /* 0.85.0 (sa demande du 26/11/2026 : « modifier les brouillons dans JARVIS et les envoyer après ») : destinataires, objet et texte
+         remplacés, le fil et ses en-têtes de réponse gardés. Un brouillon avec pièce jointe se modifie dans Gmail (le texte seul la perdrait) */
+      update_draft: async (i) => {
+        const adr = (v) => [].concat(v == null ? [] : v).map((x) => String(x).trim()).filter(Boolean);
+        const x = await api('GET', `${URLS.gmail}/users/me/drafts/${enc(i.draftId)}?format=full`), m = x.message || {};
+        if (piecesDe(m.payload).length) { const e = new Error('Ce brouillon a une pièce jointe : modifie-le dans Gmail, pour ne pas la perdre.'); e.code = 'pieces_jointes'; e.status = 409; throw e; }
+        const o = mailMsg(m, true), to = i.to != null ? adr(i.to) : o.toRecipients, cc = i.cc != null ? adr(i.cc) : addrs(hdr(m, 'Cc')).map((a) => a.emailAddress);
+        const mauvaise = [...to, ...cc].find((a) => !/^[^\s@<>(),;:"\\]+@[^\s@<>(),;:"\\]+\.[a-z]{2,}$/i.test(a));
+        if (mauvaise) { const e = new Error('Adresse invalide : ' + mauvaise.slice(0, 80)); e.code = 'adresse'; e.status = 400; throw e; }
+        if (to.length > 20 || cc.length > 20) { const e = new Error('Trop de destinataires (20 au plus).'); e.code = 'adresse'; e.status = 400; throw e; }
+        const subject = uneLigne(i.subject != null ? String(i.subject) : o.subject).slice(0, 300), body = (i.body != null ? String(i.body) : o.plaintextBody || '').replace(/\r\n?/g, '\n').slice(0, 60000);
+        const irt = hdr(m, 'In-Reply-To'), refs = String(hdr(m, 'References') || '').split(/\s+/).filter((r) => r && r !== irt).join(' ');
+        const y = await api('PUT', `${URLS.gmail}/users/me/drafts/${enc(i.draftId)}`, {id: i.draftId, message: {raw: rawMail({to, cc, subject, body, inReplyTo: irt, references: refs}), ...(m.threadId ? {threadId: m.threadId} : {})}}), n = y.message || {};
+        return {id: y.id || i.draftId, messageId: n.id || '', threadId: n.threadId || m.threadId || '', toRecipients: to, ccRecipients: cc, subject, plaintextBody: body};
+      },
       delete_draft: (i) => api('DELETE', `${URLS.gmail}/users/me/drafts/${enc(i.draftId)}`),
       unlabel_thread: (i) => api('POST', `${URLS.gmail}/users/me/threads/${enc(i.threadId)}/modify`, {removeLabelIds: [].concat(i.labelIds || [])})
     },
     'Google Drive': {
+      /* 0.85.0 (note de télétravail d'Hermes, 26/11/2026) : UN fichier PDF par son identifiant, en lecture seule (un justificatif fixe,
+         l'avis de taxe foncière) ; 10 Mo au plus ; rendu en base64 avec son nom */
+      file_pdf: async (i) => {
+        const id = String(i.fileId || '');
+        if (!/^[A-Za-z0-9_-]{10,120}$/.test(id)) throw new ToolError('tool_error', 'Identifiant de fichier invalide.', 400);
+        const m = await api('GET', `${URLS.drive}/files/${enc(id)}?fields=id,name,mimeType,size,modifiedTime,trashed`);
+        if (m.trashed) throw new ToolError('tool_error', 'Ce fichier est dans la corbeille.', 404);
+        if (m.mimeType !== 'application/pdf') throw new ToolError('tool_error', 'Ce fichier n’est pas un PDF.', 415);
+        if (+m.size > 10e6) throw new ToolError('tool_error', 'Fichier trop gros (10 Mo au plus).', 413);
+        const b = await apiOctets(`${URLS.drive}/files/${enc(id)}?alt=media`, 10e6);
+        if (b.subarray(0, 5).toString('latin1') !== '%PDF-') throw new ToolError('tool_error', 'Le contenu n’est pas un PDF.', 415);
+        return {id: m.id, name: m.name || '', modifiedTime: m.modifiedTime || '', size: b.length, data: b.toString('base64')};
+      },
       /* 0.37.0 : un Google Doc par son nom dans un dossier (le Profil), en lecture seule : le plus récent de ce nom, exporté en HTML */
       doc_html: async (i) => {
         const qs = (v) => "'" + String(v).replace(/\\/g, '\\\\').replace(/'/g, "\\'") + "'";

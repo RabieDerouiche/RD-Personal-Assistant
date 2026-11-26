@@ -180,7 +180,8 @@ de chaque : « matin congé, après-midi mission »), et le total attendu. Tu ne
 7. En « MODE CRA DU MOIS » : complète seulement les jours vides, avec l'activité de la consigne (sur ce portail,
    chaque clic s'enregistre). Puis relis le mois entier : chaque jour ouvré renseigné comme la consigne, et le
    total par activité égal à celui de la consigne. Tout est juste : clique « Valider ce compte rendu d'activité »,
-   une fois, confirme la fenêtre de validation, une fois, puis relis le statut (attendu : « en attente »). Aucun
+   une fois, confirme la fenêtre de validation, une fois, puis relis le statut (attendu : « Validé par vous », ou
+   « en attente »). Aucun
    justificatif à joindre. Une différence, une erreur ou une alerte du portail : ne valide pas, ne corrige rien en
    devinant, recopie l'alerte (sans nom ni numéro) et réponds « Résultat : complété, pas validé » (ou « Résultat :
    rien saisi » si tu n'as rien complété).
