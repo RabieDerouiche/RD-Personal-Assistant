@@ -1829,6 +1829,16 @@ const RADAR = createRadar({file: path.join(DATA, 'radar.json'), now, log: (t) =>
     return runClaude({kind: 'radar', titre: 'Radar : lecture de factures', prompt, system, model: MODELS.rapide, cwd: box, timeoutMs: 180000,
       tools: {allow: [], deny: ['Bash', 'Read', 'Edit', 'Write', 'Glob', 'Grep', 'NotebookEdit', 'WebFetch', 'WebSearch', 'Task']}}); },
   push: (msg) => (S.push && S.push.subs.length ? PUSH.send(msg, {urgency: 'high'}) : Promise.resolve([]))});
+/* 0.94.0 : une ligne de JARVIS dans le Journal de Pilotage quand une réponse à un mail du mois arrive (jours.mjs) : les colonnes de
+   pilotage_ajouter (Date et heure, Bot, Type, Sujet, Détail), Bot « JARVIS », Type « ETAT » ; ni nom ni adresse, jamais un extrait du mail */
+const journalJarvis = async ({sujet, detail}) => {
+  if (!pilLie()) return false;
+  const hd = (await exeEntetes('Journal')).map(exeCle), row = hd.map(() => ''), met = (nom, v) => { const i = hd.indexOf(exeCle(nom)); if (i >= 0) row[i] = v; return i; };
+  if (met('Sujet', clip(sujet, 120)) < 0 || met('Bot', 'JARVIS') < 0) throw new Error('onglet Journal : en-têtes inattendus');
+  met('Date et heure', exeMaintenant(true)); met('Type', 'ETAT'); met('Détail', clip(detail, 400));
+  await GG.tool('Google Sheets', 'append_values', {spreadsheetId: PILOTAGE, range: exePlage('Journal', 'A1'), values: [row], valueInputOption: 'RAW'});
+  return true;
+};
 /* 0.83.0 : les jours du mois (jours.mjs ; « Hermes remplace Chronos », étape 2) : le bilan tiré de l'agenda « Présence » et des fériés, sans
    IA, envoyé le 24 à midi et relu le dernier jour ; son oui dans JARVIS (0.83.1 : sur ses congés, pour le CRA du 26). Gardé à part, dans jours.json ; Claude ne lit qu'une correction
    que les règles n'ont pas comprise, sans aucun outil. */
@@ -1837,16 +1847,19 @@ const JOURS = createJours({file: path.join(DATA, 'jours.json'), now, retours: pr
   mails: {modeles: () => { try { return TRAVAIL.conf().mails || {}; } catch { return {}; } },
     brouillon: (m) => GG.tool('Gmail', 'create_draft', {to: m.to, subject: m.subject, body: m.body}),
     majBrouillon: (m) => GG.tool('Gmail', 'update_draft', {draftId: m.draftId, to: m.to, subject: m.subject, body: m.body}),
-    envoye: async (objet) => { const r = await GG.tool('Gmail', 'search_threads', {query: 'in:sent subject:"' + String(objet).replace(/"/g, '') + '" newer_than:40d', pageSize: 3}); return !!((r && r.threads) || []).length; }},
+    envoye: async (objet) => { const r = await GG.tool('Gmail', 'search_threads', {query: 'in:sent subject:"' + String(objet).replace(/"/g, '') + '" newer_than:40d', pageSize: 3, idsOnly: true}); return !!((r && r.threads) || []).length; },
+    /* 0.94.0 : le suivi des réponses (identifiants et version des fils seulement ; un fil n'est lu en entier que s'il a changé), son adresse */
+    chercher: (q) => GG.tool('Gmail', 'search_threads', {query: q, pageSize: 10, idsOnly: true}), fil: (id) => GG.tool('Gmail', 'get_thread', {threadId: id}), moi: () => GG.status('').account || ''},
+  ecrireJournal: (l) => journalJarvis(l),
   agenda: {lie: () => GG.status('').linked, calendriers: async () => ((await GG.tool('Google Calendar', 'list_calendars', {})) || {}).calendars || [],
     evenements: async (calendarId, debut, fin) => ((await GG.tool('Google Calendar', 'list_events', {calendarId, startTime: debut + 'T00:00:00', endTime: fin + 'T00:00:00', pageSize: 250})) || {}).events || []},
   claude: (prompt, system) => { const box = path.join(DATA, 'jours'); fs.mkdirSync(box, {recursive: true, mode: 0o700});
     return runClaude({kind: 'jours', titre: 'Jours du mois : lecture d’une correction', prompt, system, model: MODELS.rapide, cwd: box, timeoutMs: 90000,
       tools: {allow: [], deny: ['Bash', 'Read', 'Edit', 'Write', 'Glob', 'Grep', 'NotebookEdit', 'WebFetch', 'WebSearch', 'Task']}}); },
   push: (msg) => (S.push && S.push.subs.length ? PUSH.send(msg, {urgency: 'high'}) : Promise.resolve([]))});
-/* 0.85.0 : l'espace « Travail » : les passages de Chronos lus dans l'onglet Journal de Pilotage, les mails dans Gmail (lecture seule) */
+/* 0.85.0 : l'espace « Travail » : les passages de Chronos lus dans l'onglet Journal de Pilotage ; 0.94.0 : les mails du mois et leurs
+   réponses ne sont plus cherchés ici (trois recherches de dix fils à chaque ouverture : le quota de Gmail) mais lus dans le suivi de JOURS */
 const TRAVAIL = createTravail({file: path.join(DATA, 'travail.json'), jours: JOURS, retours: process.env.JARVIS_RETOURS_CRA || '/var/lib/hermes-portail-retours', now, log: (t) => console.log(t),
-  gmail: (q) => (GG.status('').linked ? GG.tool('Gmail', 'search_threads', {query: q, pageSize: 10}) : Promise.resolve(null)),
   journal: async () => {
     if (!pilLie()) return [];
     const r = await GG.tool('Google Sheets', 'get_values', {spreadsheetId: PILOTAGE, range: "'Journal'!A1:H"}), v = (r && r.values) || [], hd = (v[0] || []).map((x) => String(x).trim());
@@ -2455,6 +2468,7 @@ const server = http.createServer(async (req, res) => {
         try {
           if (b.server === 'Claude Code Remote' && b.tool === 'fire_trigger') return json(res, 200, {payload: startTache()});   /* « Confier à la tâche Claude » */
           const payload = await GG.tool(String(b.server || ''), String(b.tool || ''), b.input || {});
+          if (b.server === 'Gmail' && b.tool === 'send_message') { JOURS.reveillerSuivi(); TRAVAIL.invalider(); }   /* 0.94.0 : un mail part de JARVIS : le suivi des mails du mois le voit au passage suivant */
           /* routines de Grok Bot reprises (26/11/2026) : une ligne du Canal pour Hermes (ou, Grok Bot arrêté, pour un de ses bots) réveille Hermes */
           if (b.server === 'Google Sheets' && b.tool === 'append_values' && /^'?Canal'?!/i.test(String((b.input || {}).range || ''))) {
             const pour = ((b.input || {}).values || []).map((r) => exeCle(Array.isArray(r) ? r[2] : ''));

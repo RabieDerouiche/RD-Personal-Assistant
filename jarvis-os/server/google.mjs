@@ -203,10 +203,14 @@ export function createGoogle({S, save, log = () => {}}) {
     try { t = await enCours.p; } catch (e) { if (G.refresh && G.refresh !== rt) return token(); throw e; }   /* compte changé entre-temps : avec le nouveau */
     return G.refresh === rt ? t : token();
   }
-  async function api(method, url, body, retry = true) {
+  /* 0.94.0 : un quota atteint (429 ; le 26/11/2026, « Queries per minute per user » sur Gmail) n'était géré nulle part : la lecture
+     échouait telle quelle. Une LECTURE (GET, sans effet) est réessayée une fois, après une courte attente ; une écriture, jamais. */
+  const REESSAI = process.env.JARVIS_GOOGLE_REESSAI_MS != null ? +process.env.JARVIS_GOOGLE_REESSAI_MS : 1500;
+  async function api(method, url, body, retry = true, quota = true) {
     const t = await token();
     const r = await gfetch(url, {method, headers: {authorization: 'Bearer ' + t, ...(body ? {'content-type': 'application/json'} : {})}, body: body ? JSON.stringify(body) : undefined});
-    if (r.status === 401 && retry) { if (access.token === t) access = {token: '', exp: 0}; return api(method, url, body, false); }
+    if (r.status === 401 && retry) { if (access.token === t) access = {token: '', exp: 0}; return api(method, url, body, false, quota); }
+    if (r.status === 429 && quota && method === 'GET') { try { await r.arrayBuffer(); } catch { /* corps déjà perdu */ } await new Promise((z) => setTimeout(z, REESSAI + Math.floor(Math.random() * 300))); return api(method, url, body, retry, false); }
     if (r.status === 204) return {};
     const j = await lireJson(r);
     if (!r.ok) {
