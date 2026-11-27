@@ -12861,6 +12861,75 @@ void main(){
       };
     } }
 
+  /* ================= ESSAI « accueil repensé » (28/11/2026). Sa demande : « refais la page d'accueil avec la même charte graphique que les
+     autres pages et les couleurs et tout, mais repense la page d'accueil, donne plusieurs propositions » ; il veut des tuiles qui DISENT
+     quelque chose (comme Agenda et Argent) et mènent aux blocs (Travail, Routines, Papiers…), Réglages accessible, et pas de recoloriage.
+     Trois ORGANISATIONS de la page, toutes dans le thème tel qu'il est (aucune teinte, aucun dégradé, aucun effet nouveau : seulement des
+     tailles et des places) ; rien ne change sans « ?accueil=1 », « 2 » ou « 3 » dans l'adresse. Les chiffres sont ceux de l'app (les tuiles
+     d'Espaces et de l'écran de JARVIS sont réutilisées telles quelles, avec leur appui).
+       1 « Huit portes » : le globe reste au centre ; huit tuiles reliées l'entourent (quatre de chaque côté) au lieu de quatre ;
+       2 « Tableau de bord » : le globe devient une vignette en tête, avec l'heure et la phrase du jour ; dessous, les tuiles des autres
+         pages (celles d'Espaces), deux par ligne, puis « À faire maintenant » et la journée ; Réglages en ligne de coulisses ;
+       3 « D'abord ce qui t'attend » : la même tête ; la carte du dessus de la pile « Attend ton oui » est sur l'accueil ; dessous, un
+         ruban de tuiles qui défile vers Agenda, Argent, Travail, Hermes, Papiers, Achats, Réglages ; puis la journée. ================= */
+  { let variante = ''; try { variante = new URLSearchParams(location.search).get('accueil') || ''; } catch (e) { /* rien */ }
+    if (['1', '2', '3'].includes(variante)) {
+      document.head.append(h('style', {text: ''
+        /* 1 : huit tuiles autour du globe (places et tailles seulement) */
+        + '.hud-8 .hud-core{height:408px}.hud-8.hud .hud-ro{width:112px;padding:7px 9px 8px}.hud-8.hud .hud-ro b{font-size:15px}.hud-8 .hud-ro small{font-size:10.5px;letter-spacing:.14em}.hud-8 .hud-ro span{font-size:11.5px}'
+        + '.hud-8 .hud-ro.q-l1{left:6px;top:0}.hud-8 .hud-ro.q-l2{left:0;top:113px;animation-delay:-1s}.hud-8 .hud-ro.q-l3{left:0;top:226px;animation-delay:-2s}.hud-8 .hud-ro.q-l4{left:6px;top:339px;animation-delay:-3s}'
+        + '.hud-8 .hud-ro.q-r1{right:6px;top:0;animation-delay:-.5s}.hud-8 .hud-ro.q-r2{right:0;top:113px;animation-delay:-1.5s}.hud-8 .hud-ro.q-r3{right:0;top:226px;animation-delay:-2.5s}.hud-8 .hud-ro.q-r4{right:6px;top:339px;animation-delay:-3.5s}'
+        /* 2 et 3 : la tête (le globe en vignette, l'heure, la phrase) */
+        + '.acc-tete{display:grid;grid-template-columns:112px minmax(0,1fr);gap:12px;align-items:center;margin:0 0 14px}.acc-tete .acc-g{position:relative;width:112px;height:112px}.acc-tete .acc-g .holo-stage{position:absolute;inset:-14px;width:auto;height:auto}.acc-tete .acc-g .holo-stage canvas{width:100%;height:100%;display:block}'
+        + '.acc-tete .hud-clock{font-size:34px}.acc-tete .hud-clock small{font-size:14px}.acc-tete .hud-date{margin-top:5px;font-size:11px}.acc-dit{margin:0 0 16px;min-height:0;text-align:left;font-size:15.5px}'
+        + '.acc-esp{margin:0 0 6px}.acc-esp .esp-tile{min-height:112px}.acc-regl{margin:4px 0 14px}'
+        /* 3 : la carte qui l'attend, puis le ruban */
+        + '.acc-oui{margin:0 0 14px}.acc-oui .pile-h{margin:0 0 10px}.acc-oui>.card,.acc-oui>button.card{display:block;width:100%;box-sizing:border-box}.acc-oui>article.card{display:grid}.acc-oui .acc-tous{display:block;width:100%;margin-top:8px;min-height:44px;background:none;border:0;color:var(--muted);font:600 13.5px var(--sans);text-decoration:underline;text-underline-offset:3px;cursor:pointer}'
+        + '.acc-ruban{display:flex;gap:10px;overflow-x:auto;margin:0 -16px 16px;padding:6px 16px 10px;scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch;scrollbar-width:none}.acc-ruban::-webkit-scrollbar{display:none}'
+        + '.acc-ruban .hud-ro{position:relative;flex:0 0 136px;width:136px;scroll-snap-align:start;animation:none;left:auto;right:auto;top:auto;bottom:auto}.hud.acc-ruban .hud-ro{width:136px}'}));
+      const VA_ACC = VIEWS.accueil;
+      const tuileEsp = (id, ic, nom, v, sub, amb) => h('button', {type: 'button', class: 'esp-tile' + (amb ? ' amb' : ''), 'data-go': id, onclick: () => go(id)}, h('span', {class: 'esp-ic', html: icon(ic, 18)}), h('span', {class: 'esp-n', text: nom}), h('b', {class: 'esp-v', text: v}), h('span', {class: 'esp-s', text: sub}));
+      const ro = (pos, act, k, b, sub, amb) => h('button', {type: 'button', class: 'hud-ro' + (pos ? ' q-' + pos : '') + (amb ? ' amb' : ''), 'data-k': k, onclick: act}, h('small', {text: k}), h('b', {text: b}), h('span', {text: sub}));
+      VIEWS.accueil = (el) => {
+        const src = h('div'); VA_ACC(src);
+        const hud = src.querySelector('section.hud'), core = hud && hud.querySelector('.hud-core'); if (!core) { el.append(...src.childNodes); return; }
+        const esp = h('div'); try { VIEWS.espaces(esp); } catch (e) { /* rien */ }
+        const T = (id) => esp.querySelector('.esp-tile[data-go="' + id + '"]'), tx = (n, c) => ((n && n.querySelector(c) && n.querySelector(c).textContent) || '').trim();
+        const R = (k) => core.querySelector('.hud-ro[data-k="' + k + '"]'), sec = (t) => [...src.children].find((x) => { const y = x.querySelector && x.querySelector('h2'); return !!y && y.textContent.trim() === t; });
+        const deTuile = (id, nom, pos) => { const t = T(id); return t ? ro(pos, () => go(id), nom, tx(t, '.esp-v') || '—', tx(t, '.esp-s'), t.classList.contains('amb')) : null; };
+        const reglRo = (pos) => ro(pos, () => go('reglages'), 'RÉGLAGES', 'Serveur', 'voix, Google, mémoire');
+        if (variante === '1') {
+          hud.classList.add('hud-8');
+          [['AGENDA', 'l1'], ['MÉTÉO', 'r1'], ['POUR TOI', 'l2'], ['ARGENT', 'r2'], ['BONS PRIX', 'r2']].forEach(([k, p]) => { const n = R(k); if (n) { n.classList.remove('q-tl', 'q-tr', 'q-bl', 'q-br'); n.classList.add('q-' + p); } });
+          core.append(deTuile('travail', 'TRAVAIL', 'l3'), deTuile('equipe', 'HERMES', 'r3'), deTuile('papiers', 'PAPIERS', 'l4'), reglRo('r4'));
+          el.append(...src.childNodes);
+          requestAnimationFrame(() => requestAnimationFrame(() => { try { hudLines(); } catch (e) { /* rien */ } }));
+          return;
+        }
+        /* 2 et 3 : la tête */
+        const stage = core.querySelector('.holo-stage') || core.firstElementChild, top = hud.querySelector('.hud-top'), dit = hud.querySelector('.hud-say');
+        const tete = h('div', {class: 'acc-tete hud'}, h('div', {class: 'acc-g'}, stage), h('div', {}, top ? top.firstElementChild : null));
+        if (dit) dit.classList.add('acc-dit');
+        el.append(tete, dit);
+        const pm = R('POUR TOI'), ag = R('AGENDA'), arg = R('ARGENT');
+        if (variante === '2') {
+          const tuiles = [pm ? tuileEsp('demandes', 'chat', 'Pour toi', tx(pm, 'b') || '—', tx(pm, 'span'), pm.classList.contains('amb')) : null, ag ? tuileEsp('agenda', 'cal', 'Agenda', tx(ag, 'b') || '—', tx(ag, 'span')) : null,
+            T('travail'), T('argent'), T('equipe'), T('papiers'), T('achats'), T('voyages')].filter(Boolean);
+          el.append(h('div', {class: 'esp-grid acc-esp'}, tuiles));
+          const regl = esp.querySelector('.esp-row[data-go="reglages"]'); if (regl) el.append(h('div', {class: 'esp-rows acc-regl'}, regl));
+        } else {
+          const dm = h('div'); try { VIEWS.demandes(dm); } catch (e) { /* rien */ }
+          const carte = dm.querySelector('.pm-list.pile > .pile-top') || dm.querySelector('.pm-sec .pm-list > *'), n = +((dm.querySelector('.pile-h') || {dataset: {}}).dataset.pile || 0);
+          if (carte) { carte.hidden = false; carte.classList.remove('pile-top');
+            el.append(h('section', {class: 'acc-oui'}, h('div', {class: 'pile-h'}, h('span', {class: 'pile-k', text: 'Attend ton oui'}), n ? h('span', {class: 'pile-n', text: String(n)}) : null), carte,
+              n > 1 ? h('button', {type: 'button', class: 'acc-tous', onclick: () => go('demandes')}, 'Voir les ' + n + ' dans Pour moi') : null)); }
+          el.append(h('div', {class: 'acc-ruban hud', 'aria-label': 'Tes espaces'}, ag, arg, deTuile('travail', 'TRAVAIL', ''), deTuile('equipe', 'HERMES', ''), deTuile('papiers', 'PAPIERS', ''), deTuile('achats', 'ACHATS', ''), R('MÉTÉO'), reglRo('')));
+          el.querySelectorAll('.acc-ruban .hud-ro').forEach((x) => x.classList.remove('q-tl', 'q-tr', 'q-bl', 'q-br'));
+        }
+        ['À faire maintenant', "Aujourd'hui", 'Les 14 prochains jours', 'À surveiller', 'Voyage en préparation'].forEach((t) => { const x = sec(t); if (x) el.append(x); });
+      };
+    } }
+
   boot();
 })();
 </script>
