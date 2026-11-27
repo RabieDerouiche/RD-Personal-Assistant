@@ -565,7 +565,11 @@ t = re.sub(r"\bhttps?://\S+", "(adresse)", t, flags=re.I); t = re.sub(r"\S+@\S+\
 t = re.sub(r"\b(?:[a-z0-9-]+\.)+[a-z]{2,}\b(?:/\S*)?", "(adresse)", t, flags=re.I)
 for mot in [m for m in re.split(r"[.-]", hote) if len(m) >= 4 and m not in ("portail", "intranet", "extranet", "client", "espace", "login", "compte")]:
     t = re.sub(re.escape(mot), "(portail)", t, flags=re.I)
-print(" ".join(t.split())[-300:])
+t = " ".join(t.split())
+if len(t) > 300:   # 27/11/2026 (vu au premier essai à blanc réel) : jamais coupé au milieu d un mot ni d une phrase
+    t = t[-300:]; c = re.search(r"[.!?»]\s+(?=[A-ZÀ-ÝJ«])", t[:150])
+    t = t[c.end():] if c else "… " + t.split(" ", 1)[-1]
+print(t)
 PY
 }
 

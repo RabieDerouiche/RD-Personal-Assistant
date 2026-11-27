@@ -245,8 +245,13 @@ disent où, si tu y es déjà passé). Tu ne fais rien d'autre que ce qui suit.
    l'onglet ou de la zone, le libellé du bouton de dépôt, ce que la page dit du mois (son statut), puis réponds
    « Résultat : à blanc ». Fin.
 5. En « MODE DÉPÔT, » : dépose le fichier de la ligne « Fichier à déposer », avec `upload_file`, dans ce champ-là,
-   et jamais un autre fichier ni à un autre endroit. Si le portail demande de confirmer le dépôt de ce fichier,
-   confirme une fois. Puis relis la page : le document doit apparaître pour ce mois. Il apparaît : « Résultat :
+   et jamais un autre fichier ni à un autre endroit. Si le champ de fichier n'apparaît qu'après un bouton d'import
+   (« Importer… », « Ajouter un document »…, vu à blanc le 27/11/2026), tu peux cliquer ce bouton-là, une fois :
+   il ouvre le formulaire, il ne dépose rien. Si le formulaire demande autre chose que le fichier (le mois, la
+   mission, un type de document), choisis ce qui correspond à la consigne et rien d'autre ; s'il demande une
+   information que la consigne ne donne pas, ou s'il n'y a ni champ de fichier ni zone de dépôt utilisable avec
+   `upload_file` : annule, ne dépose rien, décris ce que le formulaire demande et réponds « Résultat : rien
+   déposé ». Si le portail demande de confirmer le dépôt de ce fichier, confirme une fois. Puis relis la page : le document doit apparaître pour ce mois. Il apparaît : « Résultat :
    déposé ». Il n'apparaît pas, ou le portail affiche une erreur : n'essaie pas une seconde fois, recopie l'alerte
    (sans nom ni numéro) et réponds « Résultat : rien déposé ».
 6. Jamais deux dépôts. Tu ne touches à aucune case du compte rendu, tu ne cliques pas « Valider ce compte rendu
