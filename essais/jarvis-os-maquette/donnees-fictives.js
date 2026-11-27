@@ -570,6 +570,41 @@
   /* 0.23.0 : la météo de l'accueil (en vrai : Open-Meteo, à la position de l'iPhone) */
   window.__METEO = {current: {temperature_2m: 9.4, apparent_temperature: 6.2, weather_code: 3}, daily: {time: [fr(D(0)), fr(D(1))], weather_code: [3, 61], temperature_2m_min: [4, 2], temperature_2m_max: [11, 7], precipitation_probability_max: [10, 70]}};
   window.__G = G; window.__MAIL = MAIL; window.__CAL = CAL;
+  /* 0.91.0 : le dépôt de papiers de la maquette (données inventées ; mêmes réponses que le pont du serveur, JarvisServeur.depot). Deux
+     fichiers attendent ; « valider » range dans le faux Drive ci-dessus. `depot: false` dans le scénario : comme un serveur pas encore à
+     jour (la carte « À trier » de la 0.87.0) ; `depotPortee: 'non'` : la portée Google « drive » pas accordée (« Reconnecte Google une fois »). */
+  if (SCEN.depot !== false) {
+    const RACINE = '1huMsPD8I81buG4GWhuoGmsOafvy4HrE4', JOUR = 864e5, dossiers = [{id: RACINE, chemin: []}];
+    (function descend(id, ch) { DRIVE.folders.filter((f) => f.parent === id).sort((a, b) => a.name.localeCompare(b.name, 'fr')).forEach((f) => { dossiers.push({id: f.id, chemin: ch.concat(f.name)}); descend(f.id, ch.concat(f.name)); }); })(RACINE, []);
+    const ou = (...noms) => dossiers.find((d) => d.chemin.join('/') === noms.join('/')) || dossiers[0], copie = (x) => JSON.parse(JSON.stringify(x)), portee = () => SCEN.depotPortee || 'oui';
+    const prop = (d, nom, raison, par, prive) => ({dossier: d.id, chemin: d.chemin, nom, raison, par, sur: par === 'regles', prive: !!prive});
+    let seq = 0; const neuf = (nom, ext, taille, source, p, age) => ({id: 'dp' + (++seq), at: now - age, jusqua: now - age + 30 * JOUR, nom, genre: ext === 'pdf' ? 'PDF' : 'photo', ext, taille, source, proposition: p});
+    const E = {attente: [neuf('Quittance novembre.pdf', 'pdf', 184320, 'app', prop(ou('Logement'), 'Quittance de loyer 2026-11.pdf', 'Reconnu : quittance de loyer (dans le nom du fichier).', 'regles'), 3600000),
+      neuf('IMG_4521.heic', 'heic', 2411724, 'raccourci', prop(ou('À trier'), 'Photo 2026-11-25.heic', 'Une image n’est pas lue : proposition par défaut.', 'defaut'), 26 * 3600000)], ranges: []};
+    window.__DEPOT = {
+      etat: async () => ({lie: true, portee: portee(), dossiers: copie(dossiers), attente: copie(E.attente), ranges: copie(E.ranges.slice().reverse()), max: 25 * 1024 * 1024, jours: 30, types: 'PDF, JPEG, PNG, HEIC'}),
+      envoyer: async (f, nom) => {
+        const n = String(nom || (f && f.name) || 'Document').split(/[\\/]/).pop(), m = /\.(pdf|jpe?g|png|heic)$/i.exec(n);
+        if (!m) return {ok: false, status: 415, error: 'Ce fichier n’est ni un PDF ni une image (JPEG, PNG, HEIC) : je ne le garde pas.'};
+        const ext = m[1].toLowerCase().replace('jpeg', 'jpg'), passeport = /passeport/i.test(n);
+        const x = neuf(n, ext, (f && f.size) || 1000, 'app', passeport ? prop(ou('Lui', 'Identité et séjour'), 'Passeport Lui.' + ext, 'Reconnu : passeport (dans le nom du fichier).', 'regles')
+          : prop(ou('À trier'), n, ext === 'pdf' ? 'Rien reconnu dans le nom ni dans le texte : proposition par défaut.' : 'Une image n’est pas lue : proposition par défaut.', 'defaut'), 0);
+        E.attente.unshift(x); return {ok: true, fichier: copie(x)};
+      },
+      corriger: async () => ({ok: true}),
+      valider: async (id, dossier, nom) => {
+        const x = E.attente.find((y) => y.id === id), d = dossiers.find((y) => y.id === dossier);
+        if (!x) return {ok: false, error: 'Ce fichier n’est plus en attente.'};
+        if (portee() === 'non') return {ok: false, code: 'portee', error: 'Reconnecte Google une fois (Réglages, Google, Reconnecter) : JARVIS n’a pas encore le droit de ranger dans ton Drive.'};
+        if (!d) return {ok: false, code: 'hors_arbre', error: 'Ce dossier n’est pas dans « RD Assistant/Papiers » : JARVIS n’y range rien.'};
+        const n = String(nom || x.nom).replace(/\.(pdf|jpe?g|png|hei[cf])$/i, '') + '.' + x.ext, fid = 'ffd' + (++seq), lien = 'https://drive.google.com/file/d/exemple-' + fid + '/view';
+        DRIVE.files.push({id: fid, name: n, parent: d.id, mimeType: x.ext === 'pdf' ? 'application/pdf' : 'image/jpeg', modifiedTime: new Date().toISOString(), size: x.taille, viewUrl: lien});
+        E.attente = E.attente.filter((y) => y !== x); const r = {id: x.id, at: Date.now(), nom: n, chemin: d.chemin, dossier: d.id, lien, fichier: fid}; E.ranges.push(r);
+        return {ok: true, range: copie(r)};
+      },
+      retirer: async (id) => { const n = E.attente.length; E.attente = E.attente.filter((y) => y.id !== id); return {ok: E.attente.length < n}; }
+    };
+  }
   /* 0.92.0 : les routines d'Hermes en direct (données inventées, même forme que GET /api/hermes/routines) ; elles ne sont pas celles de
      l'onglet Routines plus haut (« Semaine à venir » n'y est plus) : la page ne doit montrer que celles-ci. SCEN.hermesIndispo : résumé indisponible */
   if (SCEN.grokOff) {
