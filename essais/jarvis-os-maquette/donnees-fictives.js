@@ -612,16 +612,79 @@
     const hrOcc = (jours, heures, sens) => { for (let k = 0; k < 9; k++) { const c = [];
       heures.forEach(([hh, mi]) => { const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + sens * k, hh, mi); if ((!jours || jours.includes(d.getDay())) && (sens < 0 ? d <= now : d > now)) c.push(+d); });
       if (c.length) return new Date(sens < 0 ? Math.max(...c) : Math.min(...c)).toISOString().slice(0, 19) + 'Z'; } return null; };
-    const hr = (nom, libelle, moment, mode, jours, heures, plus) => Object.assign({nom, libelle, moment, mode, posee: true, active: true, dernier: hrOcc(jours, heures, -1), resultat: 'ok', cause: null, prochain: hrOcc(jours, heures, 1)}, plus || {});
+    /* 0.96.0 : ce que la feuille d'une routine lit en plus (pause, passage en cours, horaire d'origine et sa forme fermée, événement) */
+    const HR_JOURS = ['dim', 'lun', 'mar', 'mer', 'jeu', 'ven', 'sam'], hrForme = (jours, heures) => ({jours: !jours ? 'tous' : jours.length === 5 ? 'ouvres' : jours.map((j) => HR_JOURS[j]), heures: heures.map(([hh, mi]) => String(hh).padStart(2, '0') + ':' + String(mi).padStart(2, '0'))});
+    const hr = (nom, libelle, moment, mode, jours, heures, plus) => Object.assign({nom, libelle, moment, mode, posee: true, active: true, dernier: hrOcc(jours, heures, -1), resultat: 'ok', cause: null, prochain: hrOcc(jours, heures, 1),
+      pause: null, enCours: false, origine: moment, modifie: false, forme: hrForme(jours, heures), evenement: nom === 'reveil', _j: jours, _h: heures}, plus || {});
     window.__HERMES_ROUTINES = SCEN.hermesIndispo
       ? {disponible: false, code: 'vieux', raison: 'dernière écriture du résumé à 07 h 52 : plus de 30 minutes (la relance d’Hermes, hermes-relance, ne passe plus)'}
       : {disponible: true, at: +now - 4 * 60000, passerelle: 'active', garde: {etat: 'coupé', jusqua: '2026-12-03'}, routines: [
         hr('veille-du-matin', 'Veille du matin', 'du lundi au vendredi à 7 h 40', 'réel', [1, 2, 3, 4, 5], [[7, 40]]),
         hr('bilan-hebdo', 'Bilan de la semaine', 'le lundi à 8 h 50', 'réel', [1], [[8, 50]]),
         hr('reveil', 'Réveil', 'chaque jour à 9 h 15, 13 h 15 et 18 h 15', 'réel', null, [[9, 15], [13, 15], [18, 15]]),
-        hr('digest-ia', 'Digest IA et .NET', 'le lundi à 9 h 10', 'double', [1], [[9, 10]], {active: false, dernier: null, resultat: 'jamais', prochain: null}),
+        hr('digest-ia', 'Digest IA et .NET', 'le lundi à 9 h 10', 'double', [1], [[9, 10]], {active: false, dernier: null, resultat: 'jamais', prochain: null, pause: {depuis: new Date(+now - 26 * 3600e3).toISOString().slice(0, 19) + 'Z', par: 'jarvis'}}),
         hr('prix-suivis', 'Prix suivis', 'chaque jour à 9 h', 'réel', null, [[9, 0]], {resultat: 'erreur', cause: 'limite du forfait'}),
         hr('sorties-du-week-end', 'Sorties du week-end', 'le jeudi à 19 h', 'réel', [4], [[19, 0]])]};
+    /* 0.96.0 : l'administration des routines dans la maquette (données inventées, mêmes formes que GET /api/hermes/routine et les deux
+       routes d'ordre). Elle joue JARVIS et root : un ordre est « posé », root répond 0,7 s plus tard ; un passage lancé dure 3,4 s.
+       SCEN.hermesRefus : root refuse le lancement (limite du forfait, avec l'heure de reprise). */
+    if (window.__HERMES_ROUTINES.disponible) {
+      const R = window.__HERMES_ROUTINES.routines, iso = (ms) => new Date(ms).toISOString().slice(0, 19) + 'Z', hmP = (ms) => { const d = new Date(ms); return String(d.getHours()).padStart(2, '0') + ' h ' + String(d.getMinutes()).padStart(2, '0'); };
+      const FAITS = {'veille-du-matin': 'Trois mails à voir signalés, agenda du jour relu, une échéance rappelée.', 'bilan-hebdo': 'Bilan de la semaine écrit au Journal : six routines passées, forfait à 41 %.', reveil: 'Deux courriers traités, une ligne du Canal répondue.',
+        'prix-suivis': 'Quatre prix relevés, aucun sous son seuil.', 'sorties-du-week-end': 'Trois idées de sortie proposées pour samedi, météo vérifiée.'};
+      const LANCES = {programme: 'programmé', jarvis: 'lancé à la main depuis JARVIS', limite: 'relancé après la limite du forfait', reveil: 'réveil par JARVIS (courrier, Canal)', main: 'lancé à la main sur le serveur'};
+      const suite = (m) => (m.length === 1 ? m[0] : m.slice(0, -1).join(', ') + ' et ' + m[m.length - 1]), NOMJ = {lun: 'lundi', mar: 'mardi', mer: 'mercredi', jeu: 'jeudi', ven: 'vendredi', sam: 'samedi', dim: 'dimanche'};
+      const moment = (f) => (f.jours === 'tous' ? 'chaque jour ' : f.jours === 'ouvres' ? 'du lundi au vendredi ' : suite(f.jours.map((x) => 'le ' + NOMJ[x])) + ' ') + 'à ' + suite(f.heures.map((x) => +x.slice(0, 2) + ' h' + (+x.slice(3) ? ' ' + x.slice(3) : '')));
+      const E = {hist: {}, ordres: {}, lances: {}, res: {}};
+      R.forEach((r, k) => { E.hist[r.nom] = []; if (!r.dernier) return;
+        for (let i = 5; i >= 0; i--) { const fin = Date.parse(r.dernier) - i * (r._j && r._j.length === 1 ? 7 : 1) * 864e5 + 95000, duree = 80 + ((k * 37 + i * 53) % 160), der = i === 0, ko = der && r.resultat === 'erreur';
+          E.hist[r.nom].push({fin: iso(fin), debut: iso(fin - duree * 1000), duree, mode: r.mode, resultat: ko ? 'erreur' : 'ok', cause: ko ? r.cause : null, lance: r.nom === 'reveil' && i === 2 ? 'reveil' : 'programme', ordre: null,
+            erreur: ko ? 'RuntimeError: You\'ve hit your 5-hour limit · resets 5:40pm (Europe/Paris)\nFile "claude_subscription.py", line 212, in complete' : null, resume: !ko && r.mode === 'réel' ? FAITS[r.nom] || null : null}); }
+        if (r.mode === 'réel' && FAITS[r.nom]) E.res[r.nom] = {at: Date.parse(E.hist[r.nom].filter((p) => p.resume).slice(-1)[0].fin) - 4000, texte: FAITS[r.nom]}; });
+      const prochain = (r) => hrOcc(r.forme && r.forme.jours !== 'tous' ? (r.forme.jours === 'ouvres' ? [1, 2, 3, 4, 5] : r.forme.jours.map((j) => HR_JOURS.indexOf(j))) : null, (r.forme ? r.forme.heures : ['09:00']).map((x) => [+x.slice(0, 2), +x.slice(3)]), 1);
+      const etatDe = (r) => (!r.posee ? 'pas posée' : r.pause || !r.active ? 'en pause' : r.enCours ? 'en cours' : r.resultat === 'erreur' ? 'en erreur' : 'active');
+      const refus = (r, action) => { const o = E.ordres[r.nom];
+        if (o && !o.fini) return 'un ordre pour cette routine attend déjà le serveur.';
+        if (action !== 'lancer') return null;
+        if (r.pause || !r.active) return 'la routine est en pause : reprends-la d’abord.';
+        if (r.enCours) return 'un passage de cette routine est déjà en cours.';
+        if (E.lances[r.nom] && Date.now() - E.lances[r.nom] < 5 * 60000) return 'déjà lancée il y a moins de 5 minutes : possible à ' + hmP(E.lances[r.nom] + 5 * 60000) + '.';
+        return null; };
+      const touche = () => { window.__HERMES_ROUTINES.at = Date.now(); };
+      const detail = (nom) => { const r = R.find((x) => x.nom === nom); if (!r) return {raison: 'routine inconnue'};
+        const hist = E.hist[nom].slice(-30).map((p) => Object.assign({}, p, {lanceDit: LANCES[p.lance]})).reverse(), finis = hist.length, ok = hist.filter((p) => p.resultat === 'ok').length, ko = r.resultat === 'erreur' ? hist.find((p) => p.resultat === 'erreur') : null, rf = refus(r, 'lancer');
+        const pub = Object.assign({}, r); delete pub._j; delete pub._h; delete pub.ordre;
+        return JSON.parse(JSON.stringify({disponible: true, raison: null, at: Date.now(), passerelle: 'active', garde: window.__HERMES_ROUTINES.garde, routine: pub, etat: etatDe(r), ordre: E.ordres[nom] || null, peut: {lancer: !rf, raison: rf},
+          resume: E.res[nom] || null, historique: hist, stats: {passages: finis, reussis: ok, taux: finis ? Math.round(ok / finis * 100) : null, dureeMoyenne: finis ? Math.round(hist.reduce((s, p) => s + p.duree, 0) / finis) : null},
+          erreur: r.resultat === 'erreur' ? {cause: r.cause, quand: r.dernier, detail: ko ? ko.erreur : null, conseil: r.cause === 'limite du forfait' ? 'La limite du forfait Claude a coupé ce passage : reprise vers 17 h 40, elle repartira seule.' : 'Erreur pendant le passage. Si elle se répète, change ce qu’il faut puis relance-la.', relancer: true} : null,
+          plafonds: {lancersParJour: 12, ecartMinutes: 5, horairesParJour: 6}})); };
+      const ordre = (b) => { const r = R.find((x) => x.nom === (b && b.nom)), action = b && b.action;
+        if (!r || !['lancer', 'pause', 'reprendre', 'horaire'].includes(action)) return {ok: false, error: 'Routine ou action inconnue.'};
+        const rf = refus(r, action); if (rf) return {ok: false, error: 'Refusé : ' + rf};
+        const t = Date.now(), o = E.ordres[r.nom] = {id: 'o' + t, routine: r.nom, action, at: t, etat: 'posé', fini: false, texte: 'Demandé à ' + hmP(t) + ' — en attente du serveur…'};
+        setTimeout(() => {
+          if (action === 'pause') { r.pause = {depuis: iso(Date.now()), par: 'jarvis'}; r.active = false; r.prochain = null; Object.assign(o, {etat: 'fait', fini: true, texte: 'En pause depuis ' + hmP(t) + ', jusqu’à nouvel ordre.'}); }
+          else if (action === 'reprendre') { r.pause = null; r.active = true; r.prochain = prochain(r); Object.assign(o, {etat: 'fait', fini: true, texte: 'Reprise à ' + hmP(t) + '.'}); }
+          else if (action === 'horaire') { if (b.origine) { r.moment = r.origine; r.forme = hrForme(r._j, r._h); } else { r.forme = {jours: b.jours, heures: b.heures}; r.moment = moment(r.forme); }
+            r.modifie = r.moment !== r.origine; if (r.active) r.prochain = prochain(r);
+            Object.assign(o, {etat: 'fait', fini: true, texte: b.origine ? 'Horaire d’origine remis — pris en compte à ' + hmP(t) + '.' : 'Horaire changé — pris en compte à ' + hmP(t) + ' : ' + r.moment + '.'}); }
+          else if (SCEN.hermesRefus) Object.assign(o, {etat: 'refusé', fini: true, raison: 'limite', texte: 'Refusé à ' + hmP(t) + ' : la limite du forfait Claude est atteinte : reprise vers 17 h 40, elle repartira seule.'});
+          else { r.enCours = true; E.lances[r.nom] = t; Object.assign(o, {etat: 'en cours', texte: 'Demandé à ' + hmP(t) + ' — en cours…'});
+            setTimeout(() => { const fin = Date.now(); r.enCours = false; r.dernier = iso(fin); r.resultat = 'ok'; r.cause = null;
+              const texte = r.mode === 'réel' ? 'Passage lancé à la main : ' + (FAITS[r.nom] || 'rien de neuf.') : null;
+              E.hist[r.nom].push({fin: iso(fin), debut: iso(fin - 3000), duree: 3, mode: r.mode, resultat: 'ok', cause: null, lance: 'jarvis', ordre: o.id, erreur: null, resume: texte}); if (texte) E.res[r.nom] = {at: fin, texte};
+              Object.assign(o, {etat: 'terminé', fini: true, resultat: 'ok', fin: iso(fin), texte: 'Lancée à ' + hmP(t) + ', terminée à ' + hmP(fin) + ' : réussie.'}); liste(); touche(); }, 3400); }
+          liste(); touche(); }, 700);
+        return {ok: true, ordre: JSON.parse(JSON.stringify(o))}; };
+      const liste = () => { R.forEach((r) => { const o = E.ordres[r.nom]; if (o && !o.fini) r.ordre = {action: o.action, etat: o.etat, texte: o.texte}; else delete r.ordre; }); };
+      window.__HERMES_ADMIN = {
+        detail: (nom) => { liste(); return Promise.resolve(detail(nom)); },
+        ordre: (b) => { const x = ordre(b); liste(); touche(); return Promise.resolve(x); },
+        tout: (action) => { if (!['pause', 'reprendre'].includes(action)) return Promise.resolve({ok: false, error: 'Seulement « pause » ou « reprendre ».'});
+          const faits = [], ref = [];
+          R.filter((r) => r.posee && (action === 'pause' ? r.active && !r.pause : !!r.pause || !r.active)).forEach((r) => { const x = ordre({nom: r.nom, action}); (x.ok ? faits : ref).push({nom: r.nom, libelle: r.libelle, raison: x.error}); });
+          liste(); touche(); return Promise.resolve({ok: true, action, faits, refus: ref}); }};
+    }
   }
   /* 0.85.0 : l'espace « Travail » de la maquette (données inventées, même forme que GET /api/travail) */
   /* 0.86.0 : une note de frais d'Hermes à valider (données inventées, même forme que GET /api/jours/notes) */
