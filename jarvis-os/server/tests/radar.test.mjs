@@ -1,6 +1,6 @@
 /* Banc du Radar : node tests/radar.test.mjs (aucun vrai Google, aucun vrai Claude, aucun coût). Mails et montants inventés. */
 import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path';
-import {J, ymd, feries, occurrences, paies, resteA, trouverMontant, trouverDate, genre, avantApres, lireMail, regrouper, nomService, categorie, montantDe, createRadar, domaine, montantPdf, rythmeDe, sansPub, prelevementsPdf, calendrierPdf, montantPalier, courantes} from '../radar.mjs';
+import {J, ymd, feries, occurrences, paies, resteA, trouverMontant, trouverDate, genre, avantApres, lireMail, regrouper, nomService, categorie, montantDe, createRadar, domaine, montantPdf, rythmeDe, sansPub, prelevementsPdf, calendrierPdf, montantPalier, courantes, depenseEntre, HISTO_MOIS} from '../radar.mjs';
 import {textOf} from '../google.mjs';
 import {texteDePdf} from '../pdf.mjs';
 import zlib from 'node:zlib';
@@ -8,6 +8,7 @@ import {interdit} from '../memoire.mjs';
 const results = []; let fails = 0;
 const ok = (name, cond, info) => { results.push((cond ? 'OK   ' : 'ÉCHEC') + ' ' + name + (info ? ' :: ' + info : '')); if (!cond) fails++; };
 const DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'radar-'));
+const eurTxt = (n) => Number(n).toLocaleString('fr-FR', {minimumFractionDigits: 2, maximumFractionDigits: 2}).replace(/\u202f/g, ' ') + ' €';   /* comme `eur` du Radar */
 try {
   /* ---------- calendrier : le même que la page (lundi 23/11/2026, paie le 28 = un samedi) ---------- */
   const F = [['Crédit immobilier', 1150, 5], ['Assurance emprunteur', 38.4, 5], ['Assurance habitation', 16.9, 10], ['Électricité', 48.2, 12], ['Box internet', 29.99, 8], ['Forfait mobile', 9.99, 3],
@@ -583,6 +584,97 @@ try {
     quand = Date.parse('2026-12-03T09:00:00Z'); const dec = Rm.etat().mois, garde = JSON.parse(fs.readFileSync(fc, 'utf8')).evolution;
     ok('Radar 0.81 : un mois plus tard, novembre garde le total de ses dépenses courantes (720 €, retenu au fil de l\'eau) et sert de comparaison ; décembre a 5 jeudis',
       dec.evolution[4].mois === '2026-11' && dec.evolution[4].courantes === 720 && dec.precedent === 820 && dec.totalCourantes === 770 && garde['2026-11'] === 720 && garde['2026-12'] === 770, JSON.stringify([dec.evolution[4], dec.totalCourantes, garde]));
+  }
+  /* 0.93.0 : « déjà dépensé ce mois » et l'historique mois par mois (services et montants inventés) */
+  { const fx = [{id: 'fa', service: 'Loyer exemple', cat: 'Logement', montant: 100, jour: 10, rythme: 'mensuel'}, {id: 'fb', service: 'Box exemple', cat: 'Télécoms', montant: 30, jour: 20, rythme: 'mensuel'},
+      {id: 'fc', service: 'Salle exemple', cat: 'Autres', montant: 25, jour: 5, rythme: 'mensuel', fin: '2026-10-31'}, {id: 'fd', service: 'Assurance exemple', cat: 'Assurances', montant: 40, jour: 16, rythme: 'mensuel'}];
+    const cr = [{id: 'dca', service: 'Courses', type: 'courses', mode: 'enveloppe', montant: 400, reels: [{d: '2026-11-03', m: 60.5}, {d: '2026-11-10', m: 39.5}, {d: '2026-10-28', m: 15}]},
+      {id: 'dcb', service: 'Boucherie', type: 'boucherie', mode: 'mois', montant: 120, faits: ['2026-11']}, {id: 'dcc', service: 'Ménage', type: 'menage', mode: 'semaine', montant: 50, jour: 4}];
+    const plans = {pl1: {id: 'pl1', service: 'Boutique exemple', fois: 3, total: 88.65, date: '2026-10-05', maj: '2026-10-05', echeances: [{date: '2026-10-05', montant: 29.55, payee: true}, {date: '2026-11-05', montant: 29.55}, {date: '2026-12-05', montant: 29.55}]},
+      pl2: {id: 'pl2', service: 'Magasin exemple', fois: 2, total: 155.54, date: '2026-11-08', maj: '2026-11-08', echeances: [{date: '2026-11-08', montant: 77.77}, {date: '2026-12-08', montant: 77.77}]}};
+    /* la fonction seule : du 1er au 15 novembre, les notes de tout le mois */
+    const d0 = depenseEntre({fixes: fx, courantes: cr, plans, plansRetires: ['pl2']}, J(2026, 10, 1), J(2026, 10, 15), {notesJusqua: J(2026, 10, 30)});
+    ok('Radar 0.93 : déjà dépensé du 1er au 15 novembre : le loyer du 10 (100 €) ; pas la box du 20, ni l’assurance du 16, ni la salle finie en octobre ; l’échéance du 5 d’un paiement en 3 fois (29,55 €), pas celle d’un paiement « plus à payer » ; les notes de novembre (60,50 + 39,50) et la boucherie cochée « Fait ce mois-ci » (120 €) ; 349,55 € en tout',
+      d0.fixes === 100 && d0.nFixes === 1 && d0.plans === 29.55 && d0.nPlans === 1 && d0.courantes === 220 && d0.nNotes === 3 && d0.total === 349.55 && d0.lignes.length === 5 && d0.lignes.find((l) => l.fait).service === 'Boucherie'
+      && JSON.stringify(d0.postes.map((x) => [x.label, x.montant, !!x.courant])) === JSON.stringify([['Alimentation', 220, true], ['Logement', 100, false], ['Paiements en plusieurs fois', 29.55, false]]), JSON.stringify([d0.fixes, d0.plans, d0.courantes, d0.total, d0.postes]));
+    const dv = depenseEntre({fixes: fx, courantes: cr, plans}, J(2026, 10, 1), J(2026, 9, 31), {notesJusqua: J(2026, 10, 30)}), dp = depenseEntre({fixes: [], courantes: [], plans: {p: {id: 'p', service: 'x', echeances: [{date: '2026-11-25', montant: 10, payee: true}, {date: '2026-11-26', montant: 10}]}}}, J(2026, 10, 1), J(2026, 10, 15), {notesJusqua: J(2026, 10, 30)});
+    ok('Radar 0.93 : le 1er du mois, aucune dépense fixe n’est encore passée (les notes du mois comptent) ; une échéance qu’un mail dit payée compte même avant sa date, une échéance à venir non',
+      dv.fixes === 0 && dv.plans === 0 && dv.courantes === 220 && dp.plans === 10 && dp.nPlans === 1, JSON.stringify([dv.fixes, dv.plans, dv.courantes, dp.plans]));
+    /* le Radar : lundi 16 novembre 2026 */
+    let quand = Date.parse('2026-11-16T09:00:00Z'); const pushes = [], logs = [];
+    const fh = path.join(DIR, 'radar93.json');
+    fs.writeFileSync(fh, JSON.stringify({version: 7, fixes: fx, courantes: cr, plans, plansRetires: ['pl2'], scan: {fini: quand, lus: 0, mois: 1, total: 1}, revenus: {jour: 28, avance: true}}), {mode: 0o600});
+    const Rh = createRadar({file: fh, gmail: {lie: () => true, chercher: async () => ({threads: []}), fil: async () => ({messages: []})}, claude: async () => ({ok: true, text: '[]'}), now: () => quand, moisDepart: 1, push: async (m) => { pushes.push(m); return []; }, log: (t) => logs.push(t)});
+    const lu = () => JSON.parse(fs.readFileSync(fh, 'utf8')), set = (cle, valeur) => Rh.traiter('POST', '/api/radar/set', async () => ({cle, valeur}));
+    const m1 = Rh.etat().mois, r1 = resteA(fx, {jour: 28, avance: true}, J(2026, 10, 16), 'mois');
+    ok('Radar 0.93 : la page reçoit « déjà dépensé ce mois » (349,55 € : 100 de dépenses fixes, 29,55 d’échéances, 220 de dépenses courantes), jusqu’à hier (15/11), avec le détail ; les dépenses fixes déjà passées et le reste à payer d’ici la fin du mois font le mois entier (100 + 70 = 170)',
+      m1.depense.total === 349.55 && m1.depense.fixes === 100 && m1.depense.plans === 29.55 && m1.depense.courantes === 220 && m1.depense.jusqua === '2026-11-15' && m1.depense.mois === '2026-11' && m1.depense.lignes.length === 5 && m1.depense.postes.length === 3
+      && r1.total === 70 && m1.depense.fixes + r1.total === m1.totalFixes, JSON.stringify([m1.depense.total, m1.depense.fixes, r1.total, m1.totalFixes]));
+    Rh.plan('pl2', 'remettre'); const remis = Rh.etat().mois.depense.plans; Rh.plan('pl2', 'retirer');
+    await set('fixes', fx.filter((f) => f.id !== 'fa')); const retiree = Rh.etat().mois.depense; await set('fixes', fx);
+    ok('Radar 0.93 : un paiement remis « à payer » recompte son échéance passée (29,55 + 77,77), « plus à payer » la retire ; une dépense fixe retirée de la liste n’est plus comptée',
+      remis === 107.32 && Rh.etat().mois.depense.plans === 29.55 && retiree.fixes === 0 && retiree.total === 249.55 && Rh.etat().mois.depense.fixes === 100, JSON.stringify([remis, retiree.fixes, retiree.total]));
+    const h1 = m1.historique, f1 = lu();
+    ok('Radar 0.93 : avant la première clôture, l’historique montre les cinq mois d’avant, « estimés » d’après les dépenses fixes d’aujourd’hui (octobre : 170 + 25 de la salle + 15 notés), rien de clos ; le fichier retient le mois suivi (2026-11), droits 600',
+      h1.length === 5 && h1[0].mois === '2026-10' && h1[0].libelle === 'octobre 2026' && h1[0].estime === true && h1[0].fixes === 195 && h1[0].courantes === 15 && h1[0].total === 210 && h1[4].mois === '2026-06' && h1.every((x) => x.estime && !x.clos)
+      && f1.historique.suivi === '2026-11' && Object.keys(f1.historique.mois).length === 0 && (fs.statSync(fh).mode & 0o777) === 0o600, JSON.stringify([h1.map((x) => [x.mois, x.total]), f1.historique]));
+    await set('revenus', {jour: 28, avance: true, montant: 3000});
+    /* le premier tic de décembre (00 h 05 à Paris) clôt novembre : aucune notification, rien au journal */
+    const nP = pushes.length, nL = logs.length; quand = Date.parse('2026-11-30T23:05:00Z'); Rh.tic(); await Rh.attendre();
+    const f2 = lu(), nov = f2.historique.mois['2026-11'];
+    ok('Radar 0.93 : le premier tic de décembre garde le bilan de novembre : 170 € de dépenses fixes, 29,55 € d’échéances, 220 € de dépenses courantes notées (419,55 €), par poste, le budget retenu (720 €), le reste à vivre (3 000 − 419,55 = 2 580,45 €), la date de clôture ; aucune notification, aucune ligne de journal',
+      !!nov && nov.fixes === 170 && nov.plans === 29.55 && nov.courantes === 220 && nov.total === 419.55 && nov.prevu === 720 && nov.paie === 3000 && nov.resteAVivre === 2580.45 && nov.clos === '2026-12-01' && !nov.reconstitue && nov.postes.find((x) => x.label === 'Alimentation').montant === 220
+      && nov.postes.find((x) => x.label === 'Logement').n === 1 && f2.historique.suivi === '2026-12' && pushes.length === nP && logs.length === nL && (fs.statSync(fh).mode & 0o777) === 0o600, JSON.stringify([nov, pushes.length - nP, logs.slice(nL)]));
+    /* le bilan gardé ne bouge plus : le loyer passe à 999 €, la paie change, une note est ajoutée en novembre après coup */
+    quand = Date.parse('2026-12-03T09:00:00Z');
+    await set('fixes', fx.map((f) => (f.id === 'fa' ? {...f, montant: 999} : f))); await set('revenus', {jour: 28, avance: true, montant: 4000});
+    const m3 = Rh.etat().mois, n3 = m3.historique.find((x) => x.mois === '2026-11');
+    ok('Radar 0.93 : le mois clos ne bouge plus (le loyer passé à 999 € et la paie à 4 000 € changent décembre, pas novembre) ; les « six mois » lisent le bilan gardé ; octobre, jamais suivi, reste « estimé » ; le mois en cours est calculé en direct (déjà dépensé au 2/12 : rien de passé)',
+      n3.fixes === 170 && n3.total === 419.55 && n3.resteAVivre === 2580.45 && n3.libelle === 'novembre 2026' && !n3.estime && m3.historique[0].mois === '2026-11' && m3.historique[1].mois === '2026-10' && m3.historique[1].estime === true && m3.historique[1].fixes === 1094
+      && m3.evolution[4].mois === '2026-11' && m3.evolution[4].fixes === 170 && m3.evolution[4].courantes === 720 && m3.evolution[4].total === 890 && m3.precedent === 890 && m3.depense.mois === '2026-12' && m3.depense.fixes === 0 && m3.depense.total === 0 && m3.paie === 4000,
+      JSON.stringify([n3, m3.historique.slice(0, 2).map((x) => [x.mois, x.fixes, x.estime]), m3.evolution[4], m3.depense.total]));
+    await set('fixes', fx);
+    /* rattrapage : le serveur est resté arrêté de décembre à mars */
+    quand = Date.parse('2027-03-10T09:00:00Z'); const m4 = Rh.etat().mois, f4 = lu().historique;
+    ok('Radar 0.93 : serveur arrêté de décembre à mars : au premier calcul, décembre (le dernier mois suivi) est clos, janvier et février sont rattrapés et dits « reconstitués » ; novembre est toujours là ; du plus récent au plus ancien',
+      Object.keys(f4.mois).sort().join() === '2026-11,2026-12,2027-01,2027-02' && !f4.mois['2026-12'].reconstitue && f4.mois['2027-01'].reconstitue === true && f4.mois['2027-02'].reconstitue === true && f4.mois['2027-02'].clos === '2027-03-10' && f4.suivi === '2027-03'
+      && f4.mois['2026-12'].fixes === 170 && f4.mois['2026-12'].plans === 29.55 && m4.historique.slice(0, 4).map((x) => x.mois).join() === '2027-02,2027-01,2026-12,2026-11' && m4.historique[4].mois === '2026-10' && m4.historique[4].estime === true,
+      JSON.stringify([Object.keys(f4.mois), m4.historique.map((x) => x.mois)]));
+    /* l'horloge recule : rien n'est clos ni effacé */
+    quand = Date.parse('2027-01-15T09:00:00Z'); Rh.etat(); const f5 = lu().historique; quand = Date.parse('2027-03-10T09:00:00Z');
+    ok('Radar 0.93 : une horloge qui recule ne clôt ni n’efface rien', Object.keys(f5.mois).length === 4 && f5.suivi === '2027-03', JSON.stringify(f5.suivi));
+    /* 40 mois de suite : au moins 24 mois gardés */
+    for (let k = 1; k <= 40; k++) { quand = Date.UTC(2027, 2 + k, 1, 3, 0, 0); Rh.tic(); }
+    await Rh.attendre(); const f6 = lu().historique, cles = Object.keys(f6.mois).sort(), m6 = Rh.etat().mois;
+    ok('Radar 0.93 : quarante mois plus tard, l’historique garde les ' + HISTO_MOIS + ' derniers mois clos (24 au moins), un par mois, sans trou ; la page les reçoit du plus récent au plus ancien ; toujours aucune notification',
+      HISTO_MOIS >= 24 && cles.length === HISTO_MOIS && cles[cles.length - 1] === '2030-06' && cles[0] === '2027-07' && m6.historique.length === HISTO_MOIS && m6.historique[0].mois === '2030-06' && m6.historique[23].mois === '2028-07' && m6.historique.every((x, i, l) => !i || l[i - 1].mois > x.mois)
+      && m6.historique.every((x) => !x.estime && x.fixes === 170) && pushes.length === nP, JSON.stringify([cles.length, cles[0], cles[cles.length - 1], pushes.length - nP]));
+    /* un fichier d'avant 0.93.0 est relu tel quel : rien n'est perdu, l'historique s'ajoute seul */
+    const fv = path.join(DIR, 'radar-avant93.json'), vieux = {version: 7, fixes: fx, courantes: cr, revenus: {jour: 28, avance: true, montant: 3000}, notif: {veille: true, seuil: 20, echec: true}, evolution: {'2026-10': 500, '2026-11': 720}, plans, plansRetires: ['pl2'], scan: {fini: 1, lus: 3, mois: 1, total: 1}, refus: ['exemple.fr'], alertesVues: {a1: 5}};
+    fs.writeFileSync(fv, JSON.stringify(vieux), {mode: 0o600}); quand = Date.parse('2026-11-26T09:00:00Z');
+    const Rv = createRadar({file: fv, gmail: {lie: () => true, chercher: async () => ({threads: []}), fil: async () => ({messages: []})}, claude: async () => ({ok: true, text: '[]'}), now: () => quand, moisDepart: 1});
+    const mv = Rv.etat().mois, apres = JSON.parse(fs.readFileSync(fv, 'utf8'));
+    ok('Radar 0.93 : un radar.json d’avant est relu tel quel (dépenses fixes, dépenses courantes et leurs notes, paie, budgets retenus, paiements en plusieurs fois, refus : rien de perdu) ; octobre, dont le budget avait été retenu, est clos « reconstitué » ; novembre continue en direct',
+      Object.keys(vieux).every((k) => JSON.stringify(apres[k]) === JSON.stringify(vieux[k])) && apres.historique.suivi === '2026-11' && Object.keys(apres.historique.mois).join() === '2026-10' && apres.historique.mois['2026-10'].reconstitue === true && apres.historique.mois['2026-10'].prevu === 500
+      && apres.historique.mois['2026-10'].courantes === 15 && mv.depense.mois === '2026-11' && mv.depense.fixes === 170 && mv.historique[0].mois === '2026-10' && !mv.historique[0].estime && mv.historique[1].estime === true, JSON.stringify([Object.keys(vieux).filter((k) => JSON.stringify(apres[k]) !== JSON.stringify(vieux[k])), apres.historique]));
+    /* un historique abîmé (édition à la main) : remis à neuf sans erreur, le reste intact */
+    const fa = path.join(DIR, 'radar-abime93.json'); fs.writeFileSync(fa, JSON.stringify({version: 7, fixes: fx, historique: ['pas', 'un', 'objet']}), {mode: 0o600});
+    const Ra = createRadar({file: fa, gmail: {lie: () => false}, now: () => quand}); let jete = null; try { Ra.etat(); Ra.tic(); } catch (e) { jete = e; }
+    ok('Radar 0.93 : un historique illisible dans le fichier repart de zéro sans erreur ; les dépenses fixes restent', !jete && JSON.parse(fs.readFileSync(fa, 'utf8')).historique.suivi === '2026-11' && Ra.etat().fixes.length === 4, String(jete));
+    /* sur le serveur seulement : rien ne sort du Radar que par ses adresses /api/radar (appareil relié) ; ni le serveur MCP, ni la mémoire, ni la
+       sauvegarde de Pilotage, ni Pilotage, ni les notifications, ni le journal d'activité ne lisent le Radar */
+    const src = (f) => fs.readFileSync(new URL('../' + f, import.meta.url), 'utf8'), sansCom = (t) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+    const autres = fs.readdirSync(new URL('../', import.meta.url)).filter((f) => /\.mjs$/.test(f) && !['radar.mjs', 'server.mjs'].includes(f));
+    /* un autre module peut prendre au Radar son calendrier (jours fériés, jours ouvrés), rien d'autre */
+    const CALENDRIER = ['feries', 'ouvre', 'J', 'ymd', 'parisJour'];
+    const fuites = autres.filter((f) => { const t = sansCom(src(f)), imp = [...t.matchAll(/import\s*\{([^}]*)\}\s*from\s*'\.\/radar\.mjs'/g)].flatMap((m) => m[1].split(',').map((x) => x.trim().split(/\s+as\s+/)[0]).filter(Boolean));
+      return imp.some((n) => !CALENDRIER.includes(n)) || /import\s*\(\s*'\.\/radar\.mjs'|import\s+\*[^;]*radar\.mjs|createRadar|radar\.json|depenseEntre|historique\.mois|\bRADAR\b/.test(t) || /radar/i.test(t.replace(/import\s*\{[^}]*\}\s*from\s*'\.\/radar\.mjs';?/g, '')); });
+    const srv = sansCom(src('server.mjs')).split('\n').filter((l) => /\bRADAR\b|createRadar|radar\.json/.test(l)), permis = [/^import \{createRadar\} from '\.\/radar\.mjs';$/, /^const RADAR = createRadar\(\{file: path\.join\(DATA, 'radar\.json'\)/, /^\s*if \(p\.startsWith\('\/api\/radar'\)\) \{ const r = await RADAR\.traiter\(req\.method, p, \(\) => readBody\(req\)\); if \(r\) return json\(res, r\.status, r\.body\); \}/, /^\s*RADAR\.demarrer\(/];
+    ok('Radar 0.93 : l’historique ne peut sortir ni par le serveur MCP ni par la mémoire : aucun autre module du serveur (mcp.mjs, memoire.mjs, sauvegarde.mjs, pilotage-local.mjs, notify.mjs…) ne lit le Radar, et server.mjs ne s’en sert que pour /api/radar (appareil relié) et son minuteur',
+      autres.includes('mcp.mjs') && autres.includes('memoire.mjs') && autres.includes('sauvegarde.mjs') && autres.includes('pilotage-local.mjs') && autres.length >= 20 && fuites.length === 0 && srv.length === 4 && srv.every((l) => permis.some((re) => re.test(l))), JSON.stringify({fuites, srv: srv.map((l) => l.trim().slice(0, 90))}));
+    /* ce que le Radar pousse lui-même : la notification de la veille ne porte ni « déjà dépensé » ni un bilan de l'historique */
+    quand = Date.parse('2030-07-09T18:00:00Z'); pushes.length = 0; const v = await Rh.veille(), H = lu().historique.mois, interdits = [...new Set(Object.values(H).flatMap((g) => [g.total, g.courantes, g.resteAVivre]).concat([Rh.etat().mois.depense.total]).filter((x) => x > 0).map((x) => eurTxt(x)))];
+    ok('Radar 0.93 : la notification de la veille (le loyer de demain) ne porte ni « déjà dépensé » ni un montant de l’historique', !!v && pushes.length === 1 && /Loyer exemple/.test(v.body) && !/dépensé|historique|bilan/i.test(v.title + v.body) && interdits.length > 0 && interdits.every((x) => !(v.title + v.body).includes(x)), JSON.stringify([v, interdits]));
   }
   /* la mémoire de JARVIS (lue par le serveur MCP, que Grok Bot peut joindre) refuse les chiffres d'un crédit */
   ok('Mémoire : refuse les chiffres d’un crédit (règle du 12/11/2026), garde le reste', interdit('Ma mensualité de crédit immobilier est de 1150 €') && interdit('Il reste 180 000 € à rembourser sur le prêt immobilier') && !interdit("J'ai un crédit immobilier à la banque") && !interdit('Je suis prêt à 8h'));

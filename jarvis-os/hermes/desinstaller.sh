@@ -15,7 +15,7 @@ nft delete table inet hermes_sortie 2>/dev/null || true
 rm -f /etc/systemd/system/hermes-gateway.service /etc/systemd/system/hermes-sortie.service /etc/systemd/system/hermes-garde.service /etc/systemd/system/hermes-garde.timer
 rm -f /etc/systemd/system/hermes-reveil.service /etc/systemd/system/hermes-reveil.path /usr/local/sbin/hermes-reveil
 rm -f /usr/local/sbin/hermes-garde-forfait; rm -rf /var/lib/hermes-garde
-rm -f /etc/systemd/system/hermes-relance.service /etc/systemd/system/hermes-relance.timer /usr/local/sbin/hermes-relance; rm -rf /usr/local/lib/hermes-relance /var/lib/hermes-relance /var/lib/hermes-relance-avis
+rm -f /etc/systemd/system/hermes-relance.service /etc/systemd/system/hermes-relance.timer /usr/local/sbin/hermes-relance; rm -rf /usr/local/lib/hermes-relance /var/lib/hermes-relance /var/lib/hermes-relance-avis /var/lib/hermes-relance-etat
 systemctl daemon-reload
 rm -rf /etc/hermes
 echo "Hermes est arrêté ; service, garde du forfait, règles réseau et politique retirés."

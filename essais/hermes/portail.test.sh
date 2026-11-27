@@ -612,7 +612,7 @@ unset HERMES_BANC_JARVIS_U HERMES_BANC_JARVIS_SRV HERMES_BANC_JARVIS_DATA
 
 echo "== Note de télétravail (26/11/2026 : Hermes la prépare à blanc le dernier jour ; faux JARVIS, pièces inventées)"
 FT=$T/faux-jarvis-tt; rm -rf $FT; mkdir -p $FT/serveur $FT/donnees $T/tt-drive $T/tt-pas-root; chown $U: $T/tt-pas-root
-for f in jours.mjs radar.mjs notify.mjs pdf.mjs bots.mjs; do cp "$RACINE/jarvis-os/server/$f" $FT/serveur/; done
+for f in jours.mjs reponses.mjs radar.mjs notify.mjs pdf.mjs bots.mjs; do cp "$RACINE/jarvis-os/server/$f" $FT/serveur/; done
 # trois PDF inventés (texte simple, police standard), lisibles par pdf.mjs et assemblables par pdfunite
 python3 -I - $FT/serveur <<'PY'
 import sys

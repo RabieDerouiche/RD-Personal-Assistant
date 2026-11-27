@@ -77,7 +77,14 @@ if id hermes >/dev/null 2>&1; then
     else echo "    garde COUPÉ à sa demande jusqu'au $f (/etc/hermes/garde.coupe) : il reprend seul le lendemain"; fi
   fi
   echo "  relance après la limite du forfait : $(systemctl is-active hermes-relance.timer 2>/dev/null || echo absente)"
-  journalctl -u hermes-relance --since "-24h" --no-pager -o cat 2>/dev/null | grep -E 'relancée|redémarrée|AVIS|en attente' | tail -3 | sed 's/^/    /'
+  journalctl -u hermes-relance --since "-24h" --no-pager -o cat 2>/dev/null | grep -E 'relancée|redémarrée|AVIS|en attente|Résumé' | tail -3 | sed 's/^/    /'
+  # 0.92.0 : le résumé des routines que JARVIS affiche en direct (écrit par hermes-relance à chaque passage)
+  res=/var/lib/hermes-relance-etat/routines.json
+  if [ -f "$res" ]; then
+    echo "    résumé pour JARVIS : dossier $(stat -c '%U:%G %a' /var/lib/hermes-relance-etat), fichier $(stat -c '%U:%G %a' "$res"), écrit il y a $(( ($(date +%s) - $(stat -c %Y "$res")) / 60 )) min, $(python3 -I -c 'import json,sys; print(len(json.load(open(sys.argv[1])).get("routines") or []))' "$res" 2>/dev/null || echo '?') routines"
+  else
+    echo "    résumé pour JARVIS : absent (écrit au prochain passage de hermes-relance ; sinon relancer install.sh)"
+  fi
   echo "  réveil par JARVIS : $(systemctl is-active hermes-reveil.path 2>/dev/null || echo absent)"
   echo "  dernières lignes utiles du journal :"
   grep -E "telegram connected|Connected to Telegram|ERROR|Traceback|plan limit|extra usage|denied" /home/hermes/.hermes/logs/gateway.log 2>/dev/null | tail -5 | cut -c1-160 | sed -E 's/[0-9]{6,}/<n>/g; s/^/    /'

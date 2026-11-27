@@ -271,6 +271,103 @@ fs.rmSync(DIR, {recursive: true, force: true});
   ok('mail du CRA : sans congé, aucune phrase de congé', e.phrases.length === 0 && e.texte === 'J’ai 22 jours sur ce mois.', JSON.stringify(e));
   const r = mailCraRempli({a: ['contact@exemple.invalid'], objet: 'CRA {MOIS} {ANNEE}', corps: 'Bonjour,\n\nJ’ai {JOURS} jours sur ce mois.\n{CONGES}\nMerci !'}, '2026-10', J, '2026-10-24');
   ok('mail du CRA : le modèle rempli (objet, nombre, phrases à leur place ; sans congé, la ligne disparaît)', r.objet === 'CRA Octobre 2026' && r.corps === 'Bonjour,\n\nJ’ai 12,5 jours sur ce mois.\n' + a.phrases.join('\n') + '\nMerci !' && mailCraRempli({corps: 'A\n{CONGES}\nB'}, '2026-10', mois('2026-10', {}), '2026-10-24').corps === 'A\nB', JSON.stringify(r)); }
+/* ---------- 0.94.0 : les réponses aux mails du mois, suivies (détection active, une seule notification, redémarrage) — faux Gmail, tout inventé ---------- */
+{ const RT3 = path.join(DIR, 'retours-suivi'); fs.mkdirSync(RT3, {recursive: true});
+  let Ts = Date.parse('2026-11-26T14:00:00Z');   /* jeudi 26, 15 h à Paris */
+  const MIN = 60e3, CALS3 = [{id: 'p1@group.calendar.google.com', summary: 'Présence'}, {id: 'en-gb.french#holiday@group.v.calendar.google.com', summary: 'Holidays in France'}];
+  const ag3 = {lie: () => true, calendriers: async () => CALS3, evenements: async (id) => (id === 'p1@group.calendar.google.com' ? BASE : FER)};
+  const MOI = 'moi@exemple.invalid', PDF = {filename: 'CRA signé.pdf', mimeType: 'application/pdf', size: 48213, attachmentId: 'piece-v1'}, IMG = {filename: 'image.png', mimeType: 'image/png', size: 900, attachmentId: 'image-v1'};
+  const msg = (id, de, nom, objet, at, labelIds, attachments = [], snippet = '') => ({id, sender: de, addressDisplayNames: [{displayName: nom, emailAddress: de}], subject: objet, internalDate: String(at), labelIds, snippet, attachments});
+  /* le faux Gmail : des fils entiers, une version par fil (historyId), les recherches et les lectures comptées */
+  const G = {fils: {}, v: {}, recherches: [], lus: [], erreur: null, erreurEnvoye: null, deja: new Set()};
+  const poser = (id, messages) => { G.fils[id] = {id, messages}; G.v[id] = (G.v[id] || 0) + 1; };
+  const chercher = async (q) => { G.recherches.push(q); if (G.erreur) throw G.erreur;
+    const s = q.match(/^subject:"([^"]+)"/), f = q.match(/^from:\(([^)]+)\) filename:pdf/);
+    const ids = Object.values(G.fils).filter((x) => (s ? x.messages.some((m) => m.subject.toLowerCase().includes(s[1].toLowerCase())) : f ? x.messages.some((m) => f[1].split(' OR ').includes(m.sender) && m.attachments.some((p) => /pdf/.test(p.mimeType))) : false)).map((x) => x.id);
+    return ids.length ? {threads: ids.map((id) => ({id, historyId: String(G.v[id])}))} : {}; };
+  const MOD = {cra_client: {a: ['contact@exemple.invalid'], objet: 'CRA {MOIS} {ANNEE}', corps: 'Bonjour,\n\nJ’ai {JOURS} jours sur ce mois.\n{CONGES}\nMerci !'}, prolongation: {a: ['chargee@exemple.invalid'], objet: 'Prolongation de mission', corps: 'Ma mission se termine le {FIN}.'}};
+  const X = {push: [], journal: [], log: [], crees: []};
+  const mailsS = {modeles: () => MOD, brouillon: async (m) => { X.crees.push(m); return {id: 'b' + X.crees.length}; }, majBrouillon: async () => ({}),
+    envoye: async (objet) => { if (G.erreurEnvoye) throw G.erreurEnvoye; return G.deja.has(objet); }, chercher, fil: async (id) => { G.lus.push(id); return JSON.parse(JSON.stringify(G.fils[id])); }, moi: () => MOI};
+  const creer = (nom) => createJours({file: path.join(DIR, nom), agenda: ag3, retours: RT3, mails: mailsS, push: async (m) => { X.push.push(m); return []; }, ecrireJournal: async (l) => { X.journal.push(l); }, log: (t) => X.log.push(t), now: () => Ts});
+  const reps = () => X.push.filter((p) => /^(CRA signé reçu|Réponse à ton mail)/.test(p.title));
+  const lu = (nom) => JSON.parse(fs.readFileSync(path.join(DIR, nom), 'utf8')).mois['2026-11'];
+  const JS = creer('js.json');
+  await JS.lire('2026-11'); JS.confirmer('2026-11', JS.etat('2026-11').bilan.empreinte);
+  fs.writeFileSync(path.join(RT3, 'mois-2026-11.json'), JSON.stringify({resultat: 'validee', fin: '2026-11-30', at: Ts}));
+  await JS.tic();
+  ok('suivi : les deux brouillons préparés gardent leur objet ; tant que rien n’est parti, une recherche par mail, ni envoi ni réponse', X.crees.length === 2 && lu('js.json').mailCra.objet === 'CRA Novembre 2026' && lu('js.json').mailProlong.objet === 'Prolongation de mission' && G.recherches.length === 2 && G.recherches[0] === 'subject:"CRA Novembre 2026" newer_than:50d' && !lu('js.json').suivi.cra.envoi && !reps().length, JSON.stringify(G.recherches));
+  /* il envoie les deux mails */
+  const tCra = Date.parse('2026-11-26T14:02:00Z'), tPro = Date.parse('2026-11-26T14:03:00Z');
+  poser('fil-cra-0001', [msg('m1', MOI, 'Moi', 'CRA Novembre 2026', tCra, ['SENT'])]); poser('fil-pro-0001', [msg('p1', MOI, 'Moi', 'Prolongation de mission', tPro, ['SENT'])]);
+  let r0 = G.recherches.length; await JS.tic();
+  ok('suivi : pas plus d’un passage toutes les 5 minutes (le tic tourne chaque minute)', G.recherches.length === r0);
+  Ts += 5 * MIN; r0 = G.recherches.length; await JS.tic();
+  { const m = lu('js.json');
+    ok('suivi : les mails partis sont vus, avec la vraie date de l’envoi ; les brouillons sont marqués envoyés ; aucune notification sans réponse', m.suivi.cra.envoi.at === tCra && m.suivi.cra.envoi.fil === 'fil-cra-0001' && m.suivi.prolongation.envoi.at === tPro && m.mailCra.envoye === true && m.mailProlong.envoye === true && !reps().length && m.historique.some((h) => /mail du CRA : envoyé le 26\/11 à 15:02/.test(h.quoi)), JSON.stringify(m.suivi));
+    ok('suivi : 4 recherches Gmail au plus par passage (ici 3 : l’objet de chaque mail, et les PDF des destinataires du CRA)', G.recherches.length - r0 === 3 && G.recherches.slice(r0).some((q) => q === 'from:(contact@exemple.invalid) filename:pdf newer_than:50d'), JSON.stringify(G.recherches.slice(r0))); }
+  /* les deux réponses arrivent : même fil avec le CRA en PDF (puis sa propre réponse, dernier message du fil) ; autre adresse, autre fil, « Re :objet » */
+  const tR1 = Date.parse('2026-11-26T14:20:00Z'), tR2 = Date.parse('2026-11-26T14:25:00Z');
+  poser('fil-cra-0001', [G.fils['fil-cra-0001'].messages[0], msg('m2', 'contact@exemple.invalid', 'Contact Client', 'Re: CRA Novembre 2026', tR1, ['INBOX', 'UNREAD'], [IMG, PDF], 'Bonjour, ci-joint le CRA sign&#233;.'), msg('m3', MOI, 'Moi', 'Re: CRA Novembre 2026', tR1 + MIN, ['SENT'], [], 'Merci !')]);
+  poser('fil-pro-0002', [msg('p2', 'equipe@exemple.invalid', 'Équipe Missions', 'Re :Prolongation de mission', tR2, ['INBOX', 'UNREAD'], [IMG], 'Bonjour, nous regardons et revenons vers vous.')]);
+  Ts += 5 * MIN; await JS.tic();
+  { const m = lu('js.json'), c = m.suivi.cra.reponses[0] || {}, p = m.suivi.prolongation.reponses[0] || {}, n = reps();
+    ok('détection active : la réponse dans le même fil (CRA en PDF) et celle d’un autre fil, d’une autre adresse (« Re :objet »), notées dans jours.json (qui, quand, message, fil, PDF, extrait, historique)', m.suivi.cra.reponses.length === 1 && c.id === 'm2' && c.fil === 'fil-cra-0001' && c.at === tR1 && c.pdf === true && c.nom === 'Contact Client' && c.de === 'contact@exemple.invalid' && c.extrait === 'Bonjour, ci-joint le CRA signé.' && m.suivi.cra.clos === 'pdf' && m.suivi.prolongation.reponses.length === 1 && p.id === 'p2' && p.fil === 'fil-pro-0002' && p.pdf === false && p.voie === 'objet'
+      && m.historique.some((h) => /^CRA signé reçu : Contact Client, le 26\/11 à 15:20$/.test(h.quoi)) && m.historique.some((h) => /^réponse au mail de prolongation : Équipe Missions/.test(h.quoi)), JSON.stringify(m.suivi));
+    ok('le CRA signé : jours.json garde de quoi retrouver le PDF sans le télécharger (message, pièce jointe, nom du fichier, taille) ; rien pour une image', c.pdfs.length === 1 && c.pdfs[0].message === 'm2' && c.pdfs[0].piece === 'piece-v1' && c.pdfs[0].nom === 'CRA signé.pdf' && c.pdfs[0].taille === 48213 && c.pdfs[0].type === 'application/pdf' && p.pdfs.length === 0, JSON.stringify([c.pdfs, p.pdfs]));
+    ok('détection active : deux notifications, une par réponse (titre, expéditeur affiché et extrait, lien vers Travail)', n.length === 2 && n[0].title === 'CRA signé reçu de ton client' && n[0].body === 'Contact Client : Bonjour, ci-joint le CRA signé. À rattacher sur le portail.' && n[0].url === '/#travail' && n[0].tag === 'rep-cra-2026-11' && n[1].title === 'Réponse à ton mail de prolongation' && /^Équipe Missions : Bonjour, nous regardons/.test(n[1].body), JSON.stringify(n));
+    ok('Journal de Pilotage : une ligne par réponse, sans nom, sans adresse, sans extrait du mail', X.journal.length === 2 && X.journal[0].sujet === 'CRA du mois : CRA signé reçu' && /^Réponse au mail « CRA Novembre 2026 » reçue le 26\/11 à 15:20, avec un PDF\. À rattacher sur le portail\.$/.test(X.journal[0].detail) && X.journal[1].sujet === 'Prolongation de mission : réponse reçue' && !/Contact|Équipe|@|Bonjour/.test(JSON.stringify(X.journal)), JSON.stringify(X.journal)); }
+  /* les passages suivants : rien de renotifié ; le mail du CRA n'est plus cherché (CRA reçu) ; un fil inchangé n'est pas relu */
+  Ts += 5 * MIN; r0 = G.recherches.length; let l0 = G.lus.length; await JS.tic(); Ts += 5 * MIN; await JS.tic();
+  ok('une réponse déjà notée n’est jamais renotifiée ; le CRA reçu, son mail n’est plus cherché ; un fil que Gmail dit inchangé n’est pas relu', reps().length === 2 && X.journal.length === 2 && G.recherches.slice(r0).length === 2 && G.recherches.slice(r0).every((q) => /^subject:"Prolongation de mission"/.test(q)) && G.lus.length === l0, JSON.stringify([G.recherches.slice(r0), G.lus.length - l0]));
+  /* un redémarrage : même fichier, mémoire vide */
+  const JS2 = creer('js.json'); Ts += 5 * MIN; await JS2.tic();
+  ok('redémarrage : le suivi reprend au premier passage, sans rien renotifier (tout est dans jours.json)', reps().length === 2 && X.journal.length === 2 && lu('js.json').suivi.prolongation.reponses.length === 1 && G.lus.length > l0);
+  /* il lit la réponse dans Gmail, puis une seconde réponse arrive */
+  poser('fil-pro-0002', [{...G.fils['fil-pro-0002'].messages[0], labelIds: ['INBOX']}]); Ts += 5 * MIN; await JS2.tic();
+  ok('une réponse lue dans Gmail est notée « lue », sans notification', lu('js.json').suivi.prolongation.reponses[0].lu === true && reps().length === 2);
+  poser('fil-pro-0002', [...G.fils['fil-pro-0002'].messages, msg('p3', 'chargee@exemple.invalid', 'Chargée', 'RE: Re :Prolongation de mission', Ts, ['INBOX', 'UNREAD'], [], 'La suite du message.')]); Ts += 5 * MIN; await JS2.tic(); Ts += 5 * MIN; await JS2.tic();
+  ok('une nouvelle réponse au même mail : notifiée une fois, elle aussi', reps().length === 3 && reps()[2].title === 'Réponse à ton mail de prolongation' && /^Chargée : La suite/.test(reps()[2].body) && lu('js.json').suivi.prolongation.reponses.length === 2);
+  { const a = JS2.rattacher('2026-10'), b = JS2.rattacher('2026-11');
+    ok('« C’est rattaché » : gardé dans jours.json (refusé pour un mois sans CRA signé reçu)', !a.ok && b.ok && lu('js.json').suivi.cra.rattache > 0 && lu('js.json').historique.some((h) => /rattaché/.test(h.quoi))); }
+  /* le quota de Gmail : une pause de 15 minutes, écrite une fois au journal du serveur */
+  G.erreur = Object.assign(new Error('Quota exceeded for quota metric \'Queries\' and limit \'Queries per minute per user\''), {status: 429});
+  Ts += 5 * MIN; r0 = G.recherches.length; const g0 = X.log.length; await JS2.tic(); Ts += 5 * MIN; await JS2.tic(); Ts += 5 * MIN; await JS2.tic();
+  const dits = X.log.slice(g0).filter((t) => /suivi des réponses/.test(t));
+  G.erreur = null; Ts += 6 * MIN; await JS2.tic();
+  ok('quota de Gmail atteint : une seule recherche, le suivi attend 15 minutes, c’est écrit une fois au journal du serveur, puis il reprend', G.recherches.length - r0 === 2 && dits.length === 1 && /quota de Gmail, nouvel essai dans 15 minutes/.test(dits[0]) && lu('js.json').suivi.prolongation.erreur === '', JSON.stringify([G.recherches.length - r0, dits]));
+  /* 45 jours après l'envoi : le suivi s'arrête */
+  Ts += 46 * 864e5; await JS2.tic(); Ts += 5 * MIN; r0 = G.recherches.length; await JS2.tic(); Ts += 5 * MIN; await JS2.tic();
+  ok('45 jours après l’envoi, le mail n’est plus suivi (plus aucune recherche)', G.recherches.length === r0, String(G.recherches.length - r0));
+  /* rattrapage : un mail envoyé à la main (sans brouillon de JARVIS), des réponses déjà arrivées avant le premier passage */
+  Ts = Date.parse('2026-11-27T12:30:00Z'); X.push.length = 0; X.journal.length = 0; G.deja.add('CRA Novembre 2026'); G.deja.add('Prolongation de mission');
+  const JR = creer('jr.json'); await JR.lire('2026-11'); JR.confirmer('2026-11', JR.etat('2026-11').bilan.empreinte); const c0 = X.crees.length;
+  await JR.tic(); await JR.tic();
+  { const m = lu('jr.json');
+    ok('rattrapage : mails envoyés à la main (« envoye » sans brouillon) et réponses déjà là : détectées et notifiées une fois dès le premier passage', X.crees.length === c0 && m.mailCra.envoye && !m.mailCra.draftId && m.suivi.cra.envoi.at === tCra && m.suivi.cra.reponses[0].pdf && m.suivi.prolongation.reponses.length === 2 && reps().length === 3 && reps()[0].title === 'CRA signé reçu de ton client', JSON.stringify([m.suivi, reps().map((p) => p.title)])); }
+  /* l'ancienne voie : le CRA arrive dans un mail d'un autre objet, d'un destinataire du modèle, avec un PDF */
+  for (const k of Object.keys(G.fils)) delete G.fils[k];
+  poser('fil-cra-0001', [msg('m1', MOI, 'Moi', 'CRA Novembre 2026', tCra, ['SENT'])]);
+  poser('fil-doc-0001', [msg('d0', 'contact@exemple.invalid', 'Contact Client', 'Un PDF d’avant', tCra - MIN, ['INBOX'], [PDF]), msg('d1', 'contact@exemple.invalid', 'Contact Client', 'Document signé', tCra + 30 * MIN, ['INBOX'], [PDF], 'Voici le document.')]);
+  X.push.length = 0; const JV = creer('jv.json'); await JV.lire('2026-11'); JV.confirmer('2026-11', JV.etat('2026-11').bilan.empreinte); await JV.tic();
+  ok('l’ancienne voie, corrigée : un PDF d’un destinataire du modèle arrivé après l’envoi, sous un autre objet, vaut « CRA signé reçu » (pas celui d’avant l’envoi)', lu('jv.json').suivi.cra.reponses.length === 1 && lu('jv.json').suivi.cra.reponses[0].id === 'd1' && lu('jv.json').suivi.cra.reponses[0].voie === 'destinataire' && reps().length === 1 && reps()[0].title === 'CRA signé reçu de ton client', JSON.stringify(lu('jv.json').suivi.cra));
+  /* une réponse sans PDF au mail du CRA, puis le mois suivant : le mois d'avant reste suivi */
+  for (const k of Object.keys(G.fils)) delete G.fils[k];
+  poser('fil-cra-0001', [msg('m1', MOI, 'Moi', 'CRA Novembre 2026', tCra, ['SENT']), msg('m5', 'contact@exemple.invalid', 'Contact Client', 'RE: CRA Novembre 2026', tCra + 10 * MIN, ['INBOX', 'UNREAD'], [IMG], 'Je te l’envoie lundi.')]);
+  X.push.length = 0; const JD = creer('jd.json'); await JD.lire('2026-11'); JD.confirmer('2026-11', JD.etat('2026-11').bilan.empreinte); await JD.tic();
+  ok('mail du CRA : une réponse sans PDF (image de signature seule) est notifiée « sans le CRA », et le suivi continue', reps().length === 1 && reps()[0].title === 'Réponse à ton mail du CRA, sans le CRA' && !lu('jd.json').suivi.cra.clos && lu('jd.json').suivi.cra.reponses[0].pdf === false, JSON.stringify(reps()));
+  Ts = Date.parse('2026-12-02T08:00:00Z'); poser('fil-cra-0001', [...G.fils['fil-cra-0001'].messages, msg('m6', 'contact@exemple.invalid', 'Contact Client', 'RE: CRA Novembre 2026', Ts - MIN, ['INBOX', 'UNREAD'], [PDF], 'Le voici.')]);
+  await JD.tic();
+  ok('le mois suivant : la réponse au mail du mois d’avant est encore détectée (notée dans le mois du mail, notifiée une fois)', reps().length === 2 && reps()[1].title === 'CRA signé reçu de ton client' && reps()[1].tag === 'rep-cra-2026-11' && lu('jd.json').suivi.cra.clos === 'pdf' && lu('jd.json').suivi.cra.reponses.length === 2, JSON.stringify(reps().map((p) => p.title)));
+  { const s1 = await JD.suivre('2026-11'), s2 = JD.suivi('2026-10');
+    ok('l’espace Travail lit le même état (suivre, suivi) ; un mois sans suivi rend un objet vide, sans le créer', s1.cra.reponses.length === 2 && JSON.stringify(s2) === '{}' && !JD.brut().mois['2026-10']); }
+  /* une recherche « déjà envoyé ? » qui échoue n'est plus prise pour « pas envoyé » (un brouillon en double était préparé) */
+  Ts = Date.parse('2026-11-26T14:00:00Z'); for (const k of Object.keys(G.fils)) delete G.fils[k]; G.deja.clear(); G.erreurEnvoye = Object.assign(new Error('Quota exceeded'), {status: 429});
+  const JE = creer('je.json'); await JE.lire('2026-11'); JE.confirmer('2026-11', JE.etat('2026-11').bilan.empreinte); const c1 = X.crees.length, g1 = X.log.length;
+  await JE.tic(); Ts += MIN; await JE.tic(); Ts += MIN; await JE.tic();
+  const e1 = X.log.slice(g1).filter((t) => /mail du CRA impossible \(recherche du mail déjà envoyé impossible/.test(t)).length;
+  G.erreurEnvoye = null; Ts += 5 * MIN; await JE.tic();
+  ok('recherche « déjà envoyé ? » en échec (quota) : aucun brouillon préparé à tort, l’erreur écrite au journal du serveur, nouvel essai 5 minutes plus tard (pas chaque minute)', e1 === 1 && X.crees.length === c1 + 2 && !!lu('je.json').mailCra.draftId, JSON.stringify([e1, X.crees.length - c1])); }
 console.log(results.join('\n'));
 console.log((fails ? 'ÉCHECS : ' + fails : 'Tout est bon') + ' (' + results.length + ' vérifications)');
 process.exit(fails ? 1 : 0);

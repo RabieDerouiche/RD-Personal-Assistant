@@ -6,6 +6,10 @@
 #   sudo hermes-relance             relance UNE fois, après la levée de la limite, ce qu'elle a coupé : routines jarvis-… d'Hermes,
 #                                   tâches d'hermes-portail coupées avant tout contact avec le portail ; redémarre une passerelle plantée
 #   sudo hermes-relance --a-blanc   dit ce qu'il ferait, sans rien toucher (ni état, ni service, ni notification)
+#
+# 0.92.0 : à chaque passage (pas à blanc), même sans rien à relancer, il écrit aussi pour JARVIS un résumé assaini du cron d'Hermes
+# (/var/lib/hermes-relance-etat/routines.json, root et groupe de JARVIS, 750 et 640) : l'app montre « Hermes et ses routines » en direct.
+# Aucune lecture d'usage en plus, Hermes n'est pas lancé ; une erreur de ce résumé ne change jamais le résultat de la relance.
 set -uo pipefail
 [ "$(id -u)" = 0 ] || { echo "À lancer en root : sudo hermes-relance"; exit 1; }
 case "${1:-}" in ""|--a-blanc) ;; *) sed -n '5,7p' "$0" | sed 's/^# \{0,3\}//'; exit 1 ;; esac

@@ -1,0 +1,719 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#0c0e13">
+<title>JARVIS · proposition C, « Le fil »</title>
+<!-- Maquette (26/11/2026). Proposition C de la refonte : plus d'écrans, un seul fil. Tout arrive dans une conversation avec JARVIS,
+     chaque élément est une carte vivante (elle avance, puis se replie), un résumé de trois lignes reste épinglé en haut,
+     on demande en bas au lieu de naviguer. Données inventées : rien n'est lu ni envoyé. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&display=swap">
+<style>
+  :root {
+    --bg: #0c0e13; --fond: #07080b; --carte: #14181f; --creux: #1b2029;
+    --trait: rgba(236, 232, 223, .09); --trait2: rgba(236, 232, 223, .18);
+    --encre: #ece8df; --gris: #a9aeb8; --pale: #838994;
+    --ambre: #f2b441; --cyan: #62d3e6; --rouge: #ff7d6e; --vert: #7cc49a; --violet: #a78bfa;
+    --serif: 'Newsreader', 'Iowan Old Style', 'Palatino Linotype', Georgia, serif;
+    --sans: 'Instrument Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; margin: 0; overflow: hidden; }
+  body { background: var(--fond); color: var(--encre); font: 400 16px/1.45 var(--sans); -webkit-font-smoothing: antialiased; -webkit-text-size-adjust: 100%; display: grid; place-items: center; }
+  button { font: inherit; color: inherit; cursor: pointer; margin: 0; }
+  button:focus-visible, input:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+  ul, ol { list-style: none; margin: 0; padding: 0; }
+  time, .nb { white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .dessins { position: absolute; width: 0; height: 0; }
+
+  /* ---- le cadre : plein écran sur le téléphone, centré sur un ordinateur ---- */
+  .cadre { position: relative; display: flex; flex-direction: column; width: 100%; max-width: 430px; height: 100vh; height: 100dvh; background: var(--bg); overflow: hidden; }
+  @media (min-width: 520px) and (min-height: 640px) {
+    .cadre { height: min(880px, calc(100dvh - 40px)); border: 1px solid var(--trait2); border-radius: 38px; box-shadow: 0 30px 80px rgba(0, 0, 0, .6); }
+  }
+
+  /* ---- le haut : étiquette, JARVIS, le résumé épinglé ---- */
+  .haut { flex: none; position: relative; z-index: 6; padding-top: env(safe-area-inset-top, 0px); background: var(--bg); }
+  .etiquette { margin: 0; padding: 7px 16px 0; text-align: center; font-size: 12px; line-height: 16px; letter-spacing: .02em; color: var(--pale); }
+  .tete { display: flex; align-items: center; gap: 12px; padding: 8px 16px 8px; }
+  .tete .globe { width: 40px; height: 40px; flex: none; }
+  .tete h1 { margin: 0; font: 500 23px/1.15 var(--serif); letter-spacing: -.01em; }
+  .tete p { margin: 2px 0 0; font-size: 14px; color: var(--gris); }
+  .tete .qui { flex: 1; min-width: 0; }
+  .hermes { flex: none; display: flex; align-items: center; gap: 7px; min-height: 44px; padding: 0 2px 0 8px; border: 0; background: none; font-size: 14px; color: var(--gris); }
+  .globe { display: block; filter: drop-shadow(0 0 6px rgba(98, 211, 230, .35)); }
+
+  .pt { flex: none; display: inline-block; width: 9px; height: 9px; border-radius: 50%; border: 1.5px solid var(--pale); }
+  .pt.amb { background: var(--ambre); border-color: var(--ambre); }
+  .pt.cy { background: var(--cyan); border-color: var(--cyan); }
+  .pt.red { background: var(--rouge); border-color: var(--rouge); }
+  .pt.vert { background: var(--vert); border-color: var(--vert); }
+  .pt.vif { animation: pouls 2.2s ease-out infinite; }
+  @keyframes pouls { 0% { box-shadow: 0 0 0 0 rgba(98, 211, 230, .5); } 100% { box-shadow: 0 0 0 9px rgba(98, 211, 230, 0); } }
+
+  .resume { position: relative; height: 54px; }
+  .resume::after { content: ""; position: absolute; left: 16px; right: 16px; bottom: 0; height: 1px; background: linear-gradient(90deg, rgba(98, 211, 230, .55), rgba(167, 139, 250, .35) 45%, transparent); }
+  /* la forme courte (une ligne) quand on remonte le fil ou qu'on filtre */
+  .res-c { display: grid; grid-template-columns: auto auto minmax(0, 1fr); gap: 4px; height: 54px; padding: 0 10px; transition: opacity .2s; }
+  .res-c button { display: flex; align-items: center; gap: 7px; min-width: 0; min-height: 44px; margin: 5px 0; padding: 0 8px; border: 0; border-radius: 12px; background: none; font-size: 14.5px; color: var(--gris); white-space: nowrap; }
+  .res-c b { font: 500 19px/1 var(--serif); color: var(--encre); }
+  .res-c em { font-style: normal; color: var(--rouge); }
+  .res-c .coupe { overflow: hidden; text-overflow: ellipsis; }
+  .res-c button[aria-pressed="true"] { background: var(--creux); color: var(--encre); }
+  /* la forme longue (trois lignes), au repos en bas du fil */
+  .res-l { position: absolute; left: 0; right: 0; top: 0; padding: 0 10px 10px; background: var(--bg); border-bottom: 1px solid transparent; opacity: 0; visibility: hidden; transform: translateY(-8px); transition: opacity .22s, transform .22s, visibility .22s; }
+  .res-l::after { content: ""; position: absolute; left: 0; right: 0; top: 100%; height: 26px; background: linear-gradient(var(--bg), transparent); pointer-events: none; }
+  .res-l::before { content: ""; position: absolute; left: 16px; right: 16px; bottom: 0; height: 1px; background: linear-gradient(90deg, rgba(98, 211, 230, .55), rgba(167, 139, 250, .35) 45%, transparent); }
+  .resume.large .res-l { opacity: 1; visibility: visible; transform: none; }
+  .resume.large .res-c { opacity: 0; }
+  .rl { display: grid; grid-template-columns: 9px 76px 26px minmax(0, 1fr) 12px; align-items: center; gap: 10px; width: 100%; min-height: 46px; padding: 0 8px; border: 0; border-radius: 12px; background: none; text-align: left; }
+  .rl + .rl { box-shadow: 0 -1px 0 var(--trait); }
+  .rl .rn { font-weight: 600; font-size: 16px; }
+  .rl b { font: 500 24px/1 var(--serif); text-align: right; }
+  .rl .rd { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; color: var(--gris); }
+  .rl .rd em { font-style: normal; color: var(--rouge); }
+  .rl .rd strong { font-weight: 500; color: var(--encre); }
+  .rl .rx { color: var(--pale); font-size: 18px; line-height: 1; }
+
+  /* ---- le fil ---- */
+  .fil { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+  .fil::-webkit-scrollbar { display: none; }
+  .fil-in { position: relative; padding: 14px 0 18px; min-height: 100%; }
+  .fil-in::before { content: ""; position: absolute; left: 20px; top: 0; bottom: 0; width: 1px; background: linear-gradient(rgba(236, 232, 223, .07), rgba(98, 211, 230, .28) 70%, rgba(167, 139, 250, .5)); }
+
+  .ef { display: none; position: sticky; top: 0; z-index: 3; align-items: center; justify-content: space-between; gap: 10px; margin: -14px 0 14px; padding: 6px 12px 6px 40px; background: var(--bg); border-bottom: 1px solid var(--trait); }
+  .ef span { font: italic 400 19px var(--serif); }
+  .ef button { min-height: 44px; padding: 0 14px; border: 1px solid var(--trait2); border-radius: 99px; background: none; font-size: 15px; font-weight: 500; }
+  .fil-in[data-f] .ef { display: flex; }
+
+  /* le fil filtré par une ligne du résumé : on ne garde que les cartes du sujet */
+  .fil-in:not([data-f]) .seul { display: none; }
+  .fil-in[data-f] .mh, .fil-in[data-f] .it:not([data-t]) { display: none; }
+  .fil-in[data-f] .moment.ferme .mc { display: block; }
+  .fil-in[data-f] .mc { padding-top: 0; }
+  .fil-in[data-f="toi"] .it:not([data-t~="toi"]), .fil-in[data-f="cours"] .it:not([data-t~="cours"]), .fil-in[data-f="venir"] .it:not([data-t~="venir"]) { display: none; }
+
+  .moment { position: relative; }
+  .mh { position: relative; display: flex; align-items: baseline; gap: 10px; width: 100%; min-height: 44px; padding: 10px 16px 6px 40px; border: 0; background: none; text-align: left; }
+  .mh::before { content: ""; position: absolute; left: 14px; top: 23px; width: 13px; height: 1px; background: var(--pale); }
+  .mh span { font: italic 400 20px/1.2 var(--serif); color: var(--encre); }
+  .mh small { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; color: var(--pale); }
+  .mh i { font-style: normal; color: var(--pale); transition: transform .2s; }
+  .moment.ferme .mh i { transform: rotate(-90deg); }
+  .moment.ferme .mc { display: none; }
+  .mc { padding-top: 8px; }
+
+  .it { position: relative; margin: 0 0 24px; padding: 0 16px 0 40px; }
+  .it > .nd { position: absolute; left: 15px; top: 5px; width: 11px; height: 11px; border-radius: 50%; background: var(--bg); border: 1.5px solid var(--pale); }
+  .it.s-toi > .nd { background: var(--ambre); border-color: var(--ambre); box-shadow: 0 0 0 4px rgba(242, 180, 65, .16); }
+  .it.s-cours > .nd { background: var(--cyan); border-color: var(--cyan); animation: pouls 2.2s ease-out infinite; }
+  .it.s-err > .nd { background: var(--rouge); border-color: var(--rouge); }
+  .it.s-fait > .nd { background: var(--bg); border-color: var(--vert); }
+  .it.replie { margin-bottom: 4px; }
+  .it.replie > .nd { top: 17px; }
+  .it.arrive { animation: arrive .34s ease both; }
+  @keyframes arrive { from { opacity: 0; transform: translateY(10px); } }
+  .it.eclat .carte { animation: eclat 1.3s ease; }
+  @keyframes eclat { 30% { border-color: var(--cyan); box-shadow: 0 0 0 4px rgba(98, 211, 230, .14); } }
+
+  .meta { display: flex; align-items: center; gap: 6px; min-height: 22px; margin: 0 0 8px; font-size: 14px; color: var(--pale); }
+  .meta time { color: var(--gris); font-weight: 500; }
+  .meta .etat { margin-left: auto; font-weight: 500; white-space: nowrap; }
+  .meta .src { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .s-toi .etat { color: var(--ambre); } .s-cours .etat { color: var(--cyan); } .s-err .etat { color: var(--rouge); } .s-fait .etat { color: var(--vert); }
+  .rp { display: none; margin: -11px -6px -11px auto; min-height: 44px; padding: 0 6px; border: 0; background: none; font-size: 14px; color: var(--gris); text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--trait2); }
+  .pliable > .meta .rp, .pliable > .rj .rp { display: block; }
+  .pliable > .meta .etat { margin-left: 0; } .pliable > .meta .src { display: none; }
+
+  .carte { position: relative; padding: 16px; border: 1px solid var(--trait); border-radius: 18px; background: var(--carte); }
+  .s-toi > .carte { border-color: rgba(242, 180, 65, .34); }
+  .s-err > .carte { border-color: rgba(255, 125, 110, .3); }
+  .carte h3 { margin: 0 0 6px; font: 500 21px/1.25 var(--serif); letter-spacing: -.005em; }
+  .carte h3.avec { padding-right: 34px; }
+  .carte p { margin: 0 0 4px; color: var(--gris); }
+  .carte p.cit { margin: 4px 0 6px; padding-left: 14px; border-left: 2px solid var(--trait2); font: italic 400 19px/1.4 var(--serif); color: var(--encre); }
+  .agr { position: absolute; top: 4px; right: 4px; display: grid; place-items: center; width: 44px; height: 44px; border: 0; background: none; color: var(--pale); }
+  .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+  .b { min-height: 46px; padding: 0 18px; border: 1px solid var(--trait2); border-radius: 14px; background: none; font-weight: 600; font-size: 16px; white-space: nowrap; }
+  .b.oui { flex: 1; border-color: var(--ambre); background: var(--ambre); color: #1b1404; }
+  .b.lien { min-height: 44px; padding: 0 4px; border: 0; font-weight: 500; color: var(--gris); text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--trait2); }
+  .b:active { transform: scale(.98); }
+  .occupe .actions { opacity: .35; pointer-events: none; }
+  .verdict { display: none; align-items: center; justify-content: space-between; gap: 10px; margin: 10px 0 -8px !important; color: var(--vert) !important; font-weight: 500; }
+  .s-tard .verdict { color: var(--gris) !important; }
+  .traite .verdict { display: flex; } .traite .actions { display: none; }
+
+  .pli { display: none; align-items: center; gap: 10px; width: 100%; min-height: 44px; padding: 0; border: 0; background: none; text-align: left; font-size: 15.5px; color: var(--gris); }
+  .replie > .pli { display: flex; }
+  .replie > .meta, .replie > .carte, .replie > .bulle, .replie > .rj, .replie > .dit, .replie > .av { display: none; }
+  .pli .co { flex: none; width: 16px; text-align: center; color: var(--vert); }
+  .s-tard .pli .co, .rep .pli .co { color: var(--pale); }
+  .pli .tx { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pli .ch { flex: none; color: var(--pale); }
+  .ligne { display: flex; align-items: center; gap: 10px; min-height: 36px; font-size: 15.5px; color: var(--pale); }
+  .ligne .co { width: 16px; text-align: center; color: var(--vert); }
+
+  /* JARVIS parle : pas de carte, juste sa voix */
+  .av { position: absolute; left: 5px; top: -3px; width: 31px; height: 31px; padding: 3px; border-radius: 50%; background: var(--bg); }
+  .av .globe { width: 25px; height: 25px; }
+  .av.parle { animation: parle 1.1s ease-in-out infinite; }
+  @keyframes parle { 50% { box-shadow: 0 0 0 5px rgba(98, 211, 230, .13); } }
+  .dit { margin: 0 0 12px; font: 400 19.5px/1.42 var(--serif); color: var(--encre); }
+  .dit:last-child { margin-bottom: 0; }
+  .dit .b { margin-top: 12px; display: block; font-family: var(--sans); }
+  .attente { display: flex; gap: 5px; align-items: center; height: 27px; }
+  .attente i { width: 6px; height: 6px; border-radius: 50%; background: var(--gris); animation: point 1s infinite; }
+  .attente i:nth-child(2) { animation-delay: .15s; } .attente i:nth-child(3) { animation-delay: .3s; }
+  @keyframes point { 0%, 60%, 100% { opacity: .25; } 30% { opacity: 1; } }
+  .bulle { width: fit-content; max-width: 88%; margin: 0 0 16px auto; padding: 10px 15px; border-radius: 18px 18px 5px 18px; background: var(--creux); font-size: 16.5px; }
+  .rj { position: relative; }
+  .rj > .av { left: -35px; }
+
+  /* les contenus de carte */
+  .mini li { display: grid; grid-template-columns: 82px minmax(0, 1fr); gap: 10px; padding: 9px 0; border-top: 1px solid var(--trait); }
+  .mini li:first-child { border-top: 0; }
+  .mini li > span { font-size: 14.5px; color: var(--pale); padding-top: 1px; }
+  .mini b { font-weight: 500; } .mini small { display: block; font-size: 14.5px; color: var(--gris); }
+  .mini.large li { grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; }
+  .mini.large li > span { font-size: 16px; color: var(--gris); }
+  .mini .al { color: var(--ambre); } .mini .bon { color: var(--vert); }
+  .piece { display: inline-flex; align-items: center; gap: 8px; margin: 8px 0 2px; padding: 7px 12px 7px 9px; border-radius: 10px; background: var(--creux); font-size: 14.5px; color: var(--gris); }
+  .jours { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin: 12px 0 2px; }
+  .jours span { padding: 7px 0 6px; border-radius: 10px; background: var(--creux); text-align: center; font-size: 13.5px; color: var(--gris); }
+  .jours span b { display: block; font: 500 17px/1.2 var(--serif); color: var(--encre); }
+  .jours span.cg { background: none; box-shadow: inset 0 0 0 1px var(--trait2); } .jours span.cg b { color: var(--pale); }
+
+  .chaine { margin: 12px 0 2px; }
+  .chaine li { position: relative; display: flex; justify-content: space-between; gap: 10px; padding: 5px 0 5px 24px; font-size: 15.5px; color: var(--gris); }
+  .chaine li::before { content: ""; position: absolute; left: 3px; top: 11px; width: 9px; height: 9px; border-radius: 50%; border: 1.5px solid var(--vert); background: var(--carte); z-index: 1; }
+  .chaine li::after { content: ""; position: absolute; left: 7px; top: 20px; bottom: -11px; width: 1px; background: var(--trait2); }
+  .chaine li:last-child::after { display: none; }
+  .chaine time { color: var(--pale); font-size: 14.5px; }
+  .chaine li.att { color: var(--encre); font-weight: 600; } .chaine li.att::before { background: var(--ambre); border-color: var(--ambre); box-shadow: 0 0 0 4px rgba(242, 180, 65, .16); } .chaine li.att time { color: var(--ambre); font-weight: 500; }
+  .chaine li.cours { color: var(--encre); font-weight: 600; } .chaine li.cours::before { background: var(--cyan); border-color: var(--cyan); animation: pouls 1.4s ease-out infinite; } .chaine li.cours time { color: var(--cyan); font-weight: 500; }
+  .chaine li.ok.neuf { color: var(--encre); } .chaine li.ok.neuf::before { background: var(--vert); } .chaine li.ok.neuf time { color: var(--vert); }
+
+  .pass { display: flex; align-items: center; gap: 10px; margin: 0 0 6px; font-weight: 600; }
+  .pass small { margin-left: auto; font-weight: 400; font-size: 14.5px; color: var(--gris); }
+  .rts li { display: grid; grid-template-columns: 9px minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 9px 0; border-top: 1px solid var(--trait); }
+  .rts b { display: block; font-weight: 600; } .rts small { display: block; font-size: 14.5px; color: var(--gris); }
+  .rts .qd { font-size: 14.5px; color: var(--pale); text-align: right; white-space: nowrap; }
+  .rts .err small, .rts .err .qd { color: var(--rouge); }
+  .note { margin: 10px 0 0 !important; padding-top: 10px; border-top: 1px solid var(--trait); font-size: 15px; }
+  .gros { display: flex; align-items: baseline; gap: 12px; margin: 0 0 12px; }
+  .gros b { font: 500 46px/1 var(--serif); letter-spacing: -.02em; white-space: nowrap; }
+  .gros span { color: var(--gris); line-height: 1.3; }
+  .jauge { height: 5px; margin: 0 0 6px; border-radius: 9px; background: var(--creux); overflow: hidden; }
+  .jauge i { display: block; height: 100%; border-radius: 9px; background: var(--gris); }
+  .frise h5 { margin: 14px 0 2px; font: italic 400 17px var(--serif); color: var(--gris); } .frise h5:first-child { margin-top: 0; }
+
+  /* ---- la barre de parole ---- */
+  .parole { flex: none; position: relative; z-index: 5; padding: 0 0 calc(env(safe-area-inset-bottom, 0px) + 10px); background: var(--bg); border-top: 1px solid var(--trait); }
+  .puces { display: flex; gap: 0; padding: 4px 10px 0; overflow-x: auto; scrollbar-width: none; -webkit-mask-image: linear-gradient(90deg, #000 86%, transparent); mask-image: linear-gradient(90deg, #000 86%, transparent); }
+  .puces::-webkit-scrollbar { display: none; }
+  .puces button { flex: none; display: flex; align-items: center; height: 44px; padding: 0 4px; border: 0; background: none; }
+  .puces button span { display: block; padding: 6px 13px; border: 1px solid var(--trait2); border-radius: 99px; font-size: 15px; font-weight: 500; white-space: nowrap; }
+  .puces button:last-child { padding-right: 40px; }
+  .champ { display: flex; align-items: center; gap: 4px; margin: 2px 12px 0; padding: 0 4px 0 18px; height: 52px; border: 1px solid var(--trait2); border-radius: 26px; background: var(--carte); }
+  .champ input { flex: 1; min-width: 0; height: 100%; border: 0; outline: 0; background: none; color: var(--encre); font: 400 17px var(--sans); }
+  .champ input::placeholder { color: var(--pale); }
+  .champ button { flex: none; display: grid; place-items: center; width: 44px; height: 44px; border: 0; border-radius: 50%; background: none; color: var(--gris); }
+  #envoi { background: var(--encre); color: var(--bg); width: 40px; height: 40px; margin: 0 2px; display: none; }
+  .champ.plein #envoi { display: grid; } .champ.plein #micro { display: none; }
+  .champ.ecoute { border-color: var(--cyan); }
+  .champ.ecoute #micro { color: var(--cyan); animation: parle 1.1s ease-in-out infinite; }
+  .toast { position: absolute; left: 16px; right: 16px; bottom: 100%; margin-bottom: 10px; padding: 11px 16px; border: 1px solid var(--trait2); border-radius: 14px; background: #20252f; font-size: 15px; text-align: center; opacity: 0; transform: translateY(6px); transition: opacity .2s, transform .2s; pointer-events: none; }
+  .toast.on { opacity: 1; transform: none; }
+
+  /* ---- une carte ouverte en grand ---- */
+  .grand { position: absolute; inset: 0; z-index: 20; display: flex; flex-direction: column; background: var(--bg); transform: translateY(102%); visibility: hidden; transition: transform .3s cubic-bezier(.2, .8, .2, 1), visibility .3s; }
+  .grand.on { transform: none; visibility: visible; }
+  .g-tete { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: calc(env(safe-area-inset-top, 0px) + 8px) 12px 4px 6px; }
+  .g-tete button { display: flex; align-items: center; gap: 4px; min-height: 44px; padding: 0 12px; border: 0; background: none; font-weight: 500; }
+  .g-tete span { font-size: 14px; color: var(--pale); padding-right: 6px; }
+  .g-corps { flex: 1; min-height: 0; overflow-y: auto; padding: 6px 20px 24px; scrollbar-width: none; }
+  .g-corps::-webkit-scrollbar { display: none; }
+  .g-corps h2 { margin: 6px 0 8px; font: 500 36px/1.08 var(--serif); letter-spacing: -.02em; }
+  .g-corps .lead { margin: 0 0 20px; font: 400 20px/1.4 var(--serif); color: var(--gris); }
+  .sec { margin: 0 0 26px; }
+  .sec h4 { margin: 0 0 4px; padding-bottom: 8px; border-bottom: 1px solid var(--trait2); font: italic 400 19px var(--serif); color: var(--encre); }
+  .lg { display: grid; grid-template-columns: 9px minmax(0, 1fr) auto; align-items: center; gap: 12px; min-height: 52px; padding: 10px 0; border-bottom: 1px solid var(--trait); }
+  .lg b { display: block; font-weight: 500; } .lg small { display: block; font-size: 14.5px; color: var(--gris); }
+  .lg .dr { font-size: 15px; color: var(--gris); text-align: right; white-space: nowrap; }
+  .lg .dr.fort { font: 500 20px var(--serif); color: var(--encre); }
+  .lg .dr.al { color: var(--ambre); } .lg .dr.bon { color: var(--vert); } .lg .dr.er { color: var(--rouge); }
+  .sec .chaine li::before { background: var(--bg); } .sec .chaine { margin-bottom: 8px; }
+  .sec .sous { margin: 12px 0 0; font-weight: 600; } .sec .sous small { font-weight: 400; color: var(--gris); font-size: 14.5px; }
+  .deux { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 0 0 12px; }
+  .deux div { padding: 14px 14px 12px; border: 1px solid var(--trait); border-radius: 16px; background: var(--carte); }
+  .deux b { display: block; font: 500 34px/1.05 var(--serif); letter-spacing: -.02em; white-space: nowrap; } .deux small { color: var(--gris); font-size: 14.5px; }
+  .depot { display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; min-height: 56px; margin: 0 0 24px; border: 1px dashed var(--trait2); border-radius: 16px; background: none; font-weight: 600; }
+  .g-pied { flex: none; padding: 10px 16px calc(env(safe-area-inset-bottom, 0px) + 12px); border-top: 1px solid var(--trait); }
+  .g-pied button { width: 100%; }
+
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<svg class="dessins" aria-hidden="true"><defs>
+  <radialGradient id="g-fond" cx="38%" cy="32%" r="75%"><stop offset="0" stop-color="#62d3e6" stop-opacity=".34"/><stop offset=".6" stop-color="#7c6cf0" stop-opacity=".14"/><stop offset="1" stop-color="#0c0e13" stop-opacity="0"/></radialGradient>
+  <linearGradient id="g-trait" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8fe9f7"/><stop offset="1" stop-color="#a78bfa"/></linearGradient>
+</defs></svg>
+
+<div class="cadre" id="cadre">
+  <div class="haut">
+    <p class="etiquette">Proposition C · Le fil · maquette, données inventées</p>
+    <header class="tete">
+      <span data-globe></span>
+      <div class="qui"><h1>Jeudi 26 novembre</h1><p><time id="horloge">16 h 10</time> · 6 °C, couvert</p></div>
+      <button class="hermes" data-q="tourne" aria-label="Hermes est actif : voir ce qui tourne"><i class="pt vert"></i>Hermes actif</button>
+    </header>
+    <nav class="resume large" id="resume" aria-label="Résumé épinglé">
+      <div class="res-c">
+        <button data-f="toi" aria-pressed="false"><i class="pt amb" data-pt-toi></i><b data-n-toi>3</b>à toi</button>
+        <button data-f="cours" aria-pressed="false"><i class="pt cy"></i><b data-n-cours>8</b>en cours<em>· 1 erreur</em></button>
+        <button data-f="venir" aria-pressed="false"><i class="pt"></i><span class="coupe">Pédiatre 17 h 30</span></button>
+      </div>
+      <div class="res-l">
+        <button class="rl" data-f="toi" aria-pressed="false"><i class="pt amb" data-pt-toi></i><span class="rn">À toi</span><b data-n-toi>3</b><span class="rd" id="d-toi"></span><span class="rx">›</span></button>
+        <button class="rl" data-f="cours" aria-pressed="false"><i class="pt cy vif"></i><span class="rn">En cours</span><b data-n-cours>8</b><span class="rd"><em>1 en erreur</em> · relance 17&nbsp;h&nbsp;40</span><span class="rx">›</span></button>
+        <button class="rl" data-f="venir" aria-pressed="false"><i class="pt"></i><span class="rn">À venir</span><b></b><span class="rd" style="grid-column: 3 / 5"><strong>Pédiatre 17&nbsp;h&nbsp;30</strong> · colis demain matin</span><span class="rx">›</span></button>
+      </div>
+    </nav>
+  </div>
+
+  <main class="fil" id="fil">
+    <div class="fil-in" id="fil-in">
+      <div class="ef"><span id="ef-t"></span><button data-f="">Tout le fil</button></div>
+
+      <!-- têtes de fil filtré : elles n'apparaissent que sous leur filtre -->
+      <article class="it seul" data-t="cours" id="tete-tourne"></article>
+      <article class="it seul" data-t="venir" id="tete-venir"></article>
+      <article class="it seul" data-t="venir">
+        <span class="nd"></span>
+        <div class="meta"><span class="src">Sujet ouvert · Papiers</span></div>
+        <div class="carte"><h3>Passeport à renouveler</h3><p>Rendez-vous à prendre avant le 01/12. Je peux te préparer la liste des pièces.</p>
+          <div class="actions"><button class="b" data-grand="papiers">Ouvrir mes papiers</button></div></div>
+      </article>
+
+      <section class="moment ferme" id="m-hier">
+        <button class="mh" aria-expanded="false"><span>Hier</span><small>mercredi 25 · 4 éléments, tout est traité</small><i>⌄</i></button>
+        <div class="mc">
+          <div class="it replie"><span class="nd"></span><div class="ligne"><span class="co">✓</span>7 h 41 · Veille du matin lue</div></div>
+          <div class="it replie"><span class="nd"></span><div class="ligne"><span class="co">✓</span>10 h 05 · 2 mails rangés, 0 à traiter</div></div>
+          <div class="it replie"><span class="nd"></span><div class="ligne"><span class="co">✓</span>12 h 00 · Prix suivis : rien de neuf</div></div>
+          <div class="it replie"><span class="nd"></span><div class="ligne"><span class="co">✓</span>18 h 20 · Jours du mois validés pour le CRA</div></div>
+        </div>
+      </section>
+
+      <section class="moment">
+        <button class="mh" aria-expanded="true"><span>Ce matin</span><small></small><i>⌄</i></button>
+        <div class="mc">
+          <article class="it s-fait pliable replie" data-t="cours">
+            <span class="nd"></span>
+            <button class="pli"><span class="co">✓</span><span class="tx">7 h 27 · 2 mails envoyés pour toi, 2 réponses</span><span class="ch">›</span></button>
+            <div class="meta"><time>7 h 27</time><span class="etat">2 réponses reçues</span><button class="rp">Replier</button></div>
+            <div class="carte"><h3>Deux mails envoyés pour toi</h3>
+              <ul class="mini">
+                <li><span>7 h 27</span><div><b>« CRA Novembre »</b><small class="bon">Réponse à 14 h 29, avec le PDF signé</small></div></li>
+                <li><span>7 h 27</span><div><b>« Prolongation de mission »</b><small class="bon">Réponse à 11 h 17 : prolongé pour décembre</small></div></li>
+              </ul></div>
+          </article>
+
+          <article class="it jv">
+            <span class="av" data-globe></span>
+            <p class="dit">Bonjour. Voilà ta journée.</p>
+            <div class="meta"><time>7 h 41</time><span class="src">· Hermes · Veille du matin</span></div>
+            <div class="carte"><button class="agr" data-grand="semaine" aria-label="Ouvrir ma semaine en grand"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M14 4h6v6M20 4l-7 7M10 20H4v-6M4 20l7-7"/></svg></button>
+              <ul class="mini">
+                <li><span>6 °C</span><div><b>Couvert toute la journée</b></div></li>
+                <li><span>17 h 30</span><div><b>Pédiatre</b></div></li>
+                <li><span>Demain</span><div><b>Livraison d’un colis</b><small>entre 9 h 45 et 13 h 45</small></div></li>
+                <li><span>Avant le 01/12</span><div><b>Devis à envoyer à l’assurance</b><small>et rendez-vous passeport à prendre</small></div></li>
+                <li><span>Ce soir, 19 h</span><div><b>Mes idées de sorties pour le week-end</b></div></li>
+              </ul></div>
+          </article>
+
+          <article class="it s-fait pliable replie" data-t="cours">
+            <span class="nd"></span>
+            <button class="pli"><span class="co">✓</span><span class="tx">8 h 05 · Note de frais Box internet créée</span><span class="ch">›</span></button>
+            <div class="meta"><time>8 h 05</time><span class="etat">fait</span><button class="rp">Replier</button></div>
+            <div class="carte"><h3>Note de frais Box internet</h3><p>Hermes l’a créée sur le portail. Prochaine le 15/12.</p><ol class="chaine" data-chaine="box"></ol></div>
+          </article>
+
+          <article class="it s-toi" data-t="toi" data-id="sem" data-court="CRA de la semaine" data-ok="CRA de la semaine confirmé" data-okv="Confirmé">
+            <span class="nd"></span>
+            <button class="pli"></button>
+            <div class="meta"><time>9 h 02</time><span class="src">· Travail</span><span class="etat">attend ton oui</span><button class="rp">Replier</button></div>
+            <div class="carte"><h3>CRA de la semaine : 4 jours travaillés, 1 congé</h3><p>C’est bien ça ? Je l’inscris dès ton oui.</p>
+              <div class="jours" aria-label="Lundi à jeudi travaillés, vendredi en congé"><span>lun<b>23</b></span><span>mar<b>24</b></span><span>mer<b>25</b></span><span>jeu<b>26</b></span><span class="cg">congé<b>27</b></span></div>
+              <div class="actions"><button class="b oui" data-oui>Confirmer</button><button class="b" data-toast="Dans l’app, tu corrigerais les jours ici.">Corriger</button></div>
+              <p class="verdict"></p></div>
+          </article>
+
+          <article class="it" data-id="prolong" data-ok="Mission prolongée pour décembre" data-okv="Vu">
+            <span class="nd"></span>
+            <button class="pli"></button>
+            <div class="meta"><time>11 h 17</time><span class="src">· Courrier</span><span class="etat"></span><button class="rp">Replier</button></div>
+            <div class="carte"><h3>Réponse à ton mail de prolongation</h3><p class="cit">« Ta mission est prolongée pour décembre. »</p><p>Rien à faire. Je l’ai noté.</p>
+              <div class="actions"><button class="b" data-oui>Vu</button></div>
+              <p class="verdict"></p></div>
+          </article>
+        </div>
+      </section>
+
+      <section class="moment">
+        <button class="mh" aria-expanded="true"><span>Ce midi</span><small></small><i>⌄</i></button>
+        <div class="mc">
+          <article class="it">
+            <span class="nd"></span>
+            <div class="meta"><time>12 h 00</time><span class="src">· Hermes · Prix suivis</span></div>
+            <div class="carte"><h3>Un prix est passé sous ton seuil</h3>
+              <ul class="mini large"><li><span>Aspirateur balai</span><b>189 € <small class="bon">ton seuil : 200 €</small></b></li></ul>
+              <div class="actions"><button class="b" data-grand="achats">Voir mes achats</button></div></div>
+          </article>
+
+          <article class="it" data-t="venir" id="c-sinistre">
+            <span class="nd"></span>
+            <div class="meta"><time>13 h 15</time><span class="src">· Courrier · sujet ouvert</span></div>
+            <div class="carte"><h3>Sinistre dégât des eaux</h3><p>Ton assureur a écrit. J’ai tout rangé dans une seule fiche.</p>
+              <ul class="mini">
+                <li><span>2 échéances</span><div><b>Devis à l’assurance avant le 01/12</b><small>Passage de l’expert le 08/12</small></div></li>
+                <li><span>1 mail</span><div><b>attend une réponse</b><small>devis demandé à l’artisan lundi</small></div></li>
+                <li><span>Dossier</span><div><b>4 pièces</b></div></li>
+              </ul>
+              <div class="actions"><button class="b" data-grand="sinistre">Ouvrir la fiche</button></div></div>
+          </article>
+        </div>
+      </section>
+
+      <section class="moment">
+        <button class="mh" aria-expanded="true"><span>Cet après-midi</span><small></small><i>⌄</i></button>
+        <div class="mc">
+          <article class="it s-toi" data-t="toi cours" id="c-cra" data-id="cra" data-court="CRA signé" data-ok="CRA de novembre déposé sur le portail" data-okv="Déposé">
+            <span class="nd"></span>
+            <button class="pli"></button>
+            <div class="meta"><time>14 h 29</time><span class="src">· CRA du mois</span><span class="etat">attend ton oui</span><button class="rp">Replier</button></div>
+            <div class="carte"><h3>Ton client a renvoyé le CRA signé. Je le fais déposer par Hermes ?</h3>
+              <span class="piece"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/></svg>CRA-novembre-signé.pdf</span>
+              <ol class="chaine" data-chaine="cra"></ol>
+              <div class="actions"><button class="b oui" data-oui>Oui, dépose-le</button><button class="b" data-tard>Plus tard</button></div>
+              <p class="verdict"></p></div>
+          </article>
+
+          <article class="it s-toi" data-t="toi" data-id="frais" data-court="Note de frais" data-ok="Note de frais Télétravail validée" data-okv="Validée">
+            <span class="nd"></span>
+            <button class="pli"></button>
+            <div class="meta"><time>15 h 40</time><span class="src">· Travail</span><span class="etat">attend ton oui</span><button class="rp">Replier</button></div>
+            <div class="carte"><h3>Note de frais Télétravail de novembre</h3><p>9 jours à la maison, 22,50 €. Je l’ai préparée, à toi de valider.</p>
+              <div class="actions"><button class="b oui" data-oui>Valider</button><button class="b" data-grand="travail">Voir le détail</button></div>
+              <p class="verdict"></p></div>
+          </article>
+
+          <article class="it s-err" data-t="cours">
+            <span class="nd"></span>
+            <div class="meta"><time>16 h 02</time><span class="src">· Hermes</span><span class="etat">en erreur</span></div>
+            <div class="carte"><h3>Le bilan de la semaine s’est arrêté</h3><p>Limite du forfait atteinte. Je le relance à 17&nbsp;h&nbsp;40. Rien à faire de ton côté.</p>
+              <div class="actions"><button class="b" data-q="tourne">Voir ce qui tourne</button></div></div>
+          </article>
+        </div>
+      </section>
+
+      <section class="moment" id="m-now">
+        <button class="mh" aria-expanded="true"><span>Maintenant</span><small></small><i>⌄</i></button>
+        <div class="mc" id="bas" aria-live="polite">
+          <article class="it jv">
+            <span class="av" data-globe></span>
+            <p class="dit"><span id="dit-now"></span> Le reste avance tout seul. Pédiatre à 17&nbsp;h&nbsp;30.
+              <button class="b" data-f="toi" id="b-now">Voir ce qui t’attend</button></p>
+          </article>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <footer class="parole">
+    <div class="toast" id="toast" role="status"></div>
+    <div class="puces" id="puces" aria-label="Raccourcis de question">
+      <button data-q="tourne"><span>Ce qui tourne</span></button>
+      <button data-q="papiers"><span>Mes papiers</span></button>
+      <button data-q="argent"><span>Mon argent</span></button>
+      <button data-q="semaine"><span>Ma semaine</span></button>
+      <button data-q="achats"><span>Mes achats</span></button>
+      <button data-q="sorties"><span>Ce week-end</span></button>
+      <button data-q="travail"><span>Mon travail</span></button>
+    </div>
+    <form class="champ" id="champ" autocomplete="off">
+      <input id="q" type="text" placeholder="Demande-moi…" enterkeyhint="send" aria-label="Demander à JARVIS">
+      <button type="button" id="micro" aria-label="Dicter"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0014 0M12 18v3"/></svg></button>
+      <button type="submit" id="envoi" aria-label="Envoyer"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M6 11l6-6 6 6"/></svg></button>
+    </form>
+  </footer>
+
+  <section class="grand" id="grand" aria-hidden="true" role="dialog" aria-label="Carte ouverte en grand">
+    <div class="g-tete"><button data-retour><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>Le fil</button><span id="g-sur"></span></div>
+    <div class="g-corps" id="g-corps"></div>
+    <div class="g-pied"><button class="b" data-retour>Revenir au fil</button></div>
+  </section>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  var $ = function (s, r) { return (r || document).querySelector(s); };
+  var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
+  var fil = $('#fil'), filIn = $('#fil-in'), resume = $('#resume'), grand = $('#grand'), bas = $('#bas'), champ = $('#champ'), q = $('#q');
+  var calme = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var E = { cra: 'att', craH: '', minute: 10, filtre: '' };
+  function heure() { return '16 h ' + (E.minute < 10 ? '0' : '') + E.minute; }
+  function el(html) { var t = document.createElement('template'); t.innerHTML = html.trim(); return t.content.firstElementChild; }
+  function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+
+  /* ---- la signature : le petit globe de JARVIS ---- */
+  var GLOBE = '<svg class="globe" viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="17.5" fill="url(#g-fond)"/><g fill="none" stroke="url(#g-trait)" stroke-width="1.15"><circle cx="20" cy="20" r="17.5"/><ellipse cx="20" cy="20" rx="17.5" ry="6.5" opacity=".5"/><path d="M4.5 12.5h31M4.5 27.5h31" opacity=".28"/><ellipse cx="20" cy="20" rx="7" ry="17.5" opacity=".85"><animate attributeName="rx" values="17.5;0;17.5" dur="8s" repeatCount="indefinite"/></ellipse><ellipse cx="20" cy="20" rx="13" ry="17.5" opacity=".5"><animate attributeName="rx" values="0;17.5;0" dur="8s" repeatCount="indefinite"/></ellipse></g><circle cx="27.5" cy="12.5" r="1.5" fill="#d9f7ff"/><circle cx="11.5" cy="25" r="1.1" fill="#cdbcff"/></svg>';
+  $$('[data-globe]').forEach(function (e) { e.innerHTML = GLOBE; });
+  var AGR = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M14 4h6v6M20 4l-7 7M10 20H4v-6M4 20l7-7"/></svg>';
+
+  /* ---- les données (inventées) ---- */
+  var RT = [
+    ['vert', 'Veille du matin', 'tous les jours, 7 h 40 · passée à 7 h 41', 'demain'],
+    ['cy vif', 'Courrier à l’arrivée', 'à chaque mail important · dernier à 13 h 15', 'à l’écoute'],
+    ['vert', 'Prix suivis', 'tous les jours, midi · passée à 12 h 00', 'demain'],
+    ['cy', 'Sorties du week-end', 'le jeudi, 19 h', 'ce soir'],
+    ['vert', 'Digest IA', 'le lundi, 8 h · passé lundi', 'lundi'],
+    ['red', 'Bilan de la semaine', 'le lundi, 9 h · limite du forfait', 'relance 17 h 40']
+  ];
+  function etapes(nom) {
+    if (nom === 'box') return [['Facture téléchargée', '8 h 03', 'ok'], ['Vérifiée à blanc', '8 h 04', 'ok'], ['Créée', '8 h 05', 'ok']];
+    return [['Jours validés', 'hier', 'ok'], ['Mail au client', '7 h 27', 'ok'], ['CRA validé sur le portail', '7 h 31', 'ok'], ['CRA signé reçu', '14 h 29', 'ok'],
+      E.cra === 'fait' ? ['Déposé sur le portail', E.craH, 'ok neuf'] : E.cra === 'cours' ? ['Dépôt sur le portail', 'Hermes dépose…', 'cours'] : ['Déposé sur le portail', 'attend ton oui', 'att']];
+  }
+  function chaine(nom) { return etapes(nom).map(function (s) { return '<li class="' + s[2] + '"><span>' + s[0] + '</span><time>' + s[1] + '</time></li>'; }).join(''); }
+  function chaines() { $$('[data-chaine]').forEach(function (o) { o.innerHTML = chaine(o.dataset.chaine); }); }
+  function L(pt, t, s, d, cl) { return '<li class="lg"><i class="pt ' + pt + '"></i><div><b>' + t + '</b>' + (s ? '<small>' + s + '</small>' : '') + '</div>' + (d ? '<span class="dr ' + (cl || '') + '">' + d + '</span>' : '') + '</li>'; }
+  function S(t, rows) { return '<section class="sec"><h4>' + t + '</h4><ul>' + rows.join('') + '</ul></section>'; }
+  function M(a, t, s, cl) { return '<li><span>' + a + '</span><div><b>' + t + '</b>' + (s ? '<small class="' + (cl || '') + '">' + s + '</small>' : '') + '</div></li>'; }
+  function craEtat() { return E.cra === 'fait' ? 'déposé à ' + E.craH : E.cra === 'cours' ? 'Hermes dépose…' : 'attend ton oui'; }
+  function craCl() { return E.cra === 'fait' ? 'bon' : E.cra === 'cours' ? '' : 'al'; }
+  function fait(id) { var e = $('.it[data-id="' + id + '"]'); return e && e.classList.contains('s-fait'); }
+
+  function carteTourne() {
+    return '<div class="carte"><button class="agr" data-grand="tourne" aria-label="Ouvrir ce qui tourne en grand">' + AGR + '</button>' +
+      '<p class="pass"><i class="pt vert"></i>Passerelle d’Hermes : active</p>' +
+      '<ul class="rts">' + RT.map(function (r) { return '<li class="' + (r[0] === 'red' ? 'err' : '') + '"><i class="pt ' + r[0] + '"></i><div><b>' + r[1] + '</b><small>' + r[2] + '</small></div><span class="qd">' + r[3] + '</span></li>'; }).join('') + '</ul>' +
+      '<p class="note">Deux chaînes : CRA du mois (' + (E.cra === 'fait' ? 'terminée' : '4 étapes sur 5') + '), Note de frais Box internet (terminée).</p>' +
+      '<div class="actions"><button class="b" data-grand="tourne">Ouvrir en grand</button></div></div>';
+  }
+  function friseVenir() {
+    return '<div class="frise"><h5>Aujourd’hui</h5><ul class="mini">' + M('17 h 30', 'Pédiatre') + M('17 h 40', 'Je relance le bilan de la semaine') + M('19 h', 'Idées de sorties pour le week-end', 'Hermes') + '</ul>' +
+      '<h5>Demain</h5><ul class="mini">' + M('7 h 40', 'Veille du matin') + M('9 h 45', 'Livraison d’un colis', 'jusqu’à 13 h 45') + '</ul>' +
+      '<h5>Ensuite</h5><ul class="mini">' + M('Sam. 28', 'Prélèvement Électricité', '62 €') + M('Avant le 01/12', 'Devis à envoyer à l’assurance', 'Sinistre dégât des eaux', 'al') + M('Avant le 01/12', 'Rendez-vous passeport à prendre', '', '') + M('Mar. 08/12', 'Passage de l’expert', 'Sinistre dégât des eaux') + M('Mar. 15/12', 'Note de frais Box internet', 'Hermes la crée seul') + '</ul></div>';
+  }
+
+  /* ce que JARVIS répond : une phrase, une carte de synthèse, la ligne une fois repliée, la carte en grand */
+  var REP = {
+    tourne: { q: 'Ce qui tourne', dit: function () { return 'Six routines chez Hermes. Cinq vont bien, une est en erreur : je la relance à 17 h 40.'; }, court: 'Ce qui tourne · 6 routines, 1 en erreur', carte: carteTourne },
+    papiers: { q: 'Mes papiers', grand: 'papiers', dit: function () { return 'Tout est rangé. Deux pièces sont à surveiller.'; }, court: 'Mes papiers · 2 pièces à surveiller',
+      carte: function () { return '<ul class="mini">' + M('Avant le 01/12', 'Passeport à renouveler', 'rendez-vous à prendre', 'al') + M('Dans 5 mois', 'Carte d’identité', 'elle expire fin avril') + M('3 récents', 'Attestation d’assurance habitation', 'Facture Box internet · Ordonnance du pédiatre') + '</ul>'; }, plus: '<button class="b" data-toast="Dans l’app : une photo, un fichier ou un mail transféré.">Déposer un document</button>' },
+    argent: { q: 'Mon argent', grand: 'argent', dit: function () { return 'Il te reste 640 € à payer ce mois-ci.'; }, court: 'Mon argent · 640 € restent à payer',
+      carte: function () { return '<div class="gros"><b>640 €</b><span>restent à payer<br>en novembre</span></div><div class="jauge"><i style="width:65%"></i></div><ul class="mini large"><li><span>Déjà dépensé</span><b>1 180 €</b></li><li><span>Prochain prélèvement</span><b>Électricité, 62 € le 28</b></li></ul>'; } },
+    semaine: { q: 'Ma semaine', grand: 'semaine', dit: function () { return 'Semaine calme. Deux échéances tombent mardi.'; }, court: 'Ma semaine · 2 échéances mardi',
+      carte: function () { return '<ul class="mini">' + M('Auj. 17 h 30', 'Pédiatre') + M('Demain', 'Livraison d’un colis', 'entre 9 h 45 et 13 h 45') + M('Week-end', '3 idées de sorties', 'je te les envoie ce soir à 19 h') + M('Avant mardi', 'Devis à l’assurance, rendez-vous passeport', '', '') + '</ul>'; } },
+    achats: { q: 'Mes achats', grand: 'achats', dit: function () { return 'Je suis deux prix. L’un est passé sous ton seuil.'; }, court: 'Mes achats · 1 prix sous ton seuil',
+      carte: function () { return '<ul class="mini large"><li><span>Aspirateur balai</span><b>189 € <small class="bon">sous ton seuil (200 €)</small></b></li><li><span>Casque antibruit</span><b>249 € <small>seuil : 220 €</small></b></li></ul>'; } },
+    sorties: { q: 'Ce week-end', grand: 'sorties', dit: function () { return 'Trois idées pour ce week-end, et un voyage en projet.'; }, court: 'Ce week-end · 3 idées, 1 voyage en projet',
+      carte: function () { return '<ul class="mini">' + M('Samedi', 'Marché de Noël du centre', 'gratuit, dès 10 h') + M('Dim. matin', 'Ferme pédagogique', '20 min en voiture') + M('Dim. 16 h', 'Spectacle de marionnettes', 'dès 3 ans') + M('En projet', 'Lisbonne en février', '2 options à comparer') + '</ul>'; } },
+    travail: { q: 'Mon travail', grand: 'travail', dit: function () { return 'Mission prolongée pour décembre. ' + (E.cra === 'fait' ? 'Le CRA de novembre est déposé.' : 'Le CRA du mois attend ton oui.'); }, court: 'Mon travail · CRA et notes de frais',
+      carte: function () { return '<ul class="mini">' + M('CRA du mois', E.cra === 'fait' ? 'Déposé sur le portail' : 'Étape 5 sur 5', craEtat(), craCl()) + M('CRA semaine', '4 jours, 1 congé', fait('sem') ? 'confirmé' : 'à confirmer', fait('sem') ? 'bon' : 'al') + M('Frais', 'Télétravail de novembre', fait('frais') ? 'validée' : 'à valider', fait('frais') ? 'bon' : 'al') + M('Frais', 'Box internet', 'créée · prochaine le 15/12') + '</ul>'; } },
+    cra: { q: 'Où en est le CRA ?', grand: 'travail', dit: function () { return E.cra === 'fait' ? 'Le CRA de novembre est déposé depuis ' + E.craH + '. C’est terminé.' : 'Quatre étapes sur cinq sont faites. Il ne reste que le dépôt sur le portail : il attend ton oui.'; }, court: 'Le CRA du mois · étape 5 sur 5',
+      carte: function () { return '<h3>CRA du mois</h3><ol class="chaine" data-chaine="cra">' + chaine('cra') + '</ol>'; }, plusF: function () { return E.cra === 'att' ? '<button class="b" data-va="c-cra">Aller à la carte</button>' : ''; } },
+    sinistre: { q: 'Où en est le sinistre ?', grand: 'sinistre', dit: function () { return 'Prochaine étape : envoyer le devis à l’assurance avant le 01/12. L’artisan n’a pas encore répondu.'; }, court: 'Sinistre dégât des eaux · devis avant le 01/12',
+      carte: function () { return '<ul class="mini">' + M('Avant le 01/12', 'Envoyer le devis à l’assurance', '', '') + M('Mar. 08/12', 'Passage de l’expert') + M('1 mail', 'attend une réponse', 'devis demandé à l’artisan lundi') + '</ul>'; } },
+    inconnu: { dit: function () { return 'Dans cette maquette, je sais répondre sur le CRA, tes papiers, ton argent, ta semaine, tes achats, le week-end et ce qui tourne.'; }, court: 'Question sans réponse dans la maquette' }
+  };
+  var ROUTES = [[/\bcra\b|compte.rendu/, 'cra'], [/sinistre|d[ée]g[âa]t|assur|expert|devis/, 'sinistre'], [/papier|document|passeport|identit/, 'papiers'], [/argent|reste|combien|budget|d[ée]pens|pr[ée]l[èe]v/, 'argent'], [/tourne|routine|hermes|erreur|bilan/, 'tourne'], [/semaine|agenda|demain|rendez|p[ée]diatre|colis/, 'semaine'], [/achat|prix|aspirateur|casque/, 'achats'], [/week|sortie|voyage|lisbonne/, 'sorties'], [/travail|frais|mission/, 'travail']];
+
+  var GRAND = {
+    tourne: { sur: 'Ce qui tourne', t: 'Ce qui tourne', lead: function () { return 'Hermes fait six routines pour toi. Une seule est en erreur, et je m’en occupe.'; }, corps: function () {
+      return S('Hermes', [L('vert', 'Passerelle active', 'il reçoit mes demandes', 'en ligne', 'bon')]) +
+        S('Les six routines', RT.map(function (r) { return L(r[0], r[1], r[2], r[3], r[0] === 'red' ? 'er' : ''); })) +
+        '<section class="sec"><h4>Deux chaînes d’étapes</h4><p class="sous">CRA du mois <small>· ' + craEtat() + '</small></p><ol class="chaine">' + chaine('cra') + '</ol><p class="sous">Note de frais Box internet <small>· prochaine le 15/12</small></p><ol class="chaine">' + chaine('box') + '</ol></section>' +
+        S('Mails que j’ai envoyés', [L('vert', '« CRA Novembre »', 'envoyé à 7 h 27 · réponse à 14 h 29, avec PDF', 'répondu', 'bon'), L('vert', '« Prolongation de mission »', 'envoyé à 7 h 27 · réponse à 11 h 17', 'répondu', 'bon')]);
+    } },
+    papiers: { sur: 'Papiers', t: 'Mes papiers', lead: function () { return 'Tout est rangé. Deux pièces sont à surveiller.'; }, corps: function () {
+      return '<button class="depot" data-toast="Dans l’app : une photo, un fichier ou un mail transféré."><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 16V4M7 9l5-5 5 5M5 20h14"/></svg>Déposer un document</button>' +
+        S('À surveiller', [L('amb', 'Passeport à renouveler', 'rendez-vous à prendre', 'avant le 01/12', 'al'), L('', 'Carte d’identité', 'elle expire fin avril', 'dans 5 mois')]) +
+        S('Déposés récemment', [L('', 'Attestation d’assurance habitation', 'rangée dans Logement', 'hier'), L('', 'Facture Box internet, novembre', 'rangée dans Logement', 'mardi'), L('', 'Ordonnance du pédiatre', 'rangée dans Santé', '20/11')]) +
+        S('Rangement', [L('', 'Logement', '', '14'), L('', 'Santé', '', '9'), L('', 'Voiture', '', '6'), L('', 'Voyages', '', '4')]);
+    } },
+    argent: { sur: 'Argent', t: 'Mon argent', lead: function () { return 'Il te reste 640 € à payer ce mois-ci. Rien d’inhabituel.'; }, corps: function () {
+      return '<div class="deux"><div><b>640 €</b><small>restent à payer</small></div><div><b>1 180 €</b><small>déjà dépensés</small></div></div><div class="jauge" style="margin-bottom:26px"><i style="width:65%"></i></div>' +
+        S('Prochains prélèvements', [L('', 'Électricité', 'samedi 28', '62 €', 'fort'), L('', 'Assurance habitation', 'mardi 01/12', '31 €', 'fort'), L('', 'Box internet', 'samedi 05/12', '35 €', 'fort')]) +
+        S('Dépensé en novembre', [L('', 'Logement', '', '520 €', 'fort'), L('', 'Courses', '', '410 €', 'fort'), L('', 'Transports', '', '130 €', 'fort'), L('', 'Loisirs', '', '120 €', 'fort')]);
+    } },
+    travail: { sur: 'Travail', t: 'Mon travail', lead: function () { return 'Mission prolongée pour décembre. Le reste suit son cours.'; }, corps: function () {
+      return '<section class="sec"><h4>CRA</h4><p class="sous">CRA du mois <small>· ' + craEtat() + '</small></p><ol class="chaine">' + chaine('cra') + '</ol><ul>' + L(fait('sem') ? 'vert' : 'amb', 'CRA de la semaine', '4 jours travaillés, 1 congé', fait('sem') ? 'confirmé' : 'à confirmer', fait('sem') ? 'bon' : 'al') + '</ul></section>' +
+        '<section class="sec"><h4>Notes de frais</h4><ul>' + L(fait('frais') ? 'vert' : 'amb', 'Télétravail de novembre', '9 jours · 22,50 €', fait('frais') ? 'validée' : 'à valider', fait('frais') ? 'bon' : 'al') + '</ul><p class="sous">Box internet <small>· prochaine le 15/12</small></p><ol class="chaine">' + chaine('box') + '</ol></section>' +
+        S('Mission', [L('vert', 'Prolongée pour décembre', 'réponse reçue à 11 h 17')]);
+    } },
+    achats: { sur: 'Achats', t: 'Mes achats', lead: function () { return 'Je regarde deux prix tous les jours à midi. L’un est passé sous ton seuil.'; }, corps: function () {
+      return S('Prix suivis', [L('vert', 'Aspirateur balai', 'ton seuil : 200 € · au plus bas depuis 30 jours', '189 €', 'fort'), L('', 'Casque antibruit', 'ton seuil : 220 € · encore 29 € au-dessus', '249 €', 'fort')]) +
+        S('Dernier passage', [L('vert', 'Aujourd’hui à 12 h 00', 'Hermes · prochain demain midi')]);
+    } },
+    sorties: { sur: 'Sorties et voyages', t: 'Sorties et voyages', lead: function () { return 'Trois idées pour ce week-end. Je les mets à jour ce soir à 19 h.'; }, corps: function () {
+      return S('Ce week-end', [L('', 'Marché de Noël du centre', 'samedi, dès 10 h', 'gratuit'), L('', 'Ferme pédagogique', 'dimanche matin · 20 min en voiture', '8 €'), L('', 'Spectacle de marionnettes', 'dimanche 16 h · dès 3 ans', '6 €')]) +
+        S('Voyage en projet', [L('cy', 'Lisbonne en février', 'vacances d’hiver · 2 options à comparer', 'en projet')]);
+    } },
+    semaine: { sur: 'Agenda', t: 'Ma semaine', lead: function () { return 'Aujourd’hui : 6 °C, couvert. Deux échéances tombent mardi.'; }, corps: function () { return friseVenir(); } },
+    sinistre: { sur: 'Sujet ouvert', t: 'Sinistre dégât des eaux', lead: function () { return 'Une seule fiche pour tout le dossier. Prochaine étape : le devis, avant le 01/12.'; }, corps: function () {
+      return S('Deux échéances', [L('amb', 'Envoyer le devis à l’assurance', 'il manque le devis de l’artisan', 'avant le 01/12', 'al'), L('', 'Passage de l’expert', 'mardi, entre 9 h et 12 h', '08/12')]) +
+        S('Un mail attend une réponse', [L('cy', 'Devis demandé à l’artisan', 'envoyé lundi · je relance demain matin', '3 jours')]) +
+        S('Le dossier', [L('', 'Courrier de l’assureur', 'reçu aujourd’hui à 13 h 15', 'PDF'), L('', 'Déclaration de sinistre', 'envoyée le 18/11', 'PDF'), L('', 'Photos des dégâts', '6 photos', 'images'), L('', 'Constat amiable', 'signé le 17/11', 'PDF')]);
+    } }
+  };
+
+  /* ---- le résumé épinglé ---- */
+  function majResume() {
+    var att = $$('.it[data-t~="toi"]:not(.traite):not(.occupe)', filIn), n = att.length, rep = $$('.it.s-tard', filIn).length;
+    $$('[data-n-toi]').forEach(function (b) { b.textContent = n; });
+    $$('[data-pt-toi]').forEach(function (p) { p.className = 'pt ' + (n ? 'amb' : 'vert'); });
+    $('#d-toi').textContent = (n ? att.map(function (e) { return e.dataset.court; }).join(' · ') : 'Tu es à jour') + (rep ? ' · ' + rep + ' reporté' : '');
+    $$('[data-n-cours]').forEach(function (b) { b.textContent = E.cra === 'fait' ? 7 : 8; });
+    $('#dit-now').textContent = n === 3 ? 'Trois choses attendent ton oui.' : n === 2 ? 'Encore deux choses attendent ton oui.' : n === 1 ? 'Plus qu’une chose attend ton oui.' : 'Tu es à jour.';
+    $('#b-now').style.display = n ? '' : 'none';
+    $('#horloge').textContent = heure();
+    $$('.moment', filIn).forEach(function (m) {
+      if (m.id === 'm-hier') return;
+      var its = $$('.mc > .it', m), a = $$('.mc > .it[data-t~="toi"]:not(.traite)', m).length;
+      $('.mh small', m).textContent = m.classList.contains('ferme') ? its.length + ' élément' + (its.length > 1 ? 's' : '') + (a ? ' · ' + a + (a > 1 ? ' attendent' : ' attend') + ' ton oui' : '') : (m.id === 'm-now' ? heure() : '');
+    });
+    if (E.filtre === 'toi') $('#ef-t').textContent = n ? 'Ce qui attend ton oui · ' + n : 'Tu es à jour';
+  }
+  function auBas() { return fil.scrollHeight - fil.scrollTop - fil.clientHeight < 56; }
+  function forme() { resume.classList.toggle('large', !E.filtre && auBas()); }
+  var tic = false;
+  fil.addEventListener('scroll', function () { if (tic) return; tic = true; requestAnimationFrame(function () { tic = false; forme(); }); }, { passive: true });
+
+  function filtrer(f) {
+    if (f === E.filtre) f = '';
+    E.filtre = f;
+    if (f) filIn.dataset.f = f; else delete filIn.dataset.f;
+    $$('[data-f]', resume).forEach(function (b) { b.setAttribute('aria-pressed', String(!!f && b.dataset.f === f)); });
+    $('#ef-t').textContent = { toi: 'Ce qui attend ton oui', cours: 'Ce qui tourne', venir: 'Ce qui arrive' }[f] || '';
+    if (f === 'cours') tetes();
+    majResume();
+    fil.scrollTop = f ? 0 : fil.scrollHeight;
+    forme();
+  }
+  function tetes() {
+    $('#tete-tourne').innerHTML = '<span class="nd"></span><div class="meta"><span class="src">Hermes · 6 routines · 2 chaînes</span><span class="etat">en direct</span></div>' + carteTourne();
+    $('#tete-tourne').classList.add('s-cours');
+    $('#tete-venir').innerHTML = '<span class="nd"></span><div class="meta"><span class="src">Agenda et échéances</span></div><div class="carte"><button class="agr" data-grand="semaine" aria-label="Ouvrir ma semaine en grand">' + AGR + '</button>' + friseVenir() + '</div>';
+  }
+
+  /* ---- replier, trancher ---- */
+  function plier(it, oui) {
+    var a = it.offsetHeight; it.classList.toggle('replie', oui); var b = it.offsetHeight;
+    if (calme || a === b) { forme(); return; }
+    it.style.height = a + 'px'; it.style.overflow = 'hidden'; void it.offsetHeight;
+    it.style.transition = 'height .3s ease'; it.style.height = b + 'px';
+    setTimeout(function () { it.style.height = it.style.overflow = it.style.transition = ''; forme(); }, 320);
+  }
+  function trancher(it, mode) {
+    var tard = mode === 'tard', court = it.dataset.court || it.dataset.ok;
+    it.classList.remove('s-toi', 's-cours', 'occupe');
+    it.classList.add('traite', 'pliable', tard ? 's-tard' : 's-fait');
+    $('.pli', it).innerHTML = '<span class="co">' + (tard ? '◷' : '✓') + '</span><span class="tx">' + (tard ? 'Reporté à demain 8 h · ' + court : heure() + ' · ' + it.dataset.ok) + '</span><span class="ch">›</span>';
+    $('.verdict', it).innerHTML = '<span>' + (tard ? '◷ Reporté à demain 8 h' : '✓ ' + it.dataset.okv + ' à ' + heure()) + '</span><button class="b lien" data-annuler>Annuler</button>';
+    $('.etat', it).textContent = tard ? 'reporté' : 'fait';
+    majResume();
+    setTimeout(function () { if (it.classList.contains('traite')) plier(it, true); }, 900);
+  }
+  function oui(it) {
+    if (it.dataset.id !== 'cra') { E.minute += 2; trancher(it, 'fait'); return; }
+    E.cra = 'cours'; it.classList.remove('s-toi'); it.classList.add('s-cours', 'occupe'); $('.etat', it).textContent = 'Hermes dépose…';
+    chaines(); majResume();
+    setTimeout(function () { E.minute += 2; E.cra = 'fait'; E.craH = heure(); chaines(); trancher(it, 'fait'); }, 2600);
+  }
+  function annuler(it) {
+    it.classList.remove('traite', 'pliable', 'replie', 's-tard', 's-fait');
+    if (it.dataset.t) { it.classList.add('s-toi'); $('.etat', it).textContent = 'attend ton oui'; } else $('.etat', it).textContent = '';
+    if (it.dataset.id === 'cra') { E.cra = 'att'; chaines(); }
+    majResume();
+  }
+
+  /* ---- demander ---- */
+  function defiler(e) { var y = e.getBoundingClientRect().top - fil.getBoundingClientRect().top + fil.scrollTop - 10; fil.scrollTo({ top: y, behavior: calme ? 'auto' : 'smooth' }); }
+  function demander(cle, texte) {
+    if (grand.classList.contains('on')) fermer();
+    if (E.filtre) filtrer('');
+    $('#m-now').classList.remove('ferme');
+    $$('.rep:not(.replie)', bas).forEach(function (e) { e.classList.add('replie'); });
+    var r = REP[cle] || REP.inconnu;
+    var e = el('<article class="it rep arrive" data-k="' + cle + '"><button class="pli"><span class="co">↩</span><span class="tx">' + r.court + '</span><span class="ch">›</span></button><div class="bulle">' + esc(texte || r.q) + '</div><div class="rj"><span class="av parle">' + GLOBE + '</span><p class="dit attente" aria-label="JARVIS réfléchit"><i></i><i></i><i></i></p></div></article>');
+    bas.appendChild(e); defiler(e);
+    setTimeout(function () {
+      var plus = (r.plusF ? r.plusF() : r.plus || '') + (r.grand || cle === 'tourne' ? '' : '');
+      var corps = r.carte ? r.carte() : '';
+      if (corps && cle !== 'tourne') corps = '<div class="carte">' + (r.grand ? '<button class="agr" data-grand="' + r.grand + '" aria-label="Ouvrir en grand">' + AGR + '</button>' : '') + corps + '<div class="actions">' + plus + (r.grand ? '<button class="b" data-grand="' + r.grand + '">Ouvrir en grand</button>' : '') + '</div></div>';
+      $('.rj', e).innerHTML = '<span class="av">' + GLOBE + '</span><p class="dit">' + r.dit() + '</p><div class="meta"><time>' + heure() + '</time><span class="src">· ta question</span><button class="rp">Replier</button></div>' + corps;
+      e.classList.add('pliable');
+      var h3 = $('.carte h3', e); if (h3 && $('.agr', e)) h3.classList.add('avec');
+      defiler(e); forme();
+    }, 800);
+  }
+  function route(txt) { var t = txt.toLowerCase(); for (var i = 0; i < ROUTES.length; i++) if (ROUTES[i][0].test(t)) return ROUTES[i][1]; return 'inconnu'; }
+  champ.addEventListener('submit', function (ev) { ev.preventDefault(); var t = q.value.trim(); if (!t) return; q.value = ''; champ.classList.remove('plein'); q.blur(); demander(route(t), t); });
+  q.addEventListener('input', function () { champ.classList.toggle('plein', !!q.value.trim()); });
+  $('#micro').addEventListener('click', function () {
+    if (champ.classList.contains('ecoute')) return;
+    var phrase = 'Où en est le CRA ?', i = 0;
+    champ.classList.add('ecoute'); q.value = ''; q.placeholder = 'Je t’écoute…';
+    setTimeout(function taper() {
+      q.value = phrase.slice(0, ++i);
+      if (i < phrase.length) return setTimeout(taper, 45);
+      setTimeout(function () { champ.classList.remove('ecoute'); q.placeholder = 'Demande-moi…'; q.value = ''; demander('cra', phrase); }, 450);
+    }, 900);
+  });
+
+  /* ---- ouvrir une carte en grand, revenir au fil ---- */
+  function ouvrir(cle) {
+    var g = GRAND[cle]; if (!g) return;
+    $('#g-sur').textContent = g.sur;
+    $('#g-corps').innerHTML = '<h2>' + g.t + '</h2><p class="lead">' + g.lead() + '</p>' + g.corps();
+    $('#g-corps').scrollTop = 0;
+    grand.classList.add('on'); grand.setAttribute('aria-hidden', 'false');
+  }
+  function fermer() { grand.classList.remove('on'); grand.setAttribute('aria-hidden', 'true'); }
+  var tt;
+  function toast(m) { var t = $('#toast'); t.textContent = m; t.classList.add('on'); clearTimeout(tt); tt = setTimeout(function () { t.classList.remove('on'); }, 2400); }
+
+  $('#cadre').addEventListener('click', function (ev) {
+    var b = ev.target.closest('button'); if (!b) return;
+    var it = b.closest('.it'), d = b.dataset;
+    if (d.retour !== undefined) return fermer();
+    if (d.f !== undefined) return filtrer(d.f);
+    if (d.q) return demander(d.q);
+    if (d.grand) return ouvrir(d.grand);
+    if (d.toast) return toast(d.toast);
+    if (d.va) { var c = $('#' + d.va); defiler(c); c.classList.add('eclat'); setTimeout(function () { c.classList.remove('eclat'); }, 1400); return; }
+    if (b.classList.contains('pli')) return plier(it, false);
+    if (b.classList.contains('rp')) return plier(it, true);
+    if (b.classList.contains('mh')) { var m = b.parentNode; m.classList.toggle('ferme'); b.setAttribute('aria-expanded', String(!m.classList.contains('ferme'))); majResume(); forme(); return; }
+    if (d.oui !== undefined) return oui(it);
+    if (d.tard !== undefined) return trancher(it, 'tard');
+    if (d.annuler !== undefined) return annuler(it);
+  });
+  document.addEventListener('keydown', function (ev) { if (ev.key === 'Escape') fermer(); });
+
+  chaines(); tetes(); majResume();
+  fil.scrollTop = fil.scrollHeight; forme();
+  window.addEventListener('load', function () { if (!E.filtre && !$('.rep', bas)) { fil.scrollTop = fil.scrollHeight; forme(); } });
+})();
+</script>
+</body>
+</html>

@@ -169,6 +169,11 @@ install -o root -g root -m 0644 "$ICI/hermes-relance.service" /etc/systemd/syste
 install -o root -g root -m 0644 "$ICI/hermes-relance.timer" /etc/systemd/system/hermes-relance.timer
 install -d -o root -g root -m 0700 /var/lib/hermes-relance
 if id jarvis >/dev/null 2>&1; then install -d -o root -g "$(id -gn jarvis)" -m 0750 /var/lib/hermes-relance-avis; else install -d -o root -g root -m 0750 /var/lib/hermes-relance-avis; fi
+# 0.92.0 : « Hermes et ses routines » en direct dans JARVIS. À chaque passage, hermes-relance écrit un résumé assaini du cron
+# d'Hermes (routines.json) dans un dossier de root lisible par le groupe de JARVIS (750, fichier 640) ; la liste fermée des
+# routines et leurs libellés viennent d'une copie root de routines.conf (jamais lue dans le dépôt par la minuterie).
+install -o root -g root -m 0644 "$ICI/routines.conf" /usr/local/lib/hermes-relance/routines.conf
+if id jarvis >/dev/null 2>&1; then install -d -o root -g "$(id -gn jarvis)" -m 0750 /var/lib/hermes-relance-etat; else install -d -o root -g root -m 0750 /var/lib/hermes-relance-etat; fi
 nft -c -f /etc/hermes/sortie.nft 2>/dev/null && echo "Règles réseau : syntaxe vérifiée." || [ "$BANC" = 1 ] || { echo "Règles réseau refusées par nft : arrêt."; exit 1; }
 if [ "$BANC" != 1 ]; then
   systemctl daemon-reload
