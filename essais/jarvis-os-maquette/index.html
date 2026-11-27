@@ -12861,35 +12861,43 @@ void main(){
       };
     } }
 
-  /* ================= ESSAI « accueil : huit portes » (28/11/2026). Sa demande : « refais la page d'accueil avec la même charte graphique que
-     les autres pages et les couleurs et tout, mais repense la page d'accueil, donne plusieurs propositions » ; des trois organisations
-     montrées (huit portes, tableau de bord, d'abord ce qui t'attend) il retient la première : « 1 mais revisité, il est pas top mais c'est
-     la bonne direction, tu dois la peaufiner ». Rien ne change sans « ?accueil=1 » dans l'adresse. Aucune teinte, aucun effet nouveau :
-     des places et des tailles, et les tuiles de l'écran de JARVIS telles qu'elles sont.
-     Huit tuiles autour du globe, en trois étages : en haut la journée (Agenda, Météo), larges, le texte entier ; de chaque côté du globe ce
-     qui bouge (Pour toi et Travail à gauche, Argent et Hermes à droite), la ligne du bas sur deux lignes ; en bas ce qui se range (Papiers,
-     Réglages), larges. Travail, Hermes et Papiers reprennent le chiffre et la ligne de leur tuile d'Espaces (mêmes données, même appui).
-     Le globe garde sa place au milieu, dégagé ; chaque tuile lui reste reliée (hudLines). ================= */
-  { let huit = false; try { huit = new URLSearchParams(location.search).get('accueil') === '1'; } catch (e) { /* rien */ }
-    if (huit) {
-      document.head.append(h('style', {text: '.hud-8 .hud-core{height:400px;margin-top:12px}'
-        + '.hud-8.hud .hud-ro.q-t1,.hud-8.hud .hud-ro.q-t2,.hud-8.hud .hud-ro.q-b1,.hud-8.hud .hud-ro.q-b2{width:calc(50% - 22px)}'
-        + '.hud-8 .hud-ro.q-t1{left:8px;top:0}.hud-8 .hud-ro.q-t2{right:8px;top:0;animation-delay:-.6s}.hud-8 .hud-ro.q-b1{left:8px;bottom:0;animation-delay:-3s}.hud-8 .hud-ro.q-b2{right:8px;bottom:0;animation-delay:-3.6s}'
-        + '.hud-8.hud .hud-ro.q-l1,.hud-8.hud .hud-ro.q-l2,.hud-8.hud .hud-ro.q-r1,.hud-8.hud .hud-ro.q-r2{width:112px;min-height:84px}'
-        + '.hud-8 .hud-ro.q-l1{left:8px;top:86px;animation-delay:-1.2s}.hud-8 .hud-ro.q-l2{left:8px;bottom:86px;animation-delay:-2.4s}.hud-8 .hud-ro.q-r1{right:8px;top:86px;animation-delay:-1.8s}.hud-8 .hud-ro.q-r2{right:8px;bottom:86px;animation-delay:-.3s}'
-        + '.hud-8 .hud-ro.q-l1 span,.hud-8 .hud-ro.q-l2 span,.hud-8 .hud-ro.q-r1 span,.hud-8 .hud-ro.q-r2 span{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;line-height:1.25}'
-        + '.hud-8.hud .hud-ro.q-l1 b,.hud-8.hud .hud-ro.q-l2 b,.hud-8.hud .hud-ro.q-r1 b,.hud-8.hud .hud-ro.q-r2 b{font-size:15px}'}));
+  /* ================= ESSAI « accueil : les portes autour du globe » (28/11/2026 ; rien ne change sans « ?accueil=1 » dans l'adresse).
+     Ses mots, dans l'ordre : « repense la page d'accueil, donne plusieurs propositions » ; des trois organisations montrées il retient
+     les tuiles autour du globe : « 1 mais revisité, c'est la bonne direction, tu dois la peaufiner » ; puis, la version à huit tuiles vue :
+     « Météo pas besoin de son bloc, tu peux mettre le texte en petit dans le coin droit en haut ; Réglages, tu mets une petite icône à côté
+     de l'icône de refresh en haut ; Papiers est trop grand, réduis la taille de ces blocs et donne à chacun une couleur qui va dans le thème
+     mais qui matche le contenu ».
+     Donc : six tuiles compactes, trois de chaque côté du globe, reliées à lui (hudLines) : Agenda, Pour toi, Travail à gauche ; Argent, Hermes,
+     Papiers à droite. Travail, Hermes et Papiers reprennent le chiffre et la ligne de leur tuile d'Espaces. La météo devient une ligne sous
+     « en ligne », en haut à droite (un appui l'ouvre, comme la tuile d'avant). Réglages : une roue dans l'en-tête, après le rafraîchissement.
+     Les couleurs : celles de la palette du thème, une par contenu (--c1 ciel : Agenda ; --c3 violet : Travail ; le vert « en ligne » : Argent ;
+     --c4 indigo : Hermes ; --c9 glace : Papiers) ; l'orange reste à ce qui l'attend (Pour toi, et toute tuile où quelque chose l'attend). ================= */
+  { let portes = false; try { portes = new URLSearchParams(location.search).get('accueil') === '1'; } catch (e) { /* rien */ }
+    if (portes) {
+      document.head.append(h('style', {text: '.hud-8 .hud-core{height:318px;margin-top:10px}'
+        + '.hud-8.hud .hud-ro{width:124px;padding:6px 9px 7px;box-shadow:0 0 18px rgba(var(--c1),.18),inset 0 0 14px rgba(var(--c1),.08)}.hud-8.hud .hud-ro b{font-size:14px;margin-top:2px}.hud-8 .hud-ro small{font-size:10px;letter-spacing:.15em}'
+        + '.hud-8 .hud-ro span{font-size:11px;line-height:1.25;white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}'
+        + '.hud-8 .hud-ro.q-l1{left:8px;top:0}.hud-8 .hud-ro.q-l2{left:8px;top:calc(50% - 33px);animation-delay:-1.2s}.hud-8 .hud-ro.q-l3{left:8px;bottom:0;animation-delay:-2.4s}'
+        + '.hud-8 .hud-ro.q-r1{right:8px;top:0;animation-delay:-.6s}.hud-8 .hud-ro.q-r2{right:8px;top:calc(50% - 33px);animation-delay:-1.8s}.hud-8 .hud-ro.q-r3{right:8px;bottom:0;animation-delay:-3s}'
+        + '.hud-8 .hud-ro[data-k="TRAVAIL"]:not(.amb){--c1:var(--c3);--c2:196,160,255}.hud-8 .hud-ro[data-k="ARGENT"]:not(.amb){--c1:52,211,153;--c2:110,231,183}'
+        + '.hud-8 .hud-ro[data-k="HERMES"]:not(.amb){--c1:var(--c4);--c2:165,180,252}.hud-8 .hud-ro[data-k="PAPIERS"]:not(.amb){--c1:var(--c9);--c2:var(--c9)}'
+        + '.hud-met{display:block;margin:5px 0 0 auto;padding:0;background:none;border:0;font:500 12px var(--sans);letter-spacing:.02em;color:var(--muted);text-align:right;white-space:nowrap;cursor:pointer}.hud-met b{color:var(--fg);font-weight:600}'}));
       const VA_8 = VIEWS.accueil;
       const ro = (pos, act, k, b, sub, amb) => h('button', {type: 'button', class: 'hud-ro q-' + pos + (amb ? ' amb' : ''), 'data-k': k, onclick: act}, h('small', {text: k}), h('b', {text: b}), h('span', {text: sub}));
+      /* Réglages : une roue dans l'en-tête, après le rafraîchissement (une seule fois) */
+      { const tools = document.getElementById('top-tools'); if (tools && !document.getElementById('regl-btn')) tools.append(h('button', {type: 'button', class: 'btn icon-btn', id: 'regl-btn', 'aria-label': 'Réglages', title: 'Réglages', onclick: () => go('reglages'), html: icon('gear', 18)})); }
       VIEWS.accueil = (el) => {
         VA_8(el);
         const hud = el.querySelector('section.hud'), core = hud && hud.querySelector('.hud-core'); if (!core || hud.classList.contains('hud-8')) return;
         const esp = h('div'); try { VIEWS.espaces(esp); } catch (e) { /* rien */ }
-        const tx = (n, c) => ((n && n.querySelector(c) && n.querySelector(c).textContent) || '').trim();
+        const tx = (n, c) => ((n && n.querySelector(c) && n.querySelector(c).textContent) || '').trim(), R = (k) => core.querySelector('.hud-ro[data-k="' + k + '"]');
         const deTuile = (id, nom, pos) => { const t = esp.querySelector('.esp-tile[data-go="' + id + '"]'); return t ? ro(pos, () => go(id), nom, tx(t, '.esp-v') || '—', tx(t, '.esp-s'), t.classList.contains('amb')) : null; };
         hud.classList.add('hud-8');
-        [['AGENDA', 't1'], ['MÉTÉO', 't2'], ['POUR TOI', 'l1'], ['ARGENT', 'r1'], ['BONS PRIX', 'r1']].forEach(([k, p]) => { const n = core.querySelector('.hud-ro[data-k="' + k + '"]'); if (n) { n.classList.remove('q-tl', 'q-tr', 'q-bl', 'q-br'); n.classList.add('q-' + p); } });
-        core.append(deTuile('travail', 'TRAVAIL', 'l2'), deTuile('equipe', 'HERMES', 'r2'), deTuile('papiers', 'PAPIERS', 'b1'), ro('b2', () => go('reglages'), 'RÉGLAGES', 'Serveur et accès', 'voix, notifications, Google, mémoire'));
+        /* la météo : une ligne sous « en ligne » ; sa tuile sort du globe mais garde son appui */
+        { const met = R('MÉTÉO'), on = hud.querySelector('.hud-on'); if (met && on) { met.remove(); const t = tx(met, 'b'), sub = tx(met, 'span');
+            on.append(h('button', {type: 'button', class: 'hud-met', 'aria-label': 'Météo', onclick: () => met.click()}, t && t !== '—' ? h('b', {text: t}) : null, (t && t !== '—' ? ' · ' : '') + sub)); } }
+        [['AGENDA', 'l1'], ['POUR TOI', 'l2'], ['ARGENT', 'r1'], ['BONS PRIX', 'r1']].forEach(([k, p]) => { const n = R(k); if (n) { n.classList.remove('q-tl', 'q-tr', 'q-bl', 'q-br'); n.classList.add('q-' + p); } });
+        core.append(deTuile('travail', 'TRAVAIL', 'l3'), deTuile('equipe', 'HERMES', 'r2'), deTuile('papiers', 'PAPIERS', 'r3'));
         requestAnimationFrame(() => requestAnimationFrame(() => { try { hudLines(); } catch (e) { /* rien */ } }));
       };
     } }
