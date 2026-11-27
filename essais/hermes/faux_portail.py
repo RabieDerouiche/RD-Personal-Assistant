@@ -10,7 +10,7 @@ requête utile) : le banc y lit si Hermes s'est connecté, ce qu'il a ouvert, et
 
 Identifiants du banc : banc@exemple.test / un mot de passe passé par --mot-de-passe (inventé par le banc).
 """
-import argparse, base64, hashlib, hmac, html, json, secrets, ssl, struct, time
+import argparse, base64, hashlib, hmac, html, json, re, secrets, ssl, struct, time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs
 
@@ -33,6 +33,7 @@ DEPENSES = [('FRAIS-0001', 'Abonnement logiciel (inventé)', '20,00 €', 'Valid
 ETAPES = {}            # jeton d'étape (mot de passe accepté, code attendu) -> heure de fin
 FEUILLES = {}          # feuilles de temps du banc : date du lundi (MM/JJ/AAAA) -> quantités et état
 ACTIVITES = {}         # 26/11/2026 : comptes rendus d'activité du mois (AAAA-MM) -> {date: [matin, après-midi]}, statut
+SIGNES = {}            # 0.97.0 : CRA signés du client déposés (AAAA-MM) -> [(nom du fichier, taille, empreinte SHA-256)]
 
 
 def activite_du_mois(m):
@@ -161,7 +162,8 @@ class P(BaseHTTPRequestHandler):
             m = (q.get('mois') or ['2026-11'])[0][:7]; A = activite_du_mois(m)
             note(evenement='activite', mois=m, statut=A['statut'])
             lignes = ''.join('<tr><td>%s</td><td class="matin">%s</td><td class="apres-midi">%s</td></tr>' % (d, html.escape(v[0]), html.escape(v[1])) for d, v in sorted(A['cases'].items()))
-            return self.rendre(200, page('Compte rendu d’activité (banc)',
+            onglets = '<nav id="onglets"><a id="onglet-saisie" href="/activite?mois=%s">Saisie</a> · <a id="onglet-signe" href="/activite/signe?mois=%s">CRA signé du client</a></nav>' % (html.escape(m), html.escape(m))
+            return self.rendre(200, page('Compte rendu d’activité (banc)', onglets +
                 '<p>Mois : %s · Statut : <b id="statut">%s</b> · Fin de mission : <span id="fin">30/11/2026</span></p>'
                 '<table id="mois"><tr><th>Jour</th><th>Matin</th><th>Après-midi</th></tr>%s</table>'
                 '<form method="post" action="/activite/case" id="case"><input name="mois" id="c_mois" value="%s"><input name="date" id="c_date">'
@@ -170,6 +172,20 @@ class P(BaseHTTPRequestHandler):
                 '<button type="submit" id="c_ok">OK</button></form>'
                 '<form method="post" action="/activite/valider"><input type="hidden" name="mois" value="%s"><button type="submit" id="valider">Valider ce compte rendu d’activité</button></form>'
                 % (html.escape(m), html.escape(A['statut']), lignes, html.escape(m), html.escape(m))))
+        if chemin == '/activite/signe':   # 0.97.0 : l'onglet du haut de la page du mois, où se dépose le CRA signé du client
+            q = parse_qs(self.path.split('?', 1)[1]) if '?' in self.path else {}
+            m = (q.get('mois') or ['2026-11'])[0][:7]
+            docs = SIGNES.get(m, [])
+            note(evenement='activite-signe', mois=m, deposes=len(docs))
+            lignes = ''.join('<li class="document">%s (%d octets)</li>' % (html.escape(n), t) for n, t, _ in docs) or '<li id="aucun">Aucun document déposé</li>'
+            return self.rendre(200, page('CRA signé du client (banc)',
+                '<nav id="onglets"><a id="onglet-saisie" href="/activite?mois=%s">Saisie</a> · <b id="onglet-signe">CRA signé du client</b></nav>'
+                '<p>Mois : <span id="mois-signe">%s</span></p><ul id="documents">%s</ul>'
+                '<form method="post" action="/activite/signe/deposer?mois=%s" enctype="multipart/form-data" id="depot">'
+                '<label>CRA signé (PDF) <input type="file" name="fichier" id="fichier_signe" accept="application/pdf"></label> '
+                '<button type="submit" id="deposer">Déposer</button></form>'
+                '<form method="post" action="/activite/valider"><input type="hidden" name="mois" value="%s"><button type="submit" id="valider">Valider ce compte rendu d’activité</button></form>'
+                % (html.escape(m), html.escape(m), lignes, html.escape(m), html.escape(m))))
         if chemin == '/deconnexion':
             SESSIONS.pop(s, None)
             note(evenement='deconnexion')
@@ -178,6 +194,24 @@ class P(BaseHTTPRequestHandler):
 
     def do_POST(self):
         chemin = self.path.split('?')[0]
+        if chemin == '/activite/signe/deposer':   # 0.97.0 : le dépôt du CRA signé (un formulaire « multipart » : le fichier entier, 2 Mo au plus ici)
+            corps = self.rfile.read(min(int(self.headers.get('Content-Length') or 0), 2000000))
+            if not self.session():
+                return self.vers('/connexion')
+            q = parse_qs(self.path.split('?', 1)[1]) if '?' in self.path else {}
+            m = (q.get('mois') or [''])[0][:7]
+            limite = re.search(r'boundary=("?)([^";]+)\1', self.headers.get('Content-Type') or '')
+            nom, octets = '', b''
+            for bloc in (corps.split(b'--' + limite.group(2).encode()) if limite else []):
+                tete, _, reste = bloc.partition(b'\r\n\r\n')
+                f = re.search(rb'name="fichier"; filename="([^"]*)"', tete)
+                if f:
+                    nom, octets = f.group(1).decode('utf-8', 'replace'), reste[:-2] if reste.endswith(b'\r\n') else reste
+            if not octets:
+                note(evenement='CRA-SIGNE-VIDE', mois=m); return self.vers('/activite/signe?mois=' + m)
+            SIGNES.setdefault(m, []).append((nom, len(octets), hashlib.sha256(octets).hexdigest()))
+            note(evenement='CRA-SIGNE-DEPOT', mois=m, nom=nom, taille=len(octets), empreinte=hashlib.sha256(octets).hexdigest(), pdf=octets[:5] == b'%PDF-')
+            return self.vers('/activite/signe?mois=' + m)
         n = min(int(self.headers.get('Content-Length') or 0), 65536)
         champs = {k: v[0] for k, v in parse_qs(self.rfile.read(n).decode('utf-8', 'replace')).items()}
         if chemin == '/connexion':

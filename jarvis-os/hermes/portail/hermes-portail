@@ -19,6 +19,8 @@
 #   sudo hermes-portail ndf-auto | ndf etat        (la minuterie de 5 minutes : une note validée dans JARVIS, ou d'une sorte déjà validée une fois, créée pour de vrai)
 #   sudo hermes-portail cra-auto                   (la minuterie : une semaine confirmée dans JARVIS, saisie et soumise ; compte rendu pour JARVIS ; rien sans /etc/hermes-portail/cra.conf)
 #   sudo hermes-portail cra-mois-auto              (la minuterie : le 26 ou après, le mois validé dans JARVIS, complété et validé par Hermes ; rien sans « adresse_mois= » dans cra.conf)
+#   sudo hermes-portail cra-signe <adresse> --mois <AAAA-MM> (--a-blanc | --fichier <pdf de root>)   (le CRA signé du client sur la page du mois : --a-blanc trouve où il se dépose sans rien déposer ; --fichier le dépose, une fois)
+#   sudo hermes-portail cra-signe-auto             (la minuterie : le PDF gardé par JARVIS, vérifié à blanc sur le portail, puis déposé après son oui dans JARVIS ; rien sans « adresse_mois= » dans cra.conf)
 #   sudo hermes-portail notes [ajouter <hôte> "<texte>" | oublier <hôte> [numéro]]   (ce qu'Hermes a appris d'un portail, relu à chaque passage)
 #   sudo hermes-portail cle                        (remet la clé du coffre d'Hermes en mémoire vive, depuis jarvis-coffre)
 #   sudo hermes-portail fermer                     (efface la clé de la mémoire vive)
@@ -58,7 +60,7 @@ if [ "$SYSTEMD" = 0 ]; then   # banc seulement (pas de systemd) : un faux JARVIS
 fi
 HOTE='^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$'
 
-usage() { sed -n '4,25p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,3\}//'; exit "${1:-1}"; }
+usage() { sed -n '4,27p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,3\}//'; exit "${1:-1}"; }
 [ "$(id -u)" = 0 ] || { echo "À lancer en root : sudo hermes-portail ${1:-etat}"; exit 1; }
 id "$U" >/dev/null 2>&1 && [ -x "$H/.local/bin/hermes" ] || { echo "Hermes « portail » n'est pas installé : sudo bash /opt/rd/jarvis-os/hermes/portail/install.sh"; exit 1; }
 terminal() { [ -t 0 ] || { echo "À lancer dans un vrai terminal (Termius) : cette commande demande une saisie."; exit 1; }; }
@@ -421,6 +423,152 @@ FIN
 
 # Une commande recopiée depuis l'iPhone arrive parfois avec des espaces insécables : les mots restent collés et rien
 # n'est reconnu (vu le 25/11/2026 : « domaines ajouter » a affiché l'aide). On les rend à des espaces ordinaires.
+# ---- 0.97.0 : le CRA signé du client, déposé sur le portail par Hermes après son oui (son QCM du 26/11/2026 : « Hermes, après mon oui » ;
+# un essai à blanc d'abord, sa validation la première fois). JARVIS garde le PDF reçu de son contact (son dossier de données,
+# « cra-signe/ », et jours.json : mois[AAAA-MM].suivi.cra.signe = fichier, empreinte SHA-256, puis son oui). Ici, root :
+#   1. recopie le PDF chez lui ($SIGNE/<mois>/signe.pdf) sans jamais suivre de lien, en revérifiant « %PDF- », la taille et l'empreinte ;
+#   2. fait un passage À BLANC (aucun fichier remis à Hermes) : où se dépose le CRA signé, ce que la page dit du mois ; compte rendu pour
+#      JARVIS : pret, deja, introuvable ou echec ;
+#   3. après son oui (même empreinte, même mois), fait le dépôt RÉEL, une seule fois par oui ; compte rendu : depose, deja ou echec.
+# Jamais avant que le CRA du mois soit validé par Hermes ; rien sans « adresse_mois= » ; ni nom de portail ni adresse dans un compte rendu.
+SIGNE=$VAR/cra-signe
+signe_choisir() {   # signe_choisir <données de JARVIS> <aujourd'hui> : ce qu'il y a à faire (une ligne « RIEN … », « REFUS … », « BLANC … » ou « REEL … »)
+  python3 -I - "$1" "$SIGNE" "$VAR/cra/mois-valides.txt" "$RETOURS" "$2" <<'PY'
+import datetime, hashlib, json, os, re, sys
+donnees, S, valides_f, retours, auj = sys.argv[1:6]
+NOMS = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"]
+MAX = 15 * 1024 * 1024
+libelle = lambda ym: NOMS[int(ym[5:7]) - 1] + " " + ym[:4]
+def dire(t): print("RIEN " + t); sys.exit(0)
+def lignes(f):
+    try: return {l.strip() for l in open(f, encoding="utf-8") if l.strip()}
+    except OSError: return set()
+def noter(f, ligne):
+    fd = os.open(f, os.O_WRONLY | os.O_CREAT | os.O_APPEND | os.O_NOFOLLOW, 0o600)
+    os.write(fd, (ligne + "\n").encode()); os.close(fd)
+def ordinaire(fd):
+    st = os.fstat(fd)
+    return (st.st_mode & 0o170000) == 0o100000 and st.st_nlink == 1 and 0 < st.st_size <= MAX
+def lire_garde(nom):
+    """Le PDF gardé par JARVIS : ni le dossier « cra-signe » ni le fichier ne sont suivis s'ils sont des liens ; un fichier ordinaire."""
+    try: d = os.open(os.path.join(donnees, "cra-signe"), os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+    except OSError: raise ValueError("le dossier du PDF gardé par JARVIS est absent, ou c’est un lien")
+    try:
+        try: fd = os.open(nom, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=d)
+        except OSError: raise ValueError("le PDF gardé par JARVIS est absent, ou c’est un lien")
+    finally: os.close(d)
+    with os.fdopen(fd, "rb") as f:
+        if not ordinaire(f.fileno()): raise ValueError("le PDF gardé par JARVIS n’est pas un fichier ordinaire de 15 Mo au plus")
+        return f.read(MAX + 1)
+def lire_copie(d):
+    try: fd = os.open(os.path.join(d, "signe.pdf"), os.O_RDONLY | os.O_NOFOLLOW)
+    except OSError: return b""
+    with os.fdopen(fd, "rb") as f: return f.read(MAX + 1) if ordinaire(f.fileno()) else b""
+try: a = datetime.date.fromisoformat(auj)
+except ValueError: dire("date du jour illisible.")
+mois = []; p = a.replace(day=1)
+for _ in range(3):
+    mois.append("%04d-%02d" % (p.year, p.month)); p = (p - datetime.timedelta(days=1)).replace(day=1)
+try:
+    fd = os.open(os.path.join(donnees, "jours.json"), os.O_RDONLY | os.O_NOFOLLOW)   # jamais un lien (posé par l’utilisateur de JARVIS vers un fichier de root)
+    st = os.fstat(fd)
+    if (st.st_mode & 0o170000) != 0o100000 or st.st_size > 4000000: os.close(fd); dire("jours.json n’est pas un fichier ordinaire : ignoré.")
+    D = json.load(os.fdopen(fd, encoding="utf-8"))
+except Exception:
+    dire("jours.json absent ou illisible.")
+M = D.get("mois") if isinstance(D, dict) else None
+M = M if isinstance(M, dict) else {}
+tentes, deposes = lignes(os.path.join(S, "tentes.txt")), {l.split()[0] for l in lignes(os.path.join(S, "deposes.txt"))}
+valides = {l.split()[0] for l in lignes(valides_f)}
+def cra_valide(ym):
+    """Le CRA du mois validé par Hermes : le registre de root, ou son compte rendu (« validee », « deja »)."""
+    if ym in valides: return True
+    try:
+        fd = os.open(os.path.join(retours, "mois-%s.json" % ym), os.O_RDONLY | os.O_NOFOLLOW)
+        with os.fdopen(fd, encoding="utf-8") as f: return json.load(f).get("resultat") in ("validee", "deja")
+    except Exception: return False
+raisons = []
+for ym in sorted(mois):
+    x = M.get(ym); s = ((x.get("suivi") or {}) if isinstance(x, dict) else {}).get("cra")
+    g = s.get("signe") if isinstance(s, dict) else None
+    if not isinstance(g, dict): continue
+    L = libelle(ym)
+    if s.get("rattache"): raisons.append(L + " : déjà rattaché"); continue
+    if g.get("moi"): raisons.append(L + " : il le dépose lui-même"); continue
+    nom, emp = g.get("fichier"), g.get("empreinte")
+    if not isinstance(nom, str) or not re.fullmatch(r"[0-9a-f]{32}\.pdf", nom) or not isinstance(emp, str) or not re.fullmatch(r"[0-9a-f]{64}", emp):
+        raisons.append(L + " : aucun PDF gardé par JARVIS"); continue
+    if ym in deposes: raisons.append(L + " : déjà déposé par Hermes"); continue
+    if not cra_valide(ym): raisons.append(L + " : le CRA du mois n’est pas encore validé par Hermes"); continue
+    d = os.path.join(S, ym)
+    try: P = json.load(open(os.path.join(d, "prepare.json")))
+    except (OSError, ValueError): P = {}
+    if P.get("empreinte") != emp:   # pas encore recopié chez root (ou JARVIS garde un autre fichier) : la copie, vérifiée
+        cle = "copie %s %s" % (ym, emp)
+        if cle in tentes: raisons.append(L + " : ce PDF a déjà été refusé"); continue
+        try:
+            buf = lire_garde(nom)
+            if buf[:5] != b"%PDF-": raise ValueError("le fichier gardé par JARVIS n’est pas un PDF")
+            if len(buf) > MAX: raise ValueError("le PDF dépasse 15 Mo")
+            if hashlib.sha256(buf).hexdigest() != emp: raise ValueError("le PDF gardé par JARVIS ne correspond plus à son empreinte")
+        except ValueError as e:
+            noter(os.path.join(S, "tentes.txt"), cle)
+            print("REFUS %s %s 0 %s : rien déposé." % (ym, emp, str(e)[0].upper() + str(e)[1:])); sys.exit(0)
+        os.makedirs(d, mode=0o700, exist_ok=True)
+        for f in ("etat", "signe.pdf", "prepare.json"):
+            try: os.unlink(os.path.join(d, f))
+            except OSError: pass
+        fd = os.open(os.path.join(d, "signe.pdf"), os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600); os.write(fd, buf); os.close(fd)
+        fd = os.open(os.path.join(d, "prepare.json"), os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+        os.write(fd, json.dumps({"mois": ym, "empreinte": emp, "taille": len(buf)}).encode()); os.close(fd)
+    cb = "blanc %s %s" % (ym, emp)
+    if cb not in tentes: print("BLANC %s %s" % (ym, emp)); sys.exit(0)
+    try: etat = open(os.path.join(d, "etat")).read().strip()
+    except OSError: etat = ""
+    if etat != "pret": raisons.append(L + " : essai à blanc déjà fait (" + (etat or "sans résultat") + ")"); continue
+    oui = g.get("oui"); at = oui.get("at") if isinstance(oui, dict) else None
+    if not isinstance(oui, dict): raisons.append(L + " : prêt, attend son oui dans JARVIS"); continue
+    if oui.get("empreinte") != emp or oui.get("mois") != ym or not isinstance(at, (int, float)) or isinstance(at, bool):
+        raisons.append(L + " : son oui porte sur un autre fichier ou un autre mois : refusé"); continue
+    cr = "reel %s %s %d" % (ym, emp, int(at))
+    if cr in tentes: raisons.append(L + " : déjà tenté pour ce oui"); continue
+    copie = lire_copie(d)
+    if copie[:5] != b"%PDF-" or hashlib.sha256(copie).hexdigest() != emp:   # jamais un autre fichier que celui dont l’empreinte a reçu son oui
+        noter(os.path.join(S, "tentes.txt"), cr)
+        print("REFUS %s %s 1 La copie du PDF a changé depuis son oui : rien déposé." % (ym, emp)); sys.exit(0)
+    print("REEL %s %s %d" % (ym, emp, int(at))); sys.exit(0)
+dire((" ; ".join(raisons) or "aucun CRA signé gardé par JARVIS") + ".")
+PY
+}
+signe_retour() {   # signe_retour <mois> <empreinte> <état> <réel : true|false> <première : true|false> <texte> : le compte rendu pour JARVIS (root 640)
+  local groupe; groupe=$(id -gn "$JARVIS_U" 2>/dev/null) || groupe=root
+  install -d -o root -g "$groupe" -m 0750 "$RETOURS"; chown root:"$groupe" "$RETOURS"; chmod 0750 "$RETOURS"
+  python3 -I - "$RETOURS/signe-$1.json" "$@" <<'PY'
+import json, os, sys, time
+dest, mois, emp, etat, reel, premiere, texte = sys.argv[1:8]
+tmp = dest + ".tmp"
+fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o640)
+os.write(fd, json.dumps({"mois": mois, "etat": etat, "reel": reel == "true", "empreinte": emp, "texte": " ".join(texte.split())[:300], "premiere": premiere == "true" and etat == "depose",
+                         "at": int(time.time() * 1000)}, ensure_ascii=False).encode()); os.close(fd)
+os.replace(tmp, dest)
+PY
+  chown root:"$groupe" "$RETOURS/signe-$1.json"; chmod 0640 "$RETOURS/signe-$1.json"
+}
+signe_texte() {   # signe_texte <sortie du passage> <hôte du portail> : ce qu'Hermes dit de la page, sans adresse, sans hôte ni nom tiré de l'hôte, sans adresse mail ; 300 caractères
+  python3 -I - "$1" "$2" <<'PY'
+import re, sys
+src, hote = sys.argv[1:3]
+lignes = [re.sub(r"\x1b\[[0-9;?]*[A-Za-z]", "", l).strip() for l in open(src, encoding="utf-8", errors="replace")]
+corps = [l for l in lignes if l and not l.startswith(("==", "(gardé", "Notes gardées", "session_id", "-- systemd", "MODE ")) and not re.match(r"^[-*•\s]*(Appris|R[ée]sultat|Connexion|Page d.arriv[ée]e)\s*:", l)]
+t = " ".join(corps)
+t = re.sub(r"\bhttps?://\S+", "(adresse)", t, flags=re.I); t = re.sub(r"\S+@\S+\.\S+", "(adresse)", t)
+t = re.sub(r"\b(?:[a-z0-9-]+\.)+[a-z]{2,}\b(?:/\S*)?", "(adresse)", t, flags=re.I)
+for mot in [m for m in re.split(r"[.-]", hote) if len(m) >= 4 and m not in ("portail", "intranet", "extranet", "client", "espace", "login", "compte")]:
+    t = re.sub(re.escape(mot), "(portail)", t, flags=re.I)
+print(" ".join(t.split())[-300:])
+PY
+}
+
 case "$*" in *$'\xc2\xa0'*|*$'\xe2\x80\xaf'*)
   set -f; set -- $(printf '%s ' "$@" | sed -e 's/\xc2\xa0/ /g' -e 's/\xe2\x80\xaf/ /g'); set +f ;;
 esac
@@ -997,6 +1145,140 @@ os.replace(tmp, dest)
     python3 -I "$LIB/limite.py" aviser --cle "cra-mois-$mois" --titre "$titre" --texte "$texte" > /dev/null 2>&1 || echo "Avis pour JARVIS pas posé."
     cat "$out"; rm -f "$out"
     echo "Avis pour JARVIS : $titre"
+    exit 0 ;;
+  cra-signe)
+    # Le CRA signé du client sur la page du compte rendu d'activité du mois (0.97.0 ; son QCM du 26/11/2026 : « Hermes, après mon oui »).
+    # --a-blanc : AUCUN fichier n'est remis à Hermes (il ne peut donc rien déposer) : il trouve où se dépose le CRA signé et dit ce que la
+    # page montre. Sans --a-blanc : UN fichier de root (un vrai PDF de 15 Mo au plus, jamais un lien), remis dans le dépôt le temps du
+    # passage sous un nom fixe. La consigne est écrite ici ; rien ne vient d'un mail (le nom du fichier reçu n'est jamais utilisé).
+    [ $# -ge 1 ] || usage
+    adresse=$1; shift; mois=""; fichier=""; blanc=0; joint=""
+    while [ $# -gt 0 ]; do case "$1" in
+      --mois) mois=${2:-}; shift 2 ;; --fichier) fichier=${2:-}; shift 2 ;; --a-blanc) blanc=1; shift ;;
+      *) usage ;; esac; done
+    [[ "$adresse" =~ ^https?://[A-Za-z0-9._:/?=%\&~+-]+$ ]] || { echo "Adresse attendue (https://…)."; exit 1; }
+    hote=$(hote_de "$adresse") || { echo "Adresse attendue (https://…)."; exit 1; }
+    [[ "$mois" =~ ^[0-9]{4}-(0[1-9]|1[0-2])$ ]] || { echo "Mois attendu : AAAA-MM."; exit 1; }
+    libelle=$(python3 -I -c 'import sys; m = sys.argv[1]; print(["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"][int(m[5:7]) - 1] + " " + m[:4])' "$mois")
+    if [ $blanc = 0 ]; then
+      [ -n "$fichier" ] && [ -f "$fichier" ] && [ ! -L "$fichier" ] && [ "$(stat -c %U "$fichier")" = root ] && [ "$(wc -c < "$fichier")" -le 15728640 ] && [ "$(head -c 5 "$fichier")" = "%PDF-" ] \
+        || { echo "Refus : le fichier à déposer doit être un PDF de root, de 15 Mo au plus, jamais un lien."; echo "Résultat CRA signé : echec"; exit 1; }
+    fi
+    cle; rc=$?; [ $rc = 0 ] || { echo "Résultat CRA signé : coffre"; exit $rc; }   # coffre verrouillé : rien tenté (cra-signe-auto réessaie au quart d'heure suivant)
+    install -d -o root -g root -m 0700 "$VAR/essais"
+    consigne="$H/.consigne"; sortie="$VAR/essais/$(date +%Y-%m-%d_%H%M%S)-cra-signe.txt"; rm -f "$consigne"
+    install -d -o root -g "$U" -m 0750 "$DEPOT"; rm -f "$DEPOT"/CRA-signe-*.pdf
+    if [ $blanc = 0 ]; then joint="$DEPOT/CRA-signe-$mois.pdf"; install -o root -g "$U" -m 0640 "$fichier" "$joint"; fi
+    { if [ $blanc = 1 ]; then
+        echo "MODE DÉPÔT À BLANC, selon ta skill « portail » (section « CRA signé du client »). Adresse : $adresse"
+        echo "Mois : $libelle."
+        echo "Aucun fichier ne t'est remis : tu ne déposes rien et tu ne cliques aucun bouton de dépôt, d'envoi, d'enregistrement ni de validation."
+        echo "Tu ouvres la page du compte rendu d'activité de ce mois, tu trouves où se dépose le CRA signé du client (il dit : l'onglet du haut"
+        echo "de la page du CRA), tu dis ce que la page montre pour ce mois, et si un CRA signé y est déjà déposé."
+      else
+        echo "MODE DÉPÔT, selon ta skill « portail » (section « CRA signé du client »). Adresse : $adresse"
+        echo "Mois : $libelle."
+        echo "Fichier à déposer (le seul fichier permis, avec upload_file) : $joint"
+        echo "Il a dit oui pour ce fichier et ce mois. Tu déposes ce fichier-là, une seule fois, à l'endroit prévu pour le CRA signé du client sur"
+        echo "la page de ce mois, tu vérifies qu'il apparaît, et tu ne touches à rien d'autre : aucune case, aucune validation, aucun autre document."
+      fi
+      notes_pour_consigne "$hote"
+      [ "$SYSTEMD" = 0 ] && [ -n "${HERMES_BANC_CONSIGNE_EN_PLUS:-}" ] && cat "$HERMES_BANC_CONSIGNE_EN_PLUS"   # banc seulement : la suite d'appels du faux modèle
+      echo "Termine par l'étape « Avant de finir » de ta skill (l'attente qui enregistre la session), puis réponds."
+    } > "$consigne"
+    chown "$U:$U" "$consigne"; chmod 0600 "$consigne"
+    rm -rf "$RECU"
+    debut=$(date +%s); lancer_agent "$consigne" "$sortie"; rc=$?
+    rm -f "$consigne"; [ -n "$joint" ] && rm -f "$joint"; chmod 0600 "$sortie" 2>/dev/null
+    echo "== CRA signé$( [ $blanc = 1 ] && echo ' à blanc') du $(date '+%d/%m/%Y %H:%M'), $libelle ($(( $(date +%s) - debut )) s, code $rc)"
+    propre < "$sortie" | grep -v '^session_id:' | tail -40
+    echo "(gardé dans $sortie, lisible par root seul)"
+    notes_apprises "$hote" "$sortie"
+    dit=$(propre < "$sortie" | sed -nE 's/^[[:space:]*•-]*R[ée]sultat[[:space:]]*:[[:space:]]*(.+)$/\1/p' | tail -1 | tr '[:upper:]' '[:lower:]')
+    case "$dit" in
+      *"déjà déposé"*|*"deja depose"*) res=deja ;;
+      *introuvable*) res=introuvable ;;
+      *"rien déposé"*|*"rien depose"*|*"pas déposé"*|*"pas depose"*) res=echec ;;
+      *blanc*) res=blanc ;;
+      *"déposé"*|*depose*) res=depose ;;
+      *) res=echec ;;
+    esac
+    [ $blanc = 1 ] && [ "$res" = depose ] && res=echec   # à blanc, aucun fichier n'a été remis : rien ne peut avoir été déposé
+    [ $blanc = 0 ] && { [ "$res" = blanc ] || [ "$res" = introuvable ]; } && res=echec
+    echo "Texte CRA signé : $(signe_texte "$sortie" "$hote")"
+    echo "Résultat CRA signé : $res"
+    case "$res" in depose|deja|blanc) exit 0 ;; *) exit 4 ;; esac ;;
+  cra-signe-auto)
+    # La minuterie du CRA signé (0.97.0 ; toutes les 15 minutes, hermes-portail-cra-signe.timer). Rien sans « adresse_mois= » dans cra.conf,
+    # rien avant que le CRA du mois soit validé par Hermes, rien sans PDF gardé par JARVIS. Un passage au plus par lancement : la copie
+    # vérifiée et l'essai à blanc d'abord ; le dépôt réel seulement après son oui dans JARVIS (même empreinte, même mois), une tentative
+    # par oui. Coupé par la limite du forfait avant tout contact avec le portail : pas compté, une relance (comme cra-mois-auto).
+    conf="$ETC/cra.conf"; [ -f "$conf" ] || exit 0
+    adresse=$(sed -n 's/^adresse_mois=//p' "$conf" | head -1); donnees=$(sed -n 's/^jarvis_donnees=//p' "$conf" | head -1); donnees=${donnees:-/home/$JARVIS_U/.jarvis}
+    [ -n "$adresse" ] || exit 0   # sans l'adresse du compte rendu d'activité : rien
+    [[ "$adresse" =~ ^https?://[A-Za-z0-9._:/?=%\&~+-]+$ ]] || { echo "cra.conf : adresse_mois illisible."; exit 1; }
+    install -d -o root -g root -m 0700 "$VAR/cra" "$SIGNE"; touch "$VAR/cra/mois-valides.txt" "$SIGNE/tentes.txt" "$SIGNE/deposes.txt"; chmod 0600 "$VAR/cra/mois-valides.txt" "$SIGNE/tentes.txt" "$SIGNE/deposes.txt"
+    exec 9> "$SIGNE/.verrou"; flock -n 9 || exit 0
+    exec 8> "$VAR/cra/.verrou-mois"; flock -n 8 || exit 0   # jamais en même temps que le CRA du mois : c'est la même page du portail
+    [ "$SYSTEMD" = 1 ] && systemctl is-active --quiet hermes-portail-essai.service && exit 0   # un autre passage d'Hermes tourne : au quart d'heure suivant
+    limite_attente && exit 0   # la limite du forfait tient encore : rien tenté avant sa levée
+    aujourdhui=$(TZ=Europe/Paris date +%F); [ "$SYSTEMD" = 0 ] && [ -n "${HERMES_BANC_AUJOURDHUI:-}" ] && aujourdhui=$HERMES_BANC_AUJOURDHUI
+    choix=$(signe_choisir "$donnees" "$aujourdhui")
+    read -r quoi mois emp reste <<< "$choix"
+    case "$quoi" in
+      REFUS)   # le PDF n'est pas recopiable (lien, plus le même fichier) ou la copie a changé depuis son oui : dit une fois à JARVIS, rien déposé
+        reel=false; [ "${reste%% *}" = 1 ] && reel=true
+        signe_retour "$mois" "$emp" echec "$reel" false "${reste#* }"
+        echo "CRA signé de $mois : ${reste#* }"; exit 0 ;;
+      BLANC|REEL) ;;
+      *) [ -z "${INVOCATION_ID:-}" ] && echo "CRA signé : rien à faire (${choix#RIEN })"   # à la main seulement : la minuterie se tait
+         exit 0 ;;
+    esac
+    [[ "$mois" =~ ^[0-9]{4}-(0[1-9]|1[0-2])$ ]] && [[ "$emp" =~ ^[0-9a-f]{64}$ ]] || { echo "CRA signé : choix illisible."; exit 1; }
+    out=$(mktemp); chmod 0600 "$out"; debut_signe=$(date +%s); limite_txt=""; premiere=false
+    if [ "$quoi" = BLANC ]; then
+      cle_essai="blanc $mois $emp"; reel=false
+      echo "$cle_essai" >> "$SIGNE/tentes.txt"   # un essai à blanc par fichier, noté avant le passage
+      "$0" cra-signe "$adresse" --mois "$mois" --a-blanc > "$out" 2>&1
+    else
+      [[ "$reste" =~ ^[0-9]+$ ]] || { echo "CRA signé : oui illisible."; rm -f "$out"; exit 1; }
+      cle_essai="reel $mois $emp $reste"; reel=true
+      grep -q ' depose$' "$SIGNE/deposes.txt" || premiere=true   # le premier dépôt fait par Hermes : il vérifie sur le portail
+      echo "$cle_essai" >> "$SIGNE/tentes.txt"   # une tentative par oui, notée avant le passage
+      "$0" cra-signe "$adresse" --mois "$mois" --fichier "$SIGNE/$mois/signe.pdf" > "$out" 2>&1
+    fi
+    res=$(sed -n 's/^Résultat CRA signé : //p' "$out" | tail -1); res=${res%% *}; res=${res:-echec}
+    if [ "$res" = coffre ]; then   # jarvis-coffre verrouillé (après un redémarrage) : pas compté, rien dit à JARVIS ; au quart d'heure suivant
+      oter_ligne "$SIGNE/tentes.txt" "$cle_essai"; [ -z "${INVOCATION_ID:-}" ] && cat "$out"; rm -f "$out"; exit 0
+    fi
+    texte=$(sed -n 's/^Texte CRA signé : //p' "$out" | tail -1)
+    if [ "$reel" = false ]; then case "$res" in blanc) etat=pret ;; deja) etat=deja ;; introuvable) etat=introuvable ;; *) etat=echec ;; esac
+    else case "$res" in depose) etat=depose ;; deja) etat=deja ;; *) etat=echec ;; esac; fi
+    if [ "$etat" = echec ]; then   # coupé par la limite avant tout contact avec le portail → repart une fois après la levée
+      case "$(limite_verdict "$debut_signe")" in
+        avant) if limite_planifier cra-signe "$cle_essai" hermes-portail-cra-signe.service; then
+                 oter_ligne "$SIGNE/tentes.txt" "$cle_essai"; cat "$out"; rm -f "$out"; exit 0
+               fi
+               limite_txt=$LIMITE_DEUX ;;
+        apres) limite_txt="$LIMITE_APRES Regarde la page du CRA sur le portail avant de le déposer à la main." ;;
+      esac
+      refus=$(grep -m1 -E '^Refus|verrouillé' "$out" | cut -c1-280)
+      texte=${limite_txt:-${refus:-${texte:-Le passage n’a rien rendu.}}}
+    fi
+    # l'état de l'essai à blanc reste « pret » après un dépôt en échec : un nouveau oui dans JARVIS vaut une nouvelle tentative, une seule
+    if [ "$reel" = false ] || [ "$etat" != echec ]; then echo "$etat" > "$SIGNE/$mois/etat"; chmod 0600 "$SIGNE/$mois/etat"; fi
+    if [ "$etat" = depose ] || [ "$etat" = deja ]; then   # fait : noté à root, la copie du PDF est effacée
+      echo "$mois $(date '+%d/%m/%Y_%H:%M') $emp $etat" >> "$SIGNE/deposes.txt"; rm -f "$SIGNE/$mois/signe.pdf"
+    fi
+    case "$etat" in
+      pret) texte=${texte:-Hermes a trouvé où déposer le CRA signé ; rien n’est déposé.} ;;
+      depose) texte=${texte:-Déposé sur la page du mois.} ;;
+      deja) texte=${texte:-Un CRA signé est déjà déposé pour ce mois : rien de déposé en double.} ;;
+      introuvable) texte=${texte:-Hermes n’a pas trouvé où déposer le CRA signé sur la page du mois.} ;;
+    esac
+    signe_retour "$mois" "$emp" "$etat" "$reel" "$premiere" "$texte"
+    cat "$out"; rm -f "$out"
+    echo "Compte rendu pour JARVIS : CRA signé de $mois, $( [ "$reel" = true ] && echo dépôt || echo 'à blanc' ) : $etat"
     exit 0 ;;
   teletravail)
     # La note de frais de télétravail (26/11/2026, sa décision : Hermes la prépare le dernier jour du mois). À BLANC seulement tant que

@@ -1,0 +1,11 @@
+# JARVIS OS — toutes les 15 minutes : un CRA signé gardé par JARVIS attend-il Hermes ? (hermes-portail-cra-signe.service)
+[Unit]
+Description=CRA signé du client : vérifier toutes les 15 minutes si un PDF gardé par JARVIS attend (à blanc, puis son oui)
+
+[Timer]
+OnBootSec=9min
+OnUnitInactiveSec=15min
+AccuracySec=1min
+
+[Install]
+WantedBy=timers.target

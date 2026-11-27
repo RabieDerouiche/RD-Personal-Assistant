@@ -513,6 +513,151 @@ verif "cra-mois-auto, coupé deux fois avant contact pour le même oui : plus de
 verif "relance après la limite : l'unité du CRA du mois est connue (planifier l'accepte, une inconnue est refusée)" bash -c "d=\$(mktemp -d); echo '{}' > \$d/d.json; python3 -I /usr/local/lib/hermes-portail/limite.py planifier --dossier \$d --tache cra-mois --cle 'x:1' --unite hermes-portail-cra-mois.service --depuis \$d/d.json >/dev/null && ! python3 -I /usr/local/lib/hermes-portail/limite.py planifier --dossier \$d --tache cra-mois --cle 'x:2' --unite autre.service --depuis \$d/d.json >/dev/null; r=\$?; rm -rf \$d; [ \$r = 0 ]"
 rm -f /etc/hermes-portail/cra.conf $MV $MT; rm -rf /var/lib/hermes-portail-retours $LIMV $AV
 
+echo "== CRA signé du client (0.97.0 : gardé par JARVIS, vérifié à blanc sur le portail, déposé par Hermes après son oui)"
+FJS=$T/jarvis-signe; SG=/var/lib/hermes-portail/cra-signe; RS=/var/lib/hermes-portail-retours; MVS=/var/lib/hermes-portail/cra/mois-valides.txt
+rm -rf $FJS $SG $RS $LIMV; rm -f $MVS /etc/hermes-portail/cra.conf; install -d -m 0755 $FJS; install -d -m 0700 $FJS/cra-signe
+printf '%%PDF-1.4\n%% CRA signé inventé du banc\n%%%%EOF\n' > $T/signe.pdf; E1=$(sha256sum < $T/signe.pdf | cut -d' ' -f1); N1=00000000000000000000000000000001.pdf
+printf '%%PDF-1.4\n%% un autre fichier inventé\n%%%%EOF\n' > $T/signe2.pdf; E2=$(sha256sum < $T/signe2.pdf | cut -d' ' -f1); N2=00000000000000000000000000000002.pdf
+install -m 0600 $T/signe.pdf $FJS/cra-signe/$N1; install -m 0600 $T/signe2.pdf $FJS/cra-signe/$N2
+signe_jours() {   # signe_jours <AAAA-MM> <fichier> <empreinte> [clé=valeur …] : jours.json comme JARVIS l'écrit (oui=<empreinte>:<mois>:<heure>, rattache=1, moi=1)
+  python3 -I - $FJS/jours.json "$@" <<'PY'
+import json, sys
+f, ym, nom, emp = sys.argv[1:5]; plus = dict(x.split("=", 1) for x in sys.argv[5:])
+g = {"message": "m-rep", "nom": "CRA signé.pdf", "taille": 48, "fichier": nom, "empreinte": emp, "garde": 1798000000000}
+if "oui" in plus:
+    e, m, at = plus["oui"].split(":"); g["oui"] = {"empreinte": e, "mois": m, "at": int(at)}
+if "moi" in plus: g["moi"] = 1798000000001
+cra = {"reponses": [{"id": "m-rep", "pdf": True}], "clos": "pdf", "signe": g}
+if "rattache" in plus: cra["rattache"] = 1798000000002
+json.dump({"version": 1, "mois": {ym: {"etat": "valide", "corrections": {}, "historique": [], "suivi": {"cra": cra}}}}, open(f, "w"))
+PY
+}
+csa() { HERMES_BANC_AUJOURDHUI=2027-05-28 HERMES_BANC_JARVIS_U=nobody HERMES_BANC_PASSAGE=${1:-} HERMES_BANC_FILTRE_JOURNAL=${2:-} HERMES_BANC_CONSIGNE_EN_PLUS=${3:-} bash /usr/local/sbin/hermes-portail cra-signe-auto; }
+depots() { grep -c "\"evenement\": \"CRA-SIGNE-DEPOT\", \"mois\": \"$1\"" $T/traces/portail.jsonl; }
+cr_signe() {   # cr_signe <mois> <expression Python sur r> : le compte rendu pour JARVIS, à root en 640, vérifie l'expression
+  [ "$(stat -c '%U %a' $RS/signe-$1.json 2>/dev/null)" = 'root 640' ] && python3 -I -c "import json,sys; r=json.load(open(sys.argv[1])); sys.exit(0 if ($2) else 1)" $RS/signe-$1.json
+}
+consigne_signe() {   # consigne_signe <expression Python sur t> : la consigne reçue par le faux modèle au dernier passage
+  python3 -I - $T/traces/modele.jsonl "$1" <<'PY'
+import json, sys
+c = [json.loads(l) for l in open(sys.argv[1])][0]['corps']
+t = ' '.join(m['content'] if isinstance(m['content'], str) else ' '.join(x.get('text', '') for x in m['content']) for m in c['messages'] if m['role'] == 'user').lstrip()
+sys.exit(0 if eval(sys.argv[2]) else 1)
+PY
+}
+attente() { install -d -m 0700 $LIMV; python3 -I -c "import json,sys,time; json.dump({'reprise': int(time.time()) + int(sys.argv[2])}, open(sys.argv[1], 'w'))" $LIMV/attente.json "$1"; }
+v() { verif "$1" [ "$2" = 0 ]; }   # v <nom> <code de la condition>
+verif "install.sh pose l'unité et la minuterie du CRA signé (15 minutes) ; son unité est dans la liste fermée des relances" bash -c "grep -q 'cra-signe-auto' /etc/systemd/system/hermes-portail-cra-signe.service && grep -q 'OnUnitInactiveSec=15min' /etc/systemd/system/hermes-portail-cra-signe.timer && grep -q 'hermes-portail-cra-signe.service' /usr/local/lib/hermes-portail/limite.py"
+signe_jours 2027-05 $N1 $E1
+csa > $T/cs0.log 2>&1; rc=$?
+[ $rc = 0 ] && [ ! -s $T/cs0.log ] && [ ! -e $SG ]; v "cra-signe-auto sans cra.conf : ne fait rien (code 0, rien lu, rien copié)" $?
+printf 'adresse=%s\njarvis_donnees=%s\n' "$FC" "$FJS" > /etc/hermes-portail/cra.conf; chmod 0600 /etc/hermes-portail/cra.conf
+csa > $T/cs1.log 2>&1; rc=$?
+[ $rc = 0 ] && [ ! -s $T/cs1.log ] && [ ! -e $SG ]; v "cra-signe-auto sans « adresse_mois » : ne fait rien" $?
+printf 'adresse_mois=%s\n' "$FA" >> /etc/hermes-portail/cra.conf
+n0=$(wc -l < $T/traces/portail.jsonl)
+csa > $T/cs2.log 2>&1
+grep -q 'mai 2027 : le CRA du mois n’est pas encore validé par Hermes' $T/cs2.log && [ ! -e $SG/2027-05 ] && [ ! -e $RS/signe-2027-05.json ] && [ "$(wc -l < $T/traces/portail.jsonl)" = $n0 ]
+v "jamais avant que le CRA du mois soit validé par Hermes : rien copié, aucun passage, aucun compte rendu" $?
+install -d -m 0750 $RS; printf '{"mois": "2027-05", "resultat": "validee", "at": 1}' > $RS/mois-2027-05.json
+# le PDF gardé par JARVIS est un lien vers un fichier de root (au bon contenu) : jamais suivi
+install -m 0600 $T/signe.pdf $T/signe-root.pdf; rm -f $FJS/cra-signe/$N1; ln -s $T/signe-root.pdf $FJS/cra-signe/$N1
+csa > $T/cs3.log 2>&1
+grep -q 'absent, ou c’est un lien' $T/cs3.log && [ ! -e $SG/2027-05/signe.pdf ] && cr_signe 2027-05 "r['etat']=='echec' and r['reel'] is False and r['empreinte']=='$E1' and 'lien' in r['texte']" && [ "$(wc -l < $T/traces/portail.jsonl)" = $n0 ]
+v "le PDF gardé est un lien (vers un fichier de root au bon contenu) : refusé, rien copié, aucun passage, compte rendu « echec » pour JARVIS" $?
+rm -f $FJS/cra-signe/$N1; install -m 0600 $T/signe.pdf $FJS/cra-signe/$N1; rm -rf $SG $RS/signe-2027-05.json
+mv $FJS/cra-signe $FJS/vrai-dossier; ln -s $FJS/vrai-dossier $FJS/cra-signe
+csa > $T/cs4.log 2>&1
+grep -q 'dossier du PDF gardé par JARVIS est absent, ou c’est un lien' $T/cs4.log && [ ! -e $SG/2027-05/signe.pdf ] && cr_signe 2027-05 "r['etat']=='echec' and 'lien' in r['texte']"
+v "le dossier de garde est un lien : refusé de la même façon" $?
+rm -f $FJS/cra-signe; mv $FJS/vrai-dossier $FJS/cra-signe; rm -rf $SG $RS/signe-2027-05.json
+# le fichier n'est plus celui de l'empreinte gardée dans jours.json
+signe_jours 2027-05 $N2 $E1
+csa > $T/cs5.log 2>&1
+grep -q 'ne correspond plus à son empreinte' $T/cs5.log && [ ! -e $SG/2027-05/signe.pdf ] && cr_signe 2027-05 "r['etat']=='echec' and 'empreinte' in r['texte']" && grep -qx "copie 2027-05 $E1" $SG/tentes.txt
+v "PDF changé (son contenu n'est plus celui de l'empreinte) : refusé, rien copié, dit une fois à JARVIS" $?
+csa > $T/cs5b.log 2>&1
+grep -q 'ce PDF a déjà été refusé' $T/cs5b.log; v "un PDF refusé n'est pas réessayé à chaque quart d'heure" $?
+rm -rf $SG $RS/signe-2027-05.json; signe_jours 2027-05 $N1 $E1
+# la limite du forfait coupe l'essai à blanc avant tout contact avec le portail : pas compté, une relance
+csa $T/passage-limite $T/relais-claude > $T/cs6.log 2>&1; rc=$?
+[ $rc = 0 ] && [ "$(sha256sum < $SG/2027-05/signe.pdf | cut -d' ' -f1)" = $E1 ] && [ "$(stat -c '%U %a' $SG/2027-05/signe.pdf)" = 'root 600' ] && [ "$(stat -c '%U %a' $SG)" = 'root 700' ] \
+  && ! grep -q '^blanc ' $SG/tentes.txt && grep -q hermes-portail-cra-signe.service $LIMV/relance-cra-signe.json && grep -q 'relancé automatiquement' $T/cs6.log && [ ! -e $RS/signe-2027-05.json ]
+v "PDF recopié chez root (700/600, empreinte revérifiée) ; essai à blanc coupé par la limite avant tout contact : pas compté, une relance prévue sur sa minuterie, aucun compte rendu" $?
+attente 3600; csa > $T/cs7.log 2>&1
+grep -q 'Limite du forfait Claude jusqu' $T/cs7.log && ! grep -q '^blanc ' $SG/tentes.txt; v "tant que la limite tient, rien n'est tenté" $?
+cat > $T/signe-blanc.txt <<FIN
+SUITE: [
+ {"nom": "browser_exec", "args": {"code": "# La page du mois, puis l'onglet du CRA signé\nnew_tab('$FA?mois=2027-05')\nwait_for_load()\nprint(js(\"document.querySelector('#onglets').innerText\"))\ngoto_url('$FA/signe?mois=2027-05')\nwait_for_load()\nprint(js(\"document.querySelector('#documents').innerText\"))"}}
+]
+DIRE: "Connexion : session encore ouverte\nPage d'arrivée : Compte rendu d’activité (banc), $FA\nLe dépôt se fait dans l'onglet « CRA signé du client » de $FA/signe (bouton « Déposer »). Statut du mois : saisie en cours. Aucun document déposé.\nDéjà déposé : non\nRésultat : à blanc"
+FIN
+attente -60; : > $T/traces/modele.jsonl; n0=$(wc -l < $T/traces/portail.jsonl)
+csa '' '' $T/signe-blanc.txt > $T/cs8.log 2>&1; rc=$?
+consigne_signe "t.startswith('MODE DÉPÔT À BLANC, ') and 'mai 2027' in t and 'Fichier à déposer' not in t and 'Aucun fichier ne t' in t"
+v "la limite levée, l'essai à blanc repart : consigne « MODE DÉPÔT À BLANC », le mois, aucun fichier remis à Hermes" $?
+[ $rc = 0 ] && grep -q 'Résultat CRA signé : blanc' $T/cs8.log && tail -n +$((n0 + 1)) $T/traces/portail.jsonl | grep -q '"evenement": "activite-signe", "mois": "2027-05"' && [ "$(depots 2027-05)" = 0 ] && ! tail -n +$((n0 + 1)) $T/traces/portail.jsonl | grep -q 'CRA-MOIS-' \
+  && grep -qx "blanc 2027-05 $E1" $SG/tentes.txt && [ "$(cat $SG/2027-05/etat)" = pret ] && ! ls /var/lib/hermes-portail-depot/CRA-signe-* >/dev/null 2>&1
+v "à blanc : Hermes ouvre l'onglet du CRA signé, rien n'est déposé ni validé ; l'essai est noté à root, état « pret »" $?
+cr_signe 2027-05 "r['etat']=='pret' and r['reel'] is False and r['premiere'] is False and r['empreinte']=='$E1' and r['mois']=='2027-05' and 'Déposer' in r['texte'] and 'http' not in r['texte'] and '127.0.0.1' not in r['texte'] and 'Page d' not in r['texte'] and len(r['texte'])<=300"
+v "compte rendu « pret » pour JARVIS (root 640) : ce que la page dit, sans adresse ni hôte du portail" $?
+: > $T/traces/modele.jsonl
+csa '' '' $T/signe-blanc.txt > $T/cs9.log 2>&1
+grep -q 'mai 2027 : prêt, attend son oui dans JARVIS' $T/cs9.log && [ ! -s $T/traces/modele.jsonl ] && [ "$(depots 2027-05)" = 0 ]; v "sans son oui : rien (aucun passage, rien déposé)" $?
+signe_jours 2027-05 $N1 $E1 oui=$E2:2027-05:1798000100000; csa > $T/cs10.log 2>&1
+signe_jours 2027-05 $N1 $E1 oui=$E1:2027-04:1798000100000; csa > $T/cs11.log 2>&1
+grep -q 'son oui porte sur un autre fichier ou un autre mois : refusé' $T/cs10.log && grep -q 'son oui porte sur un autre fichier ou un autre mois : refusé' $T/cs11.log && [ ! -s $T/traces/modele.jsonl ] && [ "$(depots 2027-05)" = 0 ] && ! grep -q '^reel ' $SG/tentes.txt
+v "un oui sur une autre empreinte, ou pour un autre mois : refusé, aucun passage, rien déposé" $?
+# la copie de root change après l'essai à blanc : jamais un autre fichier que celui dont l'empreinte a reçu son oui
+cp -p $SG/2027-05/signe.pdf $T/copie-root.pdf; cat $T/signe2.pdf > $SG/2027-05/signe.pdf
+signe_jours 2027-05 $N1 $E1 oui=$E1:2027-05:1798000200000; csa > $T/cs12.log 2>&1
+grep -q 'La copie du PDF a changé depuis son oui' $T/cs12.log && [ ! -s $T/traces/modele.jsonl ] && [ "$(depots 2027-05)" = 0 ] && grep -qx "reel 2027-05 $E1 1798000200000" $SG/tentes.txt && cr_signe 2027-05 "r['etat']=='echec' and r['reel'] is True and 'changé' in r['texte']"
+v "la copie de root n'est plus le fichier de son oui : refusé avant tout passage, compté, compte rendu « echec » du dépôt" $?
+cat $T/copie-root.pdf > $SG/2027-05/signe.pdf
+csa > $T/cs13.log 2>&1
+grep -q 'mai 2027 : déjà tenté pour ce oui' $T/cs13.log && [ "$(depots 2027-05)" = 0 ]; v "jamais deux tentatives pour le même oui" $?
+# un nouveau oui, coupé par la limite après avoir joint le portail : jamais relancé, compté
+rm -f $LIMV/relance-cra-signe.json; signe_jours 2027-05 $N1 $E1 oui=$E1:2027-05:1798000300000
+attente -60; csa $T/passage-limite $T/relais-portail > $T/cs14.log 2>&1
+grep -qx "reel 2027-05 $E1 1798000300000" $SG/tentes.txt && [ ! -e $LIMV/relance-cra-signe.json ] && [ "$(cat $SG/2027-05/etat)" = pret ] && cr_signe 2027-05 "r['etat']=='echec' and r['reel'] is True and 'vérifie le portail' in r['texte']"
+v "dépôt coupé par la limite après contact avec le portail : jamais relancé, compté ; compte rendu « echec » (vérifier le portail) ; l'essai à blanc reste valable" $?
+# un nouveau oui : le dépôt réel, une seule fois
+cat > $T/signe-depot.txt <<FIN
+SUITE: [
+ {"nom": "browser_exec", "args": {"code": "# L'onglet du CRA signé : rien de déposé, le fichier, puis le dépôt\nnew_tab('$FA/signe?mois=2027-05')\nwait_for_load()\nprint(js(\"document.querySelector('#documents').innerText\"))\nupload_file('#fichier_signe', '/var/lib/hermes-portail-depot/CRA-signe-2027-05.pdf')\njs(\"document.querySelector('#deposer').click()\")\nwait_for_load()\nprint(js(\"document.querySelector('#documents').innerText\"))"}}
+]
+DIRE: "Connexion : session encore ouverte\nLe fichier est déposé dans l'onglet « CRA signé du client » et apparaît dans la liste des documents du mois.\nDéjà déposé : non\nRésultat : déposé"
+FIN
+signe_jours 2027-05 $N1 $E1 oui=$E1:2027-05:1798000400000
+attente -60; : > $T/traces/modele.jsonl; n0=$(wc -l < $T/traces/portail.jsonl)
+csa '' '' $T/signe-depot.txt > $T/cs15.log 2>&1; rc=$?
+consigne_signe "t.startswith('MODE DÉPÔT, ') and 'mai 2027' in t and 'Fichier à déposer (le seul fichier permis, avec upload_file) : /var/lib/hermes-portail-depot/CRA-signe-2027-05.pdf' in t and 'CRA signé.pdf' not in t"
+v "son oui (même empreinte, même mois) : consigne « MODE DÉPÔT », le fichier de root sous un nom fixe (jamais le nom venu du mail)" $?
+[ $rc = 0 ] && grep -q 'Résultat CRA signé : depose' $T/cs15.log && [ "$(depots 2027-05)" = 1 ] && grep '"evenement": "CRA-SIGNE-DEPOT"' $T/traces/portail.jsonl | grep -q "\"nom\": \"CRA-signe-2027-05.pdf\", \"taille\": $(wc -c < $T/signe.pdf), \"empreinte\": \"$E1\", \"pdf\": true" \
+  && ! tail -n +$((n0 + 1)) $T/traces/portail.jsonl | grep -q 'CRA-MOIS-\|SOUMISSION\|ENREGISTREE'
+v "dépôt réel : ce fichier-là (même empreinte) arrive sur la page du mois, une fois ; rien d'autre n'est touché ni validé" $?
+grep -q "^2027-05 .* $E1 depose$" $SG/deposes.txt && [ "$(stat -c '%U %a' $SG/deposes.txt)" = 'root 600' ] && [ ! -e $SG/2027-05/signe.pdf ] && ! ls /var/lib/hermes-portail-depot/CRA-signe-* >/dev/null 2>&1 \
+  && cr_signe 2027-05 "r['etat']=='depose' and r['reel'] is True and r['premiere'] is True and r['empreinte']=='$E1' and 'http' not in r['texte']"
+v "dépôt noté à root, la copie du PDF effacée (chez root et dans le dépôt d'Hermes) ; compte rendu « depose », première exécution" $?
+signe_jours 2027-05 $N1 $E1 oui=$E1:2027-05:1798000500000; rm -f $SG/tentes.txt; : > $T/traces/modele.jsonl
+csa '' '' $T/signe-depot.txt > $T/cs16.log 2>&1
+grep -q 'mai 2027 : déjà déposé par Hermes' $T/cs16.log && [ "$(depots 2027-05)" = 1 ] && [ ! -s $T/traces/modele.jsonl ]; v "un mois déjà déposé ne repart jamais, même avec un nouveau oui (registre de root)" $?
+# un autre mois, où le portail a déjà un CRA signé (réponse du modèle simulée, sans passage) ; puis « introuvable » ; un « déposé » prétendu à blanc
+printf '{"mois": "2027-04", "resultat": "deja", "at": 1}' > $RS/mois-2027-04.json
+printf 'Un document est déjà déposé pour ce mois.\nDéjà déposé : oui\nRésultat : déjà déposé\n' > $T/passage-deja
+signe_jours 2027-04 $N2 $E2; csa $T/passage-deja > $T/cs17.log 2>&1
+cr_signe 2027-04 "r['etat']=='deja' and r['reel'] is False and r['premiere'] is False" && grep -q "^2027-04 .* $E2 deja$" $SG/deposes.txt && [ ! -e $SG/2027-04/signe.pdf ] && [ "$(depots 2027-04)" = 0 ]
+v "déjà déposé sur le portail : rien déposé en double, compte rendu « deja », mois noté à root" $?
+printf 'Aucun onglet ni zone de dépôt sur la page du mois.\nRésultat : introuvable\n' > $T/passage-introuvable; printf 'Fait.\nRésultat : déposé\n' > $T/passage-pretend
+r1=$(HERMES_BANC_PASSAGE=$T/passage-introuvable bash /usr/local/sbin/hermes-portail cra-signe $FA --mois 2027-03 --a-blanc 2>&1 | grep '^Résultat CRA signé'); r2=$(HERMES_BANC_PASSAGE=$T/passage-pretend bash /usr/local/sbin/hermes-portail cra-signe $FA --mois 2027-03 --a-blanc 2>&1 | grep '^Résultat CRA signé')
+[ "$r1" = 'Résultat CRA signé : introuvable' ] && [ "$r2" = 'Résultat CRA signé : echec' ]; v "cra-signe --a-blanc : « introuvable » est rendu tel quel ; un « déposé » prétendu à blanc compte pour un échec" $?
+ln -s $T/signe.pdf $T/signe-lien.pdf; install -m 0644 -o nobody $T/signe.pdf $T/signe-nobody.pdf; printf 'pas un PDF' > $T/faux.pdf
+r3=$(bash /usr/local/sbin/hermes-portail cra-signe $FA --mois 2027-03 --fichier $T/signe-lien.pdf 2>&1; bash /usr/local/sbin/hermes-portail cra-signe $FA --mois 2027-03 --fichier $T/signe-nobody.pdf 2>&1; bash /usr/local/sbin/hermes-portail cra-signe $FA --mois 2027-03 --fichier $T/faux.pdf 2>&1; bash /usr/local/sbin/hermes-portail cra-signe $FA --mois 2027-13 --a-blanc 2>&1)
+[ "$(grep -c '^Refus : le fichier à déposer doit être un PDF de root' <<< "$r3")" = 3 ] && grep -q 'Mois attendu' <<< "$r3"; v "cra-signe : un lien, un fichier qui n'est pas à root, un fichier qui n'est pas un PDF, un mois mal écrit : refusés avant tout passage" $?
+signe_jours 2027-05 $N1 $E1 rattache=1; rm -f $SG/deposes.txt; csa > $T/cs18.log 2>&1; signe_jours 2027-05 $N1 $E1 moi=1; csa > $T/cs19.log 2>&1
+grep -q 'mai 2027 : déjà rattaché' $T/cs18.log && grep -q 'mai 2027 : il le dépose lui-même' $T/cs19.log; v "« C'est rattaché » ou « Je le fais moi-même » dans JARVIS : Hermes ne fait plus rien" $?
+rm -f /etc/hermes-portail/cra.conf $MVS; rm -rf $RS $LIMV $SG $FJS
+
 echo "== Ce qu'Hermes apprend d'un portail"
 N=/var/lib/hermes-portail/notes/127.0.0.1.txt
 verif "les deux notes utiles du passage sont gardées, à root seul" bash -c "[ \"\$(stat -c '%U %a' $N)\" = 'root 600' ] && [ \"\$(wc -l < $N)\" = 2 ] && grep -q 'Enregistrer sans envoyer' $N && grep -q '/depense/nouvelle' $N"
@@ -612,7 +757,7 @@ unset HERMES_BANC_JARVIS_U HERMES_BANC_JARVIS_SRV HERMES_BANC_JARVIS_DATA
 
 echo "== Note de télétravail (26/11/2026 : Hermes la prépare à blanc le dernier jour ; faux JARVIS, pièces inventées)"
 FT=$T/faux-jarvis-tt; rm -rf $FT; mkdir -p $FT/serveur $FT/donnees $T/tt-drive $T/tt-pas-root; chown $U: $T/tt-pas-root
-for f in jours.mjs reponses.mjs radar.mjs notify.mjs pdf.mjs bots.mjs; do cp "$RACINE/jarvis-os/server/$f" $FT/serveur/; done
+for f in jours.mjs reponses.mjs signe.mjs radar.mjs notify.mjs pdf.mjs bots.mjs; do cp "$RACINE/jarvis-os/server/$f" $FT/serveur/; done
 # trois PDF inventés (texte simple, police standard), lisibles par pdf.mjs et assemblables par pdfunite
 python3 -I - $FT/serveur <<'PY'
 import sys
