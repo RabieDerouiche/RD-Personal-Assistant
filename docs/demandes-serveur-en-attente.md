@@ -23,7 +23,7 @@ CONTRÔLES (lecture seule) : les contrôles 1 à 4 de la section « CRA signé �
 5. journalctl -u jarvis --since "-10 min" --no-pager | grep -ciE "erreur|error" (et les lignes, s'il y en a) ; systemctl is-active jarvis hermes-gateway hermes-ordres.path
 6. 0.98.0, le PDF comparé à la saisie (dans les 6 minutes après le redémarrage ; un nombre et un mot, jamais un nom) :
    sudo python3 -I -c "import json; D=json.load(open('/home/jarvis/.jarvis/jours.json')); c=D['mois'].get('2026-11',{}).get('suivi',{}).get('cra',{}).get('signe',{}).get('controle',{}); print(c.get('etat'), c.get('total'), c.get('attendu'), c.get('detail'), '| premier dépôt déjà fait :', bool(D.get('signePremier')))"
-   → attendu : « conforme 15 15 True | premier dépôt déjà fait : False » (vérifié à la main sur le vrai PDF, hors dépôt). Autre chose : rapporter la ligne telle quelle.
+   → attendu : « conforme N N True | premier dépôt déjà fait : False » (le même nombre deux fois ; vérifié à la main sur le vrai PDF, hors dépôt). Dans ta réponse : seulement le mot, si les deux nombres sont égaux, et les deux booléens.
 7. La skill corrigée du CRA de la semaine : sudo grep -c 'Ne te fie jamais au texte' /etc/hermes-portail/skills/portail/portail/SKILL.md → 1
    L'état de la semaine, sans contenu : sudo python3 -I -c "import json; s=json.load(open('/home/jarvis/.jarvis/jours.json')).get('semaines',{}).get('2026-11-23',{}); print(s.get('etat'))"   → a_la_main (il touchera « Relancer Hermes » dans JARVIS ; NE PAS relancer à sa place, ne pas toucher à tentees.txt)
 8. « L'ESSAI À BLANC RÉEL POUR NOVEMBRE 2026 » de la section : il part seul ; relevés a à g.
