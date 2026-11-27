@@ -31,18 +31,19 @@
   h1, h2, h3, h4, p, ol, ul { margin: 0; padding: 0; }
 
   /* ---- le cadre : plein écran sur iPhone, centré sur un ordinateur ---- */
-  .app { position: relative; display: grid; grid-template-rows: auto auto auto minmax(0, 1fr) auto; height: 100vh; height: 100dvh; max-width: 430px; margin: 0 auto; overflow: hidden;
+  .app { position: relative; display: grid; grid-template-rows: auto auto auto minmax(0, 1fr) auto; height: 100vh; height: 100dvh; max-width: 430px; margin: 0 auto; overflow: hidden; overflow: clip;
     padding-left: env(safe-area-inset-left, 0px); padding-right: env(safe-area-inset-right, 0px);
     background:
       linear-gradient(rgba(125, 211, 252, .04) 1px, transparent 1px) 0 0 / 100% 26px,
       linear-gradient(90deg, rgba(125, 211, 252, .04) 1px, transparent 1px) 0 0 / 26px 100%,
       radial-gradient(110% 55% at 85% 0%, #0d2142 0%, #060b18 55%, var(--bg) 100%); }
   @media (min-width: 520px) { .app { height: min(100dvh - 32px, 900px); margin-top: 16px; border: 1px solid var(--l2); box-shadow: 0 0 60px rgba(56, 189, 248, .12); } }
-  .globe { position: absolute; top: -58px; right: -74px; width: 250px; height: 250px; opacity: .2; pointer-events: none; }
+  .fond { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+  .globe { position: absolute; top: -58px; right: -74px; width: 250px; height: 250px; opacity: .13; }
   .globe g { transform-origin: 50% 50%; animation: tourne 90s linear infinite; }
   @keyframes tourne { to { transform: rotate(360deg); } }
 
-  .tag { position: relative; padding: calc(var(--st) + 5px) 16px 5px; font: 500 13px/1.3 var(--sans); color: #d2ae58; text-align: center; text-wrap: balance; border-bottom: 1px dashed rgba(251, 191, 36, .28); background: rgba(251, 191, 36, .05); }
+  .tag { position: relative; padding: calc(var(--st) + 5px) 6px 5px; font: 500 13px/1.3 var(--sans); letter-spacing: -.02em; color: #d2ae58; text-align: center; text-wrap: balance; border-bottom: 1px dashed rgba(251, 191, 36, .28); background: rgba(251, 191, 36, .05); }
   .top { position: relative; display: flex; align-items: baseline; gap: 10px; padding: 9px 16px 5px; }
   .logo { font: 700 16px var(--logo); letter-spacing: .26em; color: #a9d6ff; text-shadow: 0 0 14px rgba(56, 189, 248, .7); }
   .quand { margin-left: auto; color: var(--mut); font-size: 14px; white-space: nowrap; }
@@ -59,16 +60,15 @@
   .etat b { font: 700 20px var(--num); }
   .e-am b { color: var(--am); } .e-cy b { color: var(--cy); } .e-rd b { color: var(--rd); }
   .e-rd.z, .e-am.z { color: var(--mut); } .e-rd.z b, .e-am.z b { color: var(--gr); }
-  .e-rd:not(.z) b { animation: clign 1.6s ease-in-out infinite; }
-  @keyframes clign { 50% { opacity: .45; } }
+  @keyframes clign { 50% { opacity: .55; } }
 
   /* ---- la zone des trois files ---- */
   .zone { position: relative; display: grid; grid-template-rows: auto auto minmax(0, 1fr); min-height: 0; }
   .files { position: relative; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 10px 16px 0; border-bottom: 1px solid var(--l2); }
-  .files button { display: flex; align-items: center; justify-content: center; gap: 7px; min-height: 46px; font: 600 15px var(--num); letter-spacing: .08em; text-transform: uppercase; color: var(--dim); white-space: nowrap; transition: color .2s; }
+  .files button { display: flex; align-items: center; justify-content: center; gap: 7px; min-height: 46px; font: 600 15px var(--num); letter-spacing: .04em; text-transform: uppercase; color: var(--dim); white-space: nowrap; transition: color .2s; }
   .files button[aria-selected="true"] { color: var(--fg); text-shadow: 0 0 12px rgba(103, 232, 249, .55); }
   .files b { min-width: 22px; padding: 1px 5px; border: 1px solid currentColor; border-radius: 2px; font: 700 13px var(--num); letter-spacing: 0; text-align: center; opacity: .9; }
-  .files .al { width: 7px; height: 7px; border-radius: 50%; background: var(--rd); box-shadow: 0 0 8px var(--rd); }
+  .files .al { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--rd); box-shadow: 0 0 8px var(--rd); }
   .files button[data-f="0"][aria-selected="true"] b { color: var(--am); } .files button[data-f="1"][aria-selected="true"] b { color: var(--cy); }
   .ind { position: absolute; left: 0; bottom: -1px; width: 33.333%; height: 2px; background: var(--cy); box-shadow: 0 0 12px var(--cy), 0 0 2px #fff; will-change: transform; }
   .chips { display: flex; gap: 8px; padding: 6px 16px; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
@@ -141,7 +141,7 @@
   .vr li.toi::before, .vr li.run::before, .vr li.av::before, .vr li.err::before { background: repeating-linear-gradient(180deg, var(--dim) 0 4px, transparent 4px 8px); box-shadow: none; opacity: .6; }
   .vr b { display: block; font-weight: 600; line-height: 1.25; } .vr small { display: block; color: var(--mut); font-size: 13.5px; }
   .vr .av b { color: var(--mut); font-weight: 500; } .vr .toi small { color: var(--am); font-weight: 600; } .vr .run small { color: var(--cy); font-weight: 600; } .vr .err small { color: var(--rd); font-weight: 600; }
-  .vr .acts { margin-top: 8px; }
+  .vr .acts { margin-top: 8px; } .vr .acts .sm { flex: none; }
 
   /* ---- À toi : une décision par carte ---- */
   .dec { padding: 11px 12px 12px 15px; }
@@ -194,7 +194,7 @@
   .rt.err { background: linear-gradient(90deg, rgba(255, 143, 156, .16), rgba(255, 143, 156, .03)); box-shadow: inset 3px 0 0 var(--rd); }
   .rt.err .rd { color: var(--rd); } .rt.err .rp { color: var(--am); }
   .rt .al { grid-column: 2 / -1; margin-top: 3px; color: var(--rd); font-size: 14px; font-weight: 600; line-height: 1.3; }
-  .rt .al span { color: var(--am); }
+  .rt .al span { display: inline-block; color: var(--am); white-space: nowrap; }
   .rt-d { padding: 8px 12px 12px 28px; border-top: 1px dashed var(--l1); background: rgba(3, 6, 13, .45); }
   .rt-d p { color: var(--fg); margin-top: 8px; } .rt-d p small { display: block; color: var(--mut); font-size: 13px; }
   .hist { display: flex; align-items: center; gap: 4px; margin-top: 10px; color: var(--mut); font-size: 13px; }
@@ -229,17 +229,18 @@
   .dj { display: flex; align-items: baseline; gap: 8px; margin: 16px 0 4px; font: 700 15px var(--num); letter-spacing: .06em; text-transform: uppercase; color: var(--fg); }
   .dj small { font: 500 13px var(--sans); letter-spacing: 0; text-transform: none; color: var(--mut); }
   .tl { list-style: none; }
-  .tl li { position: relative; display: grid; grid-template-columns: 54px 14px minmax(0, 1fr); column-gap: 10px; align-items: start; min-height: 46px; padding: 6px 0; }
+  .tl li { position: relative; display: grid; grid-template-columns: 54px 14px minmax(0, 1fr); column-gap: 10px; align-items: start; min-height: 46px; padding: 1px 0; }
   .tl li::before { content: ''; position: absolute; left: 70px; top: 0; bottom: 0; width: 2px; background: var(--l2); }
-  .tl li:first-child::before { top: 12px; } .tl li:last-child::before { bottom: calc(100% - 14px); }
+  .tl li:first-child::before { top: 14px; } .tl li:last-child::before { bottom: calc(100% - 14px); }
   .tl li:only-child::before { display: none; }
-  .tl .h { font: 600 15px var(--num); color: var(--cy); text-align: right; padding-top: 1px; white-space: nowrap; }
-  .tl .mk { position: relative; z-index: 1; width: 14px; height: 14px; margin-top: 4px; border-radius: 50%; background: var(--cy); box-shadow: 0 0 0 3px #060b17, 0 0 10px var(--cy); }
+  .tl .h { font: 600 15px var(--num); color: var(--cy); text-align: right; padding-top: 4px; white-space: nowrap; }
+  .tl .mk { position: relative; z-index: 1; width: 14px; height: 14px; margin-top: 7px; border-radius: 50%; background: var(--cy); box-shadow: 0 0 0 3px #060b17, 0 0 10px var(--cy); }
   .tl b { display: block; font-weight: 600; line-height: 1.25; } .tl small { display: block; color: var(--mut); font-size: 13px; }
   .tl .ech .mk { border-radius: 2px; background: var(--am); box-shadow: 0 0 0 3px #060b17, 0 0 10px rgba(251, 191, 36, .7); } .tl .ech .h { color: var(--am); }
-  .tl .pas .mk { width: 10px; height: 10px; margin: 6px 2px 0; background: #060b17; border: 2px solid var(--vi); box-shadow: 0 0 0 3px #060b17; } .tl .pas .h { color: var(--vi); } .tl .pas b { font-weight: 500; color: #cfd9ea; }
+  .tl .pas .mk { width: 10px; height: 10px; margin: 9px 2px 0; background: #060b17; border: 2px solid var(--vi); box-shadow: 0 0 0 3px #060b17; } .tl .pas .h { color: var(--vi); } .tl .pas b { font-weight: 500; color: #cfd9ea; }
   .tl .pas.al .mk { border-color: var(--rd); } .tl .pas.al small { color: var(--rd); }
-  .tl button { min-height: 34px; width: 100%; }
+  .tl button, .tl li > div { display: flex; flex-direction: column; justify-content: center; min-height: 44px; width: 100%; }
+  .tl .z { opacity: .55; }
   .rien { padding: 2px 0 0 78px; color: var(--dim); font-size: 14px; }
 
   /* ---- la fiche courte d'un domaine ---- */
@@ -251,11 +252,11 @@
   .tri div { padding: 8px 8px 9px; border: 1px solid var(--l1); border-radius: 2px; background: rgba(3, 6, 13, .5); }
   .tri b { display: block; font: 700 24px/1.1 var(--num); white-space: nowrap; } .tri small { display: block; margin-top: 3px; color: var(--mut); font-size: 13px; line-height: 1.25; }
   .tri div:nth-child(1) b { color: var(--am); } .tri div:nth-child(3) b { color: var(--cy); }
-  .champ { display: flex; align-items: center; gap: 8px; min-height: 44px; margin-top: 8px; padding: 0 12px; border: 1px solid var(--l2); border-radius: 3px; background: rgba(3, 6, 13, .6); }
-  .champ svg { flex: none; width: 18px; height: 18px; color: var(--mut); } .champ input { flex: 1; min-width: 0; height: 42px; background: none; border: 0; outline: 0; font-size: 16px; }
+  .champ { display: flex; align-items: center; gap: 8px; min-height: 46px; margin-top: 8px; padding: 0 12px; border: 1px solid var(--l2); border-radius: 3px; background: rgba(3, 6, 13, .6); }
+  .champ svg { flex: none; width: 18px; height: 18px; color: var(--mut); } .champ input { flex: 1; min-width: 0; height: 44px; background: none; border: 0; outline: 0; font-size: 16px; }
   .champ input::placeholder { color: var(--dim); }
   .doc { display: grid; grid-template-columns: 20px minmax(0, 1fr) auto; gap: 10px; align-items: center; min-height: 44px; padding: 5px 0; border-top: 1px solid var(--l1); }
-  .doc svg { width: 20px; height: 20px; color: var(--bl); } .doc b { display: block; font-weight: 600; line-height: 1.25; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .doc small { color: var(--mut); font-size: 13px; } .doc > span:last-child { color: var(--mut); font: 500 13px var(--num); white-space: nowrap; }
+  .doc svg { width: 20px; height: 20px; color: var(--bl); } .doc b { display: block; font-weight: 600; line-height: 1.25; overflow-wrap: anywhere; } .doc small { color: var(--mut); font-size: 13px; } .doc > span:last-child { color: var(--mut); font: 500 13px var(--num); white-space: nowrap; }
   .alerte { display: flex; align-items: center; gap: 8px; margin-top: 8px; padding: 8px 10px; border: 1px solid rgba(251, 191, 36, .4); border-radius: 2px; background: rgba(251, 191, 36, .07); color: var(--am); font-weight: 600; }
   .px { display: grid; grid-template-columns: minmax(0, 1fr) 64px auto; gap: 10px; align-items: center; min-height: 50px; padding: 6px 0; border-top: 1px solid var(--l1); }
   .px:first-of-type { border-top: 0; }
@@ -272,7 +273,7 @@
   .cmd button { flex: none; display: flex; align-items: center; justify-content: center; width: 46px; height: 46px; border: 1px solid var(--l2); border-radius: 3px; color: var(--cy); background: rgba(13, 24, 46, .7); }
   .cmd button svg { width: 22px; height: 22px; } .cmd #env { background: var(--cy); color: #021018; border-color: var(--cy); }
   .cmd.ecoute #mic { background: var(--rd); border-color: var(--rd); color: #2a0810; animation: clign 1s ease-in-out infinite; }
-  .parl { position: absolute; inset: 0; z-index: 5; display: flex; flex-direction: column; background: rgba(3, 6, 13, .97); border-top: 1px solid var(--l2); transform: translateY(102%); visibility: hidden; transition: transform .26s ease, visibility 0s .26s; }
+  .parl { position: absolute; inset: 0; z-index: 5; display: flex; flex-direction: column; background: #040813; border-top: 1px solid var(--l2); transform: translateY(102%); visibility: hidden; transition: transform .26s ease, visibility 0s .26s; }
   .parl.on { transform: none; visibility: visible; transition: transform .26s ease; }
   .parl-h { display: flex; align-items: center; gap: 12px; padding: 10px 8px 10px 16px; border-bottom: 1px solid var(--l1); }
   .parl-h b { display: block; font: 700 15px var(--num); letter-spacing: .12em; text-transform: uppercase; } .parl-h small { color: var(--cy); font-size: 14px; }
@@ -298,12 +299,62 @@
   .sug button { flex: none; min-height: 44px; padding: 0 12px; border: 1px solid var(--l2); border-radius: 3px; color: var(--fg); font-size: 15px; white-space: nowrap; background: rgba(13, 24, 46, .7); }
   .toast { position: absolute; left: 12px; right: 12px; bottom: calc(var(--sb) + 74px); z-index: 8; display: flex; align-items: center; gap: 10px; padding: 8px 8px 8px 14px; border: 1px solid var(--cy); border-radius: 3px; background: #061224; box-shadow: 0 0 22px rgba(103, 232, 249, .3); transform: translateY(20px); opacity: 0; pointer-events: none; transition: transform .2s, opacity .2s; }
   .toast.on { transform: none; opacity: 1; pointer-events: auto; } .toast span { flex: 1; min-width: 0; } .toast button { flex: none; min-height: 44px; padding: 0 10px; color: var(--cy); font-weight: 700; }
+  /* ---- la feuille d'une routine ---- */
+  .rt.pause .rn b, .rt.pause .rd { color: var(--mut); } .rt.pause .rp { color: var(--vi); } .rt.run .rp { color: var(--cy); }
+  .pt.pause { background: none; border: 2px solid var(--vi); box-shadow: none; } .pt.run { background: var(--cy); box-shadow: 0 0 10px var(--cy); animation: clign .8s ease-in-out infinite; }
+  .pt.ko { background: var(--rd); box-shadow: none; }
+  .hud-f { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 10px; border-top: 1px solid var(--l1); }
+  .hud-f small { min-width: 0; color: var(--mut); font-size: 13px; line-height: 1.3; } .hud-f .b { flex: none; }
+  .feu .parl-h { align-items: flex-start; padding-top: 12px; } .feu .parl-h b { font: 700 19px/1.2 var(--sans); letter-spacing: 0; text-transform: none; } .feu .parl-h small { display: block; margin-top: 5px; }
+  .fe-c { flex: 1; min-height: 0; padding: 4px 16px 24px; overflow-y: auto; scrollbar-width: none; overscroll-behavior: contain; } .fe-c::-webkit-scrollbar { display: none; }
+  .fe-c > .kv:first-child { border-top: 0; }
+  .kv.w span:first-child { flex: none; color: var(--mut); } .kv.w span:last-child { flex: 1; min-width: 0; color: var(--fg); font-size: 15px; }
+  .kv.w i { margin-left: 4px; padding: 0 5px; border: 1px solid var(--vi); border-radius: 2px; color: var(--vi); font-style: normal; font-size: 13px; }
+  .alerte.r { display: block; margin: 10px 0 6px; border-color: rgba(255, 143, 156, .5); background: rgba(255, 143, 156, .08); color: var(--fg); font-weight: 500; }
+  .alerte.r b { display: block; font: 600 13px var(--num); letter-spacing: .1em; text-transform: uppercase; color: var(--rd); } .alerte.r p { margin: 3px 0 10px; }
+  .acts3 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 10px; } .acts3 .b1, .acts3 .plein { grid-column: 1 / -1; }
+  .b[disabled] { opacity: .45; cursor: default; }
+  .note { margin-top: 6px; color: var(--mut); font-size: 13px; }
+  .ed { margin-top: 12px; padding: 0 12px 6px; border-color: var(--l2); }
+  .sub small { margin-left: 6px; font: 500 13px var(--sans); letter-spacing: 0; text-transform: none; color: var(--mut); }
+  .seg { display: flex; gap: 6px; } .jrs { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; margin-top: 8px; }
+  .seg button, .jrs button { flex: 1 1 auto; min-height: 44px; padding: 0 6px; border: 1px solid var(--l2); border-radius: 3px; background: rgba(3, 6, 13, .5); color: var(--mut); font-size: 14px; font-weight: 600; text-align: center; white-space: nowrap; }
+  .jrs button { padding: 0; } .seg button[aria-pressed="true"], .jrs button[aria-pressed="true"] { color: #021018; background: var(--cy); border-color: var(--cy); }
+  .hrs { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  .hr { display: inline-flex; align-items: center; height: 46px; border: 1px solid var(--l2); border-radius: 3px; background: rgba(3, 6, 13, .6); }
+  .hr input { height: 44px; min-width: 92px; padding: 0 8px 0 10px; border: 0; outline: 0; background: none; font: 600 16px var(--num); color-scheme: dark; }
+  .hr button { width: 44px; height: 44px; border-left: 1px solid var(--l1); color: var(--mut); font-size: 20px; text-align: center; }
+  .apercu { margin: 12px 0 10px; padding: 8px 10px; border-left: 2px solid var(--cy); background: rgba(103, 232, 249, .07); color: var(--mut); } .apercu b { color: var(--fg); }
+  .fait-p { margin-top: 8px; } .fait-p small { display: block; color: var(--mut); font-size: 13px; }
+  .stat { color: var(--mut); } .stat b { font: 600 15px var(--num); color: var(--fg); }
+  .fe-c .hist { margin: 8px 0 6px; gap: 4px; } .fe-c .hist i { width: 6px; height: 18px; }
+  .hrow { display: grid; grid-template-columns: minmax(0, 1fr) 72px 92px; gap: 8px; align-items: center; min-height: 46px; border-top: 1px solid var(--l1); color: var(--mut); font-size: 14px; }
+  .hrow b { display: block; font: 600 14px var(--num); color: var(--fg); } .hrow small { font-size: 13px; }
+  .hrow > span:nth-child(2) { font: 500 14px var(--num); text-align: right; } .hrow > span:last-child { display: flex; align-items: center; justify-content: flex-end; gap: 6px; color: var(--fg); }
+  /* ---- le dépôt d'un papier ---- */
+  .depo { padding: 0 10px 10px; border: 1px solid rgba(251, 191, 36, .45); border-radius: 2px; background: rgba(251, 191, 36, .05); } .depo .doc { border-top: 0; }
+  .doc > .bdg.toi { color: var(--am); } .doc > .bdg.att { color: var(--vi); }
+  .doss { display: flex; flex-wrap: wrap; gap: 0 8px; margin-top: 6px; }
+  /* ---- Argent : deux chiffres, des barres fines ---- */
+  .tri.deux { grid-template-columns: repeat(2, minmax(0, 1fr)); } .tri.deux div:nth-child(1) b { color: var(--fg); } .tri.deux div:nth-child(2) b { color: var(--am); }
+  .tri.deux small:first-of-type { color: var(--fg); font-weight: 600; }
+  .bars { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); margin-top: 2px; }
+  .bars button { display: flex; flex-direction: column; align-items: center; }
+  .bars .col { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; width: 100%; height: 108px; border-bottom: 1px solid var(--l2); }
+  .bars .v { margin-bottom: 3px; font: 600 13px var(--num); color: var(--fg); white-space: nowrap; }
+  .bars .col i { display: block; flex: none; width: 14px; border-radius: 4px 4px 0 0; background: #3b9ee8; }
+  .bars .col i.r { margin-bottom: 2px; border: 1px dashed var(--mut); border-radius: 4px; background: none; }
+  .bars small { padding: 5px 0 3px; color: var(--mut); font-size: 13px; }
+  .bars button[aria-pressed="true"] .col i:not(.r) { box-shadow: 0 0 12px rgba(59, 158, 232, .9); } .bars button[aria-pressed="true"] small { color: var(--fg); font-weight: 700; }
+  .bars:has([aria-pressed="true"]) button[aria-pressed="false"] .col i { opacity: .45; }
+  .mois-d { margin-top: 8px; padding: 8px 10px 2px; border: 1px solid var(--l2); border-radius: 2px; background: rgba(3, 6, 13, .5); } .mois-d > b { display: block; margin-bottom: 4px; }
+  .pag { display: flex; align-items: center; justify-content: space-between; margin-top: 8px; } .pag span { color: var(--mut); font: 500 14px var(--num); } .pag .b { width: 46px; padding: 0; font-size: 22px; }
   @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
 </style>
 </head>
 <body>
 <div class="app" id="app">
-  <svg class="globe" viewBox="0 0 200 200" fill="none" stroke="#7dd3fc" stroke-width=".8" aria-hidden="true"><g><circle cx="100" cy="100" r="92"/><ellipse cx="100" cy="100" rx="92" ry="34"/><ellipse cx="100" cy="100" rx="92" ry="66"/><ellipse cx="100" cy="100" rx="34" ry="92"/><ellipse cx="100" cy="100" rx="66" ry="92"/><path d="M8 100h184M100 8v184"/><g fill="#a5f3fc" stroke="none"><circle cx="46" cy="60" r="2.4"/><circle cx="132" cy="44" r="2"/><circle cx="160" cy="118" r="2.4"/><circle cx="74" cy="150" r="2"/><circle cx="104" cy="96" r="2.6"/></g><path d="M46 60l58 36 56 22M132 44l-28 52-30 54" stroke="#c4b5fd" stroke-width=".7"/></g></svg>
+  <div class="fond" aria-hidden="true"><svg class="globe" viewBox="0 0 200 200" fill="none" stroke="#7dd3fc" stroke-width=".8" aria-hidden="true"><g><circle cx="100" cy="100" r="92"/><ellipse cx="100" cy="100" rx="92" ry="34"/><ellipse cx="100" cy="100" rx="92" ry="66"/><ellipse cx="100" cy="100" rx="34" ry="92"/><ellipse cx="100" cy="100" rx="66" ry="92"/><path d="M8 100h184M100 8v184"/><g fill="#a5f3fc" stroke="none"><circle cx="46" cy="60" r="2.4"/><circle cx="132" cy="44" r="2"/><circle cx="160" cy="118" r="2.4"/><circle cx="74" cy="150" r="2"/><circle cx="104" cy="96" r="2.6"/></g><path d="M46 60l58 36 56 22M132 44l-28 52-30 54" stroke="#c4b5fd" stroke-width=".7"/></g></svg></div>
   <div class="tag">Proposition B · Poste de contrôle · maquette, données inventées</div>
   <header class="top">
     <span class="logo">JARVIS</span>
@@ -325,6 +376,7 @@
       <section class="file" id="f1" role="tabpanel" aria-label="En cours"></section>
       <section class="file" id="f2" role="tabpanel" aria-label="À venir"></section>
     </main>
+    <div class="parl feu" id="feu" role="dialog" aria-label="Routine" aria-hidden="true"><div class="parl-h" id="feu-h"></div><div class="fe-c" id="feu-c"></div></div>
     <div class="parl" id="parl" aria-hidden="true">
       <div class="parl-h">
         <svg class="holo" viewBox="0 0 60 60" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><circle cx="30" cy="30" r="26"/><ellipse cx="30" cy="30" rx="26" ry="9"/><ellipse class="m" cx="30" cy="30" rx="26" ry="26"/><ellipse class="m m2" cx="30" cy="30" rx="26" ry="26"/><ellipse class="m m3" cx="30" cy="30" rx="26" ry="26"/><circle cx="30" cy="30" r="3" fill="currentColor" stroke="none"/></svg>
@@ -355,7 +407,8 @@
   var calme = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   // ---- l'état de la maquette (tout est inventé) ----
-  var S = { f: 0, dom: 'tout', open: {}, dec: { d1: 'att', d2: 'att', d3: 'att' }, depot: 'att', ndf: 'non', fait: { devis: false, passeport: false }, fil: [], parl: false };
+  var S = { f: 0, dom: 'tout', open: {}, dec: { d1: 'att', d2: 'att', d3: 'att', d4: 'att' }, depot: 'att', ndf: 'non', fait: { devis: false, passeport: false }, fil: [], parl: false,
+    rt: {}, feu: null, edit: null, tout: null, dossier: 'Logement', choix: false, lu: {}, mois: null, page: 0 };
   var T = {};
   var CHEV = '<svg class="chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 6l5 5 5-5"/></svg>';
   var I_OUT = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8"/></svg>';
@@ -370,26 +423,59 @@
   var DEC = [
     { id: 'd1', dom: 'travail', src: 'Travail · CRA de la semaine', h: '16:02', t: 'CRA de la semaine', q: '4 jours travaillés, 1 congé. On confirme ?', oui: 'Confirmer', fait: 'Confirmé', suite: 'Confirmé. Hermes saisit la semaine sur le portail.' },
     { id: 'd2', dom: 'travail', src: 'Travail · CRA du mois · étape 5 sur 5', h: '14:29', t: 'CRA signé reçu de ton client (PDF)', q: 'Hermes le dépose sur le portail ?', oui: 'Oui, déposer', fait: 'Dépôt lancé', suite: 'C’est parti : Hermes dépose le PDF.', voir: 'cra' },
-    { id: 'd3', dom: 'travail', src: 'Travail · Note de frais', h: '15:48', t: 'Note de frais Télétravail de novembre', q: '18 jours, 45,00 €. On valide ?', oui: 'Valider', fait: 'Validée', suite: 'Validée. Hermes la crée sur le portail.', voir: 'ndf' }
+    { id: 'd3', dom: 'travail', src: 'Travail · Note de frais', h: '15:48', t: 'Note de frais Télétravail de novembre', q: '18 jours, 45,00 €. On valide ?', oui: 'Valider', fait: 'Validée', suite: 'Validée. Hermes la crée sur le portail.', voir: 'ndf' },
+    { id: 'd4', dom: 'papiers', src: 'Papiers · Dépôt', h: '16:08', t: 'scan-0412.pdf à ranger', oui: 'Oui, ranger ici', fait: 'Rangé', suite: '' }
   ];
   var ROUT = [
     { id: 'bilan', n: 'Bilan de la semaine', cad: 'lundi · 9:00', der: 'lun. 9:00', pro: 'auj. 17:40', e: 'err',
       st: [['Mails', 'fait'], ['Agenda', 'fait'], ['Rédaction', 'err'], ['Envoi', 'av']], hist: 'ooooonx', res: 'Arrêté pendant la rédaction : limite du forfait atteinte.', note: 'Relance automatique à 17 h 40. Rien à faire de ton côté.' },
     { id: 'veille', n: 'Veille du matin', cad: 'tous les jours · 7:40', der: '7:41', pro: 'dem. 7:40', e: 'ok',
-      st: [['Mails', 'fait'], ['Agenda', 'fait'], ['Résumé', 'fait'], ['Notifié', 'fait']], hist: 'ooooooo', res: '2 mails à voir, 1 rendez-vous aujourd’hui.', note: 'Notification envoyée à 7 h 41.' },
+      st: [['Mails', 'fait'], ['Agenda', 'fait'], ['Résumé', 'fait'], ['Notifié', 'fait']], hist: 'ooooooo', res: '3 points pour aujourd’hui, 2 attentes, rien d’envoyé.', note: 'Notification envoyée à 7 h 41.' },
     { id: 'courrier', n: 'Courrier à l’arrivée', cad: 'à chaque mail important', der: '13:15', pro: 'à l’arrivée', e: 'ok',
       st: [['Repéré', 'fait'], ['Lu', 'fait'], ['Classé', 'fait'], ['Notifié', 'fait']], hist: 'ooooooo', res: 'Avis de livraison du colis : demain, 9 h 45 – 13 h 45.', note: 'Créneau ajouté à l’agenda.' },
     { id: 'prix', n: 'Prix suivis', cad: 'tous les jours · 12:00', der: '12:00', pro: 'dem. 12:00', e: 'ok', dom: 'achats',
       st: [['Relevé', 'fait'], ['Seuils', 'fait'], ['Notifié', 'fait']], hist: 'ooooooo', res: 'Aspirateur balai à 189 € : sous ton seuil.', note: '2 prix relevés.' },
     { id: 'sorties', n: 'Sorties du week-end', cad: 'jeudi · 19:00', der: 'jeu. 19', pro: 'auj. 19:00', e: 'soon', dom: 'sorties',
-      st: [['Recherche', 'av'], ['Tri', 'av'], ['Notifié', 'av']], hist: 'nnnnnno', res: 'Jeudi dernier : 3 idées trouvées.', note: 'Prochain passage ce soir à 19 h.' },
+      st: [['Recherche', 'fait'], ['Tri', 'fait'], ['Notifié', 'fait']], hist: 'nnnnnno', res: 'Jeudi dernier : 3 idées trouvées pour le week-end.', note: 'Prochain passage ce soir à 19 h.' },
     { id: 'digest', n: 'Digest IA', cad: 'lundi · 8:00', der: 'lun. 8:00', pro: 'lun. 8:00', e: 'ok', dom: 'travail',
       st: [['Sources', 'fait'], ['Tri', 'fait'], ['Résumé', 'fait'], ['Envoyé', 'fait']], hist: 'nnnnnno', res: 'Lundi : 5 articles retenus.', note: 'Mail parti de JARVIS à 8 h 03.' }
   ];
+  // l'horaire d'origine, l'historique et les chiffres de chaque routine
+  var RX = {
+    bilan: { sch: { j: [0], h: ['9:00'] }, ok: 3, tot: 4, moy: '4 min 05', bx: [0], hi: [['lun. 23 · 9:00', '2 min 03', 'x', 'p'], ['lun. 16 · 9:00', '4 min 12', 'o', 'p'], ['lun. 9 · 9:00', '3 min 58', 'o', 'p'], ['lun. 2 · 9:00', '4 min 05', 'o', 'p']] },
+    veille: { sch: { j: 'tous', h: ['7:40'] }, ok: 28, tot: 30, moy: '1 min 40', bx: [3, 18], hi: [['auj. 7:40', '1 min 38', 'o', 'p'], ['mer. 25 · 7:40', '1 min 44', 'o', 'p'], ['mar. 24 · 18:12', '1 min 20', 'o', 'm'], ['mar. 24 · 7:40', '12 s', 'x', 'p'], ['lun. 23 · 7:40', '1 min 41', 'o', 'p']] },
+    courrier: { sch: null, ok: 41, tot: 41, moy: '35 s', bx: [], hi: [['auj. 13:15', '34 s', 'o', 'p'], ['auj. 9:02', '29 s', 'o', 'p'], ['mer. 25 · 17:48', '36 s', 'o', 'p'], ['mer. 25 · 10:20', '41 s', 'o', 'p']] },
+    prix: { sch: { j: 'tous', h: ['12:00'] }, ok: 30, tot: 30, moy: '50 s', bx: [], hi: [['auj. 12:00', '52 s', 'o', 'p'], ['mer. 25 · 12:00', '49 s', 'o', 'p'], ['mar. 24 · 12:00', '55 s', 'o', 'p'], ['lun. 23 · 12:00', '47 s', 'o', 'p']] },
+    sorties: { sch: { j: [3], h: ['19:00'] }, ok: 4, tot: 4, moy: '3 min 10', bx: [], hi: [['jeu. 19 · 19:00', '3 min 12', 'o', 'p'], ['jeu. 12 · 19:00', '2 min 58', 'o', 'p'], ['jeu. 5 · 19:00', '3 min 20', 'o', 'p']] },
+    digest: { sch: { j: [0], h: ['8:00'] }, ok: 4, tot: 4, moy: '2 min 20', bx: [], hi: [['lun. 23 · 8:00', '2 min 24', 'o', 'p'], ['lun. 16 · 8:00', '2 min 10', 'o', 'p'], ['lun. 9 · 8:00', '2 min 31', 'o', 'p']] }
+  };
+  ROUT.forEach(function (r) { var x = RX[r.id], k; for (k in x) r[k] = x[k]; S.rt[r.id] = { p: r.id === 'digest' ? 'le 24/11' : null, run: false, fix: false, sch: null, der: null, plus: [] }; });
+  var JN = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche'], JC = ['lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.', 'dim.'];
+  function rget(id) { return ROUT.filter(function (r) { return r.id === id; })[0]; }
+  function etatR(r) { var x = S.rt[r.id]; return x.run ? 'run' : x.p ? 'pause' : r.e === 'err' && !x.fix ? 'err' : 'ok'; }
+  function sch(r) { return S.rt[r.id].sch || r.sch; }
+  function mn(h) { var p = h.split(':'); return +p[0] * 60 + +p[1]; }
+  function tri(h) { return h.slice().sort(function (a, b) { return mn(a) - mn(b); }); }
+  function hh(h) { var p = h.split(':'); return +p[0] + ' h' + (p[1] === '00' ? '' : ' ' + p[1]); }
+  function et(a) { return a.length > 1 ? a.slice(0, -1).join(', ') + ' et ' + a[a.length - 1] : a[0] || ''; }
+  function clair(s) { if (!s) return 'à chaque mail important'; return (s.j === 'tous' ? 'tous les jours' : s.j === 'sem' ? 'du lundi au vendredi' : s.j.length ? (s.j.length > 1 ? 'les ' : 'le ') + et(s.j.map(function (i) { return JN[i]; })) : 'aucun jour') + ' à ' + et(tri(s.h).map(hh)); }
+  function court(s) { if (!s) return 'à chaque mail important'; return (s.j === 'tous' ? 'tous les jours' : s.j === 'sem' ? 'lun. au ven.' : s.j.length === 1 ? JN[s.j[0]] : s.j.map(function (i) { return JC[i]; }).join(' ')) + ' · ' + tri(s.h).join(', '); }
+  function proch(r) {   // le prochain passage, calculé depuis jeudi 16 h 10
+    var x = S.rt[r.id], s = sch(r), d, k, jd, js, hs;
+    if (x.run) return 'en cours'; if (x.p) return 'en pause'; if (r.e === 'err' && !x.fix) return 'auj. 17:40'; if (!s) return 'à l’arrivée';
+    js = s.j === 'tous' ? [0, 1, 2, 3, 4, 5, 6] : s.j === 'sem' ? [0, 1, 2, 3, 4] : s.j; hs = tri(s.h);
+    for (d = 0; d < 8; d++) { jd = (3 + d) % 7; if (js.indexOf(jd) < 0) continue; for (k = 0; k < hs.length; k++) { if (d === 0 && mn(hs[k]) <= 970) continue; return (d === 0 ? 'auj.' : d === 1 ? 'dem.' : JC[jd]) + ' ' + hs[k]; } }
+    return '—';
+  }
   var MAILS = [
-    { id: 'm1', dom: 'travail', n: 'CRA Novembre', a: '7:27', r: '14:29', rs: 'réponse · PDF', ex: 'Pièce jointe : <b>le CRA signé</b>. Il attend ton oui pour le dépôt.' },
-    { id: 'm2', dom: 'travail', n: 'Prolongation de mission', a: '7:27', r: '11:17', rs: 'réponse', ex: 'Réponse : <b>« prolongé pour décembre »</b>.' }
+    { id: 'm1', dom: 'travail', n: 'CRA Novembre', a: '7:27', r: '14:29', rs: 'PDF signé', ex: 'Réponse avec <b>le PDF signé</b>. La suite, le dépôt sur le portail, est dans « À toi ».' },
+    { id: 'm2', dom: 'travail', n: 'Prolongation de mission', a: '7:27', r: '11:17', rs: 'réponse', alire: 1, ex: 'Réponse : <b>« prolongé pour décembre »</b>.' }
   ];
+  var DOSS = ['Logement', 'Voiture', 'Famille', 'Voyages', 'À trier'];
+  var MN = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'], MC = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'], MOIS = [];
+  [690, 410, 380, 520, 470, 610, 540, 720, 760, 450, 500, 430, 710, 440, 400, 560, 490, 580, 620, 700, 680, 470, 530].forEach(function (k, i) { var m = (11 + i) % 12, a = 2024 + Math.floor((11 + i) / 12), f = (a < 2026 ? 1370 : 1410) + (m === 2 ? 180 : 0); MOIS.push({ n: MN[m] + ' ' + a, c: MC[m], a: a, f: f, k: k, t: f + k }); });
+  MOIS.push({ n: 'novembre 2026', c: 'nov.', a: 2026, f: 930, k: 250, t: 1180, r: 640 });
+  function eur(n) { return String(n).replace(/\B(?=(\d{3})+$)/g, '\u00a0') + '\u00a0€'; }
   var DOCS = [['Devis plombier.pdf', 'Logement · Sinistre', 'hier'], ['Attestation assurance habitation.pdf', 'Logement', 'lun. 23'], ['Certificat de scolarité.pdf', 'Famille', '18/11']];
   var JOURS = [
     { k: 'j26', c: 'jeu.', n: '26', l: 'Aujourd’hui', l2: 'jeudi 26', ev: [
@@ -423,7 +509,7 @@
       { c: 'Mail', l: 'Mail au client', q: 'auj. 7:27 · envoyé par JARVIS', e: 'fait' },
       { c: 'Portail', l: 'CRA validé sur le portail', q: 'auj. 7:31 · par Hermes', e: 'fait' },
       { c: 'Signé', l: 'CRA signé reçu', q: 'auj. 14:29 · PDF de ton client', e: 'fait' },
-      { c: 'Dépôt', l: 'Déposé sur le portail', q: d === 'fait' ? 'auj. 16:10 · par Hermes' : d === 'run' ? 'Hermes dépose le PDF…' : 'Attend ton oui', e: d === 'fait' ? 'fait' : d === 'run' ? 'run' : 'toi', act: d === 'att' ? 'd2' : null }] }];
+      { c: 'Dépôt', l: d === 'fait' ? 'Déposé sur le portail' : 'Dépôt sur le portail', q: d === 'fait' ? 'auj. 16:10 · par Hermes' : d === 'run' ? 'Hermes dépose le PDF…' : 'Hermes le dépose sur le portail ? Il attend ton oui.', e: d === 'fait' ? 'fait' : d === 'run' ? 'run' : 'toi', act: d === 'att' ? 'd2' : null }] }];
     if (S.ndf !== 'non') l.push({ id: 'ndf', n: 'Note de frais Télétravail', sub: 'novembre · chaîne', dom: 'travail', der: 'auj. 16:10', pro: S.ndf === 'fait' ? 'en décembre' : 'création en cours', st: [
       { c: 'Préparée', l: 'Préparée par Hermes', q: 'auj. 15:48 · 18 jours, 45,00 €', e: 'fait' },
       { c: 'Validée', l: 'Validée', q: 'auj. 16:10 · par toi', e: 'fait' },
@@ -443,11 +529,12 @@
         { c: 'Envoi', l: 'Envoyer le devis à l’assurance', q: fd ? 'auj. 16:10 · fait par toi' : 'À toi · avant le 01/12', e: fd ? 'fait' : 'toi', todo: fd ? null : 'devis' },
         { c: 'Expert', l: 'Passage de l’expert', q: '08/12 · à l’agenda', e: 'av' },
         { c: 'Clôture', l: 'Indemnisation', q: 'après le passage de l’expert', e: 'av' }],
-        plus: '<h4 class="sub">Mail en attente de réponse</h4><div class="ar"><span class="p a">' + I_OUT + 'lun. 23 <small>envoyé</small></span><i class="tr w"></i><span class="p w">' + I_WAIT + '<small>pas de réponse</small></span></div><p class="ex" style="margin-top:6px;color:var(--mut);font-size:14px">« Délai de traitement du dossier ? » à ton assurance. JARVIS te prévient à la réponse.</p>' +
+        plus: '<h4 class="sub">2 échéances</h4><div class="kv"><span>Envoyer le devis à l’assurance</span><span class="' + (fd ? 'gr">fait' : 'am">avant le 01/12') + '</span></div><div class="kv"><span>Passage de l’expert</span><span>08/12</span></div>' +
+          '<h4 class="sub">1 mail en attente de réponse</h4><div class="ar"><span class="p a">' + I_OUT + 'lun. 23 <small>envoyé</small></span><i class="tr w"></i><span class="p w">' + I_WAIT + '<small>pas de réponse</small></span></div><p class="ex" style="margin-top:6px;color:var(--mut);font-size:14px">« Délai de traitement du dossier ? » à ton assurance. JARVIS te prévient à la réponse.</p>' +
           '<h4 class="sub">Dossier</h4><div class="kv"><span>4 pièces rangées dans Papiers</span><span>Logement</span></div><button class="lien" data-act="dom" data-id="papiers">Voir les papiers du dossier</button>' },
       { id: 'passeport', n: 'Passeport à renouveler', sub: 'sujet · 1 échéance', dom: 'papiers', suj: 1, der: '20/11', pro: fp ? 'dépôt en mairie' : 'avant le 01/12', st: [
-        { c: 'Pré-demande', l: 'Pré-demande en ligne', q: '20/11 · faite', e: 'fait' },
-        { c: 'Rendez-vous', l: 'Prendre le rendez-vous en mairie', q: fp ? 'auj. 16:10 · fait par toi' : 'À toi · avant le 01/12', e: fp ? 'fait' : 'toi', todo: fp ? null : 'passeport' },
+        { c: 'Demande', l: 'Pré-demande en ligne', q: '20/11 · faite', e: 'fait' },
+        { c: 'Rendez\u2011vous', l: 'Prendre le rendez-vous en mairie', q: fp ? 'auj. 16:10 · fait par toi' : 'À toi · avant le 01/12', e: fp ? 'fait' : 'toi', todo: fp ? null : 'passeport' },
         { c: 'Dépôt', l: 'Dépôt du dossier', q: 'le jour du rendez-vous', e: 'av' },
         { c: 'Retrait', l: 'Retrait du passeport', q: 'quelques semaines après', e: 'av' }] }
     ];
@@ -456,8 +543,8 @@
   function compte(tout) {
     var v = tout ? function () { return true; } : vis;
     var dec = DEC.filter(function (d) { return S.dec[d.id] === 'att' && v(d); }).length;
-    var err = ROUT.filter(function (r) { return r.e === 'err' && v(r); }).length;
-    var cours = ROUT.filter(function (r) { return r.e !== 'err' && v(r); }).length + chaines().filter(function (c) { return etatCh(c) !== 'ok' && v(c); }).length + sujets().filter(v).length;
+    var err = ROUT.filter(function (r) { return etatR(r) === 'err' && v(r); }).length;
+    var cours = ROUT.filter(function (r) { var e = etatR(r); return (e === 'ok' || e === 'run') && v(r); }).length + chaines().filter(function (c) { return etatCh(c) !== 'ok' && v(c); }).length + sujets().filter(v).length;
     var venir = 0; JOURS.forEach(function (j) { j.ev.forEach(function (e) { if (e.ty !== 'pas' && v(e) && !(e.todo && S.fait[e.todo])) venir++; }); });
     return { dec: dec, err: err, cours: cours, venir: venir };
   }
@@ -481,6 +568,25 @@
       }).join('') + '</ol>' + (c.plus || '') + '</div>' : '') + '</div>';
   }
 
+  // ---- un papier déposé : la proposition de JARVIS ----
+  function propo() {
+    return '<p class="q">JARVIS propose le dossier <b>' + S.dossier + '</b>, sous le nom <b>« 2026-11 Facture électricité.pdf »</b>.</p>' +
+      (S.choix ? '<div class="doss">' + DOSS.map(function (d) { return '<button class="chip" data-act="dossier" data-id="' + d + '" aria-pressed="' + (d === S.dossier) + '">' + d + '</button>'; }).join('') + '</div>' : '') +
+      '<div class="acts3"><button class="b b1" data-act="oui" data-id="d4">Oui, ranger ici</button><button class="b b2 sm" data-act="choix">Changer de dossier</button><button class="b b2 sm" data-act="retirer">Retirer</button></div>';
+  }
+  // ---- Argent : les deux chiffres du mois et l'historique en barres fines ----
+  function argent() {
+    var deb = 18 - S.page * 6, six = MOIS.slice(deb, deb + 6), s = S.mois == null ? null : MOIS[S.mois], px = function (v) { return Math.round(v / 2200 * 84); };
+    return '<h2>Argent <small>novembre 2026</small></h2><div class="tri deux"><div><b>1 180 €</b><small>déjà dépensé ce mois</small><small class="d">fixes passées 930\u00a0€ · courantes notées 250\u00a0€</small></div><div><b>640 €</b><small>reste à payer</small><small class="d">prochain : Électricité, 62\u00a0€ le\u00a028</small></div></div>' +
+      '<h4 class="sub">Historique <small>mois par mois · 6 sur 24</small></h4><div class="bars" role="group" aria-label="Dépenses mois par mois">' + six.map(function (m, k) {
+        var i = deb + k, on = i === S.mois;
+        return '<button data-act="mois" data-id="' + i + '" aria-pressed="' + on + '" aria-label="' + m.n + ' : ' + eur(m.t) + '"><span class="col"><span class="v">' + (on || (s == null && i === 23) ? eur(m.t) : '') + '</span>' + (m.r ? '<i class="r" style="height:' + px(m.r) + 'px"></i>' : '') + '<i style="height:' + px(m.t) + 'px"></i></span><small>' + m.c + '</small></button>';
+      }).join('') + '</div>' +
+      (s ? '<div class="mois-d"><b>' + s.n.charAt(0).toUpperCase() + s.n.slice(1) + (s.r ? ', en cours' : '') + ' : ' + eur(s.t) + '</b><div class="kv"><span>' + (s.r ? 'Fixes passées' : 'Dépenses fixes') + '</span><span>' + eur(s.f) + '</span></div><div class="kv"><span>' + (s.r ? 'Courantes notées' : 'Dépenses courantes') + '</span><span>' + eur(s.k) + '</span></div>' + (s.r ? '<div class="kv"><span>Reste à payer</span><span class="am">' + eur(s.r) + '</span></div>' : '') + '</div>'
+        : '<p class="note">Touche un mois pour l’ouvrir.' + (S.page ? '' : ' En pointillé : le reste à payer de novembre.') + '</p>') +
+      '<div class="pag"><button class="b b2 sm" data-act="page" data-id="1" aria-label="Six mois plus tôt"' + (S.page > 2 ? ' disabled' : '') + '>‹</button><span>' + six[0].c + (six[0].a !== six[5].a ? ' ' + six[0].a : '') + ' – ' + six[5].c + ' ' + six[5].a + '</span><button class="b b2 sm" data-act="page" data-id="-1" aria-label="Six mois plus tard"' + (S.page < 1 ? ' disabled' : '') + '>›</button></div>';
+  }
+
   // ---- la fiche courte d'un domaine ----
   function fiche() {
     var d = S.dom, h = '';
@@ -489,13 +595,17 @@
       '<div class="kv"><span>CRA de novembre</span><span class="' + (S.depot === 'fait' ? 'gr">déposé' : S.depot === 'run' ? '">dépôt en cours' : 'am">signé, à déposer') + '</span></div>' +
       '<div class="kv"><span>Notes de frais</span><span class="' + (S.ndf === 'non' ? 'am">1 créée · 1 à valider' : '">' + (S.ndf === 'fait' ? '2 créées' : '1 créée · 1 en route')) + '</span></div>' +
       '<div class="kv"><span>Mission</span><span class="gr">prolongée pour décembre</span></div>';
-    if (d === 'papiers') h = '<h2>Papiers <small>déposer, chercher</small></h2>' +
-      '<button class="b b1" style="width:100%" data-act="deposer">Déposer un document</button>' +
-      '<label class="champ">' + I_LOUPE + '<input id="qdoc" type="text" placeholder="Chercher un papier…" aria-label="Chercher un papier"></label>' +
-      '<h4 class="sub">Derniers documents</h4><div id="docs">' + DOCS.map(function (x) { return '<div class="doc">' + I_DOC + '<span><b>' + x[0] + '</b><small>' + x[1] + '</small></span><span>' + x[2] + '</span></div>'; }).join('') + '</div>' +
-      '<div class="alerte">Carte d’identité : expire dans 5 mois</div>';
-    if (d === 'argent') h = '<h2>Argent <small>novembre</small></h2><div class="tri">' +
-      '<div><b>640 €</b><small>reste à payer ce mois</small></div><div><b>1 180 €</b><small>déjà dépensé</small></div><div><b>62 €</b><small>Électricité, le 28</small></div></div>';
+    if (d === 'papiers') {
+      var dd = DOCS.slice(); if (S.dec.d4 === 'oui') dd.unshift(['2026-11 Facture électricité.pdf', S.dossier, 'à l’instant']);
+      h = '<h2>Papiers <small>déposer, chercher</small></h2><button class="b b1" style="width:100%" data-act="deposer">Déposer un document</button><h4 class="sub">Dépôt en cours</h4>' +
+        (S.dec.d4 === 'att' ? '<div class="depo"><div class="doc">' + I_DOC + '<span><b>scan-0412.pdf</b><small>déposé à 16:08 · lu par JARVIS</small></span><span class="bdg toi">à ranger</span></div>' + propo() + '</div>'
+          : S.dec.d4 === 'retire' ? '<div class="doc">' + I_DOC + '<span><b>scan-0412.pdf</b><small>retiré du dépôt</small></span><button class="b b2 sm" data-act="annuler" data-id="d4">Remettre</button></div>' : '') +
+        '<div class="doc">' + I_DOC + '<span><b>photo-0413.jpg</b><small>déposé à 16:09 · pas encore lu</small></span><span class="bdg att">en attente</span></div>' +
+        '<label class="champ">' + I_LOUPE + '<input class="qdoc" type="text" placeholder="Chercher un papier…" aria-label="Chercher un papier"></label>' +
+        '<h4 class="sub">Derniers documents</h4><div class="dl">' + dd.map(function (x) { return '<div class="doc">' + I_DOC + '<span><b>' + x[0] + '</b><small>' + x[1] + '</small></span><span>' + x[2] + '</span></div>'; }).join('') + '</div>' +
+        '<div class="alerte">Carte d’identité : expire dans 5 mois</div>';
+    }
+    if (d === 'argent') h = argent();
     if (d === 'achats') h = '<h2>Achats <small>2 prix suivis · relevés à 12:00</small></h2>' +
       '<div class="px bas"><span><b>Aspirateur balai</b><small class="gr">sous ton seuil de 200 €</small></span><svg viewBox="0 0 64 26" fill="none" aria-hidden="true"><path d="M0 9h64" stroke="#fbbf24" stroke-dasharray="3 3" stroke-width="1"/><path d="M1 5l10 1 10-2 10 3 10 1 10 4 12 8" stroke="#6ee7b7" stroke-width="2"/></svg><span class="m">189 €</span></div>' +
       '<div class="px"><span><b>Casque audio</b><small>seuil 240 € · encore au-dessus</small></span><svg viewBox="0 0 64 26" fill="none" aria-hidden="true"><path d="M0 20h64" stroke="#fbbf24" stroke-dasharray="3 3" stroke-width="1"/><path d="M1 8l10-2 10 3 10-1 10 2 10-3 12 2" stroke="#67e8f9" stroke-width="2"/></svg><span class="m">279 €</span></div>';
@@ -509,14 +619,15 @@
   // ---- file 1 : À toi ----
   function vizDec(d) {
     if (d.id === 'd1') return '<span class="sem7"><span>lun.</span><span>mar.</span><span class="c">congé</span><span>jeu.</span><span>ven.</span></span>';
-    if (d.id === 'd2') return rail(chaines()[0].st, 1) + '<small>CRA du mois : 4 étapes sur 5 faites</small>';
-    return rail([['', 'fait'], ['', 'toi'], ['', 'av']], 1) + '<small>Préparée par Hermes à 15:48</small>';
+    if (d.id === 'd2') return rail(chaines()[0].st, 1) + '<small>4 étapes sur 5 faites</small>';
+    return rail([['', 'fait'], ['', 'toi'], ['', 'av']], 1) + '<small>Préparée à 15:48</small>';
   }
   function fToi() {
     var att = DEC.filter(function (d) { return S.dec[d.id] === 'att' && vis(d); }), tard = DEC.filter(function (d) { return S.dec[d.id] === 'tard' && vis(d); }), ok = DEC.filter(function (d) { return S.dec[d.id] === 'oui' && vis(d); });
     var h = fiche() + '<h2 class="sh am">Attend ton oui <span>' + (att.length ? att.length + (att.length > 1 ? ' décisions' : ' décision') : 'rien') + '</span></h2>';
     if (!att.length) h += '<div class="bloc vide"><b>Rien n’attend ton oui' + (S.dom === 'tout' ? '.' : ' ici.') + '</b>Le reste avance tout seul : regarde « En cours ».</div>';
     h += att.map(function (d) {
+      if (d.id === 'd4') return S.dom === 'papiers' ? '<div class="bloc vide"><b>Ranger scan-0412.pdf</b>La proposition de JARVIS est dans la fiche Papiers, juste au-dessus.</div>' : '<article class="dec bloc" id="x-d4"><i class="bar"></i><div class="dec-h"><span>' + d.src + '</span><span>' + d.h + '</span></div><h3>' + d.t + '</h3>' + propo() + '</article>';
       return '<article class="dec bloc" id="x-' + d.id + '"><i class="bar"></i><div class="dec-h"><span>' + d.src + '</span><span>' + d.h + '</span></div><h3>' + d.t + '</h3><p class="q">' + d.q + '</p>' +
         '<div class="viz">' + vizDec(d) + '</div><div class="acts"><button class="b b1" data-act="oui" data-id="' + d.id + '">' + d.oui + '</button><button class="b b2" data-act="tard" data-id="' + d.id + '">Plus tard</button></div></article>';
     }).join('');
@@ -537,40 +648,43 @@
     var ch = chaines().filter(vis), rt = ROUT.filter(vis), ml = MAILS.filter(vis), sj = sujets().filter(vis), h = fiche();
     if (ch.length) h += '<h2 class="sh">Chaînes <span>' + ch.length + ' · étape par étape</span></h2>' + ch.map(ligne).join('');
     if (rt.length) {
-      var ne = rt.filter(function (r) { return r.e === 'err'; }).length;
-      h += '<h2 class="sh">Routines d’Hermes <span>' + rt.length + (ne ? ' · ' + ne + ' en erreur' : ' · tout va bien') + '</span></h2><div class="bloc hud">' +
+      var ne = rt.filter(function (r) { return etatR(r) === 'err'; }).length, np = rt.filter(function (r) { return etatR(r) === 'pause'; }).length;
+      h += '<h2 class="sh">Routines d’Hermes <span>' + rt.length + (ne ? ' · ' + ne + ' en erreur' : '') + (np ? ' · ' + np + ' en pause' : '') + (ne || np ? '' : ' · tout va bien') + '</span></h2><div class="bloc hud">' +
         '<div class="hud-top"><i class="pt"></i><span>Passerelle d’Hermes : <b>active</b></span><svg class="ecg" viewBox="0 0 96 20" aria-hidden="true"><path class="f" d="M0 10h22l3-6 4 13 4-10 3 3h20l3-6 4 13 4-10 3 3h23"/><path pathLength="250" d="M0 10h22l3-6 4 13 4-10 3 3h20l3-6 4 13 4-10 3 3h23"/></svg></div>' +
         '<div class="cols"><span></span><span>Routine</span><span>Dernier</span><span>Prochain</span></div>' +
         rt.map(function (r) {
-          var o = !!S.open[r.id];
-          return '<button class="rt ' + r.e + (o ? ' on' : '') + '" id="x-' + r.id + '" data-act="ouvrir" data-id="' + r.id + '" aria-expanded="' + o + '"><i class="pt ' + (r.e === 'ok' ? '' : r.e) + '"></i><span class="rn"><b>' + r.n + '</b><small>' + r.cad + '</small></span><span class="rd">' + r.der + '</span><span class="rp">' + r.pro + '</span>' +
-            (r.e === 'err' ? '<span class="al">Erreur : limite du forfait. <span>Relance prévue à 17 h 40.</span></span>' : '') + '</button>' +
-            (o ? '<div class="rt-d">' + rail(r.st) + '<p>' + r.res + '<small>' + r.note + '</small></p><div class="hist">' + r.hist.split('').map(function (c) { return '<i class="' + (c === 'x' ? 'x' : c === 'n' ? 'n' : '') + '"></i>'; }).join('') + '<span>7 derniers jours</span></div></div>' : '');
-        }).join('') + '</div>';
+          var x = S.rt[r.id], e = etatR(r), pr = proch(r), soon = e === 'ok' && /^auj/.test(pr);
+          return '<button class="rt ' + e + (soon ? ' soon' : '') + '" id="x-' + r.id + '" data-act="feuille" data-id="' + r.id + '" aria-haspopup="dialog"><i class="pt ' + (e === 'ok' ? (soon ? 'soon' : '') : e) + '"></i><span class="rn"><b>' + r.n + '</b><small>' + (e === 'pause' ? 'en pause depuis ' + x.p : e === 'run' ? 'passage en cours…' : court(sch(r))) + '</small></span><span class="rd">' + (x.der || r.der) + '</span><span class="rp">' + pr + '</span>' +
+            (e === 'err' ? '<span class="al">Erreur : limite du forfait. <span>Relance prévue à 17 h 40.</span></span>' : '') + '</button>';
+        }).join('') +
+        '<div class="hud-f"><small>Touche une routine pour l’administrer.</small><button class="b b2 sm" data-act="toutpause">' + (S.tout ? 'Tout reprendre' : 'Tout mettre en pause') + '</button></div></div>';
     }
-    if (ml.length) h += '<h2 class="sh">Mails envoyés par JARVIS <span>' + ml.length + ' · réponse reçue</span></h2><div class="bloc">' + ml.map(function (m) {
-      return '<div class="ml" id="x-' + m.id + '"><div class="ml-h"><b>' + m.n + '</b><span class="bdg ok">répondu</span></div><div class="ar"><span class="p a">' + I_OUT + m.a + ' <small>envoyé</small></span><i class="tr"></i><span class="p r">' + I_IN + m.r + ' <small>' + m.rs + '</small></span></div><p class="ex">' + m.ex + '</p></div>';
+    if (ml.length) h += '<h2 class="sh">Mails suivis <span>' + ml.length + ' · envoyés par JARVIS</span></h2><div class="bloc">' + ml.map(function (m) {
+      var al = m.alire && !S.lu[m.id];
+      return '<div class="ml" id="x-' + m.id + '"><div class="ml-h"><b>' + m.n + '</b><span class="bdg ' + (al ? 'toi">à lire' : 'ok">' + (m.alire ? 'lu' : 'répondu')) + '</span></div><div class="ar"><span class="p a">' + I_OUT + m.a + ' <small>envoyé</small></span><i class="tr"></i><span class="p r">' + I_IN + m.r + ' <small>' + m.rs + '</small></span></div>' +
+        (al ? '<button class="lien" data-act="lire" data-id="' + m.id + '">Lire la réponse</button>' : '<p class="ex">' + m.ex + '</p>') + '</div>';
     }).join('') + '</div>';
     if (sj.length) h += '<h2 class="sh">Sujets ouverts <span>' + sj.length + ' · tout au même endroit</span></h2>' + sj.map(ligne).join('');
     if (!ch.length && !rt.length && !ml.length && !sj.length) h += '<div class="bloc vide" style="margin-top:12px"><b>Rien ne tourne dans ' + NOMDOM[S.dom] + '.</b>Pas de routine ni de chaîne pour ce domaine.</div>';
-    else h += '<div class="leg"><span><span class="fait"><i class="st"></i></span>fait</span><span><span class="run"><i class="st"></i></span>en route</span><span><span class="toi"><i class="st"></i></span>attend toi</span><span><span class="err"><i class="st"></i></span>erreur</span><span><span class="av"><i class="st"></i></span>à venir</span></div>';
+    else h += '<div class="leg"><span><span class="fait"><i class="st"></i></span>fait</span><span><span class="run"><i class="st"></i></span>en route</span><span><span class="toi"><i class="st"></i></span>t’attend</span><span><span class="err"><i class="st"></i></span>erreur</span><span><span class="av"><i class="st"></i></span>à venir</span></div>';
     return h;
   }
 
   // ---- file 3 : À venir ----
   function evLi(e) {
-    var fini = e.todo && S.fait[e.todo];
-    var c = '<span class="h">' + e.h + '</span><i class="mk"></i>', t = '<b>' + e.t + '</b><small>' + (fini ? 'fait' : e.s) + '</small>';
-    return '<li class="' + e.ty + (e.al ? ' al' : '') + '">' + c + (e.id ? '<button data-act="voir" data-f="' + e.f + '" data-id="' + e.id + '">' + t + '</button>' : '<div>' + t + '</div>') + '</li>';
+    var fini = e.todo && S.fait[e.todo], rp = e.ty === 'pas' && S.rt[e.id] && etatR(rget(e.id)) === 'pause';
+    var c = '<span class="h">' + e.h + '</span><i class="mk"></i>', t = '<b>' + e.t + '</b><small>' + (fini ? 'fait' : rp ? 'en pause : ne passera pas' : e.s) + '</small>';
+    return '<li class="' + e.ty + (e.al ? ' al' : '') + (rp || fini ? ' z' : '') + '">' + c + (e.id ? '<button data-act="voir" data-f="' + e.f + '" data-id="' + e.id + '">' + t + '</button>' : '<div>' + t + '</div>') + '</li>';
   }
+  function evs(j) { return j.ev.filter(vis).filter(function (e) { return !(e.al && etatR(rget('bilan')) !== 'err'); }); }
   function fVenir() {
-    var h = fiche() + '<div class="auj bloc"><div><b>Jeudi 26 novembre</b><small>6 °C, couvert · 2 rendez-vous d’ici demain</small></div><div class="t">16:10</div></div><div class="sem">' +
+    var h = fiche() + '<div class="auj bloc"><div><b>Jeudi 26 novembre</b><small>1 rendez-vous · 2 passages d’Hermes</small></div><div class="t">6 °C<small>couvert</small></div></div><div class="sem">' +
       JOURS.map(function (j, i) {
-        var ev = j.ev.filter(vis);
+        var ev = evs(j);
         return '<button class="' + (i ? '' : 'now') + (ev.length ? '' : ' z') + '" data-act="jour" data-id="' + j.k + '" aria-label="' + j.l + '"><small>' + j.c + '</small><b>' + j.n + '</b><span class="n">' + ev.slice(0, 3).map(function (e) { return '<i class="' + (e.ty === 'ech' ? 'e' : e.ty === 'pas' ? 'p' : '') + '"></i>'; }).join('') + '</span></button>';
       }).join('') + '</div>', n = 0;
     JOURS.forEach(function (j) {
-      var ev = j.ev.filter(vis);
+      var ev = evs(j);
       if (!ev.length && S.dom !== 'tout') return;
       n += ev.length;
       h += '<h3 class="dj" id="x-' + j.k + '">' + j.l + (j.l2 ? ' <small>' + j.l2 + '</small>' : '') + '</h3>' + (ev.length ? '<ol class="tl">' + ev.map(evLi).join('') + '</ol>' : '<p class="rien">rien de prévu</p>');
@@ -582,6 +696,14 @@
     return h;
   }
 
+  // ---- typographie : pas de coupure avant « : ? ! € » ni au milieu d'une heure ou d'un montant ----
+  function typo(el) {
+    var w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT), n, t;
+    while ((n = w.nextNode())) {
+      t = n.nodeValue.replace(/ ([:;?!»€])/g, '\u00a0$1').replace(/« /g, '«\u00a0').replace(/(\d) (\d{3})(?!\d)/g, '$1\u00a0$2').replace(/(\d) h (\d\d)/g, '$1\u00a0h\u00a0$2').replace(/(\d) (h|min|s|mois|jours)(?![a-zà-ÿ])/g, '$1\u00a0$2').replace(/min (\d\d)/g, 'min\u00a0$1');
+      if (t !== n.nodeValue) n.nodeValue = t;
+    }
+  }
   // ---- tout redessiner ----
   function render() {
     var g = compte(true), c = compte(false);
@@ -594,10 +716,11 @@
     tb[2].innerHTML = 'À venir <b>' + c.venir + '</b>';
     $('#chips').innerHTML = DOMS.map(function (d) {
       var n = d[0] === 'tout' ? 0 : DEC.filter(function (x) { return x.dom === d[0] && S.dec[x.id] === 'att'; }).length;
-      var t = d[0] === 'papiers' ? (S.fait.devis ? 0 : 1) + (S.fait.passeport ? 0 : 1) : 0;
-      return '<button class="chip" data-act="dom" data-id="' + d[0] + '" aria-pressed="' + (S.dom === d[0]) + '">' + d[1] + (n ? '<i>' + n + '</i>' : t ? '<i>' + t + '</i>' : '') + '</button>';
+      return '<button class="chip" data-act="dom" data-id="' + d[0] + '" aria-pressed="' + (S.dom === d[0]) + '">' + d[1] + (n ? '<i>' + n + '</i>' : '') + '</button>';
     }).join('');
     $('#f0').innerHTML = fToi(); $('#f1').innerHTML = fCours(); $('#f2').innerHTML = fVenir();
+    typo($('#pistes')); typo($('#etat'));
+    feuilleR();
   }
 
   // ---- naviguer ----
@@ -611,13 +734,14 @@
   }, { passive: true });
   window.addEventListener('resize', function () { pistes.scrollLeft = S.f * pistes.clientWidth; });
   function voir(f, id, ouvre) {
-    fermer();
+    fermer(); fermerF();
     var it = chaines().concat(sujets(), ROUT, MAILS, DEC).filter(function (x) { return x.id === id; })[0];
     if (it && !vis(it)) S.dom = 'tout';
     if (ouvre !== false && id && !/^(m|d|j)\d/.test(id)) S.open[id] = true;
     render(); file(f, true);
     var el = document.getElementById('x-' + id);
-    if (el) { var p = el.closest('.file'); p.scrollTop = Math.max(0, el.offsetTop - p.offsetTop - 70); el.classList.add('flash'); setTimeout(function () { el.classList.remove('flash'); }, 1700); }
+    if (el) { var p = el.closest('.file'); p.scrollTop = Math.max(0, p.scrollTop + el.getBoundingClientRect().top - p.getBoundingClientRect().top - 70); el.classList.add('flash'); setTimeout(function () { el.classList.remove('flash'); }, 1700); }
+    if (S.rt[id]) ouvrirF(id);
   }
   function toast(m, lien) {
     var t = $('#toast'), b = $('button', t); $('span', t).textContent = m;
@@ -625,12 +749,46 @@
     t.classList.add('on'); clearTimeout(T.toast); T.toast = setTimeout(function () { t.classList.remove('on'); }, 4200);
   }
 
+  // ---- administrer une routine : sa feuille ----
+  function ouvrirF(id) { fermer(); S.feu = id; S.edit = null; var f = $('#feu'); f.classList.add('on'); f.setAttribute('aria-hidden', 'false'); feuilleR(); $('#feu-c').scrollTop = 0; }
+  function fermerF() { if (!S.feu) return; S.feu = null; S.edit = null; var f = $('#feu'); f.classList.remove('on'); f.setAttribute('aria-hidden', 'true'); }
+  function feuilleR() {
+    if (!S.feu) return;
+    var r = rget(S.feu), x = S.rt[r.id], e = etatR(r), s = sch(r), ed = S.edit, hi = x.plus.concat(r.hi), ok = r.ok + x.plus.length, n = r.tot + x.plus.length, h = '', i, nb = Math.min(n, 30);
+    $('#feu-h').innerHTML = '<div><b>' + r.n + '</b><small>' + (e === 'pause' ? '<span class="bdg att">en pause depuis ' + x.p + '</span>' : e === 'err' ? '<span class="bdg err">en erreur</span>' : e === 'run' ? '<span class="bdg run">passage en cours…</span>' : '<span class="bdg ok">active</span>') + '</small></div><button class="x" data-act="fermerF">Fermer</button>';
+    if (e === 'err') h += '<div class="alerte r"><b>L’erreur en détail</b><p>Limite du forfait atteinte à 9 h 02. Reprise vers 17 h 40 : elle repartira seule.</p><button class="b b2 sm" data-act="lancer">Relancer maintenant</button></div>';
+    h += '<div class="kv w"><span>Moment</span><span>' + clair(s) + (x.sch ? ' <i>modifié</i>' : '') + '</span></div>' +
+      '<div class="kv w"><span>Dernier passage</span><span>' + hi[0][0] + ' · ' + (hi[0][2] === 'o' ? 'réussi' : 'en erreur') + ' · ' + hi[0][1] + '</span></div>' +
+      '<div class="kv w"><span>Prochain passage</span><span>' + (e === 'pause' ? 'aucun : en pause' : e === 'err' ? 'relance auj. 17:40' : proch(r)) + '</span></div>';
+    h += '<div class="acts3">' + (e === 'pause' ? '<button class="b b1" data-act="rpause">Reprendre</button>' : '') +
+      (e !== 'err' ? '<button class="b ' + (e === 'pause' ? 'b2 sm' : 'b1') + '" data-act="lancer"' + (e === 'run' ? ' disabled' : '') + '>' + (e === 'run' ? 'Passage en cours…' : 'Lancer maintenant') + '</button>' : '') +
+      (e !== 'pause' ? '<button class="b b2 sm' + (s && !ed ? '' : ' plein') + '" data-act="rpause">Mettre en pause</button>' : '') +
+      (s && !ed ? '<button class="b b2 sm" data-act="horaire">Changer l’horaire</button>' : '') + '</div>' +
+      '<p class="note">' + (e === 'pause' ? 'En pause jusqu’à nouvel ordre : rien ne repart sans toi.' : s ? 'La pause dure jusqu’à nouvel ordre.' : 'Pas d’horaire : elle se déclenche à chaque mail important.') + '</p>';
+    if (ed) h += '<div class="ed bloc" id="ed"><h4 class="sub">Jours</h4><div class="seg">' + [['tous', 'Tous les jours'], ['sem', 'Lundi au vendredi'], ['liste', 'À cocher']].map(function (o) { return '<button data-act="hj" data-id="' + o[0] + '" aria-pressed="' + (o[0] === 'liste' ? typeof ed.j !== 'string' : ed.j === o[0]) + '">' + o[1] + '</button>'; }).join('') + '</div>' +
+      (typeof ed.j !== 'string' ? '<div class="jrs">' + JC.map(function (c, k) { return '<button data-act="hjour" data-id="' + k + '" aria-pressed="' + (ed.j.indexOf(k) >= 0) + '" aria-label="' + JN[k] + '">' + c.slice(0, 3) + '</button>'; }).join('') + '</div>' : '') +
+      '<h4 class="sub">Heures <small>une à quatre</small></h4><div class="hrs">' + ed.h.map(function (v, k) { return '<span class="hr"><input type="time" value="' + (v.length < 5 ? '0' + v : v) + '" data-i="' + k + '" aria-label="Heure ' + (k + 1) + '">' + (ed.h.length > 1 ? '<button data-act="hmoins" data-id="' + k + '" aria-label="Retirer cette heure">×</button>' : '') + '</span>'; }).join('') + (ed.h.length < 4 ? '<button class="b b2 sm" data-act="hplus">+ une heure</button>' : '') + '</div>' +
+      '<p class="apercu">Aperçu : <b>' + clair(ed) + '</b></p><div class="acts"><button class="b b1" data-act="hsave"' + (typeof ed.j !== 'string' && !ed.j.length ? ' disabled' : '') + '>Enregistrer</button><button class="b b2" data-act="hannul">Annuler</button></div>' +
+      (x.sch || clair(ed) !== clair(r.sch) ? '<button class="lien" data-act="horig">Revenir à l’horaire d’origine</button>' : '') + '</div>';
+    h += '<h4 class="sub">Ce qu’elle a fait <small>dernier passage</small></h4>' + rail(x.plus.length ? r.st.map(function (t) { return [t[0], 'fait']; }) : r.st) +
+      '<p class="fait-p">' + (x.plus.length ? 'Passage lancé à la main à 16 h 10 : terminé sans erreur.' : r.res) + '<small>' + (x.plus.length ? 'Durée : 1 min 12.' : r.note) + '</small></p>';
+    h += '<h4 class="sub">Historique</h4><p class="stat"><b>' + ok + ' réussis sur ' + n + '</b> · ' + r.moy + ' en moyenne</p><div class="hist">';
+    for (i = nb - 1; i >= 0; i--) h += '<i class="' + (r.bx.indexOf(i - x.plus.length) >= 0 ? 'x' : '') + '"></i>';
+    h += '</div>' + hi.map(function (l) { return '<div class="hrow"><span><b>' + l[0] + '</b><small>' + (l[3] === 'm' ? 'lancé à la main' : 'programmé') + '</small></span><span>' + l[1] + '</span><span class="' + l[2] + '"><i class="pt' + (l[2] === 'x' ? ' ko' : '') + '"></i>' + (l[2] === 'o' ? 'réussi' : 'en erreur') + '</span></div>'; }).join('');
+    $('#feu-c').innerHTML = h; typo($('#feu'));
+  }
+  function lancer(id) {
+    var x = S.rt[id], r = rget(id); if (x.run) return;
+    x.run = true; render(); toast(r.n + ' : passage lancé à la main.');
+    setTimeout(function () { x.run = false; x.fix = true; x.der = '16:10'; x.plus.unshift(['auj. 16:10', '1 min 12', 'o', 'm']); render(); toast(r.n + ' : passage réussi en 1 min 12.'); }, calme ? 60 : 4200);
+  }
+
   // ---- trancher ----
   function oui(id) {
     var d = DEC.filter(function (x) { return x.id === id; })[0]; S.dec[id] = 'oui';
     if (id === 'd2') { S.depot = 'run'; clearTimeout(T.d2); T.d2 = setTimeout(function () { S.depot = 'fait'; render(); toast('CRA déposé sur le portail. Chaîne bouclée.', { l: 'Voir', f: 1, id: 'cra' }); }, 5200); }
     if (id === 'd3') { S.ndf = 'run'; clearTimeout(T.d3); T.d3 = setTimeout(function () { S.ndf = 'fait'; render(); toast('Note de frais Télétravail créée sur le portail.', { l: 'Voir', f: 1, id: 'ndf' }); }, 6400); }
-    render(); toast(d.suite, d.voir ? { l: 'Suivre', f: 1, id: d.voir } : null);
+    render(); toast(id === 'd4' ? 'Rangé dans ' + S.dossier + ', sous son nouveau nom.' : d.suite, d.voir ? { l: 'Suivre', f: 1, id: d.voir } : null);
   }
   function annuler(id) { S.dec[id] = 'att'; if (id === 'd2') { clearTimeout(T.d2); S.depot = 'att'; } if (id === 'd3') { clearTimeout(T.d3); S.ndf = 'non'; } render(); toast('Annulé : la décision revient dans « À toi ».'); }
 
@@ -638,7 +796,7 @@
   var parl = $('#parl'), q = $('#q'), cmd = $('#cmd');
   var SUG = ['Où en est mon CRA du mois ?', 'Qu’est-ce qui est en erreur ?', 'J’ai quoi demain ?', 'Combien il me reste à payer ?'];
   function etatP(e) { parl.className = 'parl on ' + e; cmd.classList.toggle('ecoute', e === 'ecoute'); $('#petat').textContent = { pret: 'prêt · demande ou cherche', ecoute: 'à l’écoute…', pense: 'réfléchit…', parle: 'répond' }[e]; }
-  function ouvrir() { if (S.parl) return; S.parl = true; parl.setAttribute('aria-hidden', 'false'); etatP('pret'); filR(); }
+  function ouvrir() { if (S.parl) return; fermerF(); S.parl = true; parl.setAttribute('aria-hidden', 'false'); etatP('pret'); filR(); }
   function fermer() { if (!S.parl) return; S.parl = false; clearInterval(T.dic); parl.className = 'parl'; parl.setAttribute('aria-hidden', 'true'); cmd.classList.remove('ecoute'); q.value = ''; maj(); q.blur(); }
   function filR() {
     var f = $('#fil');
@@ -646,7 +804,7 @@
       if (m.w) return '<div class="bu j att"><i></i><i></i><i></i></div>';
       return '<div class="bu ' + (m.m ? 'moi' : 'j') + '">' + (m.m ? esc(m.t) : m.t) + (m.a ? '<div class="acts">' + m.a + '</div>' : '') + '</div>';
     }).join('') : '<div class="intro"><b>Dis-moi, ou cherche.</b>Une question, un ordre, un mot à retrouver : c’est la même barre. Je réponds ici, et je t’emmène à la bonne ligne.</div>';
-    f.scrollTop = f.scrollHeight;
+    typo(f); f.scrollTop = f.scrollHeight;
     $('#sug').innerHTML = SUG.map(function (s) { return '<button data-act="sug">' + s + '</button>'; }).join('');
   }
   function repondre(x) {
@@ -654,7 +812,7 @@
     var b = function (l, f, id) { return '<button class="b b2 sm" data-act="voir" data-f="' + f + '" data-id="' + id + '">' + l + '</button>'; };
     if (/cra/.test(x)) return S.depot === 'att' ? { t: 'Le CRA de novembre est <b>signé par ton client</b> : PDF reçu à 14 h 29. Il reste une étape, le dépôt sur le portail, et elle attend ton oui.', a: '<button class="b b1 sm" data-act="oui" data-id="d2">Oui, déposer</button>' + b('Voir la chaîne', 1, 'cra') }
       : { t: S.depot === 'run' ? 'Hermes est en train de déposer le CRA signé sur le portail. Je te préviens dès que c’est fait.' : 'Le CRA de novembre est déposé sur le portail depuis 16 h 10. La chaîne est bouclée.', a: b('Voir la chaîne', 1, 'cra') };
-    if (/erreur|bilan|forfait|cloche|panne|marche pas/.test(x)) return { t: 'Une seule erreur : <b>Bilan de la semaine</b>, arrêté par la limite du forfait. La relance est prévue à 17 h 40. Rien à faire de ton côté.', a: b('Voir la routine', 1, 'bilan') };
+    if (/erreur|bilan|forfait|cloche|panne|marche pas/.test(x)) return !compte(true).err ? { t: 'Aucune erreur en ce moment. Tout ce qui est actif tourne.' } : { t: 'Une seule erreur : <b>Bilan de la semaine</b>, arrêté par la limite du forfait. La relance est prévue à 17 h 40. Rien à faire de ton côté.', a: b('Voir la routine', 1, 'bilan') };
     if (/demain|agenda|rendez|aujourd|journ|semaine/.test(x)) return { t: 'Aujourd’hui : <b>pédiatre à 17 h 30</b>. Demain : livraison du colis entre 9 h 45 et 13 h 45. Avant mardi : le devis à envoyer à l’assurance et le rendez-vous passeport.', a: '<button class="b b2 sm" data-act="file" data-f="2">Voir « À venir »</button>' };
     if (/argent|reste|payer|budget|depens|dépens|prelev|prélèv/.test(x)) return { t: 'Il te reste <b>640 €</b> à payer ce mois. Déjà dépensé : 1 180 €. Prochain prélèvement : Électricité, 62 €, le 28.', a: '<button class="b b2 sm" data-act="dom" data-id="argent">Ouvrir Argent</button>' };
     if (/prix|aspirateur|casque|achat/.test(x)) return { t: 'L’aspirateur balai est à <b>189 €</b>, sous ton seuil de 200 €. Le casque audio est encore à 279 € (seuil 240 €).', a: '<button class="b b2 sm" data-act="dom" data-id="achats">Ouvrir Achats</button>' };
@@ -686,7 +844,7 @@
     [['Aspirateur balai', 'prix suivi', 'achats'], ['Casque audio', 'prix suivi', 'achats'], ['Électricité', 'prélèvement', 'argent'], ['Lisbonne', 'voyage en projet', 'sorties'], ['Marché de Noël du centre', 'sortie', 'sorties'], ['Carte d’identité', 'papier · expire dans 5 mois', 'papiers']].forEach(function (x) { l.push([x[0], x[1], -1, x[2]]); });
     return l;
   }
-  function norm(s) { return s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/['’]/g, ' '); }
+  function norm(s) { return s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/['’\u00a0]/g, ' '); }
   function maj() {
     var x = q.value.trim(), r = $('#res');
     $('#env').hidden = !x; $('#mic').hidden = !!x;
@@ -703,11 +861,11 @@
 
   // ---- les appuis ----
   $('#app').addEventListener('click', function (ev) {
-    var b = ev.target.closest('[data-act]'); if (!b) { var t = ev.target.closest('#files button'); if (t) { fermer(); file(+t.dataset.f); } return; }
+    var b = ev.target.closest('[data-act]'); if (!b) { var t = ev.target.closest('#files button'); if (t) { fermer(); fermerF(); file(+t.dataset.f); } return; }
     var a = b.dataset.act, id = b.dataset.id;
-    if (a === 'file') { fermer(); file(+b.dataset.f); }
-    else if (a === 'erreur') { var e = ROUT.filter(function (r) { return r.e === 'err'; })[0]; if (e) voir(1, e.id); else { fermer(); file(1); } }
-    else if (a === 'dom') { fermer(); S.dom = S.dom === id && id !== 'tout' ? 'tout' : id; render(); $$('.file').forEach(function (f) { f.scrollTop = 0; }); var c = $('.chip[aria-pressed="true"]'); if (c && c.scrollIntoView) c.scrollIntoView({ block: 'nearest', inline: 'center' }); }
+    if (a === 'file') { fermer(); fermerF(); file(+b.dataset.f); }
+    else if (a === 'erreur') { var e = ROUT.filter(function (r) { return etatR(r) === 'err'; })[0]; if (e) voir(1, e.id); else { fermer(); fermerF(); file(1); } }
+    else if (a === 'dom') { fermer(); fermerF(); S.dom = S.dom === id && id !== 'tout' ? 'tout' : id; render(); $$('.file').forEach(function (f) { f.scrollTop = 0; }); var c = $('#chips .chip[aria-pressed="true"]'), cb = $('#chips'); if (c) cb.scrollLeft = Math.max(0, c.offsetLeft - cb.offsetLeft - (cb.clientWidth - c.offsetWidth) / 2); }
     else if (a === 'ouvrir') { S.open[id] = !S.open[id]; render(); }
     else if (a === 'oui') { var p = S.parl; oui(id); if (p) { S.fil.push({ m: 0, t: 'C’est parti. Je te préviens quand c’est déposé.' }); filR(); } }
     else if (a === 'tard') { S.dec[id] = 'tard'; render(); toast('Mis de côté. Tu le retrouves en bas de « À toi ».'); }
@@ -715,16 +873,43 @@
     else if (a === 'annuler') annuler(id);
     else if (a === 'fait') { S.fait[id] = !S.fait[id]; render(); toast(S.fait[id] ? 'Noté : c’est fait. Le sujet avance d’une étape.' : 'Remis à faire.'); }
     else if (a === 'voir') voir(+b.dataset.f, id);
-    else if (a === 'jour') { var el = document.getElementById('x-' + id); if (el) { var pp = $('#f2'); pp.scrollTo({ top: el.offsetTop - pp.offsetTop - 8, behavior: calme ? 'auto' : 'smooth' }); } }
+    else if (a === 'jour') { var el = document.getElementById('x-' + id); if (el) { var pp = $('#f2'); pp.scrollTo({ top: pp.scrollTop + el.getBoundingClientRect().top - pp.getBoundingClientRect().top - 8, behavior: calme ? 'auto' : 'smooth' }); } }
     else if (a === 'deposer') toast('Maquette : ici s’ouvre l’appareil photo ou Fichiers. JARVIS range ensuite le papier.');
-    else if (a === 'sug') { q.value = b.textContent; envoyer(); }
+    else if (a === 'sug') { q.value = b.textContent.replace(/\u00a0/g, ' '); envoyer(); }
     else if (a === 'fermer') fermer();
+    else if (a === 'feuille') ouvrirF(id);
+    else if (a === 'fermerF') fermerF();
+    else if (a === 'lancer') lancer(S.feu);
+    else if (a === 'rpause') {
+      var x = S.rt[S.feu], rr = rget(S.feu);
+      if (x.p) { x.p = null; if (S.tout) { S.tout = S.tout.filter(function (k) { return k !== S.feu; }); if (!S.tout.length) S.tout = null; } render(); toast(rr.n + ' reprend. Prochain passage : ' + proch(rr) + '.'); }
+      else { x.p = '16:10'; render(); toast(rr.n + ' : en pause jusqu’à nouvel ordre.'); }
+    }
+    else if (a === 'toutpause') {
+      if (S.tout) { S.tout.forEach(function (k) { S.rt[k].p = null; }); S.tout = null; render(); toast('Les routines reprennent leur horaire.'); }
+      else { var l = []; ROUT.forEach(function (r) { if (!S.rt[r.id].p) { S.rt[r.id].p = '16:10'; l.push(r.id); } }); S.tout = l.length ? l : null; render(); toast('Toutes les routines sont en pause, jusqu’à nouvel ordre.'); }
+    }
+    else if (a === 'horaire') { var so = sch(rget(S.feu)); S.edit = { j: typeof so.j === 'string' ? so.j : so.j.slice(), h: so.h.slice() }; feuilleR(); var ee = $('#ed'), fc = $('#feu-c'); fc.scrollTop = Math.max(0, ee.offsetTop - fc.offsetTop - 8); }
+    else if (a === 'hj') { S.edit.j = id !== 'liste' ? id : typeof S.edit.j !== 'string' ? S.edit.j : S.edit.j === 'sem' ? [0, 1, 2, 3, 4] : [0, 1, 2, 3, 4, 5, 6]; feuilleR(); }
+    else if (a === 'hjour') { var jl = S.edit.j, at = jl.indexOf(+id); if (at < 0) jl.push(+id); else jl.splice(at, 1); jl.sort(); feuilleR(); }
+    else if (a === 'hplus') { S.edit.h.push(['12:00', '18:00', '20:00', '9:00', '15:00'].filter(function (v) { return S.edit.h.indexOf(v) < 0; })[0]); feuilleR(); }
+    else if (a === 'hmoins') { S.edit.h.splice(+id, 1); feuilleR(); }
+    else if (a === 'hsave') { var rs = rget(S.feu), ns = { j: S.edit.j, h: tri(S.edit.h) }; S.rt[S.feu].sch = clair(ns) === clair(rs.sch) ? null : ns; S.edit = null; render(); toast('Horaire enregistré : ' + clair(ns) + '.'); }
+    else if (a === 'hannul') { S.edit = null; feuilleR(); }
+    else if (a === 'horig') { S.rt[S.feu].sch = null; S.edit = null; render(); toast('Horaire d’origine rétabli : ' + clair(rget(S.feu).sch) + '.'); }
+    else if (a === 'choix') { S.choix = !S.choix; render(); }
+    else if (a === 'dossier') { S.dossier = id; S.choix = false; render(); }
+    else if (a === 'retirer') { S.dec.d4 = 'retire'; S.choix = false; render(); toast('scan-0412.pdf retiré du dépôt.'); }
+    else if (a === 'lire') { S.lu[id] = true; render(); }
+    else if (a === 'mois') { S.mois = S.mois === +id ? null : +id; render(); }
+    else if (a === 'page') { S.page = Math.max(0, Math.min(3, S.page + +id)); S.mois = null; render(); }
   });
   // la recherche de la fiche Papiers (sans tout redessiner)
   $('#app').addEventListener('input', function (ev) {
-    if (ev.target.id !== 'qdoc') return;
+    if (ev.target.matches('.hr input')) { if (ev.target.value && S.edit) { S.edit.h[+ev.target.dataset.i] = ev.target.value.replace(/^0/, ''); var ap = $('.apercu b'); if (ap) { ap.textContent = clair(S.edit); typo(ap); } } return; }
+    if (!ev.target.classList.contains('qdoc')) return;
     var n = norm(ev.target.value), box = ev.target.closest('.fiche');
-    $$('.doc', box).forEach(function (d) { d.hidden = norm(d.textContent).indexOf(n) < 0; });
+    $$('.dl .doc', box).forEach(function (d) { d.hidden = norm(d.textContent).indexOf(n) < 0; });
   });
   $('#files').addEventListener('keydown', function (e) { if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') { var i = Math.max(0, Math.min(2, S.f + (e.key === 'ArrowRight' ? 1 : -1))); file(i); $$('#files button')[i].focus(); } });
 
