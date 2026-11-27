@@ -12481,12 +12481,12 @@ void main(){
     const RH = {tout: false, ouvert: ''};
     function radDepense(m) {
       const d = m.depense; if (!d) return null;
-      const parts = [[d.fixes, 'de dépenses fixes déjà passées', d.nFixes], [d.plans, 'd’échéances de paiements en plusieurs fois', d.nPlans], [d.courantes, 'de dépenses courantes notées', d.nNotes]].filter((x) => x[0] > 0 || x[2] > 0);
+      const parts = [[d.fixes, 'de dépenses fixes déjà passées', d.nFixes], [d.plans, 'd’échéances de paiements en plusieurs fois', d.nPlans], [d.courantes, d.nBudget ? 'de dépenses courantes (notées, ou comptées d’après ton budget pour ce qui est écoulé et pas noté : ' + radEur(d.courantesBudget) + ')' : 'de dépenses courantes notées', d.nNotes]].filter((x) => x[0] > 0 || x[2] > 0);   /* 0.99.0 : un budget pas noté compte pour ses semaines écoulées */
       const dits = parts.map(([v, l, n]) => radEur(v) + ' ' + l + ' (' + n + ')');
       const phrase = dits.length ? 'Soit ' + (dits.length > 1 ? dits.slice(0, -1).join(', ') + ' et ' : '') + dits[dits.length - 1] + '.' : 'Rien de passé ni de noté pour l’instant.';
       const jq = d.jusqua ? ' Les dépenses fixes sont comptées jusqu’à hier (' + radDate(d.jusqua) + ') : celles d’aujourd’hui sont encore dans le reste à payer.' : ' Aucune dépense fixe n’est encore passée ce mois-ci.';
       const lignes = (d.lignes || []).slice().reverse();
-      const sorte = (l) => (l.sorte === 'courante' ? (l.fait ? 'Dépense courante · cochée « Fait ce mois-ci »' : 'Dépense courante · notée') : l.sorte === 'plan' ? 'Paiement en plusieurs fois' : (l.poste || 'Dépense fixe')) + (l.estime ? ' · montant estimé' : '');
+      const sorte = (l) => (l.sorte === 'courante' ? (l.budget ? 'Dépense courante · d’après ton budget, pas notée' : l.fait ? 'Dépense courante · cochée « Fait ce mois-ci »' : 'Dépense courante · notée') : l.sorte === 'plan' ? 'Paiement en plusieurs fois' : (l.poste || 'Dépense fixe')) + (l.estime ? ' · montant estimé' : '');
       return h('section', {class: 'card rad-depense'}, h('small', {class: 'rad-k', text: 'Déjà dépensé en ' + moisLong(d.mois)}), h('b', {class: 'rad-big', text: radEur(d.total)}),
         h('p', {class: 'muted'}, radNw(phrase + jq)),
         lignes.length ? h('details', {class: 'rad-dep-det'}, h('summary', {text: 'Le détail (' + lignes.length + ')'}), h('div', {class: 'rad-dep-l'}, lignes.map((l) => h('div', {class: 'rad-dep-r'},
