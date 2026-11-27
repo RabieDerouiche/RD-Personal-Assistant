@@ -447,14 +447,15 @@ def cmd_relancer(a):
         fin = iso_ep(j.get("last_run_at")) if j else None
         if j and fin and fin >= int(s.get("at") or 0) - 5:
             court = nom.replace("jarvis-", "", 1)
-            if j.get("last_status") in ("ok", "delivery_failed"):
+            if j.get("last_status") in ("ok", "delivery_failed", "delivery_queued"):   # « delivery_queued » : réussi, résultat en cours d'envoi
                 dire.append("%s : le passage relancé a abouti." % court)
                 histo.append({"nom": court, "at": int(s.get("at") or t), "resultat": "réussie"})
             else:
                 faites[nom + "|" + str(j.get("last_run_at"))] = t   # cet échec-là n'est pas relancé une seconde fois
                 aviser("routine-" + court, "Hermes : « %s » en échec après la relance" % court,
                        "Coupée par la limite du forfait Claude, relancée le %s, de nouveau en échec (%s). Relance-la à la main si elle est "
-                       "toujours utile (session Serveur JARVIS : routines.sh --lancer %s)." % (heure_paris(int(s.get("at") or t)), erreur_du_passage(j)[:160] or "sans message", court), blanc, dire)
+                       "toujours utile (dans JARVIS : Hermes et ses routines, « Lancer maintenant » ; ou session Serveur JARVIS : routines.sh --lancer %s)."
+                       % (heure_paris(int(s.get("at") or t)), resultat_de(j)[1] or "erreur", court), blanc, dire)   # 0.96.0 : la catégorie, jamais le texte de l'erreur dans une notification
                 histo.append({"nom": court, "at": int(s.get("at") or t), "resultat": "échec"})
             suivis.pop(nom)
         elif t - int(s.get("at") or t) > SUIVI_MAX:
@@ -613,6 +614,8 @@ def cmd_relancer(a):
 RESUME = E("HERMES_RELANCE_RESUME", "/var/lib/hermes-relance-etat")
 ROUTINES_CONF = E("HERMES_RELANCE_CONF", "/usr/local/lib/hermes-relance/routines.conf")   # copie root de routines.conf
 ROUTINES_MODE = E("HERMES_RELANCE_MODES", "/etc/hermes/routines.mode")                    # écrit par routines.sh --reel / --double
+ROUTINES_PAUSE = E("HERMES_ROUTINES_PAUSES", "/var/lib/hermes-relance/routines.pause")       # 0.96.0 : routines mises en pause depuis JARVIS (ordres.py) : « nom époque »
+ROUTINES_HORAIRE = E("HERMES_ROUTINES_HORAIRES", "/var/lib/hermes-relance/routines.horaire")  # 0.96.0 : horaires changés depuis JARVIS (ordres.py) : « nom|cron à 5 champs »
 GARDE_MINUTERIE = "hermes-garde.timer"
 R_NOM = re.compile(r"[a-z0-9][a-z0-9-]{1,39}")
 R_CRON = re.compile(r"[0-9*,/-]{1,20}(?: [0-9*,/-]{1,20}){4}")
@@ -631,13 +634,13 @@ def moment_lisible(cron):
     """« 40 7 * * 1-5 » → « du lundi au vendredi à 7 h 40 » (heure de Paris) ; un horaire plus tordu est rendu tel quel (« cron … »)."""
     c = cron.split()
     brut = "cron " + cron
-    if len(c) != 5 or c[2] != "*" or c[3] != "*" or not c[0].isdigit() or int(c[0]) > 59:
+    if len(c) != 5 or c[2] != "*" or c[3] != "*":
         return brut
-    heures = c[1].split(",")
-    if not all(x.isdigit() and int(x) <= 23 for x in heures) or len(heures) > 6:
+    minutes, heures = c[0].split(","), c[1].split(",")
+    if not all(x.isdigit() and int(x) <= 59 for x in minutes) or not all(x.isdigit() and int(x) <= 23 for x in heures) or len(minutes) * len(heures) > 6:
         return brut
-    mi = int(c[0])
-    quand = "à " + _suite(["%d h%s" % (int(x), " %02d" % mi if mi else "") for x in heures])
+    # 0.96.0 : plusieurs minutes (« 0,15 9 * * * » = 9 h et 9 h 15) : chaque heure × chaque minute, dans l'ordre de la journée
+    quand = "à " + _suite(["%d h%s" % (h, " %02d" % mi if mi else "") for h, mi in sorted({(int(h), int(mi)) for h in heures for mi in minutes})])
     j = c[4]
     if j == "*":
         return "chaque jour " + quand
@@ -647,6 +650,56 @@ def moment_lisible(cron):
     if re.fullmatch(r"[0-7](?:,[0-7]){0,6}", j):
         return _suite(["le " + JOURS[int(x)] for x in j.split(",")]) + " " + quand
     return brut
+
+
+CODES_JOURS = ("dim", "lun", "mar", "mer", "jeu", "ven", "sam")   # les jours d'un ordre « horaire » (0.96.0), dans l'ordre du cron (0 = dimanche)
+
+
+def forme_de(cron):
+    """La forme fermée d'un horaire (celle d'un ordre « horaire » de JARVIS) : {jours: « tous » | « ouvres » | [codes], heures: [« HH:MM »]},
+    ou None quand l'expression n'y tient pas (l'app repart alors d'un choix vide)."""
+    c = str(cron or "").split()
+    if len(c) != 5 or c[2] != "*" or c[3] != "*":
+        return None
+    minutes, heures = c[0].split(","), c[1].split(",")
+    if not all(x.isdigit() and int(x) <= 59 for x in minutes) or not all(x.isdigit() and int(x) <= 23 for x in heures) or len(minutes) * len(heures) > 4:
+        return None
+    if c[4] == "*":
+        jours = "tous"
+    elif c[4] == "1-5":
+        jours = "ouvres"
+    elif re.fullmatch(r"[0-7](?:,[0-7]){0,6}", c[4]):
+        jours = sorted({CODES_JOURS[int(x) % 7] for x in c[4].split(",")}, key=lambda x: (CODES_JOURS.index(x) - 1) % 7)   # du lundi au dimanche
+    else:
+        return None
+    return {"jours": jours, "heures": ["%02d:%02d" % x for x in sorted({(int(h), int(mi)) for h in heures for mi in minutes})]}
+
+
+def pauses_jarvis():
+    """Les routines mises en pause depuis JARVIS (fichier de root tenu par ordres.py, respecté par routines.sh) : nom → époque."""
+    p = {}
+    for ligne in lire_texte(ROUTINES_PAUSE, 20_000).splitlines():
+        mots = ligne.split()
+        if len(mots) == 2 and R_NOM.fullmatch(mots[0]) and mots[1].isdigit() and len(mots[1]) <= 11:
+            p[mots[0]] = int(mots[1])
+    return p
+
+
+def horaires_jarvis():
+    """Les horaires changés depuis JARVIS (fichier de root tenu par ordres.py, respecté par routines.sh) : nom → cron à 5 champs."""
+    h = {}
+    for ligne in lire_texte(ROUTINES_HORAIRE, 20_000).splitlines():
+        c = [x.strip() for x in ligne.split("|")]
+        if len(c) == 2 and R_NOM.fullmatch(c[0]) and R_CRON.fullmatch(" ".join(c[1].split())):
+            h[c[0]] = " ".join(c[1].split())
+    return h
+
+
+def en_cours(j, t):
+    """Un passage est-il en cours ? (certain, code d'Hermes v0.23.3 : fire_claim {at, by}, rafraîchi toutes les 60 s, vivant 300 s)"""
+    c = j.get("fire_claim") if isinstance(j, dict) else None
+    ep = iso_ep(c.get("at")) if isinstance(c, dict) and isinstance(c.get("at"), str) and len(c["at"]) <= 40 else None
+    return ep is not None and 0 <= t - ep < 300
 
 
 def routines_connues():
@@ -662,13 +715,17 @@ def routines_connues():
         if len(c) < 6 or not R_NOM.fullmatch(c[0]) or not R_CRON.fullmatch(" ".join(c[2].split())) or len(connues) >= 40:
             continue
         m = R_LIBELLE.search(c[5])
-        connues[c[0]] = {"libelle": m.group(1).strip() if m else c[0], "horaire": " ".join(c[2].split()),
-                         "mode": "réel" if "« en réel »" in c[5] else "double"}
+        connues[c[0]] = {"libelle": m.group(1).strip() if m else c[0], "horaire": " ".join(c[2].split()), "origine": " ".join(c[2].split()),
+                         "modifie": False, "mode": "réel" if "« en réel »" in c[5] else "double"}
     # le mode noté sur le serveur (routines.sh --reel / --double) l'emporte, comme dans routines.sh ; la dernière ligne gagne
     for ligne in lire_texte(ROUTINES_MODE, 20_000).splitlines():
         mots = ligne.split()
         if len(mots) == 2 and mots[0] in connues and mots[1] in ("reel", "double"):
             connues[mots[0]]["mode"] = "réel" if mots[1] == "reel" else "double"
+    # 0.96.0 : l'horaire changé depuis JARVIS l'emporte sur celui de routines.conf, qui reste « l'horaire d'origine »
+    for nom, cron in horaires_jarvis().items():
+        if nom in connues and cron != connues[nom]["origine"]:
+            connues[nom]["horaire"], connues[nom]["modifie"] = cron, True
     return connues
 
 
@@ -685,7 +742,9 @@ def resultat_de(j):
     st = j.get("last_status")
     if not j.get("last_run_at") or st is None:
         return "jamais", None
-    if st == "ok":
+    # (certain, code d'Hermes v0.23.3, cron/delivery_outcome.py, et banc du 27/11/2026) « delivery_queued » : le passage a réussi, son
+    # résultat attend d'être envoyé par la passerelle ; il devient « ok » ou « delivery_failed » une ou deux secondes plus tard
+    if st in ("ok", "delivery_queued"):
         return "ok", None
     if st == "delivery_failed":
         return "erreur", "résultat non envoyé"
@@ -725,21 +784,33 @@ def resume_routines():
             par_nom[nom[7:]] = j
         else:
             inconnues += 1   # une routine jarvis-… hors de la liste : comptée, jamais décrite
-    routines = []
+    routines, pauses = [], pauses_jarvis()
     for nom, c in (connues or {}).items():
         j = par_nom.get(nom)
         r = {"nom": nom, "libelle": c["libelle"], "moment": moment_lisible(c["horaire"]), "mode": c["mode"], "posee": j is not None,
              "active": False, "dernier": None, "resultat": "jamais", "cause": None, "prochain": None}
+        # 0.96.0 (administrer les routines depuis JARVIS) : la pause et qui l'a posée, un passage en cours, l'horaire d'origine et s'il a
+        # été changé, sa forme fermée (pour préremplir « Changer l'horaire »), et si la routine se lance aussi sur un événement
+        en_vigueur = c["horaire"]
+        r.update(pause=None, en_cours=False, origine=moment_lisible(c["origine"]), modifie=bool(c["modifie"]), forme=None, evenement=nom == "reveil")
         if j is not None:
             expr = j["schedule"].get("expr") if isinstance(j.get("schedule"), dict) else None
             if isinstance(expr, str) and R_CRON.fullmatch(" ".join(expr.split())):
-                r["moment"] = moment_lisible(" ".join(expr.split()))   # l'horaire vraiment posé chez Hermes
+                en_vigueur = " ".join(expr.split())
+                r["moment"] = moment_lisible(en_vigueur)   # l'horaire vraiment posé chez Hermes
+                r["modifie"] = en_vigueur != c["origine"]
             r["active"] = j.get("enabled", True) is not False and j.get("state") not in ("paused", "completed") and not j.get("paused_at")
             r["resultat"], r["cause"] = resultat_de(j)
             if r["cause"] is not None and r["cause"] not in CAUSES:
                 r["cause"] = "erreur"
             r["dernier"] = iso_sur(j.get("last_run_at")) if r["resultat"] != "jamais" else None
             r["prochain"] = iso_sur(j.get("next_run_at")) if r["active"] else None
+            r["en_cours"] = en_cours(j, t)
+            if not r["active"]:
+                r["pause"] = {"depuis": iso_sur(j.get("paused_at")), "par": "hermes"}
+        if nom in pauses:
+            r["pause"] = {"depuis": datetime.datetime.fromtimestamp(pauses[nom], datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"), "par": "jarvis"}
+        r["forme"] = forme_de(en_vigueur)
         routines.append(r)
     return {"v": 1, "at": t, "liste": connues is not None, "cron": jobs is not None,
             "passerelle": PASSERELLE.get(sctl("is-active", SERVICE)[1], "inconnue"), "garde": etat_garde(jour),

@@ -55,29 +55,20 @@
   .pt.vif { animation: pouls 2.2s ease-out infinite; }
   @keyframes pouls { 0% { box-shadow: 0 0 0 0 rgba(98, 211, 230, .5); } 100% { box-shadow: 0 0 0 9px rgba(98, 211, 230, 0); } }
 
-  .resume { position: relative; height: 54px; }
+  /* le résumé épinglé : trois lignes de même hauteur, dans la mise en page (le fil commence dessous, rien ne passe derrière) */
+  .resume { position: relative; padding: 0 10px 7px; }
   .resume::after { content: ""; position: absolute; left: 16px; right: 16px; bottom: 0; height: 1px; background: linear-gradient(90deg, rgba(98, 211, 230, .55), rgba(167, 139, 250, .35) 45%, transparent); }
-  /* la forme courte (une ligne) quand on remonte le fil ou qu'on filtre */
-  .res-c { display: grid; grid-template-columns: auto auto minmax(0, 1fr); gap: 4px; height: 54px; padding: 0 10px; transition: opacity .2s; }
-  .res-c button { display: flex; align-items: center; gap: 7px; min-width: 0; min-height: 44px; margin: 5px 0; padding: 0 8px; border: 0; border-radius: 12px; background: none; font-size: 14.5px; color: var(--gris); white-space: nowrap; }
-  .res-c b { font: 500 19px/1 var(--serif); color: var(--encre); }
-  .res-c em { font-style: normal; color: var(--rouge); }
-  .res-c .coupe { overflow: hidden; text-overflow: ellipsis; }
-  .res-c button[aria-pressed="true"] { background: var(--creux); color: var(--encre); }
-  /* la forme longue (trois lignes), au repos en bas du fil */
-  .res-l { position: absolute; left: 0; right: 0; top: 0; padding: 0 10px 10px; background: var(--bg); border-bottom: 1px solid transparent; opacity: 0; visibility: hidden; transform: translateY(-8px); transition: opacity .22s, transform .22s, visibility .22s; }
-  .res-l::after { content: ""; position: absolute; left: 0; right: 0; top: 100%; height: 26px; background: linear-gradient(var(--bg), transparent); pointer-events: none; }
-  .res-l::before { content: ""; position: absolute; left: 16px; right: 16px; bottom: 0; height: 1px; background: linear-gradient(90deg, rgba(98, 211, 230, .55), rgba(167, 139, 250, .35) 45%, transparent); }
-  .resume.large .res-l { opacity: 1; visibility: visible; transform: none; }
-  .resume.large .res-c { opacity: 0; }
-  .rl { display: grid; grid-template-columns: 9px 76px 26px minmax(0, 1fr) 12px; align-items: center; gap: 10px; width: 100%; min-height: 46px; padding: 0 8px; border: 0; border-radius: 12px; background: none; text-align: left; }
-  .rl + .rl { box-shadow: 0 -1px 0 var(--trait); }
+  .rl { position: relative; display: grid; grid-template-columns: 9px 72px 22px minmax(0, 1fr) 12px; align-items: center; gap: 9px; width: 100%; height: 44px; padding: 0 8px; border: 0; border-radius: 12px; background: none; text-align: left; white-space: nowrap; }
+  .rl + .rl::before { content: ""; position: absolute; left: 8px; right: 8px; top: 0; height: 1px; background: var(--trait); }
+  .rl[aria-pressed="true"] { background: var(--creux); }
+  .rl[aria-pressed="true"]::before, .rl[aria-pressed="true"] + .rl::before { display: none; }
   .rl .rn { font-weight: 600; font-size: 16px; }
-  .rl b { font: 500 24px/1 var(--serif); text-align: right; }
-  .rl .rd { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; color: var(--gris); }
+  .rl b { font: 500 23px/1 var(--serif); text-align: right; }
+  .rl .rd { overflow: hidden; text-overflow: ellipsis; font-size: 15px; color: var(--gris); }
+  .rl .rd.tout { grid-column: 3 / 5; }
   .rl .rd em { font-style: normal; color: var(--rouge); }
   .rl .rd strong { font-weight: 500; color: var(--encre); }
-  .rl .rx { color: var(--pale); font-size: 18px; line-height: 1; }
+  .rl .rx { color: var(--pale); font-size: 17px; line-height: 1; text-align: center; }
 
   /* ---- le fil ---- */
   .fil { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
@@ -154,8 +145,9 @@
   .s-tard .pli .co, .rep .pli .co { color: var(--pale); }
   .pli .tx { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .pli .ch { flex: none; color: var(--pale); }
-  .ligne { display: flex; align-items: center; gap: 10px; min-height: 36px; font-size: 15.5px; color: var(--pale); }
-  .ligne .co { width: 16px; text-align: center; color: var(--vert); }
+  .ligne { display: flex; align-items: baseline; gap: 10px; padding: 7px 0; font-size: 15.5px; line-height: 22px; color: var(--pale); }
+  .ligne .co { flex: none; width: 16px; text-align: center; color: var(--vert); } .ligne .co.nul { color: var(--pale); }
+  .it.jl > .nd { top: 12px; } .it.jl.neuf .ligne { color: var(--gris); }
 
   /* JARVIS parle : pas de carte, juste sa voix */
   .av { position: absolute; left: 5px; top: -3px; width: 31px; height: 31px; padding: 3px; border-radius: 50%; background: var(--bg); }
@@ -174,12 +166,16 @@
   .rj > .av { left: -35px; }
 
   /* les contenus de carte */
-  .mini li { display: grid; grid-template-columns: 82px minmax(0, 1fr); gap: 10px; padding: 9px 0; border-top: 1px solid var(--trait); }
-  .mini li:first-child { border-top: 0; }
-  .mini li > span { font-size: 14.5px; color: var(--pale); padding-top: 1px; }
+  .mini { display: grid; grid-template-columns: max-content minmax(0, 1fr); }
+  .mini li > span { padding-right: 14px !important; }
+  .mini li { display: contents; }
+  .mini li > * { padding: 9px 0; border-top: 1px solid var(--trait); }
+  .mini li:first-child > * { border-top: 0; }
+  .mini li > span { font-size: 14.5px; line-height: 23px; color: var(--pale); white-space: nowrap; }
   .mini b { font-weight: 500; } .mini small { display: block; font-size: 14.5px; color: var(--gris); }
-  .mini.large li { grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; }
-  .mini.large li > span { font-size: 16px; color: var(--gris); }
+  .mini.large { grid-template-columns: minmax(0, 1fr) auto; }
+  .mini.large li > span { font-size: 16px; color: var(--gris); white-space: normal; }
+  .mini.large b { text-align: right; }
   .mini .al { color: var(--ambre); } .mini .bon { color: var(--vert); }
   .piece { display: inline-flex; align-items: center; gap: 8px; margin: 8px 0 2px; padding: 7px 12px 7px 9px; border-radius: 10px; background: var(--creux); font-size: 14.5px; color: var(--gris); }
   .jours { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin: 12px 0 2px; }
@@ -197,12 +193,16 @@
   .chaine li.cours { color: var(--encre); font-weight: 600; } .chaine li.cours::before { background: var(--cyan); border-color: var(--cyan); animation: pouls 1.4s ease-out infinite; } .chaine li.cours time { color: var(--cyan); font-weight: 500; }
   .chaine li.ok.neuf { color: var(--encre); } .chaine li.ok.neuf::before { background: var(--vert); } .chaine li.ok.neuf time { color: var(--vert); }
 
-  .pass { display: flex; align-items: center; gap: 10px; margin: 0 0 6px; font-weight: 600; }
-  .pass small { margin-left: auto; font-weight: 400; font-size: 14.5px; color: var(--gris); }
-  .rts li { display: grid; grid-template-columns: 9px minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 9px 0; border-top: 1px solid var(--trait); }
-  .rts b { display: block; font-weight: 600; } .rts small { display: block; font-size: 14.5px; color: var(--gris); }
-  .rts .qd { font-size: 14.5px; color: var(--pale); text-align: right; white-space: nowrap; }
-  .rts .err small, .rts .err .qd { color: var(--rouge); }
+  .carte p.pass { display: flex; align-items: center; gap: 10px; min-height: 30px; margin: 0 0 8px; padding-right: 34px; font-weight: 600; color: var(--encre); }
+  /* une routine = une ligne qu'on touche pour ouvrir sa fiche */
+  .rts li { border-top: 1px solid var(--trait); }
+  .rt { display: grid; grid-template-columns: 9px minmax(0, 1fr) auto 7px; align-items: center; gap: 11px; width: 100%; min-height: 57px; padding: 7px 0; border: 0; background: none; text-align: left; white-space: nowrap; }
+  .rt b { display: block; font-weight: 600; overflow: hidden; text-overflow: ellipsis; }
+  .rt small { display: block; font-size: 14.5px; color: var(--gris); overflow: hidden; text-overflow: ellipsis; }
+  .rt .qd { font-size: 14.5px; color: var(--gris); text-align: right; } .rt .qd small { color: var(--pale); } .rt .qd i { font-style: normal; color: var(--vert); }
+  .rt .ch { color: var(--pale); }
+  .rt.err .qd, .rt.err .qd small { color: var(--rouge); }
+  .rt.pau b { color: var(--gris); } .rt.cou .qd { color: var(--cyan); }
   .note { margin: 10px 0 0 !important; padding-top: 10px; border-top: 1px solid var(--trait); font-size: 15px; }
   .gros { display: flex; align-items: baseline; gap: 12px; margin: 0 0 12px; }
   .gros b { font: 500 46px/1 var(--serif); letter-spacing: -.02em; white-space: nowrap; }
@@ -210,6 +210,52 @@
   .jauge { height: 5px; margin: 0 0 6px; border-radius: 9px; background: var(--creux); overflow: hidden; }
   .jauge i { display: block; height: 100%; border-radius: 9px; background: var(--gris); }
   .frise h5 { margin: 14px 0 2px; font: italic 400 17px var(--serif); color: var(--gris); } .frise h5:first-child { margin-top: 0; }
+
+  /* la fiche d'une routine : actions, horaire */
+  .b.plein { border-color: var(--encre); background: var(--encre); color: var(--bg); }
+  .b[disabled] { opacity: .4; }
+  .actions.occ { opacity: .4; pointer-events: none; }
+  .actions.gr .plein { flex: 1; }
+  .seg { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 4px; }
+  .seg button { min-width: 44px; min-height: 44px; padding: 0 14px; border: 1px solid var(--trait2); border-radius: 12px; background: none; font-size: 15.5px; font-weight: 500; color: var(--gris); }
+  .seg button[aria-pressed="true"] { border-color: var(--encre); background: var(--encre); color: var(--bg); }
+  .seg.js { gap: 6px; } .seg.js button { width: 44px; padding: 0; }
+  .hh { display: inline-flex; align-items: center; border: 1px solid var(--trait2); border-radius: 12px; background: var(--carte); }
+  .hh select { height: 44px; min-width: 62px; padding: 0 6px 0 12px; border: 0; background: none; color: var(--encre); font: 500 17px var(--sans); color-scheme: dark; }
+  .hh select + select { min-width: 54px; padding-left: 4px; border-left: 1px solid var(--trait); }
+  .mini .er { color: var(--rouge); }
+  .hh button { border: 0; border-left: 1px solid var(--trait); border-radius: 0; padding: 0; }
+  .apercu { margin: 12px 0 0; padding: 12px 14px; border-radius: 12px; background: var(--creux); color: var(--gris); } .apercu b { font-weight: 600; color: var(--encre); }
+  .etl { display: flex; align-items: baseline; gap: 10px; } .etl .pt { position: relative; top: -3px; }
+  .g-corps .lead.etl { margin-bottom: 12px; }
+  .txt { margin: 12px 0 0; color: var(--gris); } .txt.pied { font-size: 15px; }
+  .faits { margin-bottom: 4px; }
+  .hor .sous { margin-top: 14px; }
+  /* un papier déposé, à ranger */
+  .fich li { padding: 12px 0; border-top: 1px solid var(--trait); } .fich li:first-child { padding-top: 0; border-top: 0; } .fich li:last-child { padding-bottom: 2px; }
+  .fi { display: grid; grid-template-columns: 36px minmax(0, 1fr); align-items: center; gap: 11px; padding-right: 30px; }
+  .fi svg, .fi .co { width: 36px; height: 36px; padding: 8px; border-radius: 10px; background: var(--creux); color: var(--gris); }
+  .fi .co { padding: 0; line-height: 36px; text-align: center; color: var(--vert); } .fi .co.nul { color: var(--pale); }
+  .fi b { display: block; font-weight: 600; line-height: 1.3; overflow-wrap: anywhere; }
+  .fich li + li .fi, .bloc .fi { padding-right: 0; }
+  .fi small { display: block; font-size: 14.5px; color: var(--gris); } .fi small em { font-style: normal; color: var(--ambre); }
+  .carte p.vers, p.vers { margin: 11px 0 0; font: 400 18.5px/1.4 var(--serif); color: var(--encre); } .vers b { font-weight: 500; }
+  .bloc { margin: 0 0 14px; padding: 14px 16px; border: 1px solid rgba(242, 180, 65, .34); border-radius: 18px; background: var(--carte); }
+  /* l'argent : deux chiffres, puis les mois en barres */
+  .duo { display: grid; grid-template-columns: max-content 1fr; gap: 22px; white-space: nowrap; }
+  .duo b { display: block; font: 500 31px/1.05 var(--serif); letter-spacing: -.02em; } .duo small { font-size: 14.5px; color: var(--gris); }
+  .carte p.det, p.det { margin: 6px 0 0; font-size: 14.5px; color: var(--gris); }
+  .bars { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--trait); }
+  .bg { display: flex; align-items: flex-end; gap: 4px; height: 104px; }
+  .bg button { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 5px; height: 100%; padding: 0; border: 0; background: none; font-size: 13.5px; color: var(--pale); }
+  .ba { display: block; width: 100%; max-width: 38px; border-radius: 6px 6px 2px 2px; background: #363c48; overflow: hidden; }
+  .ba i { display: block; background: #596171; }
+  .bg button[aria-pressed="true"] { color: var(--encre); font-weight: 600; }
+  .bg button[aria-pressed="true"] .ba { background: #aeb2ba; } .bg button[aria-pressed="true"] .ba i { background: var(--encre); }
+  .bn { display: flex; align-items: center; justify-content: space-between; margin: 2px 0 4px; font-size: 14.5px; line-height: 1.3; color: var(--gris); text-align: center; } .bn small { display: block; font-size: 13.5px; color: var(--pale); }
+  .bn button { flex: none; width: 44px; height: 44px; padding: 0; border: 0; background: none; font-size: 22px; color: var(--gris); } .bn button[disabled] { opacity: .3; }
+  .md { padding: 10px 14px; border-radius: 12px; background: var(--creux); } .md b { display: block; font-weight: 600; } .md small { font-size: 14.5px; color: var(--gris); }
+  .leg { display: flex; gap: 14px; margin: 8px 0 0; font-size: 14px; color: var(--pale); } .leg i { display: inline-block; width: 9px; height: 9px; margin-right: 6px; border-radius: 2px; background: #363c48; } .leg i.c { background: #596171; }
 
   /* ---- la barre de parole ---- */
   .parole { flex: none; position: relative; z-index: 5; padding: 0 0 calc(env(safe-area-inset-bottom, 0px) + 10px); background: var(--bg); border-top: 1px solid var(--trait); }
@@ -226,7 +272,7 @@
   .champ.plein #envoi { display: grid; } .champ.plein #micro { display: none; }
   .champ.ecoute { border-color: var(--cyan); }
   .champ.ecoute #micro { color: var(--cyan); animation: parle 1.1s ease-in-out infinite; }
-  .toast { position: absolute; left: 16px; right: 16px; bottom: 100%; margin-bottom: 10px; padding: 11px 16px; border: 1px solid var(--trait2); border-radius: 14px; background: #20252f; font-size: 15px; text-align: center; opacity: 0; transform: translateY(6px); transition: opacity .2s, transform .2s; pointer-events: none; }
+  .toast { position: absolute; left: 16px; right: 16px; top: calc(env(safe-area-inset-top, 0px) + 8px); z-index: 40; padding: 11px 16px; border: 1px solid var(--trait2); border-radius: 14px; background: #20252f; font-size: 15px; text-align: center; box-shadow: 0 10px 30px rgba(0, 0, 0, .5); opacity: 0; transform: translateY(-6px); transition: opacity .2s, transform .2s; pointer-events: none; }
   .toast.on { opacity: 1; transform: none; }
 
   /* ---- une carte ouverte en grand ---- */
@@ -248,7 +294,7 @@
   .lg .dr.al { color: var(--ambre); } .lg .dr.bon { color: var(--vert); } .lg .dr.er { color: var(--rouge); }
   .sec .chaine li::before { background: var(--bg); } .sec .chaine { margin-bottom: 8px; }
   .sec .sous { margin: 12px 0 0; font-weight: 600; } .sec .sous small { font-weight: 400; color: var(--gris); font-size: 14.5px; }
-  .deux { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 0 0 12px; }
+  .deux { display: grid; grid-template-columns: 1.25fr 1fr; gap: 12px; margin: 0 0 12px; }
   .deux div { padding: 14px 14px 12px; border: 1px solid var(--trait); border-radius: 16px; background: var(--carte); }
   .deux b { display: block; font: 500 34px/1.05 var(--serif); letter-spacing: -.02em; white-space: nowrap; } .deux small { color: var(--gris); font-size: 14.5px; }
   .depot { display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; min-height: 56px; margin: 0 0 24px; border: 1px dashed var(--trait2); border-radius: 16px; background: none; font-weight: 600; }
@@ -272,17 +318,10 @@
       <div class="qui"><h1>Jeudi 26 novembre</h1><p><time id="horloge">16 h 10</time> · 6 °C, couvert</p></div>
       <button class="hermes" data-q="tourne" aria-label="Hermes est actif : voir ce qui tourne"><i class="pt vert"></i>Hermes actif</button>
     </header>
-    <nav class="resume large" id="resume" aria-label="Résumé épinglé">
-      <div class="res-c">
-        <button data-f="toi" aria-pressed="false"><i class="pt amb" data-pt-toi></i><b data-n-toi>3</b>à toi</button>
-        <button data-f="cours" aria-pressed="false"><i class="pt cy"></i><b data-n-cours>8</b>en cours<em>· 1 erreur</em></button>
-        <button data-f="venir" aria-pressed="false"><i class="pt"></i><span class="coupe">Pédiatre 17 h 30</span></button>
-      </div>
-      <div class="res-l">
-        <button class="rl" data-f="toi" aria-pressed="false"><i class="pt amb" data-pt-toi></i><span class="rn">À toi</span><b data-n-toi>3</b><span class="rd" id="d-toi"></span><span class="rx">›</span></button>
-        <button class="rl" data-f="cours" aria-pressed="false"><i class="pt cy vif"></i><span class="rn">En cours</span><b data-n-cours>8</b><span class="rd"><em>1 en erreur</em> · relance 17&nbsp;h&nbsp;40</span><span class="rx">›</span></button>
-        <button class="rl" data-f="venir" aria-pressed="false"><i class="pt"></i><span class="rn">À venir</span><b></b><span class="rd" style="grid-column: 3 / 5"><strong>Pédiatre 17&nbsp;h&nbsp;30</strong> · colis demain matin</span><span class="rx">›</span></button>
-      </div>
+    <nav class="resume" id="resume" aria-label="Résumé épinglé">
+      <button class="rl" data-f="toi" aria-pressed="false"><i class="pt amb" id="p-toi"></i><span class="rn">À toi</span><b id="n-toi">3</b><span class="rd" id="d-toi"></span><span class="rx">›</span></button>
+      <button class="rl" data-f="cours" aria-pressed="false"><i class="pt cy vif" id="p-cours"></i><span class="rn">En cours</span><b>8</b><span class="rd" id="d-cours"></span><span class="rx">›</span></button>
+      <button class="rl" data-f="venir" aria-pressed="false"><i class="pt"></i><span class="rn">À venir</span><span class="rd tout"><strong>Pédiatre 17 h 30</strong> · colis demain</span><span class="rx">›</span></button>
     </nav>
   </div>
 
@@ -303,10 +342,10 @@
       <section class="moment ferme" id="m-hier">
         <button class="mh" aria-expanded="false"><span>Hier</span><small>mercredi 25 · 4 éléments, tout est traité</small><i>⌄</i></button>
         <div class="mc">
-          <div class="it replie"><span class="nd"></span><div class="ligne"><span class="co">✓</span>7 h 41 · Veille du matin lue</div></div>
-          <div class="it replie"><span class="nd"></span><div class="ligne"><span class="co">✓</span>10 h 05 · 2 mails rangés, 0 à traiter</div></div>
-          <div class="it replie"><span class="nd"></span><div class="ligne"><span class="co">✓</span>12 h 00 · Prix suivis : rien de neuf</div></div>
-          <div class="it replie"><span class="nd"></span><div class="ligne"><span class="co">✓</span>18 h 20 · Jours du mois validés pour le CRA</div></div>
+          <div class="it replie jl"><span class="nd"></span><div class="ligne"><span class="co">✓</span>7 h 41 · Veille du matin lue</div></div>
+          <div class="it replie jl"><span class="nd"></span><div class="ligne"><span class="co">✓</span>10 h 05 · 2 mails rangés, 0 à traiter</div></div>
+          <div class="it replie jl"><span class="nd"></span><div class="ligne"><span class="co">✓</span>12 h 00 · Prix suivis : rien de neuf</div></div>
+          <div class="it replie jl"><span class="nd"></span><div class="ligne"><span class="co">✓</span>18 h 20 · Jours du mois validés pour le CRA</div></div>
         </div>
       </section>
 
@@ -330,11 +369,11 @@
             <div class="meta"><time>7 h 41</time><span class="src">· Hermes · Veille du matin</span></div>
             <div class="carte"><button class="agr" data-grand="semaine" aria-label="Ouvrir ma semaine en grand"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M14 4h6v6M20 4l-7 7M10 20H4v-6M4 20l7-7"/></svg></button>
               <ul class="mini">
-                <li><span>6 °C</span><div><b>Couvert toute la journée</b></div></li>
+                <li><span>6 °C</span><div><b>Couvert</b><small>toute la journée</small></div></li>
                 <li><span>17 h 30</span><div><b>Pédiatre</b></div></li>
                 <li><span>Demain</span><div><b>Livraison d’un colis</b><small>entre 9 h 45 et 13 h 45</small></div></li>
-                <li><span>Avant le 01/12</span><div><b>Devis à envoyer à l’assurance</b><small>et rendez-vous passeport à prendre</small></div></li>
-                <li><span>Ce soir, 19 h</span><div><b>Mes idées de sorties pour le week-end</b></div></li>
+                <li><span>Avant le 01/12</span><div><b>Devis pour l’assurance</b><small>et rendez-vous passeport</small></div></li>
+                <li><span>Ce soir, 19 h</span><div><b>Idées de sorties</b><small>pour le week-end</small></div></li>
               </ul></div>
           </article>
 
@@ -345,22 +384,30 @@
             <div class="carte"><h3>Note de frais Box internet</h3><p>Hermes l’a créée sur le portail. Prochaine le 15/12.</p><ol class="chaine" data-chaine="box"></ol></div>
           </article>
 
-          <article class="it s-toi" data-t="toi" data-id="sem" data-court="CRA de la semaine" data-ok="CRA de la semaine confirmé" data-okv="Confirmé">
+          <article class="it s-err" data-t="cours" id="c-bilan">
             <span class="nd"></span>
             <button class="pli"></button>
-            <div class="meta"><time>9 h 02</time><span class="src">· Travail</span><span class="etat">attend ton oui</span><button class="rp">Replier</button></div>
+            <div class="meta"><time>9 h 02</time><span class="src">· Hermes</span><span class="etat">en erreur</span><button class="rp">Replier</button></div>
+            <div class="carte"><h3>Le bilan de la semaine s’est arrêté</h3><p>Limite du forfait atteinte à 9 h 02. Il repartira seul vers 17&nbsp;h&nbsp;40. Rien à faire de ton côté.</p>
+              <div class="actions"><button class="b" data-rt="bilan">Voir la routine</button></div></div>
+          </article>
+
+          <article class="it s-toi" data-t="toi" data-id="sem" data-genre="CRA" data-court="CRA de la semaine" data-ok="CRA de la semaine confirmé" data-okv="Confirmé">
+            <span class="nd"></span>
+            <button class="pli"></button>
+            <div class="meta"><time>9 h 20</time><span class="src">· Travail</span><span class="etat">attend ton oui</span><button class="rp">Replier</button></div>
             <div class="carte"><h3>CRA de la semaine : 4 jours travaillés, 1 congé</h3><p>C’est bien ça ? Je l’inscris dès ton oui.</p>
               <div class="jours" aria-label="Lundi à jeudi travaillés, vendredi en congé"><span>lun<b>23</b></span><span>mar<b>24</b></span><span>mer<b>25</b></span><span>jeu<b>26</b></span><span class="cg">congé<b>27</b></span></div>
               <div class="actions"><button class="b oui" data-oui>Confirmer</button><button class="b" data-toast="Dans l’app, tu corrigerais les jours ici.">Corriger</button></div>
               <p class="verdict"></p></div>
           </article>
 
-          <article class="it" data-id="prolong" data-ok="Mission prolongée pour décembre" data-okv="Vu">
+          <article class="it" data-id="prolong" data-ok="Mission prolongée pour décembre, lu" data-okv="Lu" data-etat="à lire">
             <span class="nd"></span>
             <button class="pli"></button>
-            <div class="meta"><time>11 h 17</time><span class="src">· Courrier</span><span class="etat"></span><button class="rp">Replier</button></div>
-            <div class="carte"><h3>Réponse à ton mail de prolongation</h3><p class="cit">« Ta mission est prolongée pour décembre. »</p><p>Rien à faire. Je l’ai noté.</p>
-              <div class="actions"><button class="b" data-oui>Vu</button></div>
+            <div class="meta"><time>11 h 17</time><span class="src">· Mail suivi</span><span class="etat">à lire</span><button class="rp">Replier</button></div>
+            <div class="carte"><h3>Réponse à ton mail de prolongation</h3><p class="cit">« Ta mission est prolongée pour décembre. »</p><p>Envoyé à 7 h 27, répondu à 11 h 17. Rien à faire.</p>
+              <div class="actions"><button class="b" data-oui>Lu</button></div>
               <p class="verdict"></p></div>
           </article>
         </div>
@@ -394,31 +441,24 @@
       <section class="moment">
         <button class="mh" aria-expanded="true"><span>Cet après-midi</span><small></small><i>⌄</i></button>
         <div class="mc">
-          <article class="it s-toi" data-t="toi cours" id="c-cra" data-id="cra" data-court="CRA signé" data-ok="CRA de novembre déposé sur le portail" data-okv="Déposé">
+          <article class="it s-toi" data-t="toi cours" id="c-cra" data-id="cra" data-genre="CRA" data-court="CRA signé" data-ok="CRA de novembre déposé sur le portail" data-okv="Déposé">
             <span class="nd"></span>
             <button class="pli"></button>
-            <div class="meta"><time>14 h 29</time><span class="src">· CRA du mois</span><span class="etat">attend ton oui</span><button class="rp">Replier</button></div>
-            <div class="carte"><h3>Ton client a renvoyé le CRA signé. Je le fais déposer par Hermes ?</h3>
+            <div class="meta"><time>14 h 29</time><span class="src">· Mail suivi · CRA du mois</span><span class="etat">attend ton oui</span><button class="rp">Replier</button></div>
+            <div class="carte"><h3>Ton client a renvoyé le CRA signé (PDF). Je le fais déposer sur le portail par Hermes ?</h3>
               <span class="piece"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/></svg>CRA-novembre-signé.pdf</span>
               <ol class="chaine" data-chaine="cra"></ol>
               <div class="actions"><button class="b oui" data-oui>Oui, dépose-le</button><button class="b" data-tard>Plus tard</button></div>
               <p class="verdict"></p></div>
           </article>
 
-          <article class="it s-toi" data-t="toi" data-id="frais" data-court="Note de frais" data-ok="Note de frais Télétravail validée" data-okv="Validée">
+          <article class="it s-toi" data-t="toi" data-id="frais" data-genre="note de frais" data-court="Note de frais" data-ok="Note de frais Télétravail validée" data-okv="Validée">
             <span class="nd"></span>
             <button class="pli"></button>
             <div class="meta"><time>15 h 40</time><span class="src">· Travail</span><span class="etat">attend ton oui</span><button class="rp">Replier</button></div>
             <div class="carte"><h3>Note de frais Télétravail de novembre</h3><p>9 jours à la maison, 22,50 €. Je l’ai préparée, à toi de valider.</p>
               <div class="actions"><button class="b oui" data-oui>Valider</button><button class="b" data-grand="travail">Voir le détail</button></div>
               <p class="verdict"></p></div>
-          </article>
-
-          <article class="it s-err" data-t="cours">
-            <span class="nd"></span>
-            <div class="meta"><time>16 h 02</time><span class="src">· Hermes</span><span class="etat">en erreur</span></div>
-            <div class="carte"><h3>Le bilan de la semaine s’est arrêté</h3><p>Limite du forfait atteinte. Je le relance à 17&nbsp;h&nbsp;40. Rien à faire de ton côté.</p>
-              <div class="actions"><button class="b" data-q="tourne">Voir ce qui tourne</button></div></div>
           </article>
         </div>
       </section>
@@ -428,7 +468,7 @@
         <div class="mc" id="bas" aria-live="polite">
           <article class="it jv">
             <span class="av" data-globe></span>
-            <p class="dit"><span id="dit-now"></span> Le reste avance tout seul. Pédiatre à 17&nbsp;h&nbsp;30.
+            <p class="dit"><span id="dit-now"></span> Le reste avance tout seul.
               <button class="b" data-f="toi" id="b-now">Voir ce qui t’attend</button></p>
           </article>
         </div>
@@ -437,7 +477,6 @@
   </main>
 
   <footer class="parole">
-    <div class="toast" id="toast" role="status"></div>
     <div class="puces" id="puces" aria-label="Raccourcis de question">
       <button data-q="tourne"><span>Ce qui tourne</span></button>
       <button data-q="papiers"><span>Mes papiers</span></button>
@@ -455,10 +494,11 @@
   </footer>
 
   <section class="grand" id="grand" aria-hidden="true" role="dialog" aria-label="Carte ouverte en grand">
-    <div class="g-tete"><button data-retour><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>Le fil</button><span id="g-sur"></span></div>
+    <div class="g-tete"><button data-retour><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg><span id="g-dos">Le fil</span></button><span id="g-sur"></span></div>
     <div class="g-corps" id="g-corps"></div>
-    <div class="g-pied"><button class="b" data-retour>Revenir au fil</button></div>
+    <div class="g-pied"><button class="b" data-fermer>Revenir au fil</button></div>
   </section>
+  <div class="toast" id="toast" role="status"></div>
 </div>
 
 <script>
@@ -468,7 +508,7 @@
   var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
   var fil = $('#fil'), filIn = $('#fil-in'), resume = $('#resume'), grand = $('#grand'), bas = $('#bas'), champ = $('#champ'), q = $('#q');
   var calme = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  var E = { cra: 'att', craH: '', minute: 10, filtre: '' };
+  var E = { cra: 'att', craH: '', minute: 10, filtre: '', pile: [], hor: null, tout: null, choix: 0, md: 0, ms: -1, neuf: 0 };
   function heure() { return '16 h ' + (E.minute < 10 ? '0' : '') + E.minute; }
   function el(html) { var t = document.createElement('template'); t.innerHTML = html.trim(); return t.content.firstElementChild; }
   function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
@@ -479,14 +519,58 @@
   var AGR = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M14 4h6v6M20 4l-7 7M10 20H4v-6M4 20l7-7"/></svg>';
 
   /* ---- les données (inventées) ---- */
+  /* les six routines d'Hermes : a = accord (relancé, relancée…), j = jours ('tous', 'lv' ou numéros, lundi = 0), h = heures, q = sans horaire,
+     e = état (ok, pause, err), hi = derniers passages [quand, durée, réussi, programmé] */
+  var JN = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche'];
   var RT = [
-    ['vert', 'Veille du matin', 'tous les jours, 7 h 40 · passée à 7 h 41', 'demain'],
-    ['cy vif', 'Courrier à l’arrivée', 'à chaque mail important · dernier à 13 h 15', 'à l’écoute'],
-    ['vert', 'Prix suivis', 'tous les jours, midi · passée à 12 h 00', 'demain'],
-    ['cy', 'Sorties du week-end', 'le jeudi, 19 h', 'ce soir'],
-    ['vert', 'Digest IA', 'le lundi, 8 h · passé lundi', 'lundi'],
-    ['red', 'Bilan de la semaine', 'le lundi, 9 h · limite du forfait', 'relance 17 h 40']
+    { k: 'veille', n: 'Veille du matin', a: 'e', j: 'tous', h: ['07:40'], e: 'ok', der: 'aujourd’hui, 7 h 41', dc: '7 h 41', du: '1 min 38', fait: '3 points pour aujourd’hui, 2 attentes, rien d’envoyé.', st: '28 réussis sur 30 · 1 min 40 en moyenne',
+      hi: [['auj., 7 h 41', '1 min 38', 1, 1], ['mer. 25, 7 h 40', '1 min 44', 1, 1], ['mar. 24, 7 h 41', '1 min 36', 1, 1], ['lun. 23, 18 h 02', '1 min 52', 1, 0], ['lun. 23, 7 h 40', '12 s', 0, 1]] },
+    { k: 'courrier', n: 'Courrier à l’arrivée', a: '', q: 'à chaque mail important', e: 'ok', der: 'aujourd’hui, 13 h 15', dc: '13 h 15', du: '34 s', fait: '1 mail important : ton assureur. Rangé dans le sujet « Sinistre dégât des eaux ».', st: '41 réussis sur 41 · 35 s en moyenne',
+      hi: [['auj., 13 h 15', '38 s', 1, 1], ['auj., 11 h 17', '29 s', 1, 1], ['mer. 25, 17 h 48', '33 s', 1, 1], ['mer. 25, 10 h 05', '41 s', 1, 1]] },
+    { k: 'prix', n: 'Prix suivis', a: 's', j: 'tous', h: ['12:00'], e: 'ok', der: 'aujourd’hui, 12 h 00', dc: '12 h 00', du: '52 s', fait: '2 prix relevés. L’aspirateur balai est passé sous ton seuil : 189 €.', st: '30 réussis sur 30 · 55 s en moyenne',
+      hi: [['auj., 12 h 00', '52 s', 1, 1], ['mer. 25, 12 h 00', '57 s', 1, 1], ['mar. 24, 12 h 00', '54 s', 1, 1], ['lun. 23, 12 h 01', '58 s', 1, 1]] },
+    { k: 'sorties', n: 'Sorties du week-end', a: 'es', j: [3], h: ['19:00'], e: 'ok', der: 'jeudi 19, 19 h 02', dc: 'jeudi 19', du: '2 min 04', fait: 'Jeudi dernier : 3 idées trouvées, toutes à moins de 10 €.', st: '4 réussis sur 4 · 2 min 10 en moyenne',
+      hi: [['jeu. 19, 19 h 02', '2 min 04', 1, 1], ['jeu. 12, 19 h 00', '2 min 21', 1, 1], ['jeu. 5, 19 h 01', '2 min 02', 1, 1]] },
+    { k: 'digest', n: 'Digest IA', a: '', j: [0], h: ['08:00'], e: 'pause', dep: 'le 24/11', der: 'lundi 23, 8 h 03', dc: 'lundi 23', du: '2 min 58', fait: 'Lundi : 5 articles retenus sur 41, résumé envoyé à 8 h 03.', st: '4 réussis sur 4 · 3 min 05 en moyenne',
+      hi: [['lun. 23, 8 h 03', '2 min 58', 1, 1], ['lun. 16, 8 h 02', '3 min 11', 1, 1], ['lun. 9, 8 h 02', '3 min 06', 1, 1]] },
+    { k: 'bilan', n: 'Bilan de la semaine', a: '', j: [0], h: ['09:00'], e: 'err', der: 'aujourd’hui, 9 h 02', dc: '9 h 02', du: '2 min 21', fait: 'Arrêté avant la fin : rien n’a été envoyé.', st: '3 réussis sur 5 · 2 min 30 en moyenne',
+      hi: [['auj., 9 h 02', '14 s', 0, 0], ['lun. 23, 9 h 00', '9 s', 0, 1], ['lun. 16, 9 h 00', '2 min 26', 1, 1], ['lun. 9, 9 h 01', '2 min 34', 1, 1]] }
   ];
+  RT.forEach(function (r) { r.o = { j: r.j, h: r.h && r.h.slice() }; });
+  function rt(k) { return RT.filter(function (r) { return r.k === k; })[0]; }
+  function hm(s) { var p = s.split(':'), h = +p[0], m = +p[1]; return h === 12 && !m ? 'midi' : h + ' h' + (m ? ' ' + (m < 10 ? '0' : '') + m : ''); }
+  function joursTxt(j) {
+    if (j === 'tous' || j.length === 7) return 'tous les jours';
+    if (j === 'lv' || j.join() === '0,1,2,3,4') return 'du lundi au vendredi';
+    var n = j.map(function (d) { return JN[d]; });
+    return 'le ' + (n.length > 1 ? n.slice(0, -1).join(', ') + ' et ' + n[n.length - 1] : n[0]);
+  }
+  function momentTxt(j, h) { var t = h.map(hm); return joursTxt(j) + ' à ' + (t.length > 1 ? t.slice(0, -1).join(', ') + ' et ' + t[t.length - 1] : t[0]); }
+  function moment(r) { return r.q || momentTxt(r.j, r.h); }
+  function jourOk(j, d) { return j === 'tous' || (j === 'lv' ? d < 5 : j.indexOf(d) >= 0); }
+  function prochain(r) { /* [en court pour la ligne, en clair pour la fiche] ; on est jeudi (3), à 16 h et quelques */
+    if (r.run) return ['en cours', 'en cours'];
+    if (r.e === 'pause') return ['depuis ' + r.dep, 'aucun pendant la pause'];
+    if (r.e === 'err') return ['relance 17 h 40', 'vers 17 h 40, sans toi'];
+    if (r.q) return ['à l’écoute', 'au prochain mail important'];
+    var now = 16 * 60 + E.minute, hs = r.h.slice().sort();
+    for (var d = 0; d < 8; d++) {
+      var jour = (3 + d) % 7; if (!jourOk(r.j, jour)) continue;
+      for (var i = 0; i < hs.length; i++) {
+        var p = hs[i].split(':'), m = p[0] * 60 + +p[1]; if (!d && m <= now) continue;
+        var qd = !d ? (m >= 1080 ? 'ce soir' : 'aujourd’hui') : d === 1 ? 'demain' : JN[jour];
+        return [qd, qd + ', ' + hm(hs[i])];
+      }
+    }
+    return ['—', 'aucun'];
+  }
+  function accord(r, mot) { return mot + (r.a === 'e' ? 'e' : r.a === 'es' ? 'es' : r.a === 's' && !/s$/.test(mot) ? 's' : ''); }
+  function ligneRt(r) {
+    var p = prochain(r), haut = r.run ? 'tourne…' : r.e === 'pause' ? 'en pause' : r.e === 'err' ? 'en erreur' : r.dc + ' <i>✓</i>';
+    var pt = r.run ? 'cy vif' : r.e === 'pause' ? '' : r.e === 'err' ? 'red' : r.q ? 'cy vif' : 'vert';
+    return '<li><button class="rt ' + (r.run ? 'cou' : r.e === 'err' ? 'err' : r.e === 'pause' ? 'pau' : '') + '" data-rt="' + r.k + '"><i class="pt ' + pt + '"></i><span><b>' + r.n + '</b><small>' + moment(r) + '</small></span><span class="qd">' + haut + '<small>' + p[0] + '</small></span><span class="ch">›</span></button></li>';
+  }
+  function boutonTout() { return '<button class="b" data-ra="tout">' + (E.tout ? 'Tout reprendre' : 'Tout mettre en pause') + '</button>'; }
   function etapes(nom) {
     if (nom === 'box') return [['Facture téléchargée', '8 h 03', 'ok'], ['Vérifiée à blanc', '8 h 04', 'ok'], ['Créée', '8 h 05', 'ok']];
     return [['Jours validés', 'hier', 'ok'], ['Mail au client', '7 h 27', 'ok'], ['CRA validé sur le portail', '7 h 31', 'ok'], ['CRA signé reçu', '14 h 29', 'ok'],
@@ -502,11 +586,80 @@
   function fait(id) { var e = $('.it[data-id="' + id + '"]'); return e && e.classList.contains('s-fait'); }
 
   function carteTourne() {
-    return '<div class="carte"><button class="agr" data-grand="tourne" aria-label="Ouvrir ce qui tourne en grand">' + AGR + '</button>' +
+    return '<div class="carte" data-ct><button class="agr" data-grand="tourne" aria-label="Ouvrir ce qui tourne en grand">' + AGR + '</button>' +
       '<p class="pass"><i class="pt vert"></i>Passerelle d’Hermes : active</p>' +
-      '<ul class="rts">' + RT.map(function (r) { return '<li class="' + (r[0] === 'red' ? 'err' : '') + '"><i class="pt ' + r[0] + '"></i><div><b>' + r[1] + '</b><small>' + r[2] + '</small></div><span class="qd">' + r[3] + '</span></li>'; }).join('') + '</ul>' +
+      '<ul class="rts">' + RT.map(ligneRt).join('') + '</ul>' +
       '<p class="note">Deux chaînes : CRA du mois (' + (E.cra === 'fait' ? 'terminée' : '4 étapes sur 5') + '), Note de frais Box internet (terminée).</p>' +
-      '<div class="actions"><button class="b" data-grand="tourne">Ouvrir en grand</button></div></div>';
+      '<div class="actions">' + boutonTout() + '</div></div>';
+  }
+  function compte() { var n = { ok: 0, pause: 0, err: 0 }; RT.forEach(function (r) { n[r.e]++; }); return n; }
+  function nb(n, f) { return ['aucune', f ? 'une' : 'un', 'deux', 'trois', 'quatre', 'cinq', 'six'][n]; }
+
+  /* la fiche d'une routine, ouverte en grand : état, actions, horaire, dernier passage, historique */
+  function ficheRt(r) {
+    var p = prochain(r), mod = !r.q && (String(r.j) !== String(r.o.j) || r.h.join() !== r.o.h.join());
+    var et = r.run ? ['cy vif', 'Passage en cours…'] : r.e === 'pause' ? ['', 'En pause depuis ' + r.dep + ', jusqu’à nouvel ordre.'] : r.e === 'err' ? ['red', 'En erreur depuis 9 h 02. Reprise prévue vers 17 h 40.'] : ['vert', 'Active.'];
+    var h = '<h2>' + r.n + '</h2><p class="lead etl"><i class="pt ' + et[0] + '"></i><span id="rt-etat">' + et[1] + '</span></p>' +
+      '<ul class="mini faits">' + M('Moment', moment(r), mod ? 'horaire modifié' : '') + M('Dernier passage', r.der, r.hi[0][2] ? 'réussi' : 'en erreur', r.hi[0][2] ? 'bon' : 'er') + M('Prochain passage', p[1]) + '</ul>' +
+      '<div class="actions gr' + (r.run ? ' occ' : '') + '"><button class="b plein" data-ra="lancer">Lancer maintenant</button><button class="b" data-ra="' + (r.e === 'pause' ? 'reprendre">Reprendre' : 'pause">Mettre en pause') + '</button>' + (r.q ? '' : '<button class="b" data-ra="horaire">Changer l’horaire</button>') + '</div>';
+    if (E.hor) h += horaire();
+    if (r.e === 'err' && !r.run) h += '<section class="sec" style="margin-top:26px"><h4>L’erreur en détail</h4><p class="txt">Limite du forfait atteinte à 9 h 02. Reprise vers 17 h 40 : elle repartira seule.</p><div class="actions"><button class="b" data-ra="lancer">Relancer maintenant</button></div></section>';
+    return h + '<section class="sec" style="margin-top:26px"><h4>Ce qu’elle a fait</h4><p class="txt">' + r.fait + '</p></section>' +
+      '<section class="sec"><h4>Historique</h4><ul>' + r.hi.slice(0, 5).map(function (x) { return L(x[2] ? 'vert' : 'red', x[0], x[1] + ' · ' + (x[3] ? 'programmé' : 'lancé à la main'), x[2] ? 'réussi' : 'en erreur', x[2] ? 'bon' : 'er'); }).join('') + '</ul><p class="txt pied">' + r.st + '</p></section>';
+  }
+  function ouvrirHoraire(r) { E.hor = { mode: r.j === 'tous' ? 'tous' : r.j === 'lv' ? 'lv' : 'coche', sel: JN.map(function (_, d) { return jourOk(r.j, d); }), h: r.h.slice() }; }
+  function horJ() { var o = E.hor; if (o.mode !== 'coche') return o.mode; return o.sel.map(function (s, d) { return s ? d : -1; }).filter(function (d) { return d >= 0; }); }
+  function apercu() { var j = horJ(); return typeof j !== 'string' && !j.length ? 'Coche au moins un jour.' : 'Aperçu : <b>' + momentTxt(j, E.hor.h.slice().sort()) + '</b>'; }
+  function horaire() {
+    var o = E.hor, j = horJ(), vide = typeof j !== 'string' && !j.length;
+    return '<section class="sec hor" id="hor" style="margin-top:16px"><h4>Changer l’horaire</h4><p class="sous">Les jours</p><div class="seg">' +
+      [['tous', 'Tous les jours'], ['lv', 'Du lundi au vendredi'], ['coche', 'Jours à cocher']].map(function (m) { return '<button data-hm="' + m[0] + '" aria-pressed="' + (o.mode === m[0]) + '">' + m[1] + '</button>'; }).join('') + '</div>' +
+      (o.mode === 'coche' ? '<div class="seg js">' + JN.map(function (n, d) { return '<button data-hd="' + d + '" aria-pressed="' + o.sel[d] + '" aria-label="' + n + '">' + n.slice(0, 3) + '</button>'; }).join('') + '</div>' : '') +
+      '<p class="sous">Les heures <small>· une à quatre</small></p><div class="seg">' +
+      o.h.map(function (v, i) {
+        var p = v.split(':'), hs = '', ms = '';
+        for (var a = 0; a < 24; a++) hs += '<option value="' + a + '"' + (a === +p[0] ? ' selected' : '') + '>' + a + ' h</option>';
+        for (var b = 0; b < 60; b += 5) ms += '<option value="' + b + '"' + (b === +p[1] ? ' selected' : '') + '>' + (b < 10 ? '0' : '') + b + '</option>';
+        return '<span class="hh"><select data-hi="' + i + '" data-part="0" aria-label="Heure ' + (i + 1) + '">' + hs + '</select><select data-hi="' + i + '" data-part="1" aria-label="Minutes de l’heure ' + (i + 1) + '">' + ms + '</select>' + (o.h.length > 1 ? '<button data-hx="' + i + '" aria-label="Retirer cette heure">✕</button>' : '') + '</span>';
+      }).join('') +
+      (o.h.length < 4 ? '<button data-hplus>+ Ajouter une heure</button>' : '') + '</div>' +
+      '<p class="apercu" id="apercu">' + apercu() + '</p>' +
+      '<div class="actions"><button class="b plein" data-hok' + (vide ? ' disabled' : '') + '>Enregistrer</button><button class="b" data-hannul>Annuler</button></div><button class="b lien" data-horig>Revenir à l’horaire d’origine</button></section>';
+  }
+
+  /* les papiers déposés : le premier est proposé, le suivant attend */
+  var FICH = [{ f: 'scan-0412.pdf', q: 'déposé à 16 h 04 · 1 page', dos: 'Logement', nom: '2026-11 Facture électricité.pdf', e: 'prop' }, { f: 'photo-0413.jpg', q: 'déposé à 16 h 06', dos: 'Santé', nom: '2026-11 Ordonnance pédiatre.jpg', e: 'att' }];
+  var DOC = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/></svg>';
+  function aRanger() { return FICH.filter(function (x) { return x.e === 'prop'; })[0]; }
+  function depot() {
+    return '<ul class="fich">' + FICH.map(function (x) {
+      if (x.e === 'ok' || x.e === 'ret') return '<li><div class="fi"><span class="co' + (x.e === 'ok' ? '">✓' : ' nul">✕') + '</span><div><b>' + (x.e === 'ok' ? x.nom : x.f) + '</b><small>' + (x.e === 'ok' ? 'rangé dans ' + x.dos + ' à ' + x.h : 'retiré, rien n’est rangé') + '</small></div></div></li>';
+      var prop = x.e === 'prop';
+      return '<li><div class="fi">' + DOC + '<div><b>' + x.f + '</b><small>' + x.q + ' · ' + (prop ? '<em>à ranger</em>' : 'en attente') + '</small></div></div>' + (prop ? '<p class="vers">Je le range dans <b>' + x.dos + '</b>, sous le nom « ' + x.nom + ' » ?</p>' +
+        (E.choix ? '<div class="seg">' + ['Logement', 'Santé', 'Voiture', 'Voyages', 'À trier'].map(function (z) { return '<button data-pd="' + z + '" aria-pressed="' + (z === x.dos) + '">' + z + '</button>'; }).join('') + '</div>' : '') +
+        '<div class="actions"><button class="b oui" data-pa="oui">Oui, ranger ici</button><button class="b" data-pa="dossier">Changer de dossier</button><button class="b lien" data-pa="retirer">Retirer</button></div>' : '') + '</li>';
+    }).join('') + '</ul>';
+  }
+  function papier(a, dossier) {
+    var x = aRanger(); if (!x) return;
+    if (dossier) { x.dos = dossier; E.choix = 0; }
+    else if (a === 'dossier') E.choix = !E.choix;
+    else { if (a === 'oui') E.minute += 2; x.e = a === 'oui' ? 'ok' : 'ret'; x.h = heure(); E.choix = 0; var s = FICH.filter(function (f) { return f.e === 'att'; })[0]; if (s) s.e = 'prop'; }
+    rendu();
+  }
+
+  /* l'argent mois par mois : 24 mois inventés, six visibles, un mois s'ouvre */
+  var MN = ['novembre', 'octobre', 'septembre', 'août', 'juillet', 'juin', 'mai', 'avril', 'mars', 'février', 'janvier', 'décembre'], MC = ['nov.', 'oct.', 'sept.', 'août', 'juil.', 'juin', 'mai', 'avr.', 'mars', 'févr.', 'janv.', 'déc.'];
+  var MOIS = [];
+  for (var mi = 0; mi < 24; mi++) MOIS.push({ n: MN[mi % 12], c: MC[mi % 12], an: mi < 11 ? 2026 : mi < 23 ? 2025 : 2024, fx: mi ? 1290 + [0, 0, 45, 0, 0, -30, 0, 60, 0, 0, 0, 25][mi % 12] : 930, co: mi ? 330 + (mi * 97) % 290 : 250 });
+  function eur(n) { return String(n).replace(/\B(?=(\d{3})+$)/g, ' ') + ' €'; }
+  function moisTxt(i) { var s = MOIS[i]; return s.n.charAt(0).toUpperCase() + s.n.slice(1) + ' ' + s.an + (i ? '' : ', en cours'); }
+  function barres() {
+    var d = E.md, h = '<div class="bg">';
+    for (var i = d + 5; i >= d; i--) { var m = MOIS[i], t = m.fx + m.co; h += '<button data-mois="' + i + '" aria-pressed="' + (i === E.ms) + '" aria-label="' + m.n + ' ' + m.an + ' : ' + eur(t) + '"><span class="ba" style="height:' + Math.round(t / 26) + 'px"><i style="height:' + Math.round(m.co / 26) + 'px"></i></span>' + m.c + '</button>'; }
+    h += '</div><div class="bn"><button data-mdec="6"' + (d >= 18 ? ' disabled' : '') + ' aria-label="Six mois plus tôt">‹</button><span>' + MOIS[d + 5].c + (MOIS[d + 5].an === MOIS[d].an ? '' : ' ' + MOIS[d + 5].an) + ' à ' + MOIS[d].c + ' ' + MOIS[d].an + '<small>6 mois sur 24 · touche un mois</small></span><button data-mdec="-6"' + (d ? '' : ' disabled') + ' aria-label="Six mois plus tard">›</button></div>';
+    if (E.ms >= d && E.ms < d + 6) { var s = MOIS[E.ms]; h += '<div class="md"><b>' + moisTxt(E.ms) + ' : ' + eur(s.fx + s.co) + '</b><small>' + (E.ms ? 'fixes ' + eur(s.fx) + ' · courantes ' + eur(s.co) : 'fixes passées 930 € · courantes notées 250 €') + '</small></div>'; }
+    return h;
   }
   function friseVenir() {
     return '<div class="frise"><h5>Aujourd’hui</h5><ul class="mini">' + M('17 h 30', 'Pédiatre') + M('17 h 40', 'Je relance le bilan de la semaine') + M('19 h', 'Idées de sorties pour le week-end', 'Hermes') + '</ul>' +
@@ -516,11 +669,12 @@
 
   /* ce que JARVIS répond : une phrase, une carte de synthèse, la ligne une fois repliée, la carte en grand */
   var REP = {
-    tourne: { q: 'Ce qui tourne', dit: function () { return 'Six routines chez Hermes. Cinq vont bien, une est en erreur : je la relance à 17 h 40.'; }, court: 'Ce qui tourne · 6 routines, 1 en erreur', carte: carteTourne },
-    papiers: { q: 'Mes papiers', grand: 'papiers', dit: function () { return 'Tout est rangé. Deux pièces sont à surveiller.'; }, court: 'Mes papiers · 2 pièces à surveiller',
-      carte: function () { return '<ul class="mini">' + M('Avant le 01/12', 'Passeport à renouveler', 'rendez-vous à prendre', 'al') + M('Dans 5 mois', 'Carte d’identité', 'elle expire fin avril') + M('3 récents', 'Attestation d’assurance habitation', 'Facture Box internet · Ordonnance du pédiatre') + '</ul>'; }, plus: '<button class="b" data-toast="Dans l’app : une photo, un fichier ou un mail transféré.">Déposer un document</button>' },
-    argent: { q: 'Mon argent', grand: 'argent', dit: function () { return 'Il te reste 640 € à payer ce mois-ci.'; }, court: 'Mon argent · 640 € restent à payer',
-      carte: function () { return '<div class="gros"><b>640 €</b><span>restent à payer<br>en novembre</span></div><div class="jauge"><i style="width:65%"></i></div><ul class="mini large"><li><span>Déjà dépensé</span><b>1 180 €</b></li><li><span>Prochain prélèvement</span><b>Électricité, 62 € le 28</b></li></ul>'; } },
+    tourne: { q: 'Ce qui tourne', court: 'Ce qui tourne · 6 routines chez Hermes', carte: carteTourne, dit: function () {
+      var n = compte(); return 'Six routines chez Hermes : ' + nb(n.ok, 1) + ' active' + (n.ok > 1 ? 's' : '') + (n.pause ? ', ' + nb(n.pause, 1) + ' en pause' : '') + (n.err ? ', ' + nb(n.err, 1) + ' en erreur que je relance à 17 h 40' : '') + '. Touche une routine pour la régler.'; } },
+    papiers: { q: 'Mes papiers', grand: 'papiers', sans: 1, court: 'Mes papiers · 2 fichiers déposés', dit: function () { return aRanger() ? 'Tu as déposé deux fichiers. Voici ce que je propose pour le premier.' : 'Tout est rangé. Deux pièces sont à surveiller.'; },
+      carte: function () { return '<div data-depot>' + depot() + '</div>'; }, plus: '<button class="b lien" data-grand="papiers">Et 2 pièces à surveiller ›</button>' },
+    argent: { q: 'Mon argent', grand: 'argent', dit: function () { return 'Voilà où tu en es ce mois-ci.'; }, court: 'Mon argent · 1 180 € dépensés, 640 € à payer',
+      carte: function () { return '<div class="duo"><div><b>1 180 €</b><small>déjà dépensé ce mois</small></div><div><b>640 €</b><small>reste à payer</small></div></div><p class="det">fixes passées 930 € · courantes notées 250 €</p><div class="bars" data-barres>' + barres() + '</div>'; } },
     semaine: { q: 'Ma semaine', grand: 'semaine', dit: function () { return 'Semaine calme. Deux échéances tombent mardi.'; }, court: 'Ma semaine · 2 échéances mardi',
       carte: function () { return '<ul class="mini">' + M('Auj. 17 h 30', 'Pédiatre') + M('Demain', 'Livraison d’un colis', 'entre 9 h 45 et 13 h 45') + M('Week-end', '3 idées de sorties', 'je te les envoie ce soir à 19 h') + M('Avant mardi', 'Devis à l’assurance, rendez-vous passeport', '', '') + '</ul>'; } },
     achats: { q: 'Mes achats', grand: 'achats', dit: function () { return 'Je suis deux prix. L’un est passé sous ton seuil.'; }, court: 'Mes achats · 1 prix sous ton seuil',
@@ -535,25 +689,27 @@
       carte: function () { return '<ul class="mini">' + M('Avant le 01/12', 'Envoyer le devis à l’assurance', '', '') + M('Mar. 08/12', 'Passage de l’expert') + M('1 mail', 'attend une réponse', 'devis demandé à l’artisan lundi') + '</ul>'; } },
     inconnu: { dit: function () { return 'Dans cette maquette, je sais répondre sur le CRA, tes papiers, ton argent, ta semaine, tes achats, le week-end et ce qui tourne.'; }, court: 'Question sans réponse dans la maquette' }
   };
-  var ROUTES = [[/\bcra\b|compte.rendu/, 'cra'], [/sinistre|d[ée]g[âa]t|assur|expert|devis/, 'sinistre'], [/papier|document|passeport|identit/, 'papiers'], [/argent|reste|combien|budget|d[ée]pens|pr[ée]l[èe]v/, 'argent'], [/tourne|routine|hermes|erreur|bilan/, 'tourne'], [/semaine|agenda|demain|rendez|p[ée]diatre|colis/, 'semaine'], [/achat|prix|aspirateur|casque/, 'achats'], [/week|sortie|voyage|lisbonne/, 'sorties'], [/travail|frais|mission/, 'travail']];
+  var ROUTES = [[/\bcra\b|compte.rendu/, 'cra'], [/sinistre|d[ée]g[âa]t|assur|expert|devis/, 'sinistre'], [/papier|document|passeport|identit/, 'papiers'], [/argent|reste|combien|budget|d[ée]pens|pr[ée]l[èe]v/, 'argent'], [/tourne|routine|hermes|erreur|bilan|pause|veille|digest/, 'tourne'], [/semaine|agenda|demain|rendez|p[ée]diatre|colis/, 'semaine'], [/achat|prix|aspirateur|casque/, 'achats'], [/week|sortie|voyage|lisbonne/, 'sorties'], [/travail|frais|mission/, 'travail']];
 
   var GRAND = {
-    tourne: { sur: 'Ce qui tourne', t: 'Ce qui tourne', lead: function () { return 'Hermes fait six routines pour toi. Une seule est en erreur, et je m’en occupe.'; }, corps: function () {
+    tourne: { sur: 'Ce qui tourne', t: 'Ce qui tourne', lead: function () { return 'Hermes fait six routines pour toi. Touche une routine pour la lancer, la mettre en pause ou changer son horaire.'; }, corps: function () {
       return S('Hermes', [L('vert', 'Passerelle active', 'il reçoit mes demandes', 'en ligne', 'bon')]) +
-        S('Les six routines', RT.map(function (r) { return L(r[0], r[1], r[2], r[3], r[0] === 'red' ? 'er' : ''); })) +
+        '<section class="sec"><h4>Les six routines</h4><ul class="rts">' + RT.map(ligneRt).join('') + '</ul><div class="actions">' + boutonTout() + '</div></section>' +
         '<section class="sec"><h4>Deux chaînes d’étapes</h4><p class="sous">CRA du mois <small>· ' + craEtat() + '</small></p><ol class="chaine">' + chaine('cra') + '</ol><p class="sous">Note de frais Box internet <small>· prochaine le 15/12</small></p><ol class="chaine">' + chaine('box') + '</ol></section>' +
         S('Mails que j’ai envoyés', [L('vert', '« CRA Novembre »', 'envoyé à 7 h 27 · réponse à 14 h 29, avec PDF', 'répondu', 'bon'), L('vert', '« Prolongation de mission »', 'envoyé à 7 h 27 · réponse à 11 h 17', 'répondu', 'bon')]);
     } },
-    papiers: { sur: 'Papiers', t: 'Mes papiers', lead: function () { return 'Tout est rangé. Deux pièces sont à surveiller.'; }, corps: function () {
-      return '<button class="depot" data-toast="Dans l’app : une photo, un fichier ou un mail transféré."><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 16V4M7 9l5-5 5 5M5 20h14"/></svg>Déposer un document</button>' +
+    papiers: { sur: 'Papiers', t: 'Mes papiers', lead: function () { return aRanger() ? 'Tu as déposé deux fichiers. Dis-moi où je les range.' : 'Tout est rangé. Deux pièces sont à surveiller.'; }, corps: function () {
+      return '<div class="bloc">' + depot() + '</div><button class="depot" data-toast="Dans l’app : une photo, un fichier ou un mail transféré."><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 16V4M7 9l5-5 5 5M5 20h14"/></svg>Déposer un autre document</button>' +
         S('À surveiller', [L('amb', 'Passeport à renouveler', 'rendez-vous à prendre', 'avant le 01/12', 'al'), L('', 'Carte d’identité', 'elle expire fin avril', 'dans 5 mois')]) +
-        S('Déposés récemment', [L('', 'Attestation d’assurance habitation', 'rangée dans Logement', 'hier'), L('', 'Facture Box internet, novembre', 'rangée dans Logement', 'mardi'), L('', 'Ordonnance du pédiatre', 'rangée dans Santé', '20/11')]) +
+        S('Rangés récemment', FICH.filter(function (x) { return x.e === 'ok'; }).map(function (x) { return L('vert', x.nom, 'rangé dans ' + x.dos, x.h, 'bon'); }).concat([L('', 'Attestation d’assurance habitation', 'rangée dans Logement', 'hier'), L('', 'Facture Box internet, novembre', 'rangée dans Logement', 'mardi'), L('', 'Ordonnance du pédiatre', 'rangée dans Santé', '20/11')])) +
         S('Rangement', [L('', 'Logement', '', '14'), L('', 'Santé', '', '9'), L('', 'Voiture', '', '6'), L('', 'Voyages', '', '4')]);
     } },
-    argent: { sur: 'Argent', t: 'Mon argent', lead: function () { return 'Il te reste 640 € à payer ce mois-ci. Rien d’inhabituel.'; }, corps: function () {
-      return '<div class="deux"><div><b>640 €</b><small>restent à payer</small></div><div><b>1 180 €</b><small>déjà dépensés</small></div></div><div class="jauge" style="margin-bottom:26px"><i style="width:65%"></i></div>' +
-        S('Prochains prélèvements', [L('', 'Électricité', 'samedi 28', '62 €', 'fort'), L('', 'Assurance habitation', 'mardi 01/12', '31 €', 'fort'), L('', 'Box internet', 'samedi 05/12', '35 €', 'fort')]) +
-        S('Dépensé en novembre', [L('', 'Logement', '', '520 €', 'fort'), L('', 'Courses', '', '410 €', 'fort'), L('', 'Transports', '', '130 €', 'fort'), L('', 'Loisirs', '', '120 €', 'fort')]);
+    argent: { sur: 'Argent', t: 'Mon argent', lead: function () { return 'Déjà dépensé ce mois : 1 180 €. Reste à payer : 640 €. Rien d’inhabituel.'; }, corps: function () {
+      var i = Math.max(0, E.ms), s = MOIS[i], cs = Math.round(s.co * .06) * 10;
+      return '<div class="deux"><div><b>1 180 €</b><small>déjà dépensé ce mois</small></div><div><b>640 €</b><small>reste à payer</small></div></div><p class="det" style="margin-bottom:24px">fixes passées 930 € · courantes notées 250 €</p>' +
+        '<section class="sec"><h4>Mois par mois</h4><div class="bars" style="border:0;margin-top:8px">' + barres() + '</div><p class="leg"><span><i></i>dépenses fixes</span><span><i class="c"></i>dépenses courantes</span></p></section>' +
+        S(moisTxt(i), [L('', 'Logement', 'fixe', '620 €', 'fort'), L('', 'Abonnements et assurances', 'fixe', eur(s.fx - 620), 'fort'), L('', 'Courses', 'courant', eur(cs), 'fort'), L('', 'Sorties et divers', 'courant', eur(s.co - cs), 'fort')]) +
+        S('Prochains prélèvements', [L('', 'Électricité', 'samedi 28', '62 €', 'fort'), L('', 'Assurance habitation', 'mardi 01/12', '31 €', 'fort'), L('', 'Box internet', 'samedi 05/12', '35 €', 'fort')]);
     } },
     travail: { sur: 'Travail', t: 'Mon travail', lead: function () { return 'Mission prolongée pour décembre. Le reste suit son cours.'; }, corps: function () {
       return '<section class="sec"><h4>CRA</h4><p class="sous">CRA du mois <small>· ' + craEtat() + '</small></p><ol class="chaine">' + chaine('cra') + '</ol><ul>' + L(fait('sem') ? 'vert' : 'amb', 'CRA de la semaine', '4 jours travaillés, 1 congé', fait('sem') ? 'confirmé' : 'à confirmer', fait('sem') ? 'bon' : 'al') + '</ul></section>' +
@@ -579,10 +735,13 @@
   /* ---- le résumé épinglé ---- */
   function majResume() {
     var att = $$('.it[data-t~="toi"]:not(.traite):not(.occupe)', filIn), n = att.length, rep = $$('.it.s-tard', filIn).length;
-    $$('[data-n-toi]').forEach(function (b) { b.textContent = n; });
-    $$('[data-pt-toi]').forEach(function (p) { p.className = 'pt ' + (n ? 'amb' : 'vert'); });
-    $('#d-toi').textContent = (n ? att.map(function (e) { return e.dataset.court; }).join(' · ') : 'Tu es à jour') + (rep ? ' · ' + rep + ' reporté' : '');
-    $$('[data-n-cours]').forEach(function (b) { b.textContent = E.cra === 'fait' ? 7 : 8; });
+    var genres = {}, c = compte(), cours = [];
+    att.forEach(function (e) { genres[e.dataset.genre] = (genres[e.dataset.genre] || 0) + 1; });
+    $('#n-toi').textContent = n; $('#p-toi').className = 'pt ' + (n ? 'amb' : 'vert');
+    $('#d-toi').textContent = (n ? Object.keys(genres).map(function (g) { return genres[g] + ' ' + g; }).join(' · ') : 'Tu es à jour') + (rep ? ' · ' + rep + ' reporté' : '');
+    if (c.err) cours.push('<em>' + c.err + ' en erreur</em>'); if (c.pause) cours.push(c.pause === 6 ? 'tout est en pause' : c.pause + ' en pause');
+    $('#d-cours').innerHTML = cours.join(' · ') || 'tout va bien';
+    $('#p-cours').className = 'pt ' + (c.pause === 6 ? '' : 'cy vif');
     $('#dit-now').textContent = n === 3 ? 'Trois choses attendent ton oui.' : n === 2 ? 'Encore deux choses attendent ton oui.' : n === 1 ? 'Plus qu’une chose attend ton oui.' : 'Tu es à jour.';
     $('#b-now').style.display = n ? '' : 'none';
     $('#horloge').textContent = heure();
@@ -593,24 +752,95 @@
     });
     if (E.filtre === 'toi') $('#ef-t').textContent = n ? 'Ce qui attend ton oui · ' + n : 'Tu es à jour';
   }
-  function auBas() { return fil.scrollHeight - fil.scrollTop - fil.clientHeight < 56; }
-  function forme() { resume.classList.toggle('large', !E.filtre && auBas()); }
-  var tic = false;
-  fil.addEventListener('scroll', function () { if (tic) return; tic = true; requestAnimationFrame(function () { tic = false; forme(); }); }, { passive: true });
+  /* se placer dans le fil : un bloc commence toujours juste sous le résumé, jamais une carte coupée par le haut.
+     S'il manque de la hauteur sous le bloc, on ajoute du vide en bas du fil. */
+  function haut(e) { return e.getBoundingClientRect().top - filIn.getBoundingClientRect().top; }
+  function allerA(e, doux) {
+    var av = e.previousElementSibling, marge = av && av.offsetParent ? Math.max(0, Math.min(12, haut(e) - haut(av) - av.offsetHeight)) : e.classList.contains('it') ? Math.min(12, haut(e) - haut(e.parentNode)) : 12;
+    var p = parseFloat(filIn.style.paddingBottom) || 18, y = Math.max(0, Math.round(haut(e) - marge)), manque = y + fil.clientHeight - (fil.scrollHeight - p + 18);
+    filIn.style.paddingBottom = 18 + Math.max(0, Math.ceil(manque)) + 'px';
+    fil.scrollTo({ top: y, behavior: doux && !calme ? 'smooth' : 'auto' });
+  }
+  function caler() { /* à l'ouverture : le premier bloc à partir duquel tout tient à l'écran jusqu'à « Maintenant » */
+    filIn.style.paddingBottom = '';
+    var blocs = $$('.moment > .mh, .moment:not(.ferme) > .mc > .it', filIn), seuil = fil.scrollHeight - fil.clientHeight + 12, cible = blocs[blocs.length - 1];
+    for (var i = 0; i < blocs.length; i++) if (haut(blocs[i]) >= seuil) { cible = blocs[i]; break; }
+    allerA(cible);
+  }
+  function voir(e) { var a = e.getBoundingClientRect().bottom - fil.getBoundingClientRect().bottom; if (a > -8) fil.scrollTop += a + 16; }
 
   function filtrer(f) {
     if (f === E.filtre) f = '';
     E.filtre = f;
     if (f) filIn.dataset.f = f; else delete filIn.dataset.f;
-    $$('[data-f]', resume).forEach(function (b) { b.setAttribute('aria-pressed', String(!!f && b.dataset.f === f)); });
+    $$('[data-f]', resume).forEach(function (b) { var on = !!f && b.dataset.f === f; b.setAttribute('aria-pressed', String(on)); $('.rx', b).textContent = on ? '✕' : '›'; });
     $('#ef-t').textContent = { toi: 'Ce qui attend ton oui', cours: 'Ce qui tourne', venir: 'Ce qui arrive' }[f] || '';
-    if (f === 'cours') tetes();
     majResume();
-    fil.scrollTop = f ? 0 : fil.scrollHeight;
-    forme();
+    if (f) { filIn.style.paddingBottom = ''; fil.scrollTop = 0; } else caler();
   }
+  /* tout ce qui dépend d'un état se redessine sur place : les cartes sont vivantes */
+  function rendu() {
+    chaines(); tetes();
+    $$('[data-ct]', fil).forEach(function (c) { if (!c.closest('.seul')) c.outerHTML = carteTourne(); });
+    $$('[data-depot]', fil).forEach(function (c) { c.innerHTML = depot(); });
+    $$('[data-barres]', fil).forEach(function (c) { c.innerHTML = barres(); });
+    if (E.pile.length) { var g = $('#g-corps'), y = g.scrollTop; vue(); g.scrollTop = y; }
+    majResume();
+  }
+  function noter(txt, signe) { /* une action laisse une ligne dans le fil */
+    var e = el('<div class="it replie jl neuf arrive"><span class="nd"></span><div class="ligne"><span class="co' + (signe ? ' nul">' + signe : '">✓') + '</span><span>' + txt + '</span></div></div>');
+    bas.appendChild(e); $('#m-now').classList.remove('ferme');
+    if (grand.classList.contains('on')) { E.neuf = 1; toast(txt + ' · noté dans le fil'); } else if (E.filtre) toast(txt); else voir(e);
+  }
+
+  /* ---- administrer une routine ---- */
+  function lancer(r) {
+    if (r.run) return; r.run = 1; rendu();
+    setTimeout(function () {
+      r.run = 0; E.minute += 2; if (r.e === 'err') r.e = 'ok';
+      r.der = 'aujourd’hui, ' + heure(); r.dc = heure(); r.hi.unshift(['auj., ' + heure(), r.du, 1, 0]);
+      if (r.k === 'bilan') {
+        r.fait = 'Bilan envoyé : 4 jours travaillés, 2 dossiers avancés, 3 décisions prises.';
+        var c = $('#c-bilan');
+        if (!c.classList.contains('traite')) { c.classList.remove('s-err'); c.classList.add('traite', 'pliable', 's-fait', 'replie'); $('.etat', c).textContent = 'reparti'; $('.pli', c).innerHTML = '<span class="co">✓</span><span class="tx">' + heure() + ' · Bilan de la semaine reparti</span><span class="ch">›</span>'; }
+      }
+      noter(r.n + ' ' + accord(r, 'relancé') + ' à ' + heure()); rendu();
+    }, 2200);
+  }
+  function agir(a, k) {
+    var r = k && rt(k);
+    if (a === 'tout') {
+      E.minute += 2;
+      if (E.tout) { RT.forEach(function (x) { x.e = E.tout[x.k]; }); E.tout = null; noter('Toutes les routines reprises à ' + heure()); }
+      else { E.tout = {}; RT.forEach(function (x) { E.tout[x.k] = x.e; if (x.e !== 'pause') { x.e = 'pause'; x.dep = heure(); } }); noter('Toutes les routines en pause depuis ' + heure(), '‖'); }
+      return rendu();
+    }
+    if (!r) return;
+    if (a === 'lancer') return lancer(r);
+    if (a === 'pause') { E.minute += 2; r.e = 'pause'; r.dep = heure(); noter(r.n + ' en pause depuis ' + heure(), '‖'); return rendu(); }
+    if (a === 'reprendre') { E.minute += 2; r.e = 'ok'; noter(r.n + ' ' + accord(r, 'repris') + ' à ' + heure()); return rendu(); }
+    if (a === 'horaire') { if (E.hor) E.hor = null; else ouvrirHoraire(r); rendu(); var s = $('#hor'); if (s) s.scrollIntoView({ block: 'nearest', behavior: calme ? 'auto' : 'smooth' }); }
+  }
+  function horaireClic(d) { /* les réglages de l'horaire : rien n'est enregistré avant « Enregistrer » */
+    var o = E.hor, r = rt(E.pile[E.pile.length - 1].k);
+    if (d.hm) { if (d.hm === 'coche' && o.mode !== 'coche') o.sel = JN.map(function (_, i) { return jourOk(o.mode, i); }); o.mode = d.hm; }
+    else if (d.hd) o.sel[+d.hd] = !o.sel[+d.hd];
+    else if (d.hx) o.h.splice(+d.hx, 1);
+    else if (d.hplus !== undefined) o.h.push(['18:00', '12:00', '21:00', '08:00', '15:00'].filter(function (v) { return o.h.indexOf(v) < 0; })[0]);
+    else if (d.hannul !== undefined) E.hor = null;
+    else {
+      if (d.horig !== undefined) { r.j = r.o.j; r.h = r.o.h.slice(); }
+      else { var j = horJ(); r.j = typeof j === 'string' ? j : j.length === 7 ? 'tous' : j.join() === '0,1,2,3,4' ? 'lv' : j; r.h = o.h.filter(function (v, i) { return o.h.indexOf(v) === i; }).sort(); }
+      E.hor = null; E.minute += 2; noter(r.n + ' : ' + (d.horig !== undefined ? 'retour à l’horaire d’origine, ' : 'désormais ') + moment(r));
+    }
+    rendu();
+  }
+  $('#g-corps').addEventListener('change', function (ev) {
+    var t = ev.target, i = t.dataset.hi; if (i === undefined) return;
+    var p = E.hor.h[+i].split(':'); p[+t.dataset.part] = (t.value < 10 ? '0' : '') + t.value; E.hor.h[+i] = p.join(':'); $('#apercu').innerHTML = apercu();
+  });
   function tetes() {
-    $('#tete-tourne').innerHTML = '<span class="nd"></span><div class="meta"><span class="src">Hermes · 6 routines · 2 chaînes</span><span class="etat">en direct</span></div>' + carteTourne();
+    $('#tete-tourne').innerHTML = '<span class="nd"></span><div class="meta"><span class="src">Hermes · 6 routines · touche-en une pour la régler</span></div>' + carteTourne();
     $('#tete-tourne').classList.add('s-cours');
     $('#tete-venir').innerHTML = '<span class="nd"></span><div class="meta"><span class="src">Agenda et échéances</span></div><div class="carte"><button class="agr" data-grand="semaine" aria-label="Ouvrir ma semaine en grand">' + AGR + '</button>' + friseVenir() + '</div>';
   }
@@ -618,10 +848,10 @@
   /* ---- replier, trancher ---- */
   function plier(it, oui) {
     var a = it.offsetHeight; it.classList.toggle('replie', oui); var b = it.offsetHeight;
-    if (calme || a === b) { forme(); return; }
+    if (calme || a === b) return;
     it.style.height = a + 'px'; it.style.overflow = 'hidden'; void it.offsetHeight;
     it.style.transition = 'height .3s ease'; it.style.height = b + 'px';
-    setTimeout(function () { it.style.height = it.style.overflow = it.style.transition = ''; forme(); }, 320);
+    setTimeout(function () { it.style.height = it.style.overflow = it.style.transition = ''; }, 320);
   }
   function trancher(it, mode) {
     var tard = mode === 'tard', court = it.dataset.court || it.dataset.ok;
@@ -641,33 +871,46 @@
   }
   function annuler(it) {
     it.classList.remove('traite', 'pliable', 'replie', 's-tard', 's-fait');
-    if (it.dataset.t) { it.classList.add('s-toi'); $('.etat', it).textContent = 'attend ton oui'; } else $('.etat', it).textContent = '';
+    if (it.dataset.t) { it.classList.add('s-toi'); $('.etat', it).textContent = 'attend ton oui'; } else $('.etat', it).textContent = it.dataset.etat || '';
     if (it.dataset.id === 'cra') { E.cra = 'att'; chaines(); }
     majResume();
   }
 
   /* ---- demander ---- */
-  function defiler(e) { var y = e.getBoundingClientRect().top - fil.getBoundingClientRect().top + fil.scrollTop - 10; fil.scrollTo({ top: y, behavior: calme ? 'auto' : 'smooth' }); }
-  function demander(cle, texte) {
+  function demander(cle, texte, ordre) {
     if (grand.classList.contains('on')) fermer();
     if (E.filtre) filtrer('');
     $('#m-now').classList.remove('ferme');
     $$('.rep:not(.replie)', bas).forEach(function (e) { e.classList.add('replie'); });
-    var r = REP[cle] || REP.inconnu;
-    var e = el('<article class="it rep arrive" data-k="' + cle + '"><button class="pli"><span class="co">↩</span><span class="tx">' + r.court + '</span><span class="ch">›</span></button><div class="bulle">' + esc(texte || r.q) + '</div><div class="rj"><span class="av parle">' + GLOBE + '</span><p class="dit attente" aria-label="JARVIS réfléchit"><i></i><i></i><i></i></p></div></article>');
-    bas.appendChild(e); defiler(e);
+    var r = ordre ? repOrdre(ordre, texte) : REP[cle] || REP.inconnu;
+    var e = el('<article class="it rep arrive" data-k="' + cle + '"><button class="pli"><span class="co">↩&#xFE0E;</span><span class="tx">' + r.court + '</span><span class="ch">›</span></button><div class="bulle">' + esc(texte || r.q) + '</div><div class="rj"><span class="av parle">' + GLOBE + '</span><p class="dit attente" aria-label="JARVIS réfléchit"><i></i><i></i><i></i></p></div></article>');
+    bas.appendChild(e); allerA(e, true);
     setTimeout(function () {
-      var plus = (r.plusF ? r.plusF() : r.plus || '') + (r.grand || cle === 'tourne' ? '' : '');
+      var plus = (r.plusF ? r.plusF() : r.plus || '') + (r.grand && !r.sans ? '<button class="b" data-grand="' + r.grand + '">Ouvrir en grand</button>' : '');
       var corps = r.carte ? r.carte() : '';
-      if (corps && cle !== 'tourne') corps = '<div class="carte">' + (r.grand ? '<button class="agr" data-grand="' + r.grand + '" aria-label="Ouvrir en grand">' + AGR + '</button>' : '') + corps + '<div class="actions">' + plus + (r.grand ? '<button class="b" data-grand="' + r.grand + '">Ouvrir en grand</button>' : '') + '</div></div>';
-      $('.rj', e).innerHTML = '<span class="av">' + GLOBE + '</span><p class="dit">' + r.dit() + '</p><div class="meta"><time>' + heure() + '</time><span class="src">· ta question</span><button class="rp">Replier</button></div>' + corps;
+      if (corps && cle !== 'tourne') corps = '<div class="carte">' + (r.grand ? '<button class="agr" data-grand="' + r.grand + '" aria-label="Ouvrir en grand">' + AGR + '</button>' : '') + corps + (plus ? '<div class="actions">' + plus + '</div>' : '') + '</div>';
+      $('.rj', e).innerHTML = '<span class="av">' + GLOBE + '</span><p class="dit">' + r.dit() + (ordre && ordre.k ? '<button class="b" data-rt="' + ordre.k + '">Voir la routine</button>' : '') + '</p><div class="meta"><time>' + heure() + '</time><span class="src">· ta ' + (ordre ? 'demande' : 'question') + '</span><button class="rp">Replier</button></div>' + corps;
       e.classList.add('pliable');
       var h3 = $('.carte h3', e); if (h3 && $('.agr', e)) h3.classList.add('avec');
-      defiler(e); forme();
+      allerA(e, true);
+      if (ordre) agir(ordre.a, ordre.k);
     }, 800);
   }
+  /* on peut aussi demander une action : « relance la veille du matin », « mets le digest en pause », « reprends le digest » */
+  function lireOrdre(t) {
+    var a = /pause|arr[êe]te|suspend/.test(t) ? 'pause' : /repren|r[ée]active/.test(t) ? 'reprendre' : /lance/.test(t) ? 'lancer' : '';
+    if (!a) return null;
+    var k = [[/veille/, 'veille'], [/courrier|mail/, 'courrier'], [/prix/, 'prix'], [/sortie|week/, 'sorties'], [/digest/, 'digest'], [/bilan/, 'bilan']].filter(function (x) { return x[0].test(t); })[0];
+    if (k) return { a: a, k: k[1] };
+    return /tout/.test(t) && (a === 'pause' ? !E.tout : a === 'reprendre' && E.tout) ? { a: 'tout' } : null;
+  }
+  function repOrdre(o, texte) {
+    var r = o.k && rt(o.k), n = r && r.n;
+    return { court: esc(texte), dit: function () {
+      return o.a === 'tout' ? (E.tout ? 'Je remets tout en route.' : 'Je mets les six routines en pause, jusqu’à nouvel ordre.') : o.a === 'lancer' ? 'C’est parti : je relance « ' + n + ' ». Je te le note ici dès que c’est fait.' : o.a === 'pause' ? 'C’est noté : « ' + n + ' » est en pause, jusqu’à nouvel ordre.' : '« ' + n + ' » reprend son horaire : ' + moment(r) + '.'; } };
+  }
   function route(txt) { var t = txt.toLowerCase(); for (var i = 0; i < ROUTES.length; i++) if (ROUTES[i][0].test(t)) return ROUTES[i][1]; return 'inconnu'; }
-  champ.addEventListener('submit', function (ev) { ev.preventDefault(); var t = q.value.trim(); if (!t) return; q.value = ''; champ.classList.remove('plein'); q.blur(); demander(route(t), t); });
+  champ.addEventListener('submit', function (ev) { ev.preventDefault(); var t = q.value.trim(); if (!t) return; q.value = ''; champ.classList.remove('plein'); q.blur(); var o = lireOrdre(t.toLowerCase()); if (o) demander('ordre', t, o); else demander(route(t), t); });
   q.addEventListener('input', function () { champ.classList.toggle('plein', !!q.value.trim()); });
   $('#micro').addEventListener('click', function () {
     if (champ.classList.contains('ecoute')) return;
@@ -681,38 +924,53 @@
   });
 
   /* ---- ouvrir une carte en grand, revenir au fil ---- */
-  function ouvrir(cle) {
-    var g = GRAND[cle]; if (!g) return;
-    $('#g-sur').textContent = g.sur;
-    $('#g-corps').innerHTML = '<h2>' + g.t + '</h2><p class="lead">' + g.lead() + '</p>' + g.corps();
+  function vue() { /* dessine le haut de la pile : un domaine, ou la fiche d'une routine */
+    var v = E.pile[E.pile.length - 1], avant = E.pile[E.pile.length - 2], g = GRAND[v.k];
+    $('#g-sur').textContent = v.rt ? 'Routine d’Hermes' : g.sur;
+    $('#g-corps').innerHTML = v.rt ? ficheRt(rt(v.k)) : '<h2>' + g.t + '</h2><p class="lead">' + g.lead() + '</p>' + g.corps();
+    $('#g-dos').textContent = avant ? GRAND[avant.k].t : 'Le fil';
+  }
+  function ouvrir(cle, routine) {
+    if (!routine && !GRAND[cle]) return;
+    E.hor = null; E.pile.push({ k: cle, rt: routine ? 1 : 0 }); vue();
     $('#g-corps').scrollTop = 0;
     grand.classList.add('on'); grand.setAttribute('aria-hidden', 'false');
   }
-  function fermer() { grand.classList.remove('on'); grand.setAttribute('aria-hidden', 'true'); }
+  function retour() { E.hor = null; E.pile.pop(); if (E.pile.length) vue(); else fermer(); }
+  function fermer() { E.pile = []; E.hor = null; grand.classList.remove('on'); grand.setAttribute('aria-hidden', 'true'); if (E.neuf) { E.neuf = 0; if (!E.filtre) caler(); } }
   var tt;
   function toast(m) { var t = $('#toast'); t.textContent = m; t.classList.add('on'); clearTimeout(tt); tt = setTimeout(function () { t.classList.remove('on'); }, 2400); }
 
   $('#cadre').addEventListener('click', function (ev) {
     var b = ev.target.closest('button'); if (!b) return;
     var it = b.closest('.it'), d = b.dataset;
-    if (d.retour !== undefined) return fermer();
+    if (d.retour !== undefined) return retour();
+    if (d.fermer !== undefined) return fermer();
     if (d.f !== undefined) return filtrer(d.f);
     if (d.q) return demander(d.q);
     if (d.grand) return ouvrir(d.grand);
+    if (d.rt) return ouvrir(d.rt, 1);
+    if (d.ra) { var v = E.pile[E.pile.length - 1]; return agir(d.ra, v && v.rt ? v.k : null); }
+    if (d.hm || d.hd || d.hx || d.hplus !== undefined || d.hok !== undefined || d.hannul !== undefined || d.horig !== undefined) return horaireClic(d);
+    if (d.pd) return papier('', d.pd);
+    if (d.pa) return papier(d.pa);
+    if (d.mois) { E.ms = +d.mois === E.ms ? -1 : +d.mois; return rendu(); }
+    if (d.mdec) { E.md = Math.max(0, Math.min(18, E.md + +d.mdec)); E.ms = -1; return rendu(); }
     if (d.toast) return toast(d.toast);
-    if (d.va) { var c = $('#' + d.va); defiler(c); c.classList.add('eclat'); setTimeout(function () { c.classList.remove('eclat'); }, 1400); return; }
+    if (d.va) { var c = $('#' + d.va); allerA(c, true); c.classList.add('eclat'); setTimeout(function () { c.classList.remove('eclat'); }, 1400); return; }
     if (b.classList.contains('pli')) return plier(it, false);
     if (b.classList.contains('rp')) return plier(it, true);
-    if (b.classList.contains('mh')) { var m = b.parentNode; m.classList.toggle('ferme'); b.setAttribute('aria-expanded', String(!m.classList.contains('ferme'))); majResume(); forme(); return; }
+    if (b.classList.contains('mh')) { var m = b.parentNode; m.classList.toggle('ferme'); b.setAttribute('aria-expanded', String(!m.classList.contains('ferme'))); majResume(); return; }
     if (d.oui !== undefined) return oui(it);
     if (d.tard !== undefined) return trancher(it, 'tard');
     if (d.annuler !== undefined) return annuler(it);
   });
   document.addEventListener('keydown', function (ev) { if (ev.key === 'Escape') fermer(); });
 
-  chaines(); tetes(); majResume();
-  fil.scrollTop = fil.scrollHeight; forme();
-  window.addEventListener('load', function () { if (!E.filtre && !$('.rep', bas)) { fil.scrollTop = fil.scrollHeight; forme(); } });
+  chaines(); tetes(); majResume(); caler();
+  function recaler() { if (!E.filtre && !$('.rep, .neuf', bas)) caler(); }
+  window.addEventListener('load', recaler);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(recaler);
 })();
 </script>
 </body>

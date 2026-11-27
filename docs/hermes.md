@@ -263,6 +263,59 @@ peut pas lire le cron d'Hermes (`/home/hermes` en 0700) : c'est root qui lui en 
 
 Bancs : `bash essais/hermes/relance.test.sh` (80 vérifications), `sudo bash essais/hermes/banc.sh --neuf` (88).
 
+### Administrer les routines depuis JARVIS (0.96.0, 27/11/2026)
+
+Sa demande : relancer une routine depuis JARVIS, l'arrêter jusqu'à nouvel ordre, voir son historique et le détail d'une erreur, changer son
+horaire. JARVIS n'exécute rien : il pose un ordre, root agit (`ordres.py`, copie root `/usr/local/lib/hermes-relance/ordres.py`, lancé par
+`hermes-ordres.path` → `hermes-ordres.service` → `/usr/local/sbin/hermes-ordres`).
+
+- **Un ordre** = `/var/lib/jarvis-reveil/ordres/ordre-<16 hexadécimaux>.json` (dossier à `jarvis`, 700) : `{id, routine, action, at}`,
+  action dans `lancer`, `pause`, `reprendre`, `horaire` ; pour `horaire`, `{jours, heures}` (forme fermée) ou `{origine: true}`. Son contenu
+  n'est jamais une consigne : liste blanche des clés et des valeurs, rien d'autre ne sert.
+- **Validation** : dossier ouvert sans suivre de lien (il appartient à `jarvis`) puis tout par rapport à ce descripteur ; fichier
+  ordinaire, un seul nom, 512 octets au plus ; routine dans la copie root de `routines.conf` ; ordre de moins de 10 minutes (2 minutes
+  d'avance au plus) ; identifiant jamais rejoué (gardé un jour) ; le fichier est retiré avant d'agir ; toute autre entrée du dossier est
+  retirée sans être lue. Le dossier finit toujours vide (`DirectoryNotEmpty` repart sinon ; 30 départs par minute au plus).
+- **`lancer`** : `hermes cron run <id>` dans une unité à part (`systemd-run --unit=hermes-ordre-<routine>`, une heure au plus), qui attend
+  la fin du passage (45 minutes au plus, relu toutes les 10 secondes) puis écrit le résultat. Refus : `garde`, `passerelle`, `pause`,
+  `en-cours` (marque `fire_claim` de moins de 5 minutes dans `jobs.json`, ou un lancement de moins d'une heure pas encore revenu),
+  `limite` (un passage de moins de 24 heures coupé par la limite dont la reprise n'est pas passée, ou une relance en attente ; l'usage
+  n'est pas lu), `trop-tot` (5 minutes), `plafond` (12 par jour), `hermes` (la commande a échoué ou n'a rien lancé).
+  - (certain, code d'Hermes v0.23.3, `tools/cronjob_tools.py`) `hermes cron run` : avec la passerelle en marche et un résultat envoyé par
+    elle (Telegram), le passage est confié à son prochain tic (« It will run on the next scheduler tick ») ; sinon il se fait dans la
+    commande, jusqu'au bout (« Ran now »). Un passage déjà pris est dit sans erreur (« Already being fired ») : compté comme un refus.
+  - (certain, même code, `cron/jobs.py`) `trigger_job` remet `enabled` à vrai : lancer une routine en pause la reprendrait. D'où le refus
+    `pause`, ici et dans `routines.sh --lancer`.
+  - (certain, code `cron/delivery_outcome.py` et banc du 27/11/2026 sur le vrai Hermes) juste après un passage réussi, `last_status`
+    vaut **`delivery_queued`** une ou deux secondes, le temps que la passerelle envoie le résultat ; il devient ensuite `ok` ou
+    `delivery_failed`. Le résumé de la 0.92.0 le lisait comme une erreur, et la relance comme « de nouveau en échec » : corrigé
+    (`resultat_de` et la relance le comptent comme réussi). L'ordre d'un passage lancé à la main n'est soldé qu'une fois ce statut
+    tranché (3 minutes d'attente au plus).
+- **`pause` / `reprendre`** : `hermes cron pause|resume <id>` (certain, `cron/jobs.py` : `enabled` faux, `state` « paused », `paused_at` ;
+  la reprise recalcule `next_run_at`), et le nom dans `/var/lib/hermes-relance/routines.pause` (« nom époque », root 600). `routines.sh`
+  recrée une routine en pause avec `--paused`, remet la pause d'une routine inchangée, refuse `--lancer` ; `hermes-relance` remet la
+  pause si elle a sauté. Possible Hermes arrêté. À la main sur le serveur, la même pause : `routines.sh --pause <nom>` et
+  `routines.sh --reprendre <nom>`.
+- **`horaire`** : root construit l'expression (`minutes heures * * jours`, heure de Paris : `timezone: "Europe/Paris"` de la politique)
+  et la pose par `hermes cron edit <id> --schedule`. Une expression n'a qu'une liste de minutes et une liste d'heures : les passages
+  partagent la même minute (9 h 15 et 13 h 15) ou la même heure (9 h 00 et 9 h 15) ; sinon refus `forme`, dit en clair. Gardée dans
+  `/var/lib/hermes-relance/routines.horaire` (« nom|cron ») ; `routines.conf` reste l'horaire d'origine ; `origine: true` retire la
+  surcharge. `routines.sh` pose l'horaire choisi à la création et le remet sur une routine inchangée. 6 changements par jour.
+- **Ce que root écrit pour JARVIS** (`/var/lib/hermes-relance-etat`, 750 et 640) : `ordres.json` (40 derniers résultats),
+  `historique.json` (30 passages par routine), `routines.json` (récrit après chaque ordre et toutes les 10 secondes pendant un passage
+  lancé à la main).
+- **L'historique** : à chaque passage de `hermes-relance` (`ordres.py suivre`, après la relance, code de sortie de la relance gardé), le
+  dernier passage de `jobs.json` est comparé au précédent ; le registre d'exécutions d'Hermes (`~/.hermes/cron/executions.db`, table
+  `executions` : `claimed_at`, `started_at`, `finished_at`, `status`, `scheduled_instant`, `error`) donne le début, la durée, les passages
+  manqués entre deux minuteries et « hors horaire » (`scheduled_instant` vide = passage lancé à la main). Il est lu par un petit
+  programme lancé **en tant qu'utilisateur `hermes`** : root n'ouvre jamais lui-même cette base.
+- **Le nettoyage de l'erreur** (`nettoyer_erreur`, règles en tête de la fonction) : seconde couche après celle d'Hermes
+  (`redact_sensitive_text`). `sudo python3 -I /usr/local/lib/hermes-relance/ordres.py nettoyer < fichier` montre ce qu'il rend.
+- `diagnostic.sh` : la surveillance des ordres, le dossier, les derniers ordres du journal, les pauses et les horaires posés depuis JARVIS.
+
+Bancs : `bash essais/hermes/ordres.test.sh` (117 vérifications), `bash essais/hermes/relance.test.sh` (88),
+`sudo bash essais/hermes/banc.sh --neuf` (104).
+
 ### La première exécution réelle, suivie par JARVIS (0.91.0, suite ; 26/11/2026)
 
 Le 26/11, chaque routine devait retenir dans la mémoire d'Hermes une clé « en réel : <routine> » et notifier « Première

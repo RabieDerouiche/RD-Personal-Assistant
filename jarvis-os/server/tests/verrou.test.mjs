@@ -110,6 +110,9 @@ try {
     const dB = [(await c('/api/depot', {headers: B})).status, await brut('/api/depot?nom=a.pdf'), (await post('/api/depot/valider', B, {id: 'x', dossier: 'y'})).status, (await post('/api/depot/retirer', B, {id: 'x'})).status, await brut('/api/raccourci/depot?nom=a.pdf')];
     ok('0.91 : appareil verrouillé : le dépôt de papiers répond 423 (lire, déposer, valider, retirer), 401 par l\'adresse du Raccourci ; rien n\'est gardé ; l\'appareil ouvert, lui, lit le dépôt (200)',
       dB.join() === '423,423,423,423,401' && !fs.existsSync(path.join(DATA, 'depot')) && (await c('/api/depot', {headers: A})).status === 200, dB.join()); }
+  /* 0.96.0 : administrer les routines d'Hermes est derrière le verrou comme le reste : la feuille, un ordre, « tout mettre en pause » */
+  { const hB = [(await c('/api/hermes/routine?nom=reveil', {headers: B})).status, (await post('/api/hermes/routine/ordre', B, {nom: 'reveil', action: 'lancer'})).status, (await post('/api/hermes/routines/ordre', B, {action: 'pause'})).status, (await c('/api/hermes/routines', {headers: B})).status];
+    ok('0.96 : appareil verrouillé : les routines d\'Hermes répondent 423 (la feuille, un ordre, « tout mettre en pause », la liste) ; l\'appareil ouvert, lui, lit la feuille (200)', hB.join() === '423,423,423,423' && (await c('/api/hermes/routine?nom=reveil', {headers: A})).status === 200, hB.join()); }
   ok('un appareil verrouillé ne peut ni créer une passkey, ni désactiver le verrou, ni retirer une passkey',
     (await c('/api/verrou/creer', {headers: B})).status === 423 && (await post('/api/verrou/desactiver', B)).status === 423 && (await post('/api/verrou/retirer', B, {id: act.body.cles[0].id})).status === 423);
   const oB = await prouver(B, K);

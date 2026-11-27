@@ -1,0 +1,14 @@
+# JARVIS OS — les ordres de JARVIS pour les routines d'Hermes (0.96.0, 27/11/2026 ; posé par install.sh).
+# JARVIS (utilisateur jarvis) pose un petit fichier d'ordre dans ce dossier ; root lance hermes-ordres.service, qui le lit, le
+# retire et agit (lancer, pause, reprendre, horaire). Le dossier finit toujours vide : tant qu'il ne l'est pas, le service repart.
+[Unit]
+Description=Ordres de JARVIS pour les routines d'Hermes (lancer, pause, reprendre, horaire)
+
+[Path]
+DirectoryNotEmpty=/var/lib/jarvis-reveil/ordres
+Unit=hermes-ordres.service
+TriggerLimitIntervalSec=60
+TriggerLimitBurst=30
+
+[Install]
+WantedBy=multi-user.target

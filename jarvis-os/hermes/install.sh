@@ -174,6 +174,15 @@ if id jarvis >/dev/null 2>&1; then install -d -o root -g "$(id -gn jarvis)" -m 0
 # routines et leurs libellés viennent d'une copie root de routines.conf (jamais lue dans le dépôt par la minuterie).
 install -o root -g root -m 0644 "$ICI/routines.conf" /usr/local/lib/hermes-relance/routines.conf
 if id jarvis >/dev/null 2>&1; then install -d -o root -g "$(id -gn jarvis)" -m 0750 /var/lib/hermes-relance-etat; else install -d -o root -g root -m 0750 /var/lib/hermes-relance-etat; fi
+# 0.96.0 : administrer les routines depuis JARVIS (sa demande du 27/11/2026). JARVIS pose un ordre (lancer, pause, reprendre, horaire) dans
+# un sous-dossier de /var/lib/jarvis-reveil (le seul dossier hors de chez lui où son service peut écrire), root le lit par la copie root
+# d'ordres.py. Les pauses et les horaires choisis depuis JARVIS sont gardés dans /var/lib/hermes-relance (routines.pause, routines.horaire) :
+# ni ce script ni routines.sh ne les effacent, ils survivent à une réinstallation.
+install -o root -g root -m 0644 "$ICI/ordres.py" /usr/local/lib/hermes-relance/ordres.py
+install -o root -g root -m 0755 "$ICI/ordres.sh" /usr/local/sbin/hermes-ordres
+install -o root -g root -m 0644 "$ICI/hermes-ordres.service" /etc/systemd/system/hermes-ordres.service
+install -o root -g root -m 0644 "$ICI/hermes-ordres.path" /etc/systemd/system/hermes-ordres.path
+if id jarvis >/dev/null 2>&1; then install -d -o jarvis -g jarvis -m 0700 /var/lib/jarvis-reveil/ordres; else install -d -m 0700 /var/lib/jarvis-reveil/ordres; fi
 nft -c -f /etc/hermes/sortie.nft 2>/dev/null && echo "Règles réseau : syntaxe vérifiée." || [ "$BANC" = 1 ] || { echo "Règles réseau refusées par nft : arrêt."; exit 1; }
 if [ "$BANC" != 1 ]; then
   systemctl daemon-reload
@@ -193,6 +202,7 @@ if [ "$BANC" != 1 ]; then
     systemctl enable --now hermes-garde.timer   # toutes les 10 min : Hermes s'arrête au-delà de $SEUIL_FORFAIT % de la semaine
   fi
   systemctl enable --now hermes-reveil.path     # le réveil d'Hermes par JARVIS
+  systemctl enable --now hermes-ordres.path     # les ordres de JARVIS pour les routines (lancer, pause, reprendre, horaire)
   systemctl enable --now hermes-relance.timer   # toutes les 10 min : relance UNE fois ce que la limite du forfait a coupé, après sa levée
   if [ -f /var/lib/hermes-garde/arret ]; then
     # en pause par le garde : c'est lui qui décide, avec ses nouvelles règles (il relance Hermes si le forfait le permet)

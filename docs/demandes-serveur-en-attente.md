@@ -1,4 +1,4 @@
-# Demandes au serveur en attente (27/11/2026) : JARVIS 0.95.0
+# Demandes au serveur en attente (27/11/2026) : JARVIS 0.95.0 et 0.96.0
 
 À exécuter par la session « Serveur JARVIS 2 » (`session_01JvDfwzJbpLqSKJPKSk65Mq`). Un seul plan, un seul oui. `<COMMIT>` = le commit de main donné dans le message de la demande. Aucun secret ici ni dans la réponse ; ne recopie aucun nom de fichier du dossier `depot/`, aucun montant, et n'affiche pas le contenu de `radar.json`.
 
@@ -12,7 +12,8 @@ LECTURES DE DÉPART (sans demander)
 
 DÉPLOIEMENT (un seul oui)
 1. sudo -u jarvis git -C /opt/rd pull --ff-only          (attendu : <COMMIT>)
-2. sudo systemctl restart jarvis                          (version attendue : 0.95.0, sans erreur au démarrage)
+2. sudo systemctl restart jarvis                          (version attendue : 0.96.0, sans erreur au démarrage)
+2b. sudo bash /opt/rd/jarvis-os/hermes/install.sh         (0.96.0 : ordres de JARVIS pour les routines — hermes-ordres.path et .service, copie root d'ordres.py, dossier des ordres sous /var/lib/jarvis-reveil ; relance Hermes comme d'habitude ; le garde reste coupé jusqu'au 2026-12-03)
 3. Sa règle du 25/11/2026 pour la session du serveur, écrite une fois pour toutes dans le fichier que chaque session neuve relit
    (copie de l'ancien fichier gardée) :
    sudo cp -p /root/serveur/CLAUDE.md /root/serveur/CLAUDE.md.avant-regle && sudo tee -a /root/serveur/CLAUDE.md >/dev/null <<'REGLE'
@@ -29,11 +30,12 @@ CONTRÔLES (lecture seule)
 4. Section « Rangement des papiers », ses étapes 3 à 5 (santé et version, 401, 401, 303, journal).
 5. Section « Radar », ses contrôles (droits 600, clé historique sans montant à l'écran, journal sans erreur du Radar), lancés sous
    l'utilisateur jarvis (sudo -iu jarvis …).
+5b. Section « Administrer les routines » ci-dessous : ses lectures, ses contrôles, et son essai réel sans passage (pause puis reprise d'une routine par un ordre posé sous l'utilisateur jarvis).
 6. journalctl -u jarvis --since "-10 min" --no-pager | grep -ciE "erreur|error" (et les lignes, s'il y en a) ; systemctl is-active jarvis hermes-gateway
 7. Suivi de la 0.94.0, sans contenu : journalctl -u jarvis --since "2026-11-27 07:20" --no-pager | grep -ciE "suivi des réponses|réveil d.Hermes impossible"   (attendu : 0)
 
 RETOUR ARRIÈRE
-- Le code : sudo -u jarvis git -C /opt/rd checkout 0007ecd && sudo systemctl restart jarvis   (pour revenir ensuite : git checkout main)
+- Le code : sudo -u jarvis git -C /opt/rd checkout 0007ecd && sudo systemctl restart jarvis && sudo bash /opt/rd/jarvis-os/hermes/install.sh   (pour revenir ensuite : git checkout main) ; voir aussi le retour arrière de la section « Administrer les routines »
 - La règle : sudo cp -p /root/serveur/CLAUDE.md.avant-regle /root/serveur/CLAUDE.md
 - Les fichiers en attente du dépôt et radar.json : rien à défaire (voir les deux sections).
 
@@ -106,3 +108,63 @@ Contrôles en lecture seule (aucun n'affiche un montant : ne pas faire afficher 
 Retour arrière : revenir au commit d'avant et redémarrer. Le serveur d'avant ignore la clé `historique` (il la garde dans le fichier sans
 la lire) et reprend ses « six mois » ; rien à défaire dans `radar.json`. L'app d'avant ne lit ni `mois.depense` ni `mois.historique`.
 Dans l'autre sens, l'app 0.93.0 devant un serveur d'avant garde « Six derniers mois » et ne montre pas « Déjà dépensé ».
+
+## Section « Administrer les routines » (0.96.0)
+
+`git pull`, le redémarrage de `jarvis` et `sudo bash /opt/rd/jarvis-os/hermes/install.sh` sont faits une fois par la demande commune. Ce
+chantier n'ajoute **aucun** `ReadWritePaths` (les ordres vont dans `/var/lib/jarvis-reveil`, déjà permis), aucun hôte, aucun secret.
+
+**LECTURES (avant, en lecture seule)**
+1. `systemctl show jarvis -p ReadWritePaths` : `/var/lib/jarvis-reveil` doit y être (corrigé le 27/11).
+2. `sudo bash /opt/rd/jarvis-os/hermes/routines.sh --liste` : l'état des routines avant (à garder pour comparer).
+3. `ls -la /var/lib/jarvis-reveil /var/lib/hermes-relance-etat` et `sudo ls -la /var/lib/hermes-relance`.
+
+**DÉPLOIEMENT (rien de plus que la demande commune)**
+- `install.sh` pose `ordres.py`, `/usr/local/sbin/hermes-ordres`, `hermes-ordres.path` et `.service`, crée `/var/lib/jarvis-reveil/ordres`
+  (à `jarvis`, 700) et active la surveillance. `routines.sh` n'a pas à être relancé (aucune routine ne change).
+
+**CONTRÔLES (lecture seule)**
+1. `systemctl is-active hermes-ordres.path` → `active` ; `systemctl status hermes-ordres.path --no-pager | head -5`.
+2. `stat -c '%U:%G %a' /var/lib/jarvis-reveil/ordres` → `jarvis:jarvis 700` ; `stat -c '%U %a' /usr/local/lib/hermes-relance/ordres.py
+   /usr/local/sbin/hermes-ordres` → `root 644`, `root 755`.
+3. `sudo systemctl start hermes-relance.service` puis `ls -la /var/lib/hermes-relance-etat` : `routines.json` et `historique.json`
+   (`root jarvis`, 640). `sudo python3 -I -c "import json; d=json.load(open('/var/lib/hermes-relance-etat/historique.json'));
+   print({k: len(v) for k, v in d['routines'].items()})"` : un nombre de passages par routine (la durée vient du registre d'Hermes).
+4. **L'horaire en vigueur et celui d'origine** : `sudo python3 -I -c "import json; [print(r['nom'], '|', r['moment'], '| modifié' if
+   r['modifie'] else '| origine', '|', r['origine'], '| prochain', r['prochain']) for r in
+   json.load(open('/var/lib/hermes-relance-etat/routines.json'))['routines']]"` : pour chaque routine, « modifié » doit être faux et les
+   deux horaires identiques ; à comparer avec `routines.sh --liste` (heures de Paris).
+5. `journalctl -u hermes-relance -n 15 --no-pager -o cat` : pas de « Suivi des routines pour JARVIS : en échec ».
+6. `sudo bash /opt/rd/jarvis-os/hermes/diagnostic.sh | sed -n '/ordres de JARVIS/,/historique pour JARVIS/p'`.
+7. `curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8787/api/hermes/routine?nom=reveil` → `401` (sans appareil relié).
+
+**UN ESSAI RÉEL SANS RISQUE (mettre en pause puis reprendre une routine, sans lancer de passage)** — routine : `sorties-du-week-end`
+(prochain passage jeudi 19 h : rien ne tombe pendant l'essai) :
+```
+ID=$(openssl rand -hex 8); printf '{"id":"%s","routine":"sorties-du-week-end","action":"pause","at":%s}' "$ID" "$(date +%s)" | sudo -u jarvis tee /var/lib/jarvis-reveil/ordre-essai.tmp >/dev/null
+sudo -u jarvis mv /var/lib/jarvis-reveil/ordre-essai.tmp /var/lib/jarvis-reveil/ordres/ordre-$ID.json
+sleep 8; journalctl -u hermes-ordres -n 5 --no-pager -o cat; sudo ls -A /var/lib/jarvis-reveil/ordres | wc -l
+sudo cat /var/lib/hermes-relance/routines.pause; sudo bash /opt/rd/jarvis-os/hermes/routines.sh --liste | grep sorties
+```
+Attendu : « Ordre … (pause sorties-du-week-end) : fait. », dossier vide (0), `sorties-du-week-end <époque>` dans `routines.pause`, la
+liste dit `pause … ; en pause depuis JARVIS`. Puis la reprise (même chose avec `"action":"reprendre"` et un nouvel `ID`) : « fait »,
+`routines.pause` vide, la liste dit `actif` avec un prochain passage jeudi 19 h. Vérifier aussi que le réveil n'a pas été lancé par
+l'essai : `journalctl -u hermes-reveil --since -5min --no-pager -o cat` (rien de neuf).
+
+**RETOUR ARRIÈRE**
+- Couper seulement les ordres : `sudo systemctl disable --now hermes-ordres.path` (l'app dira « pas pris en compte : le serveur ne répond
+  pas » ; le reste de la 0.92.0 continue ; attention, `hermes-relance` rattrape encore un ordre posé toutes les 10 minutes : pour tout
+  couper, aussi `sudo rmdir /var/lib/jarvis-reveil/ordres` : l'app répond alors « le dossier des ordres n'existe pas sur ce serveur » ;
+  `install.sh` le recrée).
+- Défaire à la main, sans l'app, ce qui a été réglé depuis JARVIS : une pause, `sudo bash /opt/rd/jarvis-os/hermes/routines.sh
+  --reprendre <nom>` (et `--pause <nom>` pour la poser) ; un horaire, retirer sa ligne de `/var/lib/hermes-relance/routines.horaire`
+  puis `sudo bash /opt/rd/jarvis-os/hermes/routines.sh` (il repose l'horaire de `routines.conf` sur la routine).
+- Revenir à la version d'avant : `git checkout` du commit précédent, `install.sh`, redémarrage de `jarvis` (comme la demande commune) ;
+  les fichiers `/var/lib/hermes-relance-etat/historique.json` et `ordres.json` peuvent rester (l'ancienne version ne les lit pas).
+
+**CE QUE J'ATTENDS EN RETOUR**
+- Les sorties des contrôles 1 à 7 ; les quatre lignes de l'essai (pause puis reprise) ; la ligne `routines.sh --liste` de
+  `sorties-du-week-end` avant et après ; s'il y en a une, toute ligne « Entrée inattendue », « refusé » ou « Traceback » du journal
+  `hermes-ordres`.
+- Après son premier « Lancer maintenant » depuis l'app (à lui de le faire) : `journalctl -u hermes-ordres -u 'hermes-ordre-*' --since
+  -15min --no-pager -o cat` (on y lit si Hermes a confié le passage à la passerelle ou l'a fait sur place).
