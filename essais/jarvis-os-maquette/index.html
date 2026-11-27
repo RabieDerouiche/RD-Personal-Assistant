@@ -12810,15 +12810,16 @@ void main(){
     window.__sujets93 = {lier: (label, objet, noms, texte) => { const k = sjLier(label, objet, (noms || []).map(sjSujet), texte); return k ? k.nom : null; }, mots: (t) => [...sjMots(t)]};
   }
 
-  /* ================= ESSAI « pile » (27/11/2026, son QCM : aucune des trois maquettes, « la seule chose pas trop mal est la façon d'afficher
-     les Pour moi dans la maquette A » ; puis « Montre-moi d'abord »). Rien ne change dans l'app : ce bloc ne s'active qu'avec « ?pile=1 »
-     dans l'adresse. Il ne réécrit rien : après le rendu de « Pour moi », la section « À décider » montre UNE carte à la fois, les suivantes
+  /* ================= 0.99.0 : « Pour moi », la pile « Attend ton oui » (27/11/2026, son QCM : aucune des trois maquettes, « la seule chose pas
+     trop mal est la façon d'afficher les Pour moi dans la maquette A » ; « Montre-moi d'abord » ; puis, captures vues : « Oui, dans l'app »).
+     Active par défaut ; « ?pile=0 » dans l'adresse la coupe, et « Tout voir en liste » rend la liste d'avant (son choix est gardé sur
+     l'appareil). Le banc d'essai garde la liste pour ses vérifications d'avant (scénario `sansPile`). Ce bloc ne réécrit rien : après le rendu de « Pour moi », la section « À décider » montre UNE carte à la fois, les suivantes
      dépassent derrière (une pile), avec « Plus tard » (la carte passe sous la pile ; rien n'est écrit), « Précédente », un compteur, et
      « Tout voir en liste » qui rend la liste d'aujourd'hui. La ligne de Travail qui l'attend (« CRA signé reçu : … ? ») entre dans la pile.
      Glisser à gauche = « Plus tard », à droite = « Précédente » ; aucun geste ne dit oui : le oui reste un bouton de la carte. ================= */
-  { let pileOn = false; try { pileOn = new URLSearchParams(location.search).get('pile') === '1'; } catch (e) { /* rien */ }
+  { let pileOn = true; try { pileOn = new URLSearchParams(location.search).get('pile') !== '0'; } catch (e) { /* rien */ }
     if (pileOn) {
-      document.head.append(h('style', {text: '.pile-h{display:flex;align-items:center;gap:10px;margin:2px 0 14px}.pile-k{font:700 12px var(--display);letter-spacing:.2em;text-transform:uppercase;color:#fbbf24}'
+      document.head.append(h('style', {text: '.pile-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}.pile-h{display:flex;align-items:center;gap:10px;margin:2px 0 14px}.pile-k{font:700 12px var(--display);letter-spacing:.2em;text-transform:uppercase;color:#fbbf24}'
         + '.pile-n{display:inline-grid;place-items:center;min-width:26px;height:26px;padding:0 7px;border-radius:13px;background:#fbbf24;color:#1a1204;font:700 13px var(--display)}.pile-pos{margin-left:auto;color:var(--muted);font:600 13px var(--sans)}'
         + '.pm-list.pile{position:relative;display:block;padding-top:20px}.pm-list.pile>.pile-g{position:absolute;left:0;right:0;top:0;height:70px;border-radius:22px;border:1px solid rgba(251,191,36,.42);background:linear-gradient(180deg,rgba(251,191,36,.10),rgba(var(--c1),.04));pointer-events:none}'
         + '.pm-list.pile>.pile-g.g2{margin:10px 12px 0;opacity:.95}.pm-list.pile>.pile-g.g3{margin:0 28px;opacity:.6}.pm-list.pile>.pm-travail.pile-top{padding:20px 18px;min-height:96px;text-align:left;background:linear-gradient(180deg,rgba(18,22,44,.98),rgba(12,14,30,.98))}.pm-list.pile>.pile-top{background-color:rgb(12,14,30)}'
@@ -12826,20 +12827,21 @@ void main(){
         + '.pm-list.pile>.pile-top.va-g{transform:translateX(-42px) rotate(-2deg);opacity:.2}.pm-list.pile>.pile-top.va-d{transform:translateX(42px) rotate(2deg);opacity:.2}'
         + '.pile-bar{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}.pile-bar .btn{min-height:48px;justify-content:center}.pile-liste{display:block;width:100%;margin-top:6px;min-height:44px;background:none;border:0;color:var(--muted);font:600 13.5px var(--sans);text-decoration:underline;text-underline-offset:3px;cursor:pointer}'
         + '@media (prefers-reduced-motion:reduce){.pm-list.pile>.pile-top{transition:none}}'}));
-      const PILE = {i: 0, liste: false};
+      const PILE = {i: 0, liste: false}; try { PILE.liste = localStorage.getItem('jv-pile-liste') === '1'; } catch (e) { /* rien */ }
       const VD_PILE = VIEWS.demandes;
       VIEWS.demandes = (el) => {
         VD_PILE(el);
+        if (window.__SCEN && window.__SCEN.sansPile) return;   /* le banc : ses vérifications d'avant portent sur la liste */
         const sec = [...el.querySelectorAll('section.pm-sec')].find((x) => { const t = x.querySelector('h2'); return !x.hidden && !!t && t.textContent.trim() === 'À décider'; });
         const list = sec && sec.querySelector(':scope > .pm-list'); if (!list) return;
         const tr = el.querySelector('.pm-travail.toi'); if (tr && !PILE.liste) list.prepend(tr);   /* ce qui l'attend dans Travail entre dans la pile */
         const cartes = [...list.children].filter((c) => !c.hidden), n = cartes.length; if (!n) return;
         const tete = sec.querySelector(':scope > .panel-h');
-        const bascule = h('button', {type: 'button', class: 'pile-liste', onclick: () => { PILE.liste = !PILE.liste; renderView(true); }}, PILE.liste ? 'Une décision à la fois' : 'Tout voir en liste');
+        const bascule = h('button', {type: 'button', class: 'pile-liste', onclick: () => { PILE.liste = !PILE.liste; try { localStorage.setItem('jv-pile-liste', PILE.liste ? '1' : '0'); } catch (e) { /* rien */ } renderView(true); }}, PILE.liste ? 'Une décision à la fois' : 'Tout voir en liste');
         if (PILE.liste) { sec.append(bascule); return; }
         const pos = h('span', {class: 'pile-pos'});
         const enTete = h('div', {class: 'pile-h', 'data-pile': String(n)}, h('span', {class: 'pile-k', text: 'Attend ton oui'}), h('span', {class: 'pile-n', text: String(n)}), pos);
-        if (tete) tete.replaceWith(enTete); else list.before(enTete);
+        if (tete) { tete.classList.add('pile-sr'); tete.after(enTete); } else list.before(enTete);   /* le titre « À décider » reste pour les lecteurs d'écran */
         list.classList.add('pile'); { const une = el.querySelector('.fc-start'); if (une) une.hidden = true; }   /* « Traiter une par une » fait double emploi avec la pile */
         if (n > 2) list.prepend(h('div', {class: 'pile-g g3', 'aria-hidden': 'true'}));
         if (n > 1) list.prepend(h('div', {class: 'pile-g g2', 'aria-hidden': 'true'}));
@@ -12859,26 +12861,35 @@ void main(){
       };
     } }
 
-  /* ================= ESSAI « accès » (sa demande du 27/11/2026 à minuit : « garde le même thème mais essaye de rajouter d'une façon clean
-     plus d'icônes ou de tuiles qui emmènent vers les blocs comme Travail, Routines, Papiers… fais une proposition clean et sobre ; et rajoute
-     Réglages quelque part »). Une proposition : rien ne change dans l'app sans « ?acces=1 » dans l'adresse. Sur « Aujourd'hui », juste sous le
-     globe : une rangée « Accès », huit tuiles sobres (une icône, un mot), deux lignes de quatre : Travail, Routines, Papiers, Argent, Achats,
-     Voyages, Sorties, Réglages. Un appui ouvre la rubrique ; aucune donnée, aucun compteur, aucune couleur de plus. ================= */
+  /* ================= ESSAI « accès », 2e proposition (27/11/2026 ; sa demande : « garde le même thème mais rajoute d'une façon clean plus
+     d'icônes ou de tuiles qui emmènent vers les blocs comme Travail, Routines, Papiers… ; et rajoute Réglages quelque part » ; puis, la
+     première capture vue (huit icônes) : « Non, je veux des trucs comme Argent, rendez-vous, etc., pas comme ça, et un peu moins de ce bleu
+     dans la page d'accueil, fais un truc plus classe »). Rien ne change dans l'app sans « ?acces=1 » dans l'adresse. Sur « Aujourd'hui », sous
+     le globe : « Tes espaces », des tuiles qui DISENT quelque chose, comme « Agenda » et « Argent » du globe : un nom, une valeur, une ligne.
+     Ce sont les tuiles d'Espaces elles-mêmes (mêmes chiffres, même appui), rendues plus petites ; Argent n'y est pas (il est déjà sur le
+     globe) ; en dessous, une ligne « Réglages ». Et l'accueil perd de son bleu : les titres et les bordures passent à un argent froid, le
+     globe reste, l'orange reste réservé à ce qui l'attend. ================= */
   { let accesOn = false; try { accesOn = new URLSearchParams(location.search).get('acces') === '1'; } catch (e) { /* rien */ }
     if (accesOn) {
-      document.head.append(h('style', {text: '.acc-sec{margin:18px 0 6px}.acc-k{margin:0 0 10px;font:600 12px var(--display);letter-spacing:.18em;text-transform:uppercase;color:rgb(var(--c1))}'
-        + '.acc-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}'
-        + '.acc-t{display:grid;justify-items:center;align-content:center;gap:7px;min-height:76px;padding:10px 4px;border-radius:16px;border:1px solid rgba(var(--c1),.22);background:rgba(var(--c1),.05);color:var(--fg);font:600 12.5px var(--sans);cursor:pointer;-webkit-tap-highlight-color:transparent}'
-        + '.acc-t .ic{display:inline-flex;color:rgb(var(--c1))}.acc-t span:last-child{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}'
-        + '.acc-t:active{background:rgba(var(--c1),.14)}.acc-t:focus-visible{outline:2px solid rgb(var(--c1));outline-offset:2px}'}));
-      const ACCES = [['travail', 'brief', 'Travail'], ['equipe', 'bot', 'Routines'], ['papiers', 'doc', 'Papiers'], ['argent', 'euro', 'Argent'],
-        ['achats', 'tag', 'Achats'], ['voyages', 'plane', 'Voyages'], ['sorties', 'map', 'Sorties'], ['reglages', 'gear', 'Réglages']];
+      document.head.append(h('style', {text: '.view-in:has(>.acc-sec){--c1:186,198,220;--c2:214,222,236}'
+        + '.acc-sec{margin:20px 0 8px}.acc-k{margin:0 0 10px;font:600 12px var(--display);letter-spacing:.18em;text-transform:uppercase;color:rgba(214,222,236,.72)}'
+        + '.acc-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}'
+        + '.acc-sec .esp-tile{min-height:0;gap:2px;padding:11px 13px 12px;border-radius:4px 14px 4px 14px;border:1px solid rgba(255,255,255,.11);background:linear-gradient(180deg,rgba(255,255,255,.055),rgba(255,255,255,.015));box-shadow:none}'
+        + '.acc-sec .esp-tile .esp-ic,.acc-sec .esp-tile>img{display:none}.acc-sec .esp-tile.pic{background:linear-gradient(180deg,rgba(255,255,255,.055),rgba(255,255,255,.015))}.acc-sec .esp-tile.pic::after,.acc-sec .esp-tile.pic::before{display:none}'
+        + '.acc-sec .esp-n{font:700 11px var(--display);letter-spacing:.16em;color:rgba(214,222,236,.66)}.acc-sec .esp-v{font:700 16.5px/1.2 var(--display);color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}'
+        + '.acc-sec .esp-s{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.acc-sec .esp-tile.pic .esp-n{color:rgba(214,222,236,.66)}.acc-sec .esp-tile.pic .esp-s{color:var(--muted)}'
+        + '.acc-sec .esp-tile.amb{border-color:rgba(251,191,36,.55)}.acc-sec .esp-tile.amb .esp-n{color:#fbbf24}'
+        + '.acc-regl{display:flex;align-items:center;gap:10px;width:100%;margin-top:10px;min-height:46px;padding:10px 13px;border-radius:4px 14px 4px 14px;border:1px solid rgba(255,255,255,.11);background:none;color:var(--fg);font:600 14px var(--sans);text-align:left;cursor:pointer}'
+        + '.acc-regl small{margin-left:auto;color:var(--muted);font-weight:500;font-size:12.5px}.acc-regl .ic{display:inline-flex;color:rgba(214,222,236,.8)}'}));
       const VA_ACC = VIEWS.accueil;
       VIEWS.accueil = (el) => {
         VA_ACC(el);
         const hud = el.querySelector('section.hud'); if (!hud || el.querySelector('.acc-sec')) return;
-        hud.after(h('section', {class: 'acc-sec', 'aria-label': 'Accès aux rubriques'}, h('p', {class: 'acc-k', text: 'Accès'}),
-          h('div', {class: 'acc-grid'}, ACCES.filter(([id]) => typeof VIEWS[id] === 'function').map(([id, ic, nom]) => h('button', {type: 'button', class: 'acc-t', 'data-acc': id, onclick: () => go(id)}, h('span', {class: 'ic', html: icon(ic, 22)}), h('span', {text: nom}))))));
+        const tmp = h('div'); try { VIEWS.espaces(tmp); } catch (e) { return; }
+        const tuiles = [...tmp.querySelectorAll('.esp-tile')].filter((t) => t.dataset.go !== 'argent');   /* Argent est déjà sur le globe */
+        if (!tuiles.length) return;
+        hud.after(h('section', {class: 'acc-sec', 'aria-label': 'Tes espaces'}, h('p', {class: 'acc-k', text: 'Tes espaces'}), h('div', {class: 'acc-grid'}, tuiles),
+          h('button', {type: 'button', class: 'acc-regl', 'data-acc': 'reglages', onclick: () => go('reglages')}, h('span', {class: 'ic', html: icon('gear', 18)}), h('span', {text: 'Réglages'}), h('small', {text: 'Serveur, voix, notifications, Google ›'}))));
       };
     } }
 

@@ -12,7 +12,7 @@ srv.listen(0, async () => {
   /* 17/11/2026 : la pause de Grok de la maquette se déduisait d'une activité « d'hier » ; du mardi 12h47 au mercredi, elle était donc « finie »
      et la sonnette automatique de reprise masquait des boutons. Le banc pose une pause explicite (onglet Faits), la même quel que soit le jour. */
   const PAUSE_INIT = () => { let v; const d = new Date(Date.now() + 2 * 864e5), p2 = (n) => String(n).padStart(2, '0'); const until = p2(d.getDate()) + '/' + p2(d.getMonth() + 1) + '/' + d.getFullYear() + ' 12h47';
-    Object.defineProperty(window, '__SCEN', {configurable: true, get: () => v, set: (x) => { v = Object.assign({pauseUntil: until}, x || {}); }}); };
+    Object.defineProperty(window, '__SCEN', {configurable: true, get: () => v, set: (x) => { v = Object.assign({pauseUntil: until, sansPile: true}, x || {}); }}); };   /* 0.99.0 : les vérifications d'avant portent sur la liste de « Pour moi » ; la pile a les siennes (sansPile: false) */
   /* une page avec un scénario de la maquette en plus (micro, voix) */
   const pageWith = async (scen, url) => { const ctx = await b.newContext({...devices['iPhone 15 Pro Max']}); await ctx.addInitScript(PAUSE_INIT); await ctx.addInitScript((sc) => { const d = Object.getOwnPropertyDescriptor(window, '__SCEN'); Object.defineProperty(window, '__SCEN', {configurable: true, get: d.get, set: (x) => d.set.call(window, Object.assign({}, sc, x || {}))}); }, scen); const p = await ctx.newPage(); p.on('pageerror', (e) => errs.push(url + ' : ' + e.message)); await p.goto(base + url); await p.waitForTimeout(3500); return p; };
   const page = async (url) => { const ctx = await b.newContext({...devices['iPhone 15 Pro Max']}); await ctx.addInitScript(PAUSE_INIT); const p = await ctx.newPage(); p.on('pageerror', (e) => errs.push(url + ' : ' + e.message)); await p.goto(base + url); await p.waitForTimeout(3500); return p; };
@@ -1316,6 +1316,27 @@ srv.listen(0, async () => {
       const c8 = await carte(q), s8 = await feuille(q);
       ok('0.98 : conforme, déposé sans attendre : la carte dit « CRA signé conforme à la saisie : Hermes le dépose… sans attendre ton oui », rien ne l’attend pour le CRA signé, aucun bouton de dépôt', c8.signe.join() === 'oui CRA signé conforme à la saisie : Hermes le dépose sur le portail (dans le quart d’heure), sans attendre ton oui.'
         && !c8.alerte.some((x) => /CRA signé/.test(x)) && !s8.acts.some((x) => /déposer|rattaché|moi-même/i.test(x)), JSON.stringify([c8, s8.acts]));
+      await q.context().close(); }
+    /* 0.99.0 : « Pour moi », la pile « Attend ton oui » (son QCM du 27/11/2026 : « Oui, dans l'app ») */
+    { const SCP = {grokOff: true, sujets: true, reponses: true, signe: 'pret', sansPile: false};
+      let q = await pageWith(SCP, '#demandes'); await q.waitForTimeout(1200);
+      const etat = () => q.evaluate(() => { const l = document.querySelector('.pm-list.pile'), sec = [...document.querySelectorAll('section.pm-sec')].find((x) => (x.querySelector('h2') || {}).textContent === 'À décider');
+        const c = sec ? [...sec.querySelectorAll('.pm-list > *')].filter((x) => !x.classList.contains('pile-g')) : [], v = c.filter((x) => !x.hidden), une = document.querySelector('.fc-start');
+        return {pile: !!l, n: c.length, vus: v.length, tete: ((document.querySelector('.pile-h') || {}).textContent || ''), pos: ((document.querySelector('.pile-pos') || {}).textContent || ''), titre: !!(sec && sec.querySelector('.panel-h.pile-sr h2')), top: v[0] ? v[0].textContent.slice(0, 50) : '', une: !!(une && !une.hidden),
+          travail: !!(l && l.querySelector('.pm-travail')), bascule: ((document.querySelector('.pile-liste') || {}).textContent || ''), garde: (() => { try { return localStorage.getItem('jv-pile-liste'); } catch (e) { return 'x'; } })()}; });
+      const appui = async (re) => { await q.evaluate((src) => [...document.querySelectorAll('.pile-bar .btn, .pile-liste')].find((x) => new RegExp(src).test(x.textContent)).click(), re); await q.waitForTimeout(700); };
+      const e1 = await etat();
+      ok('0.99 pile : « Pour moi » montre une décision à la fois sous « Attend ton oui » (le compte, « 1 sur n »), la ligne de Travail qui l’attend est dans la pile, le titre « À décider » reste pour les lecteurs d’écran, « Traiter une par une » est masqué',
+        e1.pile && e1.n >= 3 && e1.vus === 1 && new RegExp('^Attend ton oui' + e1.n).test(e1.tete) && e1.pos === '1 sur ' + e1.n && e1.titre && !e1.une && e1.travail && /^CRA signé reçu/.test(e1.top), JSON.stringify(e1));
+      await appui('^Plus tard'); const e2 = await etat(); await appui('^Précédente'); const e3 = await etat();
+      ok('0.99 pile : « Plus tard » passe à la carte suivante (« 2 sur n »), « Précédente » revient ; une seule carte visible à chaque fois ; rien n’est retiré', e2.pos === '2 sur ' + e1.n && e2.vus === 1 && e2.top !== e1.top && e2.n === e1.n && e3.pos === '1 sur ' + e1.n && e3.top === e1.top, JSON.stringify([e2.pos, e3.pos]));
+      await appui('^Tout voir en liste'); await q.waitForTimeout(600); const e4 = await etat();
+      ok('0.99 pile : « Tout voir en liste » rend la liste d’avant (toutes les cartes), le choix est gardé sur l’appareil, « Une décision à la fois » la remet', !e4.pile && e4.vus === e4.n && e4.n >= e1.n - 1 && e4.garde === '1' && /^Une décision à la fois/.test(e4.bascule), JSON.stringify(e4));
+      await appui('^Une décision à la fois'); await q.waitForTimeout(600); const e5 = await etat();
+      ok('0.99 pile : remise, elle reprend (une carte visible, choix gardé)', e5.pile && e5.vus === 1 && e5.garde === '0', JSON.stringify([e5.pile, e5.vus, e5.garde]));
+      await q.context().close();
+      q = await pageWith(SCP, '?pile=0#demandes'); await q.waitForTimeout(1200); const e6 = await etat();
+      ok('0.99 pile : « ?pile=0 » dans l’adresse la coupe (la liste, comme avant)', !e6.pile && e6.vus === e6.n && e6.n >= 2 && !e6.bascule, JSON.stringify(e6));
       await q.context().close(); }
     { const q = await page('#demandes'); await q.waitForTimeout(2400);
       ok('0.94 : sans rien qui attend dans Travail, « Pour moi » n’a pas de ligne de Travail en plus', await q.evaluate(() => document.querySelectorAll('.pm-travail.toi').length === 0));
