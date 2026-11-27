@@ -48,6 +48,7 @@ export function startFakeGoogle() {
      refusDrive : la portée drive pas accordée ; adresseAilleurs : l'adresse d'envoi rendue n'est pas chez Google */
   F.depots = []; F.depotSeq = 0; F.sessions = {}; F.refusDrive = false; F.adresseAilleurs = false;
   F.brouillons = []; F.fils = {};   /* brouillons créés (jamais envoyés) ; fils Gmail posés par le banc, au format de l'API */
+  F.pieces = {};   /* 0.97.0 : pièces jointes posées par le banc (« <message>/<pièce> » → octets), rendues comme l'API (base64 « url ») */
   const send = (res, st, body) => { res.writeHead(st, {'content-type': 'application/json'}); res.end(st === 204 ? '' : JSON.stringify(body)); };
   const server = http.createServer((req, res) => {
     const morceaux = []; req.on('data', (d) => { morceaux.push(d); }); req.on('end', () => {
@@ -133,6 +134,7 @@ export function startFakeGoogle() {
       }
       /* 0.94.0 : un quota de Gmail atteint (F.quota réponses 429 de suite aux lectures) ; une recherche posée par le banc (F.recherche(q) → [{id, historyId}] ou null) */
       if (F.quota > 0 && p.startsWith('/gmail/') && req.method === 'GET') { F.quota--; return send(res, 429, {error: {code: 429, message: "Quota exceeded for quota metric 'Queries' and limit 'Queries per minute per user'", status: 'RESOURCE_EXHAUSTED'}}); }
+      if ((m = p.match(/^\/gmail\/users\/me\/messages\/([^/]+)\/attachments\/([^/]+)$/))) { const o = F.pieces[decodeURIComponent(m[1]) + '/' + decodeURIComponent(m[2])]; return o ? send(res, 200, {size: o.length, data: Buffer.from(o).toString('base64url')}) : send(res, 404, {error: {code: 404, message: 'Not Found'}}); }
       if (p === '/gmail/users/me/threads' && F.recherche) { const r = F.recherche(q.q || ''); if (r) return send(res, 200, r.length ? {threads: r, resultSizeEstimate: r.length} : {resultSizeEstimate: 0}); }
       if (p === '/gmail/users/me/threads' && /\(facture OR /.test(q.q || '')) return send(res, 200, {threads: Object.keys(F.radar).map((id) => ({id})), resultSizeEstimate: Object.keys(F.radar).length});   /* la requête du Radar */
       if (p === '/gmail/users/me/threads' && /"JARVIS Voix" OR \(subject:\(budget OR budgétaire\) Cloud\)/.test(q.q || '')) return send(res, 200, (F.budget || []).length ? {threads: F.budget.map((id) => ({id})), resultSizeEstimate: F.budget.length} : {resultSizeEstimate: 0});   /* 0.48.0 : alertes de budget de Google Cloud */

@@ -94,17 +94,33 @@ export function createTravail({file, jours, retours = '/var/lib/hermes-portail-r
     const valideMois = R && ['validee', 'deja'].includes(R.resultat), rattache = rattacheDe(cm, S2);
     const unMail = (sorte, s, reps, etat) => ({sorte, quoi: 'Mail « ' + TXT(s.objet, 80) + ' »', quand: jjmm(paris(new Date(s.envoi.at)).ymd), etat, envoye: 'envoyé le ' + quandH(s.envoi.at), url: filUrl(s.envoi.fil),
       reponses: reps.map((x) => ({de: TXT(x.nom, 60) || 'ton contact', quand: 'le ' + quandH(x.at), extrait: TXT(x.extrait, 160), pdf: !!x.pdf, lu: !!x.lu, url: filUrl(x.fil)}))});
-    /* ce qui l'attend, en clair : le CRA signé à rattacher, une réponse pas encore lue dans Gmail */
-    const attend = [recu && !rattache ? 'CRA signé reçu : à rattacher' : sansCra && !sansCra.lu ? 'Réponse à ton mail du CRA, sans le CRA : à lire' : '', rp && !rp.lu ? 'Réponse à ton mail de prolongation : à lire' : ''].filter(Boolean);
+    /* 0.97.0 : le CRA signé déposé par Hermes après son oui (son QCM du 26/11/2026). `jours.signe` dit où on en est : PDF gardé, portail
+       vérifié à blanc par Hermes, son oui, dépôt. `attend` et `toi` ne portent que ce qui l'attend, lui ; ce qui est en cours chez JARVIS
+       ou Hermes est dit à part (`signe.dit`). Sans accès aux pièces jointes (ou avant la 0.97.0) : l'ancien chemin, « à rattacher ». */
+    const SG0 = recu && jours.signe ? jours.signe(cm) : null, SG = SG0 && !rattache ? SG0 : null, sgE = SG ? SG.etat : '';
+    const sgFichier = SG && SG.nom ? '« ' + TXT(SG.nom, 80) + ' »' + (SG.tailleDite ? ', ' + SG.tailleDite : '') : '', sgRaison = SG && SG.raison ? ' ' + TXT(SG.raison, 200).replace(/[.\s]*$/, '.') : '';
+    const sgAttend = {pret: 'CRA signé reçu : Hermes le dépose sur le portail ?', introuvable: 'CRA signé reçu : Hermes n’a pas trouvé où le déposer : à faire à la main', echec_blanc: 'CRA signé reçu : Hermes n’a pas pu vérifier le portail : à faire à la main',
+      echec: 'CRA signé pas déposé : à faire à la main', refuse: 'CRA signé reçu : PDF pas récupéré, à rattacher à la main'}[sgE] || '';
+    const sgToi = {pret: 'CRA signé reçu : Hermes le dépose sur le portail ? ' + sgFichier + '. Il a trouvé où le déposer (essai à blanc : rien n’est déposé).' + (SG && SG.autres ? ' La réponse portait ' + (SG.autres + 1) + ' PDF : le plus gros est retenu.' : ''),
+      introuvable: 'CRA signé reçu : Hermes n’a pas trouvé où le déposer : à faire à la main.' + sgRaison, echec_blanc: 'CRA signé reçu : Hermes n’a pas pu vérifier le portail : à faire à la main.' + sgRaison,
+      echec: 'CRA signé pas déposé : à faire à la main.' + sgRaison + ' Le PDF reste gardé.', refuse: 'CRA signé reçu, mais le PDF n’a pas pu être gardé : à rattacher à la main.' + sgRaison}[sgE] || '';
+    const sgDit = {recupere: 'CRA signé reçu : JARVIS récupère le PDF…' + (SG && SG.raison ? ' (' + TXT(SG.raison, 120) + ' : nouvel essai dans le quart d’heure)' : ''), attend_cra: 'CRA signé reçu : Hermes vérifiera le portail une fois le CRA du mois validé.',
+      verifie: 'CRA signé reçu : Hermes vérifie le portail…', oui: 'Ton oui est noté : Hermes dépose le CRA signé sur le portail (dans le quart d’heure).'}[sgE] || '';
+    const sgAttente = !!sgDit;   /* en cours chez JARVIS ou Hermes : rien ne l'attend, lui */
+    const rattDit = !rattache || !SG0 ? '' : 'CRA signé ' + (SG0.par === 'hermes' ? 'déposé sur le portail par Hermes' : SG0.par === 'portail' ? 'déjà sur le portail (vu par Hermes)' : 'rattaché (dit par toi)') + (SG0.le ? ' le ' + quandH(SG0.le) : '') + '.';
+    const signe = SG ? {etat: sgE, mois: cm, dit: sgDit, nom: TXT(SG.nom, 80), taille: SG.tailleDite, autres: SG.autres, raison: TXT(SG.raison, 200), url: filUrl(SG.fil), ...(sgE === 'pret' || sgE === 'echec' ? {empreinte: SG.empreinte} : {})}
+      : rattDit ? {etat: 'fait', mois: cm, dit: rattDit, par: SG0.par} : null;
+    /* ce qui l'attend, en clair : le CRA signé à rattacher (ou son oui pour qu'Hermes le dépose), une réponse pas encore lue dans Gmail */
+    const attend = [recu && !rattache ? (sgAttente ? '' : sgAttend || 'CRA signé reçu : à rattacher') : sansCra && !sansCra.lu ? 'Réponse à ton mail du CRA, sans le CRA : à lire' : '', rp && !rp.lu ? 'Réponse à ton mail de prolongation : à lire' : ''].filter(Boolean);
     routines.push({id: 'mois', bloc: 'cra', titre: titre(C, 'mois'), mois: cm, qui: R ? 'reel' : 'blanc', quiDit: R ? 'Hermes · réel' : 'Hermes',
       prochaine: cm !== ym ? court(le26) + ' · 12 h' : valideMois ? '26/' + pad(m === 12 ? 1 : m + 1) : court(le26) + ' · 12 h',
-      etapes: [['Congés validés', ouiC ? 'fait' : auj >= c24 ? 'encours' : ''], ['Mail au client', mailCra ? 'fait' : ouiC ? 'encours' : ''], ['CRA validé', valideMois ? 'fait' : R && R.resultat !== 'blanc' ? 'bloque' : ''], ['CRA du client reçu', recu ? 'fait' : mailCra ? 'encours' : ''], ['Rattaché', rattache ? 'fait' : recu ? 'encours' : '']],
+      etapes: [['Congés validés', ouiC ? 'fait' : auj >= c24 ? 'encours' : ''], ['Mail au client', mailCra ? 'fait' : ouiC ? 'encours' : ''], ['CRA validé', valideMois ? 'fait' : R && R.resultat !== 'blanc' ? 'bloque' : ''], ['CRA du client reçu', recu ? 'fait' : mailCra ? 'encours' : ''], ['Rattaché', rattache ? 'fait' : sgE === 'echec' ? 'bloque' : recu ? 'encours' : '']],
       prevu: Tc ? {texte: moisMaj(cmo), puces: [[Tc.travailles + ' jours de mission', ''], [Tc.conges + (Tc.conges > 1 ? ' congés' : ' congé'), 'non'], [Tc.feries + (Tc.feries > 1 ? ' fériés' : ' férié'), 'non']]} : null,
       alerte: fin && fin <= cDern ? 'Fin de mission le ' + finDit + '. ' + (rp ? 'Réponse à ton mail de prolongation reçue le ' + quandH(rp.at) + (rp.lu ? ' (lue dans Gmail).' : ' : à lire.') : prolong ? 'Mail de prolongation envoyé le ' + jjmm(paris(new Date(prolong.at)).ymd) + ' : pas encore de réponse.' : 'Pas encore de mail de prolongation.') : '',
       derniere: R ? {quand: jjmm(new Date(+R.at || now()).toISOString().slice(0, 10)), quoi: {validee: 'validé', deja: 'déjà validé', rien: 'rien saisi', enregistree: 'complété, pas validé', blanc: 'à blanc', echec: 'échec'}[R.resultat] || R.resultat, par: 'Hermes', ok: valideMois} : derChronos(C.journalMois || 'cra.*mois|compte rendu d.activit'),
       mails: [mailCra ? unMail('cra', sc, repCra, recu ? 'CRA signé reçu' : sansCra ? 'réponse reçue, sans le CRA' : 'envoyé') : null, prolong ? unMail('prolongation', sp, repPro, rp ? 'réponse reçue' : 'envoyé') : null].filter(Boolean),
-      attend, rattachable: !!recu && !rattache,
-      toi: [recu && !rattache ? 'CRA signé reçu : à rattacher sur le portail (onglet du haut de la page du CRA).' : sansCra && !sansCra.lu ? 'Réponse à ton mail du CRA, sans le CRA : à lire.' : '', rp && !rp.lu ? 'Réponse à ton mail de prolongation : à lire.' : ''].filter(Boolean).join(' '), ouvrir: 'mois'});
+      attend, rattachable: !!recu && !rattache && sgE !== 'pret' && sgE !== 'oui', ...(signe ? {signe} : {}),
+      toi: [recu && !rattache ? (sgAttente ? '' : sgToi || 'CRA signé reçu : à rattacher sur le portail (onglet du haut de la page du CRA).') : sansCra && !sansCra.lu ? 'Réponse à ton mail du CRA, sans le CRA : à lire.' : '', rp && !rp.lu ? 'Réponse à ton mail de prolongation : à lire.' : ''].filter(Boolean).join(' '), ouvrir: 'mois'});
     { const Rm = cm === ym ? R : retourMois(ym); if (!(Rm && ['validee', 'deja'].includes(Rm.resultat))) ev(le26, titre(C, 'mois'), 'Hermes saisit et valide'); }
 
     /* les notes de frais */

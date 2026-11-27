@@ -1869,7 +1869,10 @@ const JOURS = createJours({file: path.join(DATA, 'jours.json'), now, retours: pr
     majBrouillon: (m) => GG.tool('Gmail', 'update_draft', {draftId: m.draftId, to: m.to, subject: m.subject, body: m.body}),
     envoye: async (objet) => { const r = await GG.tool('Gmail', 'search_threads', {query: 'in:sent subject:"' + String(objet).replace(/"/g, '') + '" newer_than:40d', pageSize: 3, idsOnly: true}); return !!((r && r.threads) || []).length; },
     /* 0.94.0 : le suivi des réponses (identifiants et version des fils seulement ; un fil n'est lu en entier que s'il a changé), son adresse */
-    chercher: (q) => GG.tool('Gmail', 'search_threads', {query: q, pageSize: 10, idsOnly: true}), fil: (id) => GG.tool('Gmail', 'get_thread', {threadId: id}), moi: () => GG.status('').account || ''},
+    chercher: (q) => GG.tool('Gmail', 'search_threads', {query: q, pageSize: 10, idsOnly: true}), fil: (id) => GG.tool('Gmail', 'get_thread', {threadId: id}), moi: () => GG.status('').account || '',
+    /* 0.97.0 : le PDF du CRA signé, téléchargé une fois et gardé sous le dossier de données (`cra-signe/`, signe.mjs) pour qu'Hermes le dépose
+       sur le portail après son oui ; lecture seule de Gmail, aucune route ni aucun outil MCP ne rend ce fichier */
+    piece: (messageId, attachmentId) => GG.tool('Gmail', 'get_attachment', {messageId, attachmentId})},
   ecrireJournal: (l) => journalJarvis(l),
   agenda: {lie: () => GG.status('').linked, calendriers: async () => ((await GG.tool('Google Calendar', 'list_calendars', {})) || {}).calendars || [],
     evenements: async (calendarId, debut, fin) => ((await GG.tool('Google Calendar', 'list_events', {calendarId, startTime: debut + 'T00:00:00', endTime: fin + 'T00:00:00', pageSize: 250})) || {}).events || []},
