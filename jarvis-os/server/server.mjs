@@ -37,6 +37,7 @@ import {createPilotageLocal, createCopieDrive} from './pilotage-local.mjs';   /*
 import {cliPilotage} from './pilotage-cli.mjs';
 import {createDepot} from './depot.mjs';   /* 0.91.0 : rangement des papiers par JARVIS */
 import {limiteDe, estLimite, heureParis, ecritureFaite, createAvisRelance} from './limite.mjs';   /* 0.89.0 : la relance automatique après la limite du forfait */
+import {createHermesAdmin} from './hermes-admin.mjs';   /* 0.96.0 : administrer les routines d'Hermes depuis l'app (ordres posés pour root, historique, erreur en détail) */
 import {createHermesRoutines} from './hermes-routines.mjs';   /* 0.92.0 : « Hermes et ses routines » en direct (le résumé de root, lu sans rien écrire) */
 const ACT = createActivite();   /* 0.33.0 : ce que fait Claude à l'instant */
 
@@ -1184,6 +1185,12 @@ setInterval(() => { AVIS_RELANCE.tick().catch(() => {}); }, +process.env.JARVIS_
 /* 0.92.0 : les routines d'Hermes en direct : le résumé assaini que root (hermes-relance) écrit toutes les 10 minutes, relu et revalidé à
    chaque demande (GET /api/hermes/routines, ligne « Routines d'Hermes » de la santé) ; JARVIS n'écrit jamais dans ce dossier */
 const HERMES_ROUT = createHermesRoutines({fichier: process.env.JARVIS_HERMES_ROUTINES || '/var/lib/hermes-relance-etat/routines.json', now});
+/* 0.96.0 : administrer les routines d'Hermes depuis l'app. JARVIS pose un ordre (lancer, pause, reprendre, horaire) dans un sous-dossier du
+   seul dossier hors de chez lui où son service écrit déjà (/var/lib/jarvis-reveil) ; root le lit, agit, et écrit le résultat, l'historique
+   et l'erreur nettoyée dans le dossier du résumé, que JARVIS relit et revalide. Un passage lancé à la main qui se termine : une notification. */
+const HERMES_ADMIN = createHermesAdmin({routines: HERMES_ROUT, dossierEtat: path.dirname(process.env.JARVIS_HERMES_ROUTINES || '/var/lib/hermes-relance-etat/routines.json'),
+  dossierOrdres: process.env.JARVIS_HERMES_ORDRES || '/var/lib/jarvis-reveil/ordres', S, save, now, push: PUSH, connues: () => routinesHermes(), sain: (t) => !interdit(t), attente: () => AVIS_RELANCE.etat(), log: (t) => console.log(t)});
+setInterval(() => { HERMES_ADMIN.tick().catch(() => {}); }, +process.env.JARVIS_HERMES_ORDRES_TICK_MS || 20000).unref();
 /* veilleur de santé (0.16.0) : toutes les 10 minutes, sans Claude ; prévient une fois de ce qui casse sans bruit */
 if (GG.status('').linked && !S.googleVu) { S.googleVu = true; save(); }
 const SANTE = createSante({S, save, push: PUSH, checks: {
@@ -1594,6 +1601,7 @@ MCP_OUTILS.push(...[
       if (!lib) throw new Error('Routine inconnue : ' + clip(a.routine, 40) + '. Tes routines : ' + Object.keys(r).join(', ') + '.');
       const resume = clip(a.resume, 300); if (resume.length < 2) throw new Error('« resume » est demandé : ce que tu as fait, en une ou deux phrases.');
       exeSain(resume);
+      HERMES_ADMIN.noterResume(nom, resume);   /* 0.96.0 : « ce qu'elle a fait », gardé pour la feuille de la routine (les 30 derniers, déjà filtrés : rien de bancaire) */
       if (!S.mcp.premieres || typeof S.mcp.premieres !== 'object') S.mcp.premieres = {};
       const deja = S.mcp.premieres[nom]; if (deja) return 'Première exécution réelle de « ' + lib + ' » déjà signalée le ' + exeQuand(deja.at) + ' : rien à faire.';
       if (!(S.push && S.push.subs.length)) throw new Error('Aucun appareil du propriétaire n’a activé les notifications de JARVIS : la première exécution réelle n’est pas signalée (elle le sera au prochain passage).');
@@ -2465,7 +2473,10 @@ const server = http.createServer(async (req, res) => {
         return json(res, r.error ? 400 : 200, {...r, ...mcpEtat(req)});
       }
       /* 0.41.0 : les routines planifiées et le brief du matin */
-      if (p === '/api/hermes/routines' && req.method === 'GET') return json(res, 200, HERMES_ROUT.lire());   /* 0.92.0 : les routines d'Hermes en direct, ou « indisponible » et pourquoi */
+      /* 0.96.0 : administrer les routines d'Hermes. Ces routes sont derrière `authed` (un appareil relié, verrou passé : ni invité, ni jeton MCP,
+         ni clé du Raccourci) ; JARVIS n'exécute rien, il pose un ordre que root lit. Aucun outil MCP n'y mène. */
+      if (p === '/api/hermes/routine' || p === '/api/hermes/routine/ordre' || p === '/api/hermes/routines/ordre') { const r = await HERMES_ADMIN.traiter(req, p, url, {readBody}); if (r) return json(res, r.status, r.body); }
+      if (p === '/api/hermes/routines' && req.method === 'GET') return json(res, 200, HERMES_ADMIN.liste());   /* 0.92.0 : les routines d'Hermes en direct, ou « indisponible » et pourquoi */
       if (p === '/api/routines' && req.method === 'GET') return json(res, 200, {routines: ROUT.liste(), brief: S.brief || null});
       if (p === '/api/routines/lire' && req.method === 'POST') { const b = await readBody(req), l = lirePhrase(b.phrase); return json(res, 200, {lu: l, quand: l.erreur ? '' : quandDit(l)}); }
       if (p === '/api/routines' && req.method === 'POST') { const r = ROUT.ajouter(await readBody(req)); return json(res, r.ok ? 200 : 400, {...r, routines: ROUT.liste()}); }
