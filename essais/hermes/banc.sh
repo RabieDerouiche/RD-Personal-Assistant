@@ -209,6 +209,63 @@ ok = (sorted(r) == ['dormante', 'lecture'] and d['cron'] is True and d['liste'] 
       and p['posee'] and not p['active'] and p['resultat'] == 'jamais' and p['prochain'] is None and p['moment'] == 'le dimanche à 18 h 30')
 sys.exit(0 if ok else 1)"
 verif "… droits du résumé (750 et 640), aucune lecture d'usage, rien dit d'autre que « Rien à relancer »" bash -c "[ \"\$(stat -c %a $T/resume)\" = 750 ] && [ \"\$(stat -c %a $T/resume/routines.json)\" = 640 ] && [ ! -e $T/usage-lu ] && [ \"\$(cat $T/relance.log)\" = 'Rien à relancer.' ]"
+# 0.96.0 : administrer les routines depuis JARVIS. Les ordres sont lus par la copie root d'ordres.py et exécutés sur le VRAI Hermes
+# (hermes cron pause, resume, edit, run), avec la politique du banc ; pause et horaire doivent survivre à routines.sh et à install.sh.
+verif "0.96.0 : install.sh a posé la copie root d'ordres.py (644), le lanceur (755), les deux unités et le dossier des ordres (700)" bash -c "[ \"\$(stat -c '%U %a' /usr/local/lib/hermes-relance/ordres.py)\" = 'root 644' ] && cmp -s '$KIT/ordres.py' /usr/local/lib/hermes-relance/ordres.py && [ \"\$(stat -c '%U %a' /usr/local/sbin/hermes-ordres)\" = 'root 755' ] && [ -f /etc/systemd/system/hermes-ordres.path ] && [ -f /etc/systemd/system/hermes-ordres.service ] && [ \"\$(stat -c %a /var/lib/jarvis-reveil/ordres)\" = 700 ]"
+mkdir -p $T/ordres; no=0
+ordres() { env HERMES_RELANCE_JOBS=$HH/cron/jobs.json HERMES_RELANCE_ETAT=$T/relance-etat HERMES_RELANCE_AVIS=$T/relance-avis HERMES_RELANCE_RESUME=$T/resume HERMES_RELANCE_MODES=$T/routines.mode HERMES_GARDE_ETAT=$T/garde-arret \
+  HERMES_RELANCE_GARDE_COUPE=$T/garde-coupe HERMES_RELANCE_SYSTEMCTL=$T/faux-systemctl HERMES_RELANCE_JARVIS_U=nobody HERMES_ROUTINES_PAUSES=$T/relance-etat/routines.pause HERMES_ROUTINES_HORAIRES=$T/relance-etat/routines.horaire \
+  HERMES_ORDRES_DOSSIER=$T/ordres HERMES_ORDRES_SUR_PLACE=1 HERMES_ORDRES_GERE=$MANAGED HERMES_ORDRES_ATTENTE=90 HERMES_ORDRES_PAS=2 HERMES_REVEIL_DERNIER=$T/reveil-dernier python3 -I /usr/local/lib/hermes-relance/ordres.py "${@:-traiter}" > $T/ordres.log 2>&1; }
+poser_ordre() {   # poser_ordre <routine> <action> [JSON en plus] : comme JARVIS le pose
+  no=$((no + 1)); OID=$(printf '%016x' $no)
+  python3 -I -c "
+import json, sys, time
+json.dump(dict(id=sys.argv[1], routine=sys.argv[2], action=sys.argv[3], at=int(time.time()), **json.loads(sys.argv[4] or '{}')), open(sys.argv[5] + '/ordre-' + sys.argv[1] + '.json', 'w'))" "$OID" "$1" "$2" "${3:-}" "$T/ordres"; }
+vrai() {   # vrai <expression> : j = les routines du vrai jobs.json par nom, o = le résultat de l'ordre $OID, r = le résumé, h = l'historique
+  python3 -I -c "
+import json, os, sys
+T, oid = sys.argv[1], sys.argv[2]
+j = {x['name'][7:]: x for x in json.load(open(sys.argv[3]))['jobs'] if str(x.get('name', '')).startswith('jarvis-')}
+lire = lambda f: json.load(open(T + '/resume/' + f)) if os.path.exists(T + '/resume/' + f) else {}
+o = {x['id']: x for x in lire('ordres.json').get('ordres', [])}.get(oid, {})
+r = {x['nom']: x for x in lire('routines.json').get('routines', [])}; h = lire('historique.json').get('routines', {})
+sys.exit(0 if eval(sys.argv[4]) else 1)" "$T" "$OID" "$HH/cron/jobs.json" "$1"; }
+poser_ordre lecture pause; ordres
+verif "0.96.0 : ordre « pause » sur le vrai Hermes : la routine est en pause dans son cron (enabled faux, state « paused »), notée chez root, dite « par jarvis » dans le résumé" vrai "o.get('etat') == 'fait' and j['lecture']['enabled'] is False and j['lecture']['state'] == 'paused' and r['lecture']['active'] is False and r['lecture']['pause']['par'] == 'jarvis' and r['lecture']['prochain'] is None and open('$T/relance-etat/routines.pause').read().startswith('lecture ')"
+routines() { HERMES_BANC=1 HERMES_MANAGED_DIR=$T/politique HERMES_ROUTINES_CONF=$T/routines.conf HERMES_ROUTINES_ETAT=$T/routines.etat HERMES_ROUTINES_PAUSES=$T/relance-etat/routines.pause HERMES_ROUTINES_HORAIRES=$T/relance-etat/routines.horaire bash "$KIT/routines.sh" "$@" > $T/routines.log 2>&1; }
+routines
+verif "0.96.0 : la pause survit à routines.sh (routine inchangée : toujours en pause)" vrai "j['lecture']['enabled'] is False and j['lecture']['state'] == 'paused'"
+sed -i 's/^lecture | actif | 15 9 /lecture | actif | 20 9 /' $T/routines.conf; routines
+verif "0.96.0 : … et à une recréation par routines.sh (ligne changée : recréée en pause, « en pause depuis JARVIS »)" bash -c "grep -q '✓ lecture : recréée (en pause depuis JARVIS' $T/routines.log && python3 -I -c \"import json,sys; j=[x for x in json.load(open('$HH/cron/jobs.json'))['jobs'] if x.get('name')=='jarvis-lecture'][0]; sys.exit(0 if j['enabled'] is False and j['state']=='paused' else 1)\""
+routines --lancer lecture; rcl=$?
+verif "0.96.0 : routines.sh --lancer refuse une routine en pause depuis JARVIS (elle ne repart pas par là)" bash -c "[ $rcl != 0 ] && grep -q 'en pause depuis JARVIS' $T/routines.log"
+poser_ordre lecture lancer; ordres
+verif "0.96.0 : « lancer » une routine en pause : refusé par root (la reprendre d'abord), aucun passage" vrai "o.get('etat') == 'refusé' and o.get('raison') == 'pause'"
+poser_ordre lecture reprendre; ordres
+verif "0.96.0 : ordre « reprendre » : la routine est de nouveau programmée chez Hermes (enabled, prochain passage calculé), le fichier des pauses est vide" vrai "o.get('etat') == 'fait' and j['lecture']['enabled'] is True and j['lecture']['state'] == 'scheduled' and j['lecture'].get('next_run_at') and r['lecture']['active'] is True and r['lecture']['pause'] is None and open('$T/relance-etat/routines.pause').read() == ''"
+routines --pause lecture; rp1=$?; pz=$(cut -d' ' -f1 $T/relance-etat/routines.pause); routines --reprendre lecture; rp2=$?
+verif "0.96.0 : routines.sh --pause puis --reprendre (à la main sur le serveur) : la même pause, posée puis levée chez le vrai Hermes" bash -c "[ $rp1 = 0 ] && [ $rp2 = 0 ] && [ '$pz' = lecture ] && [ ! -s $T/relance-etat/routines.pause ] && python3 -I -c \"import json,sys; j=[x for x in json.load(open('$HH/cron/jobs.json'))['jobs'] if x.get('name')=='jarvis-lecture'][0]; sys.exit(0 if j['enabled'] is True and j['state']=='scheduled' else 1)\""
+poser_ordre lecture horaire '{"jours": "ouvres", "heures": ["07:40", "07:55"]}'; ordres
+verif "0.96.0 : ordre « horaire » : l'expression construite par root est posée chez le vrai Hermes (« 40,55 7 * * 1-5 », heure de Paris), le prochain passage recalculé tombe sur cet horaire" python3 -I -c "
+import datetime, json, sys
+from zoneinfo import ZoneInfo
+j = [x for x in json.load(open('$HH/cron/jobs.json'))['jobs'] if x.get('name') == 'jarvis-lecture'][0]
+n = datetime.datetime.fromisoformat(j['next_run_at']).astimezone(ZoneInfo('Europe/Paris'))
+r = {x['nom']: x for x in json.load(open('$T/resume/routines.json'))['routines']}['lecture']
+ok = (j['schedule']['expr'] == '40,55 7 * * 1-5' and n.hour == 7 and n.minute in (40, 55) and n.weekday() < 5 and r['moment'] == 'du lundi au vendredi à 7 h 40 et 7 h 55' and r['modifie'] is True and r['origine'] == 'le lundi à 9 h 20'
+      and r['forme'] == dict(jours='ouvres', heures=['07:40', '07:55']) and open('$T/relance-etat/routines.horaire').read() == 'lecture|40,55 7 * * 1-5\n')
+sys.exit(0 if ok else 1)"
+routines
+verif "0.96.0 : l'horaire choisi depuis JARVIS survit à routines.sh (routine inchangée : son horaire reste)" vrai "j['lecture']['schedule']['expr'] == '40,55 7 * * 1-5'"
+sed -i 's/^lecture | actif | 20 9 /lecture | actif | 25 9 /' $T/routines.conf; routines
+verif "0.96.0 : … et à une recréation (ligne changée : recréée avec l'horaire choisi, pas celui de routines.conf)" bash -c "grep -q '✓ lecture : recréée (actif, 40,55 7 \* \* 1-5 choisi depuis JARVIS' $T/routines.log && python3 -I -c \"import json,sys; j=[x for x in json.load(open('$HH/cron/jobs.json'))['jobs'] if x.get('name')=='jarvis-lecture'][0]; sys.exit(0 if j['schedule']['expr']=='40,55 7 * * 1-5' else 1)\""
+poser_ordre lecture horaire '{"origine": true}'; ordres
+verif "0.96.0 : « revenir à l'horaire d'origine » : l'horaire de routines.conf est reposé chez Hermes, la surcharge retirée" vrai "o.get('etat') == 'fait' and j['lecture']['schedule']['expr'] == '25 9 * * 1' and r['lecture']['modifie'] is False and open('$T/relance-etat/routines.horaire').read() == ''"
+n0=$(envois); poser_ordre lecture lancer; ordres; cp $T/ordres.log $T/ordres-lancer.log; for i in $(seq 1 60); do [ "$(envois)" -gt "$n0" ] && break; sleep 1; done; sleep 1; ordres suivre; n1=$(envois)
+verif "0.96.0 : ordre « lancer » sur le vrai Hermes : un passage dans le mode actuel (le résultat part au propriétaire), l'ordre passe à « terminé », réussi" bash -c "[ $n1 -gt $n0 ] && grep -q 'lecture : passage lancé depuis JARVIS' $T/ordres-lancer.log && python3 -I -c \"import json,sys; o=[x for x in json.load(open('$T/resume/ordres.json'))['ordres'] if x['id']=='$OID'][0]; sys.exit(0 if o['etat']=='terminé' and o['resultat']=='ok' and o['fin'] else 1)\""
+verif "0.96.0 : l'historique vient du vrai registre d'Hermes (lu en tant qu'utilisateur hermes) : ce passage est « lancé à la main depuis JARVIS », avec son début, sa fin et sa durée " vrai "h['lecture'][-1]['lance'] == 'jarvis' and h['lecture'][-1]['ordre'] == '$OID' and h['lecture'][-1]['resultat'] == 'ok' and h['lecture'][-1]['debut'] and isinstance(h['lecture'][-1]['duree'], int)"
+verif "0.96.0 : droits de ce que JARVIS lit (historique et résultats des ordres : 640 ; fichiers de root : 600 dans un dossier 700)" bash -c "[ \"\$(stat -c %a $T/resume/historique.json)\" = 640 ] && [ \"\$(stat -c %a $T/resume/ordres.json)\" = 640 ] && [ \"\$(stat -c %a $T/relance-etat)\" = 700 ] && [ \"\$(stat -c %a $T/relance-etat/ordres.json)\" = 600 ]"
+routines() { HERMES_BANC=1 HERMES_MANAGED_DIR=$T/politique HERMES_ROUTINES_CONF=$T/routines.conf HERMES_ROUTINES_ETAT=$T/routines.etat bash "$KIT/routines.sh" "$@" > $T/routines.log 2>&1; }
 wait 2>/dev/null; pic=$(sort -n $T/rss-routine.log | tail -1)
 echo "  mémoire d'Hermes pendant une routine : $pic Mo au plus (plus environ 250 Mo pour son Claude Code)"
 verif "mémoire pendant une routine sous 550 Mo" [ "${pic:-999}" -lt 550 ]
@@ -263,8 +320,13 @@ echo "== Rangement"
 pkill -TERM -u hermes -f "gateway run"; for i in $(seq 1 40); do pgrep -u hermes -f "gateway run" >/dev/null || break; sleep 0.5; done
 pkill -f "faux_services.py $PM"
 cp -p $T/config.avant $HH/config.yaml; cp -p $T/env.avant $HH/.env
+# 0.96.0 : ce qu'il a réglé depuis JARVIS (pauses, horaires : fichiers de root) doit survivre à une réinstallation
+install -d -m 0700 /var/lib/hermes-relance; printf 'lecture 1795000000\n' > /var/lib/hermes-relance/routines.pause; printf 'lecture|40 7 * * 1-5\n' > /var/lib/hermes-relance/routines.horaire
 rm -f /etc/hermes/jarvis.env; HERMES_BANC=1 bash "$KIT/install.sh" > $T/install-fin.log 2>&1   # le conteneur repart sans liaison
+verif "0.96.0 : install.sh relancé ne touche ni aux pauses ni aux horaires posés depuis JARVIS (fichiers de root)" bash -c "[ \"\$(cat /var/lib/hermes-relance/routines.pause)\" = 'lecture 1795000000' ] && [ \"\$(cat /var/lib/hermes-relance/routines.horaire)\" = 'lecture|40 7 * * 1-5' ]"
+rm -f /var/lib/hermes-relance/routines.pause /var/lib/hermes-relance/routines.horaire
 nft delete table inet hermes_sortie 2>/dev/null
+rm -rf /var/lib/jarvis-reveil/ordres   # 0.96.0 : le dossier des ordres posé par install.sh ne reste pas dans le conteneur
 rm -rf /var/lib/hermes-relance-etat   # 0.92.0 : sinon un serveur JARVIS lancé par un autre banc dans ce conteneur y verrait un Hermes installé sans résumé
 echo
 echo "Banc d'Hermes : $ok vérifications réussies, $ko en échec."

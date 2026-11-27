@@ -290,8 +290,9 @@ def horaires_ecrire(h):
 # ---------------------------------------------------------------- Hermes
 def hermes(*args, delai=90):
     """Une commande « hermes cron … » en tant qu'utilisateur hermes : (réussie, sortie)."""
-    banc = E("HERMES_ORDRES_HERMES")
-    cmd = [banc, *args] if banc else L.HX + ["hermes", *args]
+    banc, gere = E("HERMES_ORDRES_HERMES"), E("HERMES_ORDRES_GERE")   # banc : un faux « hermes », ou le vrai avec la politique du banc
+    hx = [("HERMES_MANAGED_DIR=" + gere) if gere and x.startswith("HERMES_MANAGED_DIR=") else x for x in L.HX]
+    cmd = [banc, *args] if banc else hx + ["hermes", *args]
     try:
         p = subprocess.run(cmd, capture_output=True, text=True, timeout=delai, cwd="/" if banc else "/home/hermes")
         return p.returncode == 0, (p.stdout or "") + (p.stderr or "")
@@ -718,19 +719,22 @@ def suivre(connues, t):
                 elif p in nouveaux or (p.get("resultat"), p.get("cause")) != (resultat, cause):
                     p.update(resultat=resultat, cause=cause if resultat == "erreur" else None, erreur=nettoyer_erreur(L.erreur_du_passage(j)) if resultat == "erreur" else None)
             # comment chaque nouveau passage a été lancé : depuis JARVIS, après la limite, par un réveil, programmé, ou à la main
-            ec = etat["encours"].get(nom)
+            ec, pris = etat["encours"].get(nom), False
             for p in sorted(nouveaux, key=lambda p: p["fin"]):
                 fin, debut = L.iso_ep(p["fin"]), L.iso_ep(p["debut"]) if p["debut"] else None
-                if isinstance(ec, dict) and fin >= int(ec.get("at") or 0) - 5 and (debut is None or debut >= int(ec.get("at") or 0) - 30):
-                    p["lance"], p["ordre"] = "jarvis", ec.get("id")
-                    resultat_ordre({"id": ec.get("id"), "routine": nom, "action": "lancer", "at": ec.get("at")}, t, "terminé", None, fin=p["fin"], resultat=p["resultat"], cause=p["cause"])
-                    etat["encours"].pop(nom, None)
-                    ec = None
-                    finis.add(nom)
+                if isinstance(ec, dict) and not pris and fin >= int(ec.get("at") or 0) - 5 and (debut is None or debut >= int(ec.get("at") or 0) - 30):
+                    p["lance"], p["ordre"], pris = "jarvis", ec.get("id"), True
                 elif any(n == nom and at and fin >= at - 5 and fin - at <= L.SUIVI_MAX and (debut is None or debut >= at - 30) for n, at in apres_limite):
                     p["lance"] = "limite"
                 elif nom == "reveil" and reveil and (abs(debut - reveil) <= 60 if debut else 0 <= fin - reveil <= 900):
                     p["lance"] = "reveil"
+            # l'ordre du passage lancé à la main est soldé une fois le résultat tranché : (certain, code d'Hermes et banc) juste après un
+            # passage réussi, last_status vaut « delivery_queued » le temps que la passerelle envoie le résultat (3 minutes d'attente au plus)
+            p = next((p for p in passages if isinstance(ec, dict) and p.get("ordre") == ec.get("id")), None)
+            if p is not None and not (j.get("last_status") == "delivery_queued" and t - L.iso_ep(p["fin"]) < 180):
+                resultat_ordre({"id": ec.get("id"), "routine": nom, "action": "lancer", "at": ec.get("at")}, t, "terminé", None, fin=p["fin"], resultat=p["resultat"], cause=p["cause"])
+                etat["encours"].pop(nom, None)
+                finis.add(nom)
             routines[nom] = sorted(passages, key=lambda p: p["fin"])[-HISTO_MAX:]
         # une routine mise en pause depuis JARVIS qui ne l'est plus chez Hermes (recréée, relancée à la main) : la pause est remise
         for nom in L.pauses_jarvis():

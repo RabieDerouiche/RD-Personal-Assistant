@@ -447,7 +447,7 @@ def cmd_relancer(a):
         fin = iso_ep(j.get("last_run_at")) if j else None
         if j and fin and fin >= int(s.get("at") or 0) - 5:
             court = nom.replace("jarvis-", "", 1)
-            if j.get("last_status") in ("ok", "delivery_failed"):
+            if j.get("last_status") in ("ok", "delivery_failed", "delivery_queued"):   # « delivery_queued » : réussi, résultat en cours d'envoi
                 dire.append("%s : le passage relancé a abouti." % court)
                 histo.append({"nom": court, "at": int(s.get("at") or t), "resultat": "réussie"})
             else:
@@ -742,7 +742,9 @@ def resultat_de(j):
     st = j.get("last_status")
     if not j.get("last_run_at") or st is None:
         return "jamais", None
-    if st == "ok":
+    # (certain, code d'Hermes v0.23.3, cron/delivery_outcome.py, et banc du 27/11/2026) « delivery_queued » : le passage a réussi, son
+    # résultat attend d'être envoyé par la passerelle ; il devient « ok » ou « delivery_failed » une ou deux secondes plus tard
+    if st in ("ok", "delivery_queued"):
         return "ok", None
     if st == "delivery_failed":
         return "erreur", "résultat non envoyé"

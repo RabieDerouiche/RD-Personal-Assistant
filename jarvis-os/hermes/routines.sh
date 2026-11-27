@@ -65,6 +65,8 @@ if [ "${1:-}" = "--liste" ]; then lister; exit 0; fi
 #   routines.sh --reel <nom>     la routine passe « en réel » (le bot l'a mise en pause), puis tout est reposé
 #   routines.sh --double <nom>   retour arrière : de nouveau « en double » (n'écrit que le Journal et l'État)
 #   routines.sh --lancer <nom>   un passage tout de suite, hors de son horaire (hermes cron run)
+#   routines.sh --pause <nom>    0.96.0 : la routine ne passe plus jusqu'à nouvel ordre (comme « Mettre en pause » dans JARVIS)
+#   routines.sh --reprendre <nom>  0.96.0 : l'inverse (comme « Reprendre » dans JARVIS)
 # Le mode écrit ici remplace « en double » ou « en réel » dans la consigne de routines.conf.
 MODES=${HERMES_ROUTINES_MODES:-/etc/hermes/routines.mode}
 mode_de() { [ -f "$MODES" ] && awk -v n="$1" '$1 == n {m = $2} END {if (m) print m}' "$MODES"; }
@@ -75,6 +77,20 @@ case "${1:-}" in
     touch "$MODES" && chmod 0644 "$MODES"
     { grep -v "^${2} " "$MODES"; echo "$2 ${1#--}"; } > "$MODES.tmp" && mv "$MODES.tmp" "$MODES" && chmod 0644 "$MODES"
     echo "  $2 : mode « $([ "$1" = --reel ] && echo 'en réel' || echo 'en double') » noté dans $MODES" ;;
+  --pause|--reprendre)   # 0.96.0 : la même pause que celle posée depuis JARVIS (fichier de root, tenue à chaque recréation)
+    [[ "${2:-}" =~ ^[a-z0-9-]{2,40}$ ]] || { echo "Usage : $0 $1 <nom de la routine>"; exit 1; }
+    grep -q "^${2} *|" "$CONF" 2>/dev/null || { echo "Routine inconnue dans $CONF : $2"; exit 1; }
+    ident=$(poses | awk -F'\t' -v n="jarvis-$2" '$2 == n {print $1}' | head -1)
+    [ -n "$ident" ] || { echo "Routine non posée : $2 (sudo bash $0)"; exit 1; }
+    install -d -m 0700 "$(dirname "$PAUSES")"; touch "$PAUSES" && chmod 0600 "$PAUSES"
+    if [ "$1" = --pause ]; then
+      pause_jarvis "$2" || echo "$2 $(date +%s)" >> "$PAUSES"
+      if hx hermes cron pause "$ident" >/dev/null 2>&1; then echo "  ⏸ $2 : en pause jusqu'à nouvel ordre (reprise : $0 --reprendre $2, ou dans JARVIS)"; exit 0; fi
+    else
+      { grep -v "^${2} " "$PAUSES" || true; } > "$PAUSES.tmp" && mv "$PAUSES.tmp" "$PAUSES" && chmod 0600 "$PAUSES"
+      if hx hermes cron resume "$ident" >/dev/null 2>&1; then echo "  ▶ $2 : reprise"; exit 0; fi
+    fi
+    echo "  ✗ $2 : Hermes a refusé (hermes cron ${1#--} $ident)"; exit 1 ;;
   --lancer)
     [[ "${2:-}" =~ ^[a-z0-9-]{2,40}$ ]] || { echo "Usage : $0 --lancer <nom de la routine>"; exit 1; }
     ident=$(poses | awk -F'\t' -v n="jarvis-$2" '$2 == n {print $1}' | head -1)
@@ -131,7 +147,7 @@ while IFS= read -r ligne || [ -n "$ligne" ]; do
     echo "  = $nom : inchangée"; echo "jarvis-$nom $empreinte" >> "$nouvel_etat"
     # 0.96.0 : inchangée dans routines.conf, mais l'horaire ou la pause réglés depuis JARVIS font foi (remis s'ils ont bougé)
     pose=$(poses | awk -F'\t' -v n="jarvis-$nom" '$2 == n {print $6}' | head -1)
-    if [ -n "$pose" ] && [ "$pose" != "-" ] && [ "$pose" != "$(echo $horaire)" ]; then
+    if [ -n "$pose" ] && [ "$pose" != "-" ] && [ "$pose" != "$(printf '%s' "$horaire" | tr -s ' ')" ]; then
       hx hermes cron edit "$ident" --schedule "$horaire" >/dev/null 2>&1 && echo "  ↻ $nom : horaire remis ($horaire$([ -n "$hj" ] && echo ', choisi depuis JARVIS'))"
     fi
     if pause_jarvis "$nom" && [ "$(poses | awk -F'\t' -v n="jarvis-$nom" '$2 == n {print $3}' | head -1)" = actif ]; then

@@ -212,6 +212,13 @@ verif "… une date qui n'en est pas une : rien (jamais recopiée)" res "r['dige
 verif "… routine inconnue de routines.conf (jarvis-pirate, un nom piégé) ou hors « jarvis- » : ignorée, seulement comptée" bash -c "! grep -qE 'pirate|autre-chose|\\.\\./' '$T/resume/routines.json'"
 verif "… (deux ignorées, six décrites)" res "d['inconnues'] == 2 and len(d['routines']) == 6"
 verif "… en pause : pas active, jamais passée ; pas posée chez Hermes : dite « pas posée »" res "r['bilan-hebdo']['posee'] is True and r['bilan-hebdo']['active'] is False and r['bilan-hebdo']['resultat'] == 'jamais' and r['bilan-hebdo']['prochain'] is None and r['sorties-du-week-end']['posee'] is False and r['sorties-du-week-end']['resultat'] == 'jamais'"
+py "
+import json, sys
+d = json.load(open(sys.argv[1]))
+for j in d['jobs']:
+    if j['name'] == 'jarvis-veille-du-matin': j['last_status'] = 'delivery_queued'
+json.dump(d, open(sys.argv[1], 'w'))" "$T/jobs.json"; relancer
+verif "0.96.0 : « delivery_queued » (passage réussi, résultat en cours d'envoi par la passerelle) est un passage réussi, pas une erreur" res "r['veille-du-matin']['resultat'] == 'ok' and r['veille-du-matin']['cause'] is None"
 verif "… passerelle en marche, garde du forfait actif" res "d['passerelle'] == 'active' and d['garde'] == dict(etat='actif', jusqua=None)"
 verif "… seuls des appels « is-active » et « is-failed » à systemd : rien n'est lancé ni redémarré" bash -c "! grep -qvE '^(is-active|is-failed) ' '$T/appels'"
 echo failed > "$T/etat-passerelle"; echo "coupé jusqu'au 2026-12-03" > "$T/garde-coupe"; relancer

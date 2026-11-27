@@ -216,7 +216,10 @@ verif "ordre valide « lancer » : un passage dans le mode actuel (hermes cron r
 verif "… le résultat : « en cours », demandé à 14 h 02" res "o['etat'] == 'en cours' and o['raison'] is None and o['traite'] == $N"
 poser prix-suivis lancer; ordres
 verif "second « lancer » pendant que le premier court : refusé (un passage est déjà en cours)" res "o['etat'] == 'refusé' and o['raison'] == 'en-cours'"
-job "j['prix-suivis'].update(last_run_at='$(iso $((N + 240)))', last_status='ok')"
+job "j['prix-suivis'].update(last_run_at='$(iso $((N + 240)))', last_status='delivery_queued')"
+QUAND=$((N + 250)) ordres suivre; ID=$L1
+verif "le passage vient de finir, son résultat est encore en cours d'envoi (« delivery_queued ») : l'ordre reste « en cours », le passage est déjà dans l'historique" res "o['etat'] == 'en cours' and h['prix-suivis'][-1]['ordre'] == '$L1' and h['prix-suivis'][-1]['resultat'] == 'ok'"
+job "j['prix-suivis'].update(last_status='ok')"
 EXEC="echo '[[\"id-prix-suivis\", \"completed\", \"$(iso $((N + 20)))\", \"$(iso $((N + 21)))\", \"$(iso $((N + 240)))\", null, null]]'" QUAND=$((N + 300)) ordres suivre
 ID=$L1
 verif "le passage fini : l'ordre passe à « terminé », avec l'heure de fin et le résultat" res "o['etat'] == 'terminé' and o['fin'] == '$(py "import datetime; print(datetime.datetime.fromtimestamp($N + 240, datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'))")' and o['resultat'] == 'ok' and o['cause'] is None"
@@ -240,6 +243,11 @@ rm -rf "$T/etat"; : > "$T/hermes-appels"
 LANCERS=2 QUAND=$((N + 5 * 3600)) poser veille-du-matin lancer; LANCERS=2 QUAND=$((N + 5 * 3600)) poser reveil lancer; LANCERS=2 QUAND=$((N + 5 * 3600)) poser digest-ia lancer; LANCERS=2 QUAND=$((N + 5 * 3600)) ordres
 verif "plafond du jour (ici 2 ; 12 en vrai) : le troisième lancement est refusé, deux passages seulement" bash -c "[ \"\$(grep -c '^cron run ' '$T/hermes-appels')\" = 2 ]"
 verif "… (raison : plafond)" res "o['etat'] == 'refusé' and o['raison'] == 'plafond'"
+job "j['veille-du-matin'].update(last_run_at='$(iso $((N + 5 * 3600 + 100)))', last_status='delivery_queued')"; QUAND=$((N + 5 * 3600 + 400)) ordres suivre
+verif "… un envoi resté « en file » plus de 3 minutes n'empêche pas de solder l'ordre (terminé, réussi)" py "
+import json, sys
+o = [x for x in json.load(open(sys.argv[1]))['ordres'] if x['routine'] == 'veille-du-matin' and x['action'] == 'lancer'][-1]
+sys.exit(0 if o['etat'] == 'terminé' and o['resultat'] == 'ok' else 1)" "$T/resume/ordres.json"
 QUAND=$((N + 5 * 3600 + 3700)) ordres suivre
 verif "un passage lancé à la main dont rien ne revient au bout d'une heure : « sans suite »" py "
 import json, sys
@@ -349,6 +357,7 @@ verif "install.sh pose la copie root d'ordres.py, le lanceur, les deux unités, 
 verif "le dossier des ordres est sous /var/lib/jarvis-reveil : aucun autre dossier d'écriture pour JARVIS" bash -c "grep -q '^DirectoryNotEmpty=/var/lib/jarvis-reveil/ordres$' '$KIT/hermes-ordres.path' && [ \"\$(grep -c 'install -d -o jarvis' '$KIT/install.sh')\" = 2 ]"
 verif "l'unité n'exécute que la copie root (jamais le dépôt), sans variable du banc" bash -c "grep -q '^ExecStart=/usr/local/sbin/hermes-ordres$' '$KIT/hermes-ordres.service' && ! grep -q 'HERMES_ORDRES\|/opt/rd' '$KIT/hermes-ordres.service' && grep -q 'hermes-relance}/ordres.py' '$KIT/ordres.sh'"
 verif "relance.sh : le suivi après la relance, jamais à blanc, sans changer son code de sortie" bash -c "grep -q 'ordres.py\" suivre' '$KIT/relance.sh' && grep -q 'exit \$code' '$KIT/relance.sh' && grep -q '!= --a-blanc' '$KIT/relance.sh'"
+verif "routines.sh --pause et --reprendre : la même pause que celle de JARVIS, à la main sur le serveur" bash -c "grep -q -- '--pause|--reprendre)' '$KIT/routines.sh' && grep -q 'hermes cron pause \"\$ident\"' '$KIT/routines.sh' && grep -q 'hermes cron resume \"\$ident\"' '$KIT/routines.sh'"
 verif "routines.sh respecte les pauses et les horaires de root (recréation, routine inchangée, --lancer refusé en pause)" bash -c "grep -q 'en pause depuis JARVIS\")' '$KIT/routines.sh' && grep -q 'horaire=\$hj' '$KIT/routines.sh' && grep -q 'cron edit \"\$ident\" --schedule' '$KIT/routines.sh' && grep -q 'la reprendre là-bas' '$KIT/routines.sh'"
 verif "desinstaller.sh retire la surveillance des ordres" grep -q 'hermes-ordres.path' "$KIT/desinstaller.sh"
 verif "ordres.py ne lit jamais l'usage du forfait et n'appelle d'Hermes que cron pause, resume, edit et run" py "
