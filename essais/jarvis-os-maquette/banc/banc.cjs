@@ -1302,6 +1302,20 @@ srv.listen(0, async () => {
       q = await pageWith({reponses: true, signe: 'fait'}, '#travail'); await q.waitForTimeout(1200);
       const c6 = await carte(q), s6 = await feuille(q);
       ok('0.97 : déposé par Hermes : 5 étapes sur 5, « CRA signé déposé sur le portail par Hermes le 27/11 à 14 h 05. », plus aucun bouton de dépôt ni de rattachement', c6.fait === 5 && c6.signe.join() === 'fait CRA signé déposé sur le portail par Hermes le 27/11 à 14 h 05.' && !c6.alerte.some((x) => /CRA signé/.test(x)) && !s6.acts.some((x) => /déposer|moi-même|rattaché/i.test(x)), JSON.stringify([c6, s6.acts]));
+      await q.context().close();
+      /* 0.98.0 : le PDF comparé à la saisie */
+      q = await pageWith({reponses: true, signe: 'ecart'}, '#travail'); await q.waitForTimeout(1200);
+      const c7 = await carte(q), s7 = await feuille(q);
+      ok('0.98 : le PDF ne correspond pas à la saisie : la carte le dit avec l’écart ; la feuille propose « Déposer quand même » et « Je le fais moi-même », l’écart sous le fichier', c7.alerte.some((x) => /^À toi : CRA signé reçu, mais il ne correspond pas à la saisie : « CRA signé\.pdf », 47 Ko\. Le PDF ne correspond pas à la saisie : le PDF dit 16 jours, la saisie 17\./.test(x))
+        && s7.acts[0] === 'Déposer quand même' && s7.acts[1] === 'Je le fais moi-même' && !s7.acts.includes('Oui, déposer') && /^pret Fichier : CRA signé\.pdf · 47 Ko \| Le PDF ne correspond pas à la saisie : le PDF dit 16 jours, la saisie 17\.$/.test(s7.signe[0]), JSON.stringify([c7.alerte, s7]));
+      await appui(q, '^Déposer quand même'); await q.waitForTimeout(2800);
+      const conf7 = await q.evaluate(() => ({texte: document.getElementById('sheet').textContent.replace(/\s+/g, ' '), oui: [...document.querySelectorAll('#sheet .sa-main .btn.danger-fill')].map((x) => x.textContent)}));
+      ok('0.98 : « Déposer quand même » rappelle l’écart avant de confirmer (« Le PDF ne correspond pas à la saisie. Hermes dépose … ? »)', /Le PDF ne correspond pas à la saisie\. Hermes dépose « CRA signé\.pdf » \(47 Ko\) sur le portail \?/.test(conf7.texte) && conf7.oui.join() === 'Oui, déposer', JSON.stringify(conf7.oui));
+      await q.context().close();
+      q = await pageWith({reponses: true, signe: 'auto'}, '#travail'); await q.waitForTimeout(1200);
+      const c8 = await carte(q), s8 = await feuille(q);
+      ok('0.98 : conforme, déposé sans attendre : la carte dit « CRA signé conforme à la saisie : Hermes le dépose… sans attendre ton oui », rien ne l’attend pour le CRA signé, aucun bouton de dépôt', c8.signe.join() === 'oui CRA signé conforme à la saisie : Hermes le dépose sur le portail (dans le quart d’heure), sans attendre ton oui.'
+        && !c8.alerte.some((x) => /CRA signé/.test(x)) && !s8.acts.some((x) => /déposer|rattaché|moi-même/i.test(x)), JSON.stringify([c8, s8.acts]));
       await q.context().close(); }
     { const q = await page('#demandes'); await q.waitForTimeout(2400);
       ok('0.94 : sans rien qui attend dans Travail, « Pour moi » n’a pas de ligne de Travail en plus', await q.evaluate(() => document.querySelectorAll('.pm-travail.toi').length === 0));

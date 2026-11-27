@@ -18,6 +18,7 @@ import {feries} from './radar.mjs';
 import {paris} from './notify.mjs';
 import {lireEchange} from './reponses.mjs';
 import {creerGarde, choisirPdf, octetsDe, verifierPdf, empreinteDe, tailleDite, sansAdresse, SIGNE_MAX} from './signe.mjs';
+import {controler} from './signe-controle.mjs';   /* 0.98.0 : le CRA signé comparé à la saisie, sans IA */
 
 export const nrm = (t) => String(t ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[’`]/g, "'").replace(/\s+/g, ' ').trim();
 export const MOIS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
@@ -658,7 +659,7 @@ export function createJours({file, agenda, claude = null, push = async () => [],
     noter();   /* enregistré AVANT de notifier : une réponse notée n'est jamais renotifiée, même après un redémarrage */
     for (const r of neuves) {
       const cra = sorte === 'cra', title = cra ? (r.pdf ? 'CRA signé reçu de ton client' : 'Réponse à ton mail du CRA, sans le CRA') : 'Réponse à ton mail de prolongation';
-      await push({title, body: TXT((r.nom || 'Ton contact') + ' : ' + (r.extrait || '(pas d’extrait)') + (cra && r.pdf ? (GARDE ? ' Hermes vérifie le portail, puis te demande ton oui pour le déposer.' : ' À rattacher sur le portail.') : ''), 230), url: '/#travail', tag: 'rep-' + sorte + '-' + ym})
+      await push({title, body: TXT((r.nom || 'Ton contact') + ' : ' + (r.extrait || '(pas d’extrait)') + (cra && r.pdf ? (GARDE ? (D.signePremier ? ' Je le compare à la saisie : s’il correspond, Hermes le dépose sur le portail.' : ' Je le compare à la saisie, Hermes vérifie le portail, puis te demande ton oui pour le déposer.') : ' À rattacher sur le portail.') : ''), 230), url: '/#travail', tag: 'rep-' + sorte + '-' + ym})
         .catch((e) => log('jours : notification de la réponse impossible (' + TXT((e && e.message) || e, 120) + ')'));
       if (ecrireJournal) await Promise.resolve().then(() => ecrireJournal({sujet: cra ? (r.pdf ? 'CRA du mois : CRA signé reçu' : 'CRA du mois : réponse reçue, sans le CRA') : 'Prolongation de mission : réponse reçue',
         detail: 'Réponse au mail « ' + objet + ' » reçue le ' + quandDit(r.at) + (r.pdf ? ', avec un PDF' : ', sans PDF') + '. ' + (cra && r.pdf ? 'À rattacher sur le portail.' : 'À lire.')}))
@@ -730,6 +731,42 @@ export function createJours({file, agenda, claude = null, push = async () => [],
   const craSuivi = (ym) => { const s = suiviDe(ym).cra; return s && typeof s === 'object' ? s : null; };
   const pdfRecu = (s) => (s && (s.reponses || []).find((r) => r.pdf)) || null;
   const moisDit = (ym) => MOIS[+ym.slice(5, 7) - 1];
+  /* ---------- 0.98.0 : le CRA signé comparé à la saisie, puis déposé sans attendre si tout correspond (sa demande du 27/11/2026 : « après
+     avoir vérifié que le contenu du PDF correspond à la saisie », « automatisé dès réception du mail si saisie déjà faite ») ----------
+     Le contrôle (signe-controle.mjs, sans IA) compare le mois, le total et le détail jour par jour du PDF aux jours qu'il a validés dans
+     JARVIS (ceux qu'Hermes a saisis) ; il est refait si ces jours changent, et à l'instant du oui automatique. Le oui automatique n'est
+     posé que si : le contrôle dit « conforme », Hermes a trouvé où déposer (compte rendu à blanc « pret »), un premier dépôt par Hermes a
+     déjà réussi (le tout premier reste un essai qu'il valide lui-même), et aucun oui n'a encore été donné pour ce fichier (un dépôt
+     automatique raté ne repart jamais seul). Un écart ou un PDF illisible : rien d'automatique, la carte dit l'écart et attend sa décision. */
+  const saisieDe = (ym) => { const x = D.mois[ym]; return x && x.etat === 'valide' && x.valide ? x.valide : null; };
+  function controleDe(buf, ym) {
+    const v = saisieDe(ym); let c;
+    try { c = controler(buf, ym, v); } catch (e) { c = {etat: 'illisible', dit: 'Le PDF n’a pas pu être lu : je ne peux pas le comparer à la saisie.'}; }
+    return {etat: c.etat, dit: TXT(c.dit, 300), total: typeof c.total === 'number' ? c.total : null, attendu: typeof c.attendu === 'number' ? c.attendu : null, detail: !!c.detail, saisie: (v && v.empreinte) || '', at: now()};
+  }
+  /* un PDF gardé avant la 0.98.0, ou des jours validés (ou corrigés) depuis le dernier contrôle : le contrôle est refait */
+  function controlerSigne(ym) {
+    const x = D.mois[ym], s = x && craSuivi(ym), g = s && s.signe;
+    if (!GARDE || !g || typeof g !== 'object' || !g.fichier || s.rattache) return false;
+    const v = saisieDe(ym), cle = (v && v.empreinte) || '';
+    if (g.controle && g.controle.saisie === cle) return false;
+    const buf = GARDE.lire(g.fichier); if (!buf || empreinteDe(buf) !== g.empreinte) return false;
+    const avant = g.controle ? g.controle.etat : ''; g.controle = controleDe(buf, ym);
+    if (avant !== g.controle.etat) x.historique.push({at: now(), quoi: 'CRA signé comparé à la saisie : ' + ({conforme: 'conforme', ecart: 'écart', illisible: 'pas comparable'}[g.controle.etat] || g.controle.etat)});
+    noter(); return true;
+  }
+  async function ouiAuto(ym) {
+    const x = D.mois[ym], s = x && craSuivi(ym), g = s && s.signe;
+    if (!GARDE || !D.signePremier || !g || typeof g !== 'object' || !g.fichier || s.rattache || g.moi || g.oui) return false;
+    const R = g.retour || {}; if (R.etat !== 'pret' || R.reel || !g.controle || g.controle.etat !== 'conforme') return false;
+    const buf = GARDE.lire(g.fichier); if (!buf || verifierPdf(buf) || empreinteDe(buf) !== g.empreinte) return false;
+    g.controle = controleDe(buf, ym);   /* refait à cet instant : jamais un oui sur un contrôle périmé */
+    if (g.controle.etat !== 'conforme') { noter(); return false; }
+    g.oui = {empreinte: g.empreinte, mois: ym, at: now(), auto: true};
+    x.historique.push({at: now(), quoi: 'CRA signé conforme à la saisie : Hermes le dépose sur le portail (sans attendre ton oui)'}); noter();
+    await push({title: 'CRA signé de ' + moisDit(ym) + ' conforme : Hermes le dépose', body: TXT(g.controle.dit + ' Dépôt sur le portail dans le quart d’heure ; je te préviens.', 230), url: '/#travail', tag: 'signe-' + ym}).catch(() => {});
+    return true;
+  }
   /* le PDF d'un mois : relu, choisi, vérifié, gardé ; rend true si quelque chose a changé */
   async function garderSigne(ym) {
     const x = D.mois[ym], s = x && craSuivi(ym), rep = pdfRecu(s);
@@ -751,7 +788,7 @@ export function createJours({file, agenda, claude = null, push = async () => [],
       const buf = octetsDe(((await mails.piece(rep.id, ch.piece.attachmentId)) || {}).data), raison = verifierPdf(buf);
       if (raison) return refuser(raison, nom);
       const k = GARDE.garder(buf);
-      s.signe = {message: rep.id, fil: rep.fil, nom, taille: k.taille, autres: ch.autres, fichier: k.fichier, empreinte: k.empreinte, garde: now()};
+      s.signe = {message: rep.id, fil: rep.fil, nom, taille: k.taille, autres: ch.autres, fichier: k.fichier, empreinte: k.empreinte, garde: now(), controle: controleDe(buf, ym)};   /* 0.98.0 : comparé à la saisie dès la garde */
       x.historique.push({at: now(), quoi: 'CRA signé gardé pour le dépôt par Hermes (' + tailleDite(k.taille) + (ch.autres ? ' ; ' + ch.autres + ' autre' + (ch.autres > 1 ? 's' : '') + ' PDF laissé' + (ch.autres > 1 ? 's' : '') + ' de côté' : '') + ')'});
       noter(); return true;
     } catch (e) {
@@ -778,7 +815,7 @@ export function createJours({file, agenda, claude = null, push = async () => [],
   async function garderSignes() {
     if (!GARDE || !suiviPret() || now() < suiviPause) return;
     const ym = moisCourant();
-    for (const m of [ym, moisAvant(ym), moisAvant(moisAvant(ym))]) await garderSigne(m);
+    for (const m of [ym, moisAvant(ym), moisAvant(moisAvant(ym))]) { await garderSigne(m); controlerSigne(m); await ouiAuto(m); }   /* 0.98.0 : comparé à la saisie ; conforme et prêt : déposé sans attendre */
     menageSignes();
   }
   /* le oui tient-il encore ? (sur ce fichier-là, et pas déjà suivi d'un compte rendu de dépôt réel) */
@@ -798,11 +835,16 @@ export function createJours({file, agenda, claude = null, push = async () => [],
       g.retour = {etat, reel, texte: sansAdresse(r.texte, 300), premiere: r.premiere === true && etat === 'depose', at: +r.at || now()};
       const L = moisDit(ym), url = '/#travail', tag = 'signe-' + ym; let avis = null;
       if (etat === 'depose' || etat === 'deja') {
+        if (etat === 'depose' && !D.signePremier) D.signePremier = now();   /* 0.98.0 : un premier dépôt par Hermes a réussi : les suivants partent seuls s'ils sont conformes */
         if (!s.rattache) { s.rattache = now(); s.rattachePar = etat === 'depose' ? 'hermes' : 'portail'; x.historique.push({at: now(), quoi: etat === 'depose' ? 'CRA signé déposé sur le portail par Hermes' : 'CRA signé : déjà sur le portail (vu par Hermes)'}); }
         avis = etat === 'depose' ? {title: g.retour.premiere ? 'Première exécution d’Hermes : CRA signé de ' + L + ' déposé — vérifie sur le portail' : 'CRA signé de ' + L + ' déposé', body: g.retour.premiere ? 'Hermes l’a déposé sur le portail après ton oui. Vérifie-le sur le portail, et dis-moi si quelque chose cloche.' : 'Hermes l’a déposé sur le portail après ton oui.'}
           : {title: 'CRA signé de ' + L + ' : déjà sur le portail', body: 'Hermes l’y a trouvé : rien de déposé en double.'};
       } else if (etat === 'pret') {
-        if (!g.notifiePret) { g.notifiePret = now(); avis = {title: 'CRA signé prêt à déposer : ton oui', body: TXT('CRA de ' + L + ' : Hermes a trouvé où le déposer sur le portail (essai à blanc, rien n’est déposé). Dans JARVIS : « Oui, déposer », ou « Je le fais moi-même ».', 230)}; }
+        controlerSigne(ym);
+        if (await ouiAuto(ym)) g.notifiePret = g.notifiePret || now();   /* 0.98.0 : conforme à la saisie, et pas le premier dépôt : parti sans attendre (il est prévenu) */
+        else if (!g.notifiePret) { g.notifiePret = now(); const C = g.controle || {};
+          avis = C.etat === 'ecart' ? {title: 'CRA signé de ' + L + ' : il ne correspond pas à la saisie', body: TXT(C.dit + ' Rien n’est déposé : regarde dans JARVIS.', 230)}
+            : {title: 'CRA signé prêt à déposer : ton oui', body: TXT('CRA de ' + L + ' : ' + (C.etat === 'conforme' ? 'conforme à la saisie. ' : 'je n’ai pas pu le comparer à la saisie. ') + 'Hermes a trouvé où le déposer sur le portail (essai à blanc, rien n’est déposé). Dans JARVIS : « Oui, déposer », ou « Je le fais moi-même ».', 230)}; }
       } else if (reel) avis = {title: 'CRA signé de ' + L + ' pas déposé : à faire à la main', body: TXT((g.retour.texte || 'Hermes n’a pas pu le déposer.') + ' Le PDF reste gardé.', 230)};
       else if (!g.notifieMain) { g.notifieMain = now(); avis = {title: 'CRA signé de ' + L + ' : à déposer à la main', body: TXT((etat === 'introuvable' ? 'Hermes n’a pas trouvé où le déposer sur le portail. ' : 'Hermes n’a pas pu vérifier le portail. ') + g.retour.texte, 230)}; }
       x.historique.push({at: now(), quoi: 'CRA signé, Hermes ' + (reel ? '(dépôt)' : '(à blanc)') + ' : ' + etat});
@@ -841,7 +883,8 @@ export function createJours({file, agenda, claude = null, push = async () => [],
     const etat = s.rattache ? 'fait' : g.moi ? 'moi' : g.refus ? 'refuse' : g.efface ? 'efface' : !g.fichier ? 'recupere' : ouiTient(g) ? 'oui'
       : !rt ? (craValide ? 'verifie' : 'attend_cra') : rt.etat === 'pret' ? 'pret' : rt.reel ? 'echec' : rt.etat === 'introuvable' ? 'introuvable' : 'echec_blanc';
     return {etat, mois: ym, nom: TXT(g.nom, 200), taille: +g.taille || 0, tailleDite: g.taille ? tailleDite(g.taille) : '', autres: +g.autres || 0, empreinte: g.fichier ? g.empreinte : '', fil: rep.fil,
-      raison: TXT(g.refus || (rt && rt.etat !== 'pret' ? rt.texte : '') || (!g.fichier ? g.erreur : '') || '', 300), par: s.rattachePar || (s.rattache ? 'toi' : ''), le: s.rattache || 0, premiere: !!(rt && rt.premiere)};
+      raison: TXT(g.refus || (rt && rt.etat !== 'pret' ? rt.texte : '') || (!g.fichier ? g.erreur : '') || '', 300), par: s.rattachePar || (s.rattache ? 'toi' : ''), le: s.rattache || 0, premiere: !!(rt && rt.premiere),
+      controle: g.controle ? {etat: g.controle.etat, dit: TXT(g.controle.dit, 300)} : null, auto: !!(g.oui && g.oui.auto)};   /* 0.98.0 */
   }
 
   /* le 24 à midi (rattrapé jusqu'à la fin du mois si le serveur était arrêté) ; le dernier jour à midi, relu */

@@ -10843,7 +10843,8 @@ void main(){
     if (s.erreur) kids.push(h('p', {class: 'jrs-alerte', text: s.erreur}));
     if (s.retour) kids.push(h('p', {class: s.retour.resultat === 'soumise' || s.retour.resultat === 'deja' ? 'jrs-ok' : 'jrs-alerte'}, h('b', {text: 'Hermes : '}), s.retour.texte || s.retour.resultat, s.retour.premiere ? ' Première exécution : vérifie sur le portail ce qui a été saisi.' : ''));
     else if (s.etat === 'valide') kids.push(h('p', {class: 'jrs-ok', text: 'Confirmé : Hermes saisit et soumet ta semaine dans les minutes qui viennent.'}));
-    if (CRA.msg) kids.push(h('p', {class: 'jrs-msg', role: 'status', text: CRA.msg}));
+    /* 27/11/2026 (sa capture) : « Confirmé : Hermes saisit… » ne reste pas sous un compte rendu d'échec : dès qu'Hermes a rendu, c'est son compte rendu qui parle */
+    if (CRA.msg && !(s.retour && s.etat !== 'valide' && /^Confirmé/.test(CRA.msg))) kids.push(h('p', {class: 'jrs-msg', role: 'status', text: CRA.msg}));
     if (s.etat === 'a_la_main' && !s.bloque) kids.push(h('div', {class: 'row jrs-acts'}, btn('Relancer Hermes', () => craAgir('confirmer'), 'sm main cra-relancer')));   /* un nouveau oui = une nouvelle tentative */
     if (s.etat === 'a_valider') {
       kids.push(h('p', {class: 'jrs-rq', text: s.confirmable ? 'Ton oui lance Hermes : il saisit « 1 » pour chaque journée travaillée, rien pour un congé ou un férié, puis soumet la semaine.' : 'Le oui se donne à partir du vendredi (ton raccourci note chaque jour à 11 h).'}));
@@ -10958,6 +10959,7 @@ void main(){
     const trvSigne = (r, detail) => { const s = r.signe; if (!s) return null;
       const l = [s.dit ? h('p', {text: s.dit}) : null,
         detail && s.nom && s.etat !== 'fait' ? h('p', {}, 'Fichier : ', h('b', {text: s.nom}), (s.taille ? ' · ' + s.taille : '') + (s.autres ? ' · ' + s.autres + (s.autres > 1 ? ' autres PDF laissés de côté' : ' autre PDF laissé de côté') : '')) : null,
+        detail && s.controleDit && s.etat !== 'fait' && !s.dit ? h('p', {'data-controle': s.controle || '', text: s.controleDit}) : null,   /* 0.98.0 : le PDF comparé à la saisie */
         detail && s.etat !== 'fait' ? trvLien(s.url) : null].filter(Boolean);
       return l.length ? h('div', {class: 'trv-signe', 'data-signe': s.etat || ''}, l) : null; };
     function trvCarte(r) {
@@ -10979,8 +10981,8 @@ void main(){
           if (oui) { x.signe = Object.assign({}, x.signe, {etat: 'oui', dit: 'Ton oui est noté : Hermes dépose le CRA signé sur le portail (dans le quart d’heure).', empreinte: ''}); x.toi = ''; }
           else { x.signe = {etat: 'moi', mois: x.mois, dit: ''}; x.rattachable = true; x.attend.unshift('CRA signé reçu : à rattacher'); x.toi = 'CRA signé reçu : à rattacher sur le portail (onglet du haut de la page du CRA).'; } } return {ok: true}; };
         const suite = (p, titre, texte) => { p.then((x) => { toast(x && x.ok ? titre : 'Pas noté', x && x.ok ? texte : ((x && x.error) || '')); travailLoad(true); }); return null; };
-        if ((sg.etat === 'pret' || sg.etat === 'echec') && sg.empreinte && r.mois) actions.push(act(sg.etat === 'pret' ? 'Oui, déposer' : 'Réessayer avec Hermes', {tone: 'main', confirm: true, showExtra: true, cost: 'free',
-          ask: 'Hermes dépose ' + quoi + ' sur le portail ?', yes: 'Oui, déposer',
+        if ((sg.etat === 'pret' || sg.etat === 'echec') && sg.empreinte && r.mois) actions.push(act(sg.etat === 'pret' ? (sg.controle === 'ecart' ? 'Déposer quand même' : 'Oui, déposer') : 'Réessayer avec Hermes', {tone: 'main', confirm: true, showExtra: true, cost: 'free',   /* 0.98.0 : un écart avec la saisie change le libellé */
+          ask: (sg.controle === 'ecart' ? 'Le PDF ne correspond pas à la saisie. ' : '') + 'Hermes dépose ' + quoi + ' sur le portail ?', yes: 'Oui, déposer',
           go: () => suite(api && api.signeOui ? api.signeOui(r.mois, sg.empreinte) : Promise.resolve().then(() => maq(true)), 'Ton oui est noté', 'Hermes dépose le CRA signé sur le portail, puis te prévient.')}));
         if (sg.etat === 'pret' && r.mois) actions.push(act('Je le fais moi-même', {tone: 'main2', cost: 'free', go: () => suite(api && api.signeMoi ? api.signeMoi(r.mois) : Promise.resolve().then(() => maq(false)), 'Noté', 'Dépose-le sur le portail, puis « C’est rattaché ».')})); }
       /* 0.94.0 : le CRA signé est reçu : « C’est rattaché » quand il l'a déposé sur le portail (l'étape « Rattaché » passe à faite) */

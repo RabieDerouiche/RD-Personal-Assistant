@@ -54,3 +54,12 @@ d'heure (sauf s'il a déjà touché « C'est rattaché »).
   `travail.mjs` lit désormais les comptes rendus de root à chaque ouverture de Travail (`jours.lireRetours`) : les notes de frais
   en profitent aussi.
 - **Banc de l'app** : la vérification « notification de la page : croix « Fermer » » échouait par course (une autre notification arrivait pendant le clic) ; corrigée dans le banc à la fusion (la notification touchée est marquée).
+
+## 0.98.0 : contrôle du PDF et dépôt sans attendre — à savoir
+
+- **Le lecteur ne connaît qu'un format** (certain) : celui du CRA reçu en novembre 2026 (« Mois : … », une ligne « Total » suivie des valeurs). Un autre modèle de document, ou un scan, rend « pas comparable » : rien d'automatique, son oui.
+- **La signature n'est pas vérifiée** (certain) : le contrôle porte sur le mois et les jours, pas sur la présence d'une signature (une image dans le PDF).
+- **Le dépôt automatique ne s'ouvre qu'après un premier dépôt réussi par Hermes** (`signePremier`). Pour l'arrêter : `sudo systemctl disable --now hermes-portail-cra-signe.timer` (plus aucun essai ni dépôt), ou retirer `signePremier` de `jours.json` (son oui redevient nécessaire). Pas de réglage dans l'app : à ajouter s'il le demande.
+- **Qui peut déclencher un dépôt** (probable) : une réponse dans le fil du mail du CRA (ou sous le même objet) venant d'un destinataire connu, avec un PDF qui porte exactement le bon mois, le bon total et le bon détail. Une adresse usurpée qui enverrait un tel PDF ferait déposer ce document-là : gênant, réparable sur le portail, et il est prévenu à chaque dépôt.
+- **Jours corrigés après coup** : si les jours validés changent, le contrôle est refait ; un oui déjà posé n'est pas retiré (root l'exécute au quart d'heure).
+

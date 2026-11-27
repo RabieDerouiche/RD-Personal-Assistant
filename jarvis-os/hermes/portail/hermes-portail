@@ -1011,7 +1011,15 @@ src, dest, semaine, res, premiere, limite = sys.argv[1:7]
 lignes = [re.sub(r"\x1b\[[0-9;?]*[A-Za-z]", "", l).strip() for l in open(src, encoding="utf-8", errors="replace")]
 corps = [l for l in lignes if l and not l.startswith(("==", "(gardé", "Notes gardées", "Résultat CRA", "session_id")) and not re.match(r"^[-*•]?\s*Appris\s*:", l)]
 refus = [l for l in lignes if l.startswith("Refus") or "verrouillé" in l]
-texte = limite[:650] or (" ".join(refus) if refus else " ".join(corps))[-650:] or "Le passage n’a rien rendu."
+def propre_texte(t, n=650):
+    # 27/11/2026 (sa capture : « t », hrprd.../ROLE_… ») : ni adresse ni chemin de page dans le compte rendu, et jamais coupé au milieu d une phrase
+    t = re.sub(r"\bhttps?://\S+", "(adresse)", t, flags=re.I)
+    t = " ".join("(page)" if re.search(r"[A-Za-z]", m) and (("/" in m and len(m) >= 12) or ("_" in m and "." in m)) else m for m in t.split())
+    if len(t) > n:
+        t = t[-n:]; c = re.search(r"[.!?»]\s+(?=[A-ZÀ-ÝJ«])", t[:250])
+        t = t[c.end():] if c else "… " + t.split(" ", 1)[-1]
+    return t
+texte = limite[:650] or propre_texte(" ".join(refus) if refus else " ".join(corps)) or "Le passage n’a rien rendu."
 tmp = dest + ".tmp"
 fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o640)
 os.write(fd, json.dumps({"semaine": semaine, "resultat": res, "texte": texte, "premiere": premiere == "true" and res == "soumise", "at": int(time.time() * 1000)}, ensure_ascii=False).encode()); os.close(fd)
@@ -1125,7 +1133,15 @@ src, dest, mois, res, fin, premiere, limite = sys.argv[1:8]
 lignes = [re.sub(r"\x1b\[[0-9;?]*[A-Za-z]", "", l).strip() for l in open(src, encoding="utf-8", errors="replace")]
 corps = [l for l in lignes if l and not l.startswith(("==", "(gardé", "Notes gardées", "Résultat", "session_id", "Fin de mission")) and not re.match(r"^[-*•]?\s*Appris\s*:", l)]
 refus = [l for l in lignes if l.startswith("Refus") or "verrouillé" in l]
-texte = limite[:650] or (" ".join(refus) if refus else " ".join(corps))[-650:] or "Le passage n’a rien rendu."
+def propre_texte(t, n=650):
+    # 27/11/2026 (sa capture : « t », hrprd.../ROLE_… ») : ni adresse ni chemin de page dans le compte rendu, et jamais coupé au milieu d une phrase
+    t = re.sub(r"\bhttps?://\S+", "(adresse)", t, flags=re.I)
+    t = " ".join("(page)" if re.search(r"[A-Za-z]", m) and (("/" in m and len(m) >= 12) or ("_" in m and "." in m)) else m for m in t.split())
+    if len(t) > n:
+        t = t[-n:]; c = re.search(r"[.!?»]\s+(?=[A-ZÀ-ÝJ«])", t[:250])
+        t = t[c.end():] if c else "… " + t.split(" ", 1)[-1]
+    return t
+texte = limite[:650] or propre_texte(" ".join(refus) if refus else " ".join(corps)) or "Le passage n’a rien rendu."
 tmp = dest + ".tmp"
 fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o640)
 os.write(fd, json.dumps({"mois": mois, "resultat": res, "fin": fin, "texte": texte, "premiere": premiere == "true" and res == "validee", "auto": True, "at": int(time.time() * 1000)}, ensure_ascii=False).encode()); os.close(fd)

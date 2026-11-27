@@ -811,7 +811,7 @@ autre passage d'Hermes :
 - *la limite du forfait* : coupé avant tout contact avec le portail, l'essai (ou le oui) n'est pas compté et repart une fois
   (`hermes-portail-cra-signe.service`, connue de `limite.py`) ; après contact, ou deux fois : compté, « à faire à la main ».
   *Le coffre verrouillé* : rien n'est compté ni dit, nouvel essai au quart d'heure suivant.
-La skill a une section « CRA signé du client ». À la main : `sudo hermes-portail cra-signe-auto` dit pourquoi il ne fait rien.
+*Depuis la 0.98.0* : le oui peut être posé par JARVIS lui-même (`oui.auto`) quand le PDF correspond à la saisie (contrôle sans IA, `signe-controle.mjs`) et qu'un premier dépôt a déjà réussi ; root ne fait aucune différence : même empreinte, même mois, une tentative par oui. La skill a une section « CRA signé du client ». À la main : `sudo hermes-portail cra-signe-auto` dit pourquoi il ne fait rien.
 Banc : section « CRA signé du client » de `portail.test.sh`.
 
 **Les routines de Chronos, une par une (26/11/2026, 8 h)** :
