@@ -1264,6 +1264,43 @@ srv.listen(0, async () => {
       await q.evaluate(() => document.querySelector('.pm-travail').click()); await q.waitForTimeout(900);
       ok('0.94 : cette ligne ouvre l’espace Travail', await q.evaluate(() => location.hash === '#travail' && !!document.querySelector('.trv-card[data-trv="mois"]')));
       await q.context().close(); }
+    /* 0.97.0 : le CRA signé déposé sur le portail par Hermes après son oui (scénarios « reponses » + « signe ») : la carte « CRA du mois », sa feuille, la ligne de « Pour moi » */
+    { const carte = (q) => q.evaluate(() => { const k = document.querySelector('.trv-card[data-trv="mois"]'); return {fait: k.querySelectorAll('.trv-et .fait').length, bloque: (k.querySelector('.trv-et .bloque') || {}).textContent || '', alerte: [...k.querySelectorAll('.trv-alerte')].map((x) => x.textContent), signe: [...k.querySelectorAll('.trv-signe')].map((x) => x.getAttribute('data-signe') + ' ' + x.textContent), liens: k.querySelectorAll('a').length}; });
+      const feuille = async (q) => { await q.evaluate(() => document.querySelector('.trv-card[data-trv="mois"]').click()); await q.waitForTimeout(700);
+        return q.evaluate(() => ({acts: [...document.querySelectorAll('#sheet .sheet-actions .btn')].map((x) => x.firstChild.textContent.trim()), signe: [...document.querySelectorAll('#sheet .trv-signe')].map((x) => x.getAttribute('data-signe') + ' ' + [...x.querySelectorAll('p')].map((p) => p.textContent).join(' | ')), lien: [...document.querySelectorAll('#sheet .trv-signe a.trv-ouvrir')].map((a) => a.textContent + ' ' + a.getAttribute('href'))})); };
+      const appui = async (q, re) => { await q.evaluate((src) => [...document.querySelectorAll('#sheet .sheet-actions .btn')].find((x) => new RegExp(src).test(x.textContent)).click(), re); await q.waitForTimeout(700); };
+      const toasts = (q) => q.evaluate(() => [...document.querySelectorAll('#toasts .toast')].map((x) => x.textContent).join(' || '));
+      let q = await pageWith({reponses: true, signe: 'pret'}, '#travail'); await q.waitForTimeout(1200);
+      const c = await carte(q), s = await feuille(q);
+      ok('0.97 : CRA signé prêt : la carte dit « À toi : CRA signé reçu : Hermes le dépose sur le portail ? » avec le fichier et sa taille ; « Rattaché » reste en cours', c.fait === 4 && c.alerte.some((x) => /^À toi : CRA signé reçu : Hermes le dépose sur le portail \? « CRA signé\.pdf », 47 Ko\. Il a trouvé où le déposer \(essai à blanc : rien n’est déposé\)\./.test(x)) && c.liens === 0, JSON.stringify(c));
+      ok('0.97 : feuille : « Oui, déposer » puis « Je le fais moi-même » (plus de « C’est rattaché » tant qu’il n’a pas choisi) ; le fichier, sa taille et « Ouvrir le mail »', s.acts[0] === 'Oui, déposer' && s.acts[1] === 'Je le fais moi-même' && !s.acts.includes('C’est rattaché') && s.signe.length === 1 && s.signe[0] === 'pret Fichier : CRA signé.pdf · 47 Ko' && s.lien.join() === 'Ouvrir le mail https://mail.google.com/mail/#all/filcra0001', JSON.stringify(s));
+      await appui(q, '^Oui, déposer');
+      const conf = await q.evaluate(() => ({texte: document.getElementById('sheet').textContent, oui: [...document.querySelectorAll('#sheet .sa-main .btn.danger-fill')].map((x) => x.textContent), fichier: !!document.querySelector('#sheet .trv-signe')}));
+      ok('0.97 : « Oui, déposer » demande une confirmation, en un appui : « Hermes dépose « CRA signé.pdf » (47 Ko) sur le portail ? », le fichier reste affiché, bouton « Oui, déposer »', /Hermes dépose « CRA signé\.pdf » \(47 Ko\) sur le portail \?/.test(conf.texte) && conf.oui.join() === 'Oui, déposer' && conf.fichier, JSON.stringify([conf.oui, conf.fichier]));
+      await q.evaluate(() => document.querySelector('#sheet .sa-main .btn.danger-fill').click()); await q.waitForTimeout(900);
+      const c2 = await carte(q), t2 = await toasts(q), s2 = await feuille(q);
+      ok('0.97 : son oui donné : « Ton oui est noté : Hermes dépose… » dans la carte, plus de « À toi » pour le CRA signé, plus aucun bouton de dépôt', /Ton oui est noté/.test(t2) && c2.signe.length === 1 && /^oui Ton oui est noté : Hermes dépose le CRA signé sur le portail/.test(c2.signe[0]) && !c2.alerte.some((x) => /CRA signé/.test(x)) && !s2.acts.some((x) => /déposer|moi-même|rattaché/i.test(x)), JSON.stringify([t2, c2, s2.acts]));
+      await q.context().close();
+      q = await pageWith({reponses: true, signe: 'pret'}, '#travail'); await q.waitForTimeout(1200); await feuille(q); await appui(q, '^Je le fais moi-même'); await q.waitForTimeout(400);
+      const c3 = await carte(q), t3 = await toasts(q), s3 = await feuille(q);
+      ok('0.97 : « Je le fais moi-même » : l’ancien chemin revient (« à rattacher sur le portail », « C’est rattaché » en premier)', /Dépose-le sur le portail, puis « C’est rattaché »/.test(t3) && c3.alerte.some((x) => /^À toi : CRA signé reçu : à rattacher sur le portail/.test(x)) && s3.acts[0] === 'C’est rattaché' && !s3.acts.includes('Oui, déposer'), JSON.stringify([t3, c3.alerte, s3.acts]));
+      await q.context().close();
+      q = await pageWith({reponses: true, signe: 'pret'}, '#demandes'); await q.waitForTimeout(2600);
+      const l = await q.evaluate(() => [...document.querySelectorAll('.pm-travail')].map((x) => ({t: x.firstElementChild.textContent, toi: x.classList.contains('toi')})));
+      ok('0.97 : « Pour moi » : la ligne de Travail dit « CRA signé reçu : Hermes le dépose sur le portail ? »', l.length === 1 && l[0].toi && l[0].t === 'CRA signé reçu : Hermes le dépose sur le portail ? · Réponse à ton mail de prolongation : à lire', JSON.stringify(l));
+      await q.context().close();
+      q = await pageWith({reponses: true, signe: 'verifie'}, '#travail'); await q.waitForTimeout(1200);
+      const c4 = await carte(q), s4 = await feuille(q);
+      ok('0.97 : tant qu’Hermes vérifie le portail : la carte le dit sans rien lui demander pour le CRA signé ; « C’est rattaché » reste possible, pas de « Oui, déposer »', c4.signe.join() === 'verifie CRA signé reçu : Hermes vérifie le portail…' && !c4.alerte.some((x) => /CRA signé/.test(x)) && s4.acts[0] === 'C’est rattaché' && !s4.acts.includes('Oui, déposer') && /^verifie CRA signé reçu : Hermes vérifie le portail… \| Fichier : CRA signé\.pdf · 47 Ko$/.test(s4.signe[0]), JSON.stringify([c4, s4]));
+      await q.context().close();
+      q = await pageWith({reponses: true, signe: 'echec'}, '#travail'); await q.waitForTimeout(1200);
+      const c5 = await carte(q), s5 = await feuille(q);
+      ok('0.97 : dépôt en échec : « CRA signé pas déposé : à faire à la main » avec la raison, étape « Rattaché » bloquée ; « Réessayer avec Hermes » et « C’est rattaché »', /Rattaché/.test(c5.bloque) && c5.alerte.some((x) => /^À toi : CRA signé pas déposé : à faire à la main\. Le portail a refusé le fichier\. Le PDF reste gardé\./.test(x)) && s5.acts[0] === 'Réessayer avec Hermes' && s5.acts[1] === 'C’est rattaché', JSON.stringify([c5, s5.acts]));
+      await q.context().close();
+      q = await pageWith({reponses: true, signe: 'fait'}, '#travail'); await q.waitForTimeout(1200);
+      const c6 = await carte(q), s6 = await feuille(q);
+      ok('0.97 : déposé par Hermes : 5 étapes sur 5, « CRA signé déposé sur le portail par Hermes le 27/11 à 14 h 05. », plus aucun bouton de dépôt ni de rattachement', c6.fait === 5 && c6.signe.join() === 'fait CRA signé déposé sur le portail par Hermes le 27/11 à 14 h 05.' && !c6.alerte.some((x) => /CRA signé/.test(x)) && !s6.acts.some((x) => /déposer|moi-même|rattaché/i.test(x)), JSON.stringify([c6, s6.acts]));
+      await q.context().close(); }
     { const q = await page('#demandes'); await q.waitForTimeout(2400);
       ok('0.94 : sans rien qui attend dans Travail, « Pour moi » n’a pas de ligne de Travail en plus', await q.evaluate(() => document.querySelectorAll('.pm-travail.toi').length === 0));
       await q.context().close(); }
