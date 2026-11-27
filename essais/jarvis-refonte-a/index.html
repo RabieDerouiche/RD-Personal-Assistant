@@ -44,7 +44,7 @@
   .puce { display: inline-flex; align-items: center; gap: 7px; min-height: 36px; min-width: 0; padding: 0 12px; border: 1px solid var(--line); border-radius: 99px; background: var(--glass2); font-size: 13px; font-weight: 600; white-space: nowrap; position: relative; }
   .puce::after { content: ""; position: absolute; inset: -5px 0; }
   .puce span { overflow: hidden; text-overflow: ellipsis; }
-  .puce.large { flex: 1 1 auto; } .puce.fixe { flex: 0 0 auto; } .puce em { font-style: normal; color: var(--muted); }
+  .puce.large { flex: 1 1 auto; } .puce .ch { margin-left: auto; font-size: 16px; line-height: 1; } .puce.fixe { flex: 0 0 auto; } .puce em { font-style: normal; color: var(--muted); }
   .pt { flex: 0 0 9px; width: 9px; height: 9px; border-radius: 50%; background: rgb(var(--vert)); display: inline-block; }
   .pt.e-venir, .pt.e-cours, .pt.e-lire { background: rgb(var(--c1)); } .pt.e-oui { background: rgb(var(--amb)); } .pt.e-err { background: rgb(var(--red)); } .pt.e-pause { background: transparent; border: 1.5px dashed rgb(var(--gris)); }
 
@@ -122,8 +122,8 @@
   .carte .act { display: grid; grid-template-columns: 1.5fr 1fr 1fr; gap: 8px; }
   .vide-msg { min-height: 62px; display: flex; align-items: center; gap: 10px; padding: 8px 14px; border: 1px dashed var(--line2); border-radius: 18px; color: rgb(var(--vert)); font-weight: 600; }
   .vide-msg span { color: var(--fg); }
-  .glisse-i { position: absolute; top: -12px; z-index: 2; padding: 2px 10px; border-radius: 99px; font: 700 12px var(--display); opacity: 0; }
-  .glisse-i.o { right: 12px; background: rgb(var(--vert)); color: #022; } .glisse-i.t { left: 12px; background: rgb(var(--gris)); color: #0b1020; }
+  .glisse-i { position: absolute; top: -13px; z-index: 2; padding: 3px 12px; border-radius: 99px; font: 700 13px var(--display); font-style: normal; letter-spacing: .06em; text-transform: uppercase; opacity: 0; }
+  .glisse-i.o { left: 14px; background: rgb(var(--vert)); color: #022; } .glisse-i.t { right: 14px; background: rgb(var(--gris)); color: #0b1020; }
 
   /* ---- boutons et briques communes ---- */
   .btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 44px; padding: 0 14px; border: 1px solid var(--line2); border-radius: 14px; background: rgba(125, 211, 252, .07); font-weight: 600; font-size: 15px; white-space: nowrap; text-align: center; }
@@ -245,7 +245,7 @@
   .p-saisie .rond.mic.on { box-shadow: 0 0 0 6px rgba(var(--c1), .25), 0 0 26px rgba(var(--c1), .8); }
   .p-saisie .env { width: 44px; height: 44px; border: 0; background: none; color: rgb(var(--c2)); padding: 0; display: grid; place-items: center; }
 
-  .toast { position: absolute; left: 0; right: 0; margin: 0 auto; width: fit-content; bottom: calc(var(--sb) + 20px); z-index: 40; max-width: calc(100% - 32px); padding: 10px 16px; border: 1px solid var(--line2); border-radius: 14px; background: rgba(10, 18, 36, .96); box-shadow: 0 8px 30px rgba(0, 0, 0, .5); font-size: 14.5px; font-weight: 600; text-align: center; transform: translateY(30px); opacity: 0; pointer-events: none; transition: transform .25s, opacity .25s; }
+  .toast { position: absolute; left: 0; right: 0; margin: 0 auto; width: fit-content; top: calc(var(--st) + 10px); z-index: 40; max-width: calc(100% - 32px); padding: 10px 16px; border: 1px solid var(--line2); border-radius: 14px; background: rgba(10, 18, 36, .96); box-shadow: 0 8px 30px rgba(0, 0, 0, .5); font-size: 14.5px; font-weight: 600; text-align: center; transform: translateY(-30px); opacity: 0; pointer-events: none; transition: transform .25s, opacity .25s; }
   .toast.on { transform: none; opacity: 1; }
 
   @media (min-height: 880px) { .legende { display: flex; } }
@@ -273,7 +273,7 @@
       <button class="rond" data-a="ouvrir" data-v="reglages" aria-label="Réglages"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M18.7 5.3l-2.1 2.1M7.4 16.6l-2.1 2.1"/></svg></button>
     </div>
     <div class="puces">
-      <button class="puce large" data-a="ouvrir" data-v="tourne" id="p-hermes"><i class="pt" id="p-hermes-pt"></i><span id="p-hermes-t">Hermes actif</span></button>
+      <button class="puce large" data-a="ouvrir" data-v="tourne" id="p-hermes"><i class="pt" id="p-hermes-pt"></i><span id="p-hermes-t">Hermes actif</span><em class="ch">›</em></button>
       <button class="puce fixe" data-a="domaine" data-v="agenda"><span><em>17 h 30</em> Pédiatre</span></button>
     </div>
   </header>
@@ -392,7 +392,7 @@
   };
   var mailLu = false;
   var SUJ = {
-    sinistre: { nom: 'Sinistre dégât des eaux', sous: 'Un sujet, une fiche : le dossier, ses échéances, son mail', ech: [['Envoyer le devis à l’assurance', 'avant le 01/12 · dans 5 jours', 0], ['Passage de l’expert', 'le 08/12 · dans 12 jours', 0]] },
+    sinistre: { nom: 'Sinistre dégât des eaux', sous: 'Le dossier, ses échéances, son mail : une seule fiche', ech: [['Envoyer le devis à l’assurance', 'avant le 01/12 · dans 5 jours', 0], ['Passage de l’expert', 'le 08/12 · dans 12 jours', 0]] },
     passeport: { nom: 'Passeport à renouveler', sous: 'Un sujet, une fiche', ech: [['Prendre le rendez-vous en mairie', 'avant le 01/12 · dans 5 jours', 0]] }
   };
   var S = [
@@ -415,7 +415,7 @@
   (function () { var FX = [1010, 1010, 1010, 1025, 1025, 1025, 1040, 1040, 1040, 1040, 1055, 1055, 1055, 1055, 1070, 1070, 1070, 1070, 1085, 1085, 1085, 1085, 1085, 930], CT = [690, 410, 455, 520, 480, 610, 560, 720, 640, 430, 505, 470, 745, 395, 440, 535, 460, 590, 515, 680, 655, 420, 540, 250];
     for (var i = 0; i < 24; i++) { var m = (11 + i) % 12, a = 2024 + Math.floor((11 + i) / 12); MOIS.push({ n: MN[m], a: a, fx: FX[i], ct: CT[i] }); } MOIS[23].encours = 1; })();
   var moisFin = 23, moisSel = 23;
-  function nb(s) { return s.replace(/(\d) (h|min|€)(?=[\s<.,:;)»]|$)/g, '$1\u00a0$2').replace(/(\d\u00a0(?:h|min)) (\d\d)(?!\d)/g, '$1\u00a0$2'); }
+  function nb(s) { return s.replace(/« /g, '«\u00a0').replace(/ ([»:;?!])/g, '\u00a0$1').replace(/(\d) (h|min|€)(?=[\s<.,:;)»]|$)/g, '$1\u00a0$2').replace(/(\d\u00a0(?:h|min)) (\d\d)(?!\d)/g, '$1\u00a0$2'); }
   function eur(n) { return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + ' €'; }
 
   /* ================= horaires en clair ================= */
@@ -701,7 +701,7 @@
     var s = SUJ[id], h = '<div class="bloc">';
     if (id === 'sinistre') h += lg({ ico: 'dossier', t: 'Le dossier', s: '6 pièces : déclaration, photos, devis du plombier', a: 'domaine', v: 'papiers' });
     s.ech.forEach(function (e, i) { h += '<button class="lg" role="checkbox" aria-checked="' + (!!e[2]) + '" data-a="ech" data-v="' + id + '" data-arg="' + i + '"><span class="case">' + ic('ok', 16) + '</span><span class="t"><b>' + e[0] + '</b><small>' + e[1] + '</small></span></button>'; });
-    if (id === 'sinistre') h += lg({ ico: 'mail', t: 'Mail en attente de réponse', s: '« Demande de devis » envoyé lundi au plombier. Pas encore de réponse.', e: tag('amb', 'attend') }) + '</div><div class="rang"><button class="btn" data-a="dire" data-v="Relance préparée : tu la verras dans « Attend ton oui ».">Préparer une relance</button><button class="btn" data-a="parler">En parler à JARVIS</button></div>';
+    if (id === 'sinistre') h += lg({ ico: 'mail', t: 'Mail en attente de réponse', s: '« Demande de devis » envoyé lundi au plombier. Pas encore de réponse.', e: tag('amb', 'sans réponse') }) + '</div><div class="rang"><button class="btn" data-a="dire" data-v="Relance préparée : tu la verras dans « Attend ton oui ».">Préparer une relance</button><button class="btn" data-a="parler">En parler à JARVIS</button></div>';
     else h += '</div><div class="rang"><button class="btn" data-a="dire" data-v="JARVIS cherche un créneau et te le propose.">Chercher un créneau</button><button class="btn" data-a="parler">En parler à JARVIS</button></div>';
     return { t: s.nom, s: s.sous, h: h };
   };
@@ -722,8 +722,8 @@
   DV.travail = function () {
     var a = carte('cra-sem'), b = carte('cra-depot'), c = carte('ndf-tt');
     function e(x) { return x.st === 'attend' ? tag('amb', 'ton oui') : x.st === 'tard' ? tag('gris', 'plus tard') : tag('vert', 'fait'); }
-    return { t: 'Travail', s: 'CRA et notes de frais', h: '<h3 class="h3">CRA</h3><div class="bloc">' + lg({ ico: 'boucle', t: 'CRA du mois', s: 'CRA signé reçu à 14 h 29. Reste le dépôt sur le portail.', e: e(b), a: 'ouvrir', v: 'chaine', arg: 'cra' }) + lg({ ico: 'cal', t: 'CRA de la semaine', s: '4 jours travaillés, 1 congé', e: e(a), a: 'ouvrir', v: 'chaine', arg: 'cra' }) + '</div>' +
-      '<h3 class="h3">Notes de frais</h3><div class="bloc">' + lg({ ico: 'doc', t: 'Télétravail de novembre', s: 'Prête, vérifiée à blanc', e: e(c), a: 'ouvrir', v: 'chaine', arg: 'tt' }) + lg({ ico: 'doc', t: 'Box internet', s: 'Créée le 15/11 · prochaine le 15/12', e: tag('vert', 'fait'), a: 'ouvrir', v: 'chaine', arg: 'box' }) + '</div>' +
+    return { t: 'Travail', s: 'CRA et notes de frais', h: '<h3 class="h3">CRA</h3><div class="bloc">' + lg({ ico: 'boucle', t: 'CRA du mois', s: b.st === 'oui' ? 'CRA signé reçu, puis déposé sur le portail.' : 'CRA signé reçu à 14 h 29. Reste le dépôt sur le portail.', e: e(b), a: 'ouvrir', v: 'chaine', arg: 'cra' }) + lg({ ico: 'cal', t: 'CRA de la semaine', s: '4 jours travaillés, 1 congé', e: e(a), a: 'ouvrir', v: 'chaine', arg: 'cra' }) + '</div>' +
+      '<h3 class="h3">Notes de frais</h3><div class="bloc">' + lg({ ico: 'doc', t: 'Télétravail de novembre', s: c.st === 'oui' ? 'Validée, créée sur le portail' : 'Prête, vérifiée à blanc', e: e(c), a: 'ouvrir', v: 'chaine', arg: 'tt' }) + lg({ ico: 'doc', t: 'Box internet', s: 'Créée le 15/11 · prochaine le 15/12', e: tag('vert', 'fait'), a: 'ouvrir', v: 'chaine', arg: 'box' }) + '</div>' +
       '<h3 class="h3">Mails suivis</h3><div class="bloc">' + lg({ ico: 'mail', t: '« Prolongation de mission »', s: 'Réponse à 11 h 17 : « prolongé pour décembre »', e: mailLu ? tag('vert', 'lu') : tag('amb', 'à lire'), a: 'ouvrir', v: 'mails' }) + '</div>' };
   };
   DV.papiers = function () {
