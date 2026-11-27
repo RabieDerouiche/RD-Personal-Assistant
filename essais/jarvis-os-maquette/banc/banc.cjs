@@ -352,8 +352,6 @@ srv.listen(0, async () => {
       ok('une par une : changer de rubrique referme le mode (au retour, toute la liste)', await q.evaluate(() => !document.querySelector('.fc-view') && !!document.getElementById('fc-start')));
       await q.context().close(); }
     { const q = await page('#agenda');
-      /* 0.93.0 : le rendez-vous d'exemple est à J+6 ; à partir du 25, il tombe le mois suivant : le banc y va (avant, la vérification échouait en fin de mois) */
-      { const d = new Date(); d.setHours(12, 0, 0, 0); const m0 = d.getMonth(); d.setDate(d.getDate() + 6); if (d.getMonth() !== m0) { await q.evaluate(() => document.querySelector('.cal-head button[aria-label="Mois suivant"]').click()); await q.waitForTimeout(500); } }
       ok('agenda : le rendez-vous écrit aussi dans Échéances n\'est listé qu\'une fois dans le mois, avec le bot qui le suit', await q.evaluate(() => { const rows = [...document.querySelectorAll('#dir .mlist .dl-row')].filter((r) => /notaire/i.test(r.textContent)); return rows.length === 1 && /14h30/.test(rows[0].textContent) && /Iris/.test(rows[0].textContent); }));
       await q.context().close(); }
     /* agenda plus vivant (16/11/2026) */
