@@ -12810,6 +12810,55 @@ void main(){
     window.__sujets93 = {lier: (label, objet, noms, texte) => { const k = sjLier(label, objet, (noms || []).map(sjSujet), texte); return k ? k.nom : null; }, mots: (t) => [...sjMots(t)]};
   }
 
+  /* ================= ESSAI « pile » (27/11/2026, son QCM : aucune des trois maquettes, « la seule chose pas trop mal est la façon d'afficher
+     les Pour moi dans la maquette A » ; puis « Montre-moi d'abord »). Rien ne change dans l'app : ce bloc ne s'active qu'avec « ?pile=1 »
+     dans l'adresse. Il ne réécrit rien : après le rendu de « Pour moi », la section « À décider » montre UNE carte à la fois, les suivantes
+     dépassent derrière (une pile), avec « Plus tard » (la carte passe sous la pile ; rien n'est écrit), « Précédente », un compteur, et
+     « Tout voir en liste » qui rend la liste d'aujourd'hui. La ligne de Travail qui l'attend (« CRA signé reçu : … ? ») entre dans la pile.
+     Glisser à gauche = « Plus tard », à droite = « Précédente » ; aucun geste ne dit oui : le oui reste un bouton de la carte. ================= */
+  { let pileOn = false; try { pileOn = new URLSearchParams(location.search).get('pile') === '1'; } catch (e) { /* rien */ }
+    if (pileOn) {
+      document.head.append(h('style', {text: '.pile-h{display:flex;align-items:center;gap:10px;margin:2px 0 14px}.pile-k{font:700 12px var(--display);letter-spacing:.2em;text-transform:uppercase;color:#fbbf24}'
+        + '.pile-n{display:inline-grid;place-items:center;min-width:26px;height:26px;padding:0 7px;border-radius:13px;background:#fbbf24;color:#1a1204;font:700 13px var(--display)}.pile-pos{margin-left:auto;color:var(--muted);font:600 13px var(--sans)}'
+        + '.pm-list.pile{position:relative;display:block;padding-top:20px}.pm-list.pile>.pile-g{position:absolute;left:0;right:0;top:0;height:70px;border-radius:22px;border:1px solid rgba(251,191,36,.42);background:linear-gradient(180deg,rgba(251,191,36,.10),rgba(var(--c1),.04));pointer-events:none}'
+        + '.pm-list.pile>.pile-g.g2{margin:10px 12px 0;opacity:.95}.pm-list.pile>.pile-g.g3{margin:0 28px;opacity:.6}.pm-list.pile>.pm-travail.pile-top{padding:20px 18px;min-height:96px;text-align:left;background:linear-gradient(180deg,rgba(18,22,44,.98),rgba(12,14,30,.98))}.pm-list.pile>.pile-top{background-color:rgb(12,14,30)}'
+        + '.pm-list.pile>.pm-travail.pile-top{display:flex;width:100%;box-sizing:border-box}.pm-list.pile>.pile-top{position:relative;z-index:1;margin:0;border-color:rgba(251,191,36,.5);box-shadow:0 18px 40px -22px rgba(251,191,36,.55),0 0 0 1px rgba(251,191,36,.12) inset;touch-action:pan-y;transition:transform .18s ease,opacity .18s ease}'
+        + '.pm-list.pile>.pile-top.va-g{transform:translateX(-42px) rotate(-2deg);opacity:.2}.pm-list.pile>.pile-top.va-d{transform:translateX(42px) rotate(2deg);opacity:.2}'
+        + '.pile-bar{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}.pile-bar .btn{min-height:48px;justify-content:center}.pile-liste{display:block;width:100%;margin-top:6px;min-height:44px;background:none;border:0;color:var(--muted);font:600 13.5px var(--sans);text-decoration:underline;text-underline-offset:3px;cursor:pointer}'
+        + '@media (prefers-reduced-motion:reduce){.pm-list.pile>.pile-top{transition:none}}'}));
+      const PILE = {i: 0, liste: false};
+      const VD_PILE = VIEWS.demandes;
+      VIEWS.demandes = (el) => {
+        VD_PILE(el);
+        const sec = [...el.querySelectorAll('section.pm-sec')].find((x) => { const t = x.querySelector('h2'); return !x.hidden && !!t && t.textContent.trim() === 'À décider'; });
+        const list = sec && sec.querySelector(':scope > .pm-list'); if (!list) return;
+        const tr = el.querySelector('.pm-travail.toi'); if (tr && !PILE.liste) list.prepend(tr);   /* ce qui l'attend dans Travail entre dans la pile */
+        const cartes = [...list.children].filter((c) => !c.hidden), n = cartes.length; if (!n) return;
+        const tete = sec.querySelector(':scope > .panel-h');
+        const bascule = h('button', {type: 'button', class: 'pile-liste', onclick: () => { PILE.liste = !PILE.liste; renderView(true); }}, PILE.liste ? 'Une décision à la fois' : 'Tout voir en liste');
+        if (PILE.liste) { sec.append(bascule); return; }
+        const pos = h('span', {class: 'pile-pos'});
+        const enTete = h('div', {class: 'pile-h', 'data-pile': String(n)}, h('span', {class: 'pile-k', text: 'Attend ton oui'}), h('span', {class: 'pile-n', text: String(n)}), pos);
+        if (tete) tete.replaceWith(enTete); else list.before(enTete);
+        list.classList.add('pile'); { const une = el.querySelector('.fc-start'); if (une) une.hidden = true; }   /* « Traiter une par une » fait double emploi avec la pile */
+        if (n > 2) list.prepend(h('div', {class: 'pile-g g3', 'aria-hidden': 'true'}));
+        if (n > 1) list.prepend(h('div', {class: 'pile-g g2', 'aria-hidden': 'true'}));
+        const montrer = (sens) => {
+          PILE.i = ((PILE.i % n) + n) % n;
+          cartes.forEach((c, k) => { c.hidden = k !== PILE.i; c.classList.toggle('pile-top', k === PILE.i); c.classList.remove('va-g', 'va-d'); });
+          pos.textContent = (PILE.i + 1) + ' sur ' + n;
+          const c = cartes[PILE.i]; if (sens && c && c.animate && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) c.animate([{transform: 'translateY(-10px) scale(.97)', opacity: .4}, {transform: 'none', opacity: 1}], {duration: 180, easing: 'ease-out'});
+        };
+        const aller = (d) => { if (n < 2) return; const c = cartes[PILE.i]; c.classList.add(d > 0 ? 'va-g' : 'va-d'); setTimeout(() => { PILE.i += d; montrer(true); }, 150); };
+        /* glisser : à gauche « Plus tard », à droite « Précédente » ; jamais un oui */
+        let x0 = null, y0 = 0;
+        list.addEventListener('touchstart', (e) => { const t = e.touches[0]; x0 = t.clientX; y0 = t.clientY; }, {passive: true});
+        list.addEventListener('touchend', (e) => { if (x0 == null) return; const t = e.changedTouches[0], dx = t.clientX - x0, dy = t.clientY - y0; x0 = null; if (Math.abs(dx) > 60 && Math.abs(dx) > 1.5 * Math.abs(dy)) aller(dx < 0 ? 1 : -1); }, {passive: true});
+        sec.append(n > 1 ? h('div', {class: 'pile-bar'}, btn('Précédente', () => aller(-1), ''), btn('Plus tard', () => aller(1), '')) : null, bascule);
+        montrer(false);
+      };
+    } }
+
   boot();
 })();
 </script>
