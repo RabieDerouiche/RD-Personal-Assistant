@@ -130,3 +130,9 @@ pas commencé), 6. le dépôt du CRA signé sur le portail par Hermes après son
 - **CRA de la semaine** : il voit encore l'erreur parce qu'il n'a pas touché « Relancer Hermes » (rien ne repart seul) : redit. À regarder au prochain compte rendu du serveur.
 - Bancs de la 0.99.0 en cours : `scratchpad/g/resultat5.txt` (serveur 434 passé ; portail, app). Ensuite : fusion dans main, message à « Serveur JARVIS 2 » (plan déjà écrit : `docs/demandes-serveur-en-attente.md`).
 
+## État au 28/11/2026, 1 h
+
+- **Pile « Attend ton oui » : dans l'app** (son oui au QCM), avec cinq vérifications au banc ; banc complet de l'app en cours (`scratchpad/g/resultat6.txt`).
+- **Accueil** : trois essais refusés (icônes ; tuiles sous le globe en argent ; tuiles autour d'un globe recoloré : « du recoloriage, ce que je déteste le plus »), retirés du code. **À faire, sans se presser** : plusieurs propositions qui repensent l'ORGANISATION de l'accueil, dans la charte actuelle (aucune teinte changée) : maquettes et captures d'abord. Ce qu'il veut : des tuiles qui disent quelque chose et mènent aux blocs (Travail, Routines, Papiers…), autour du globe ; Réglages accessible ; un globe qui évolue (par exemple : ce qu'il représente, pas sa couleur).
+- **Ordre** : 1. banc de l'app vert → demande de fusion de la 0.99.0 → message à « Serveur JARVIS 2 » (plan déjà écrit) ; 2. les propositions d'accueil.
+

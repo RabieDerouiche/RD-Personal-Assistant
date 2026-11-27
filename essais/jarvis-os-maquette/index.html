@@ -12861,53 +12861,6 @@ void main(){
       };
     } }
 
-  /* ================= ESSAI « accès », 3e proposition (27 et 28/11/2026). Ses mots, dans l'ordre : « garde le même thème mais rajoute plus
-     d'icônes ou de tuiles qui emmènent vers les blocs comme Travail, Routines, Papiers… ; rajoute Réglages quelque part » ; huit icônes sous le
-     globe : « non, je veux des trucs comme Argent, rendez-vous, et un peu moins de ce bleu, plus classe » ; des tuiles sous le globe, en argent :
-     « non, je veux dire AUTOUR du globe, et le globe lui-même, fais-le évoluer, reshape la home un peu, mais pas des trucs ternes : du flashy,
-     un truc qui hurle IA futuriste, shiny ». Rien ne change dans l'app sans « ?acces=1 » dans l'adresse.
-     - autour du globe : six tuiles au lieu de quatre (Agenda, Météo, Travail, Hermes, Pour toi, Argent), reliées au globe comme aujourd'hui ;
-       sous le globe, trois de plus (Papiers, Achats, Réglages). Travail, Hermes, Papiers et Achats reprennent le chiffre et la ligne de
-       leur tuile d'Espaces (mêmes données, même appui) ;
-     - le globe : plus grand, sa teinte glisse du cyan au violet et au rose, un anneau irisé tourne autour, un halo bat derrière ;
-     - chaque tuile a sa couleur de néon (cyan, violet, rose, émeraude, ambre, or), une bordure en dégradé, un reflet qui la traverse ;
-       l'heure et « Bonsoir » passent en dégradé. Mouvements coupés si le téléphone demande moins d'animations. ================= */
-  { let accesOn = false; try { accesOn = new URLSearchParams(location.search).get('acces') === '1'; } catch (e) { /* rien */ }
-    if (accesOn) {
-      const VERRE = 'rgba(5,7,22,.80)';
-      document.head.append(h('style', {text: '.hud-x .hud-core{height:520px}'
-        + '.hud-x .holo-stage canvas{filter:saturate(1.55) brightness(1.18);animation:hxteinte 9s ease-in-out infinite}@keyframes hxteinte{0%,100%{filter:saturate(1.55) brightness(1.18) hue-rotate(-28deg)}50%{filter:saturate(1.7) brightness(1.25) hue-rotate(82deg)}}'
-        + '.hud-x .hud-core::before{content:"";position:absolute;left:50%;top:50%;width:300px;height:300px;margin:-150px 0 0 -150px;border-radius:50%;background:conic-gradient(from 0deg,#22d3ee,#a78bfa,#f472b6,#fbbf24,#34d399,#22d3ee);-webkit-mask:radial-gradient(closest-side,transparent 91%,#000 92.5%,#000 96%,transparent 97.5%);mask:radial-gradient(closest-side,transparent 91%,#000 92.5%,#000 96%,transparent 97.5%);filter:drop-shadow(0 0 10px rgba(167,139,250,.9));opacity:.9;animation:hxtour 14s linear infinite;pointer-events:none}'
-        + '.hud-x .hud-core::after{content:"";position:absolute;left:50%;top:50%;width:380px;height:380px;margin:-190px 0 0 -190px;border-radius:50%;background:radial-gradient(closest-side,rgba(167,139,250,.30),rgba(244,114,182,.14) 55%,transparent 72%);animation:hxhalo 3.6s ease-in-out infinite;pointer-events:none;z-index:0}'
-        + '@keyframes hxtour{to{transform:rotate(360deg)}}@keyframes hxhalo{50%{transform:scale(1.09);opacity:.65}}'
-        + '.hud-x .hud-ro{--a:34,211,238;--a2:167,139,250;width:136px;border:1.5px solid transparent;background:linear-gradient(110deg,transparent 38%,rgba(255,255,255,.16) 50%,transparent 62%) padding-box,linear-gradient(' + VERRE + ',' + VERRE + ') padding-box,linear-gradient(135deg,rgb(var(--a)),rgba(var(--a),.18) 42%,rgba(var(--a2),.25) 62%,rgb(var(--a2))) border-box;background-size:260% 100%,auto,auto;background-position:140% 0,0 0,0 0;box-shadow:0 0 24px rgba(var(--a),.38),inset 0 0 18px rgba(var(--a),.14);animation:hudhover 5s ease-in-out infinite,hxreflet 5.5s ease-in-out infinite}'
-        + '.hud-x.hud .hud-ro,.hud-x.hud .hud-ro:hover,.hud-x.hud .hud-ro:focus{background:linear-gradient(110deg,transparent 38%,rgba(255,255,255,.16) 50%,transparent 62%) padding-box,linear-gradient(' + VERRE + ',' + VERRE + ') padding-box,linear-gradient(135deg,rgb(var(--a)),rgba(var(--a),.18) 42%,rgba(var(--a2),.25) 62%,rgb(var(--a2))) border-box;background-size:260% 100%,auto,auto;width:136px}'
-        + '@keyframes hxreflet{0%,55%{background-position:140% 0,0 0,0 0}100%{background-position:-60% 0,0 0,0 0}}'
-        + '.hud-x .hud-ro::before,.hud-x .hud-ro::after{border-color:rgb(var(--a))}.hud-x .hud-ro small{color:rgb(var(--a));text-shadow:0 0 10px rgba(var(--a),.8)}.hud-x .hud-ro b{color:#fff;text-shadow:0 0 14px rgba(var(--a),.55)}'
-        + '.hud-x .hud-ro.q-tr{--a:167,139,250;--a2:244,114,182}.hud-x .hud-ro.q-ml{--a:244,114,182;--a2:251,191,36;left:0;top:calc(50% - 34px);animation-delay:-.6s,-1s}.hud-x .hud-ro.q-mr{--a:52,211,153;--a2:34,211,238;right:0;top:calc(50% - 34px);animation-delay:-3s,-2.4s}.hud-x.hud .hud-ro.q-ml,.hud-x.hud .hud-ro.q-mr{width:116px;padding:7px 9px 8px}.hud-x.hud .hud-ro.q-ml b,.hud-x.hud .hud-ro.q-mr b{font-size:15px}'
-        + '.hud-x .hud-ro.q-bl{--a:251,191,36;--a2:244,114,182}.hud-x .hud-ro.q-br{--a:250,204,21;--a2:52,211,153}.hud-x .hud-ro.amb{--a:251,191,36;--a2:244,114,182}.hud-x .hud-ro.amb b{color:#fde68a}'
-        + '.hud-x .hud-ro.q-tl,.hud-x .hud-ro.q-tr{top:0}.hud-x .hud-ro.q-bl,.hud-x .hud-ro.q-br{bottom:0}'
-        + '.hud-x .hud-lines path{stroke:#e9d5ff}.hud-x .hud-lines{filter:drop-shadow(0 0 4px rgba(167,139,250,.95))}'
-        + '.hud-x .hud-clock{background:linear-gradient(92deg,#67e8f9,#a78bfa 55%,#f472b6);-webkit-background-clip:text;background-clip:text;color:transparent;text-shadow:none;filter:drop-shadow(0 0 14px rgba(167,139,250,.55))}.hud-x .hud-clock small{color:#f0abfc;-webkit-text-fill-color:#f0abfc}'
-        + '.hud-x .hud-hi{background:linear-gradient(92deg,#67e8f9,#a78bfa,#f472b6);-webkit-background-clip:text;background-clip:text;color:transparent}.hud-x .hud-on{color:#c4b5fd}'
-        + '.hud-dock{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:16px 0 4px}.hud-x .hud-dock .hud-ro{position:relative;width:auto;left:auto;right:auto;top:auto;bottom:auto}.hud-x.hud .hud-dock .hud-ro{width:auto}.hud-x .hud-dock .hud-ro b{font-size:15px}'
-        + '.hud-x .hud-dock .hud-ro:nth-child(1){--a:96,165,250;--a2:167,139,250}.hud-x .hud-dock .hud-ro:nth-child(2){--a:244,114,182;--a2:167,139,250;animation-delay:-2s,-3.2s}.hud-x .hud-dock .hud-ro:nth-child(3){--a:148,163,184;--a2:34,211,238;animation-delay:-4s,-1.6s}'
-        + '@media (prefers-reduced-motion: reduce){.hud-x .holo-stage canvas,.hud-x .hud-core::before,.hud-x .hud-core::after,.hud-x .hud-ro{animation:none}}'}));
-      const VA_ACC = VIEWS.accueil;
-      VIEWS.accueil = (el) => {
-        VA_ACC(el);
-        const hud = el.querySelector('section.hud'), core = hud && hud.querySelector('.hud-core'); if (!core || hud.classList.contains('hud-x')) return;
-        hud.classList.add('hud-x');
-        const tmp = h('div'); try { VIEWS.espaces(tmp); } catch (e) { /* les tuiles d'Espaces manquent : les tuiles de plus aussi */ }
-        const de = (id, nom, pos) => { const t = tmp.querySelector('.esp-tile[data-go="' + id + '"]'); if (!t) return null; const tx = (c) => ((t.querySelector(c) || {}).textContent || '').trim();
-          return h('button', {type: 'button', class: 'hud-ro' + (pos ? ' q-' + pos : '') + (t.classList.contains('amb') ? ' amb' : ''), 'data-k': nom, onclick: () => go(id)}, h('small', {text: nom}), h('b', {text: tx('.esp-v') || '—'}), h('span', {text: tx('.esp-s')})); };
-        core.append(de('travail', 'TRAVAIL', 'ml'), de('equipe', 'HERMES', 'mr'));
-        const regl = h('button', {type: 'button', class: 'hud-ro', 'data-k': 'RÉGLAGES', onclick: () => go('reglages')}, h('small', {text: 'RÉGLAGES'}), h('b', {text: 'Serveur'}), h('span', {text: 'voix, Google, mémoire'}));
-        core.after(h('div', {class: 'hud-dock'}, de('papiers', 'PAPIERS', ''), de('achats', 'ACHATS', ''), regl));
-        requestAnimationFrame(() => requestAnimationFrame(() => { try { hudLines(); } catch (e) { /* rien */ } }));
-      };
-    } }
-
   boot();
 })();
 </script>
