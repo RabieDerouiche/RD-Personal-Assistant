@@ -1972,6 +1972,8 @@ srv.listen(0, async () => {
         /^1 sur \d+$/.test(fcn.compte) && fcn.lies === 0 && (await cartes()).length === nAv && (await cartes()).filter((c) => c.sujet).length >= 3, JSON.stringify(fcn));
       /* l'accueil : un sujet n'y est qu'une fois, et le même compte */
       await q.evaluate(() => { location.hash = ''; }); await q.waitForTimeout(1500);
+      /* le chiffre de l'accueil compte jusqu'à sa valeur (0.55.0) : attendre qu'il y soit, pas un délai fixe (lu trop tôt : « 5 », « 14 » pour 23) */
+      await q.waitForFunction((n) => ((document.querySelector('.hud-ro.q-bl b') || {}).textContent || '').startsWith(String(n)), cpt.badge, {timeout: 8000}).catch(() => {});
       const acc = await q.evaluate(() => ({t: document.getElementById('view').innerText, hud: (document.querySelector('.hud-ro.q-bl b') || {}).textContent || ''}));
       ok('0.93 : accueil : le même compte « pour toi » que la pastille ; un sujet n’y est pas deux fois', acc.hud.startsWith(String(cpt.badge)) && (acc.t.match(/Devis du plombier|Déclarer le sinistre/g) || []).length <= 1 && (acc.t.match(/Offre de prêt Gamma|Pièces pour le rachat/g) || []).length <= 1, JSON.stringify([acc.hud, cpt.badge]));
       /* la règle seule (noms inventés) */
