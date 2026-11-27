@@ -117,3 +117,9 @@ pas commencé), 6. le dépôt du CRA signé sur le portail par Hermes après son
 - **Travailler dans la copie principale** (`/home/user/RD-Personal-Assistant`) : la copie de travail de l'agent (`.claude/worktrees/agent-a87e…`) est dépassée, ne plus s'en servir.
 - Bancs repassés avant la fusion de la 0.99.0 : voir `scratchpad/g/resultat4.txt` (serveur, Radar, app).
 
+## État au 28/11/2026, 0 h
+
+- **0.98.0 déployée et vérifiée à 22 h 52** (compte rendu de « Serveur JARVIS 2 » recopié dans `docs/jarvis-os.md`). Essai à blanc réel du dépôt du CRA signé : « pret », PDF conforme à la saisie. Il a donc reçu « CRA signé prêt à déposer : ton oui ».
+- Vu à l'essai : le champ de fichier n'apparaît qu'après un bouton d'import → skill ajustée (étape 5 du dépôt) ; texte du compte rendu coupé au milieu d'un mot → corrigé. Les deux sont sur la branche (0.99.0), pas encore sur le serveur.
+- **Suite** : bancs (`scratchpad/g/resultat4.txt`, puis le banc du portail) → demande de fusion de la 0.99.0 → UN message à « Serveur JARVIS 2 » (plan : `docs/demandes-serveur-en-attente.md`, pull + redémarrage + `install.sh` du portail) → lire son compte rendu, dont ses deux gestes (« Relancer Hermes » pour la semaine, « Oui, déposer » pour le CRA signé).
+
