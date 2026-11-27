@@ -1072,7 +1072,7 @@ try {
           /* pause, reprise, refus de root, horaire, tout mettre en pause */
           const p1 = await ordre({nom: 'reveil', action: 'pause'}), cp = lu(poses()[0]); vider(); repond(cp.id, {etat: 'refusé', raison: 'limite', reprise: iso(Date.now() + 2 * 3600e3)});
           const fp = (await feuille('reveil')).body;
-          ok('0.96 routines : un refus de root est dit avec sa raison (et l’heure de reprise quand root la donne)', p1.status === 200 && cp.action === 'pause' && fp.ordre.etat === 'refusé' && /^Refusé à \d\d h \d\d : la limite du forfait Claude est atteinte : reprise vers \d\d h \d\d, elle repartira seule\.$/.test(fp.ordre.texte) && fp.routine.evenement === true, JSON.stringify(fp.ordre));
+          ok('0.96 routines : un refus de root est dit avec sa raison (et l’heure de reprise quand root la donne)', p1.status === 200 && cp.action === 'pause' && fp.ordre.etat === 'refusé' && /^Refusé à \d\d h \d\d : la limite du forfait Claude est atteinte : reprise vers (le \d\d\/\d\d à )?\d\d h \d\d, elle repartira seule\.$/.test(fp.ordre.texte) && fp.routine.evenement === true, JSON.stringify(fp.ordre));
           const h1 = await ordre({nom: 'digest-ia', action: 'horaire', jours: 'ouvres', heures: ['09:15', '09:00', '09:00']}), ch = lu(poses()[0]); vider(); repond(ch.id, {etat: 'fait'});
           ROUT = ROUT.map((x) => (x.nom === 'digest-ia' ? rt('digest-ia', 'Digest IA et .NET', {moment: 'du lundi au vendredi à 9 h et 9 h 15', origine: 'le lundi à 9 h 10', modifie: true, forme: {jours: 'ouvres', heures: ['09:00', '09:15']}}) : x)); resume();
           const fh = (await feuille('digest-ia')).body;
