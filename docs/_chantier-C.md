@@ -9,11 +9,11 @@ Note de passage pour le coordinateur : ce qui va dans `docs/jarvis-os.md`, ce qu
 À reporter aussi (je n'y ai pas touché) :
 - `docs/jarvis-os-reprise.md`, « L'accès Google direct » : portée `drive` facultative (rangement des papiers), `google.mjs` → `papiers` (hors des outils de la page). « Tester » : deux lignes, `node jarvis-os/server/tests/depot.test.mjs` (42 : types aux premiers octets, nom assaini, multipart, arbre sans « Papiers privés », règles, réponse de Claude vérifiée, dépôt 600/700, refus hors arbre, son oui en deux écritures sans partage, « (2) », corriger, retirer, liens, empreinte, portée absente, Google qui refuse, adresse d'envoi ailleurs, Claude seulement si utile, plafond, 30 jours, portées demandées, aucun outil MCP) et `NODE_PATH=/opt/node-tools/node_modules node jarvis-os/server/tests/depot-app.test.mjs` (6 : de bout en bout dans Chromium ; `DEPOT_APP_CAPTURE=<fichier.png>`).
 - `CLAUDE.md` : la ligne du tableau « Papiers » dit encore « Iris y range ce qu'il dépose » ; depuis la 0.91.0, c'est JARVIS, sur son oui.
-- La constante `VERSION` de `server.mjs` (laissée à 0.89.0).
+- La constante `VERSION` de `server.mjs` (pas touchée : 0.94.0 depuis la fusion de la branche du coordinateur ; cette entrée garde le numéro 0.91.0 qui lui a été donné).
 
 ## 2. Session « Serveur JARVIS »
 
-Rien à faire sur le serveur au-delà de `git pull` et du redémarrage de jarvis : le dossier `depot/` et `depot.json` sont créés par le serveur au premier dépôt ; aucune variable, aucune unité, aucun hôte nouveau (Drive passe par l'accès Google déjà en place). Section à fondre dans la demande commune, pour les contrôles en lecture seule :
+Rien à faire sur le serveur au-delà de `git pull` et du redémarrage de jarvis : le dossier `depot/` et `depot.json` sont créés par le serveur au premier dépôt, **sous son dossier de données** (`/home/jarvis/.jarvis`, déjà permis en écriture par le durcissement du service : aucun dossier nouveau à autoriser) ; aucune variable, aucune unité, aucun hôte nouveau (Drive passe par l'accès Google déjà en place). Section à fondre dans la demande commune, pour les contrôles en lecture seule :
 
 ```text
 SECTION « RANGEMENT DES PAPIERS » (0.91.0 ; à fondre dans la demande commune ; <COMMIT> = le commit de main qui contient la fusion).
