@@ -29,7 +29,8 @@ for j in jobs:
     n = str(j.get("name") or "")
     if n.startswith("jarvis-"):
         etat = "pause" if (j.get("state") == "paused" or not j.get("enabled", True)) else "actif"
-        print("\t".join((str(j.get("id")), n, etat, str(j.get("next_run_at") or "-")[:16].replace("T", " "), str(j.get("last_status") or "jamais passée"))))
+        s = j.get("schedule") if isinstance(j.get("schedule"), dict) else {}
+        print("\t".join((str(j.get("id")), n, etat, str(j.get("next_run_at") or "-")[:16].replace("T", " "), str(j.get("last_status") or "jamais passée"), " ".join(str(s.get("expr") or "-").split()))))
 ' "$HH/cron/jobs.json"
 }
 outils_de() {   # la liste exacte des outils d'une routine (enabled_toolsets) : `hermes cron create` n'a pas d'option pour elle
@@ -46,11 +47,19 @@ os.chown(tmp, st.st_uid, st.st_gid); os.chmod(tmp, 0o600); os.replace(tmp, chemi
 }
 lister() {
   local n=0
-  while IFS=$'\t' read -r _ nom etat prochain dernier; do
-    n=$((n + 1)); printf '  %-26s %-6s prochain passage : %s ; dernier : %s\n' "${nom#jarvis-}" "$etat" "$prochain" "$dernier"
+  while IFS=$'\t' read -r _ nom etat prochain dernier horaire; do
+    n=$((n + 1)); printf '  %-26s %-6s prochain passage : %s ; dernier : %s%s%s\n' "${nom#jarvis-}" "$etat" "$prochain" "$dernier" \
+      "$(pause_jarvis "${nom#jarvis-}" && echo ' ; en pause depuis JARVIS')" "$([ -n "$(horaire_jarvis "${nom#jarvis-}")" ] && echo " ; horaire changé depuis JARVIS ($horaire)")"
   done < <(poses)
   [ "$n" -gt 0 ] || echo "  aucune routine posée"
 }
+# 0.96.0 : ce qu'il a réglé depuis JARVIS (ordres lus par root, ordres.py) est gardé dans deux fichiers de root que ce script respecte :
+#   routines.pause    « nom époque » : la routine reste en pause jusqu'à nouvel ordre, même recréée ici
+#   routines.horaire  « nom|cron »   : son horaire remplace celui de routines.conf, qui reste l'horaire d'origine
+PAUSES=${HERMES_ROUTINES_PAUSES:-/var/lib/hermes-relance/routines.pause}
+HORAIRES=${HERMES_ROUTINES_HORAIRES:-/var/lib/hermes-relance/routines.horaire}
+pause_jarvis() { [ -f "$PAUSES" ] && awk -v n="$1" '$1 == n {f = 1} END {exit !f}' "$PAUSES"; }
+horaire_jarvis() { [ -f "$HORAIRES" ] && awk -F'|' -v n="$1" '$1 == n {h = $2} END {if (h) print h}' "$HORAIRES"; }
 if [ "${1:-}" = "--liste" ]; then lister; exit 0; fi
 # Routines de Grok Bot reprises (26/11/2026) : le mode de chaque routine, sans toucher au dépôt du serveur.
 #   routines.sh --reel <nom>     la routine passe « en réel » (le bot l'a mise en pause), puis tout est reposé
@@ -70,6 +79,7 @@ case "${1:-}" in
     [[ "${2:-}" =~ ^[a-z0-9-]{2,40}$ ]] || { echo "Usage : $0 --lancer <nom de la routine>"; exit 1; }
     ident=$(poses | awk -F'\t' -v n="jarvis-$2" '$2 == n {print $1}' | head -1)
     [ -n "$ident" ] || { echo "Routine non posée : $2 (sudo bash $0)"; exit 1; }
+    if pause_jarvis "$2"; then echo "  ✗ $2 : en pause depuis JARVIS (Hermes et ses routines) : la reprendre là-bas d'abord"; exit 1; fi
     if hx hermes cron run "$ident" >/dev/null 2>&1; then echo "  ▶ $2 : passage lancé (mode $(mode_de "$2" || true))"; exit 0; fi
     echo "  ✗ $2 : Hermes a refusé le passage (hermes cron run $ident)"; exit 1 ;;
 esac
@@ -93,6 +103,8 @@ while IFS= read -r ligne || [ -n "$ligne" ]; do
     reel) consigne=${consigne//« en double »/« en réel »} ;;
     double) consigne=${consigne//« en réel »/« en double »} ;;
   esac
+  hj=$(horaire_jarvis "$nom" | sed 's/^ *//; s/ *$//')   # 0.96.0 : l'horaire choisi depuis JARVIS l'emporte (routines.conf = l'horaire d'origine)
+  [ -n "$hj" ] && horaire=$hj
   if ! [[ "$nom" =~ ^[a-z0-9-]{2,40}$ ]] || ! [[ "$etat" =~ ^(actif|pause)$ ]] || [ "$(echo "$horaire" | wc -w)" != 5 ] \
      || ! [[ "$horaire" =~ ^[0-9*,/\ -]+$ ]] || ! [[ "$outils" =~ ^(-|[a-z0-9_,-]{2,120})$ ]] || [ "${#consigne}" -lt 10 ]; then
     echo "  ✗ ligne refusée (nom | actif ou pause | cron à 5 champs | skills | outils | consigne) : ${ligne:0:70}"; erreurs=$((erreurs + 1)); continue
@@ -116,16 +128,26 @@ while IFS= read -r ligne || [ -n "$ligne" ]; do
   empreinte=$(printf '%s|%s|%s' "$ligne" "$qui" "$consigne" | sha256sum | cut -c1-16)
   ident=$(poses | awk -F'\t' -v n="jarvis-$nom" '$2 == n {print $1}' | head -1)
   if [ -n "$ident" ] && grep -qx "jarvis-$nom $empreinte" "$ETAT"; then
-    echo "  = $nom : inchangée"; echo "jarvis-$nom $empreinte" >> "$nouvel_etat"; continue
+    echo "  = $nom : inchangée"; echo "jarvis-$nom $empreinte" >> "$nouvel_etat"
+    # 0.96.0 : inchangée dans routines.conf, mais l'horaire ou la pause réglés depuis JARVIS font foi (remis s'ils ont bougé)
+    pose=$(poses | awk -F'\t' -v n="jarvis-$nom" '$2 == n {print $6}' | head -1)
+    if [ -n "$pose" ] && [ "$pose" != "-" ] && [ "$pose" != "$(echo $horaire)" ]; then
+      hx hermes cron edit "$ident" --schedule "$horaire" >/dev/null 2>&1 && echo "  ↻ $nom : horaire remis ($horaire$([ -n "$hj" ] && echo ', choisi depuis JARVIS'))"
+    fi
+    if pause_jarvis "$nom" && [ "$(poses | awk -F'\t' -v n="jarvis-$nom" '$2 == n {print $3}' | head -1)" = actif ]; then
+      hx hermes cron pause "$ident" >/dev/null 2>&1 && echo "  ⏸ $nom : remise en pause (pause posée depuis JARVIS)"
+    fi
+    continue
   fi
   [ -n "$ident" ] && hx hermes cron remove "$ident" >/dev/null 2>&1
   [ "$etat" = pause ] && options+=(--paused --paused-reason "en pause dans routines.conf")
+  [ "$etat" != pause ] && pause_jarvis "$nom" && options+=(--paused --paused-reason "en pause depuis JARVIS")   # 0.96.0 : la pause survit à une recréation
   if hx hermes cron create "$horaire" "$consigne" --name "jarvis-$nom" --deliver "telegram:$qui" --catch-up on --no-wrap-response "${options[@]}" >/dev/null 2>&1; then
     if [ "$outils" != "-" ] && ! outils_de "jarvis-$nom" "$outils"; then
       ident=$(poses | awk -F'\t' -v n="jarvis-$nom" '$2 == n {print $1}' | head -1); [ -n "$ident" ] && hx hermes cron remove "$ident" >/dev/null 2>&1
       echo "  ✗ $nom : sa liste d'outils n'a pas pu être écrite ; routine retirée plutôt que laissée avec les outils par défaut"; erreurs=$((erreurs + 1)); continue
     fi
-    echo "  ✓ $nom : $([ -n "$ident" ] && echo recréée || echo posée) ($etat, $horaire$([ "$outils" != "-" ] && echo ", outils : $outils"))"; echo "jarvis-$nom $empreinte" >> "$nouvel_etat"
+    echo "  ✓ $nom : $([ -n "$ident" ] && echo recréée || echo posée) ($(pause_jarvis "$nom" && echo 'en pause depuis JARVIS' || echo "$etat"), $horaire$([ -n "$hj" ] && echo ' choisi depuis JARVIS')$([ "$outils" != "-" ] && echo ", outils : $outils"))"; echo "jarvis-$nom $empreinte" >> "$nouvel_etat"
   else
     echo "  ✗ $nom : Hermes a refusé la routine (sudo -u hermes hermes cron create …)"; erreurs=$((erreurs + 1))
   fi

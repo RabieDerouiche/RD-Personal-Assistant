@@ -9,6 +9,7 @@ set -euo pipefail
 systemctl disable --now hermes-garde.timer 2>/dev/null || true
 systemctl disable --now hermes-reveil.path 2>/dev/null || true
 systemctl disable --now hermes-relance.timer 2>/dev/null || true
+systemctl disable --now hermes-ordres.path 2>/dev/null || true
 systemctl disable --now hermes-gateway.service 2>/dev/null || true
 systemctl disable --now hermes-sortie.service 2>/dev/null || true
 nft delete table inet hermes_sortie 2>/dev/null || true
@@ -16,6 +17,7 @@ rm -f /etc/systemd/system/hermes-gateway.service /etc/systemd/system/hermes-sort
 rm -f /etc/systemd/system/hermes-reveil.service /etc/systemd/system/hermes-reveil.path /usr/local/sbin/hermes-reveil
 rm -f /usr/local/sbin/hermes-garde-forfait; rm -rf /var/lib/hermes-garde
 rm -f /etc/systemd/system/hermes-relance.service /etc/systemd/system/hermes-relance.timer /usr/local/sbin/hermes-relance; rm -rf /usr/local/lib/hermes-relance /var/lib/hermes-relance /var/lib/hermes-relance-avis /var/lib/hermes-relance-etat
+rm -f /etc/systemd/system/hermes-ordres.service /etc/systemd/system/hermes-ordres.path /usr/local/sbin/hermes-ordres; rm -rf /var/lib/jarvis-reveil/ordres
 systemctl daemon-reload
 rm -rf /etc/hermes
 echo "Hermes est arrêté ; service, garde du forfait, règles réseau et politique retirés."

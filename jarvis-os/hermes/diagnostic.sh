@@ -86,6 +86,12 @@ if id hermes >/dev/null 2>&1; then
     echo "    résumé pour JARVIS : absent (écrit au prochain passage de hermes-relance ; sinon relancer install.sh)"
   fi
   echo "  réveil par JARVIS : $(systemctl is-active hermes-reveil.path 2>/dev/null || echo absent)"
+  # 0.96.0 : les ordres de JARVIS pour les routines (lancer, pause, reprendre, horaire) ; ce qu'il a réglé depuis JARVIS
+  echo "  ordres de JARVIS : surveillance $(systemctl is-active hermes-ordres.path 2>/dev/null || echo absente), dossier $(stat -c '%U:%G %a' /var/lib/jarvis-reveil/ordres 2>/dev/null || echo absent) ($(ls -A /var/lib/jarvis-reveil/ordres 2>/dev/null | wc -l) en attente)"
+  journalctl -u hermes-ordres --since "-24h" --no-pager -o cat 2>/dev/null | grep -E '^Ordre |passage lancé|pause remise|Entrée inattendue' | tail -4 | sed 's/^/    /'
+  echo "    en pause depuis JARVIS : $(awk '{print $1}' /var/lib/hermes-relance/routines.pause 2>/dev/null | paste -sd, - | sed 's/^$/aucune/')"
+  echo "    horaires changés depuis JARVIS : $(sed 's/|/ → /' /var/lib/hermes-relance/routines.horaire 2>/dev/null | paste -sd';' - | sed 's/^$/aucun/')"
+  echo "    historique pour JARVIS : $(stat -c '%U:%G %a' /var/lib/hermes-relance-etat/historique.json 2>/dev/null || echo 'pas encore écrit')"
   echo "  dernières lignes utiles du journal :"
   grep -E "telegram connected|Connected to Telegram|ERROR|Traceback|plan limit|extra usage|denied" /home/hermes/.hermes/logs/gateway.log 2>/dev/null | tail -5 | cut -c1-160 | sed -E 's/[0-9]{6,}/<n>/g; s/^/    /'
 fi
