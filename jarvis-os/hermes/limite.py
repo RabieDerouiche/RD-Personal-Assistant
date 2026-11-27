@@ -232,7 +232,7 @@ def cmd_attente(a):
     sys.exit(1)
 
 
-UNITES = {"hermes-portail-cra.service", "hermes-portail-cra-mois.service", "hermes-portail-ndf.service", "hermes-portail-teletravail.service"}
+UNITES = {"hermes-portail-cra.service", "hermes-portail-cra-mois.service", "hermes-portail-cra-signe.service", "hermes-portail-ndf.service", "hermes-portail-teletravail.service"}
 
 
 def cmd_planifier(a):

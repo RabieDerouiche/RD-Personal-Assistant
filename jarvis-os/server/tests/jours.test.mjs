@@ -368,6 +368,175 @@ fs.rmSync(DIR, {recursive: true, force: true});
   const e1 = X.log.slice(g1).filter((t) => /mail du CRA impossible \(recherche du mail déjà envoyé impossible/.test(t)).length;
   G.erreurEnvoye = null; Ts += 5 * MIN; await JE.tic();
   ok('recherche « déjà envoyé ? » en échec (quota) : aucun brouillon préparé à tort, l’erreur écrite au journal du serveur, nouvel essai 5 minutes plus tard (pas chaque minute)', e1 === 1 && X.crees.length === c1 + 2 && !!lu('je.json').mailCra.draftId, JSON.stringify([e1, X.crees.length - c1])); }
+/* ---------- 0.97.0 : le CRA signé gardé par JARVIS, vérifié à blanc par Hermes, déposé après son oui — faux Gmail, faux comptes rendus de root, tout inventé ---------- */
+{ const crypto = await import('node:crypto');
+  const {choisirPdf, verifierPdf, sansAdresse, tailleDite} = await import('../signe.mjs');
+  let Ts = Date.parse('2026-11-26T14:00:00Z');   /* jeudi 26, 15 h à Paris */
+  const MIN = 60e3, CALS = [{id: 'p1@group.calendar.google.com', summary: 'Présence'}, {id: 'en-gb.french#holiday@group.v.calendar.google.com', summary: 'Holidays in France'}];
+  const ag = {lie: () => true, calendriers: async () => CALS, evenements: async (id) => (id === 'p1@group.calendar.google.com' ? BASE : FER)};
+  const MOD = {cra_client: {a: ['contact@exemple.invalid'], objet: 'CRA {MOIS} {ANNEE}', corps: 'Bonjour'}};
+  const PDF1 = Buffer.concat([Buffer.from('%PDF-1.4\n% CRA signé inventé du banc\n'), Buffer.alloc(3000, 0x20), Buffer.from('\n%%EOF\n')]), PDF2 = Buffer.from('%PDF-1.4\n% annexe inventée\n%%EOF\n');
+  const sha = (b) => crypto.createHash('sha256').update(b).digest('hex');
+  ok('signe.mjs : un seul PDF retenu, le plus gros qui n’est pas une image (une image nommée « .pdf » et une pièce sans identifiant sont écartées) ; aucun PDF : rien',
+    choisirPdf([{filename: 'scan.pdf', mimeType: 'image/png', size: 9e6, attachmentId: 'i'}, {filename: 'annexe.pdf', mimeType: 'application/pdf', size: 10, attachmentId: 'a'}, {filename: 'CRA.PDF', mimeType: 'application/octet-stream', size: 500, attachmentId: 'b'}, {filename: 'x.pdf', mimeType: 'application/pdf', size: 9e9}]).piece.attachmentId === 'b'
+    && choisirPdf([{filename: 'a.pdf', mimeType: 'application/pdf', size: 1, attachmentId: 'a'}, {filename: 'b.pdf', mimeType: 'application/pdf', size: 2, attachmentId: 'b'}]).autres === 1 && choisirPdf([{filename: 'image.png', mimeType: 'image/png', size: 1, attachmentId: 'i'}]) === null);
+  ok('signe.mjs : vérification (« %PDF- », 15 Mo au plus, pas vide) ; taille dite ; un texte de root sans adresse, hôte ni adresse mail',
+    verifierPdf(PDF1) === '' && /pas un PDF/.test(verifierPdf(Buffer.from('<html>'))) && /vide/.test(verifierPdf(Buffer.alloc(0))) && /15 Mo/.test(verifierPdf(Buffer.concat([Buffer.from('%PDF-'), Buffer.alloc(15 * 1024 * 1024)])))
+    && tailleDite(48213) === '47 Ko' && tailleDite(2621440) === '2,5 Mo' && sansAdresse('Vu sur https://portail.exemple.invalid/cra?x=1 et intranet.exemple.invalid, écrire à a@exemple.invalid. 21,5 jours.') === 'Vu sur (adresse) et (adresse), écrire à (adresse) 21,5 jours.');
+  /* une instance : son dossier de données à elle (le dossier de garde est à côté de jours.json), son faux Gmail, ses comptes rendus de root */
+  const monter = (nom, {pieces = null, octets = null, lien = false} = {}) => {
+    const dir = path.join(DIR, 'signe-' + nom), RT = path.join(dir, 'retours'); fs.mkdirSync(RT, {recursive: true});
+    const X = {push: [], log: [], lectures: 0, pieces: [], erreurPiece: null, dir, RT, garde: path.join(dir, 'cra-signe')};
+    if (lien) { fs.mkdirSync(path.join(dir, 'ailleurs')); fs.symlinkSync(path.join(dir, 'ailleurs'), X.garde); }
+    const tEnvoi = Date.parse('2026-11-26T08:02:00Z'), tRep = Date.parse('2026-11-26T13:05:00Z');
+    const pj = pieces || [{filename: 'image.png', mimeType: 'image/png', size: 900, id: 'img'}, {filename: 'annexe.pdf', mimeType: 'application/pdf', size: PDF2.length, id: 'annexe'}, {filename: 'CRA signé.pdf', mimeType: 'application/pdf', size: PDF1.length, id: 'cra'}];
+    X.octets = octets || {cra: PDF1, annexe: PDF2};
+    const msg = (id, de, nom2, objet, at, labelIds, attachments = []) => ({id, sender: de, addressDisplayNames: [{displayName: nom2, emailAddress: de}], subject: objet, internalDate: String(at), labelIds, snippet: 'Bonjour, ci-joint le CRA signé.', attachments});
+    /* comme Gmail : l'identifiant d'une pièce jointe change à chaque lecture du fil ; seul celui de la dernière lecture est accepté */
+    const fil = () => { X.lectures++; return {id: 'fil-cra-0001', messages: [msg('m-envoi', 'moi@exemple.invalid', 'Moi', 'CRA Novembre 2026', tEnvoi, ['SENT']),
+      msg('m-rep', 'contact@exemple.invalid', 'Contact Client', 'RE: CRA Novembre 2026', tRep, ['INBOX'], pj.map((p) => ({filename: p.filename, mimeType: p.mimeType, size: p.size, attachmentId: p.id + '-v' + X.lectures})))]}; };
+    const mails = {modeles: () => MOD, brouillon: async () => ({id: 'b1'}), majBrouillon: async () => ({}), envoye: async () => true, moi: () => 'moi@exemple.invalid',
+      chercher: async (q) => (/^subject:"CRA Novembre 2026"/.test(q) ? {threads: [{id: 'fil-cra-0001', historyId: '1'}]} : {}), fil: async () => fil(),
+      piece: async (message, piece) => { X.pieces.push(message + '/' + piece); if (X.erreurPiece) throw X.erreurPiece; const [id, v] = String(piece).split('-v'); if (message !== 'm-rep' || +v !== X.lectures || !X.octets[id]) throw new Error('pièce jointe introuvable'); return {size: X.octets[id].length, data: X.octets[id].toString('base64url')}; }};
+    X.J = createJours({file: path.join(dir, 'jours.json'), agenda: ag, retours: RT, mails, push: async (m) => { X.push.push(m); return []; }, log: (t) => X.log.push(t), now: () => Ts});
+    X.lu = () => JSON.parse(fs.readFileSync(path.join(dir, 'jours.json'), 'utf8')).mois['2026-11']; X.signe = () => X.lu().suivi.cra.signe || {};
+    X.retour = (r) => fs.writeFileSync(path.join(RT, 'signe-2026-11.json'), JSON.stringify({mois: '2026-11', at: Ts, ...r}));
+    X.moisValide = () => fs.writeFileSync(path.join(RT, 'mois-2026-11.json'), JSON.stringify({mois: '2026-11', resultat: 'validee', at: Ts}));
+    X.avis = () => X.push.filter((p) => /^(Première exécution d’Hermes : )?CRA signé (prêt|de )/.test(p.title));
+    X.fichiers = () => { try { return fs.readdirSync(X.garde); } catch { return []; } };
+    return X;
+  };
+  const mode = (f) => (fs.lstatSync(f).mode & 0o777).toString(8);
+  /* 1. la détection garde le PDF tout de suite */
+  Ts = Date.parse('2026-11-26T14:00:00Z'); const A = monter('a'); await A.J.tic();
+  { const g = A.signe(), f = path.join(A.garde, g.fichier || 'x'), rep = A.lu().suivi.cra.reponses[0];
+    ok('CRA signé : à la détection, le message est relu (l’identifiant de pièce gardé est périmé), le plus gros PDF est téléchargé une fois et gardé avec son empreinte SHA-256',
+      rep.pdfs[0].piece === 'annexe-v1' && A.pieces.join() === 'm-rep/cra-v2' && g.empreinte === sha(PDF1) && g.taille === PDF1.length && g.nom === 'CRA signé.pdf' && g.autres === 1 && g.message === 'm-rep' && fs.readFileSync(f).equals(PDF1), JSON.stringify([rep.pdfs, A.pieces, g]));
+    ok('CRA signé : gardé sous le dossier de données (sous-dossier 700, fichier 600, nom tiré au sort) ; c’est dit dans l’historique, avec le PDF laissé de côté', mode(A.garde) === '700' && mode(f) === '600' && /^[0-9a-f]{32}\.pdf$/.test(g.fichier) && A.fichiers().length === 1
+      && A.lu().historique.some((h) => /^CRA signé gardé pour le dépôt par Hermes \(3 Ko ; 1 autre PDF laissé de côté\)$/.test(h.quoi)), JSON.stringify([mode(A.garde), g.fichier, A.lu().historique.map((h) => h.quoi)]));
+    ok('CRA signé : la notification de la réponse annonce la suite (« Hermes vérifie le portail, puis te demande ton oui »)', A.push.some((p) => p.title === 'CRA signé reçu de ton client' && /Hermes vérifie le portail, puis te demande ton oui pour le déposer\.$/.test(p.body)), JSON.stringify(A.push.map((p) => p.body))); }
+  /* 2. où on en est, pour la carte de Travail : le CRA du mois pas encore validé par Hermes, puis validé, puis le compte rendu à blanc */
+  { const v0 = A.J.signe('2026-11'); A.moisValide(); const v1 = A.J.signe('2026-11'), e = A.signe().empreinte;
+    ok('CRA signé : tant que le CRA du mois n’est pas validé par Hermes, la carte attend ; ensuite « Hermes vérifie le portail » ; un mois sans CRA signé : rien', v0.etat === 'attend_cra' && v1.etat === 'verifie' && v1.nom === 'CRA signé.pdf' && v1.tailleDite === '3 Ko' && v1.empreinte === e && A.J.signe('2026-10') === null, JSON.stringify([v0, v1]));
+    const o0 = A.J.ouiSigne('2026-11', e);
+    ok('son oui : refusé tant qu’Hermes n’a pas rendu « pret »', !o0.ok && /pas encore vérifié/.test(o0.error) && !A.signe().oui, JSON.stringify(o0));
+    A.retour({etat: 'pret', empreinte: 'f'.repeat(64), texte: 'Onglet trouvé.'}); Ts += MIN; await A.J.tic();
+    ok('compte rendu de root pour une autre empreinte que le PDF gardé : ignoré (aucune notification, la carte ne bouge pas)', A.J.signe('2026-11').etat === 'verifie' && !A.avis().length);
+    Ts += MIN; A.retour({etat: 'pret', empreinte: e, texte: 'Onglet « CRA signé du client » trouvé sur https://portail.exemple.invalid/activite ; aucun document déposé pour novembre.'}); await A.J.tic();
+    const v2 = A.J.signe('2026-11'), n = A.avis();
+    ok('compte rendu « pret » : la carte passe à « pret », une notification « CRA signé prêt à déposer : ton oui » (sans adresse du portail), lien vers Travail', v2.etat === 'pret' && n.length === 1 && n[0].title === 'CRA signé prêt à déposer : ton oui' && /« Oui, déposer », ou « Je le fais moi-même »/.test(n[0].body) && n[0].url === '/#travail' && !/exemple\.invalid/.test(JSON.stringify(A.signe().retour)), JSON.stringify([v2, n]));
+    Ts += MIN; A.retour({etat: 'pret', empreinte: e, texte: 'Encore.'}); await A.J.tic();
+    ok('un second « pret » pour le même fichier : pas de seconde notification', A.avis().length === 1); }
+  /* 3. son oui, sur l'empreinte et le mois */
+  { const e = A.signe().empreinte, r0 = A.J.ouiSigne('2026-11', 'a'.repeat(64)), r1 = A.J.ouiSigne('2026-10', e), r2 = await A.J.traiter('POST', '/api/jours/signe/valider', async () => ({mois: '2026-11', empreinte: e})), o = A.signe().oui || {};
+    ok('son oui : refusé sur une autre empreinte ou un autre mois ; accepté par la route, gardé sur l’empreinte du PDF et le mois', !r0.ok && /a changé/.test(r0.error) && !r1.ok && r2.status === 200 && r2.body.ok && o.empreinte === e && o.mois === '2026-11' && o.at === Ts, JSON.stringify([r0, r1, r2, o]));
+    const v = A.J.signe('2026-11'), m = A.J.moiSigne('2026-11');
+    ok('son oui donné : la carte dit qu’Hermes dépose ; « Je le fais moi-même » n’est plus possible (le oui est parti)', v.etat === 'oui' && !m.ok && /déjà parti/.test(m.error), JSON.stringify([v, m]));
+    /* le dépôt réel échoue : le PDF reste gardé, un nouveau oui est possible */
+    Ts += 5 * MIN; A.retour({etat: 'echec', reel: true, empreinte: e, texte: 'Le portail a refusé le fichier.'}); await A.J.tic();
+    const v3 = A.J.signe('2026-11'), n = A.avis();
+    ok('dépôt en échec : « pas déposé : à faire à la main », la raison, le PDF reste gardé, l’étape n’est pas faite', v3.etat === 'echec' && v3.raison === 'Le portail a refusé le fichier.' && n[n.length - 1].title === 'CRA signé de novembre pas déposé : à faire à la main' && /Le PDF reste gardé\.$/.test(n[n.length - 1].body) && A.fichiers().length === 1 && !A.lu().suivi.cra.rattache, JSON.stringify([v3, n[n.length - 1]]));
+    Ts += MIN; const r3 = A.J.ouiSigne('2026-11', e), o2 = A.signe().oui;
+    ok('après un échec, un nouveau oui est un autre oui (son heure change : root fera une nouvelle tentative, une seule)', r3.ok && o2.at === Ts && A.J.signe('2026-11').etat === 'oui', JSON.stringify([r3, o2]));
+    /* le dépôt réel réussit : première exécution */
+    Ts += 5 * MIN; A.retour({etat: 'depose', reel: true, premiere: true, empreinte: e, texte: 'Déposé, visible dans la liste.'}); await A.J.tic();
+    const s = A.lu().suivi.cra, v4 = A.J.signe('2026-11'), n2 = A.avis();
+    ok('dépôt fait : étape « Rattaché » (le même état que « C’est rattaché », par Hermes), « Première exécution d’Hermes : CRA signé de novembre déposé — vérifie sur le portail », PDF gardé effacé', s.rattache === Ts && s.rattachePar === 'hermes' && v4.etat === 'fait' && v4.par === 'hermes' && n2[n2.length - 1].title === 'Première exécution d’Hermes : CRA signé de novembre déposé — vérifie sur le portail'
+      && !A.fichiers().length && !s.signe.fichier && s.signe.pourquoi === 'dépôt fait', JSON.stringify([s.rattache, s.rattachePar, v4, n2[n2.length - 1], A.fichiers()]));
+    const r4 = A.J.ouiSigne('2026-11', e), k = n2.length; Ts += MIN; await A.J.tic();
+    ok('une fois déposé : plus de oui possible, rien n’est retéléchargé ni renotifié', !r4.ok && A.avis().length === k && A.pieces.length === 1 && !A.fichiers().length, JSON.stringify([r4, A.pieces])); }
+  /* 4. les exécutions suivantes, « déjà sur le portail », « introuvable » */
+  { Ts = Date.parse('2026-11-26T14:00:00Z'); const B = monter('b'); await B.J.tic(); B.moisValide(); const e = B.signe().empreinte;
+    B.retour({etat: 'pret', empreinte: e, texte: 'Trouvé.'}); Ts += MIN; await B.J.tic(); B.J.ouiSigne('2026-11', e);
+    Ts += MIN; B.retour({etat: 'depose', reel: true, premiere: false, empreinte: e, texte: 'Déposé.'}); await B.J.tic();
+    ok('dépôt fait, pas la première fois : « CRA signé de novembre déposé »', B.avis().pop().title === 'CRA signé de novembre déposé' && B.lu().suivi.cra.rattachePar === 'hermes');
+    Ts = Date.parse('2026-11-26T14:00:00Z'); const C = monter('c'); await C.J.tic(); C.moisValide();
+    C.retour({etat: 'deja', empreinte: C.signe().empreinte, texte: 'Un CRA signé est déjà déposé pour novembre.'}); Ts += MIN; await C.J.tic();
+    ok('à blanc, « déjà déposé » : rien à faire, l’étape est faite (vu par Hermes), le PDF gardé est effacé', C.lu().suivi.cra.rattachePar === 'portail' && C.J.signe('2026-11').etat === 'fait' && !C.fichiers().length && C.avis().pop().title === 'CRA signé de novembre : déjà sur le portail', JSON.stringify(C.avis()));
+    Ts = Date.parse('2026-11-26T14:00:00Z'); const D2 = monter('d'); await D2.J.tic(); D2.moisValide(); const e2 = D2.signe().empreinte;
+    D2.retour({etat: 'introuvable', empreinte: e2, texte: 'Aucun onglet de dépôt sur la page du mois.'}); Ts += MIN; await D2.J.tic();
+    const v = D2.J.signe('2026-11'), o = D2.J.ouiSigne('2026-11', e2);
+    ok('à blanc, « introuvable » : la carte le dit avec la raison, une notification « à déposer à la main », aucun oui possible, le PDF reste gardé', v.etat === 'introuvable' && v.raison === 'Aucun onglet de dépôt sur la page du mois.' && D2.avis().pop().title === 'CRA signé de novembre : à déposer à la main' && !o.ok && D2.fichiers().length === 1, JSON.stringify([v, o]));
+    const m = await D2.J.traiter('POST', '/api/jours/signe/moi', async () => ({mois: '2026-11'})), o2 = D2.J.ouiSigne('2026-11', e2);
+    ok('« Je le fais moi-même » : noté, plus de oui possible ; puis « C’est rattaché » efface le PDF gardé', m.status === 200 && D2.J.signe('2026-11').etat === 'moi' && !o2.ok && D2.J.rattacher('2026-11').ok && !D2.fichiers().length && D2.J.signe('2026-11').par === 'toi', JSON.stringify([m, o2])); }
+  /* 5. le fichier gardé change après son affichage ; un lien à la place du dossier */
+  { Ts = Date.parse('2026-11-26T14:00:00Z'); const E = monter('e'); await E.J.tic(); E.moisValide(); const g = E.signe();
+    E.retour({etat: 'pret', empreinte: g.empreinte, texte: 'Trouvé.'}); Ts += MIN; await E.J.tic();
+    fs.writeFileSync(path.join(E.garde, g.fichier), Buffer.concat([PDF1, Buffer.from('ajout')]));
+    const o = E.J.ouiSigne('2026-11', g.empreinte);
+    ok('son oui : refusé si le PDF gardé n’est plus celui qui lui a été montré (empreinte recalculée à l’instant du oui)', !o.ok && /plus celui/.test(o.error) && !E.signe().oui, JSON.stringify(o));
+    Ts = Date.parse('2026-11-26T14:00:00Z'); const F = monter('f', {lien: true}); await F.J.tic(); Ts += 20 * MIN; await F.J.tic();
+    ok('le dossier de garde est un lien : rien n’est écrit à travers, c’est écrit au journal du serveur, la carte reste à « JARVIS récupère le PDF »', !fs.readdirSync(path.join(F.dir, 'ailleurs')).length && !F.signe().fichier && F.J.signe('2026-11').etat === 'recupere' && F.log.some((t) => /pas encore gardé \(le dossier de garde du CRA signé n’est pas un vrai dossier\)/.test(t)), JSON.stringify([F.signe(), F.log])); }
+  /* 6. ce qui n'est pas un PDF, ce qui est trop gros, un téléchargement en échec */
+  { Ts = Date.parse('2026-11-26T14:00:00Z'); const G1 = monter('g', {octets: {cra: Buffer.from('<html>pas un PDF</html>'), annexe: PDF2}}); await G1.J.tic();
+    ok('la pièce jointe ne commence pas par « %PDF- » : refusée, rien n’est gardé, la carte dit de le rattacher à la main', G1.J.signe('2026-11').etat === 'refuse' && /pas un PDF/.test(G1.J.signe('2026-11').raison) && !G1.fichiers().length && G1.pieces.length === 1, JSON.stringify(G1.signe()));
+    Ts = Date.parse('2026-11-26T14:00:00Z'); const G2 = monter('h', {pieces: [{filename: 'CRA signé.pdf', mimeType: 'application/pdf', size: 16 * 1024 * 1024, id: 'cra'}]}); await G2.J.tic();
+    ok('un PDF annoncé à plus de 15 Mo : refusé sans être téléchargé', G2.J.signe('2026-11').etat === 'refuse' && /15 Mo/.test(G2.J.signe('2026-11').raison) && !G2.pieces.length);
+    Ts = Date.parse('2026-11-26T14:00:00Z'); const G3 = monter('i'); G3.erreurPiece = new Error('réseau coupé'); await G3.J.tic();
+    const p0 = G3.pieces.length; Ts += 5 * MIN; await G3.J.tic(); const p1 = G3.pieces.length; G3.erreurPiece = null; Ts += 11 * MIN; await G3.J.tic();
+    ok('téléchargement en échec : la carte le dit, nouvel essai 15 minutes plus tard (pas avant), puis le PDF est gardé', p0 === 1 && p1 === 1 && G3.pieces.length === 2 && G3.signe().empreinte === sha(PDF1) && G3.fichiers().length === 1 && G3.log.some((t) => /pas encore gardé \(réseau coupé\) : nouvel essai dans 15 minutes/.test(t)), JSON.stringify([p0, p1, G3.pieces.length, G3.signe()])); }
+  /* 7. rattrapage d'une réponse notée avant la 0.97.0 ; 45 jours ; ce qui traîne dans le dossier */
+  { Ts = Date.parse('2026-11-26T14:00:00Z'); const H = monter('j'), dir = H.dir;
+    fs.writeFileSync(path.join(dir, 'jours.json'), JSON.stringify({version: 1, mois: {'2026-11': {etat: 'a_valider', corrections: {}, historique: [], suivi: {cra: {objet: 'CRA Novembre 2026', envoi: {id: 'm-envoi', fil: 'fil-cra-0001', at: Ts - 6 * 3600e3}, clos: 'pdf', lu: Ts - 3600e3,
+      reponses: [{id: 'm-rep', fil: 'fil-cra-0001', at: Ts - 3600e3, de: 'contact@exemple.invalid', nom: 'Contact Client', pdf: true, pieces: 1, pdfs: [{message: 'm-rep', piece: 'cra-v0', nom: 'CRA signé.pdf', taille: PDF1.length, type: 'application/pdf'}], extrait: 'Bonjour', lu: true, voie: 'fil', vu: Ts - 3600e3, notifie: Ts - 3600e3}]}}}}}));
+    const H2 = monter('j'); await H2.J.tic();
+    ok('rattrapage : une réponse déjà notée (suivi clos, rien de gardé) : son PDF est gardé au premier passage, sans notification de plus', H2.signe().empreinte === sha(PDF1) && H2.fichiers().length === 1 && !H2.push.some((p) => /CRA signé/.test(p.title)), JSON.stringify([H2.signe(), H2.push]));
+    fs.writeFileSync(path.join(H2.garde, '0'.repeat(32) + '.pdf'), PDF2); fs.writeFileSync(path.join(H2.garde, 'autre.txt'), 'x');
+    Ts += 5 * MIN; await H2.J.tic();
+    ok('ménage : un PDF qui traîne dans le dossier sans être gardé pour un mois est effacé ; rien d’autre n’est touché', H2.fichiers().sort().join() === [H2.signe().fichier, 'autre.txt'].sort().join(), H2.fichiers().join());
+    Ts += 46 * 864e5; await H2.J.tic();
+    ok('45 jours après : le PDF gardé est effacé, la carte revient à « à rattacher » (plus de oui possible)', !H2.fichiers().includes(H2.signe().fichier || 'x') && H2.signe().pourquoi === '45 jours' && H2.J.signe('2026-11').etat === 'efface' && !H2.J.ouiSigne('2026-11', sha(PDF1)).ok, JSON.stringify(H2.signe())); }
+  /* ---------- 0.98.0 : le CRA signé comparé à la saisie (sans IA), puis déposé sans attendre s'il correspond — PDF inventés, lus par pdf.mjs ---------- */
+  { const zlib = await import('node:zlib');
+    const {lireCra, controler, attenduDe} = await import('../signe-controle.mjs');
+    /* un PDF à texte, comme un logiciel en produit : une ligne par « Tj » */
+    const pdfTexte = (lignes) => { let c = '', y = 760; for (const t of lignes) { c += 'BT /F1 10 Tf 40 ' + y + ' Td (' + t.replace(/[()\\]/g, '\\$&') + ') Tj ET\n'; y -= 18; }
+      const flux = zlib.deflateSync(Buffer.from(c, 'latin1'));
+      const debut = '%PDF-1.4\n1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj\n2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj\n3 0 obj << /Type /Page /Parent 2 0 R /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >> endobj\n4 0 obj << /Length ' + flux.length + ' /Filter /FlateDecode >>\nstream\n';
+      return Buffer.concat([Buffer.from(debut, 'latin1'), flux, Buffer.from('\nendstream\nendobj\n5 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >> endobj\ntrailer << /Root 1 0 R >>\n%%EOF\n', 'latin1')]); };
+    const craPdf = (mois, total, valeurs) => pdfTexte(['Compte rendu d\'activit\xe9 mensuel', 'Nom et pr\xe9nom : INVENTE Camille Mois : ' + mois + ' Jours potentiels : ' + valeurs.length + ' Statut : Valid\xe9',
+      'Client Contrat Total', 'CLIENT INVENTE SAS Contrat invent\xe9 2026 ' + total + ' ' + valeurs.join(' '), 'Total ' + total + ' ' + valeurs.join(' '), 'Signature du responsable Signature du collaborateur']);
+    /* la saisie du banc : novembre 2026 de BASE, validé (26 et 27 pas encore notés : travaillés) */
+    const valider = async (X) => { await X.J.lire('2026-11'); X.J.confirmer('2026-11', X.J.etat('2026-11').bilan.empreinte); };
+    Ts = Date.parse('2026-11-26T14:00:00Z'); const K = monter('k'); await K.J.tic(); await valider(K);
+    const ATT = attenduDe(K.J.brut().mois['2026-11'].valide), V = ATT.jours.map((d) => d.v);
+    const BON = craPdf('novembre 2026', ATT.total, V), V2 = V.slice(); V2[V2.indexOf(1)] = 0; const FAUX = craPdf('novembre 2026', ATT.total - 1, V2), AUTRE = craPdf('octobre 2026', ATT.total, V);
+    const c0 = lireCra('Mois : novembre 2026 Jours potentiels : 20\nTotal 15 1 1 0,5 0\nTotal général : voir plus haut'), cB = controler(BON, '2026-11', K.J.brut().mois['2026-11'].valide), cF = controler(FAUX, '2026-11', K.J.brut().mois['2026-11'].valide);
+    ok('0.98 contrôle : le mois, le total et les valeurs sont lus dans le texte (« Total 15 1 1 0,5 0 ») ; la saisie attendue vient des jours validés (20 jours ouvrés non fériés, 17 travaillés)',
+      c0.mois === '2026-11' && c0.total === 15 && c0.valeurs.join() === '1,1,0.5,0' && c0.potentiels === 20 && ATT.total === 17 && V.length === 20, JSON.stringify([c0, ATT.total, V.length]));
+    ok('0.98 contrôle : PDF conforme (même mois, même total, même détail) ; un jour et le total changés : écart dit en clair, sans nom ; autre mois : écart ; PDF sans texte : pas comparable ; jours pas validés : pas comparable',
+      cB.etat === 'conforme' && cB.detail === true && /novembre 2026, 17 jours, même détail jour par jour/.test(cB.dit) && cF.etat === 'ecart' && /le PDF dit 16 jours, la saisie 17 ; jour différent : le 2 novembre \(PDF 0, saisie 1\)/.test(cF.dit) && !/INVENTE|Camille/.test(JSON.stringify([cB, cF]))
+      && controler(AUTRE, '2026-11', K.J.brut().mois['2026-11'].valide).etat === 'ecart' && /celui d’octobre 2026, pas celui de novembre 2026/.test(controler(AUTRE, '2026-11', K.J.brut().mois['2026-11'].valide).dit)
+      && controler(PDF1, '2026-11', K.J.brut().mois['2026-11'].valide).etat === 'illisible' && controler(BON, '2026-11', null).etat === 'illisible', JSON.stringify([cB, cF]));
+    /* K : le PDF du banc 0.97 (sans texte) : jamais automatique, même après un premier dépôt réussi */
+    K.J.brut().signePremier = 1; K.moisValide(); Ts += 6 * MIN; await K.J.tic();
+    K.retour({etat: 'pret', empreinte: K.signe().empreinte, texte: 'Trouvé.'}); Ts += MIN; await K.J.tic();
+    ok('0.98 : PDF pas comparable : rien d’automatique ; « prêt à déposer : ton oui », et la notification dit qu’il n’a pas pu être comparé', K.signe().controle.etat === 'illisible' && !K.signe().oui && K.J.signe('2026-11').etat === 'pret' && K.avis().length === 1 && K.avis()[0].title === 'CRA signé prêt à déposer : ton oui' && /pas pu le comparer à la saisie/.test(K.avis()[0].body), JSON.stringify([K.signe().controle, K.avis()]));
+    /* L : PDF conforme, premier dépôt (aucun dépôt réussi avant) : le verdict est dit, son oui reste demandé */
+    Ts = Date.parse('2026-11-26T14:00:00Z'); const Lx = monter('l', {octets: {cra: BON, annexe: PDF2}}); await Lx.J.tic(); const avant = Lx.signe().controle;
+    await valider(Lx); Ts += 6 * MIN; await Lx.J.tic(); Lx.moisValide(); const apres = Lx.signe().controle, vu = Lx.J.signe('2026-11');
+    Lx.retour({etat: 'pret', empreinte: Lx.signe().empreinte, texte: 'Trouvé.'}); Ts += MIN; await Lx.J.tic();
+    ok('0.98 : le PDF est comparé dès qu’il est gardé (jours pas encore validés : pas comparable), puis de nouveau quand les jours sont validés : conforme, dit à la carte',
+      avant.etat === 'illisible' && apres.etat === 'conforme' && apres.total === 17 && apres.attendu === 17 && apres.detail === true && vu.controle.etat === 'conforme' && Lx.lu().historique.some((h) => h.quoi === 'CRA signé comparé à la saisie : conforme'), JSON.stringify([avant, apres]));
+    ok('0.98 : premier dépôt : pas de oui automatique ; « prêt à déposer : ton oui », « conforme à la saisie »', !Lx.signe().oui && Lx.avis().length === 1 && Lx.avis()[0].title === 'CRA signé prêt à déposer : ton oui' && /conforme à la saisie\. Hermes a trouvé où le déposer/.test(Lx.avis()[0].body), JSON.stringify(Lx.avis()));
+    Lx.J.ouiSigne('2026-11', Lx.signe().empreinte); Ts += MIN; Lx.retour({etat: 'depose', reel: true, premiere: true, empreinte: Lx.signe().empreinte, texte: 'Déposé.'}); await Lx.J.tic();
+    ok('0.98 : le premier dépôt réussi par Hermes est noté : les suivants pourront partir seuls', Lx.J.brut().signePremier === Ts && JSON.parse(fs.readFileSync(path.join(Lx.dir, 'jours.json'), 'utf8')).signePremier === Ts);
+    /* M : PDF conforme, un dépôt a déjà réussi : dès que Hermes a trouvé où déposer, le oui est posé sans lui, une fois */
+    Ts = Date.parse('2026-11-26T14:00:00Z'); const Mx = monter('m', {octets: {cra: BON, annexe: PDF2}}); Mx.J.brut().signePremier = 1; await Mx.J.tic(); await valider(Mx); Mx.moisValide(); Ts += 6 * MIN; await Mx.J.tic();
+    const sansPret = Mx.signe().oui; Mx.retour({etat: 'pret', empreinte: Mx.signe().empreinte, texte: 'Trouvé.'}); Ts += MIN; await Mx.J.tic(); const oA = Mx.signe().oui || {}, tA = Ts;
+    ok('0.98 : conforme, portail prêt, pas le premier dépôt : le oui est posé sans lui (sur l’empreinte et le mois, marqué automatique), une notification « conforme : Hermes le dépose », pas de « ton oui »',
+      !sansPret && oA.auto === true && oA.empreinte === Mx.signe().empreinte && oA.mois === '2026-11' && oA.at === tA && Mx.J.signe('2026-11').etat === 'oui' && Mx.J.signe('2026-11').auto === true
+      && Mx.avis().length === 1 && Mx.avis()[0].title === 'CRA signé de novembre conforme : Hermes le dépose' && /17 jours/.test(Mx.avis()[0].body) && Mx.lu().historique.some((h) => /sans attendre ton oui/.test(h.quoi)), JSON.stringify([oA, Mx.avis()]));
+    Ts += 5 * MIN; Mx.retour({etat: 'echec', reel: true, empreinte: Mx.signe().empreinte, texte: 'Le portail a refusé le fichier.'}); await Mx.J.tic(); Ts += 6 * MIN; await Mx.J.tic(); Ts += 6 * MIN; await Mx.J.tic();
+    ok('0.98 : un dépôt automatique raté ne repart jamais seul : « pas déposé : à faire à la main », le oui n’est pas reposé ; le sien reste possible (« Réessayer avec Hermes »)',
+      Mx.signe().oui.at === tA && Mx.J.signe('2026-11').etat === 'echec' && Mx.avis().pop().title === 'CRA signé de novembre pas déposé : à faire à la main' && Mx.J.ouiSigne('2026-11', Mx.signe().empreinte).ok && Mx.signe().oui.at === Ts && !Mx.signe().oui.auto, JSON.stringify(Mx.signe().oui));
+    /* N : PDF qui ne correspond pas, un dépôt a déjà réussi : rien d'automatique, l'écart est dit */
+    Ts = Date.parse('2026-11-26T14:00:00Z'); const Nx = monter('n', {octets: {cra: FAUX, annexe: PDF2}}); Nx.J.brut().signePremier = 1; await Nx.J.tic(); await valider(Nx); Nx.moisValide(); Ts += 6 * MIN; await Nx.J.tic();
+    Nx.retour({etat: 'pret', empreinte: Nx.signe().empreinte, texte: 'Trouvé.'}); Ts += MIN; await Nx.J.tic(); Ts += 6 * MIN; await Nx.J.tic();
+    ok('0.98 : écart avec la saisie : aucun oui automatique ; une notification « il ne correspond pas à la saisie » avec l’écart ; la carte reste à « pret » (son oui reste possible)',
+      !Nx.signe().oui && Nx.signe().controle.etat === 'ecart' && Nx.J.signe('2026-11').etat === 'pret' && Nx.J.signe('2026-11').controle.etat === 'ecart' && Nx.avis().length === 1 && Nx.avis()[0].title === 'CRA signé de novembre : il ne correspond pas à la saisie' && /le PDF dit 16 jours, la saisie 17/.test(Nx.avis()[0].body)
+      && Nx.J.ouiSigne('2026-11', Nx.signe().empreinte).ok, JSON.stringify([Nx.signe().controle, Nx.avis()])); }
+}
 console.log(results.join('\n'));
 console.log((fails ? 'ÉCHECS : ' + fails : 'Tout est bon') + ' (' + results.length + ' vérifications)');
 process.exit(fails ? 1 : 0);

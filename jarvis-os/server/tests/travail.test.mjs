@@ -110,6 +110,40 @@ try {
     ok('une fois rattaché, la carte passe au mois en cours', e2.routines.find((x) => x.id === 'mois').mois === '2026-12' && !e2.routines.find((x) => x.id === 'mois').mails.length && !e2.routines.find((x) => x.id === 'mois').toi);
     delete SUIVI['2026-11'].cra.rattache; T2 = Date.parse('2026-12-24T09:00:00Z'); e2 = await TR2.etat();
     ok('à partir du 24, la carte est celle du mois en cours, même si le CRA d’avant n’est pas rattaché', e2.routines.find((x) => x.id === 'mois').mois === '2026-12'); }
+  /* 0.97.0 : le CRA signé déposé par Hermes après son oui : la carte dit où on en est (`jours.signe`), `attend` et `toi` seulement ce qui l'attend, lui */
+  { fs.rmSync(path.join(RET, 'mois-2026-11.json'), {force: true});
+    let SG = null; jours.signe = (ym) => (ym === '2026-11' && SG ? {mois: ym, nom: 'CRA signé.pdf', taille: 48213, tailleDite: '47 Ko', autres: 0, empreinte: 'e'.repeat(64), fil: 'fil-cra-0001', raison: '', par: '', le: 0, ...SG} : null);
+    const mo = async () => (await TR.etat()).routines.find((x) => x.id === 'mois');
+    SG = {etat: 'recupere'}; const a = await mo(); SG = {etat: 'attend_cra'}; const b = await mo(); SG = {etat: 'verifie'}; const c = await mo();
+    ok('CRA signé, en cours chez JARVIS ou Hermes : la carte le dit (« JARVIS récupère le PDF… », « une fois le CRA du mois validé », « Hermes vérifie le portail… ») sans rien lui demander ; « C’est rattaché » reste possible',
+      a.signe.dit === 'CRA signé reçu : JARVIS récupère le PDF…' && /une fois le CRA du mois validé\.$/.test(b.signe.dit) && c.signe.dit === 'CRA signé reçu : Hermes vérifie le portail…' && [a, b, c].every((x) => !x.attend.some((t) => /CRA signé/.test(t)) && !/CRA signé/.test(x.toi) && x.rattachable === true && x.etapes[4][1] === 'encours' && !x.signe.empreinte), JSON.stringify([a.signe, b.signe, c.signe, c.attend, c.toi]));
+    SG = {etat: 'pret', autres: 1}; const p = await mo();
+    ok('CRA signé prêt : « CRA signé reçu : Hermes le dépose sur le portail ? » (carte et ligne de « Pour moi »), le nom du fichier, sa taille, le mail à ouvrir, l’empreinte pour son oui ; « C’est rattaché » laisse la place aux deux boutons',
+      p.attend[0] === 'CRA signé reçu : Hermes le dépose sur le portail ?' && /^CRA signé reçu : Hermes le dépose sur le portail \? « CRA signé\.pdf », 47 Ko\. Il a trouvé où le déposer \(essai à blanc : rien n’est déposé\)\. La réponse portait 2 PDF : le plus gros est retenu\./.test(p.toi)
+      && p.signe.etat === 'pret' && p.signe.nom === 'CRA signé.pdf' && p.signe.taille === '47 Ko' && p.signe.empreinte === 'e'.repeat(64) && p.signe.url === 'https://mail.google.com/mail/#all/fil-cra-0001' && p.signe.mois === '2026-11' && p.rattachable === false && !p.signe.dit, JSON.stringify([p.attend, p.toi, p.signe]));
+    SG = {etat: 'oui'}; const o = await mo();
+    ok('son oui donné : « Ton oui est noté : Hermes dépose… », plus rien ne l’attend, aucun bouton de dépôt', /^Ton oui est noté : Hermes dépose le CRA signé sur le portail/.test(o.signe.dit) && !o.attend.some((t) => /CRA signé/.test(t)) && o.rattachable === false && !o.signe.empreinte, JSON.stringify(o.signe));
+    SG = {etat: 'introuvable', raison: 'Aucun onglet de dépôt sur la page du mois'}; const i = await mo(); SG = {etat: 'echec', raison: 'Le portail a refusé le fichier.'}; const k = await mo(); SG = {etat: 'refuse', raison: 'la pièce jointe n’est pas un PDF'}; const rf = await mo();
+    ok('Hermes n’a pas trouvé, le dépôt a échoué, le PDF n’a pas pu être gardé : « à faire à la main » avec la raison, « C’est rattaché » possible ; après un échec du dépôt, l’étape est marquée bloquée et un nouveau oui reste possible',
+      i.attend[0] === 'CRA signé reçu : Hermes n’a pas trouvé où le déposer : à faire à la main' && /à faire à la main\. Aucun onglet de dépôt sur la page du mois\.$/.test(i.toi) && i.rattachable && !i.signe.empreinte
+      && k.attend[0] === 'CRA signé pas déposé : à faire à la main' && /Le portail a refusé le fichier\. Le PDF reste gardé\.$/.test(k.toi) && k.etapes[4][1] === 'bloque' && k.rattachable && k.signe.empreinte === 'e'.repeat(64)
+      && /PDF n’a pas pu être gardé : à rattacher à la main\. la pièce jointe n’est pas un PDF\.$/.test(rf.toi) && rf.rattachable, JSON.stringify([i.toi, k.toi, k.etapes, rf.toi]));
+    SG = {etat: 'moi'}; const m = await mo();
+    ok('« Je le fais moi-même » : l’ancien chemin (« à rattacher », « C’est rattaché »)', m.attend[0] === 'CRA signé reçu : à rattacher' && /^CRA signé reçu : à rattacher sur le portail/.test(m.toi) && m.rattachable === true, JSON.stringify([m.attend, m.toi]));
+    SUIVI['2026-11'].cra.rattache = Date.parse('2026-11-27T13:05:00Z'); SG = {etat: 'fait', par: 'hermes', le: SUIVI['2026-11'].cra.rattache}; const f1 = await mo();
+    ok('déposé par Hermes : étape « Rattaché » faite, « déposé sur le portail par Hermes le 27/11 à 14 h 05 », plus rien n’attend', f1.etapes[4][1] === 'fait' && f1.signe.etat === 'fait' && f1.signe.dit === 'CRA signé déposé sur le portail par Hermes le 27/11 à 14 h 05.' && !f1.attend.some((t) => /CRA signé/.test(t)) && f1.rattachable === false, JSON.stringify([f1.etapes, f1.signe]));
+    delete SUIVI['2026-11'].cra.rattache;
+    /* 0.98.0 : le PDF comparé à la saisie : le verdict est dit dès qu'il est connu ; un écart change la question ; conforme et pas le premier dépôt : parti sans son oui */
+    const OKC = {etat: 'conforme', dit: 'Le PDF correspond à la saisie : novembre 2026, 17 jours, même détail jour par jour.'}, KO = {etat: 'ecart', dit: 'Le PDF ne correspond pas à la saisie : le PDF dit 16 jours, la saisie 17.'};
+    SG = {etat: 'verifie', controle: OKC}; const c1 = await mo(); SG = {etat: 'pret', controle: OKC}; const c2 = await mo(); SG = {etat: 'pret', controle: KO}; const c3 = await mo(); SG = {etat: 'oui', controle: OKC, auto: true}; const c4 = await mo();
+    ok('0.98 : le verdict du contrôle est dit pendant l’attente (« correspond à la saisie… Hermes vérifie le portail… ») et avec la question (« Hermes le dépose ? … correspond à la saisie »)',
+      c1.signe.dit === 'CRA signé reçu. Le PDF correspond à la saisie : novembre 2026, 17 jours, même détail jour par jour. Hermes vérifie le portail…' && c1.signe.controle === 'conforme'
+      && /^CRA signé reçu : Hermes le dépose sur le portail \? « CRA signé\.pdf », 47 Ko\. Le PDF correspond à la saisie : novembre 2026, 17 jours, même détail jour par jour\. Il a trouvé où le déposer/.test(c2.toi) && c2.signe.controle === 'conforme' && c2.signe.empreinte === 'e'.repeat(64), JSON.stringify([c1.signe, c2.toi]));
+    ok('0.98 : un écart avec la saisie : « il ne correspond pas à la saisie » (« Pour moi » et carte), l’écart en clair, son oui reste possible (« Déposer quand même »)',
+      c3.attend[0] === 'CRA signé reçu : il ne correspond pas à la saisie' && /^CRA signé reçu, mais il ne correspond pas à la saisie : « CRA signé\.pdf », 47 Ko\. Le PDF ne correspond pas à la saisie : le PDF dit 16 jours, la saisie 17\. Hermes a trouvé où le déposer \(rien n’est déposé\) : « Déposer quand même », ou « Je le fais moi-même »\./.test(c3.toi)
+      && c3.signe.controle === 'ecart' && c3.signe.empreinte === 'e'.repeat(64) && c3.rattachable === false, JSON.stringify([c3.attend, c3.toi, c3.signe]));
+    ok('0.98 : conforme et déposé sans attendre : « CRA signé conforme à la saisie : Hermes le dépose… sans attendre ton oui », rien ne l’attend', /^CRA signé conforme à la saisie : Hermes le dépose sur le portail \(dans le quart d’heure\), sans attendre ton oui\.$/.test(c4.signe.dit) && !c4.attend.some((t) => /CRA signé/.test(t)) && !c4.signe.empreinte, JSON.stringify(c4.signe));
+    delete jours.signe; }
 } catch (err) { ok('exception', false, (err && err.stack) || String(err)); }
 fs.rmSync(DIR, {recursive: true, force: true});
 console.log(results.join('\n'));

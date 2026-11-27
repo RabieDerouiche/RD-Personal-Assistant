@@ -1,0 +1,14 @@
+# JARVIS OS — le CRA signé du client (docs/hermes-portail.md ; son QCM du 26/11/2026 : « Hermes, après mon oui »).
+# Posé par install.sh ; lancé toutes les 15 minutes par hermes-portail-cra-signe.timer. Il ne fait rien sans « adresse_mois= » dans
+# /etc/hermes-portail/cra.conf (root, jamais dans le dépôt), sans PDF gardé par JARVIS pour le mois, ni avant que le CRA du mois soit
+# validé par Hermes. Un passage au plus par lancement : d'abord la copie vérifiée du PDF et un essai à blanc sur la page du mois (rien
+# déposé) ; puis, seulement après son oui dans JARVIS (même empreinte, même mois), le dépôt, une seule fois par oui.
+[Unit]
+Description=CRA signé du client : vérifié à blanc sur le portail, puis déposé par le Hermes portail après son oui dans JARVIS
+After=network-online.target hermes-portail-filtre.service hermes-portail-sortie.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/hermes-portail cra-signe-auto
+TimeoutStartSec=1500
+Nice=5

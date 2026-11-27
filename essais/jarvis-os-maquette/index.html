@@ -2607,7 +2607,7 @@ void main(){
       s.append(renderPicker(picking, (v) => finish(picking.go(v), cfg.ctx), () => renderSheet(null)));
     }
   }
-  const pickAsk = (a) => a.confirm ? 'Tu es sûr ? « ' + a.label + ' ».' : ({cote: "Je te la remets quand ? C'est gratuit : aucun bot n'est réveillé.", snooze: 'Je te le représente quand ?', slot: 'Quel créneau je bloque dans ton agenda ?', bot: 'À qui je le confie ?', date: 'Quelle date ?', text: 'Dis-moi.', number: 'Quel montant ?', choice: 'Lequel ?', info: 'Voilà le détail.'})[a.pick.kind] || 'Dis-moi.';
+  const pickAsk = (a) => a.confirm ? (a.ask || 'Tu es sûr ? « ' + a.label + ' ».') : ({cote: "Je te la remets quand ? C'est gratuit : aucun bot n'est réveillé.", snooze: 'Je te le représente quand ?', slot: 'Quel créneau je bloque dans ton agenda ?', bot: 'À qui je le confie ?', date: 'Quelle date ?', text: 'Dis-moi.', number: 'Quel montant ?', choice: 'Lequel ?', info: 'Voilà le détail.'})[a.pick.kind] || 'Dis-moi.';
   function renderActions(list, onPick) {
     const wrap = h('div', {class: 'sheet-actions'});
     /* JARVIS OS (18/11/2026) : les actions marquées « more » sont repliées sous « Autres réponses » */
@@ -2633,7 +2633,7 @@ void main(){
     const box = h('div', {class: 'sheet-pick'});
     const ret = h('button', {type: 'button', class: 'btn ghost', onclick: back}, '‹ Retour');
     const choices = (arr, map) => h('div', {class: 'sa-grid'}, arr.map((o) => h('button', {type: 'button', class: 'btn', onclick: () => done(map ? map(o) : o)}, o.label)));
-    if (a.confirm) { box.append(h('div', {class: 'sa-main'}, h('button', {type: 'button', class: 'btn danger-fill', onclick: () => done({})}, 'Oui : ' + a.label.toLowerCase()), ret)); return box; }
+    if (a.confirm) { box.append(h('div', {class: 'sa-main'}, h('button', {type: 'button', class: 'btn danger-fill', onclick: () => done({})}, a.yes || 'Oui : ' + a.label.toLowerCase()), ret)); return box; }   /* 0.97.0 : `ask` et `yes`, la question et le oui propres à une action */
     const dateInput = (label, init, cb) => {
       const id = 'pk-' + (++SEQ);
       const inp = h('input', {class: 'inp', type: 'date', id, value: isoOf(day(init == null ? 1 : init))});
@@ -10843,7 +10843,8 @@ void main(){
     if (s.erreur) kids.push(h('p', {class: 'jrs-alerte', text: s.erreur}));
     if (s.retour) kids.push(h('p', {class: s.retour.resultat === 'soumise' || s.retour.resultat === 'deja' ? 'jrs-ok' : 'jrs-alerte'}, h('b', {text: 'Hermes : '}), s.retour.texte || s.retour.resultat, s.retour.premiere ? ' Première exécution : vérifie sur le portail ce qui a été saisi.' : ''));
     else if (s.etat === 'valide') kids.push(h('p', {class: 'jrs-ok', text: 'Confirmé : Hermes saisit et soumet ta semaine dans les minutes qui viennent.'}));
-    if (CRA.msg) kids.push(h('p', {class: 'jrs-msg', role: 'status', text: CRA.msg}));
+    /* 27/11/2026 (sa capture) : « Confirmé : Hermes saisit… » ne reste pas sous un compte rendu d'échec : dès qu'Hermes a rendu, c'est son compte rendu qui parle */
+    if (CRA.msg && !(s.retour && s.etat !== 'valide' && /^Confirmé/.test(CRA.msg))) kids.push(h('p', {class: 'jrs-msg', role: 'status', text: CRA.msg}));
     if (s.etat === 'a_la_main' && !s.bloque) kids.push(h('div', {class: 'row jrs-acts'}, btn('Relancer Hermes', () => craAgir('confirmer'), 'sm main cra-relancer')));   /* un nouveau oui = une nouvelle tentative */
     if (s.etat === 'a_valider') {
       kids.push(h('p', {class: 'jrs-rq', text: s.confirmable ? 'Ton oui lance Hermes : il saisit « 1 » pour chaque journée travaillée, rien pour un congé ou un férié, puis soumet la semaine.' : 'Le oui se donne à partir du vendredi (ton raccourci note chaque jour à 11 h).'}));
@@ -10930,6 +10931,9 @@ void main(){
       + '.trv-mail-t{display:flex;justify-content:space-between;align-items:baseline;gap:8px}.trv-mail-t span{min-width:0;overflow-wrap:anywhere}'
       + '.trv-rep{margin:8px 0 0;padding:8px 0 0;border-top:1px solid rgba(var(--c1),.14)}.trv-rep b{font-weight:600}.trv-rep.neuf b{color:#fde68a}.trv-rep .trv-ch{margin-left:6px}'
       + '.trv-rep p{margin:4px 0 0;color:var(--muted);overflow-wrap:anywhere}.trv-rep .trv-ouvrir{display:inline-flex;margin:8px 0 2px}.trv-mail>.trv-ouvrir{display:inline-flex;margin:8px 0 2px}'}));
+    /* 0.97.0 : le CRA signé déposé sur le portail par Hermes après son oui (son QCM du 26/11/2026) : où on en est, en une ligne dans la carte
+       (« Hermes vérifie le portail… », « Ton oui est noté… », « déposé par Hermes le … ») ; dans la feuille, le fichier et « Ouvrir le mail » */
+    document.head.append(h('style', {text: '.trv-signe{margin:10px 0 0;padding:9px 12px;border-radius:14px;border:1px solid rgba(var(--c1),.2);background:rgba(var(--c1),.06);font-size:13.5px}.trv-signe p{margin:0;overflow-wrap:anywhere}.trv-signe p+p{margin-top:4px;color:var(--muted)}.trv-signe b{font-weight:600;color:var(--fg)}.trv-signe .trv-ouvrir{display:inline-flex;margin:8px 0 2px}'}));
     const TRV = {data: null, at: 0, loading: null, f: 'tout'};
     const travailAPI = () => (SRV_OS && window.JarvisServeur && window.JarvisServeur.travail ? window.JarvisServeur.travail : null);
     const travailOn = () => (SRV_OS ? !!travailAPI() : !!window.__TRAVAIL);
@@ -10952,6 +10956,12 @@ void main(){
       (m.reponses || []).map((x) => h('div', {class: 'trv-rep' + (x.lu ? '' : ' neuf')}, h('b', {text: 'Réponse de ' + x.de + ' ' + x.quand}), x.pdf ? h('span', {class: 'trv-ch', text: 'PDF'}) : null,
         x.extrait ? h('p', {text: '« ' + String(x.extrait).slice(0, 160) + ' »'}) : null, liens ? trvLien(x.url) : null)),
       liens && !(m.reponses || []).length ? trvLien(m.url) : null))) : null);
+    const trvSigne = (r, detail) => { const s = r.signe; if (!s) return null;
+      const l = [s.dit ? h('p', {text: s.dit}) : null,
+        detail && s.nom && s.etat !== 'fait' ? h('p', {}, 'Fichier : ', h('b', {text: s.nom}), (s.taille ? ' · ' + s.taille : '') + (s.autres ? ' · ' + s.autres + (s.autres > 1 ? ' autres PDF laissés de côté' : ' autre PDF laissé de côté') : '')) : null,
+        detail && s.controleDit && s.etat !== 'fait' && !s.dit ? h('p', {'data-controle': s.controle || '', text: s.controleDit}) : null,   /* 0.98.0 : le PDF comparé à la saisie */
+        detail && s.etat !== 'fait' ? trvLien(s.url) : null].filter(Boolean);
+      return l.length ? h('div', {class: 'trv-signe', 'data-signe': s.etat || ''}, l) : null; };
     function trvCarte(r) {
       return h('button', {type: 'button', class: 'trv-card' + (r.toi ? ' toi' : ''), 'data-trv': r.id, onclick: () => openItem('travail', r)},
         h('div', {class: 'trv-tete'}, h('h3', {text: r.titre}), h('span', {class: 'trv-qui ' + (r.qui || ''), text: r.quiDit})),
@@ -10959,10 +10969,22 @@ void main(){
         trvEtapes(r), trvPrevu(r),
         r.alerte ? h('div', {class: 'trv-alerte', text: r.alerte}) : null,
         r.toi ? h('div', {class: 'trv-alerte'}, h('b', {text: 'À toi : '}), r.toi) : null,
-        trvMails(r, false), trvDer(r));
+        trvSigne(r, false), trvMails(r, false), trvDer(r));
     }
     SHEETCFG.travail = (r) => {
       const api = travailAPI(), actions = [];
+      /* 0.97.0 : Hermes a trouvé où déposer le CRA signé (essai à blanc, rien déposé) : son oui, confirmé d'un appui, gardé par le serveur sur
+         l'empreinte du fichier et le mois ; ou « Je le fais moi-même » (il le dépose, puis « C’est rattaché »). Après un dépôt en échec, un
+         nouveau oui vaut une nouvelle tentative. En maquette (sans serveur), les données d'exemple sont changées sur place. */
+      { const sg = r.signe || {}, quoi = sg.nom ? '« ' + sg.nom + ' »' + (sg.taille ? ' (' + sg.taille + ')' : '') : 'ce fichier';
+        const maq = (oui) => { const x = ((window.__TRAVAIL || {}).routines || []).find((y) => y.id === r.id); if (x && x.signe) { x.attend = (x.attend || []).filter((t) => !/CRA signé/.test(t));
+          if (oui) { x.signe = Object.assign({}, x.signe, {etat: 'oui', dit: 'Ton oui est noté : Hermes dépose le CRA signé sur le portail (dans le quart d’heure).', empreinte: ''}); x.toi = ''; }
+          else { x.signe = {etat: 'moi', mois: x.mois, dit: ''}; x.rattachable = true; x.attend.unshift('CRA signé reçu : à rattacher'); x.toi = 'CRA signé reçu : à rattacher sur le portail (onglet du haut de la page du CRA).'; } } return {ok: true}; };
+        const suite = (p, titre, texte) => { p.then((x) => { toast(x && x.ok ? titre : 'Pas noté', x && x.ok ? texte : ((x && x.error) || '')); travailLoad(true); }); return null; };
+        if ((sg.etat === 'pret' || sg.etat === 'echec') && sg.empreinte && r.mois) actions.push(act(sg.etat === 'pret' ? (sg.controle === 'ecart' ? 'Déposer quand même' : 'Oui, déposer') : 'Réessayer avec Hermes', {tone: 'main', confirm: true, showExtra: true, cost: 'free',   /* 0.98.0 : un écart avec la saisie change le libellé */
+          ask: (sg.controle === 'ecart' ? 'Le PDF ne correspond pas à la saisie. ' : '') + 'Hermes dépose ' + quoi + ' sur le portail ?', yes: 'Oui, déposer',
+          go: () => suite(api && api.signeOui ? api.signeOui(r.mois, sg.empreinte) : Promise.resolve().then(() => maq(true)), 'Ton oui est noté', 'Hermes dépose le CRA signé sur le portail, puis te prévient.')}));
+        if (sg.etat === 'pret' && r.mois) actions.push(act('Je le fais moi-même', {tone: 'main2', cost: 'free', go: () => suite(api && api.signeMoi ? api.signeMoi(r.mois) : Promise.resolve().then(() => maq(false)), 'Noté', 'Dépose-le sur le portail, puis « C’est rattaché ».')})); }
       /* 0.94.0 : le CRA signé est reçu : « C’est rattaché » quand il l'a déposé sur le portail (l'étape « Rattaché » passe à faite) */
       if (r.rattachable && r.mois) actions.push(act('C’est rattaché', {tone: 'main', cost: 'free', go: () => {
         (api && api.rattache ? api.rattache(r.mois) : Promise.resolve().then(() => { const x = ((window.__TRAVAIL || {}).routines || []).find((y) => y.id === r.id); if (x) { x.rattachable = false; x.toi = ''; x.attend = (x.attend || []).filter((t) => !/rattacher/.test(t)); x.etapes = x.etapes.map((e) => (e[0] === 'Rattaché' ? [e[0], 'fait'] : e)); } return {ok: true}; }))
@@ -10973,7 +10995,7 @@ void main(){
       if (api) actions.push(act('Renommer', {cost: 'free', pick: {kind: 'text', label: 'Le titre de cette carte', init: r.titre, submit: 'Renommer', placeholder: 'ex. le nom du client, du fournisseur'}, go: (v) => { api.renommer(r.id, v.txt).then((x) => { toast(x.ok ? 'Renommé' : 'Pas renommé', x.ok ? '« ' + x.titre + ' »' : (x.error || '')); travailLoad(true); }); return null; }}));
       return {kicker: 'Travail · ' + r.quiDit, title: r.titre, say: r.toi || (r.alerte ? r.alerte : 'Prochaine : ' + (r.prochaine || '—') + '.'),
         extraTop: () => h('div', {class: 'trv-sheet'}, trvEtapes(r), trvPrevu(r), r.alerte && r.toi ? h('div', {class: 'trv-alerte', text: r.alerte}) : null,
-          trvMails(r, true), trvDer(r)),
+          trvSigne(r, true), trvMails(r, true), trvDer(r)),
         actions};
     };
     VIEWS.travail = (el) => {

@@ -1,170 +1,113 @@
-# Demandes au serveur en attente (27/11/2026) : JARVIS 0.95.0 et 0.96.0
+# Demandes au serveur en attente (27/11/2026, soir) : JARVIS 0.98.0 — CRA signé déposé par Hermes, contrôle du PDF, CRA de la semaine
 
-À exécuter par la session « Serveur JARVIS 2 » (`session_01JvDfwzJbpLqSKJPKSk65Mq`). Un seul plan, un seul oui. `<COMMIT>` = le commit de main donné dans le message de la demande. Aucun secret ici ni dans la réponse ; ne recopie aucun nom de fichier du dossier `depot/`, aucun montant, et n'affiche pas le contenu de `radar.json`.
+À exécuter par la session « Serveur JARVIS 2 » (`session_01JvDfwzJbpLqSKJPKSk65Mq`). Un seul plan, un seul oui. `<COMMIT>` = le commit de main donné dans le message de la demande. Aucun secret ici ni dans la réponse : pas de nom de portail, pas d'adresse, pas d'hôte, pas de nom de personne, pas de nom de fichier venu d'un mail, pas de contenu de `jours.json`.
+
+La 0.95.0 et la 0.96.0 sont déployées et vérifiées depuis le 27/11 à 16 h 45 (compte rendu : `docs/jarvis-os.md`). Ce plan apporte la 0.97.0 (CRA signé déposé par Hermes après son oui), la 0.98.0 (le PDF comparé à la saisie, dépôt sans attendre s'il correspond, après un premier dépôt réussi) et la correction de la skill pour le CRA de la semaine (le code de temps choisi dans la liste : cause trouvée par le passage en lecture seule du 27/11 au soir).
 
 ## Plan
 
 ```text
 LECTURES DE DÉPART (sans demander)
-- git -C /opt/rd log --oneline -1 ; systemctl is-active jarvis hermes-gateway ; curl -s http://127.0.0.1:8787/api/health
-- les lectures de la section « Rangement des papiers » ci-dessous (Caddy, place libre, copie de nuit)
-- ls -l /root/serveur/CLAUDE.md ; grep -c 'Règle du propriétaire' /root/serveur/CLAUDE.md   (avant : 0)
+- git -C /opt/rd log --oneline -1 (attendu : 6722569) ; systemctl is-active jarvis hermes-gateway ; curl -s http://127.0.0.1:8787/api/health
+- les lectures 1 à 5 de la section « CRA signé » ci-dessous
+- aucune routine d'Hermes dans les 5 minutes avant l'étape 2b, aucun passage du portail en cours (systemctl is-active hermes-portail-essai.service → inactive)
 
 DÉPLOIEMENT (un seul oui)
-1. sudo -u jarvis git -C /opt/rd pull --ff-only          (attendu : <COMMIT>)
-2. sudo systemctl restart jarvis                          (version attendue : 0.96.0, sans erreur au démarrage)
-2b. sudo bash /opt/rd/jarvis-os/hermes/install.sh         (0.96.0 : ordres de JARVIS pour les routines — hermes-ordres.path et .service, copie root d'ordres.py, dossier des ordres sous /var/lib/jarvis-reveil ; relance Hermes comme d'habitude ; le garde reste coupé jusqu'au 2026-12-03)
-3. Sa règle du 25/11/2026 pour la session du serveur, écrite une fois pour toutes dans le fichier que chaque session neuve relit
-   (copie de l'ancien fichier gardée) :
-   sudo cp -p /root/serveur/CLAUDE.md /root/serveur/CLAUDE.md.avant-regle && sudo tee -a /root/serveur/CLAUDE.md >/dev/null <<'REGLE'
+0. sudo rm -f /root/consigne-lecture.* /root/lecture-cra.out       (les deux fichiers temporaires du passage en lecture seule du 27/11 ; l'un contient l'adresse)
+1. sudo -u jarvis git -C /opt/rd pull --ff-only                    (attendu : <COMMIT>)
+2. sudo systemctl restart jarvis                                    (version attendue : 0.98.0, sans erreur au démarrage)
+2b. sudo bash /opt/rd/jarvis-os/hermes/install.sh                   (limite.py : une unité de plus dans la liste fermée des relances)
+2c. sudo bash /opt/rd/jarvis-os/hermes/portail/install.sh           (commande hermes-portail, skill corrigée, hermes-portail-cra-signe.service et .timer, activés)
 
-## Règle du propriétaire pour cette session (25/11/2026, recopiée le 27/11/2026)
-- Lecture seule : sans demander (un passage « hermes-portail essai » en lecture seule compris).
-- Une modification : une seule question pour tout le plan, retour arrière compris.
-- Redemander pour : un secret, une suppression, un nouvel hôte ouvert, un redémarrage hors plan, ou ce qui sort du plan.
-- Une demande de la session de développement arrive en un seul plan ; le compte rendu est court, sans secret, sans contenu de mail, sans montant.
-- Si un défaut est trouvé hors du plan : le dire et proposer la correction, ne pas la faire sans son oui.
-REGLE
-
-CONTRÔLES (lecture seule)
-4. Section « Rangement des papiers », ses étapes 3 à 5 (santé et version, 401, 401, 303, journal).
-5. Section « Radar », ses contrôles (droits 600, clé historique sans montant à l'écran, journal sans erreur du Radar), lancés sous
-   l'utilisateur jarvis (sudo -iu jarvis …).
-5b. Section « Administrer les routines » ci-dessous : ses lectures, ses contrôles, et son essai réel sans passage (pause puis reprise d'une routine par un ordre posé sous l'utilisateur jarvis).
-6. journalctl -u jarvis --since "-10 min" --no-pager | grep -ciE "erreur|error" (et les lignes, s'il y en a) ; systemctl is-active jarvis hermes-gateway
-7. Suivi de la 0.94.0, sans contenu : journalctl -u jarvis --since "2026-11-27 07:20" --no-pager | grep -ciE "suivi des réponses|réveil d.Hermes impossible"   (attendu : 0)
+CONTRÔLES (lecture seule) : les contrôles 1 à 4 de la section « CRA signé », puis
+5. journalctl -u jarvis --since "-10 min" --no-pager | grep -ciE "erreur|error" (et les lignes, s'il y en a) ; systemctl is-active jarvis hermes-gateway hermes-ordres.path
+6. 0.98.0, le PDF comparé à la saisie (dans les 6 minutes après le redémarrage ; un nombre et un mot, jamais un nom) :
+   sudo python3 -I -c "import json; D=json.load(open('/home/jarvis/.jarvis/jours.json')); c=D['mois'].get('2026-11',{}).get('suivi',{}).get('cra',{}).get('signe',{}).get('controle',{}); print(c.get('etat'), c.get('total'), c.get('attendu'), c.get('detail'), '| premier dépôt déjà fait :', bool(D.get('signePremier')))"
+   → attendu : « conforme N N True | premier dépôt déjà fait : False » (le même nombre deux fois ; vérifié à la main sur le vrai PDF, hors dépôt). Dans ta réponse : seulement le mot, si les deux nombres sont égaux, et les deux booléens.
+7. La skill corrigée du CRA de la semaine : sudo grep -c 'Ne te fie jamais au texte' /etc/hermes-portail/skills/portail/portail/SKILL.md → 1
+   L'état de la semaine, sans contenu : sudo python3 -I -c "import json; s=json.load(open('/home/jarvis/.jarvis/jours.json')).get('semaines',{}).get('2026-11-23',{}); print(s.get('etat'))"   → a_la_main (il touchera « Relancer Hermes » dans JARVIS ; NE PAS relancer à sa place, ne pas toucher à tentees.txt)
+8. « L'ESSAI À BLANC RÉEL POUR NOVEMBRE 2026 » de la section : il part seul ; relevés a à g.
+9. S'il a touché « Relancer Hermes » pendant que tu es là (sinon ne l'attends pas) : journalctl -u hermes-portail-cra --since '-20 min' --no-pager -o cat | tail -15 ; sudo tail -2 /var/lib/hermes-portail/cra/soumises.txt → le résultat (« soumise » attendu), et si Hermes dit avoir choisi le code dans la liste et relu sa valeur.
 
 RETOUR ARRIÈRE
-- Le code : sudo -u jarvis git -C /opt/rd checkout 0007ecd && sudo systemctl restart jarvis && sudo bash /opt/rd/jarvis-os/hermes/install.sh   (pour revenir ensuite : git checkout main) ; voir aussi le retour arrière de la section « Administrer les routines »
-- La règle : sudo cp -p /root/serveur/CLAUDE.md.avant-regle /root/serveur/CLAUDE.md
-- Les fichiers en attente du dépôt et radar.json : rien à défaire (voir les deux sections).
+- sudo systemctl disable --now hermes-portail-cra-signe.timer
+- sudo -u jarvis git -C /opt/rd checkout 6722569 && sudo systemctl restart jarvis && sudo bash /opt/rd/jarvis-os/hermes/install.sh && sudo bash /opt/rd/jarvis-os/hermes/portail/install.sh   (pour revenir ensuite : git checkout main)
+- voir aussi le retour arrière de la section.
 
 CE QUE J'ATTENDS EN RETOUR (court, en tableau)
-Commit et version avant/après ; les lectures de Caddy, la place libre, si la copie de nuit prend depot/ ; chaque étape : fait ou erreur
-mot pour mot ; les codes de l'étape 4 ; les sorties de l'étape 5 (le mois suivi et la liste des mois, jamais un montant) ; les comptes
-des étapes 6 et 7 ; l'heure de fin.
+Commit et version avant/après ; chaque étape : fait ou erreur mot pour mot ; les lectures et contrôles de la section (des nombres, des oui/non) ; les lignes des contrôles 6 et 7 ;
+l'essai à blanc : a à g ; le contrôle 9 s'il a eu lieu ; la durée du passage ; l'heure de fin ; ce qui a surpris.
 ```
 
-## Section « Rangement des papiers » (0.91.0)
+## Section « CRA signé » (0.97.0 et 0.98.0)
 
-Rien à faire sur le serveur au-delà de `git pull` et du redémarrage de jarvis : le dossier `depot/` et `depot.json` sont créés par le serveur au premier dépôt, **sous son dossier de données** (`/home/jarvis/.jarvis`, déjà permis en écriture par le durcissement du service : aucun dossier nouveau à autoriser) ; aucune variable, aucune unité, aucun hôte nouveau (Drive passe par l'accès Google déjà en place). Section à fondre dans la demande commune, pour les contrôles en lecture seule :
+`git pull`, le redémarrage de `jarvis`, `sudo bash /opt/rd/jarvis-os/hermes/install.sh` et
+`sudo bash /opt/rd/jarvis-os/hermes/portail/install.sh` sont faits une fois par la demande commune. Ce chantier n'ajoute **aucun**
+`ReadWritePaths` (JARVIS écrit sous son dossier de données, `/home/jarvis/.jarvis/cra-signe`), aucun hôte, aucun secret, aucun
+réglage : `adresse_mois=` est déjà dans `/etc/hermes-portail/cra.conf` depuis le CRA du mois. Ce qu'il ajoute : une minuterie
+(`hermes-portail-cra-signe.timer`, activée par `install.sh` du portail) et un dossier de root (`/var/lib/hermes-portail/cra-signe`).
 
 ```text
-SECTION « RANGEMENT DES PAPIERS » (0.91.0 ; à fondre dans la demande commune ; <COMMIT> = le commit de main qui contient la fusion).
-Aucun secret dans cette section ni dans ta réponse. Ne recopie aucun nom de fichier du dossier depot/ (des comptes seulement).
+LECTURES (avant, en lecture seule)
+1. grep -c '^adresse_mois=.' /etc/hermes-portail/cra.conf            (attendu : 1 ; ne pas afficher la ligne)
+2. sudo grep -c '^2026-11 ' /var/lib/hermes-portail/cra/mois-valides.txt ; sudo python3 -I -c "import json; print(json.load(open('/var/lib/hermes-portail-retours/mois-2026-11.json')).get('resultat'))"
+   (au moins l'un des deux doit dire que novembre est validé par Hermes : 1, ou « validee » / « deja »)
+3. L'état du CRA signé de novembre chez JARVIS, sans donnée personnelle :
+   sudo python3 -I -c "import json; c=json.load(open('/home/jarvis/.jarvis/jours.json'))['mois'].get('2026-11',{}).get('suivi',{}).get('cra',{}); print('reponses avec PDF :', sum(1 for r in c.get('reponses',[]) if r.get('pdf')), '| rattache :', bool(c.get('rattache')), '| signe :', sorted((c.get('signe') or {}).keys()))"
+   (attendu avant le déploiement : 1 réponse avec PDF ; « signe : [] ». Si « rattache : True » : il l'a déjà déposé lui-même, l'essai
+   à blanc ne partira pas — le dire, ne rien forcer.)
+4. systemctl show jarvis -p ReadWritePaths ; stat -c '%U %a' /home/jarvis/.jarvis      (JARVIS écrit bien sous /home/jarvis)
+5. systemctl list-timers 'hermes-portail-*' --no-pager                 (les heures des autres minuteries, pour ne pas lancer l'essai sur un autre passage)
 
-LECTURES (sans demander)
-- git -C /opt/rd log --oneline -1 ; systemctl is-active jarvis
-- sudo grep -n -i 'request_body\|max_size' /etc/caddy/Caddyfile   (attendu : rien ; une limite sous 26 Mo couperait un dépôt de 25 Mo)
-- sudo grep -n -i 'courses\|invite\|partage' /etc/caddy/Caddyfile   (attendu : rien sur « partage » ; /partage doit arriver à jarvis comme le reste)
-- df -h /home/jarvis | tail -1   (le dépôt garde au plus 300 Mo en attente)
-- La copie du serveur de chaque nuit, si elle existe : dis seulement si elle prend tout /home/jarvis/.jarvis (le dossier depot/ en ferait
-  alors partie : des papiers en attente, 30 jours au plus). Ne change rien.
-
-DÉPLOIEMENT (un seul oui ; sauter ce que la demande commune a déjà fait)
-1. sudo -u jarvis git -C /opt/rd pull --ff-only   (attendu : <COMMIT>)
-2. sudo systemctl restart jarvis
+DÉPLOIEMENT (rien de plus que la demande commune)
+- install.sh du portail pose hermes-portail-cra-signe.service et .timer, les active, recopie la commande, limite.py et la skill.
 
 CONTRÔLES (lecture seule)
-3. curl -s http://127.0.0.1:8787/api/health   (version attendue : celle de <COMMIT>)
-4. curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8787/api/depot   (→ 401 : réservé à un appareil relié)
-   curl -s -o /dev/null -w '%{http_code}\n' -X POST http://127.0.0.1:8787/api/raccourci/depot   (→ 401 : sans la clé du Raccourci)
-   curl -s -o /dev/null -w '%{http_code} %{redirect_url}\n' -X POST http://127.0.0.1:8787/partage   (→ 303, vers /#voir-papiers-partage-vide)
-5. journalctl -u jarvis -n 30 --no-pager -o cat | grep -c 'dépôt'   (attendu : 0 ; une ligne « [jarvis] dépôt : … » dirait une erreur, recopie-la)
-6. Après son premier dépôt seulement (sinon le dossier n'existe pas encore, c'est normal) :
-   sudo stat -c '%U %a' /home/jarvis/.jarvis/depot /home/jarvis/.jarvis/depot.json   (→ jarvis 700, jarvis 600)
-   sudo find /home/jarvis/.jarvis/depot -type f ! -perm 600 | wc -l   (→ 0) ; sudo find /home/jarvis/.jarvis/depot -type f | wc -l   (le nombre en attente)
+1. systemctl is-active hermes-portail-cra-signe.timer → active ; grep -c hermes-portail-cra-signe.service /usr/local/lib/hermes-portail/limite.py /usr/local/lib/hermes-relance/limite.py → 1 et 1
+2. sudo grep -c 'CRA signé du client' /etc/hermes-portail/skills/portail/portail/SKILL.md → 4 ; sudo hermes-portail etat | head -20 (rien de changé pour le coffre et les identifiants)
+3. Dans les deux minutes après le redémarrage de jarvis (son premier passage) :
+   sudo stat -c '%U %a' /home/jarvis/.jarvis/cra-signe ; sudo ls -la /home/jarvis/.jarvis/cra-signe
+   → jarvis 700 ; un seul fichier <32 caractères>.pdf, 600. Puis la lecture 3 de nouveau : « signe » doit contenir
+   fichier, empreinte, taille, nom, garde (et pas « erreur » ni « refus » ; s'il y en a : relever leur texte).
+   journalctl -u jarvis --since '-5 min' --no-pager -o cat | grep -i 'CRA signé'      (rien = bon signe)
+4. curl -s -o /dev/null -w '%{http_code}\n' -X POST -H 'content-type: application/json' -d '{"mois":"2026-11"}' http://127.0.0.1:8787/api/jours/signe/valider → 401 (sans appareil relié)
+
+L'ESSAI À BLANC RÉEL POUR NOVEMBRE 2026 (il doit partir SEUL : ne pas le lancer à la main avant 20 minutes)
+Le CRA signé de novembre est déjà reçu : une fois le PDF gardé (contrôle 3), la minuterie fait la copie puis le passage à blanc à son
+premier passage (au plus 15 minutes). Aucun fichier n'est remis à Hermes pendant ce passage : rien ne peut être déposé.
+À relever, SANS nom de portail, SANS adresse, SANS hôte, SANS nom de personne :
+ a. journalctl -u hermes-portail-cra-signe --since '-25 min' --no-pager -o cat | tail -40    (la ligne « Résultat CRA signé : … » et
+    « Compte rendu pour JARVIS : … »)
+ b. sudo python3 -I -c "import json; r=json.load(open('/var/lib/hermes-portail-retours/signe-2026-11.json')); print(r['etat'], r['reel'], r['premiere'], '|', r['texte'])"
+    → attendu : « pret False False | … ». Vérifier à l'œil que le texte ne contient ni nom du portail ni adresse ; s'il en
+    contient un : le dire (c'est un défaut du nettoyage), sans le recopier.
+ c. sudo ls -la /var/lib/hermes-portail/cra-signe /var/lib/hermes-portail/cra-signe/2026-11 ; sudo cat /var/lib/hermes-portail/cra-signe/2026-11/etat ; sudo cut -c1-30 /var/lib/hermes-portail/cra-signe/tentes.txt
+    → root 700 ; signe.pdf et prepare.json en 600 ; etat = pret ; une ligne « blanc 2026-11 … ».
+ d. Dans le dernier fichier /var/lib/hermes-portail/essais/*-cra-signe.txt (root seul), ce qu'Hermes a vu, en clair et en mots
+    à toi : comment s'appelle l'onglet ou la zone du dépôt ; y a-t-il un vrai champ de fichier, ou une zone « glisser-déposer »,
+    une fenêtre, un type de document à choisir, une case à cocher, un bouton de confirmation ; ce que la page dit du mois
+    (statut) ; un document y est-il déjà ; les lignes « Appris : » gardées.
+ e. journalctl -u hermes-portail-filtre --since '-25 min' --no-pager -o cat | grep -c refus    (et, s'il y en a, combien d'hôtes
+    différents, sans les nommer : un dépôt de fichier peut passer par un autre hôte que celui du portail — à savoir avant le vrai dépôt)
+ f. sudo ls -la /var/lib/hermes-portail-depot                         (aucun CRA-signe-*.pdf ne doit y rester)
+ g. Côté JARVIS : journalctl -u jarvis --since '-25 min' --no-pager -o cat | grep -ci 'signé'    et la lecture 3 : « signe » doit
+    contenir « retour » et « notifiePret ».
+Si rien n'est parti après 20 minutes : sudo hermes-portail cra-signe-auto (à la main, il dit pourquoi il ne fait rien, ou fait le
+passage à blanc) ; rapporter sa phrase. Si le résultat est « introuvable » ou « echec » : ne PAS relancer (un essai par fichier) ;
+rapporter d et e. NE PAS toucher à jours.json, ne pas poser de oui à sa place : le dépôt réel n'a lieu qu'après son oui dans l'app.
 
 RETOUR ARRIÈRE
-- Le code : sudo -u jarvis git -C /opt/rd checkout <commit d'avant> && sudo systemctl restart jarvis
-  (l'app revient à la carte « À trier » ; la portée Google « drive », si elle a été accordée, ne sert plus à rien et ne gêne pas).
-- Les fichiers en attente restent dans /home/jarvis/.jarvis/depot : il les retire lui-même dans JARVIS avant le retour arrière, ou bien,
-  sur son oui (c'est une suppression) : sudo -u jarvis rm -r /home/jarvis/.jarvis/depot /home/jarvis/.jarvis/depot.json
-- Rien de ce qui est déjà rangé dans Drive n'est touché par un retour arrière.
+- Tout arrêter côté portail (ni essai, ni dépôt) : sudo systemctl disable --now hermes-portail-cra-signe.timer
+- Revenir à l'ancien chemin dans JARVIS (« à rattacher », « C'est rattaché ») : revenir au commit d'avant et redémarrer jarvis ; le
+  dossier /home/jarvis/.jarvis/cra-signe et la clé « signe » de jours.json sont alors ignorés (les effacer seulement sur sa demande).
+- Rien à défaire sur le portail : l'essai à blanc ne dépose rien.
 
 CE QUE J'ATTENDS EN RETOUR
-Commit déployé et version ; les deux lectures de Caddy (rien, ou les lignes trouvées) ; la place libre ; si la copie de nuit prend depot/ ;
-les trois codes de l'étape 4 ; le compte de l'étape 5 (et la ligne s'il n'est pas 0) ; à l'étape 6, les droits et les deux comptes, ou
-« pas encore de dépôt » ; toute erreur mot pour mot.
+- les lectures 1 à 3 (des nombres et des oui/non) ; les contrôles 1 à 4 ;
+- l'essai à blanc : a, b (l'état et le texte tel qu'écrit), c, d (en mots à toi), e (un nombre), f, g ;
+- la durée du passage, et tout ce qui a surpris. Pas de nom de portail, pas d'adresse, pas de nom de personne.
 ```
 
-## Section « Radar » (0.93.0)
-
-Rien d'autre que `git pull` et le redémarrage du service. Pas de migration à lancer : au premier calcul, `radar.json` reçoit seul la clé
-`historique` (`{mois: {}, suivi: "AAAA-MM"}`) ; toutes les autres clés sont relues telles quelles (vérifié au banc : dépenses fixes, dépenses
-courantes et leurs notes, paie, budgets retenus, paiements en plusieurs fois, refus, alertes vues). Aucun hôte, aucune variable, aucun droit
-nouveau.
-
-Contrôles en lecture seule (aucun n'affiche un montant : ne pas faire afficher le contenu de `radar.json` dans la session du serveur) :
-
-- droits du fichier : `stat -c '%a' ~/.jarvis/radar.json` → `600` ;
-- l'historique est en place, sans montant à l'écran :
-  `python3 -c "import json,os;h=json.load(open(os.path.expanduser('~/.jarvis/radar.json'))).get('historique') or {};print(h.get('suivi'), sorted((h.get('mois') or {}).keys()))"`
-  → le mois en cours, puis la liste des mois gardés (vide jusqu'au 1er décembre, ou les mois d'avant dont le budget avait été retenu) ;
-  (le chemin du dossier de données est celui de `JARVIS_DATA` s'il est défini) ;
-- journal du service depuis le redémarrage : aucune ligne « radar : radar.json illisible », « radar.json non enregistré » ni « tic impossible » ;
-- le 1er décembre après minuit (heure de Paris) : la même commande montre `2026-11` dans les mois gardés, et aucune notification n'est partie pour cela.
-
-Retour arrière : revenir au commit d'avant et redémarrer. Le serveur d'avant ignore la clé `historique` (il la garde dans le fichier sans
-la lire) et reprend ses « six mois » ; rien à défaire dans `radar.json`. L'app d'avant ne lit ni `mois.depense` ni `mois.historique`.
-Dans l'autre sens, l'app 0.93.0 devant un serveur d'avant garde « Six derniers mois » et ne montre pas « Déjà dépensé ».
-
-## Section « Administrer les routines » (0.96.0)
-
-`git pull`, le redémarrage de `jarvis` et `sudo bash /opt/rd/jarvis-os/hermes/install.sh` sont faits une fois par la demande commune. Ce
-chantier n'ajoute **aucun** `ReadWritePaths` (les ordres vont dans `/var/lib/jarvis-reveil`, déjà permis), aucun hôte, aucun secret.
-
-**LECTURES (avant, en lecture seule)**
-1. `systemctl show jarvis -p ReadWritePaths` : `/var/lib/jarvis-reveil` doit y être (corrigé le 27/11).
-2. `sudo bash /opt/rd/jarvis-os/hermes/routines.sh --liste` : l'état des routines avant (à garder pour comparer).
-3. `ls -la /var/lib/jarvis-reveil /var/lib/hermes-relance-etat` et `sudo ls -la /var/lib/hermes-relance`.
-
-**DÉPLOIEMENT (rien de plus que la demande commune)**
-- `install.sh` pose `ordres.py`, `/usr/local/sbin/hermes-ordres`, `hermes-ordres.path` et `.service`, crée `/var/lib/jarvis-reveil/ordres`
-  (à `jarvis`, 700) et active la surveillance. `routines.sh` n'a pas à être relancé (aucune routine ne change).
-
-**CONTRÔLES (lecture seule)**
-1. `systemctl is-active hermes-ordres.path` → `active` ; `systemctl status hermes-ordres.path --no-pager | head -5`.
-2. `stat -c '%U:%G %a' /var/lib/jarvis-reveil/ordres` → `jarvis:jarvis 700` ; `stat -c '%U %a' /usr/local/lib/hermes-relance/ordres.py
-   /usr/local/sbin/hermes-ordres` → `root 644`, `root 755`.
-3. `sudo systemctl start hermes-relance.service` puis `ls -la /var/lib/hermes-relance-etat` : `routines.json` et `historique.json`
-   (`root jarvis`, 640). `sudo python3 -I -c "import json; d=json.load(open('/var/lib/hermes-relance-etat/historique.json'));
-   print({k: len(v) for k, v in d['routines'].items()})"` : un nombre de passages par routine (la durée vient du registre d'Hermes).
-4. **L'horaire en vigueur et celui d'origine** : `sudo python3 -I -c "import json; [print(r['nom'], '|', r['moment'], '| modifié' if
-   r['modifie'] else '| origine', '|', r['origine'], '| prochain', r['prochain']) for r in
-   json.load(open('/var/lib/hermes-relance-etat/routines.json'))['routines']]"` : pour chaque routine, « modifié » doit être faux et les
-   deux horaires identiques ; à comparer avec `routines.sh --liste` (heures de Paris).
-5. `journalctl -u hermes-relance -n 15 --no-pager -o cat` : pas de « Suivi des routines pour JARVIS : en échec ».
-6. `sudo bash /opt/rd/jarvis-os/hermes/diagnostic.sh | sed -n '/ordres de JARVIS/,/historique pour JARVIS/p'`.
-7. `curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8787/api/hermes/routine?nom=reveil` → `401` (sans appareil relié).
-
-**UN ESSAI RÉEL SANS RISQUE (mettre en pause puis reprendre une routine, sans lancer de passage)** — routine : `sorties-du-week-end`
-(prochain passage jeudi 19 h : rien ne tombe pendant l'essai) :
-```
-ID=$(openssl rand -hex 8); printf '{"id":"%s","routine":"sorties-du-week-end","action":"pause","at":%s}' "$ID" "$(date +%s)" | sudo -u jarvis tee /var/lib/jarvis-reveil/ordre-essai.tmp >/dev/null
-sudo -u jarvis mv /var/lib/jarvis-reveil/ordre-essai.tmp /var/lib/jarvis-reveil/ordres/ordre-$ID.json
-sleep 8; journalctl -u hermes-ordres -n 5 --no-pager -o cat; sudo ls -A /var/lib/jarvis-reveil/ordres | wc -l
-sudo cat /var/lib/hermes-relance/routines.pause; sudo bash /opt/rd/jarvis-os/hermes/routines.sh --liste | grep sorties
-```
-Attendu : « Ordre … (pause sorties-du-week-end) : fait. », dossier vide (0), `sorties-du-week-end <époque>` dans `routines.pause`, la
-liste dit `pause … ; en pause depuis JARVIS`. Puis la reprise (même chose avec `"action":"reprendre"` et un nouvel `ID`) : « fait »,
-`routines.pause` vide, la liste dit `actif` avec un prochain passage jeudi 19 h. Vérifier aussi que le réveil n'a pas été lancé par
-l'essai : `journalctl -u hermes-reveil --since -5min --no-pager -o cat` (rien de neuf).
-
-**RETOUR ARRIÈRE**
-- Couper seulement les ordres : `sudo systemctl disable --now hermes-ordres.path` (l'app dira « pas pris en compte : le serveur ne répond
-  pas » ; le reste de la 0.92.0 continue ; attention, `hermes-relance` rattrape encore un ordre posé toutes les 10 minutes : pour tout
-  couper, aussi `sudo rmdir /var/lib/jarvis-reveil/ordres` : l'app répond alors « le dossier des ordres n'existe pas sur ce serveur » ;
-  `install.sh` le recrée).
-- Défaire à la main, sans l'app, ce qui a été réglé depuis JARVIS : une pause, `sudo bash /opt/rd/jarvis-os/hermes/routines.sh
-  --reprendre <nom>` (et `--pause <nom>` pour la poser) ; un horaire, retirer sa ligne de `/var/lib/hermes-relance/routines.horaire`
-  puis `sudo bash /opt/rd/jarvis-os/hermes/routines.sh` (il repose l'horaire de `routines.conf` sur la routine).
-- Revenir à la version d'avant : `git checkout` du commit précédent, `install.sh`, redémarrage de `jarvis` (comme la demande commune) ;
-  les fichiers `/var/lib/hermes-relance-etat/historique.json` et `ordres.json` peuvent rester (l'ancienne version ne les lit pas).
-
-**CE QUE J'ATTENDS EN RETOUR**
-- Les sorties des contrôles 1 à 7 ; les quatre lignes de l'essai (pause puis reprise) ; la ligne `routines.sh --liste` de
-  `sorties-du-week-end` avant et après ; s'il y en a une, toute ligne « Entrée inattendue », « refusé » ou « Traceback » du journal
-  `hermes-ordres`.
-- Après son premier « Lancer maintenant » depuis l'app (à lui de le faire) : `journalctl -u hermes-ordres -u 'hermes-ordre-*' --since
-  -15min --no-pager -o cat` (on y lit si Hermes a confié le passage à la passerelle ou l'a fait sur place).
+Après son premier oui dans l'app (pas dans cette demande) : le dépôt part au quart d'heure suivant ; à relever alors, de la même
+façon : `signe-2026-11.json` (`depose True True`), `deposes.txt`, les refus du relais pendant le passage, et sa vérification à lui
+sur le portail.
