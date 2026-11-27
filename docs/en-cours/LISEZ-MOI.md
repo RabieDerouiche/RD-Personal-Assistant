@@ -67,3 +67,11 @@ pas commencé), 6. le dépôt du CRA signé sur le portail par Hermes après son
 - **Ordre de la suite (ses consignes du 27/11)** : 1. 0.96.0 ; 2. les trois maquettes de refonte, avec toutes les nouveautés dedans (dépôt des papiers, réponses aux mails et CRA signé, routines en direct et leur administration, Radar, « Pour moi » par sujet) ; 3. dépôt du CRA signé par Hermes ; 4. un seul récapitulatif final : ce qui a changé, les nouveautés, ce qu'il doit faire.
 - **Reprise automatique (sa demande du 27/11)** : garder un réveil programmé (`send_later`) cinq minutes après la prochaine levée probable de la fenêtre de 5 heures tant qu'il reste du travail ; au réveil, reprendre sans lui demander.
 - Banc connu : `fiab-a6.test.mjs` a 2 échecs déjà présents avant ces chantiers (rappels du matin) : à regarder, sans rapport avec eux.
+
+## État au 27/11/2026, 13 h
+
+- **Branche à `0d240e3` : JARVIS 0.96.0** (administrer les routines d'Hermes, fusionné, docs rangées, plan du serveur à jour dans `docs/demandes-serveur-en-attente.md`). Pas encore dans main : ses bancs sur l'ensemble repassent (journaux : `scratchpad/h/`, résultat dans `scratchpad/h/resultat.txt`). main est à `6b118fe` (0.95.0). Le serveur est en 0.94.0.
+- **Maquettes de refonte : finies** (A « Orbite », B « Poste de contrôle », C « Le fil »), commitées, servies à `/maquettes/refonte-a|b|c/` après la prochaine mise à jour du serveur. 21 captures finales : `scratchpad/refonte/final/`. Elles ne lui sont pas encore envoyées : il veut tout à la fin.
+- **En cours : 0.97.0, dépôt du CRA signé sur le portail par Hermes après son oui** (un agent en worktree, lancé à 12 h 55 ; note attendue : `docs/_chantier-G.md`). Limite : ne sera « fini » qu'après un essai à blanc sur le vrai portail (par la session du serveur) et sa validation la première fois.
+- **Ensuite** : fusionner 0.97.0, bancs, PR vers main, UNE demande à « Serveur JARVIS 2 » (0.95.0, 0.96.0, 0.97.0 : mise à jour, redémarrage, les deux `install.sh`, contrôles, essai pause/reprise d'une routine, essai à blanc du dépôt), lire son compte rendu, puis le récapitulatif final unique avec les captures et un QCM de choix de maquette.
+- Limite de la 0.96.0 à lui dire : une routine n'a qu'un horaire technique (passages à la même minute ou à la même heure) ; la lever = plusieurs tâches par routine côté Hermes.
