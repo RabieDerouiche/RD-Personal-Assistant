@@ -46,3 +46,15 @@ pas commencé), 6. le dépôt du CRA signé sur le portail par Hermes après son
 - Bancs et rangement de la documentation : par script ou en arrière-plan, sans consommer le forfait.
 - Pas de travail lourd dans l'heure qui précède ses routines (Veille 7 h 40, CRA de la semaine le vendredi à midi).
 - À décider et risques du chantier F : `suite-mails.md` (dont la structure de `jours.json` pour le dépôt du CRA signé par Hermes).
+
+## État au 27/11/2026, 8 h 30 (heure de Paris)
+
+- main = `95c500d` (demande de fusion 250) : A, B, D (0.92.0) et F (0.94.0) y sont ; tous les bancs verts (serveur 404, jours 106, travail 31, courrier 10, relance 80, garde 25, Hermes 88, portail 188, bout en bout 136, app 361 et 3 échecs liés à la date, identiques sur main avant la fusion).
+- **Demande de déploiement envoyée** à la session « Serveur JARVIS » le 27/11 à 8 h 25 (un seul oui : étapes communes, puis les sections 1 à 4 de `docs/demandes-serveur-en-attente.md`, plus deux relevés : appels d'outil mal formés d'Hermes, retard du réveil du 26/11). Son compte rendu se lit par `list_events` (kinds `result`). Tant qu'il n'est pas arrivé : ne rien renvoyer à cette session, ne pas lancer de travail lourd (le forfait est partagé ; CRA de la semaine à midi).
+- Ensuite, dans l'ordre : lire le compte rendu, mettre `CLAUDE.md` et les docs à jour ; reprendre E (`chantier-E.patch`, ou l'agent a93cbe731fb974b72 s'il existe encore dans la session), puis C (`chantier-C.patch`, agent a7f6dfadf7db8f13d) ; seconde demande au serveur ; maquettes ; dépôt du CRA signé par Hermes.
+
+## État au 27/11/2026, 8 h 45
+
+- **Déployé et vérifié sur le serveur à 8 h 22** (0.94.0) : compte rendu dans `docs/jarvis-os.md`, « Déploiement du 27/11/2026 ». Plus rien en attente côté serveur.
+- Session du serveur : désormais « Serveur JARVIS 2 » (`session_01JvDfwzJbpLqSKJPKSk65Mq`).
+- **Limite de la semaine en alerte** (remise à zéro lundi 30/11 à 12 h, heure de Paris) : avant de lancer E, C, les maquettes ou le dépôt du CRA signé, lui demander par QCM ce qui passe d'abord et ce qui attend lundi.
