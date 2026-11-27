@@ -108,17 +108,20 @@ export const RANG_COURANT = {courses: 'Alimentation', boucherie: 'Alimentation',
    - ses dépenses fixes dont le jour est passé (`occurrences` : une dépense qui commence plus tard, finie ou résiliée, la facture du mois,
      le montant du mois d'un contrat ; une dépense retirée de sa liste n'est plus comptée) ;
    - les échéances de ses paiements en plusieurs fois (comptées à part : `plans`) : celles dont la date est passée, ou qu'un mail dit
-     payées ; un paiement dit « plus à payer » (achat annulé, remboursé) ne compte pas du tout ;
+     payées ; un paiement dit « plus à payer » garde ses échéances déjà payées (son choix au QCM du 27/11/2026, « Compter le déjà
+     payé ») : celles qu'un mail dit payées, et celles dont la date était passée le jour où il l'a dit (`plansRetiresLe`) ; les
+     suivantes disparaissent. Un paiement retiré avant la 0.99.0 (jour inconnu) ne garde que celles qu'un mail dit payées ;
    - ce qu'il a noté de ses dépenses courantes (`reels`), jusqu'à `notesJusqua` ; une dépense « une fois par mois » cochée « Fait ce
      mois-ci » sans note compte pour son montant prévu.
    Rend les totaux, les postes (catégorie des dépenses fixes, rangement des dépenses courantes) et le détail ligne par ligne. */
-export function depenseEntre({fixes = [], courantes: cr = [], plans = {}, plansRetires = []} = {}, a, b, {notesJusqua = b} = {}) {
+export function depenseEntre({fixes = [], courantes: cr = [], plans = {}, plansRetires = [], plansRetiresLe = {}} = {}, a, b, {notesJusqua = b} = {}) {
   const lignes = [], da = ymd(a), db = ymd(b), dn = ymd(notesJusqua), moisA = da.slice(0, 7), ret = new Set(plansRetires || []);
   if (b >= a) for (const f of fixes || []) for (const o of occurrences(f, a, b)) lignes.push({date: ymd(o.le), service: o.f.service, montant: cents(o.f.montant) / 100, poste: o.f.cat || 'Autres', sorte: 'fixe', ...(o.f.estime ? {estime: true} : {})});
   for (const p of Object.values(plans || {})) {
-    if (!p || ret.has(p.id) || !Array.isArray(p.echeances)) continue;
+    if (!p || !Array.isArray(p.echeances)) continue;
+    const le = ret.has(p.id) ? String((plansRetiresLe || {})[p.id] || '0') : '';   /* « plus à payer » : seulement ce qui était déjà payé ce jour-là */
     const nom = (p.fois ? 'Paiement en ' + p.fois + ' fois : ' : 'Paiement en plusieurs fois : ') + (p.service || '');
-    for (const e of p.echeances) if (e && e.date >= da && (e.date <= db || (e.payee && e.date.slice(0, 7) === moisA && e.date <= dn))) lignes.push({date: e.date, service: nom, montant: cents(e.montant) / 100, poste: 'Paiements en plusieurs fois', sorte: 'plan'});
+    for (const e of p.echeances) if (e && e.date >= da && (!le || e.payee || e.date <= le) && (e.date <= db || (e.payee && e.date.slice(0, 7) === moisA && e.date <= dn))) lignes.push({date: e.date, service: nom, montant: cents(e.montant) / 100, poste: 'Paiements en plusieurs fois', sorte: 'plan'});
   }
   for (const c of cr || []) {
     const poste = RANG_COURANT[c.type] || 'Autres dépenses courantes';
@@ -494,7 +497,7 @@ export function createRadar({file, gmail, claude = async () => ({ok: false, erro
      seulement dans un iPhone), traitees (ses réponses aux alertes, pour « Annuler »), refusNoms (le nom de ce qu'il a écarté), claudeLus (ce que
      Claude a déjà lu, pour qu'une relecture ne lui renvoie pas les mêmes mails) */
   const R = Object.assign({fixes: [], courantes: [], revenus: null, notif: {veille: true, seuil: 20, echec: true}, propositions: [], refus: [], releves: [], alertes: [], avenir: [], ponctuels: [], mandats: [], finis: [], gardes: {}, vus: [], fils: {}, scan: null, jours: {}, maj: null,
-    plans: {}, plansRetires: [], alertesVues: {}, traitees: [], refusNoms: {}, claudeLus: {}}, lireFichier());
+    plans: {}, plansRetires: [], plansRetiresLe: {}, alertesVues: {}, traitees: [], refusNoms: {}, claudeLus: {}}, lireFichier());
   /* 0.73.0 : les mails « nouvelle mensualité » déjà appliqués à une dépense fixe (gardés hors de oublier()) : « Tout relire » ne les réapplique pas,
      sa correction à la main reste. Un fichier d'avant les retrouve dans les alertes encore gardées. */
   if (!Array.isArray(R.mensAppliquees)) R.mensAppliquees = (R.alertes || []).concat((R.avant && R.avant.alertes) || []).filter((a) => a && a.type === 'mensualite' && /^a/.test(a.id || '')).map((a) => a.id.slice(1)).slice(-200);
@@ -671,8 +674,9 @@ export function createRadar({file, gmail, claude = async () => ({ok: false, erro
   /* 0.68.0 : un paiement en plusieurs fois qui n'est plus à payer (achat annulé, remboursé, rétractation) : ses échéances ne comptent plus ; « Remettre » */
   function plan(id, action) {
     const p = vue().plans[id] || R.plans[id]; if (!p) return {ok: false, error: 'Paiement introuvable.'};
-    if (action === 'retirer') R.plansRetires = [...new Set([...(R.plansRetires || []), id])].slice(-200);
-    else if (action === 'remettre') R.plansRetires = (R.plansRetires || []).filter((k) => k !== id);
+    if (action === 'retirer') { if (!(R.plansRetires || []).includes(id)) R.plansRetiresLe = {...(R.plansRetiresLe || {}), [id]: ymd(auj())};   /* 0.99.0 : le jour où il l'a dit : ce qui était payé avant reste compté */
+      R.plansRetires = [...new Set([...(R.plansRetires || []), id])].slice(-200); }
+    else if (action === 'remettre') { R.plansRetires = (R.plansRetires || []).filter((k) => k !== id); if (R.plansRetiresLe) delete R.plansRetiresLe[id]; }
     else return {ok: false, error: 'Action inconnue.'};
     ranger(); sauver(); return {ok: true};
   }
@@ -1160,7 +1164,7 @@ export function createRadar({file, gmail, claude = async () => ({ok: false, erro
   const arr2 = (n) => Math.round(n * 100) / 100;
   function bilanDe(ym, t, reconstitue) {
     const [Y, M] = ym.split('-').map(Number), a = J(Y, M - 1, 1), b = J(Y, M - 1, dim(Y, M - 1));
-    const d = depenseEntre({fixes: R.fixes, courantes: R.courantes, plans: vue().plans, plansRetires: R.plansRetires}, a, b), paie = (R.revenus && R.revenus.montant) || null;
+    const d = depenseEntre({fixes: R.fixes, courantes: R.courantes, plans: vue().plans, plansRetires: R.plansRetires, plansRetiresLe: R.plansRetiresLe}, a, b), paie = (R.revenus && R.revenus.montant) || null;
     return {mois: ym, fixes: d.fixes, plans: d.plans, courantes: d.courantes, total: d.total, ...(R.evolution && ym in R.evolution ? {prevu: R.evolution[ym]} : {}), postes: d.postes,
       ...(paie ? {paie, resteAVivre: arr2(paie - d.total)} : {}), clos: ymd(t), ...(reconstitue ? {reconstitue: true} : {})};
   }
@@ -1197,7 +1201,7 @@ export function createRadar({file, gmail, claude = async () => ({ok: false, erro
       .sort((a, b) => b.montant - a.montant);
     /* 0.93.0 : « déjà dépensé ce mois » : ses dépenses fixes passées (jusqu'à hier : celles d'aujourd'hui sont encore dans le reste à payer),
        les échéances passées de ses paiements en plusieurs fois, et ce qu'il a noté de ses dépenses courantes ce mois-ci */
-    const hier = plus(t, -1), dep = depenseEntre({fixes: R.fixes, courantes: cr, plans: vue().plans, plansRetires: R.plansRetires}, m.a, hier, {notesJusqua: m.b});
+    const hier = plus(t, -1), dep = depenseEntre({fixes: R.fixes, courantes: cr, plans: vue().plans, plansRetires: R.plansRetires, plansRetiresLe: R.plansRetiresLe}, m.a, hier, {notesJusqua: m.b});
     const depense = {mois: m.ym, jusqua: hier >= m.a ? ymd(hier) : '', total: dep.total, fixes: dep.fixes, plans: dep.plans, courantes: dep.courantes, nFixes: dep.nFixes, nPlans: dep.nPlans, nNotes: dep.nNotes, postes: dep.postes, lignes: dep.lignes.slice(-120)};
     /* l'historique, du plus récent au plus ancien : les mois clos (gardés), puis, tant qu'ils ne sont pas clos, les mois d'avant des « six mois »
        (recalculés d'après ses dépenses fixes d'aujourd'hui : « estimé ») */

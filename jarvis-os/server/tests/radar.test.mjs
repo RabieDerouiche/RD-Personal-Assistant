@@ -610,10 +610,11 @@ try {
     ok('Radar 0.93 : la page reçoit « déjà dépensé ce mois » (349,55 € : 100 de dépenses fixes, 29,55 d’échéances, 220 de dépenses courantes), jusqu’à hier (15/11), avec le détail ; les dépenses fixes déjà passées et le reste à payer d’ici la fin du mois font le mois entier (100 + 70 = 170)',
       m1.depense.total === 349.55 && m1.depense.fixes === 100 && m1.depense.plans === 29.55 && m1.depense.courantes === 220 && m1.depense.jusqua === '2026-11-15' && m1.depense.mois === '2026-11' && m1.depense.lignes.length === 5 && m1.depense.postes.length === 3
       && r1.total === 70 && m1.depense.fixes + r1.total === m1.totalFixes, JSON.stringify([m1.depense.total, m1.depense.fixes, r1.total, m1.totalFixes]));
-    Rh.plan('pl2', 'remettre'); const remis = Rh.etat().mois.depense.plans; Rh.plan('pl2', 'retirer');
+    Rh.plan('pl2', 'remettre'); const remis = Rh.etat().mois.depense.plans; Rh.plan('pl2', 'retirer'); const redit = Rh.etat().mois.depense.plans, jourDit = Rh.brut().plansRetiresLe.pl2;
+    delete Rh.brut().plansRetiresLe.pl2;   /* la suite du banc garde un paiement retiré sans jour connu (comme avant la 0.99) */
     await set('fixes', fx.filter((f) => f.id !== 'fa')); const retiree = Rh.etat().mois.depense; await set('fixes', fx);
-    ok('Radar 0.93 : un paiement remis « à payer » recompte son échéance passée (29,55 + 77,77), « plus à payer » la retire ; une dépense fixe retirée de la liste n’est plus comptée',
-      remis === 107.32 && Rh.etat().mois.depense.plans === 29.55 && retiree.fixes === 0 && retiree.total === 249.55 && Rh.etat().mois.depense.fixes === 100, JSON.stringify([remis, retiree.fixes, retiree.total]));
+    ok('Radar 0.93 puis 0.99 : un paiement remis « à payer » recompte son échéance passée (29,55 + 77,77) ; redit « plus à payer » aujourd’hui, il GARDE ses échéances déjà passées (son choix du 27/11/2026) ; retiré sans jour connu (avant la 0.99), il ne les comptait pas ; une dépense fixe retirée de la liste n’est plus comptée',
+      remis === 107.32 && m1.depense.plans === 29.55 && redit === 107.32 && jourDit === '2026-11-16' && Rh.etat().mois.depense.plans === 29.55 && retiree.fixes === 0 && retiree.total === 249.55 && Rh.etat().mois.depense.fixes === 100, JSON.stringify([remis, retiree.fixes, retiree.total]));
     const h1 = m1.historique, f1 = lu();
     ok('Radar 0.93 : avant la première clôture, l’historique montre les cinq mois d’avant, « estimés » d’après les dépenses fixes d’aujourd’hui (octobre : 170 + 25 de la salle + 15 notés), rien de clos ; le fichier retient le mois suivi (2026-11), droits 600',
       h1.length === 5 && h1[0].mois === '2026-10' && h1[0].libelle === 'octobre 2026' && h1[0].estime === true && h1[0].fixes === 195 && h1[0].courantes === 15 && h1[0].total === 210 && h1[4].mois === '2026-06' && h1.every((x) => x.estime && !x.clos)
