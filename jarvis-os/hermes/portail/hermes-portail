@@ -1200,7 +1200,11 @@ os.replace(tmp, dest)
       *introuvable*) res=introuvable ;;
       *"rien déposé"*|*"rien depose"*|*"pas déposé"*|*"pas depose"*) res=echec ;;
       *blanc*) res=blanc ;;
-      *"déposé"*|*depose*) res=depose ;;
+      # « déposé » n'est compté que si la ligne COMMENCE par ce mot et ne porte aucune négation (« non déposé », « n'a pas été déposé »,
+      # « dépôt en erreur »…) : un dépôt dit fait à tort effacerait le PDF et fermerait l'étape ; un dépôt dit raté à tort se rattrape
+      # (« Réessayer avec Hermes » le trouve « déjà déposé »).
+      *" pas "*|*" non "*|non*|*"n'a"*|*"n’a"*|*aucun*|*rien*|*erreur*|*échec*|*echec*|*impossible*|*refus*) res=echec ;;
+      "déposé"*|"depose"*) res=depose ;;
       *) res=echec ;;
     esac
     [ $blanc = 1 ] && [ "$res" = depose ] && res=echec   # à blanc, aucun fichier n'a été remis : rien ne peut avoir été déposé

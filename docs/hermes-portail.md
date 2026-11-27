@@ -86,6 +86,7 @@ tenu par la commande) : pas encore faite.
 | `hermes-portail` | La commande (`/usr/local/sbin/hermes-portail`) : `etat`, `connexion-claude`, `enregistrer`, `domaines`, `essai` (et `--code-mail`, `--telecharger`), `brouillon` (et `--sans-creer`), `facture`, `texte`, `cra` (et `--a-blanc`), `cra-mois` (et `--a-blanc`), `teletravail` (et `drive`), `cra-auto`, `cra-mois-auto`, `notes`, `cle`, `fermer`, `oublier`. Un essai lance l'unité `hermes-portail-essai`. |
 | `hermes-portail-cra.service`, `hermes-portail-cra.timer` | Le CRA de la semaine (26/11/2026) : toutes les 5 minutes, `hermes-portail cra-auto` ; rien sans `/etc/hermes-portail/cra.conf` (root : `adresse=` la feuille de temps, `jarvis_donnees=` le dossier de JARVIS ; jamais dans le dépôt). Compte rendu dans `/var/lib/hermes-portail-retours/` (root, lisible par le groupe de JARVIS, depuis le 26/11/2026). |
 | `hermes-portail-cra-mois.service`, `hermes-portail-cra-mois.timer` | Le CRA du mois (26/11/2026, son QCM « CRA du mois seul ») : toutes les 15 minutes, `hermes-portail cra-mois-auto` ; rien sans `adresse_mois=` (l'adresse du compte rendu d'activité) dans `/etc/hermes-portail/cra.conf`, rien avant le 26. Voir « Le CRA du mois, seul ». |
+| `hermes-portail-cra-signe.service`, `hermes-portail-cra-signe.timer` | Le CRA signé du client (0.97.0, son QCM « Hermes, après mon oui ») : toutes les 15 minutes, `hermes-portail cra-signe-auto` ; rien sans `adresse_mois=`, sans PDF gardé par JARVIS, ni avant que le CRA du mois soit validé par Hermes ; à blanc d'abord, le dépôt après son oui seulement. Voir « Le CRA signé du client ». |
 | `hermes-portail-essai.service` | Un passage, enfermé (mêmes lignes que `hermes-gateway.service`, mémoire sans échange ; depuis le 25/11/2026, filtre d'appels système et espaces de noms interdits). Une vraie unité, pas `systemd-run` : au premier essai sur le serveur, `systemd-run -p IPAddressDeny=link-local` a été refusé alors que la même ligne est valable dans une unité. Consigne dans `/home/hermes-portail/.consigne`, réponse dans `/var/lib/hermes-portail/essais/`. |
 | `politique.yaml` | Sa politique (`/etc/hermes-portail/config.yaml`, root) : outils `browser`, `terminal`, `skills` seulement ; Sonnet ; profil de navigateur gardé ; navigateur envoyé vers le relais, lancé sans son bac à sable (dit en clair, voir « Durcissement »), remplissage automatique et heure réseau coupés. |
 | `teletravail.mjs` | La note de télétravail, ce que seul JARVIS sait lire (26/11/2026) : lancé par `hermes-portail teletravail` sous l'utilisateur `jarvis`, en lecture seule. `--jours AAAA-MM` : le bilan du mois par le module de JARVIS lui-même (`jours.mjs` : agendas reconnus, ses règles, ses corrections), refait sur une copie de `jours.json` effacée ensuite ; `--drive <id>` : UN PDF du Drive (outil `file_pdf` de `google.mjs`, 0.85.0). |
@@ -787,6 +788,31 @@ en conflit (X) bloque tout. Après le passage : le compte rendu `mois-<AAAA-MM>.
 (vérifie sur le portail), « CRA de <mois> validé », « déjà validé », ou « à relancer à la main ». Lancé à la main, il dit pourquoi il
 ne fait rien (« rien à faire (novembre 2026 : déjà validé par Hermes.) ») ; par la minuterie, il se tait. Le dépôt du CRA du
 client (le PDF reçu de son contact) reste à sa charge. Banc : section « CRA du mois : la minuterie » de `portail.test.sh`.
+
+**Le CRA signé du client, déposé après son oui (27/11/2026, son QCM du 26/11 : « Hermes, après mon oui »)** :
+`hermes-portail cra-signe-auto`, lancé toutes les 15 minutes par `hermes-portail-cra-signe.timer` (posé et activé par `install.sh`).
+Il ne fait rien sans `adresse_mois=` dans `cra.conf`, ni tant que le CRA du mois n'est pas validé par Hermes (`mois-valides.txt`, ou
+le compte rendu `mois-<AAAA-MM>.json` : `validee` ou `deja`), ni sans PDF gardé par JARVIS pour le mois (`jours.json`,
+`mois[AAAA-MM].suivi.cra.signe` : `fichier`, `empreinte` ; le mois en cours et les deux d'avant), ni si JARVIS dit « rattaché » ou
+« je le fais moi-même ». Un passage au plus par lancement, jamais en même temps que `cra-mois-auto` (son verrou) ni pendant un
+autre passage d'Hermes :
+- *la copie* : le PDF est lu sans suivre de lien (ni le dossier `cra-signe`, ni le fichier ; un fichier ordinaire, sans lien
+  physique, 15 Mo au plus), « %PDF- » et empreinte SHA-256 revérifiés, puis recopié chez root
+  (`/var/lib/hermes-portail/cra-signe/<mois>/signe.pdf`, 700/600). Refusé : compte rendu `echec`, une fois par empreinte ;
+- *à blanc* (`cra-signe <adresse> --mois <AAAA-MM> --a-blanc`, « MODE DÉPÔT À BLANC ») : **aucun fichier n'est remis à Hermes** ; il
+  ouvre la page du mois, trouve où se dépose le CRA signé, dit ce que la page montre et si un document y est déjà. Un essai par
+  fichier (`tentes.txt`, `blanc <mois> <empreinte>`). Compte rendu `signe-<AAAA-MM>.json` (root 640, ni nom de portail, ni adresse,
+  ni hôte : le texte est nettoyé) : `pret`, `deja` (rien à faire), `introuvable`, `echec` ;
+- *le dépôt* (`cra-signe … --fichier <copie de root>`, « MODE DÉPÔT ») : seulement si `signe.oui` porte la même empreinte et le même
+  mois, et si la copie de root a toujours cette empreinte ; le fichier est remis sous un nom fixe (`CRA-signe-<AAAA-MM>.pdf`, jamais
+  le nom venu du mail), retiré après le passage. Une tentative par oui (`reel <mois> <empreinte> <heure du oui>`) ; un mois déposé
+  (`deposes.txt`) ne repart jamais. Compte rendu `reel: true` : `depose` (`premiere` au premier dépôt fait par Hermes ; compté seulement si la ligne « Résultat » d'Hermes commence par « déposé » sans
+  aucune négation : « non déposé », « n'a pas été déposé », « erreur »… valent `echec`), `deja`, `echec` avec une raison courte ;
+- *la limite du forfait* : coupé avant tout contact avec le portail, l'essai (ou le oui) n'est pas compté et repart une fois
+  (`hermes-portail-cra-signe.service`, connue de `limite.py`) ; après contact, ou deux fois : compté, « à faire à la main ».
+  *Le coffre verrouillé* : rien n'est compté ni dit, nouvel essai au quart d'heure suivant.
+La skill a une section « CRA signé du client ». À la main : `sudo hermes-portail cra-signe-auto` dit pourquoi il ne fait rien.
+Banc : section « CRA signé du client » de `portail.test.sh`.
 
 **Les routines de Chronos, une par une (26/11/2026, 8 h)** :
 

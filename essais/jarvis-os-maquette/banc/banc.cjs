@@ -569,8 +569,10 @@ srv.listen(0, async () => {
       await p.evaluate(() => [...document.querySelectorAll('.panel')].find((x) => x.querySelector('h2') && /^Tes ordres/.test(x.querySelector('h2').textContent)).querySelector('.canal-row').click()); await p.waitForTimeout(700);
       for (let k = 0; k < 3 && !(await p.$('#toasts .toast')); k++) { await p.evaluate(() => { const b = document.querySelector('#sheet:not([hidden]) .sa-main .btn, #sheet:not([hidden]) .btn.main'); if (b) b.click(); }); await p.waitForTimeout(900); }
       const had = !!(await p.$('#toasts .toast'));
-      if (had) { await p.click('#toasts .toast .toast-x'); await p.waitForTimeout(450); }
-      ok('notification de la page : croix « Fermer », fermée tout de suite', had && await p.evaluate(() => !document.querySelector('#toasts .toast:not(.out)')), 'toast vu : ' + had); }
+      /* la notification touchée est marquée, puis sa croix est touchée dans la page : le clic de Playwright attendait la fin de l'animation
+         (2,6 s et plus sur une machine chargée) et une autre notification (« Écrit dans Pilotage », 5 s après l'action) arrivait avant le contrôle */
+      if (had) { await p.evaluate(() => { const t = document.querySelector('#toasts .toast'); t.setAttribute('data-banc', '1'); t.querySelector('.toast-x').click(); }); await p.waitForTimeout(450); }
+      ok('notification de la page : croix « Fermer », fermée tout de suite', had && await p.evaluate(() => !document.querySelector('#toasts .toast[data-banc]:not(.out)')), 'toast vu : ' + had); }
     /* glisser vers le bas ferme la fenêtre (demande du 16/11/2026) : vrais gestes tactiles */
     { const drag = async (q, x, y, dx, dy, ms) => { const c = await q.context().newCDPSession(q); await c.send('Input.dispatchTouchEvent', {type: 'touchStart', touchPoints: [{x, y}]}); for (let i = 1; i <= 8; i++) { await c.send('Input.dispatchTouchEvent', {type: 'touchMove', touchPoints: [{x: x + dx * i / 8, y: y + dy * i / 8}]}); await q.waitForTimeout(ms / 8); } await c.send('Input.dispatchTouchEvent', {type: 'touchEnd', touchPoints: []}); await q.waitForTimeout(900); };
       p = await page('#agenda'); await p.tap('.agw-d'); await p.waitForTimeout(700);

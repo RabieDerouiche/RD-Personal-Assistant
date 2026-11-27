@@ -82,3 +82,10 @@ pas commencé), 6. le dépôt du CRA signé sur le portail par Hermes après son
 - **Demande de déploiement envoyée à « Serveur JARVIS 2 » à 16 h 40** (0.95.0 et 0.96.0 ; le plan est `docs/demandes-serveur-en-attente.md`, lu là-bas par `git show origin/main:…`). Le serveur était en 0.94.0. Lire son compte rendu par `list_events` (kinds `result`) avant de dire que c'est déployé. Cette session attend son oui là-bas (mode par défaut : il doit approuver).
 - **0.97.0 (dépôt du CRA signé par Hermes)** : coupé par la limite à 15 h, relancé à 16 h 35 ; côté JARVIS écrit (`signe.mjs`, tests en cours), root, app et bancs à faire. Sauvegarde : `chantier-G.patch` (s'applique sur `0d240e3`). Une seconde demande au serveur suivra pour lui (avec l'essai à blanc réel du dépôt pour novembre).
 - Réveil programmé à 21 h 15.
+
+## État au 27/11/2026, 19 h 15
+
+- **0.96.0 (avec la 0.95.0) : déployée et vérifiée sur le serveur à 16 h 45** par « Serveur JARVIS 2 » (compte rendu recopié dans `docs/jarvis-os.md`). Essai réel pause puis reprise d'une routine : conforme.
+- **0.97.0 (CRA signé déposé par Hermes après son oui)** : l'agent a rendu, relu par la session principale (une garde ajoutée : « déposé » compté seulement sans négation ; une course du banc de l'app corrigée), fusionné dans la branche avec `VERSION` 0.97.0, docs rangées par script, plan du serveur réécrit (`docs/demandes-serveur-en-attente.md` : 0.97.0 seule, avec l'essai à blanc réel de novembre). Bancs en cours au moment de ce commit : résultat dans `scratchpad/g/resultat.txt` (jours, travail, serveur déjà passés sans échec ; portail, relance, app à lire).
+- **Ensuite** : bancs verts → demande de fusion vers main → message à « Serveur JARVIS 2 » (un seul oui là-bas) → récapitulatif final unique avec les 21 captures (`scratchpad/refonte/final/`) et un QCM de choix de maquette.
+- Risques et ce qu'il verra : `suite-cra-signe.md`.
