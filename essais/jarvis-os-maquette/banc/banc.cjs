@@ -1667,7 +1667,7 @@ srv.listen(0, async () => {
       const ch = await q.evaluate(() => { const c = document.getElementById('chat'), s = getComputedStyle(c), hd = getComputedStyle(c.querySelector('.chat-head'), '::before'); return {open: !c.hidden, top: c.getBoundingClientRect().top, rad: s.borderTopLeftRadius, poignee: hd.content !== 'none' && hd.width === '40px', bas: Math.round(c.getBoundingClientRect().bottom) === innerHeight}; });
       ok('0.87 : étape 7 : la discussion est une feuille du bas plein écran (bord arrondi, poignée, jusqu’en bas)', ch.open && ch.top >= 8 && ch.rad === '24px' && ch.poignee && ch.bas, JSON.stringify(ch));
       await q.context().close(); }
-    { const q = await pageWith({grokOff: true}, '#demandes');
+    { const q = await pageWith({grokOff: true, depot: false}, '#demandes');   /* 0.91.0 : « depot: false » = serveur pas encore à jour : Papiers › Déposer garde la carte « À trier » vérifiée plus bas */
       await q.waitForTimeout(2500);
       const r = await q.evaluate(() => { const atoi = (window.__G['À toi'] || []).slice(3).filter((x) => x[2] && x[3] && /^(Iris|Kairos|Ulysse|Athéna|Argus|Plutus)\b/.test(x[1]) && !/^Ton oui dans le chat/.test(x[3])), rep = window.__G.Canal.filter((x) => x[2] === 'Hermes' && x[3] === 'Reprise');   /* « À toi » : Depuis le, Bot, Sujet, Ce qu'on attend de toi */
         return {atoi: atoi.length, rep: rep.length, sujets: atoi.every((x) => rep.some((y) => y[7] === x[2])), forme: rep.every((y) => y[1] === 'Rabie' && y[5] === 'À faire' && /^À faire : reprends la demande d(’|e )\S+ à Rabie \(« .+ »\) : .+ \| Pourquoi : Grok Bot est arrêté/.test(y[4]) && /rien de sortant sans son oui/.test(y[4])), elision: rep.some((y) => /demande d’Iris/.test(y[4])),
@@ -1704,6 +1704,82 @@ srv.listen(0, async () => {
       await q.evaluate(() => { location.hash = ''; }); await q.waitForTimeout(1500);
       ok('0.87 : Grok arrêté : la phrase de l’accueil ne dit plus « Tes bots sont au travail » ; « En ce moment » sans les lignes « Reprise »', await q.evaluate(() => /Hermes et JARVIS font tes routines\./.test(document.querySelector('.hud-say').textContent) && !/Tes bots sont au travail/.test(document.querySelector('.hud-say').textContent) && !/reprends la demande/.test(document.getElementById('view').textContent)));
       await q.context().close(); }
+    /* ================= 0.91.0 : rangement des papiers par JARVIS (Papiers › Déposer ; données inventées de window.__DEPOT) ================= */
+    { const versDepot = async (q) => { await q.evaluate(() => document.querySelector('#view .dm-seg [data-f="depot"]').click()); await q.waitForTimeout(900); };
+      const lu = (q) => q.evaluate(() => { const pn = [...document.querySelectorAll('#view .panel')].find((x) => /Déposer un document/.test(x.querySelector('h2').textContent)), c = [...document.querySelectorAll('.dep-item')];
+        return {txt: pn ? pn.innerText.replace(/\s+/g, ' ') : '', champ: (() => { const f = document.querySelector('.dep-jarvis input[type=file]'); return f ? f.accept : ''; })(), puce: (document.querySelector('#view .dm-seg [data-f="depot"] b') || {}).textContent || '',
+          cartes: c.map((x) => ({nom: x.querySelector('.dep-recu-t b').textContent, dossier: x.querySelector('.dep-dossier').selectedOptions[0].textContent, fichier: x.querySelector('.dep-nom').value + x.querySelector('.dep-ext').textContent, raison: x.querySelector('.dep-raison').textContent, meta: x.querySelector('.dep-recu-t small').textContent})),
+          options: c[0] ? [...c[0].querySelectorAll('.dep-dossier option')].map((o) => o.textContent) : [], ranges: [...document.querySelectorAll('.dep-ranges .pf')].map((x) => x.innerText.replace(/\s+/g, ' ')), toasts: [...document.querySelectorAll('#toasts .toast')].map((x) => x.textContent).join(' || ')}; });
+      const sansToasts = (q) => q.evaluate(() => document.querySelectorAll('#toasts .toast').forEach((t) => t.remove()));
+      const q = await page('#papiers'); await versDepot(q);
+      const d0 = await lu(q);
+      ok('0.91 : Papiers › Déposer : « JARVIS range tes papiers », un vrai champ fichier (PDF, images), rien ne part avant son oui ; plus aucun bot nommé ; le filtre porte le nombre en attente', /JARVIS range tes papiers/.test(d0.txt) && /Rien ne part dans ton Drive avant ton oui/.test(d0.txt) && /application\/pdf/.test(d0.champ) && /image\/heic/.test(d0.champ)
+        && !/\b(Iris|Chronos|Kairos|Ulysse|Athéna|Argus|Plutus|Grok|Canal)\b/.test(d0.txt) && !/Range-le toi-même/.test(d0.txt) && d0.puce === '2' && /Gardé 30 jours sur ton serveur, puis effacé/.test(d0.txt), JSON.stringify([d0.txt.slice(0, 260), d0.champ, d0.puce]));
+      ok('0.91 : ce qui attend : le dossier proposé (choisi dans l’arbre de Papiers, sans « Papiers privés »), le nom modifiable avec l’extension fixe, la raison, la date limite ; un dépôt par le Raccourci est dit',
+        d0.cartes.length === 2 && d0.cartes[0].nom === 'Quittance novembre.pdf' && d0.cartes[0].dossier === 'Logement' && d0.cartes[0].fichier === 'Quittance de loyer 2026-11.pdf' && /Reconnu : quittance de loyer/.test(d0.cartes[0].raison) && /gardé jusqu’au \d\d\/\d\d/.test(d0.cartes[0].meta)
+        && d0.cartes[1].dossier === 'À trier' && /par le Raccourci/.test(d0.cartes[1].meta) && /image n’est pas lue/.test(d0.cartes[1].raison) && d0.options.includes('Lui › Identité et séjour') && d0.options.includes('Papiers') && !d0.options.some((o) => /priv|Impôts|Banque|Salaires/i.test(o)), JSON.stringify([d0.cartes, d0.options.length]));
+      await q.setInputFiles('.dep-jarvis input[type=file]', [{name: 'Passeport scan.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4 exemple inventé')}, {name: 'notes.txt', mimeType: 'text/plain', buffer: Buffer.from('pas un papier')}]); await q.waitForTimeout(1500);
+      const d1 = await lu(q);
+      ok('0.91 : déposer un PDF par le champ fichier : il s’ajoute à la liste avec sa proposition (« Lui › Identité et séjour », « Passeport Lui.pdf ») ; un fichier qui n’est ni PDF ni image est refusé et le dit',
+        d1.cartes.length === 3 && d1.cartes[0].nom === 'Passeport scan.pdf' && d1.cartes[0].dossier === 'Lui › Identité et séjour' && d1.cartes[0].fichier === 'Passeport Lui.pdf' && d1.puce === '3' && /Pas déposé/.test(d1.toasts) && /notes\.txt/.test(d1.toasts) && /ni un PDF ni une image/.test(d1.toasts), JSON.stringify([d1.cartes.map((x) => x.nom), d1.puce, d1.toasts]));
+      /* il corrige (dossier dans l'arbre, nom), puis son oui */
+      await sansToasts(q);
+      await q.evaluate(() => { const c = [...document.querySelectorAll('.dep-item')].find((x) => /Quittance novembre/.test(x.textContent)), s = c.querySelector('.dep-dossier'); s.value = [...s.options].find((o) => o.textContent === 'Logement › Locations 2018-2022').value; s.dispatchEvent(new Event('change', {bubbles: true})); });
+      await q.fill('.dep-item:nth-of-type(2) .dep-nom', 'Quittance corrigée 2026-11'); await q.waitForTimeout(200);
+      const avantOui = await q.evaluate(() => window.__DEPOT.etat().then((e) => e.ranges.length));
+      await q.evaluate(() => [...document.querySelectorAll('.dep-item')].find((x) => /Quittance novembre/.test(x.textContent)).querySelector('.dep-oui').click()); await q.waitForTimeout(1500);
+      const d2 = await lu(q);
+      ok('0.91 : il corrige le dossier et le nom, puis « Oui, ranger ici » : rien n’était parti avant ; le fichier est rangé là où il a dit, sous son nom, sort de la liste et passe dans « Rangés récemment »',
+        avantOui === 0 && d2.cartes.length === 2 && !d2.cartes.some((x) => /Quittance novembre/.test(x.nom)) && /Rangé dans ton Drive/.test(d2.toasts) && /Quittance corrigée 2026-11\.pdf/.test(d2.toasts) && /Logement › Locations 2018-2022/.test(d2.toasts) && d2.ranges.length === 1 && /Quittance corrigée 2026-11/.test(d2.ranges[0]) && /Locations 2018-2022/.test(d2.ranges[0]) && d2.puce === '2', JSON.stringify([d2.cartes.map((x) => x.nom), d2.toasts, d2.ranges]));
+      await q.evaluate(() => document.querySelector('#view .dm-seg [data-f="themes"]').click()); await q.waitForTimeout(900);
+      await q.fill('.pap-search', 'Quittance corrigée'); await q.waitForTimeout(700);
+      ok('0.91 : le fichier rangé apparaît dans Papiers (l’arbre est relu)', await q.evaluate(() => [...document.querySelectorAll('.pap-res .pf')].some((x) => /Quittance corrigée 2026-11/.test(x.textContent) && /Locations 2018-2022/.test(x.textContent))));
+      await q.fill('.pap-search', ''); await q.waitForTimeout(300); await versDepot(q); await sansToasts(q);
+      await q.evaluate(() => [...document.querySelectorAll('.dep-item')].find((x) => /IMG_4521/.test(x.textContent)).querySelector('.dep-non').click()); await q.waitForTimeout(400);
+      const conf = await q.evaluate(() => ({b: [...document.querySelectorAll('.dep-item')].find((x) => /IMG_4521/.test(x.textContent)).querySelector('.dep-non').textContent, n: document.querySelectorAll('.dep-item').length}));
+      await q.evaluate(() => [...document.querySelectorAll('.dep-item')].find((x) => /IMG_4521/.test(x.textContent)).querySelector('.dep-non').click()); await q.waitForTimeout(1200);
+      const d3 = await lu(q);
+      ok('0.91 : « Retirer » demande un second appui (« Retirer pour de bon ? »), puis efface le fichier en attente sans rien ranger', conf.b === 'Retirer pour de bon ?' && conf.n === 2 && d3.cartes.length === 1 && /Retiré/.test(d3.toasts) && /rien n’est parti dans ton Drive/.test(d3.toasts) && d3.ranges.length === 1, JSON.stringify([conf, d3.cartes.map((x) => x.nom), d3.toasts]));
+      const aide = await q.evaluate(() => { const a = document.querySelector('.dep-aide'); a.querySelector('summary').click(); return a.innerText.replace(/\s+/g, ' '); });
+      ok('0.91 : « Depuis le menu Partager de l’iPhone » : le Raccourci (Safari n’offre pas le partage aux apps de l’écran d’accueil), son adresse /api/raccourci/depot, et la réserve sur les noms de menus', /Safari sur iPhone ne laisse pas/.test(aide) && /Raccourci/.test(aide) && /\/api\/raccourci\/depot/.test(aide) && /peuvent changer selon la version d’iOS/.test(aide) && /Android/.test(aide), aide.slice(0, 300));
+      await q.context().close();
+      /* la portée « drive » pas accordée : il peut déposer, la validation dit quoi faire */
+      const r = await pageWith({depotPortee: 'non'}, '#papiers'); await versDepot(r);
+      const p0 = await lu(r);
+      await r.evaluate(() => document.querySelector('.dep-item .dep-oui').click()); await r.waitForTimeout(1200);
+      const p1 = await lu(r);
+      ok('0.91 : sans la portée Google « drive » : l’écran dit « Reconnecte Google une fois » (Réglages, Google, Reconnecter), le dépôt reste possible ; « Oui, ranger ici » le redit et le fichier attend toujours', /Reconnecte Google une fois/.test(p0.txt) && /Réglages, Google, Reconnecter/.test(p0.txt) && /Tu peux déjà déposer/.test(p0.txt) && !!p0.champ && p0.cartes.length === 2 && /Reconnecte Google une fois/.test(p1.toasts) && p1.cartes.length === 2 && !p1.ranges.length, JSON.stringify([p0.txt.slice(0, 300), p1.toasts]));
+      await r.context().close();
+      /* serveur pas encore à jour, Grok PAS arrêté : la carte « À trier » de la 0.87.0, jamais l'ancien « Iris range » (chemin cassé depuis l'arrêt de Grok) */
+      const s = await pageWith({depot: false}, '#papiers'); await versDepot(s);
+      const v0 = await lu(s);
+      ok('0.91 : serveur pas encore à jour (pas de dépôt), même sans arrêt de Grok : la carte « À trier » ; plus aucun chemin par Iris ni par le Canal', /Le fichier va dans « À trier »/.test(v0.txt) && !/\b(Iris|Canal|sonnette)\b/.test(v0.txt) && !/Envoyer à Iris|Iris range/.test(v0.txt) && !v0.champ, v0.txt.slice(0, 300));
+      await s.context().close();
+      /* l'adresse d'une notification ou du partage : « /#voir-papiers-depot » ouvre Papiers › Déposer */
+      const u = await page('#voir-papiers-depot'); await u.waitForTimeout(1500);
+      const h0 = await u.evaluate(() => ({hash: location.hash, on: (document.querySelector('#view .dm-seg [aria-pressed="true"]') || {dataset: {}}).dataset.f, vu: !!document.querySelector('.dep-jarvis') && document.querySelector('.dep-jarvis').offsetParent !== null}));
+      await u.evaluate(() => { location.hash = '#accueil'; }); await u.waitForTimeout(900); await u.evaluate(() => { location.hash = '#voir-papiers-partage-vide'; }); await u.waitForTimeout(1500);
+      const h1 = await u.evaluate(() => ({hash: location.hash, toasts: [...document.querySelectorAll('#toasts .toast')].map((x) => x.textContent).join(' || ')}));
+      ok('0.91 : « #voir-papiers-depot » (notification du Raccourci, retour du partage) ouvre Papiers › Déposer ; « #voir-papiers-partage-vide » dit que le partage n’est pas arrivé', h0.hash === '#papiers' && h0.on === 'depot' && h0.vu && h1.hash === '#papiers' && /Partage pas reçu/.test(h1.toasts), JSON.stringify([h0, h1]));
+      await u.context().close();
+      /* le service worker : le partage du système (POST multipart sur « partage ») est gardé dans un cache à part puis renvoyé à l'app ; hors navigateur */
+      { const vm = require('vm'), H = {}, mis = []; let skips = 0, vides = 0;
+        const self3 = {addEventListener: (t, f) => { H[t] = f; }, registration: {scope: 'https://jarvis.essai/'}, clients: {claim: () => Promise.resolve()}, skipWaiting: () => { skips++; return Promise.resolve(); }};
+        const cachesF = {open: (n) => Promise.resolve({add: () => Promise.resolve(), put: (rq, rp) => { mis.push({cache: n, url: rq.url || String(rq), nom: rp.headers.get('x-nom'), type: rp.headers.get('content-type')}); return Promise.resolve(); }}), keys: () => Promise.resolve(['jarvis-os-partage', 'jarvis-os-app-v1']), delete: (k) => { if (k === 'jarvis-os-partage') vides++; return Promise.resolve(true); }, match: () => Promise.resolve(null)};
+        vm.runInNewContext(fs.readFileSync(path.join(ROOT, 'sw.js'), 'utf8'), {self: self3, caches: cachesF, fetch: () => Promise.reject(new Error('réseau')), URL, Promise, Request, Response, Date, encodeURIComponent, location: {origin: 'https://jarvis.essai'}});
+        const w = []; H.install({waitUntil: (x) => w.push(x)}); H.activate({waitUntil: (x) => w.push(x)}); await Promise.all(w);
+        const fichier = new File([Buffer.from('%PDF-1.4 exemple')], 'Reçu crèche.pdf', {type: 'application/pdf'}), gros = {name: 'gros.pdf', type: 'application/pdf', size: 26 * 1024 * 1024};
+        let rendu = null; const ev = (method, url, files) => ({request: {method, url, mode: 'navigate', formData: () => Promise.resolve({getAll: (k) => (k === 'fichiers' ? files : [])}), clone: () => ({})}, respondWith: (x) => { rendu = x; }});
+        H.fetch(ev('POST', 'https://jarvis.essai/partage', [fichier, 'du texte', gros])); const rp = await rendu;
+        rendu = null; H.fetch(ev('POST', 'https://jarvis.essai/partage', [])); const rv = await rendu;
+        rendu = null; H.fetch(ev('POST', 'https://jarvis.essai/api/depot', [fichier])); const api = rendu;
+        rendu = null; H.fetch(ev('POST', 'https://jarvis.essai/courses/partage', [fichier])); const courses = rendu;
+        ok('0.91 : service worker : le partage du système est gardé dans le cache « jarvis-os-partage » (nom et type, un fichier de plus de 25 Mo écarté), puis l’app est rouverte sur Papiers › Déposer ; sans fichier : « partage vide » ; /api/ et /courses ne sont pas touchés ; ni skipWaiting à l’installation, ni cache du partage effacé à l’activation',
+          mis.length === 1 && mis[0].cache === 'jarvis-os-partage' && /^https:\/\/jarvis\.essai\/partage-recu\//.test(mis[0].url) && decodeURIComponent(mis[0].nom) === 'Reçu crèche.pdf' && mis[0].type === 'application/pdf' && rp.status === 303 && rp.headers.get('location') === 'https://jarvis.essai/#voir-papiers-depot'
+          && rv.status === 303 && rv.headers.get('location') === 'https://jarvis.essai/#voir-papiers-partage-vide' && api === null && courses === null && skips === 0 && vides === 0, JSON.stringify([mis, rp.status, rp.headers.get('location'), rv.headers.get('location'), api, courses, skips, vides]));
+        const mf = JSON.parse(fs.readFileSync(path.join(ROOT, 'manifest.webmanifest'), 'utf8')), st = mf.share_target || {};
+        ok('0.91 : manifeste : « share_target » en POST multipart vers « ./partage », fichiers PDF et images sous le nom « fichiers »', st.action === './partage' && st.method === 'POST' && st.enctype === 'multipart/form-data' && st.params.files[0].name === 'fichiers' && st.params.files[0].accept.includes('application/pdf') && st.params.files[0].accept.includes('image/heic') && mf.start_url === './' && mf.scope === './', JSON.stringify(st)); }
+    }
     /* 0.92.0 : « Hermes et ses routines » en direct (le résumé du cron d'Hermes ; données inventées de la maquette), ou « indisponible » */
     { const q = await pageWith({grokOff: true}, '#equipe');
       const p = await q.evaluate(() => { const dl = {}; document.querySelectorAll('.hm-hermes .hmh-l div').forEach((d) => { dl[d.querySelector('dt').textContent] = d.querySelector('dd').textContent; });
@@ -1738,6 +1814,191 @@ srv.listen(0, async () => {
       ok('0.92 : résumé indisponible : la tuile d’Espaces et Équipe › Routines le disent aussi (« Indisponible », la raison), sans aucune ligne de Pilotage pour Hermes',
         /^Hermes \| Indisponible \| dernière écriture du résumé à 07 h 52 : plus de 30 minutes/.test(tu) && !/routine/.test(tu) && ro.n === 0 && /indisponibles : dernière écriture/.test(ro.msg) && /^Hermes\s+indisponible$/.test(ro.aj) && !/Semaine à venir|Prix suivis|Veille du matin/.test(ro.vue), JSON.stringify([tu, {...ro, vue: ro.vue.length}]));
       await q.context().close(); }
+    /* ================= 0.93.0 : trois retours de l'app ================= */
+    /* 1. Argent : « Déjà dépensé ce mois » et l'historique mois par mois (données d'exemple, même forme que le serveur) */
+    { const q = await page('#argent'); await q.waitForTimeout(800);
+      const hero = await q.evaluate(() => { const b = document.querySelector('.rad-hero .rad-deja-mois'), D = window.__RADAR.mois.depense; return {t: b ? b.textContent : '', sous: !!(b && b.previousElementSibling && b.previousElementSibling.classList.contains('rad-prog-l')), nw: b ? b.querySelectorAll('.nw').length : 0, total: D.total, somme: Math.round((D.fixes + D.plans + D.courantes) * 100) / 100}; });
+      const eurM = (n) => Number(n).toLocaleString('fr-FR', {minimumFractionDigits: 2, maximumFractionDigits: 2}).replace(/[   ]/g, ' ') + ' €', plat = (t) => String(t).replace(/[  ]/g, ' ');
+      ok('0.93 : Argent : la grande carte dit « Déjà dépensé en <mois> : <total> » sous « Déjà prélevé », montant insécable, égal aux dépenses fixes passées + dépenses courantes notées',
+        /^Déjà dépensé en \S+ : /.test(hero.t) && plat(hero.t).includes(eurM(hero.total)) && hero.sous && hero.nw === 1 && hero.total === hero.somme && hero.total > 0, JSON.stringify(hero));
+      await q.evaluate(() => document.querySelector('.rad-hero .rad-deja-mois').click()); await q.waitForTimeout(900);
+      const dep = await q.evaluate(() => { const c = document.querySelector('#view .rad-mois .rad-depense'), D = window.__RADAR.mois.depense; if (!c) return null; c.querySelector('details').open = true;
+        return {t: c.innerText, big: c.querySelector('.rad-big').textContent, lignes: c.querySelectorAll('.rad-dep-r').length, n: D.lignes.length, nF: D.nFixes, nN: D.nNotes, mois: [...document.querySelectorAll('#view .ux-seg button, #view .rad-seg button')].some((b) => /Le mois/.test(b.textContent) && b.getAttribute('aria-pressed') === 'true'),
+          apresVivre: !!(c.previousElementSibling && /rad-vivre|rad-mois-dont|lead/.test(c.previousElementSibling.className))}; });
+      ok('0.93 : Argent › Le mois : la carte « Déjà dépensé » avec le détail (dépenses fixes déjà passées, dépenses courantes notées, comptées jusqu’à hier), une ligne par dépense, rien d’absent affiché',
+        !!dep && dep.mois && plat(dep.big) === eurM(hero.total) && new RegExp('de dépenses fixes déjà passées \\(' + dep.nF + '\\)').test(dep.t) && new RegExp('de dépenses courantes notées \\(' + dep.nN + '\\)').test(dep.t) && /jusqu’à hier \(\d\d\/\d\d\)/.test(dep.t)
+        && dep.lignes === dep.n && dep.n > 0 && /Le détail \(\d+\)/.test(dep.t) && !/null|undefined|NaN/.test(dep.t) && dep.apresVivre, JSON.stringify(dep && {...dep, t: dep.t.slice(0, 300)}));
+      const hist = await q.evaluate(() => { const p = document.querySelector('#view .rad-hist'); if (!p) return null; const rows = [...p.querySelectorAll('.rad-hm')];
+        return {titre: p.querySelector('h2').textContent, aside: p.querySelector('.aside').textContent, n: rows.length, mois: rows.map((r) => r.dataset.mois), cours: rows[0].classList.contains('is-cours') && /en cours/.test(rows[0].textContent), six: /Six derniers mois/.test(document.querySelector('#view').textContent), plus: (p.querySelector('.rad-hist-plus') || {}).textContent,
+          gardes: window.__RADAR.mois.historique.filter((g) => !g.estime).length, insecables: rows.every((r) => !!r.querySelector('summary .rad-evo-v .nw'))}; });
+      const cur = (() => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); })();
+      ok('0.93 : Argent : l’historique remplace « Six derniers mois » : le mois en cours en tête (en direct), puis les mois clos du plus récent au plus ancien (12 affichés, « Tous les mois » pour le reste), 24 mois gardés',
+        !!hist && hist.titre === 'Historique' && hist.aside === '24 mois gardés' && hist.gardes >= 24 && hist.n === 13 && hist.mois[0] === cur && hist.cours && hist.mois.every((m, i, l) => !i || l[i - 1] > m) && !hist.six && hist.plus === 'Tous les mois (26)' && hist.insecables, JSON.stringify(hist));
+      await q.evaluate(() => document.querySelector('#view .rad-hist-plus').click()); await q.waitForTimeout(600);
+      const tous = await q.evaluate(() => { const rows = [...document.querySelectorAll('#view .rad-hist .rad-hm')]; return {n: rows.length, estimes: rows.filter((r) => r.classList.contains('is-estime') && /≈/.test(r.querySelector('summary').textContent)).length, recon: rows.filter((r) => /reconstitué/.test(r.querySelector('summary').textContent)).length, note: document.querySelector('#view .rad-hist .rad-evo-note').textContent, plus: document.querySelector('#view .rad-hist-plus').textContent}; });
+      ok('0.93 : Argent : « Tous les mois » montre les 26 mois (24 gardés dont un « reconstitué », 2 plus anciens « ≈ » estimés) et le dit', tous.n === 27 && tous.estimes === 2 && tous.recon === 1 && /24 mois au moins/.test(tous.note) && /« ≈ »/.test(tous.note) && tous.plus === 'Seulement les 12 derniers mois', JSON.stringify(tous));
+      await q.evaluate(() => document.querySelectorAll('#view .rad-hist .rad-hm')[2].querySelector('summary').click()); await q.waitForTimeout(500);
+      const det = await q.evaluate(() => { const r = document.querySelectorAll('#view .rad-hist .rad-hm')[2], g = window.__RADAR.mois.historique[1]; return {open: r.open, mois: r.dataset.mois === g.mois, t: r.querySelector('.rad-hm-b').innerText, postes: r.querySelectorAll('.rad-hm-p li').length, n: g.postes.length}; });
+      await q.evaluate(() => document.querySelector('#view .rad-hist-plus').click()); await q.waitForTimeout(600);
+      const reste = await q.evaluate(() => { const r = document.querySelectorAll('#view .rad-hist .rad-hm')[2]; return !!r && r.open && document.querySelectorAll('#view .rad-hist .rad-hm').length === 13; });
+      ok('0.93 : Argent : un mois s’ouvre sur son détail (dépenses fixes payées, dépenses courantes notées sur le budget prévu, reste à vivre, postes, « Bilan gardé le … ») et reste ouvert quand la liste se redessine',
+        det.open && det.mois && /Dépenses fixes payées/.test(det.t) && /Dépenses courantes notées/.test(det.t) && /sur 520,00\s€ prévus/.test(plat(det.t)) && /Reste à vivre/.test(det.t) && /paie de 3 000,00 €/.test(plat(det.t)) && /Bilan gardé le \d\d\/\d\d\/\d{4} : il ne change plus\./.test(det.t) && det.postes === det.n && det.n >= 5 && reste, JSON.stringify({...det, t: det.t.slice(0, 260), reste}));
+      await q.context().close(); }
+    /* 2. Agenda, Grok arrêté : JARVIS ou Hermes à la place des bots (feuille d'un jour, fiches, légende) */
+    { const BOTS_RE = /Iris|Chronos|Kairos|Ulysse|Athéna|Argus|Plutus/, VIEUX = /par le Canal, réponse à son passage|Un bot s'en occupe|Un bot suit|Confier à un autre bot/;
+      /* le jour d'une échéance d'exemple : dans le mois affiché, sinon le mois d'avant ou d'après (le banc ne dépend pas de la date) */
+      const jourDe = async (q, re) => { for (const sens of [null, 'Mois suivant', 'Mois précédent', 'Mois précédent']) { if (sens) { await q.evaluate((s) => document.querySelector('.cal-head button[aria-label="' + s + '"]').click(), sens); await q.waitForTimeout(500); }
+        const i = await q.evaluate((src) => [...document.querySelectorAll('#view .mg-d')].findIndex((x) => new RegExp(src).test(x.getAttribute('aria-label') || '')), re.source); if (i >= 0) { await q.evaluate((i) => document.querySelectorAll('#view .mg-d')[i].click(), i); await q.waitForTimeout(900); return true; } } return false; };
+      const feuille = (q) => q.evaluate(() => { const s = document.getElementById('sheet'), hd = s.querySelector('.sheet-head .chr'); return {t: s.innerText, avatar: hd ? hd.className : '', lignes: [...s.querySelectorAll('.day-list .dl-row')].map((r) => [r.querySelector('span:not(.dl-ic)').textContent, (r.querySelector('small') || {}).textContent || '']), actions: [...s.querySelectorAll('.sheet-actions .btn')].map((b) => b.childNodes[0].textContent.trim()), talk: [...s.querySelectorAll('.sheet-after .talk > button b')].map((b) => b.textContent)}; });
+      const fermer = (q) => q.evaluate(() => { const b = document.querySelector('#sheet .sheet-close'); if (b) b.click(); });
+      const q = await pageWith({grokOff: true}, '#agenda'); await q.waitForTimeout(1500);
+      await q.evaluate(() => { const d = document.querySelector('#view details.lg-fold'); if (d) d.open = true; }); await q.waitForTimeout(300);
+      const vue = await q.evaluate(() => ({t: document.getElementById('view').innerText, lg: [...document.querySelectorAll('#view .cal-legend .lg-t')].map((x) => x.textContent), puces: [...document.querySelectorAll('#view .cal-legend .lg-row')][1] ? [...[...document.querySelectorAll('#view .cal-legend .lg-row')][1].querySelectorAll('.lg-chip span:not(.mg-ic)')].map((x) => x.textContent) : []}));
+      ok('0.93 : Agenda, Grok arrêté : plus aucun nom de bot ni « Un bot s’en occupe » dans la vue ; la légende dit « Fait par Hermes » avec une seule ligne (plus les sept bots)',
+        !BOTS_RE.test(vue.t) && !VIEUX.test(vue.t) && vue.lg.includes('Fait par Hermes, rien à faire pour toi') && !vue.lg.some((x) => /un bot/i.test(x)) && vue.puces.length === 1 && /^Hermes · /.test(vue.puces[0]), JSON.stringify({noms: (vue.t.match(BOTS_RE) || [])[0], lg: vue.lg, puces: vue.puces}));
+      await q.evaluate(() => [...document.querySelectorAll('#view .cal-legend .lg-row')][1].querySelector('.lg-chip').click()); await q.waitForTimeout(500);
+      const filtre = await q.evaluate(() => ({on: (document.querySelector('#view .lg-on') || {}).textContent, hits: document.querySelectorAll('#view .mg-d.is-hit').length, n: +(([...document.querySelectorAll('#view .cal-legend .lg-row')][1].querySelector('.lg-chip b') || {}).textContent || 0)}));
+      await q.evaluate(() => [...document.querySelectorAll('#view .cal-legend .lg-row')][1].querySelector('.lg-chip').click()); await q.waitForTimeout(400);
+      ok('0.93 : Agenda, Grok arrêté : la ligne « Hermes » de la légende surligne les jours de ce qu’il suit (« Filtre : Hermes »)', filtre.on === 'Filtre : Hermes' && (filtre.n === 0 ? filtre.hits === 0 : filtre.hits >= 1), JSON.stringify(filtre));
+      /* la feuille d'un jour : avatar de JARVIS, « Écrire à Hermes », « Voir Travail » ; à côté d'un prix suivi : « Hermes suit » */
+      const aOffre = await jourDe(q, /Fin de l'offre de lancement/), fo = await feuille(q);
+      ok('0.93 : Agenda, Grok arrêté : la feuille d’un jour montre l’avatar de JARVIS (plus Chronos), « Écrire à Hermes » (plus « Écrire à Chronos par le Canal »), « Voir Travail » pour le CRA et les notes de frais ; à côté de l’offre que suivait Kairos : « Hermes suit »',
+        aOffre && /chr-claude/.test(fo.avatar) && !/chr-medusa/.test(fo.avatar) && fo.talk.join() === 'Discuter avec Claude,Écrire à Hermes,Voir Travail' && !BOTS_RE.test(fo.t) && !VIEUX.test(fo.t) && fo.lignes.some((l) => /Fin de l'offre de lancement/.test(l[0]) && l[1] === 'Hermes suit'), JSON.stringify({...fo, t: fo.t.slice(0, 200)}));
+      /* la fiche de cette échéance, ouverte depuis la feuille du jour */
+      await q.evaluate(() => [...document.querySelectorAll('#sheet .day-list button.dl-row')].find((r) => /Fin de l'offre de lancement/.test(r.textContent)).click()); await q.waitForTimeout(900);
+      const fe = await q.evaluate(() => { const s = document.getElementById('sheet'), d = s.querySelector('details.sheet-det'); if (d) d.open = true; const hd = s.querySelector('.sheet-head .chr'); return {t: s.innerText, avatar: hd ? hd.className : '', talk: [...s.querySelectorAll('.sheet-after .talk > button b')].map((b) => b.textContent)}; });
+      ok('0.93 : Agenda, Grok arrêté : la fiche d’une échéance que suivait Kairos : avatar d’Hermes, « Suivi par : Hermes suit », « Écrire à Hermes », plus de « Confier à un autre bot »',
+        /chr-hermes/.test(fe.avatar) && /suivi par\s*Hermes suit/i.test(fe.t) && fe.talk.join() === 'Discuter avec Claude,Écrire à Hermes' && !BOTS_RE.test(fe.t) && !VIEUX.test(fe.t), JSON.stringify({...fe, t: fe.t.slice(0, 300)}));
+      /* « Écrire à Hermes » depuis la fiche : une ligne pour Hermes dans le Canal, le sujet de la fiche en Objet, sans sonnette */
+      await q.evaluate(() => [...document.querySelectorAll('#sheet .sheet-after .talk > button')].find((b) => /Écrire à Hermes/.test(b.textContent)).click()); await q.waitForTimeout(700);
+      const eh = await q.evaluate(() => { const s = document.getElementById('sheet'), hd = s.querySelector('.sheet-head .chr'); return {titre: s.querySelector('.sheet-title').textContent, avatar: hd ? hd.className : ''}; });
+      await q.evaluate(() => [...document.querySelectorAll('#sheet .sheet-actions .btn')].find((x) => /^Écrire/.test(x.textContent)).click()); await q.waitForTimeout(500);
+      const avantE = await q.evaluate(() => ({canal: window.__G.Canal.length, sends: (window.__calls || []).filter((c) => c.tool === 'send_message').length}));
+      await q.evaluate(() => { const t = document.querySelector('#sheet .sheet-pick textarea'); t.value = 'Garde un œil dessus.'; t.closest('form').requestSubmit(); }); await q.waitForTimeout(6800);
+      const apresE = await q.evaluate(() => ({l: window.__G.Canal[window.__G.Canal.length - 1] || [], canal: window.__G.Canal.length, sends: (window.__calls || []).filter((c) => c.tool === 'send_message').length}));
+      ok('0.93 : Agenda, Grok arrêté : « Écrire à Hermes » depuis une fiche écrit une ligne pour Hermes dans le Canal (le sujet de la fiche dans le message et dans l’Objet), sans sonnette',
+        eh.titre === 'Écrire à Hermes' && /chr-hermes/.test(eh.avatar) && apresE.canal === avantE.canal + 1 && apresE.l[1] === 'Rabie' && apresE.l[2] === 'Hermes' && /À propos de « Fin de l'offre de lancement » : Garde un œil dessus\./.test(apresE.l[4]) && apresE.l[7] === "Fin de l'offre de lancement" && apresE.sends === avantE.sends, JSON.stringify([eh, apresE]));
+      await fermer(q); await q.waitForTimeout(500);
+      /* le CRA : « Hermes · voir Travail » dans la feuille du jour, « Voir Travail » en tête de la fiche */
+      const aCra = await jourDe(q, /CRA client de la semaine/), fc = await feuille(q);
+      await q.evaluate(() => [...document.querySelectorAll('#sheet .day-list button.dl-row')].find((r) => /CRA client de la semaine/.test(r.textContent)).click()); await q.waitForTimeout(900);
+      const fcra = await q.evaluate(() => { const s = document.getElementById('sheet'), d = s.querySelector('details.sheet-det'); if (d) d.open = true; const hd = s.querySelector('.sheet-head .chr'); return {t: s.innerText, avatar: hd ? hd.className : '', kicker: s.querySelector('.sheet-kicker').textContent, mains: [...s.querySelectorAll('.sheet-actions .sa-main .btn')].map((b) => [b.childNodes[0].textContent.trim(), b.classList.contains('main')]), talk: [...s.querySelectorAll('.sheet-after .talk > button b')].map((b) => b.textContent)}; });
+      ok('0.93 : Agenda, Grok arrêté : le CRA que faisait Chronos : « Hermes · voir Travail » dans la feuille du jour ; sa fiche dit « Hermes s’en occupe », « Suivi par : Hermes, sur le portail (espace Travail) », avec « Voir Travail » en action principale',
+        aCra && fc.lignes.some((l) => /CRA client de la semaine/.test(l[0]) && l[1] === 'Hermes · voir Travail') && /chr-hermes/.test(fcra.avatar) && /^Hermes s'en occupe · /i.test(fcra.kicker) && /suivi par\s*Hermes, sur le portail \(espace Travail\)/i.test(fcra.t) && fcra.mains[0][0] === 'Voir Travail' && fcra.mains[0][1] && fcra.mains.filter((m) => m[1]).length === 1
+        && fcra.talk.join() === 'Discuter avec Claude,Écrire à Hermes,Voir Travail' && !BOTS_RE.test(fcra.t) && !VIEUX.test(fcra.t), JSON.stringify({l: fc.lignes, ...fcra, t: fcra.t.slice(0, 200)}));
+      await q.evaluate(() => [...document.querySelectorAll('#sheet .sheet-actions .btn')].find((x) => /^Voir Travail/.test(x.textContent)).click()); await q.waitForTimeout(900);
+      ok('0.93 : Agenda, Grok arrêté : « Voir Travail » ferme la fiche et ouvre l’espace Travail', await q.evaluate(() => location.hash === '#travail' && document.getElementById('sheet').hidden), await q.evaluate(() => location.hash));
+      await q.evaluate(() => { location.hash = '#agenda'; }); await q.waitForTimeout(900);
+      /* un événement de son agenda : avatar de JARVIS, « Écrire à Hermes » (plus « Écrire à Iris ») */
+      const aEv = await jourDe(q, /Dentiste/);
+      await q.evaluate(() => [...document.querySelectorAll('#sheet .day-list button.dl-row')].find((r) => /Dentiste/.test(r.textContent)).click()); await q.waitForTimeout(900);
+      const fev = await q.evaluate(() => { const s = document.getElementById('sheet'), hd = s.querySelector('.sheet-head .chr'); return {t: s.innerText, avatar: hd ? hd.className : '', talk: [...s.querySelectorAll('.sheet-after .talk > button b')].map((b) => b.textContent)}; });
+      ok('0.93 : Agenda, Grok arrêté : la fiche d’un événement : avatar de JARVIS, « Écrire à Hermes » (plus « Écrire à Iris par le Canal »)', aEv && /chr-claude/.test(fev.avatar) && fev.talk.join() === 'Discuter avec Claude,Écrire à Hermes' && !/Écrire à Iris/.test(fev.t) && !VIEUX.test(fev.t), JSON.stringify({...fev, t: fev.t.slice(0, 200)}));
+      await q.context().close();
+      /* tant que Grok n'est pas arrêté, l'ancien affichage reste */
+      const q0 = await page('#agenda'); await q0.waitForTimeout(800);
+      await q0.evaluate(() => { const d = document.querySelector('#view details.lg-fold'); if (d) d.open = true; }); await q0.waitForTimeout(300);
+      const lg0 = await q0.evaluate(() => ({lg: [...document.querySelectorAll('#view .cal-legend .lg-t')].map((x) => x.textContent), puces: [...document.querySelectorAll('#view .cal-legend .lg-row')][1].querySelectorAll('.lg-chip').length}));
+      const a0 = await jourDe(q0, /Fin de l'offre de lancement/), f0 = await feuille(q0);
+      ok('0.93 : Agenda, Grok en service : rien ne change (avatar de Chronos, « Écrire à Chronos » par le Canal, « Kairos » à côté de l’offre, la légende des sept bots)',
+        a0 && /chr-medusa/.test(f0.avatar) && f0.talk.join() === 'Discuter avec Claude,Écrire à Chronos' && /par le Canal, réponse à son passage/.test(f0.t) && f0.lignes.some((l) => /Fin de l'offre de lancement/.test(l[0]) && l[1] === 'Kairos') && lg0.lg.includes('Fait par un bot, rien à faire pour toi') && lg0.puces === 7, JSON.stringify({...f0, t: f0.t.slice(0, 160), lg0}));
+      await q0.context().close(); }
+    /* 3. Pour moi : une seule carte par sujet lié */
+    { const base0 = await (async () => { const z = await page('#demandes'); await z.waitForTimeout(800); const n = await z.evaluate(() => +document.querySelector('.tab[data-tab="demandes"] .badge').textContent); await z.context().close(); return n; })();
+      const q = await pageWith({sujets: true}, '#demandes'); await q.waitForTimeout(1500);
+      const cartes = () => q.evaluate(() => [...document.querySelectorAll('#view .pm-card')].map((c) => ({t: c.querySelector('.pm-title').textContent, de: (c.querySelector('.pm-sj-de') || {}).textContent || '', sec: (c.closest('.pm-sec') || {}).id, pill: (c.querySelector('.pm-head .pill') || {}).textContent || '', sujet: c.dataset.sujet || '', n: +(c.dataset.n || 0), lies: [...c.querySelectorAll('.pm-lie')].map((l) => [l.querySelector('b').textContent, l.querySelector('small').textContent, l.classList.contains('is-urgent')]), titreLies: (c.querySelector('.pm-lies-t') || {}).textContent || ''})));
+      const C1 = await cartes(), de = (re) => C1.filter((c) => re.test(c.t) || re.test(c.de) || c.lies.some((l) => re.test(l[0])));
+      const sin = de(/Sinistre inondations|Devis du plombier|Relancer l'assureur|Passage de l'expert/);
+      const brSin = await q.evaluate(() => [...document.querySelectorAll('#view .draft-card')].filter((c) => /Déclaration de sinistre/.test(c.textContent)).length);
+      ok('0.93 : Pour moi : le sinistre tient en une seule carte, au nom du dossier : la demande la plus urgente en tête (« Devis du plombier », venue du Canal, liée par son Objet), et dedans la demande du dossier, le brouillon prêt (lié par les mots de son objet : plus de carte « Brouillon prêt » à part) et ses deux échéances (liées par le nom entre parenthèses)',
+        sin.length === 1 && brSin === 0 && sin[0].t === 'Sinistre inondations (appartement)' && sin[0].de === 'Devis du plombier' && sin[0].sujet === 'Sinistre inondations (appartement)' && sin[0].n === 5 && sin[0].titreLies === 'Aussi dans ce sujet · 4'
+        && sin[0].lies.map((l) => l[0]).join(' | ') === "Déclarer le sinistre à l'assureur depuis son appli | Déclaration de sinistre : inondations dans l'appartement | Relancer l'assureur (Sinistre inondations) | Passage de l'expert (sinistre inondations)" && /^À faire · Iris/.test(sin[0].lies[0][1])
+        && sin[0].lies[1][1] === 'Brouillon prêt · à sinistres@assureur.example' && /^À faire par toi · demain$/.test(sin[0].lies[2][1]), JSON.stringify([sin, brSin]));
+      ok('0.93 : Pour moi : la plus urgente décide de la place et de la couleur : la carte est sous « À décider » (la question du devis) et sa pastille dit « Dans 1 j » (la relance de demain, avant le devis à 2 jours), ligne en ambre',
+        sin.length === 1 && sin[0].sec === 'pm-dec' && sin[0].pill === 'Dans 1 j' && sin[0].lies[2][2] === true && sin[0].lies[3][2] === false, JSON.stringify(sin[0] && [sin[0].sec, sin[0].pill, sin[0].lies.map((l) => l[2])]));
+      /* un sujet sans demande : deux brouillons et une échéance d'un dossier qui attend quelqu'un d'autre ; une réponse reçue et l'échéance de son dossier */
+      const sans = await q.evaluate(() => { const lies = (c) => [...c.querySelectorAll('.pm-lie')].map((l) => [l.querySelector('b').textContent, l.querySelector('small').textContent]);
+        const br = [...document.querySelectorAll('#view .draft-card')].filter((c) => /caution|recours/i.test(c.textContent)), rp = [...document.querySelectorAll('#view .card.item')].filter((c) => /Réponse reçue/.test((c.querySelector('.item-bot') || {}).textContent || '') && /Dégât des eaux/.test(c.textContent));
+        return {br: br.map((c) => ({sujet: c.dataset.sujet || '', nom: (c.querySelector('.pm-sj-nom') || {}).textContent || '', t: c.querySelector('.item-title').textContent, lies: lies(c), boutons: [...c.querySelectorAll('.row-actions .btn')].length})), rp: rp.map((c) => ({sujet: c.dataset.sujet || '', lies: lies(c), boutons: [...c.querySelectorAll('.row-actions .btn, .row-actions a')].length}))}; });
+      ok('0.93 : Pour moi : un sujet sans demande tient aussi en une carte : les deux brouillons du dossier « Remboursement de la caution » (l’un lié par son objet, l’autre par le début de son texte) et son échéance sous le premier brouillon, qui garde ses boutons et porte le nom du dossier',
+        sans.br.length === 1 && sans.br[0].sujet === 'Remboursement de la caution (ancien logement)' && sans.br[0].nom === 'Remboursement de la caution (ancien logement)' && sans.br[0].boutons >= 1 && sans.br[0].lies.length === 2 && sans.br[0].lies[0][1] === 'Brouillon prêt · à bailleur@delta.example'
+        && [sans.br[0].t, sans.br[0].lies[0][0]].sort().join(' | ') === 'Dernier courrier avant recours | Relance : remboursement de la caution' && sans.br[0].lies[1][0] === 'Point sur le remboursement de la caution', JSON.stringify(sans.br));
+      ok('0.93 : Pour moi : la réponse reçue sur le dossier « Dégât des eaux » porte l’échéance de ce dossier (« Passage de l’expert (Dégât des eaux) »), dans la même carte, avec ses boutons',
+        sans.rp.length === 1 && sans.rp[0].sujet === 'Dégât des eaux' && sans.rp[0].lies.length === 1 && sans.rp[0].lies[0][0] === "Passage de l'expert (Dégât des eaux)" && sans.rp[0].boutons >= 1, JSON.stringify(sans.rp));
+      const exp = de(/Prestimo/);
+      ok('0.93 : Pour moi : le rachat de crédit tient en une seule carte, même si le dossier attend quelqu’un d’autre : deux demandes du Canal (un nom raccourci entre parenthèses, « (rachat Prestimo) », et les mêmes mots que le dossier) et l’échéance de l’offre',
+        exp.length === 1 && exp[0].t === 'Rachat du crédit Prestimo (organisme Alpha)' && exp[0].de === 'Offre de prêt Gamma (rachat Prestimo)' && exp[0].n === 3 && exp[0].lies.map((l) => l[0]).join(' | ') === "Pièces pour le rachat du crédit Prestimo | Fin de l'offre de prêt Gamma (rachat Prestimo)" && exp[0].pill === 'Dans 3 j', JSON.stringify(exp));
+      const ass = C1.filter((c) => /ssurance/.test(c.t));
+      ok('0.93 : Pour moi : les faux amis restent séparés : « Assurance habitation », « Assurance auto » et « Attestation d’assurance » font trois cartes ; le renouvellement de l’assurance auto ne va qu’avec elle ; « Assurance : point annuel » ne va avec aucune',
+        ass.map((c) => c.t).sort().join(' | ') === "Assurance auto | Assurance habitation | Attestation d'assurance" && ass.find((c) => c.t === 'Assurance auto').lies.map((l) => l[0]).join() === "Renouvellement de l'assurance auto" && ass.find((c) => c.t === 'Assurance habitation').lies.length === 0
+        && !C1.some((c) => c.lies.some((l) => /point annuel/.test(l[0]))) && ass.every((c) => !c.de), JSON.stringify(ass.map((c) => [c.t, c.lies.map((l) => l[0])])));
+      /* les comptes : la pastille compte les sujets ; un filtre compte ce qu'il montre */
+      const cpt = await q.evaluate(() => { const n = (f) => +((document.querySelector('#view .ux-seg [data-f="' + f + '"] b') || {}).textContent || 0); return {badge: +document.querySelector('.tab[data-tab="demandes"] .badge').textContent, entete: (document.querySelector('#status .st.is-demande') || {}).textContent || '', dec: n('decider'), faire: n('faire')}; });
+      await q.evaluate(() => document.querySelector('#view .ux-seg [data-f="decider"]').click()); await q.waitForTimeout(500);
+      const vusDec = await q.evaluate(() => ['pm-dec', 'pm-cra', 'pm-jours'].reduce((s, id) => { const x = document.getElementById(id); return s + (x && !x.hidden ? x.querySelectorAll(id === 'pm-jours' ? '.jours-card' : id === 'pm-cra' ? '.cra-card' : '.pm-list > *').length : 0); }, 0));
+      await q.evaluate(() => document.querySelector('#view .ux-seg [data-f="tout"]').click()); await q.waitForTimeout(500);
+      ok('0.93 : Pour moi : le compte « pour toi » compte les sujets (7 demandes et 3 brouillons de plus, dont 2 demandes et 2 brouillons rangés dans la carte de leur sujet : + 6), le même dans l’en-tête et la pastille ; le filtre « Décider » compte ce qu’il montre',
+        cpt.badge === base0 + 6 && new RegExp('^\\s*' + cpt.badge + ' pour toi').test(cpt.entete) && cpt.dec === vusDec && cpt.dec > 0, JSON.stringify({base0, ...cpt, vusDec}));
+      /* chaque élément garde sa feuille et ses actions */
+      await q.evaluate(() => [...document.querySelectorAll('#view .pm-sujet[data-sujet^="Sinistre"] .pm-lie')].find((l) => /Déclarer le sinistre/.test(l.textContent)).click()); await q.waitForTimeout(900);
+      const fd = await q.evaluate(() => { const s = document.getElementById('sheet'); return {ouvert: !s.hidden, titre: s.querySelector('.sheet-title').textContent, actions: [...s.querySelectorAll('.sheet-actions .btn')].map((b) => b.childNodes[0].textContent.trim()), lies: [...s.querySelectorAll('.pm-lie b')].map((b) => b.textContent)}; });
+      await q.evaluate(() => document.querySelector('#sheet .sheet-close').click()); await q.waitForTimeout(500);
+      await q.evaluate(() => [...document.querySelectorAll('#view .pm-sujet[data-sujet^="Sinistre"] .pm-lie')].find((l) => /Relancer l'assureur/.test(l.textContent)).click()); await q.waitForTimeout(900);
+      const fe2 = await q.evaluate(() => { const s = document.getElementById('sheet'); return {titre: s.querySelector('.sheet-title').textContent, actions: [...s.querySelectorAll('.sheet-actions .btn')].map((b) => b.childNodes[0].textContent.trim())}; });
+      await q.evaluate(() => document.querySelector('#sheet .sheet-close').click()); await q.waitForTimeout(500);
+      await q.evaluate(() => [...document.querySelectorAll('#view .pm-sujet[data-sujet^="Sinistre"] .pm-lie')].find((l) => /Déclaration de sinistre/.test(l.textContent)).click()); await q.waitForTimeout(900);
+      const fb = await q.evaluate(() => { const s = document.getElementById('sheet'); return {titre: s.querySelector('.sheet-title').textContent, kicker: s.querySelector('.sheet-kicker').textContent, actions: [...s.querySelectorAll('.sheet-actions .btn')].map((b) => b.childNodes[0].textContent.trim())}; });
+      await q.evaluate(() => document.querySelector('#sheet .sheet-close').click()); await q.waitForTimeout(500);
+      ok('0.93 : Pour moi : le brouillon rangé dans la carte s’ouvre sur sa feuille de brouillon (relire, envoyer)', /Déclaration de sinistre/.test(fb.titre) && /^Brouillon/.test(fb.kicker) && fb.actions.length >= 1, JSON.stringify(fb));
+      ok('0.93 : Pour moi : un élément rangé dans la carte s’ouvre sur sa propre feuille, avec ses actions : la demande du dossier (ses réponses, et les autres éléments du sujet dessous), l’échéance (« C’est fait », « Reporter »)',
+        fd.ouvert && fd.titre === 'Sinistre inondations (appartement)' && fd.actions.length >= 2 && fd.lies.join(' | ') === "Devis du plombier | Déclaration de sinistre : inondations dans l'appartement | Relancer l'assureur (Sinistre inondations) | Passage de l'expert (sinistre inondations)"
+        && fe2.titre === "Relancer l'assureur (Sinistre inondations)" && fe2.actions.includes("C'est fait") && fe2.actions.includes('Reporter'), JSON.stringify([fd, fe2]));
+      /* une notification « #voir-<ligne> » ouvre toujours le bon élément, même rangé dans la carte d'un autre */
+      const rangs = await q.evaluate(() => ({pieces: window.__G.Canal.findIndex((r) => r[3] === 'Pièces pour le rachat du crédit Prestimo') + 1, devis: window.__G.Canal.findIndex((r) => r[3] === 'Devis du plombier') + 1}));
+      await q.evaluate((r) => { location.hash = '#voir-' + r; }, rangs.pieces); await q.waitForTimeout(2500);
+      const v1 = await q.evaluate(() => { const s = document.getElementById('sheet'); return {ouvert: !s.hidden, titre: (s.querySelector('.sheet-title') || {}).textContent, actions: s.querySelectorAll('.sheet-actions .btn').length}; });
+      await q.evaluate(() => { const b = document.querySelector('#sheet .sheet-close'); if (b) b.click(); }); await q.waitForTimeout(500);
+      await q.evaluate((r) => { location.hash = '#voir-' + r; }, rangs.devis); await q.waitForTimeout(2500);
+      const v2 = await q.evaluate(() => { const s = document.getElementById('sheet'); return {ouvert: !s.hidden, titre: (s.querySelector('.sheet-title') || {}).textContent}; });
+      await q.evaluate(() => { const b = document.querySelector('#sheet .sheet-close'); if (b) b.click(); }); await q.waitForTimeout(500);
+      ok('0.93 : Pour moi : « #voir-<ligne> » ouvre le bon élément : la demande « Pièces… » rangée dans la carte du rachat, et « Devis du plombier » en tête de la carte du sinistre',
+        rangs.pieces > 1 && rangs.devis > 1 && v1.ouvert && v1.titre === 'Pièces pour le rachat du crédit Prestimo' && v1.actions >= 1 && v2.ouvert && v2.titre === 'Devis du plombier', JSON.stringify([rangs, v1, v2]));
+      /* « une par une » : chaque élément y passe, un à un (rien n'est rangé) */
+      const nAv = (await cartes()).length;
+      await q.evaluate(() => document.getElementById('fc-start').click()); await q.waitForTimeout(700);
+      const fcn = await q.evaluate(() => ({compte: (document.querySelector('.fc-count') || {}).textContent || '', lies: document.querySelectorAll('#view .pm-lies').length}));
+      await q.evaluate(() => document.querySelector('.fc-close').click()); await q.waitForTimeout(600);
+      ok('0.93 : Pour moi : « Traiter une par une » passe chaque élément un à un (les deux demandes rangées y sont, sans liste « Aussi dans ce sujet ») ; au retour, les cartes par sujet reviennent',
+        /^1 sur \d+$/.test(fcn.compte) && fcn.lies === 0 && (await cartes()).length === nAv && (await cartes()).filter((c) => c.sujet).length >= 3, JSON.stringify(fcn));
+      /* l'accueil : un sujet n'y est qu'une fois, et le même compte */
+      await q.evaluate(() => { location.hash = ''; }); await q.waitForTimeout(1500);
+      /* le chiffre de l'accueil compte jusqu'à sa valeur (0.55.0) : attendre qu'il y soit, pas un délai fixe (lu trop tôt : « 5 », « 14 » pour 23) */
+      await q.waitForFunction((n) => ((document.querySelector('.hud-ro.q-bl b') || {}).textContent || '').startsWith(String(n)), cpt.badge, {timeout: 8000}).catch(() => {});
+      const acc = await q.evaluate(() => ({t: document.getElementById('view').innerText, hud: (document.querySelector('.hud-ro.q-bl b') || {}).textContent || ''}));
+      ok('0.93 : accueil : le même compte « pour toi » que la pastille ; un sujet n’y est pas deux fois', acc.hud.startsWith(String(cpt.badge)) && (acc.t.match(/Devis du plombier|Déclarer le sinistre/g) || []).length <= 1 && (acc.t.match(/Offre de prêt Gamma|Pièces pour le rachat/g) || []).length <= 1, JSON.stringify([acc.hud, cpt.badge]));
+      /* la règle seule (noms inventés) */
+      const regle = await q.evaluate(() => { const L = window.__sujets93.lier, D = ['Sinistre inondations (appartement)', 'Rachat du crédit Prestimo (organisme Alpha)', 'Assurance habitation', 'Assurance auto'], N = ['Naturalisation (Alice)', 'Naturalisation (Bob)'], F = ['Fermeture du compte Alpha (02/01)', 'Garde pendant la fermeture de la crèche du 15 au 19/02'];
+        return {objet: L('Question', 'Sinistre inondations (appartement)', D), objetSans: L('Question', 'sinistre INONDATIONS', D), paren: L('Relancer l’assureur (Sinistre inondations)', '', D), court: L('Fin de l’offre de prêt Gamma (rachat Prestimo)', '', D), guill: L('Représenter le dossier « Assurance auto »', '', D), message: L('Info', '', D, 'Choix pour « Assurance habitation » : la formule de base (voir assurance auto)'),
+          mots: L('Pièces pour le rachat du crédit Prestimo', '', D), inverse: L('Inondations appartement', '', D), seul: L('Assurance', '', D), communs: L('Dossier assurance : relance et rappel', '', D), voisin: L('Attestation d’assurance', '', D), bon: L('Renouvellement de l’assurance auto', '', D), heure: L('Rendez-vous (14h30)', '', D), rien: L('Rendez-vous notaire', '', D),
+          natVague: L('Naturalisation', '', N), natQui: L('Test de langue pour la naturalisation de Bob', '', N), natNom: L('Représenter le dossier « Naturalisation (Alice) »', '', N), natPar: L('Rendez-vous en préfecture (naturalisation)', '', N),
+          ferm: L('Fermeture de la crèche du 21 au 25/12', '', F), fermBon: L('Fermeture du compte Alpha : vider le compte avant', '', F), gardeAutre: L('Garde pendant la fermeture de la crèche du 12 au 16/04', '', F), gardeMeme: L('Qui garde ? Garde pendant la fermeture de la crèche (du 15 au 19/02)', '', F), vides: window.__sujets93.mots('Relance du dossier : rappel de la demande, 3e point'), sens: window.__sujets93.mots('Rachat du crédit Prestimo (organisme Alpha) du 12/03')}; });
+      ok('0.93 : la règle : lien explicite d’abord (l’Objet du Canal, le nom entre parenthèses ou entre « », avec ou sans la parenthèse du dossier ; dans un message, seulement entre « »), puis un nom raccourci entre parenthèses, puis les mêmes mots significatifs',
+        regle.objet === 'Sinistre inondations (appartement)' && regle.objetSans === 'Sinistre inondations (appartement)' && regle.paren === 'Sinistre inondations (appartement)' && regle.court === 'Rachat du crédit Prestimo (organisme Alpha)' && regle.guill === 'Assurance auto' && regle.message === 'Assurance habitation'
+        && regle.mots === 'Rachat du crédit Prestimo (organisme Alpha)' && regle.bon === 'Assurance auto' && regle.natQui === 'Naturalisation (Bob)' && regle.natNom === 'Naturalisation (Alice)' && regle.fermBon === 'Fermeture du compte Alpha (02/01)' && regle.gardeMeme === 'Garde pendant la fermeture de la crèche du 15 au 19/02', JSON.stringify(regle));
+      ok('0.93 : la règle, faux amis : dans le doute, rien n’est réuni (un mot commun à deux dossiers, « assurance » seul, un mot trop commun des suivis, un libellé plus court que le nom du dossier, deux dossiers au même nom à une parenthèse près, une fermeture qui n’est pas celle du dossier, la même garde à d’autres dates, une heure entre parenthèses)',
+        regle.seul === null && regle.communs === null && regle.voisin === null && regle.inverse === null && regle.heure === null && regle.rien === null && regle.natVague === null && regle.natPar === null && regle.ferm === null && regle.gardeAutre === null && regle.vides.length === 0 && regle.sens.join() === 'rachat,credit,prestimo,organisme,alpha', JSON.stringify(regle));
+      await q.context().close();
+      /* Grok arrêté : la carte du sujet et ses lignes disent Hermes */
+      const g = await pageWith({sujets: true, grokOff: true}, '#demandes'); await g.waitForTimeout(2500);
+      const sg = await g.evaluate(() => { const c = document.querySelector('#view .pm-sujet[data-sujet^="Sinistre"]'); return c ? {who: c.querySelector('.pm-who').textContent, lies: [...c.querySelectorAll('.pm-lie small')].map((x) => x.textContent), n: document.querySelectorAll('#view .pm-sujet[data-sujet^="Sinistre"]').length} : null; });
+      ok('0.93 : Pour moi, Grok arrêté : la carte du sujet et ses lignes disent Hermes (plus Iris)', !!sg && sg.n === 1 && /^Hermes · /.test(sg.who) && /^À faire · Hermes/.test(sg.lies[0]) && !sg.lies.some((x) => /Iris/.test(x)), JSON.stringify(sg));
+      await g.context().close();
+      /* la ligne de Travail du bloc 0.94.0 (réponses aux mails du mois) reste une ligne à part : le regroupement ne la range pas et ne la casse pas */
+      const w = await pageWith({sujets: true, reponses: true}, '#demandes'); await w.waitForTimeout(2500);
+      const lt = await w.evaluate(() => ({l: [...document.querySelectorAll('#view .pm-travail')].map((x) => ({t: x.firstElementChild.textContent, toi: x.classList.contains('toi'), dans: !!x.closest('.pm-sujet, .pm-card, .pm-lies'), parent: x.parentElement.className})), sin: document.querySelectorAll('#view .pm-sujet[data-sujet^="Sinistre"]').length, sujets: document.querySelectorAll('#view .pm-sujet').length}));
+      ok('0.93 : Pour moi : avec les sujets regroupés, la ligne de Travail (0.94.0 : « CRA signé reçu : à rattacher · … ») reste une seule ligne à part, hors de toute carte de sujet',
+        lt.l.length === 1 && lt.l[0].toi && lt.l[0].t === 'CRA signé reçu : à rattacher · Réponse à ton mail de prolongation : à lire' && !lt.l[0].dans && lt.sin === 1 && lt.sujets >= 5, JSON.stringify(lt));
+      await w.context().close(); }
   } catch (e) { ok('exception', false, e.stack); }
   ok('aucune erreur de page', !errs.length, errs.join(' | '));
   console.log(out.join('\n')); console.log(fails ? fails + ' échec(s)' : 'Tout passe (' + out.length + ' vérifications). Captures : ' + SH);

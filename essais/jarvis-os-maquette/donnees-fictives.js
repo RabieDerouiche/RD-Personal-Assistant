@@ -161,6 +161,37 @@
     G['Routines'].push(['Hermes', 'Veille du matin', 'Horaire (serveur de JARVIS)', 'Lun-ven 7h40', 'x', 'x', 'En place'], ['Hermes', 'Semaine à venir', 'Horaire (serveur de JARVIS)', 'Dim 18h10', 'x', 'x', 'En place'], ['Hermes', 'Prix suivis', 'Horaire (serveur de JARVIS)', 'Dim 17h', 'x', 'x', 'En place']);
     G['État'].push(['Hermes', fr(D(0)) + ' 07:42', 'Veille du matin faite', fr(D(1)) + ' 07:40 (Veille du matin)', '']);
   }
+  /* 0.93.0 : scénario « sujets » — un même sujet en plusieurs éléments (le dossier, des demandes venues du Canal, des échéances), et des faux
+     amis qui doivent rester séparés (deux dossiers d'assurance). Tout est inventé : aucun montant, aucun organisme réel. */
+  if (SCEN.sujets) {
+    G['Dossiers'].push(
+      ['Sinistre inondations (appartement)', 'En attente', "Déclarer le sinistre à l'assureur depuis son appli", fr(D(9)), 'Rabie', fr(D(-6)), 'Référence inventée 123', 'Iris', fr(D(-6)), "À faire : Déclarer le sinistre à l'assureur depuis son appli | Pourquoi : le syndic renvoie vers ton assurance | Temps : 15 min"],
+      ['Rachat du crédit Prestimo (organisme Alpha)', 'En cours', "Attendre l'appel du conseiller", fr(D(4)), 'Organisme Beta (conseiller)', fr(D(-8)), '', 'Iris', fr(D(-7)), ''],
+      ['Assurance habitation', 'En attente', "Envoyer l'attestation de l'ancien assureur", '', 'Rabie', fr(D(-3)), '', 'Iris', fr(D(-3)), "À faire : Envoyer l'attestation de l'ancien assureur | Pourquoi : le nouveau contrat l'attend"],
+      ['Assurance auto', 'En attente', 'Choisir la formule', '', 'Rabie', fr(D(-3)), '', 'Iris', fr(D(-3)), 'Choix : Quelle formule ? | Options : Tiers / Tous risques | Pourquoi : le contrat se renouvelle bientôt'],
+      ['Remboursement de la caution (ancien logement)', 'En cours', "Attendre la réponse du bailleur", '', 'Bailleur Delta', fr(D(-9)), '', 'Iris', fr(D(-9)), '']);
+    G['À toi'].push(
+      [fr(D(-6)), 'Iris', 'Sinistre inondations (appartement)', "Déclarer le sinistre à l'assureur depuis son appli"],
+      [fr(D(-1)), 'Hermes', 'Devis du plombier', 'Oui/Non : Tu acceptes le devis du plombier ? | Pourquoi : il doit passer avant la fin du mois | Si oui : je confirme le passage | Si non : je demande un autre devis | Avant le : ' + fr(D(2))],
+      [fr(D(-2)), 'Hermes', 'Offre de prêt Gamma (rachat Prestimo)', "Oui/Non : Je demande l'offre écrite à Gamma ? | Pourquoi : c'est la meilleure proposition reçue | Avant le : " + fr(D(3))],
+      [fr(D(-1)), 'Hermes', 'Pièces pour le rachat du crédit Prestimo', 'À faire : Réunir les trois derniers justificatifs demandés | Pourquoi : le conseiller les demande avant son appel'],
+      [fr(D(-3)), 'Iris', 'Assurance habitation', "Envoyer l'attestation de l'ancien assureur"],
+      [fr(D(-3)), 'Iris', 'Assurance auto', 'Choisir la formule'],
+      [fr(D(-1)), 'Hermes', "Attestation d'assurance", "À faire : Télécharger l'attestation d'assurance scolaire | Pourquoi : l'école la demande"]);
+    G['Canal'].push(
+      [fr(D(-1)), 'Hermes', 'Rabie', 'Devis du plombier', 'Oui/Non : Tu acceptes le devis du plombier ?', 'À faire', '', 'Sinistre inondations (appartement)'],
+      [fr(D(-2)), 'Hermes', 'Rabie', 'Offre de prêt Gamma (rachat Prestimo)', "Oui/Non : Je demande l'offre écrite à Gamma ?", 'À faire', '', ''],
+      [fr(D(-1)), 'Hermes', 'Rabie', 'Pièces pour le rachat du crédit Prestimo', 'À faire : Réunir les trois derniers justificatifs demandés', 'À faire', '', ''],
+      [fr(D(-1)), 'Hermes', 'Rabie', "Attestation d'assurance", "À faire : Télécharger l'attestation d'assurance scolaire", 'À faire', '', '']);
+    G['Échéances'].push(
+      [fr(D(1)), "Relancer l'assureur (Sinistre inondations)", 'Logement', '', 'À venir', 'Iris', '', 'À faire par moi'],
+      [fr(D(30)), "Passage de l'expert (sinistre inondations)", 'Logement', '', 'À venir', 'Iris', '', 'Date à retenir'],
+      [fr(D(5)), "Fin de l'offre de prêt Gamma (rachat Prestimo)", 'Finances', '3 jours avant', 'À venir', 'Iris', '', 'Offre'],
+      [fr(D(20)), "Renouvellement de l'assurance auto", 'Contrats', '', 'À venir', 'Iris', '', 'Fin de validité'],
+      [fr(D(25)), "Assurance : point annuel", 'Contrats', '', 'À venir', 'Iris', '', 'Date à retenir'],
+      [fr(D(8)), "Passage de l'expert (Dégât des eaux)", 'Logement', '', 'À venir', 'Iris', '', 'Date à retenir'],
+      [fr(D(12)), 'Point sur le remboursement de la caution', 'Logement', '', 'À venir', 'Iris', '', 'À faire par moi']);
+  }
   G['Papiers'] = [
     ['Document', 'Personne', 'Où il est (lien Drive, ou « papier »)', "Valable jusqu'au", 'Sert pour', 'Mis à jour le', 'Remarque'],
     ['Passeport', 'Rabie', 'papier, tiroir', fr(D(210)), 'voyage', '', ''],
@@ -247,6 +278,10 @@
     ]
   };
 
+  /* 0.93.0, scénario « sujets » : trois brouillons Gmail sans carte (inventés) : un pour le sinistre, deux pour un dossier qui n'attend pas sa réponse */
+  if (SCEN.sujets) MAIL.drafts.push({id: 'DRAFT93', threadId: 'dth93', toRecipients: ['sinistres@assureur.example'], ccRecipients: [], date: new Date(now - 3600000 * 3).toISOString(), subject: "Déclaration de sinistre : inondations dans l'appartement", plaintextBody: 'Bonjour,\nJe déclare un sinistre : des inondations sont apparues au plafond du salon.'},
+    {id: 'DRAFT94', threadId: 'dth94', toRecipients: ['bailleur@delta.example'], ccRecipients: [], date: new Date(now - 3600000 * 4).toISOString(), subject: 'Relance : remboursement de la caution', plaintextBody: "Bonjour,\nSans nouvelle de votre part depuis l'état des lieux, je vous relance."},
+    {id: 'DRAFT95', threadId: 'dth95', toRecipients: ['bailleur@delta.example'], ccRecipients: [], date: new Date(now - 3600000 * 2).toISOString(), subject: 'Dernier courrier avant recours', plaintextBody: "Bonjour,\nLe remboursement de la caution de l'ancien logement n'est toujours pas arrivé."});
   if (SCEN.draftPj) MAIL.drafts.push({id: 'DRAFT9', threadId: 'dth9', toRecipients: ['agence@example.org'], ccRecipients: [], date: new Date(now - 3600000).toISOString(), subject: 'Dossier location', plaintextBody: 'Bonjour,\nVoici le dossier.', pieces: ['dossier.pdf']});   /* 0.85.0 : un brouillon avec pièce jointe */
 
   /* plages A1 */
@@ -518,9 +553,58 @@
       {id: 'pc', service: 'Garde d’enfant (exemple)', cat: 'Autres', montant: null, jour: 5, jourApprox: true, rythme: 'mensuel', source: 'mail', preuves: 13, dernier: rIso(-18), depuis: '11/2025', exemple: {objet: 'Votre facture du mois (en pièce jointe)', date: rIso(-18)}}],
     scan: {enCours: false, mois: 13, total: 13, lus: 412, fini: Date.now(), erreur: ''}, google: true,
     navigo: {mois: rMoisL(1), conseil: 'liberte', joursSite: 9, liberte: 36.72, moisNet: 45.40, texte: '9 jours sur site prévus, avec une semaine de congés : reste en Liberté+ (environ 36,72 €). Le Navigo Mois coûterait 45,40 € après le remboursement de 50 %.'}};
+  /* 0.93.0 : « déjà dépensé ce mois » et l'historique mois par mois, tels que le serveur les donne (montants inventés) : les dépenses fixes
+     de la liste dont le jour est passé, deux notes de courses, puis 26 mois (24 gardés, dont un reconstitué, et deux plus anciens estimés) */
+  { const M93 = window.__RADAR.mois, jour = new Date().getDate(), ymK = (k) => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() + k); return d.getFullYear() + '-' + p2(d.getMonth() + 1); };
+    const c2 = (n) => Math.round(n * 100) / 100, moisIso = (j) => ymK(0) + '-' + p2(j);
+    const passees = window.__RADAR.fixes.filter((f) => f.rythme === 'mensuel' && f.jour < jour).map((f) => ({date: moisIso(f.jour), service: f.service, montant: f.montant, poste: f.cat, sorte: 'fixe'}));
+    const notes = [[3, 62.4], [10, 48.15]].filter(([j]) => j <= jour).map(([j, m]) => ({date: moisIso(j), service: 'Courses', montant: m, poste: 'Alimentation', sorte: 'courante'}));
+    const lignes = passees.concat(notes).sort((a, b) => (a.date < b.date ? -1 : 1)), som = (l) => c2(l.reduce((t, x) => t + x.montant, 0));
+    const postesDe = (l) => { const par = {}; l.forEach((x) => { const k = (x.sorte === 'courante' ? 'c' : 'f') + x.poste; par[k] = par[k] || {label: x.poste, montant: 0, n: 0}; par[k].montant = c2(par[k].montant + x.montant); par[k].n++; if (x.sorte === 'courante') par[k].courant = true; }); return Object.values(par).sort((a, b) => b.montant - a.montant); };
+    M93.depense = {mois: ymK(0), jusqua: jour > 1 ? rIso(-1) : '', total: som(lignes), fixes: som(passees), plans: 0, courantes: som(notes), nFixes: passees.length, nPlans: 0, nNotes: notes.length, postes: postesDe(lignes), lignes};
+    M93.historique = [...Array(26)].map((_, i) => { const fx = c2(1466.57 + ((i * 37) % 90)), co = i < 24 ? c2(380 + ((i * 53) % 140)) : 0, pl = i % 4 === 0 ? 29.55 : 0, total = c2(fx + co + pl), clos = ymK(-i) + '-01';
+      return Object.assign({mois: ymK(-(i + 1)), libelle: rMoisL(-(i + 1)), fixes: fx, plans: pl, courantes: co, total, postes: [{label: 'Logement', montant: c2(fx - 213.07), n: 4}, {label: 'Alimentation', montant: co, n: 6, courant: true}, {label: 'Abonnements', montant: 58.56, n: 5}, {label: 'Transport', montant: 89.02, n: 2}, {label: 'Télécoms', montant: 39.98, n: 2},
+        {label: 'Santé', montant: 24.5, n: 1}].concat(pl ? [{label: 'Paiements en plusieurs fois', montant: pl, n: 1}] : []).filter((x) => x.montant > 0).sort((a, b) => b.montant - a.montant)},
+        i < 24 ? {prevu: 520, paie: 3000, resteAVivre: c2(3000 - total), clos} : {estime: true}, i === 7 ? {reconstitue: true} : {}); });
+  }
   /* 0.23.0 : la météo de l'accueil (en vrai : Open-Meteo, à la position de l'iPhone) */
   window.__METEO = {current: {temperature_2m: 9.4, apparent_temperature: 6.2, weather_code: 3}, daily: {time: [fr(D(0)), fr(D(1))], weather_code: [3, 61], temperature_2m_min: [4, 2], temperature_2m_max: [11, 7], precipitation_probability_max: [10, 70]}};
   window.__G = G; window.__MAIL = MAIL; window.__CAL = CAL;
+  /* 0.91.0 : le dépôt de papiers de la maquette (données inventées ; mêmes réponses que le pont du serveur, JarvisServeur.depot). Deux
+     fichiers attendent ; « valider » range dans le faux Drive ci-dessus. `depot: false` dans le scénario : comme un serveur pas encore à
+     jour (la carte « À trier » de la 0.87.0) ; `depotPortee: 'non'` : la portée Google « drive » pas accordée (« Reconnecte Google une fois »). */
+  if (SCEN.depot !== false) {
+    const RACINE = '1huMsPD8I81buG4GWhuoGmsOafvy4HrE4', JOUR = 864e5, dossiers = [{id: RACINE, chemin: []}];
+    (function descend(id, ch) { DRIVE.folders.filter((f) => f.parent === id).sort((a, b) => a.name.localeCompare(b.name, 'fr')).forEach((f) => { dossiers.push({id: f.id, chemin: ch.concat(f.name)}); descend(f.id, ch.concat(f.name)); }); })(RACINE, []);
+    const ou = (...noms) => dossiers.find((d) => d.chemin.join('/') === noms.join('/')) || dossiers[0], copie = (x) => JSON.parse(JSON.stringify(x)), portee = () => SCEN.depotPortee || 'oui';
+    const prop = (d, nom, raison, par, prive) => ({dossier: d.id, chemin: d.chemin, nom, raison, par, sur: par === 'regles', prive: !!prive});
+    let seq = 0; const neuf = (nom, ext, taille, source, p, age) => ({id: 'dp' + (++seq), at: now - age, jusqua: now - age + 30 * JOUR, nom, genre: ext === 'pdf' ? 'PDF' : 'photo', ext, taille, source, proposition: p});
+    const E = {attente: [neuf('Quittance novembre.pdf', 'pdf', 184320, 'app', prop(ou('Logement'), 'Quittance de loyer 2026-11.pdf', 'Reconnu : quittance de loyer (dans le nom du fichier).', 'regles'), 3600000),
+      neuf('IMG_4521.heic', 'heic', 2411724, 'raccourci', prop(ou('À trier'), 'Photo 2026-11-25.heic', 'Une image n’est pas lue : proposition par défaut.', 'defaut'), 26 * 3600000)], ranges: []};
+    window.__DEPOT = {
+      etat: async () => ({lie: true, portee: portee(), dossiers: copie(dossiers), attente: copie(E.attente), ranges: copie(E.ranges.slice().reverse()), max: 25 * 1024 * 1024, jours: 30, types: 'PDF, JPEG, PNG, HEIC'}),
+      envoyer: async (f, nom) => {
+        const n = String(nom || (f && f.name) || 'Document').split(/[\\/]/).pop(), m = /\.(pdf|jpe?g|png|heic)$/i.exec(n);
+        if (!m) return {ok: false, status: 415, error: 'Ce fichier n’est ni un PDF ni une image (JPEG, PNG, HEIC) : je ne le garde pas.'};
+        const ext = m[1].toLowerCase().replace('jpeg', 'jpg'), passeport = /passeport/i.test(n);
+        const x = neuf(n, ext, (f && f.size) || 1000, 'app', passeport ? prop(ou('Lui', 'Identité et séjour'), 'Passeport Lui.' + ext, 'Reconnu : passeport (dans le nom du fichier).', 'regles')
+          : prop(ou('À trier'), n, ext === 'pdf' ? 'Rien reconnu dans le nom ni dans le texte : proposition par défaut.' : 'Une image n’est pas lue : proposition par défaut.', 'defaut'), 0);
+        E.attente.unshift(x); return {ok: true, fichier: copie(x)};
+      },
+      corriger: async () => ({ok: true}),
+      valider: async (id, dossier, nom) => {
+        const x = E.attente.find((y) => y.id === id), d = dossiers.find((y) => y.id === dossier);
+        if (!x) return {ok: false, error: 'Ce fichier n’est plus en attente.'};
+        if (portee() === 'non') return {ok: false, code: 'portee', error: 'Reconnecte Google une fois (Réglages, Google, Reconnecter) : JARVIS n’a pas encore le droit de ranger dans ton Drive.'};
+        if (!d) return {ok: false, code: 'hors_arbre', error: 'Ce dossier n’est pas dans « RD Assistant/Papiers » : JARVIS n’y range rien.'};
+        const n = String(nom || x.nom).replace(/\.(pdf|jpe?g|png|hei[cf])$/i, '') + '.' + x.ext, fid = 'ffd' + (++seq), lien = 'https://drive.google.com/file/d/exemple-' + fid + '/view';
+        DRIVE.files.push({id: fid, name: n, parent: d.id, mimeType: x.ext === 'pdf' ? 'application/pdf' : 'image/jpeg', modifiedTime: new Date().toISOString(), size: x.taille, viewUrl: lien});
+        E.attente = E.attente.filter((y) => y !== x); const r = {id: x.id, at: Date.now(), nom: n, chemin: d.chemin, dossier: d.id, lien, fichier: fid}; E.ranges.push(r);
+        return {ok: true, range: copie(r)};
+      },
+      retirer: async (id) => { const n = E.attente.length; E.attente = E.attente.filter((y) => y.id !== id); return {ok: E.attente.length < n}; }
+    };
+  }
   /* 0.92.0 : les routines d'Hermes en direct (données inventées, même forme que GET /api/hermes/routines) ; elles ne sont pas celles de
      l'onglet Routines plus haut (« Semaine à venir » n'y est plus) : la page ne doit montrer que celles-ci. SCEN.hermesIndispo : résumé indisponible */
   if (SCEN.grokOff) {
