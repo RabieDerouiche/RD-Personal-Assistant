@@ -12376,6 +12376,14 @@ void main(){
       const E = c.extra; c.extra = () => h('div', {class: 'stack'}, sjLies(g, d), E ? E() : null);
       return c;
     };
+    /* une notification « #voir-<ligne> » ouvre la demande que porte cette ligne (son libellé), avant celle du dossier nommé dans son Objet :
+       avec deux demandes dans le même sujet, c'est bien celle de la ligne qui s'ouvre (le reste du sujet est listé dans sa feuille) */
+    const VL93 = voirLigne;
+    voirLigne = function (row) {
+      const l = (S.canal || []).find((x) => +x._row === +row);
+      if (l && !(S.ordres || []).some((x) => x.id === 'o:' + (+row))) { const d = (S.demandes || []).find((x) => lvLow(x.title) === lvLow(l.subject)); if (d) { openItem('demande', d); return true; } }
+      return VL93.apply(this, arguments);
+    };
     const VD93 = VIEWS.demandes;
     VIEWS.demandes = (el) => (typeof FOCUS === 'object' && FOCUS && FOCUS.on ? VD93(el) : avecSujets(() => VD93(el)));
     const VA93 = VIEWS.accueil;

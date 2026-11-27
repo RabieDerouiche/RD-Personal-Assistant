@@ -1794,7 +1794,7 @@ srv.listen(0, async () => {
       await q.evaluate(() => [...document.querySelectorAll('#sheet .day-list button.dl-row')].find((r) => /Fin de l'offre de lancement/.test(r.textContent)).click()); await q.waitForTimeout(900);
       const fe = await q.evaluate(() => { const s = document.getElementById('sheet'), d = s.querySelector('details.sheet-det'); if (d) d.open = true; const hd = s.querySelector('.sheet-head .chr'); return {t: s.innerText, avatar: hd ? hd.className : '', talk: [...s.querySelectorAll('.sheet-after .talk > button b')].map((b) => b.textContent)}; });
       ok('0.93 : Agenda, Grok arrêté : la fiche d’une échéance que suivait Kairos : avatar d’Hermes, « Suivi par : Hermes suit », « Écrire à Hermes », plus de « Confier à un autre bot »',
-        /chr-hermes/.test(fe.avatar) && /Suivi par\s*Hermes suit/.test(fe.t) && fe.talk.join() === 'Discuter avec Claude,Écrire à Hermes' && !BOTS_RE.test(fe.t) && !VIEUX.test(fe.t), JSON.stringify({...fe, t: fe.t.slice(0, 300)}));
+        /chr-hermes/.test(fe.avatar) && /suivi par\s*Hermes suit/i.test(fe.t) && fe.talk.join() === 'Discuter avec Claude,Écrire à Hermes' && !BOTS_RE.test(fe.t) && !VIEUX.test(fe.t), JSON.stringify({...fe, t: fe.t.slice(0, 300)}));
       /* « Écrire à Hermes » depuis la fiche : une ligne pour Hermes dans le Canal, le sujet de la fiche en Objet, sans sonnette */
       await q.evaluate(() => [...document.querySelectorAll('#sheet .sheet-after .talk > button')].find((b) => /Écrire à Hermes/.test(b.textContent)).click()); await q.waitForTimeout(700);
       const eh = await q.evaluate(() => { const s = document.getElementById('sheet'), hd = s.querySelector('.sheet-head .chr'); return {titre: s.querySelector('.sheet-title').textContent, avatar: hd ? hd.className : ''}; });
@@ -1810,7 +1810,7 @@ srv.listen(0, async () => {
       await q.evaluate(() => [...document.querySelectorAll('#sheet .day-list button.dl-row')].find((r) => /CRA client de la semaine/.test(r.textContent)).click()); await q.waitForTimeout(900);
       const fcra = await q.evaluate(() => { const s = document.getElementById('sheet'), d = s.querySelector('details.sheet-det'); if (d) d.open = true; const hd = s.querySelector('.sheet-head .chr'); return {t: s.innerText, avatar: hd ? hd.className : '', kicker: s.querySelector('.sheet-kicker').textContent, mains: [...s.querySelectorAll('.sheet-actions .sa-main .btn')].map((b) => [b.childNodes[0].textContent.trim(), b.classList.contains('main')]), talk: [...s.querySelectorAll('.sheet-after .talk > button b')].map((b) => b.textContent)}; });
       ok('0.93 : Agenda, Grok arrêté : le CRA que faisait Chronos : « Hermes · voir Travail » dans la feuille du jour ; sa fiche dit « Hermes s’en occupe », « Suivi par : Hermes, sur le portail (espace Travail) », avec « Voir Travail » en action principale',
-        aCra && fc.lignes.some((l) => /CRA client de la semaine/.test(l[0]) && l[1] === 'Hermes · voir Travail') && /chr-hermes/.test(fcra.avatar) && /^Hermes s'en occupe · /i.test(fcra.kicker) && /Suivi par\s*Hermes, sur le portail \(espace Travail\)/.test(fcra.t) && fcra.mains[0][0] === 'Voir Travail' && fcra.mains[0][1] && fcra.mains.filter((m) => m[1]).length === 1
+        aCra && fc.lignes.some((l) => /CRA client de la semaine/.test(l[0]) && l[1] === 'Hermes · voir Travail') && /chr-hermes/.test(fcra.avatar) && /^Hermes s'en occupe · /i.test(fcra.kicker) && /suivi par\s*Hermes, sur le portail \(espace Travail\)/i.test(fcra.t) && fcra.mains[0][0] === 'Voir Travail' && fcra.mains[0][1] && fcra.mains.filter((m) => m[1]).length === 1
         && fcra.talk.join() === 'Discuter avec Claude,Écrire à Hermes,Voir Travail' && !BOTS_RE.test(fcra.t) && !VIEUX.test(fcra.t), JSON.stringify({l: fc.lignes, ...fcra, t: fcra.t.slice(0, 200)}));
       await q.evaluate(() => [...document.querySelectorAll('#sheet .sheet-actions .btn')].find((x) => /^Voir Travail/.test(x.textContent)).click()); await q.waitForTimeout(900);
       ok('0.93 : Agenda, Grok arrêté : « Voir Travail » ferme la fiche et ouvre l’espace Travail', await q.evaluate(() => location.hash === '#travail' && document.getElementById('sheet').hidden), await q.evaluate(() => location.hash));
@@ -1916,7 +1916,13 @@ srv.listen(0, async () => {
       const g = await pageWith({sujets: true, grokOff: true}, '#demandes'); await g.waitForTimeout(2500);
       const sg = await g.evaluate(() => { const c = document.querySelector('#view .pm-sujet[data-sujet^="Sinistre"]'); return c ? {who: c.querySelector('.pm-who').textContent, lies: [...c.querySelectorAll('.pm-lie small')].map((x) => x.textContent), n: document.querySelectorAll('#view .pm-sujet[data-sujet^="Sinistre"]').length} : null; });
       ok('0.93 : Pour moi, Grok arrêté : la carte du sujet et ses lignes disent Hermes (plus Iris)', !!sg && sg.n === 1 && /^Hermes · /.test(sg.who) && /^À faire · Hermes/.test(sg.lies[0]) && !sg.lies.some((x) => /Iris/.test(x)), JSON.stringify(sg));
-      await g.context().close(); }
+      await g.context().close();
+      /* la ligne de Travail du bloc 0.94.0 (réponses aux mails du mois) reste une ligne à part : le regroupement ne la range pas et ne la casse pas */
+      const w = await pageWith({sujets: true, reponses: true}, '#demandes'); await w.waitForTimeout(2500);
+      const lt = await w.evaluate(() => ({l: [...document.querySelectorAll('#view .pm-travail')].map((x) => ({t: x.firstElementChild.textContent, toi: x.classList.contains('toi'), dans: !!x.closest('.pm-sujet, .pm-card, .pm-lies'), parent: x.parentElement.className})), sin: document.querySelectorAll('#view .pm-sujet[data-sujet^="Sinistre"]').length, sujets: document.querySelectorAll('#view .pm-sujet').length}));
+      ok('0.93 : Pour moi : avec les sujets regroupés, la ligne de Travail (0.94.0 : « CRA signé reçu : à rattacher · … ») reste une seule ligne à part, hors de toute carte de sujet',
+        lt.l.length === 1 && lt.l[0].toi && lt.l[0].t === 'CRA signé reçu : à rattacher · Réponse à ton mail de prolongation : à lire' && !lt.l[0].dans && lt.sin === 1 && lt.sujets >= 5, JSON.stringify(lt));
+      await w.context().close(); }
   } catch (e) { ok('exception', false, e.stack); }
   ok('aucune erreur de page', !errs.length, errs.join(' | '));
   console.log(out.join('\n')); console.log(fails ? fails + ' échec(s)' : 'Tout passe (' + out.length + ' vérifications). Captures : ' + SH);
