@@ -11,6 +11,10 @@ jamais un fichier du dépôt n'est exécuté par root.
                                                   et tâches d'hermes-portail coupées par la limite, relancées UNE fois après sa levée
   limite.py passage|verdict|attente|planifier …   les aides d'hermes-portail (voir plus bas)
 
+À chaque passage de la minuterie (0.92.0), même sans rien à relancer et sans lire l'usage en plus, un résumé assaini du cron
+d'Hermes est écrit pour JARVIS (/var/lib/hermes-relance-etat/routines.json, root et groupe de JARVIS, 750 et 640) : voir
+« le résumé des routines » plus bas. Son écriture ne peut ni faire échouer ni retarder la relance.
+
 Règles (sa demande, et la sécurité d'abord) :
 - rien ne repart tant que la limite tient : une fenêtre du forfait à 100 %, ou l'heure de reprise annoncée pas encore passée ;
 - une seule relance par échec (état root 600), un plafond par jour ; une erreur qui n'est pas la limite n'est jamais relancée ;
@@ -598,6 +602,177 @@ def cmd_relancer(a):
     menage_avis()
 
 
+# ---------------------------------------------------------------- le résumé des routines, pour JARVIS (0.92.0)
+# Sa remarque du 26/11/2026 : dans l'app, « Hermes et ses routines » ne montrait qu'une ligne périmée de l'onglet Routines de
+# Pilotage. Les vraies routines sont dans le cron d'Hermes (jobs.json, chez l'utilisateur hermes, illisible pour JARVIS) :
+# root en écrit ici un résumé ASSAINI, que JARVIS lit (groupe en lecture seule) et que l'app affiche en direct.
+# - liste fermée : seules les routines de routines.conf (copie root posée par install.sh et routines.sh), jamais une autre ;
+# - chaque valeur passe par une liste blanche de formes : noms, mots connus, dates ISO refaites ici. Jamais le texte d'une
+#   erreur (une catégorie courte à la place), jamais un chemin, un jeton, un nom de portail ni un contenu de mail ;
+# - aucune lecture d'usage, aucun lancement d'Hermes : jobs.json, deux fichiers de root et systemctl is-active seulement.
+RESUME = E("HERMES_RELANCE_RESUME", "/var/lib/hermes-relance-etat")
+ROUTINES_CONF = E("HERMES_RELANCE_CONF", "/usr/local/lib/hermes-relance/routines.conf")   # copie root de routines.conf
+ROUTINES_MODE = E("HERMES_RELANCE_MODES", "/etc/hermes/routines.mode")                    # écrit par routines.sh --reel / --double
+GARDE_MINUTERIE = "hermes-garde.timer"
+R_NOM = re.compile(r"[a-z0-9][a-z0-9-]{1,39}")
+R_CRON = re.compile(r"[0-9*,/-]{1,20}(?: [0-9*,/-]{1,20}){4}")
+R_LIBELLE = re.compile(r"Routine «\s*([A-Za-zÀ-ÖØ-öø-ÿ0-9 .'’-]{2,60}?)\s*»")
+JOURS = ("dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche")
+RESEAU = re.compile(r"connection|connect ?error|timeout|timed out|\bdns\b|unreachable|network|name resolution|\b50[234]\b", re.I)
+CAUSES = ("limite du forfait", "réseau", "résultat non envoyé", "arrêtée à la main", "erreur")
+PASSERELLE = {"active": "active", "inactive": "arrêtée", "deactivating": "arrêtée", "failed": "plantée", "activating": "démarre", "reloading": "démarre"}
+
+
+def _suite(mots):
+    return mots[0] if len(mots) == 1 else ", ".join(mots[:-1]) + " et " + mots[-1]
+
+
+def moment_lisible(cron):
+    """« 40 7 * * 1-5 » → « du lundi au vendredi à 7 h 40 » (heure de Paris) ; un horaire plus tordu est rendu tel quel (« cron … »)."""
+    c = cron.split()
+    brut = "cron " + cron
+    if len(c) != 5 or c[2] != "*" or c[3] != "*" or not c[0].isdigit() or int(c[0]) > 59:
+        return brut
+    heures = c[1].split(",")
+    if not all(x.isdigit() and int(x) <= 23 for x in heures) or len(heures) > 6:
+        return brut
+    mi = int(c[0])
+    quand = "à " + _suite(["%d h%s" % (int(x), " %02d" % mi if mi else "") for x in heures])
+    j = c[4]
+    if j == "*":
+        return "chaque jour " + quand
+    m = re.fullmatch(r"([0-7])-([0-7])", j)
+    if m and int(m.group(1)) < int(m.group(2)):
+        return "du %s au %s %s" % (JOURS[int(m.group(1))], JOURS[int(m.group(2))], quand)
+    if re.fullmatch(r"[0-7](?:,[0-7]){0,6}", j):
+        return _suite(["le " + JOURS[int(x)] for x in j.split(",")]) + " " + quand
+    return brut
+
+
+def routines_connues():
+    """La liste fermée (copie root de routines.conf) : nom → {libelle, horaire, mode}. None si la copie manque."""
+    t = lire_texte(ROUTINES_CONF, 200_000)
+    if not t:
+        return None
+    connues = {}
+    for ligne in t.splitlines():
+        if not ligne.strip() or ligne.lstrip().startswith("#"):
+            continue
+        c = [x.strip() for x in ligne.split("|", 5)]
+        if len(c) < 6 or not R_NOM.fullmatch(c[0]) or not R_CRON.fullmatch(" ".join(c[2].split())) or len(connues) >= 40:
+            continue
+        m = R_LIBELLE.search(c[5])
+        connues[c[0]] = {"libelle": m.group(1).strip() if m else c[0], "horaire": " ".join(c[2].split()),
+                         "mode": "réel" if "« en réel »" in c[5] else "double"}
+    # le mode noté sur le serveur (routines.sh --reel / --double) l'emporte, comme dans routines.sh ; la dernière ligne gagne
+    for ligne in lire_texte(ROUTINES_MODE, 20_000).splitlines():
+        mots = ligne.split()
+        if len(mots) == 2 and mots[0] in connues and mots[1] in ("reel", "double"):
+            connues[mots[0]]["mode"] = "réel" if mots[1] == "reel" else "double"
+    return connues
+
+
+def iso_sur(v):
+    """Une date de jobs.json refaite ici (AAAA-MM-JJTHH:MM:SSZ, UTC) : jamais la valeur lue recopiée. None si elle n'en est pas une."""
+    ep = iso_ep(v) if isinstance(v, str) and len(v) <= 40 else None
+    if ep is None or not 1_577_836_800 <= ep <= 4_102_444_800:   # entre 2020 et 2100
+        return None
+    return datetime.datetime.fromtimestamp(ep, datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def resultat_de(j):
+    """(résultat, cause) du dernier passage : ok, erreur ou jamais ; pour une erreur, une catégorie courte, jamais son texte."""
+    st = j.get("last_status")
+    if not j.get("last_run_at") or st is None:
+        return "jamais", None
+    if st == "ok":
+        return "ok", None
+    if st == "delivery_failed":
+        return "erreur", "résultat non envoyé"
+    if st == "cancelled":
+        return "erreur", "arrêtée à la main"
+    err = erreur_du_passage(j)
+    return "erreur", "limite du forfait" if est_limite(err) else "réseau" if RESEAU.search(err) else "erreur"
+
+
+def etat_garde(jour):
+    """Le garde du forfait : coupé (jusqu'à une date), a arrêté Hermes, actif, ou arrêté (sa minuterie ne tourne pas)."""
+    try:
+        with open(GARDE_COUPE, encoding="utf-8", errors="replace") as f:
+            m = re.search(r"\d{4}-\d{2}-\d{2}", f.read(200))
+        if not m or jour <= m.group(0):
+            return {"etat": "coupé", "jusqua": m.group(0) if m else None}
+    except OSError:
+        pass
+    if os.path.exists(GARDE_ARRET):
+        return {"etat": "a arrêté Hermes", "jusqua": None}
+    return {"etat": "actif" if sctl("is-active", GARDE_MINUTERIE)[1] == "active" else "arrêté", "jusqua": None}
+
+
+def resume_routines():
+    """Ce que JARVIS peut savoir du cron d'Hermes : voir plus haut. Rien n'est recopié tel quel de jobs.json."""
+    t = maintenant()
+    jour = datetime.datetime.fromtimestamp(t, _zone("Europe/Paris")).strftime("%Y-%m-%d")
+    connues = routines_connues()
+    data = lire_json(JOBS)
+    jobs = [j for j in data["jobs"] if isinstance(j, dict)] if isinstance(data, dict) and isinstance(data.get("jobs"), list) else None
+    par_nom, inconnues = {}, 0
+    for j in jobs or []:
+        nom = j.get("name")
+        if not isinstance(nom, str) or not nom.startswith("jarvis-"):
+            continue
+        if connues is not None and nom[7:] in connues:
+            par_nom[nom[7:]] = j
+        else:
+            inconnues += 1   # une routine jarvis-… hors de la liste : comptée, jamais décrite
+    routines = []
+    for nom, c in (connues or {}).items():
+        j = par_nom.get(nom)
+        r = {"nom": nom, "libelle": c["libelle"], "moment": moment_lisible(c["horaire"]), "mode": c["mode"], "posee": j is not None,
+             "active": False, "dernier": None, "resultat": "jamais", "cause": None, "prochain": None}
+        if j is not None:
+            expr = j["schedule"].get("expr") if isinstance(j.get("schedule"), dict) else None
+            if isinstance(expr, str) and R_CRON.fullmatch(" ".join(expr.split())):
+                r["moment"] = moment_lisible(" ".join(expr.split()))   # l'horaire vraiment posé chez Hermes
+            r["active"] = j.get("enabled", True) is not False and j.get("state") not in ("paused", "completed") and not j.get("paused_at")
+            r["resultat"], r["cause"] = resultat_de(j)
+            if r["cause"] is not None and r["cause"] not in CAUSES:
+                r["cause"] = "erreur"
+            r["dernier"] = iso_sur(j.get("last_run_at")) if r["resultat"] != "jamais" else None
+            r["prochain"] = iso_sur(j.get("next_run_at")) if r["active"] else None
+        routines.append(r)
+    return {"v": 1, "at": t, "liste": connues is not None, "cron": jobs is not None,
+            "passerelle": PASSERELLE.get(sctl("is-active", SERVICE)[1], "inconnue"), "garde": etat_garde(jour),
+            "routines": routines, "inconnues": min(inconnues, 99)}
+
+
+def ecrire_resume():
+    """Le résumé dans le dossier de root lisible par le groupe de JARVIS (750, fichier 640), d'un coup, jamais à travers un lien."""
+    g = groupe_jarvis()
+    os.makedirs(RESUME, mode=0o750, exist_ok=True)
+    if os.path.islink(RESUME):
+        raise OSError("dossier du résumé : un lien")
+    try:
+        os.chown(RESUME, 0, g if g is not None else 0)
+    except OSError:
+        pass
+    os.chmod(RESUME, 0o750)
+    ecrire_json(os.path.join(RESUME, "routines.json"), resume_routines(), mode=0o640, groupe=g)
+
+
+def cmd_minuterie(a):
+    """La minuterie : la relance d'abord, puis le résumé pour JARVIS, quoi qu'il soit arrivé à la relance. Une erreur du résumé
+    est avalée et dite dans le journal (son genre seulement) : elle ne change ni le résultat ni le code de sortie de la relance."""
+    try:
+        cmd_relancer(a)
+    finally:
+        if not a.a_blanc:
+            try:
+                ecrire_resume()
+            except Exception as e:   # jamais la relance en échec pour un résumé
+                print("Résumé des routines pour JARVIS : pas écrit (%s)." % type(e).__name__)
+
+
 def main():
     p = argparse.ArgumentParser(description="La limite du forfait Claude (JARVIS OS)")
     s = p.add_subparsers(dest="cmd", required=True)
@@ -611,7 +786,7 @@ def main():
     x = s.add_parser("relancer"); x.add_argument("--a-blanc", action="store_true")
     x = s.add_parser("aviser"); x.add_argument("--cle", required=True); x.add_argument("--titre", required=True); x.add_argument("--texte", default="")
     a = p.parse_args()
-    {"texte": cmd_texte, "passage": cmd_passage, "verdict": cmd_verdict, "attente": cmd_attente, "planifier": cmd_planifier, "relancer": cmd_relancer, "aviser": cmd_aviser}[a.cmd](a)
+    {"texte": cmd_texte, "passage": cmd_passage, "verdict": cmd_verdict, "attente": cmd_attente, "planifier": cmd_planifier, "relancer": cmd_minuterie, "aviser": cmd_aviser}[a.cmd](a)
 
 
 if __name__ == "__main__":

@@ -61,6 +61,7 @@ nouveau n'était noté dans Pilotage ; c'est sa décision de faire l'essai quand
 | Service | `hermes-gateway.service` (et `hermes-sortie.service` pour les règles réseau, `/etc/hermes/sortie.nft`) |
 | Garde du forfait | `hermes-garde.timer` et `hermes-garde.service`, script `/usr/local/sbin/hermes-garde-forfait` (copie root), seuil et fenêtres comptées dans `/etc/hermes/garde.conf`, état dans `/var/lib/hermes-garde/` |
 | Relance après la limite (26/11/2026) | `hermes-relance.timer` (toutes les 10 minutes, à :02, rattrapée) et `hermes-relance.service`, commande `/usr/local/sbin/hermes-relance` (copie root, `--a-blanc` : dit ce qu'elle ferait), code `/usr/local/lib/hermes-relance/limite.py` (copie root de `jarvis-os/hermes/limite.py`), état de root `/var/lib/hermes-relance/` (700), avis pour JARVIS `/var/lib/hermes-relance-avis/` (root et groupe de JARVIS, 750, fichiers 640) |
+| Routines en direct dans JARVIS (0.92.0) | résumé écrit par `hermes-relance` à chaque passage : `/var/lib/hermes-relance-etat/routines.json` (root et groupe de JARVIS, 750 et 640) ; liste fermée : `/usr/local/lib/hermes-relance/routines.conf` (copie root de `routines.conf`, posée par `install.sh`, rafraîchie par `routines.sh`) |
 
 JARVIS, Panier, Caddy et ufw ne changent pas. Rien n'est ouvert vers Internet : Telegram est interrogé en
 sortie (polling). Hermes ouvre seulement une petite API locale pour ses propres clients (127.0.0.1, port
@@ -229,6 +230,38 @@ exemples aux bancs : « resets 10:40am (UTC) », « resets Dec 2, 7pm (Europe/Pa
 - **JARVIS** : voir `docs/jarvis-os.md`, 0.89.0.
 
 Banc : `bash essais/hermes/relance.test.sh` (usage, `jobs.json`, systemctl et lanceur simulés).
+
+### Les routines en direct dans JARVIS (0.92.0, 26/11/2026)
+
+Sa remarque : dans l'app, « Hermes et ses routines » ne montrait qu'une ligne périmée de l'onglet Routines de Pilotage. JARVIS ne
+peut pas lire le cron d'Hermes (`/home/hermes` en 0700) : c'est root qui lui en écrit un résumé, à chaque passage de
+`hermes-relance.timer` (toutes les 10 minutes), après la relance, même quand il n'y a rien à relancer.
+
+- **Ce qu'il contient** (`/var/lib/hermes-relance-etat/routines.json`, version 1) : l'heure d'écriture, la passerelle
+  (`systemctl is-active hermes-gateway`), le garde du forfait (coupé et jusqu'à quand, a arrêté Hermes, actif ou arrêté d'après
+  sa minuterie), et pour chaque routine de `routines.conf` : nom, libellé (« Routine « … » » de sa consigne), moment lisible
+  (d'après `schedule.expr` de `jobs.json`, sinon l'horaire de `routines.conf` ; un horaire tordu reste « cron … »), mode (réel ou
+  double : `/etc/hermes/routines.mode` l'emporte), posée ou non, active ou non, dernier passage, résultat, prochain passage.
+- **Assaini** : liste fermée (une routine `jarvis-…` absente de `routines.conf` est comptée, jamais décrite) ; les dates sont
+  refaites (UTC), jamais recopiées ; une erreur devient une catégorie (limite du forfait, réseau, résultat non envoyé, arrêtée à
+  la main, erreur), jamais son texte ; ni chemin, ni jeton, ni nom de portail, ni contenu de mail.
+- **Sans coût** : `jobs.json`, deux fichiers de root et `systemctl is-active` seulement. Aucune lecture d'usage en plus (la règle
+  « sans rien de coupé, le script ne lit même pas l'usage » reste vraie), Hermes n'est jamais lancé pour ça.
+- **Sans risque pour la relance** : écrit après elle, dans un `try` à part ; une erreur est dite dans le journal par son genre
+  seulement (« Résumé des routines pour JARVIS : pas écrit (…) ») et ne change pas le code de sortie. `--a-blanc` n'écrit rien.
+- **Droits** : dossier `root:jarvis` 750, fichier 640 (comme `/var/lib/hermes-relance-avis`), fichier temporaire puis
+  renommage, jamais à travers un lien. Un dossier à part, et pas celui des avis : les avis sont des notifications que JARVIS
+  marque « vues » et que root efface au bout de 14 jours, le résumé est un état remplacé toutes les 10 minutes ; les mêler
+  aurait obligé à toucher le lecteur d'avis de la 0.89.0. `hermes` n'est pas dans le groupe : il ne le lit pas.
+- **(certain, code d'Hermes v0.23.3, `cron/jobs.py`, et banc)** `jobs.json` = `{jobs: [...], updated_at}` ; par routine :
+  `name`, `enabled`, `state` (`scheduled`, `paused`, `completed`, `error`), `paused_at`, `schedule` `{kind, expr, display}`,
+  `next_run_at`, `last_run_at`, `last_status` (`ok`, `error`, `delivery_failed`, `cancelled`, ou un statut imposé),
+  `last_error`, `last_delivery_error`, `last_failure` `{at, detail}`. Le banc d'Hermes écrit le résumé à partir d'un vrai
+  `jobs.json` (une routine passée, une en pause).
+- JARVIS le relit et le revalide (`jarvis-os/server/hermes-routines.mjs`, `docs/jarvis-os.md`, 0.92.0) : au-delà de 30 minutes
+  sans écriture, il dit « indisponible ». `diagnostic.sh` montre les droits, l'âge et le nombre de routines du résumé.
+
+Bancs : `bash essais/hermes/relance.test.sh` (80 vérifications), `sudo bash essais/hermes/banc.sh --neuf` (88).
 
 ### La première exécution réelle, suivie par JARVIS (0.91.0, suite ; 26/11/2026)
 

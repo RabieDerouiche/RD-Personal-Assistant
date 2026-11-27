@@ -24,7 +24,7 @@ export function surveilles(rows) {
   return rows.slice(1).filter((r) => BOTS_SURVEILLES.includes(low(r[iB])) && /^immediat/.test(low(r[iU]))).map((r) => ({qui: clip(r[iQ], 60), bot: low(r[iB]) === 'kairos' ? 'Kairos' : 'Iris', adresses: adressesDe(r[iA])})).filter((x) => x.adresses.length);
 }
 
-export function createCourrier({S, save, now = Date.now, chercher, lireExpediteurs, reveiller = () => {}, actif = () => true, log = () => {}}) {
+export function createCourrier({S, save, now = Date.now, chercher, lireExpediteurs, reveiller = () => {}, actif = () => true, log = () => {}, moi = () => ''}) {
   const C = () => (S.courrier = S.courrier || {file: [], vus: [], depuis: 0, lu: 0, lignes: [], erreur: ''});
   let enCours = false;
   async function tic() {
@@ -38,12 +38,20 @@ export function createCourrier({S, save, now = Date.now, chercher, lireExpediteu
       if (!toutes.length) { c.erreur = ''; save(); return {nouveaux: 0}; }
       const q = 'newer_than:2d {' + toutes.map((x) => 'from:' + x.a).join(' ') + '}';
       const threads = ((await chercher(q)) || {}).threads || [], vus = new Set(c.vus), nouveaux = [];
+      /* 0.94.0 : le fil est lu message par message. Avant, seul son DERNIER message comptait : un brouillon posé dans le fil (une réponse
+         préparée par Hermes ou par JARVIS, modifiée ensuite) ou le message d'un tiers en copie cachait le mail de l'expéditeur surveillé,
+         qui n'était alors jamais mis dans la file. Désormais : le plus récent message d'un expéditeur surveillé, pas encore vu ; un
+         brouillon ne compte pas ; sa propre réponse envoyée APRÈS ce message veut toujours dire « déjà répondu » (rien dans la file). */
+      const lui = low(moi() || ''), quand = (m) => +m.internalDate || Date.parse(m.date || '') || 0, etiq = (m) => (Array.isArray(m.labelIds) ? m.labelIds : []);
+      const deLui = (m) => etiq(m).includes('SENT') || (!!lui && low(m.sender || '') === lui);
       for (const th of threads) {
-        const ms = th.messages || [], m = ms[ms.length - 1] || {}, at = +m.internalDate || Date.parse(m.date || '') || 0, id = String(m.id || th.id || '');
-        if (!id || vus.has(id) || at < c.depuis) continue;
-        const de = low(m.sender || ''), x = toutes.find((y) => de === y.a || de.endsWith('@' + y.a) || de.endsWith('.' + y.a));
-        if (!x) continue;   /* le dernier message du fil n'est pas de l'expéditeur surveillé (sa propre réponse, par exemple) */
-        vus.add(id); nouveaux.push({id, fil: String(th.id || m.threadId || ''), at, de: clip(m.sender, 80), objet: clip(m.subject, 140), qui: x.l.qui, bot: x.l.bot, etat: 'a_traiter', recu: t});
+        const ms = (th.messages || []).filter((m) => m && !etiq(m).includes('DRAFT'));
+        const surv = (m) => { const de = low(m.sender || ''); return deLui(m) ? null : toutes.find((y) => de === y.a || de.endsWith('@' + y.a) || de.endsWith('.' + y.a)) || null; };
+        const cands = ms.map((m) => ({m, x: surv(m), at: quand(m), id: String(m.id || '')})).filter((k) => k.x && k.id).sort((a, z) => a.at - z.at), k = cands[cands.length - 1];
+        if (!k || vus.has(k.id) || k.at < c.depuis) continue;
+        for (const o of cands) if (o.at >= c.depuis) vus.add(o.id);   /* un seul passage par fil : Hermes lit le fil entier */
+        if (ms.some((m) => deLui(m) && quand(m) > k.at)) continue;    /* il a déjà répondu après ce message */
+        nouveaux.push({id: k.id, fil: String(th.id || k.m.threadId || ''), at: k.at, de: clip(k.m.sender, 80), objet: clip(k.m.subject, 140), qui: k.x.l.qui, bot: k.x.l.bot, etat: 'a_traiter', recu: t});
       }
       c.vus = [...vus].slice(-600); c.file = c.file.concat(nouveaux).slice(-200); c.erreur = ''; save();
       if (nouveaux.length) reveiller('courrier');

@@ -8,7 +8,7 @@
    serveur, et il les renomme lui-même dans l'app (« Renommer »). Ce fichier garde aussi les modèles des mails (destinataire, texte). */
 import fs from 'node:fs';
 import path from 'node:path';
-import {MOIS, mailCraRempli} from './jours.mjs';
+import {MOIS} from './jours.mjs';
 
 const TITRES = {semaine: 'CRA de la semaine', mois: 'CRA du mois', jours: 'Jours du mois', claude: 'Abonnement Claude', box: 'Box internet', teletravail: 'Télétravail', grok: 'Grok Bot'};
 /* l'avancement du remplacement de Chronos par Hermes, note par note (état du chantier au 26/11/2026 ; `travail.json` peut le remplacer) */
@@ -32,16 +32,21 @@ const moisMaj = (m) => MOIS[m - 1].charAt(0).toUpperCase() + MOIS[m - 1].slice(1
 const TXT = (s, n) => String(s == null ? '' : s).replace(/\s+/g, ' ').trim().slice(0, n);
 const paris = (d) => { const p = Object.fromEntries(new Intl.DateTimeFormat('en-CA', {timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false}).formatToParts(d).map((x) => [x.type, x.value])); return {ymd: p.year + '-' + p.month + '-' + p.day, hm: (p.hour === '24' ? '00' : p.hour) + ':' + p.minute}; };
 
-export function createTravail({file, jours, retours = '/var/lib/hermes-portail-retours', journal = async () => [], gmail = null, now = Date.now, log = () => {}}) {
+export function createTravail({file, jours, retours = '/var/lib/hermes-portail-retours', journal = async () => [], now = Date.now, log = () => {}}) {
   const lireConf = () => { try { const j = JSON.parse(fs.readFileSync(file, 'utf8')); return j && typeof j === 'object' && !Array.isArray(j) ? j : {}; } catch { return {}; } };
   const ecrireConf = (c) => { const tmp = file + '.tmp'; fs.writeFileSync(tmp, JSON.stringify(c, null, 2), {mode: 0o600}); fs.renameSync(tmp, file); };
   const titre = (C, id) => TXT((C.titres || {})[id], 60) || TITRES[id];
   /* le compte rendu du CRA du mois, posé par root (`hermes-portail cra-mois`) : résultat, fin de mission */
   const retourMois = (ym) => { try { const f = path.join(retours, 'mois-' + ym + '.json'); if (!fs.lstatSync(f).isFile()) return null; const r = JSON.parse(fs.readFileSync(f, 'utf8')); return r && typeof r === 'object' ? r : null; } catch { return null; } };
-  /* Gmail et le Journal : relus au plus toutes les 10 minutes (le tableau s'ouvre souvent, ces lectures coûtent) */
+  /* le Journal et le suivi des mails : relus au plus toutes les 10 minutes (le tableau s'ouvre souvent, ces lectures coûtent) */
   const cache = new Map();
   const memo = async (cle, fn) => { const c = cache.get(cle); if (c && now() - c.at < 600000) return c.v; let v = null; try { v = await fn(); } catch (e) { log('travail : ' + cle + ' : ' + ((e && e.message) || e)); v = c ? c.v : null; } cache.set(cle, {at: now(), v}); return v; };
-  const cherche = (q) => (gmail ? memo('g:' + q, async () => { const r = await gmail(q); return ((r && r.threads) || []).map((t) => { const m = (t.messages || []).slice(-1)[0] || {}; return {id: t.id, at: +m.internalDate || Date.parse(m.date || '') || 0, objet: m.subject || ''}; }); }) : Promise.resolve(null));
+  /* 0.94.0 : les mails du mois ne sont plus cherchés ici (un fil réduit à son dernier message donnait au mail envoyé l'heure de la
+     réponse : « reçu après l'envoi » n'était jamais vrai). Leur état est tenu par `jours.mjs` (suivi message par message, toutes les
+     5 minutes, notifié) et lu ici tel quel ; à l'ouverture, le mois affiché est seulement relu si ce n'est pas déjà fait. */
+  const suiviDe = async (mois, relire) => { if (relire && jours.suivre) await memo('suivi:' + mois, () => jours.suivre(mois)); return (jours.suivi && jours.suivi(mois)) || {}; };
+  const filUrl = (fil) => (/^[\w-]{6,64}$/.test(String(fil || '')) ? 'https://mail.google.com/mail/#all/' + fil : '');
+  const quandH = (at) => { const p = paris(new Date(at)); return jjmm(p.ymd) + ' à ' + p.hm.replace(':', ' h '); };
   const passages = () => memo('journal', journal);
 
   async function etat() {
@@ -75,24 +80,32 @@ export function createTravail({file, jours, retours = '/var/lib/hermes-portail-r
       toi: S && S.demande ? 'Ton oui attend : confirme la semaine, Hermes saisit et soumet.' : st === 'a_la_main' ? 'Hermes n’a pas pu soumettre : à faire à la main, ou « Relancer Hermes ».' : '', ouvrir: 'semaine', lundi});
     ev(auj <= vendredi ? vendredi : plusJour(vendredi, 7), titre(C, 'semaine'), 'ton oui, puis Hermes', true);
 
-    /* le CRA du mois : jours validés (24), mail au client, CRA validé par Hermes (26), CRA du client reçu, rattaché */
-    const R = retourMois(ym), le26 = ymdDe(y, m, 26), MC = (C.mails || {}).cra_client || {}, objetCra = mailCraRempli(MC, ym, [], auj).objet;
-    const envoyes = (await cherche('in:sent subject:"' + objetCra.replace(/"/g, '') + '" newer_than:45d')) || [];
-    const mailCra = envoyes.sort((a, z) => z.at - a.at)[0] || null;
-    const a = [].concat(MC.a || []).filter(Boolean);
-    const recu = mailCra && a.length ? ((await cherche('from:(' + a.join(' OR ') + ') has:attachment newer_than:45d')) || []).filter((x) => x.at > mailCra.at).sort((x, z) => z.at - x.at)[0] || null : null;
-    const fin = R && /^\d{4}-\d{2}-\d{2}$/.test(String(R.fin || '')) ? R.fin : '';
-    const MP = (C.mails || {}).prolongation || {}, prolong = fin && fin <= dern ? ((await cherche('in:sent subject:"' + TXT(MP.objet || 'Prolongation mission', 80).replace(/"/g, '') + '" newer_than:45d')) || [])[0] || null : null;
-    const valideMois = R && ['validee', 'deja'].includes(R.resultat);
-    routines.push({id: 'mois', bloc: 'cra', titre: titre(C, 'mois'), qui: R ? 'reel' : 'blanc', quiDit: R ? 'Hermes · réel' : 'Hermes',
-      prochaine: valideMois ? '26/' + pad(m === 12 ? 1 : m + 1) : court(le26) + ' · 12 h',
-      etapes: [['Congés validés', ouiJours ? 'fait' : auj >= le24 ? 'encours' : ''], ['Mail au client', mailCra ? 'fait' : ouiJours ? 'encours' : ''], ['CRA validé', valideMois ? 'fait' : R && R.resultat !== 'blanc' ? 'bloque' : ''], ['CRA du client reçu', recu ? 'fait' : mailCra ? 'encours' : ''], ['Rattaché', R && R.rattache ? 'fait' : recu ? 'encours' : '']],
-      prevu: T ? {texte: moisMaj(m), puces: [[T.travailles + ' jours de mission', ''], [T.conges + (T.conges > 1 ? ' congés' : ' congé'), 'non'], [T.feries + (T.feries > 1 ? ' fériés' : ' férié'), 'non']]} : null,
-      alerte: fin && fin <= dern ? 'Fin de mission le ' + fin.split('-').reverse().join('/') + '. ' + (prolong ? 'Mail de prolongation envoyé le ' + jjmm(new Date(prolong.at).toISOString().slice(0, 10)) + '.' : 'Pas encore de mail de prolongation.') : '',
+    /* le CRA du mois : jours validés (24), mail au client, CRA validé par Hermes (26), CRA du client reçu, rattaché.
+       0.94.0 : les deux mails et leurs réponses viennent du suivi de `jours.mjs`. Le CRA signé arrive souvent au début du mois suivant :
+       jusqu'au 24, la carte reste sur le mois d'avant tant que son mail est parti et que son CRA n'est pas rattaché. */
+    const SV = await suiviDe(ym, true), prec = plusJour(ym + '-01', -1).slice(0, 7), SVp = await suiviDe(prec, false);
+    const rattacheDe = (mois, sv) => !!((retourMois(mois) || {}).rattache || (sv.cra || {}).rattache);
+    const cm = auj < le24 && (SVp.cra || {}).envoi && !rattacheDe(prec, SVp) ? prec : ym, cy = +cm.slice(0, 4), cmo = +cm.slice(5, 7), cDern = ymdDe(cy, cmo, dernierJour(cy, cmo));
+    const Ec = cm === ym ? E : jours.etat(cm), Tc = Ec.bilan ? Ec.bilan.totaux : null, ouiC = Ec.etat === 'valide', c24 = ymdDe(cy, cmo, 24), le26 = ymdDe(y, m, 26);
+    const R = retourMois(cm), S2 = cm === ym ? SV : SVp, sc = S2.cra || {}, sp = S2.prolongation || {};
+    const mailCra = sc.envoi || null, repCra = sc.reponses || [], recu = repCra.find((x) => x.pdf) || null, sansCra = !recu && repCra.length ? repCra[repCra.length - 1] : null;
+    const fin = R && /^\d{4}-\d{2}-\d{2}$/.test(String(R.fin || '')) ? R.fin : '', finDit = fin.split('-').reverse().join('/');
+    const prolong = fin && fin <= cDern ? sp.envoi || null : null, repPro = prolong ? sp.reponses || [] : [], rp = repPro[repPro.length - 1] || null;
+    const valideMois = R && ['validee', 'deja'].includes(R.resultat), rattache = rattacheDe(cm, S2);
+    const unMail = (sorte, s, reps, etat) => ({sorte, quoi: 'Mail « ' + TXT(s.objet, 80) + ' »', quand: jjmm(paris(new Date(s.envoi.at)).ymd), etat, envoye: 'envoyé le ' + quandH(s.envoi.at), url: filUrl(s.envoi.fil),
+      reponses: reps.map((x) => ({de: TXT(x.nom, 60) || 'ton contact', quand: 'le ' + quandH(x.at), extrait: TXT(x.extrait, 160), pdf: !!x.pdf, lu: !!x.lu, url: filUrl(x.fil)}))});
+    /* ce qui l'attend, en clair : le CRA signé à rattacher, une réponse pas encore lue dans Gmail */
+    const attend = [recu && !rattache ? 'CRA signé reçu : à rattacher' : sansCra && !sansCra.lu ? 'Réponse à ton mail du CRA, sans le CRA : à lire' : '', rp && !rp.lu ? 'Réponse à ton mail de prolongation : à lire' : ''].filter(Boolean);
+    routines.push({id: 'mois', bloc: 'cra', titre: titre(C, 'mois'), mois: cm, qui: R ? 'reel' : 'blanc', quiDit: R ? 'Hermes · réel' : 'Hermes',
+      prochaine: cm !== ym ? court(le26) + ' · 12 h' : valideMois ? '26/' + pad(m === 12 ? 1 : m + 1) : court(le26) + ' · 12 h',
+      etapes: [['Congés validés', ouiC ? 'fait' : auj >= c24 ? 'encours' : ''], ['Mail au client', mailCra ? 'fait' : ouiC ? 'encours' : ''], ['CRA validé', valideMois ? 'fait' : R && R.resultat !== 'blanc' ? 'bloque' : ''], ['CRA du client reçu', recu ? 'fait' : mailCra ? 'encours' : ''], ['Rattaché', rattache ? 'fait' : recu ? 'encours' : '']],
+      prevu: Tc ? {texte: moisMaj(cmo), puces: [[Tc.travailles + ' jours de mission', ''], [Tc.conges + (Tc.conges > 1 ? ' congés' : ' congé'), 'non'], [Tc.feries + (Tc.feries > 1 ? ' fériés' : ' férié'), 'non']]} : null,
+      alerte: fin && fin <= cDern ? 'Fin de mission le ' + finDit + '. ' + (rp ? 'Réponse à ton mail de prolongation reçue le ' + quandH(rp.at) + (rp.lu ? ' (lue dans Gmail).' : ' : à lire.') : prolong ? 'Mail de prolongation envoyé le ' + jjmm(paris(new Date(prolong.at)).ymd) + ' : pas encore de réponse.' : 'Pas encore de mail de prolongation.') : '',
       derniere: R ? {quand: jjmm(new Date(+R.at || now()).toISOString().slice(0, 10)), quoi: {validee: 'validé', deja: 'déjà validé', rien: 'rien saisi', enregistree: 'complété, pas validé', blanc: 'à blanc', echec: 'échec'}[R.resultat] || R.resultat, par: 'Hermes', ok: valideMois} : derChronos(C.journalMois || 'cra.*mois|compte rendu d.activit'),
-      mails: [mailCra ? {quoi: 'Mail « ' + mailCra.objet + ' »', quand: jjmm(new Date(mailCra.at).toISOString().slice(0, 10)), etat: 'envoyé'} : null, recu ? {quoi: 'CRA du client', quand: jjmm(new Date(recu.at).toISOString().slice(0, 10)), etat: 'reçu'} : null, prolong ? {quoi: 'Mail « ' + prolong.objet + ' »', quand: jjmm(new Date(prolong.at).toISOString().slice(0, 10)), etat: 'envoyé'} : null].filter(Boolean),
-      toi: recu && !(R && R.rattache) ? 'Le CRA du client est arrivé : à rattacher sur l’intranet (onglet du haut de la page du CRA).' : '', ouvrir: 'mois'});
-    if (!valideMois) ev(le26, titre(C, 'mois'), 'Hermes saisit et valide');
+      mails: [mailCra ? unMail('cra', sc, repCra, recu ? 'CRA signé reçu' : sansCra ? 'réponse reçue, sans le CRA' : 'envoyé') : null, prolong ? unMail('prolongation', sp, repPro, rp ? 'réponse reçue' : 'envoyé') : null].filter(Boolean),
+      attend, rattachable: !!recu && !rattache,
+      toi: [recu && !rattache ? 'CRA signé reçu : à rattacher sur le portail (onglet du haut de la page du CRA).' : sansCra && !sansCra.lu ? 'Réponse à ton mail du CRA, sans le CRA : à lire.' : '', rp && !rp.lu ? 'Réponse à ton mail de prolongation : à lire.' : ''].filter(Boolean).join(' '), ouvrir: 'mois'});
+    { const Rm = cm === ym ? R : retourMois(ym); if (!(Rm && ['validee', 'deja'].includes(Rm.resultat))) ev(le26, titre(C, 'mois'), 'Hermes saisit et valide'); }
 
     /* les notes de frais */
     for (const N0 of NOTES) {
@@ -137,7 +150,11 @@ export function createTravail({file, jours, retours = '/var/lib/hermes-portail-r
   async function traiter(method, p, lireCorps) {
     if (p === '/api/travail' && method === 'GET') return {status: 200, body: await etat()};
     if (p === '/api/travail/titre' && method === 'POST') { const b = await lireCorps(); const r = renommer(String(b.id || ''), b.titre); return {status: r.ok ? 200 : 400, body: r}; }
+    /* 0.94.0 : « C’est rattaché » (le compte rendu du portail ne le dit pas encore : il le dit lui-même) */
+    if (p === '/api/travail/rattache' && method === 'POST') { const b = await lireCorps(); const r = jours.rattacher ? jours.rattacher(String((b && b.mois) || '')) : {ok: false, error: 'Indisponible.'}; return {status: r.ok ? 200 : 409, body: r}; }
     return {status: 404, body: {error: 'introuvable'}};
   }
-  return {etat, renommer, traiter, conf: lireConf};
+  /* après un envoi depuis JARVIS : le mois est relu à la prochaine ouverture, sans attendre les 10 minutes */
+  const invalider = () => { for (const k of [...cache.keys()]) if (k.startsWith('suivi:')) cache.delete(k); };
+  return {etat, renommer, traiter, conf: lireConf, invalider};
 }

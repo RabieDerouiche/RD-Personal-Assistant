@@ -36,9 +36,10 @@ import {createVerrou} from './verrou.mjs';   /* 0.75.0 : le verrou de l'app par 
 import {createPilotageLocal, createCopieDrive} from './pilotage-local.mjs';   /* 0.88.0 : Pilotage hébergé par JARVIS (son choix du 26/11/2026) */
 import {cliPilotage} from './pilotage-cli.mjs';
 import {limiteDe, estLimite, heureParis, ecritureFaite, createAvisRelance} from './limite.mjs';   /* 0.89.0 : la relance automatique après la limite du forfait */
+import {createHermesRoutines} from './hermes-routines.mjs';   /* 0.92.0 : « Hermes et ses routines » en direct (le résumé de root, lu sans rien écrire) */
 const ACT = createActivite();   /* 0.33.0 : ce que fait Claude à l'instant */
 
-const VERSION = '0.89.0';
+const VERSION = '0.94.0';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PORT = +(process.env.PORT || 8787);
 const HOST = process.env.HOST || '127.0.0.1';
@@ -1179,6 +1180,9 @@ setInterval(() => { coteTick().catch(() => {}); }, +process.env.JARVIS_NOTIFY_TI
 /* 0.89.0 : les avis de root (routine d'Hermes ou tâche d'hermes-portail restée en échec après sa relance après la limite) : poussés une fois */
 const AVIS_RELANCE = createAvisRelance({dir: process.env.JARVIS_RELANCE_AVIS || '/var/lib/hermes-relance-avis', S, save, push: PUSH, log: (t) => console.log(t)});
 setInterval(() => { AVIS_RELANCE.tick().catch(() => {}); }, +process.env.JARVIS_LIMITE_TICK_MS || 60000).unref();
+/* 0.92.0 : les routines d'Hermes en direct : le résumé assaini que root (hermes-relance) écrit toutes les 10 minutes, relu et revalidé à
+   chaque demande (GET /api/hermes/routines, ligne « Routines d'Hermes » de la santé) ; JARVIS n'écrit jamais dans ce dossier */
+const HERMES_ROUT = createHermesRoutines({fichier: process.env.JARVIS_HERMES_ROUTINES || '/var/lib/hermes-relance-etat/routines.json', now});
 /* veilleur de santé (0.16.0) : toutes les 10 minutes, sans Claude ; prévient une fois de ce qui casse sans bruit */
 if (GG.status('').linked && !S.googleVu) { S.googleVu = true; save(); }
 const SANTE = createSante({S, save, push: PUSH, checks: {
@@ -1209,6 +1213,8 @@ const SANTE = createSante({S, save, push: PUSH, checks: {
     const d = [jusqua ? 'limite atteinte, reprise vers ' + heureParis(jusqua, t) : '', att.length ? 'en attente de la levée : ' + att.slice(0, 4).join(', ') : '', faites.length ? faites.length + ' relancé' + (faites.length > 1 ? 's' : '') + ' automatiquement depuis hier' : ''].filter(Boolean);
     return {nom: 'Forfait Claude', ok: true, detail: d.join(' ; ') + '.', pousser: false};
   },
+  /* 0.92.0 : les routines d'Hermes en direct (nombre, dernière écriture du résumé de root), ou « résumé indisponible » ; une information */
+  hermesRoutines: async () => HERMES_ROUT.sante(),
   notifications: async () => { const l = S.push && S.push.last; if (!l || !l.total) return null; return {nom: 'Notifications', ok: l.ok > 0, detail: l.ok > 0 ? 'reçues' : 'refusées par le service (' + (l.detail || '?') + ') : Réglages, Notifications.', pousser: false}; }
 }});
 { const ms = +process.env.JARVIS_SANTE_TICK_MS || 600000; setTimeout(() => { SANTE.tick().catch(() => {}); setInterval(() => { SANTE.tick().catch(() => {}); }, ms).unref(); }, Math.min(ms, 120000)).unref(); }
@@ -1768,7 +1774,7 @@ const JMCP = createMcp({S, save, now, version: VERSION, base: mcpBase, outils: M
 /* routines de Grok Bot reprises (26/11/2026) : le réveil d'Hermes (un fichier que root surveille, hermes-reveil.path) et le courrier
    des expéditeurs « Immédiat » relevé toutes les 5 minutes, sans IA, tant que Google est relié et qu'un exécutant non suspendu existe */
 const reveilHermes = createReveil({fichier: process.env.JARVIS_REVEIL || '/var/lib/jarvis-reveil/sonnette', fs, now, log: (t) => console.log(t)});
-const COURRIER = createCourrier({S, save, now, log: (t) => console.log(t), reveiller: reveilHermes,
+const COURRIER = createCourrier({S, save, now, log: (t) => console.log(t), reveiller: reveilHermes, moi: () => GG.status('').account || '',
   actif: () => GG.status('').linked && ((S.mcp && S.mcp.jetons) || []).some((j) => j && j.type === 'fixe' && j.profil === 'executant' && !j.suspendu),
   chercher: (q) => GG.tool('Gmail', 'search_threads', {query: q, pageSize: 25}),
   lireExpediteurs: () => sheetRead(exePlage('Expéditeurs', 'A1:H200'))});
@@ -1829,6 +1835,16 @@ const RADAR = createRadar({file: path.join(DATA, 'radar.json'), now, log: (t) =>
     return runClaude({kind: 'radar', titre: 'Radar : lecture de factures', prompt, system, model: MODELS.rapide, cwd: box, timeoutMs: 180000,
       tools: {allow: [], deny: ['Bash', 'Read', 'Edit', 'Write', 'Glob', 'Grep', 'NotebookEdit', 'WebFetch', 'WebSearch', 'Task']}}); },
   push: (msg) => (S.push && S.push.subs.length ? PUSH.send(msg, {urgency: 'high'}) : Promise.resolve([]))});
+/* 0.94.0 : une ligne de JARVIS dans le Journal de Pilotage quand une réponse à un mail du mois arrive (jours.mjs) : les colonnes de
+   pilotage_ajouter (Date et heure, Bot, Type, Sujet, Détail), Bot « JARVIS », Type « ETAT » ; ni nom ni adresse, jamais un extrait du mail */
+const journalJarvis = async ({sujet, detail}) => {
+  if (!pilLie()) return false;
+  const hd = (await exeEntetes('Journal')).map(exeCle), row = hd.map(() => ''), met = (nom, v) => { const i = hd.indexOf(exeCle(nom)); if (i >= 0) row[i] = v; return i; };
+  if (met('Sujet', clip(sujet, 120)) < 0 || met('Bot', 'JARVIS') < 0) throw new Error('onglet Journal : en-têtes inattendus');
+  met('Date et heure', exeMaintenant(true)); met('Type', 'ETAT'); met('Détail', clip(detail, 400));
+  await GG.tool('Google Sheets', 'append_values', {spreadsheetId: PILOTAGE, range: exePlage('Journal', 'A1'), values: [row], valueInputOption: 'RAW'});
+  return true;
+};
 /* 0.83.0 : les jours du mois (jours.mjs ; « Hermes remplace Chronos », étape 2) : le bilan tiré de l'agenda « Présence » et des fériés, sans
    IA, envoyé le 24 à midi et relu le dernier jour ; son oui dans JARVIS (0.83.1 : sur ses congés, pour le CRA du 26). Gardé à part, dans jours.json ; Claude ne lit qu'une correction
    que les règles n'ont pas comprise, sans aucun outil. */
@@ -1837,16 +1853,19 @@ const JOURS = createJours({file: path.join(DATA, 'jours.json'), now, retours: pr
   mails: {modeles: () => { try { return TRAVAIL.conf().mails || {}; } catch { return {}; } },
     brouillon: (m) => GG.tool('Gmail', 'create_draft', {to: m.to, subject: m.subject, body: m.body}),
     majBrouillon: (m) => GG.tool('Gmail', 'update_draft', {draftId: m.draftId, to: m.to, subject: m.subject, body: m.body}),
-    envoye: async (objet) => { const r = await GG.tool('Gmail', 'search_threads', {query: 'in:sent subject:"' + String(objet).replace(/"/g, '') + '" newer_than:40d', pageSize: 3}); return !!((r && r.threads) || []).length; }},
+    envoye: async (objet) => { const r = await GG.tool('Gmail', 'search_threads', {query: 'in:sent subject:"' + String(objet).replace(/"/g, '') + '" newer_than:40d', pageSize: 3, idsOnly: true}); return !!((r && r.threads) || []).length; },
+    /* 0.94.0 : le suivi des réponses (identifiants et version des fils seulement ; un fil n'est lu en entier que s'il a changé), son adresse */
+    chercher: (q) => GG.tool('Gmail', 'search_threads', {query: q, pageSize: 10, idsOnly: true}), fil: (id) => GG.tool('Gmail', 'get_thread', {threadId: id}), moi: () => GG.status('').account || ''},
+  ecrireJournal: (l) => journalJarvis(l),
   agenda: {lie: () => GG.status('').linked, calendriers: async () => ((await GG.tool('Google Calendar', 'list_calendars', {})) || {}).calendars || [],
     evenements: async (calendarId, debut, fin) => ((await GG.tool('Google Calendar', 'list_events', {calendarId, startTime: debut + 'T00:00:00', endTime: fin + 'T00:00:00', pageSize: 250})) || {}).events || []},
   claude: (prompt, system) => { const box = path.join(DATA, 'jours'); fs.mkdirSync(box, {recursive: true, mode: 0o700});
     return runClaude({kind: 'jours', titre: 'Jours du mois : lecture d’une correction', prompt, system, model: MODELS.rapide, cwd: box, timeoutMs: 90000,
       tools: {allow: [], deny: ['Bash', 'Read', 'Edit', 'Write', 'Glob', 'Grep', 'NotebookEdit', 'WebFetch', 'WebSearch', 'Task']}}); },
   push: (msg) => (S.push && S.push.subs.length ? PUSH.send(msg, {urgency: 'high'}) : Promise.resolve([]))});
-/* 0.85.0 : l'espace « Travail » : les passages de Chronos lus dans l'onglet Journal de Pilotage, les mails dans Gmail (lecture seule) */
+/* 0.85.0 : l'espace « Travail » : les passages de Chronos lus dans l'onglet Journal de Pilotage ; 0.94.0 : les mails du mois et leurs
+   réponses ne sont plus cherchés ici (trois recherches de dix fils à chaque ouverture : le quota de Gmail) mais lus dans le suivi de JOURS */
 const TRAVAIL = createTravail({file: path.join(DATA, 'travail.json'), jours: JOURS, retours: process.env.JARVIS_RETOURS_CRA || '/var/lib/hermes-portail-retours', now, log: (t) => console.log(t),
-  gmail: (q) => (GG.status('').linked ? GG.tool('Gmail', 'search_threads', {query: q, pageSize: 10}) : Promise.resolve(null)),
   journal: async () => {
     if (!pilLie()) return [];
     const r = await GG.tool('Google Sheets', 'get_values', {spreadsheetId: PILOTAGE, range: "'Journal'!A1:H"}), v = (r && r.values) || [], hd = (v[0] || []).map((x) => String(x).trim());
@@ -2419,6 +2438,7 @@ const server = http.createServer(async (req, res) => {
         return json(res, r.error ? 400 : 200, {...r, ...mcpEtat(req)});
       }
       /* 0.41.0 : les routines planifiées et le brief du matin */
+      if (p === '/api/hermes/routines' && req.method === 'GET') return json(res, 200, HERMES_ROUT.lire());   /* 0.92.0 : les routines d'Hermes en direct, ou « indisponible » et pourquoi */
       if (p === '/api/routines' && req.method === 'GET') return json(res, 200, {routines: ROUT.liste(), brief: S.brief || null});
       if (p === '/api/routines/lire' && req.method === 'POST') { const b = await readBody(req), l = lirePhrase(b.phrase); return json(res, 200, {lu: l, quand: l.erreur ? '' : quandDit(l)}); }
       if (p === '/api/routines' && req.method === 'POST') { const r = ROUT.ajouter(await readBody(req)); return json(res, r.ok ? 200 : 400, {...r, routines: ROUT.liste()}); }
@@ -2455,6 +2475,7 @@ const server = http.createServer(async (req, res) => {
         try {
           if (b.server === 'Claude Code Remote' && b.tool === 'fire_trigger') return json(res, 200, {payload: startTache()});   /* « Confier à la tâche Claude » */
           const payload = await GG.tool(String(b.server || ''), String(b.tool || ''), b.input || {});
+          if (b.server === 'Gmail' && b.tool === 'send_message') { JOURS.reveillerSuivi(); TRAVAIL.invalider(); }   /* 0.94.0 : un mail part de JARVIS : le suivi des mails du mois le voit au passage suivant */
           /* routines de Grok Bot reprises (26/11/2026) : une ligne du Canal pour Hermes (ou, Grok Bot arrêté, pour un de ses bots) réveille Hermes */
           if (b.server === 'Google Sheets' && b.tool === 'append_values' && /^'?Canal'?!/i.test(String((b.input || {}).range || ''))) {
             const pour = ((b.input || {}).values || []).map((r) => exeCle(Array.isArray(r) ? r[2] : ''));
