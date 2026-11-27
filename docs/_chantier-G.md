@@ -164,8 +164,25 @@ d'heure (sauf s'il a déjà touché « C'est rattaché »).
 | `jarvis-os/server/tests/jours.test.mjs` | 106 | 134 | 0 |
 | `jarvis-os/server/tests/travail.test.mjs` | 31 | 37 | 0 |
 | `jarvis-os/server/tests/server.test.mjs` | 427 | 434 | 0 |
-| `essais/hermes/portail.test.sh` | 188 | @@PORTAIL@@ | @@PORTAIL_KO@@ |
-| `essais/jarvis-os-maquette/banc/banc.cjs` | 429 OK, 3 échecs connus | @@APP@@ | @@APP_KO@@ |
+| `essais/hermes/portail.test.sh` | 188 | 214 | 0 |
+| `essais/jarvis-os-maquette/banc/banc.cjs` | 430 OK, 3 échecs connus (repassé ce jour sur l'app d'avant ; la consigne disait 429) | 438 OK | 4 : les 3 connus, et 1 instable (voir dessous) |
+| `essais/hermes/relance.test.sh` (`limite.py` : une unité de plus) | 88 | 88 | 0 |
+
+Le banc de l'app, mot pour mot (second passage, seul sur la machine, 27/11/2026 vers 16 h 30 UTC) :
+- `ÉCHEC plusieurs jours : l'événement est listé avec sa période et apparaît sur chacun de ses trois jours dans le mois` (connu, lié à la date) ;
+- `ÉCHEC plusieurs jours : écrit dans l'agenda en journées entières, fin au lendemain du dernier jour (règle de Google), et relu sur ses trois jours` (connu) ;
+- `ÉCHEC agenda : le rendez-vous écrit aussi dans Échéances n'est listé qu'une fois dans le mois, avec le bot qui le suit` (connu) ;
+- `ÉCHEC notification de la page : croix « Fermer », fermée tout de suite :: toast vu : true` : **pas dans la liste connue**. Il a
+  échoué aux deux passages complets de la nouvelle app et à un passage du seul début du banc ; il a réussi sur l'app d'avant (un passage
+  complet, un début de banc), et sur la nouvelle app à un autre début de banc et seul. Relevé pas à pas : le clic de Playwright sur
+  la croix prend 2,6 s et plus quand la machine est chargée (il attend la fin de l'animation de la notification) ; or la maquette
+  affiche « Écrit dans Pilotage » 5 secondes après l'action : dès que le clic tarde un peu plus, cette seconde notification est là
+  au moment du contrôle. C'est une course du banc, pas une régression vue à l'écran (probable, pas certain : 3 échecs sur 5 avec la
+  nouvelle app, 0 sur 3 avec l'ancienne ; rien de ce chantier ne touche aux notifications de la page). Le test n'est pas modifié :
+  à décider (par exemple attendre la fin de l'animation avant de cliquer, ou contrôler la notification cliquée plutôt que toutes).
+Les 9 vérifications « 0.97 » de l'app passent (carte, feuille, confirmation, « Je le fais moi-même », « Pour moi », les états
+« vérifie », « échec », « fait »). Le premier passage complet avait trouvé deux défauts à moi, corrigés depuis : « Je le fais
+moi-même » n'était pas à côté de « Oui, déposer », et le banc lisait la question de confirmation avant qu'elle soit écrite.
 
 Dans `server.test.mjs`, une vérification existante a changé de texte : la carte ne dit plus « CRA signé reçu : à rattacher » dès la
 détection (elle attend qu'Hermes ait regardé le portail) ; les 7 nouvelles couvrent le PDF gardé, l'absence de route qui le rend,
