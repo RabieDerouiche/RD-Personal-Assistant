@@ -50,6 +50,8 @@ export function createTravail({file, jours, retours = '/var/lib/hermes-portail-r
   const passages = () => memo('journal', journal);
 
   async function etat() {
+    /* 0.97.0 : les comptes rendus de root (CRA signé vérifié à blanc, déposé ; notes) sont lus dès qu'il ouvre Travail, sans attendre la minute */
+    if (jours.lireRetours) await jours.lireRetours().catch((e) => log('travail : comptes rendus : ' + ((e && e.message) || e)));
     const C = lireConf(), t = paris(new Date(now())), auj = t.ymd, y = +auj.slice(0, 4), m = +auj.slice(5, 7), ym = auj.slice(0, 7), dern = ymdDe(y, m, dernierJour(y, m));
     const J = (await passages()) || [];
     const derChronos = (re) => { const rx = new RegExp(re, 'i'); const l = J.filter((x) => /chronos|medusa/i.test(x.bot) && rx.test(x.sujet + ' ' + x.detail)).sort((a, b) => b.at - a.at)[0]; return l ? {quand: jjmm(l.ymd), quoi: TXT(l.sujet || l.detail, 60), par: 'Chronos', ok: !/échec|bloqu|ko\b|erreur/i.test(l.sujet + ' ' + l.detail)} : null; };
