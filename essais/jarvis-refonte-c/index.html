@@ -221,7 +221,9 @@
   .seg button[aria-pressed="true"] { border-color: var(--encre); background: var(--encre); color: var(--bg); }
   .seg.js { gap: 6px; } .seg.js button { width: 44px; padding: 0; }
   .hh { display: inline-flex; align-items: center; border: 1px solid var(--trait2); border-radius: 12px; background: var(--carte); }
-  .hh input { height: 44px; min-width: 104px; padding: 0 10px; border: 0; background: none; color: var(--encre); font: 500 17px var(--sans); color-scheme: dark; }
+  .hh select { height: 44px; min-width: 62px; padding: 0 6px 0 12px; border: 0; background: none; color: var(--encre); font: 500 17px var(--sans); color-scheme: dark; }
+  .hh select + select { min-width: 54px; padding-left: 4px; border-left: 1px solid var(--trait); }
+  .mini .er { color: var(--rouge); }
   .hh button { border: 0; border-left: 1px solid var(--trait); border-radius: 0; padding: 0; }
   .apercu { margin: 12px 0 0; padding: 12px 14px; border-radius: 12px; background: var(--creux); color: var(--gris); } .apercu b { font-weight: 600; color: var(--encre); }
   .etl { display: flex; align-items: baseline; gap: 10px; } .etl .pt { position: relative; top: -3px; }
@@ -613,7 +615,12 @@
       [['tous', 'Tous les jours'], ['lv', 'Du lundi au vendredi'], ['coche', 'Jours à cocher']].map(function (m) { return '<button data-hm="' + m[0] + '" aria-pressed="' + (o.mode === m[0]) + '">' + m[1] + '</button>'; }).join('') + '</div>' +
       (o.mode === 'coche' ? '<div class="seg js">' + JN.map(function (n, d) { return '<button data-hd="' + d + '" aria-pressed="' + o.sel[d] + '" aria-label="' + n + '">' + n.slice(0, 3) + '</button>'; }).join('') + '</div>' : '') +
       '<p class="sous">Les heures <small>· une à quatre</small></p><div class="seg">' +
-      o.h.map(function (v, i) { return '<span class="hh"><input type="time" value="' + v + '" data-hi="' + i + '" aria-label="Heure ' + (i + 1) + '">' + (o.h.length > 1 ? '<button data-hx="' + i + '" aria-label="Retirer cette heure">✕</button>' : '') + '</span>'; }).join('') +
+      o.h.map(function (v, i) {
+        var p = v.split(':'), hs = '', ms = '';
+        for (var a = 0; a < 24; a++) hs += '<option value="' + a + '"' + (a === +p[0] ? ' selected' : '') + '>' + a + ' h</option>';
+        for (var b = 0; b < 60; b += 5) ms += '<option value="' + b + '"' + (b === +p[1] ? ' selected' : '') + '>' + (b < 10 ? '0' : '') + b + '</option>';
+        return '<span class="hh"><select data-hi="' + i + '" data-part="0" aria-label="Heure ' + (i + 1) + '">' + hs + '</select><select data-hi="' + i + '" data-part="1" aria-label="Minutes de l’heure ' + (i + 1) + '">' + ms + '</select>' + (o.h.length > 1 ? '<button data-hx="' + i + '" aria-label="Retirer cette heure">✕</button>' : '') + '</span>';
+      }).join('') +
       (o.h.length < 4 ? '<button data-hplus>+ Ajouter une heure</button>' : '') + '</div>' +
       '<p class="apercu" id="apercu">' + apercu() + '</p>' +
       '<div class="actions"><button class="b plein" data-hok' + (vide ? ' disabled' : '') + '>Enregistrer</button><button class="b" data-hannul>Annuler</button></div><button class="b lien" data-horig>Revenir à l’horaire d’origine</button></section>';
@@ -827,7 +834,10 @@
     }
     rendu();
   }
-  $('#g-corps').addEventListener('change', function (ev) { var i = ev.target.dataset.hi; if (i === undefined || !ev.target.value) return; E.hor.h[+i] = ev.target.value; $('#apercu').innerHTML = apercu(); });
+  $('#g-corps').addEventListener('change', function (ev) {
+    var t = ev.target, i = t.dataset.hi; if (i === undefined) return;
+    var p = E.hor.h[+i].split(':'); p[+t.dataset.part] = (t.value < 10 ? '0' : '') + t.value; E.hor.h[+i] = p.join(':'); $('#apercu').innerHTML = apercu();
+  });
   function tetes() {
     $('#tete-tourne').innerHTML = '<span class="nd"></span><div class="meta"><span class="src">Hermes · 6 routines · touche-en une pour la régler</span></div>' + carteTourne();
     $('#tete-tourne').classList.add('s-cours');
