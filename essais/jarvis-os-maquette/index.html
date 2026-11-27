@@ -4584,7 +4584,7 @@ void main(){
         h('div', {class: 'row-actions'},
           p.url ? btn('Ouvrir le mail', () => window.open(p.url, '_blank', 'noopener'), 'sm', 'inbox') : null,
           p.retire ? btn('Remettre', () => radPlanDo(p, 'remettre'), 'sm main', 'back') : p.prochaine ? btn('Plus à payer', () => radPlanDo(p, 'retirer'), 'sm ghost', 'x') : null),
-        p.prochaine || p.retire ? h('p', {class: 'muted', text: '« Plus à payer » : achat annulé, remboursé ou rétracté. Ses échéances sortent du reste à payer ; « Remettre » les rend.'}) : null)});
+        p.prochaine || p.retire ? h('p', {class: 'muted', text: '« Plus à payer » : achat annulé, remboursé, rétracté ou soldé d’avance. Ses échéances à venir sortent du reste à payer ; celles déjà payées restent dans « déjà dépensé » ; « Remettre » les rend.'}) : null)});
   }
   function radPlanDo(p, action) {
     const JS = radAPI();

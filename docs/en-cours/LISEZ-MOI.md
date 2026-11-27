@@ -97,3 +97,16 @@ pas commencé), 6. le dépôt du CRA signé sur le portail par Hermes après son
 - **Ensuite** : bancs verts → demande de fusion vers main → UN message à « Serveur JARVIS 2 » (il donne son oui là-bas) → il touche « Relancer Hermes » sur la carte du CRA de la semaine → lire le compte rendu → récapitulatif final unique avec les 21 captures et le QCM de choix de maquette.
 - Pas fait : le faux portail du banc n'a pas de liste de code de temps (la correction de la skill n'est pas prouvée au banc) ; les maquettes ne montrent pas le verdict « conforme à la saisie » (elles montrent « Oui, déposer »).
 
+## État au 27/11/2026, 22 h 45
+
+- **main = `011b06c` (demande 254) : JARVIS 0.98.0.** Bancs : jours 143, travail 40, serveur 434 (seul), portail 214, relance 88, app 442 OK et les 3 échecs liés à la date.
+- **Demande envoyée à « Serveur JARVIS 2 » à 22 h 45** (plan : `docs/demandes-serveur-en-attente.md`, lu là-bas par `git show origin/main:…`) : elle attend son oui. Le serveur est en 0.96.0 tant que son compte rendu n'est pas lu (`list_events`, kinds `result`).
+- **À lui** : son oui dans « Serveur JARVIS 2 » ; puis « Relancer Hermes » sur la carte du CRA de la semaine ; puis « Oui, déposer » quand JARVIS annonce le CRA signé prêt (premier dépôt : il vérifie sur le portail) ; le choix d'une maquette (QCM posé avec le récapitulatif final).
+- **Ensuite, pour la session** : lire le compte rendu du serveur (essai à blanc du dépôt : relevés d et e — où se dépose le fichier, autre hôte ou non), ajuster la skill si besoin, mettre `CLAUDE.md` et `docs/jarvis-os.md` à jour (« déployé »), vider `docs/demandes-serveur-en-attente.md`, fusion dans main. Puis appliquer la maquette choisie.
+
+## État au 27/11/2026, 23 h 15
+
+- **Son QCM du soir** : aucune maquette (« je préfère l'IHM actuelle » ; seule la pile de cartes « Attend ton oui » de la maquette A l'intéresse pour « Pour moi ») ; horaires des routines : laisser ; Radar : « Compter le déjà payé ».
+- **0.99.0 sur la branche, PAS dans main** : Radar (un paiement « plus à payer » garde ses échéances déjà payées ; `plansRetiresLe`), `VERSION` 0.99.0, docs. **Ne pas fusionner dans main avant le compte rendu de « Serveur JARVIS 2 »** : son plan attend le commit `011b06c` et la version 0.98.0 ; une fusion avant fausserait ses contrôles. Après son compte rendu : demande de fusion, puis il touche « Mettre à jour » dans JARVIS (rien d'autre : pas de changement côté root).
+- Question posée par QCM : porter la pile « Attend ton oui » de A dans « Pour moi » de l'app actuelle ? retirer les trois maquettes du serveur ?
+
