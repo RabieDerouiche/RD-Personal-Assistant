@@ -338,10 +338,10 @@
       <section class="moment ferme" id="m-hier">
         <button class="mh" aria-expanded="false"><span>Hier</span><small>mercredi 25 · 4 éléments, tout est traité</small><i>⌄</i></button>
         <div class="mc">
-          <div class="it replie"><span class="nd"></span><div class="ligne"><span class="co">✓</span>7 h 41 · Veille du matin lue</div></div>
-          <div class="it replie"><span class="nd"></span><div class="ligne"><span class="co">✓</span>10 h 05 · 2 mails rangés, 0 à traiter</div></div>
-          <div class="it replie"><span class="nd"></span><div class="ligne"><span class="co">✓</span>12 h 00 · Prix suivis : rien de neuf</div></div>
-          <div class="it replie"><span class="nd"></span><div class="ligne"><span class="co">✓</span>18 h 20 · Jours du mois validés pour le CRA</div></div>
+          <div class="it replie jl"><span class="nd"></span><div class="ligne"><span class="co">✓</span>7 h 41 · Veille du matin lue</div></div>
+          <div class="it replie jl"><span class="nd"></span><div class="ligne"><span class="co">✓</span>10 h 05 · 2 mails rangés, 0 à traiter</div></div>
+          <div class="it replie jl"><span class="nd"></span><div class="ligne"><span class="co">✓</span>12 h 00 · Prix suivis : rien de neuf</div></div>
+          <div class="it replie jl"><span class="nd"></span><div class="ligne"><span class="co">✓</span>18 h 20 · Jours du mois validés pour le CRA</div></div>
         </div>
       </section>
 
@@ -380,22 +380,30 @@
             <div class="carte"><h3>Note de frais Box internet</h3><p>Hermes l’a créée sur le portail. Prochaine le 15/12.</p><ol class="chaine" data-chaine="box"></ol></div>
           </article>
 
-          <article class="it s-toi" data-t="toi" data-id="sem" data-court="CRA de la semaine" data-ok="CRA de la semaine confirmé" data-okv="Confirmé">
+          <article class="it s-err" data-t="cours" id="c-bilan">
             <span class="nd"></span>
             <button class="pli"></button>
-            <div class="meta"><time>9 h 02</time><span class="src">· Travail</span><span class="etat">attend ton oui</span><button class="rp">Replier</button></div>
+            <div class="meta"><time>9 h 02</time><span class="src">· Hermes</span><span class="etat">en erreur</span><button class="rp">Replier</button></div>
+            <div class="carte"><h3>Le bilan de la semaine s’est arrêté</h3><p>Limite du forfait atteinte à 9 h 02. Il repartira seul vers 17&nbsp;h&nbsp;40. Rien à faire de ton côté.</p>
+              <div class="actions"><button class="b" data-rt="bilan">Voir la routine</button></div></div>
+          </article>
+
+          <article class="it s-toi" data-t="toi" data-id="sem" data-genre="CRA" data-court="CRA de la semaine" data-ok="CRA de la semaine confirmé" data-okv="Confirmé">
+            <span class="nd"></span>
+            <button class="pli"></button>
+            <div class="meta"><time>9 h 20</time><span class="src">· Travail</span><span class="etat">attend ton oui</span><button class="rp">Replier</button></div>
             <div class="carte"><h3>CRA de la semaine : 4 jours travaillés, 1 congé</h3><p>C’est bien ça ? Je l’inscris dès ton oui.</p>
               <div class="jours" aria-label="Lundi à jeudi travaillés, vendredi en congé"><span>lun<b>23</b></span><span>mar<b>24</b></span><span>mer<b>25</b></span><span>jeu<b>26</b></span><span class="cg">congé<b>27</b></span></div>
               <div class="actions"><button class="b oui" data-oui>Confirmer</button><button class="b" data-toast="Dans l’app, tu corrigerais les jours ici.">Corriger</button></div>
               <p class="verdict"></p></div>
           </article>
 
-          <article class="it" data-id="prolong" data-ok="Mission prolongée pour décembre" data-okv="Vu">
+          <article class="it" data-id="prolong" data-ok="Mission prolongée pour décembre, lu" data-okv="Lu" data-etat="à lire">
             <span class="nd"></span>
             <button class="pli"></button>
-            <div class="meta"><time>11 h 17</time><span class="src">· Courrier</span><span class="etat"></span><button class="rp">Replier</button></div>
-            <div class="carte"><h3>Réponse à ton mail de prolongation</h3><p class="cit">« Ta mission est prolongée pour décembre. »</p><p>Rien à faire. Je l’ai noté.</p>
-              <div class="actions"><button class="b" data-oui>Vu</button></div>
+            <div class="meta"><time>11 h 17</time><span class="src">· Mail suivi</span><span class="etat">à lire</span><button class="rp">Replier</button></div>
+            <div class="carte"><h3>Réponse à ton mail de prolongation</h3><p class="cit">« Ta mission est prolongée pour décembre. »</p><p>Envoyé à 7 h 27, répondu à 11 h 17. Rien à faire.</p>
+              <div class="actions"><button class="b" data-oui>Lu</button></div>
               <p class="verdict"></p></div>
           </article>
         </div>
