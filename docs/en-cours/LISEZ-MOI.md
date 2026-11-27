@@ -110,3 +110,10 @@ pas commencé), 6. le dépôt du CRA signé sur le portail par Hermes après son
 - **0.99.0 sur la branche, PAS dans main** : Radar (un paiement « plus à payer » garde ses échéances déjà payées ; `plansRetiresLe`), `VERSION` 0.99.0, docs. **Ne pas fusionner dans main avant le compte rendu de « Serveur JARVIS 2 »** : son plan attend le commit `011b06c` et la version 0.98.0 ; une fusion avant fausserait ses contrôles. Après son compte rendu : demande de fusion, puis il touche « Mettre à jour » dans JARVIS (rien d'autre : pas de changement côté root).
 - Question posée par QCM : porter la pile « Attend ton oui » de A dans « Pour moi » de l'app actuelle ? retirer les trois maquettes du serveur ?
 
+## État au 27/11/2026, 23 h 45
+
+- Son second QCM : « Montre-moi d'abord » (la pile) et « Tout retirer » (les maquettes). Fait sur la branche (toujours 0.99.0, pas dans main) : maquettes `refonte-a|b|c` retirées de `MAQUETTES` ; **essai de la pile dans l'app derrière `?pile=1`** (bloc « ESSAI pile », fin du script de `essais/jarvis-os-maquette/index.html`) ; trois captures envoyées (`scratchpad/pile/`, script `cap.cjs`). Après « Mettre à jour », il peut l'essayer sur ses vraies données : adresse du serveur + `/?pile=1`.
+- En attente de lui : son avis sur la pile (l'activer pour de bon = retirer la condition `?pile=1` et ajouter des vérifications au banc ; l'abandonner = retirer le bloc).
+- **Travailler dans la copie principale** (`/home/user/RD-Personal-Assistant`) : la copie de travail de l'agent (`.claude/worktrees/agent-a87e…`) est dépassée, ne plus s'en servir.
+- Bancs repassés avant la fusion de la 0.99.0 : voir `scratchpad/g/resultat4.txt` (serveur, Radar, app).
+
