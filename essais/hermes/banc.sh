@@ -209,6 +209,10 @@ ok = (sorted(r) == ['dormante', 'lecture'] and d['cron'] is True and d['liste'] 
       and p['posee'] and not p['active'] and p['resultat'] == 'jamais' and p['prochain'] is None and p['moment'] == 'le dimanche à 18 h 30')
 sys.exit(0 if ok else 1)"
 verif "… droits du résumé (750 et 640), aucune lecture d'usage, rien dit d'autre que « Rien à relancer »" bash -c "[ \"\$(stat -c %a $T/resume)\" = 750 ] && [ \"\$(stat -c %a $T/resume/routines.json)\" = 640 ] && [ ! -e $T/usage-lu ] && [ \"\$(cat $T/relance.log)\" = 'Rien à relancer.' ]"
+wait 2>/dev/null; pic=$(sort -n $T/rss-routine.log | tail -1)
+echo "  mémoire d'Hermes pendant une routine : $pic Mo au plus (plus environ 250 Mo pour son Claude Code)"
+verif "mémoire pendant une routine sous 550 Mo" [ "${pic:-999}" -lt 550 ]
+# (placé après la mesure de mémoire d'une routine : ses commandes « hermes cron … » ne doivent pas tomber dans cette mesure)
 # 0.96.0 : administrer les routines depuis JARVIS. Les ordres sont lus par la copie root d'ordres.py et exécutés sur le VRAI Hermes
 # (hermes cron pause, resume, edit, run), avec la politique du banc ; pause et horaire doivent survivre à routines.sh et à install.sh.
 verif "0.96.0 : install.sh a posé la copie root d'ordres.py (644), le lanceur (755), les deux unités et le dossier des ordres (700)" bash -c "[ \"\$(stat -c '%U %a' /usr/local/lib/hermes-relance/ordres.py)\" = 'root 644' ] && cmp -s '$KIT/ordres.py' /usr/local/lib/hermes-relance/ordres.py && [ \"\$(stat -c '%U %a' /usr/local/sbin/hermes-ordres)\" = 'root 755' ] && [ -f /etc/systemd/system/hermes-ordres.path ] && [ -f /etc/systemd/system/hermes-ordres.service ] && [ \"\$(stat -c %a /var/lib/jarvis-reveil/ordres)\" = 700 ]"
@@ -266,9 +270,6 @@ verif "0.96.0 : ordre « lancer » sur le vrai Hermes : un passage dans le mode 
 verif "0.96.0 : l'historique vient du vrai registre d'Hermes (lu en tant qu'utilisateur hermes) : ce passage est « lancé à la main depuis JARVIS », avec son début, sa fin et sa durée " vrai "h['lecture'][-1]['lance'] == 'jarvis' and h['lecture'][-1]['ordre'] == '$OID' and h['lecture'][-1]['resultat'] == 'ok' and h['lecture'][-1]['debut'] and isinstance(h['lecture'][-1]['duree'], int)"
 verif "0.96.0 : droits de ce que JARVIS lit (historique et résultats des ordres : 640 ; fichiers de root : 600 dans un dossier 700)" bash -c "[ \"\$(stat -c %a $T/resume/historique.json)\" = 640 ] && [ \"\$(stat -c %a $T/resume/ordres.json)\" = 640 ] && [ \"\$(stat -c %a $T/relance-etat)\" = 700 ] && [ \"\$(stat -c %a $T/relance-etat/ordres.json)\" = 600 ]"
 routines() { HERMES_BANC=1 HERMES_MANAGED_DIR=$T/politique HERMES_ROUTINES_CONF=$T/routines.conf HERMES_ROUTINES_ETAT=$T/routines.etat bash "$KIT/routines.sh" "$@" > $T/routines.log 2>&1; }
-wait 2>/dev/null; pic=$(sort -n $T/rss-routine.log | tail -1)
-echo "  mémoire d'Hermes pendant une routine : $pic Mo au plus (plus environ 250 Mo pour son Claude Code)"
-verif "mémoire pendant une routine sous 550 Mo" [ "${pic:-999}" -lt 550 ]
 sed -i '/^dormante /d' $T/routines.conf; routines
 verif "ligne retirée de la liste : la routine est supprimée chez Hermes" bash -c "grep -q '− dormante : retirée' $T/routines.log && ! grep -q 'jarvis-dormante' $HH/cron/jobs.json"
 echo "melange | actif | 0 7 * * 1 | digest-ia | web,jarvis | Routine du banc qui voudrait le web et les mails." >> $T/routines.conf; routines; rc=$?
