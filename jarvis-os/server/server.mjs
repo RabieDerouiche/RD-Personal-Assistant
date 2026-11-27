@@ -54,7 +54,11 @@ const OS_DIR = process.env.JARVIS_OS_DIR || path.join(REPO, 'essais', 'jarvis-os
    après chaque « Mettre à jour ». Une nouvelle maquette = une entrée ici (son dossier entre dans MAJ_CHEMINS). */
 /* 0.79.0 (son choix du 24/11/2026 : « supprime tout ce qui est reliquat ») : la maquette de la refonte UX (appliquée depuis la 0.54.0) et la page
    d'essai de la passkey sont retirées. 0.82.0 : la maquette de l'affichage iPad (sa demande du 24/11/2026). JARVIS_MAQUETTES (JSON {nom: {dossier, titre}}) : pour le banc. */
-const MAQUETTES = (() => { const m = {ipad: {dossier: 'jarvis-ipad', titre: 'JARVIS sur iPad : menu sur le côté, colonnes, liste et détail (24/11/2026)'}}; try { for (const [k, v] of Object.entries(JSON.parse(process.env.JARVIS_MAQUETTES || '{}'))) if (/^[a-z0-9-]+$/.test(k) && v && /^[a-z0-9-]+$/.test(v.dossier || '')) m[k] = {dossier: v.dossier, titre: String(v.titre || k).replace(/[<>&"]/g, '')}; } catch { /* liste vide */ } return m; })();
+const MAQUETTES = (() => { const m = {ipad: {dossier: 'jarvis-ipad', titre: 'JARVIS sur iPad : menu sur le côté, colonnes, liste et détail (24/11/2026)'},
+  /* refonte complète après Grok Bot (ses choix du 26/11/2026 : trois propositions d'organisation, pas des recoloriages ; données inventées) */
+  'refonte-a': {dossier: 'jarvis-refonte-a', titre: 'Refonte, proposition A « Orbite » : le globe devient la navigation (27/11/2026)'},
+  'refonte-b': {dossier: 'jarvis-refonte-b', titre: 'Refonte, proposition B « Poste de contrôle » : trois files et des rails d’étapes (27/11/2026)'},
+  'refonte-c': {dossier: 'jarvis-refonte-c', titre: 'Refonte, proposition C « Le fil » : une conversation qui tient lieu d’app (27/11/2026)'}}; try { for (const [k, v] of Object.entries(JSON.parse(process.env.JARVIS_MAQUETTES || '{}'))) if (/^[a-z0-9-]+$/.test(k) && v && /^[a-z0-9-]+$/.test(v.dossier || '')) m[k] = {dossier: v.dossier, titre: String(v.titre || k).replace(/[<>&"]/g, '')}; } catch { /* liste vide */ } return m; })();
 const ESSAIS = process.env.JARVIS_ESSAIS || path.dirname(OS_DIR);   /* le dossier essais/ du dépôt (celui de la nouvelle app) */
 const ORIGINS = (process.env.JARVIS_ORIGINS || 'https://rabiederouiche.github.io').split(',').map((s) => s.trim()).filter(Boolean);
 const AGENTS = ['claude', 'jarvis', ...BOT_IDS];
