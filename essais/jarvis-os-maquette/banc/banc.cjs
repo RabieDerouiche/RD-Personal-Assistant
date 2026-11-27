@@ -1814,6 +1814,101 @@ srv.listen(0, async () => {
       ok('0.92 : résumé indisponible : la tuile d’Espaces et Équipe › Routines le disent aussi (« Indisponible », la raison), sans aucune ligne de Pilotage pour Hermes',
         /^Hermes \| Indisponible \| dernière écriture du résumé à 07 h 52 : plus de 30 minutes/.test(tu) && !/routine/.test(tu) && ro.n === 0 && /indisponibles : dernière écriture/.test(ro.msg) && /^Hermes\s+indisponible$/.test(ro.aj) && !/Semaine à venir|Prix suivis|Veille du matin/.test(ro.vue), JSON.stringify([tu, {...ro, vue: ro.vue.length}]));
       await q.context().close(); }
+    /* 0.96.0 : administrer les routines d'Hermes (sa demande du 27/11/2026) : la feuille d'une routine, lancer, mettre en pause, reprendre,
+       changer l'horaire, l'historique, l'erreur en détail, tout mettre en pause ; la maquette joue JARVIS et root (données inventées) */
+    { const q = await pageWith({grokOff: true}, '#equipe');
+      const feuille = () => q.evaluate(() => { const s = document.getElementById('sheet'), g = (c) => { const x = s.querySelector('[data-ra="' + c + '"]'); return x ? x.textContent : null; };
+        const faits = {}; s.querySelectorAll('.ra-faits div').forEach((d) => { faits[d.querySelector('dt').textContent] = d.querySelector('dd').textContent; });
+        return {ouverte: !s.hidden && !!s.querySelector('#ra'), titre: (s.querySelector('.sheet-title') || {}).textContent, kicker: (s.querySelector('.sheet-kicker') || {}).textContent, etat: g('etat'), codeEtat: (s.querySelector('[data-ra="etat"]') || {dataset: {}}).dataset.etat, faits,
+          ordre: g('ordre'), etatOrdre: (s.querySelector('[data-ra="ordre"]') || {dataset: {}}).dataset.etat || null, refus: g('refus'), pourquoi: g('pourquoi'), evenement: g('evenement'), stats: g('stats'), apercu: g('apercu'),
+          boutons: [...s.querySelectorAll('.ra button[data-ra]')].map((x) => x.dataset.ra + (x.disabled ? ' (inactif)' : '')), sections: [...s.querySelectorAll('[data-ra-sec]')].map((x) => x.dataset.raSec).join(),
+          erreur: s.querySelector('[data-ra-sec="erreur"]') ? s.querySelector('[data-ra-sec="erreur"]').innerText : null, fait: s.querySelector('[data-ra-sec="fait"]').innerText, passages: [...s.querySelectorAll('.ra-hist .ra-p')].map((x) => x.querySelector('.ra-pb').innerText.replace(/\s*\n\s*/g, ' | ')), detailPassage: [...s.querySelectorAll('.ra-pd')].map((x) => x.innerText).join(' / ')}; });
+      const ouvrir = async (nom) => { await q.evaluate(() => { const b = document.querySelector('#sheet .sheet-close'); if (b && !document.getElementById('sheet').hidden) b.click(); }); await q.waitForTimeout(400); await q.click('#hr-routines li[data-hr="' + nom + '"]'); await q.waitForTimeout(700); };
+      const appui = async (cle) => { await q.click('#sheet .ra [data-ra="' + cle + '"]'); await q.waitForTimeout(250); };
+      const li = await q.evaluate(() => [...document.querySelectorAll('#hr-routines li[data-hr]')].map((x) => x.dataset.hr + ':' + (x.getAttribute('role') || '') + ':' + (x.getAttribute('tabindex') || '') + ':' + ((x.querySelector('.ra-pst') || {}).textContent || '')).join(' ; '));
+      ok('0.96 : dans la liste, chaque routine s’ouvre d’un appui (bouton accessible au clavier) et porte une pastille quand elle est en pause ou en erreur (« En pause », « En erreur »), rien quand elle est simplement active',
+        li === 'veille-du-matin:button:0: ; bilan-hebdo:button:0: ; reveil:button:0: ; digest-ia:button:0:En pause ; prix-suivis:button:0:En erreur ; sorties-du-week-end:button:0:', li);
+      await ouvrir('veille-du-matin'); let f = await feuille();
+      ok('0.96 : toucher une routine ouvre SA feuille (la feuille du bas) : son nom, son état en clair, son moment, son mode, dernier et prochain passage',
+        f.ouverte && f.titre === 'Veille du matin' && f.kicker === 'Routine d’Hermes' && f.etat === 'Active' && f.codeEtat === 'active' && f.faits['Quand'] === 'Du lundi au vendredi à 7 h 40' && f.faits['Mode'] === 'en réel' && /à 07:40 · réussi$/.test(f.faits['Dernier']) && /à 07:40$/.test(f.faits['Prochain']), JSON.stringify(f));
+      ok('0.96 : la feuille : les gestes (Lancer maintenant, Mettre en pause), puis « Ce qu’elle a fait » (le dernier compte rendu), « Changer l’horaire », « Historique » ; pas d’« erreur en détail » quand tout va bien',
+        f.boutons.slice(0, 2).join() === 'lancer,pause' && f.sections === 'fait,horaire,historique' && f.erreur === null && /Trois mails à voir signalés, agenda du jour relu/.test(f.fait), JSON.stringify([f.boutons, f.sections, f.fait]));
+      ok('0.96 : historique : les passages (date, résultat, durée, comment il a été lancé), le taux de réussite et la durée moyenne', f.passages.length === 6 && /^.+ à 07:4\d \| réussi \| \d+ min( \d\d)? · programmé$/.test(f.passages[0]) && /^6 passages · 100 % réussis · durée moyenne \d+ min( \d\d)?$/.test(f.stats), JSON.stringify([f.passages, f.stats]));
+      await q.click('#sheet .ra-hist .ra-p:first-child .ra-pb'); await q.waitForTimeout(250); f = await feuille();
+      ok('0.96 : toucher un passage montre ce qu’il a fait (son compte rendu)', /Trois mails à voir signalés/.test(f.detailPassage), f.detailPassage);
+      /* lancer : confirmation en un appui, « Demandé à … — en cours… », puis le résultat */
+      await appui('lancer'); let c = await feuille();
+      await appui('lancer-oui'); const d1 = await feuille(); await q.waitForTimeout(1700); const d2 = await feuille(); await q.waitForTimeout(4200); const d3 = await feuille();
+      ok('0.96 : « Lancer maintenant » : un premier appui demande confirmation (« Confirmer : lancer maintenant », « Annuler »), rien n’est parti', c.boutons.includes('lancer-oui') && c.boutons.includes('lancer-non') && c.ordre === null, JSON.stringify(c.boutons));
+      ok('0.96 : … confirmé : « Demandé à … — en attente du serveur… » puis « — en cours… » (les gestes sont inactifs pendant ce temps), puis le résultat « Lancée à …, terminée à … : réussie. »',
+        /^Demandé à \d\d h \d\d — en attente du serveur…$/.test(d1.ordre) && /^Demandé à \d\d h \d\d — en cours…$/.test(d2.ordre) && d2.codeEtat === 'en cours' && d2.boutons.includes('lancer (inactif)') && /^Lancée à \d\d h \d\d, terminée à \d\d h \d\d : réussie\.$/.test(d3.ordre) && d3.etatOrdre === 'terminé' && d3.codeEtat === 'active', JSON.stringify([d1.ordre, d2.ordre, d2.boutons, d3.ordre]));
+      ok('0.96 : … le passage est dans l’historique (« lancé à la main depuis JARVIS »), « Ce qu’elle a fait » est à jour', d3.passages.length === 7 && /réussi \| 3 s · lancé à la main depuis JARVIS$/.test(d3.passages[0]) && /Passage lancé à la main/.test(d3.fait) && /^7 passages/.test(d3.stats), JSON.stringify([d3.passages[0], d3.fait]));
+      ok('0.96 : relancer moins de 5 minutes après n’est pas possible : « Lancer maintenant » est inactif et dit pourquoi (« déjà lancée il y a moins de 5 minutes : possible à … »)', d3.boutons.includes('lancer (inactif)') && /^« Lancer maintenant » : déjà lancée il y a moins de 5 minutes : possible à \d\d h \d\d\.$/.test(d3.pourquoi || ''), JSON.stringify([d3.boutons, d3.pourquoi]));
+      /* pause (second appui de confirmation), la pastille dans la liste, reprendre */
+      await appui('pause'); c = await feuille(); await appui('pause-oui'); await q.waitForTimeout(1900); const p1 = await feuille();
+      const pst = await q.evaluate(() => { const x = document.querySelector('#hr-routines li[data-hr="veille-du-matin"]'); return (x.querySelector('.ra-pst') || {}).textContent + ' | ' + x.querySelector('.hr-p').textContent; });
+      ok('0.96 : « Mettre en pause » : un second appui confirme (« Confirmer la pause, jusqu’à nouvel ordre ») ; la feuille dit « En pause depuis … , depuis JARVIS — jusqu’à nouvel ordre », plus de prochain passage, « Lancer » inactif avec sa raison, « Reprendre » à la place',
+        c.boutons.includes('pause-oui') && /^En pause depuis aujourd’hui à \d\d:\d\d, depuis JARVIS — jusqu’à nouvel ordre$/.test(p1.etat) && p1.faits['Prochain'] === 'aucun : en pause' && /^En pause depuis \d\d h \d\d, jusqu’à nouvel ordre\.$/.test(p1.ordre) && p1.boutons.slice(0, 2).join() === 'lancer (inactif),reprendre' && /en pause : reprends-la d’abord/.test(p1.pourquoi || ''), JSON.stringify(p1));
+      ok('0.96 : … et la routine en pause se voit d’un coup d’œil dans la liste (pastille « En pause », prochain passage : en pause)', pst === 'En pause | Prochain passage : en pause', pst);
+      await appui('reprendre'); await q.waitForTimeout(1900); const p2 = await feuille();
+      ok('0.96 : « Reprendre » : la routine est de nouveau active, avec son prochain passage', p2.etat === 'Active' && /^Reprise à \d\d h \d\d\.$/.test(p2.ordre) && /à 07:40$/.test(p2.faits['Prochain']) && /^lancer( \(inactif\))?,pause$/.test(p2.boutons.slice(0, 2).join()), JSON.stringify([p2.etat, p2.ordre, p2.faits]));
+      /* changer l'horaire : des jours et des heures, aperçu en clair, confirmation, retour à l'origine */
+      await q.click('#sheet .ra-hor > summary'); await q.waitForTimeout(250); const h0 = await feuille();
+      const reglages = () => q.evaluate(() => ({jours: [...document.querySelectorAll('#sheet [data-ra-jours][aria-pressed="true"]')].map((x) => x.dataset.raJours).join(), heures: [...document.querySelectorAll('#sheet [data-ra-heure]')].map((x) => x.dataset.raHeure).join(), sem: [...document.querySelectorAll('#sheet [data-ra-jour][aria-pressed="true"]')].map((x) => x.dataset.raJour).join(), minutes: [...document.querySelector('#sheet .ra-h select:nth-of-type(2)').options].map((x) => x.value).join()}));
+      const g0 = await reglages();
+      ok('0.96 : « Changer l’horaire » : prérempli avec l’horaire en vigueur (du lundi au vendredi, 07:40), minutes par pas de 5, aperçu en clair ; le bouton est inactif tant que rien ne change',
+        g0.jours === 'ouvres' && g0.heures === '07:40' && g0.minutes === '00,05,10,15,20,25,30,35,40,45,50,55' && h0.apercu === 'Aperçu : du lundi au vendredi à 7 h 40.' && h0.boutons.includes('horaire (inactif)') && !h0.boutons.includes('origine'), JSON.stringify([g0, h0.apercu, h0.boutons]));
+      await q.click('#sheet [data-ra-jours="tous"]'); await q.waitForTimeout(150); await q.click('#sheet [data-ra="heure-plus"]'); await q.waitForTimeout(150);
+      await q.selectOption('#sheet .ra-h:nth-child(2) select:nth-of-type(1)', '13'); await q.waitForTimeout(150); await q.selectOption('#sheet .ra-h:nth-child(2) select:nth-of-type(2)', '15'); await q.waitForTimeout(200); const h1 = await feuille();
+      ok('0.96 : … des heures qui ne tiennent pas dans un seul horaire (7 h 40 et 13 h 15) : dit clairement, rien à demander', /^Ces heures ne tiennent pas dans un seul horaire : garde la même minute/.test(h1.apercu) && !h1.boutons.some((x) => /^horaire/.test(x)), JSON.stringify([h1.apercu, h1.boutons]));
+      await q.selectOption('#sheet .ra-h:nth-child(2) select:nth-of-type(1)', '07'); await q.waitForTimeout(150); await q.selectOption('#sheet .ra-h:nth-child(2) select:nth-of-type(2)', '55'); await q.waitForTimeout(200); const h2 = await feuille();
+      await appui('horaire'); const h3 = await feuille(); await appui('horaire-oui'); await q.waitForTimeout(1900); const h4 = await feuille();
+      ok('0.96 : … deux heures rapprochées acceptées (7 h 40 et 7 h 55, tous les jours) : aperçu « chaque jour à 7 h 40 et 7 h 55 », confirmation en un appui',
+        h2.apercu === 'Aperçu : chaque jour à 7 h 40 et 7 h 55.' && h2.boutons.includes('horaire') && h3.boutons.includes('horaire-oui'), JSON.stringify([h2.apercu, h2.boutons, h3.boutons]));
+      ok('0.96 : … « Horaire changé — pris en compte à … », le moment dit « horaire modifié ; à l’origine : … », le prochain passage est recalculé, « Revenir à l’horaire d’origine » apparaît',
+        /^Horaire changé — pris en compte à \d\d h \d\d : chaque jour à 7 h 40 et 7 h 55\.$/.test(h4.ordre) && h4.faits['Quand'] === 'Chaque jour à 7 h 40 et 7 h 55 (horaire modifié ; à l’origine : du lundi au vendredi à 7 h 40)' && /à 07:(40|55)$/.test(h4.faits['Prochain']), JSON.stringify([h4.ordre, h4.faits]));
+      await q.evaluate(() => { const d = document.querySelector('#sheet .ra-hor'); if (!d.open) d.querySelector('summary').click(); }); await q.waitForTimeout(250); const h5 = await feuille();
+      await appui('origine'); await appui('origine-oui'); await q.waitForTimeout(1900); const h6 = await feuille();
+      ok('0.96 : … « Revenir à l’horaire d’origine » (confirmé) : l’horaire d’origine est remis', h5.boutons.includes('origine') && /^Horaire d’origine remis — pris en compte à \d\d h \d\d\.$/.test(h6.ordre) && h6.faits['Quand'] === 'Du lundi au vendredi à 7 h 40', JSON.stringify([h5.boutons, h6.ordre, h6.faits]));
+      /* une routine en erreur : l'erreur en détail ; le réveil : lancé aussi sur un événement */
+      await ouvrir('prix-suivis'); const e1 = await feuille();
+      ok('0.96 : une routine en erreur : « L’erreur en détail » avec la cause en clair, ce qu’il peut faire (« reprise vers 17 h 40, elle repartira seule ») et le texte de l’erreur',
+        e1.titre === 'Prix suivis' && /^En erreur au dernier passage : limite du forfait$/.test(e1.etat) && e1.sections === 'erreur,fait,horaire,historique' && /^L’ERREUR EN DÉTAIL\n+Limite du forfait · .+ à 09:0\d\n+La limite du forfait Claude a coupé ce passage : reprise vers 17 h 40, elle repartira seule\.\n+RuntimeError: You've hit your 5-hour limit/i.test(e1.erreur || '')
+        && /en erreur : limite du forfait/.test(e1.passages[0]) && /83 % réussis/.test(e1.stats), JSON.stringify([e1.etat, e1.sections, e1.erreur, e1.passages[0], e1.stats]));
+      await q.click('#sheet .ra-hist .ra-p:first-child .ra-pb'); await q.waitForTimeout(250); const e2 = await feuille();
+      ok('0.96 : … toucher le passage en erreur dans l’historique montre aussi son erreur', /RuntimeError: You've hit your 5-hour limit/.test(e2.detailPassage), e2.detailPassage);
+      await ouvrir('reveil'); const v1 = await feuille(); await q.click('#sheet .ra-hor > summary'); await q.waitForTimeout(250);
+      const v2 = await q.evaluate(() => [...document.querySelectorAll('#sheet .ra-hor .ra-note')].map((x) => x.textContent).join(' '));
+      ok('0.96 : le réveil : la feuille dit qu’il se lance aussi sur un événement, et « Changer l’horaire » que l’horaire ne change que ses passages programmés ; un passage « réveil par JARVIS » est dans son historique',
+        /^Se lance aussi sur un événement : un courrier qui arrive, une ligne du Canal\.$/.test(v1.evenement || '') && /l’horaire ne change que ses passages programmés/.test(v2) && v1.passages.some((x) => /réveil par JARVIS \(courrier, Canal\)$/.test(x)), JSON.stringify([v1.evenement, v2, v1.passages]));
+      await ouvrir('digest-ia'); const g1 = await feuille();
+      ok('0.96 : une routine en pause et en double : « En pause depuis hier …, depuis JARVIS », « Reprendre », et pas de compte rendu attendu en double', /^En pause depuis hier à \d\d:\d\d, depuis JARVIS — jusqu’à nouvel ordre$/.test(g1.etat) && g1.boutons.slice(0, 2).join() === 'lancer (inactif),reprendre' && /En double, la routine ne rend pas compte ici/.test(g1.fait) && g1.faits['Mode'] === 'en double (à blanc : rien n’est envoyé)', JSON.stringify([g1.etat, g1.boutons, g1.fait, g1.faits]));
+      /* la carte d'Hermes : tout mettre en pause, tout reprendre */
+      await q.evaluate(() => { document.querySelector('#sheet .sheet-close').click(); }); await q.waitForTimeout(500);
+      const t0 = await q.evaluate(() => [...document.querySelectorAll('.hm-hermes .ra-tout button')].map((x) => x.textContent).join());
+      await q.click('.hm-hermes [data-ra="tout-pause"]'); await q.waitForTimeout(200); const t1 = await q.evaluate(() => [...document.querySelectorAll('.hm-hermes .ra-tout button')].map((x) => x.textContent).join());
+      await q.click('.hm-hermes [data-ra="tout-pause-oui"]'); await q.waitForTimeout(6500);
+      const t2 = await q.evaluate(() => ({msg: (document.querySelector('.hm-hermes [data-ra="tout-msg"]') || {}).textContent, pst: [...document.querySelectorAll('#hr-routines li[data-hr]')].map((x) => (x.querySelector('.ra-pst') || {}).textContent || '-').join(), boutons: [...document.querySelectorAll('.hm-hermes .ra-tout button')].map((x) => x.textContent).join()}));
+      ok('0.96 : la carte d’Hermes : « Tout mettre en pause » et « Tout reprendre » ; un appui demande confirmation avec le nombre de routines (« Confirmer : 5 routines »)', t0 === 'Tout mettre en pause,Tout reprendre' && /^Confirmer : 5 routines,Annuler/.test(t1), JSON.stringify([t0, t1]));
+      ok('0.96 : … confirmé : « Pause demandée pour 5 routines. », les six routines portent la pastille « En pause », il ne reste que « Tout reprendre »', t2.msg === 'Pause demandée pour 5 routines.' && t2.pst === 'En pause,En pause,En pause,En pause,En pause,En pause' && t2.boutons === 'Tout reprendre', JSON.stringify(t2));
+      /* Équipe › Routines : les cartes d'Hermes s'ouvrent aussi ; une notification « #voir-routine-<nom> » ouvre la feuille */
+      await q.evaluate(() => { location.hash = '#automatisations'; }); await q.waitForTimeout(1500);
+      await q.click('#auto-hermes article[data-hr="bilan-hebdo"]'); await q.waitForTimeout(700); const a1 = await feuille();
+      ok('0.96 : Équipe › Routines : toucher une carte d’Hermes ouvre la même feuille', a1.ouverte && a1.titre === 'Bilan de la semaine' && a1.codeEtat === 'en pause', JSON.stringify([a1.titre, a1.codeEtat]));
+      await q.evaluate(() => { document.querySelector('#sheet .sheet-close').click(); }); await q.waitForTimeout(400);
+      await q.evaluate(() => { location.hash = '#voir-routine-reveil'; }); await q.waitForTimeout(2200); const n1 = await feuille();
+      ok('0.96 : la notification de fin d’un passage lancé à la main (#voir-routine-<nom>) ouvre « Hermes et ses routines » et la feuille de la routine', n1.ouverte && n1.titre === 'Réveil', JSON.stringify([n1.ouverte, n1.titre]));
+      await q.screenshot({path: path.join(SH, '096-feuille-routine.png')});
+      await q.context().close(); }
+    { const q = await pageWith({grokOff: true, hermesRefus: true}, '#equipe');
+      await q.click('#hr-routines li[data-hr="bilan-hebdo"]'); await q.waitForTimeout(700); await q.click('#sheet .ra [data-ra="lancer"]'); await q.waitForTimeout(250); await q.click('#sheet .ra [data-ra="lancer-oui"]'); await q.waitForTimeout(4200);
+      const r = await q.evaluate(() => { const x = document.querySelector('#sheet [data-ra="ordre"]'); return x ? {t: x.textContent, e: x.dataset.etat, ko: x.classList.contains('ko')} : null; });
+      ok('0.96 : un refus du serveur (root) est dit avec sa raison : « Refusé à … : la limite du forfait Claude est atteinte : reprise vers 17 h 40, elle repartira seule. »', !!r && r.e === 'refusé' && r.ko && /^Refusé à \d\d h \d\d : la limite du forfait Claude est atteinte : reprise vers 17 h 40, elle repartira seule\.$/.test(r.t), JSON.stringify(r));
+      await q.context().close(); }
+    { const q = await pageWith({grokOff: true, hermesIndispo: true}, '#equipe');
+      const n = await q.evaluate(() => ({ouvrables: document.querySelectorAll('#view .ra-ouvre').length, tout: document.querySelectorAll('.hm-hermes .ra-tout').length}));
+      ok('0.96 : résumé indisponible : aucune routine à ouvrir, pas de « Tout mettre en pause » (rien à l’aveugle)', n.ouvrables === 0 && n.tout === 0, JSON.stringify(n));
+      await q.context().close(); }
     /* ================= 0.93.0 : trois retours de l'app ================= */
     /* 1. Argent : « Déjà dépensé ce mois » et l'historique mois par mois (données d'exemple, même forme que le serveur) */
     { const q = await page('#argent'); await q.waitForTimeout(800);

@@ -82,6 +82,7 @@ relancer() { : > "$T/appels"; env HERMES_RELANCE_JOBS="$T/jobs.json" HERMES_RELA
   HERMES_GARDE_ETAT="$T/garde-arret" HERMES_RELANCE_GARDE_COUPE="$T/garde-coupe" HERMES_GARDE_POLITIQUE="$T/politique.yaml" HERMES_RELANCE_SYSTEMCTL="$T/systemctl" HERMES_RELANCE_LANCER="$T/lancer" \
   HERMES_RELANCE_USAGE_CMD="${CMD:-touch $T/lu; cat $T/usage.json}" HERMES_RELANCE_MAINTENANT="${QUAND:-$N}" HERMES_RELANCE_JARVIS_U=nobody HERMES_RELANCE_PLAFOND="${PLAF:-12}" \
   HERMES_RELANCE_RESUME="${RESUME:-$T/resume}" HERMES_RELANCE_CONF="${CONF:-$T/routines.conf}" HERMES_RELANCE_MODES="$T/routines.mode" \
+  HERMES_ROUTINES_PAUSES="$T/routines.pause" HERMES_ROUTINES_HORAIRES="$T/routines.horaire" \
   python3 -I "$L" relancer "$@" > "$T/sortie" 2>&1; }
 lances() { cat "$T/lances" 2>/dev/null | wc -l; }
 QUAND=$((Q + 600)) relancer
@@ -110,6 +111,7 @@ for j in d['jobs']:
 json.dump(d, open(f, 'w'))" "$T/jobs.json" "$(iso $((N + 300)))"
 QUAND=$((N + 600)) relancer
 verif "après la relance : la routine réussie est notée « réussie », sans avis" bash -c "grep -q 'veille-du-matin : le passage relancé a abouti' '$T/sortie' && grep -q '\"résultat\"\|réussie' '$T/avis/etat.json'"
+verif "… 0.96.0 : l'avis (une notification) porte la catégorie de l'erreur, jamais son texte" bash -c "grep -q 'de nouveau en échec (limite du forfait)' '$T/avis'/avis-*prix-suivis*.json && ! grep -qi 'hit your\|resets 6pm' '$T/avis'/avis-*prix-suivis*.json"
 verif "… celle qui échoue encore : un avis pour JARVIS (nom de la routine, quoi faire), et pas de seconde relance" bash -c "ls '$T/avis'/avis-*prix-suivis*.json >/dev/null 2>&1 && grep -q 'prix-suivis.*en échec après la relance' '$T/avis'/avis-*prix-suivis*.json && grep -q 'routines.sh --lancer prix-suivis' '$T/avis'/avis-*prix-suivis*.json && [ \"\$(wc -l < '$T/lances')\" = 2 ]"
 verif "… l'avis : root et groupe de JARVIS, 640" bash -c "[ \"\$(stat -c %a \"\$(ls '$T/avis'/avis-*.json | head -1)\")\" = 640 ]"
 QUAND=$((N + 7200)) relancer
@@ -201,13 +203,22 @@ verif "rien à relancer (erreurs de plus de 24 heures) : le résumé est écrit 
 verif "… dossier 750, fichier 640 (root et groupe de JARVIS), écrit d'un coup (aucun fichier temporaire laissé)" bash -c "[ \"\$(stat -c %a '$T/resume')\" = 750 ] && [ \"\$(stat -c %a '$T/resume/routines.json')\" = 640 ] && [ \"\$(ls '$T/resume')\" = routines.json ]"
 verif "… les six routines de routines.conf, dans l'ordre, avec leur libellé et leur horaire lisible" res "d['v'] == 1 and d['at'] == $N and d['liste'] is True and d['cron'] is True and list(r) == ['veille-du-matin', 'bilan-hebdo', 'reveil', 'digest-ia', 'prix-suivis', 'sorties-du-week-end'] and r['veille-du-matin']['libelle'] == 'Veille du matin' and r['digest-ia']['libelle'] == 'Digest IA et .NET' and r['veille-du-matin']['moment'] == 'du lundi au vendredi à 7 h 40' and r['reveil']['moment'] == 'chaque jour à 9 h 15, 13 h 15 et 18 h 15' and r['bilan-hebdo']['moment'] == 'le lundi à 8 h 50' and r['prix-suivis']['moment'] == 'chaque jour à 9 h' and r['sorties-du-week-end']['moment'] == 'le jeudi à 19 h'"
 verif "… le mode noté sur le serveur l'emporte (routines.mode, la dernière ligne gagne) ; sinon celui de routines.conf" res "r['veille-du-matin']['mode'] == 'réel' and r['prix-suivis']['mode'] == 'réel' and r['digest-ia']['mode'] == 'double' and r['reveil']['mode'] == 'double'"
-verif "… routine saine : ok, dernier et prochain passage en dates ISO refaites (UTC)" res "r['veille-du-matin'] == dict(nom='veille-du-matin', libelle='Veille du matin', moment='du lundi au vendredi à 7 h 40', mode='réel', posee=True, active=True, dernier='2026-11-26T06:40:12Z', resultat='ok', cause=None, prochain='2026-11-27T06:40:00Z')"
+verif "… routine saine : ok, dernier et prochain passage en dates ISO refaites (UTC)" res "{k: r['veille-du-matin'][k] for k in ('nom', 'libelle', 'moment', 'mode', 'posee', 'active', 'dernier', 'resultat', 'cause', 'prochain')} == dict(nom='veille-du-matin', libelle='Veille du matin', moment='du lundi au vendredi à 7 h 40', mode='réel', posee=True, active=True, dernier='2026-11-26T06:40:12Z', resultat='ok', cause=None, prochain='2026-11-27T06:40:00Z')"
+verif "… 0.96.0 : ce que la feuille de la routine affiche en plus (pas en pause, pas en cours, horaire d'origine en clair et non modifié, sa forme, pas d'événement)" res "{k: r['veille-du-matin'][k] for k in ('pause', 'en_cours', 'origine', 'modifie', 'forme', 'evenement')} == dict(pause=None, en_cours=False, origine='du lundi au vendredi à 7 h 40', modifie=False, forme=dict(jours='ouvres', heures=['07:40']), evenement=False) and sorted(r['veille-du-matin']) == sorted(['nom', 'libelle', 'moment', 'mode', 'posee', 'active', 'dernier', 'resultat', 'cause', 'prochain', 'pause', 'en_cours', 'origine', 'modifie', 'forme', 'evenement'])"
+verif "… 0.96.0 : une routine en pause chez Hermes (pas depuis JARVIS) est dite « en pause depuis … » par Hermes ; le réveil se lance aussi sur un événement" res "r['bilan-hebdo']['pause'] == dict(depuis='2026-11-26T07:00:00Z', par='hermes') and r['reveil']['evenement'] is True and r['reveil']['forme'] == dict(jours='tous', heures=['09:15', '13:15', '18:15'])"
 verif "… une erreur devient une catégorie courte : limite du forfait, réseau, ou « erreur »" res "[r[n]['resultat'] + ':' + str(r[n]['cause']) for n in ('prix-suivis', 'reveil', 'digest-ia')] == ['erreur:limite du forfait', 'erreur:réseau', 'erreur:erreur']"
 verif "… assaini : ni le texte d'une erreur, ni un chemin, ni un jeton, ni un nom de portail, ni un contenu de mail, ni une date piégée" bash -c "! grep -qiE 'hit your|RuntimeError|ValueError|ConnectionError|/home|secret|JETONPIEGE|sk-ant|exemple|invalid|facture|Objet|script|passwd|demain' '$T/resume/routines.json'"
 verif "… une date qui n'en est pas une : rien (jamais recopiée)" res "r['digest-ia']['prochain'] is None and r['digest-ia']['dernier'] == '$(py "import datetime,sys; print(datetime.datetime.fromtimestamp(int(sys.argv[1]), datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'))" $((N - 30 * 3600)))'"
 verif "… routine inconnue de routines.conf (jarvis-pirate, un nom piégé) ou hors « jarvis- » : ignorée, seulement comptée" bash -c "! grep -qE 'pirate|autre-chose|\\.\\./' '$T/resume/routines.json'"
 verif "… (deux ignorées, six décrites)" res "d['inconnues'] == 2 and len(d['routines']) == 6"
 verif "… en pause : pas active, jamais passée ; pas posée chez Hermes : dite « pas posée »" res "r['bilan-hebdo']['posee'] is True and r['bilan-hebdo']['active'] is False and r['bilan-hebdo']['resultat'] == 'jamais' and r['bilan-hebdo']['prochain'] is None and r['sorties-du-week-end']['posee'] is False and r['sorties-du-week-end']['resultat'] == 'jamais'"
+py "
+import json, sys
+d = json.load(open(sys.argv[1]))
+for j in d['jobs']:
+    if j['name'] == 'jarvis-veille-du-matin': j['last_status'] = 'delivery_queued'
+json.dump(d, open(sys.argv[1], 'w'))" "$T/jobs.json"; relancer
+verif "0.96.0 : « delivery_queued » (passage réussi, résultat en cours d'envoi par la passerelle) est un passage réussi, pas une erreur" res "r['veille-du-matin']['resultat'] == 'ok' and r['veille-du-matin']['cause'] is None"
 verif "… passerelle en marche, garde du forfait actif" res "d['passerelle'] == 'active' and d['garde'] == dict(etat='actif', jusqua=None)"
 verif "… seuls des appels « is-active » et « is-failed » à systemd : rien n'est lancé ni redémarré" bash -c "! grep -qvE '^(is-active|is-failed) ' '$T/appels'"
 echo failed > "$T/etat-passerelle"; echo "coupé jusqu'au 2026-12-03" > "$T/garde-coupe"; relancer
@@ -215,6 +226,20 @@ verif "passerelle plantée, garde coupé jusqu'à une date : dits tels quels" re
 echo inactive > "$T/etat-passerelle"; echo "coupé jusqu'au 2026-11-20" > "$T/garde-coupe"; touch "$T/garde-arret"; relancer
 verif "passerelle arrêtée, coupure finie, Hermes arrêté par le garde : « a arrêté Hermes »" res "d['passerelle'] == 'arrêtée' and d['garde'] == dict(etat='a arrêté Hermes', jusqua=None)"
 rm -f "$T/etat-passerelle" "$T/garde-coupe" "$T/garde-arret"
+# 0.96.0 : ce qu'il a réglé depuis JARVIS (fichiers de root tenus par ordres.py) se lit dans le résumé ; un passage en cours aussi
+printf 'veille-du-matin 1795000000\npirate 1795000000\nnom piégé 12\n' > "$T/routines.pause"; printf 'prix-suivis|0,15 9 * * 1-5\ndigest-ia|rm -rf /\npirate|0 9 * * *\nreveil|15 9,13,18 * * *\n' > "$T/routines.horaire"
+py "
+import json, sys
+d = json.load(open(sys.argv[1]))
+for j in d['jobs']:
+    if j['name'] == 'jarvis-prix-suivis': j['schedule'] = dict(kind='cron', expr='0,15 9 * * 1-5'); j['fire_claim'] = dict(at=sys.argv[2], by='machine:abc')
+    if j['name'] == 'jarvis-reveil': j['fire_claim'] = dict(at='2026-11-20T10:00:00+01:00', by='machine:vieux')
+json.dump(d, open(sys.argv[1], 'w'))" "$T/jobs.json" "$(iso $((N - 100)))"
+relancer
+verif "0.96.0 : une pause posée depuis JARVIS est dite avec sa date, « par jarvis » (une ligne piégée ou hors liste du fichier de root est ignorée)" res "r['veille-du-matin']['pause'] == dict(depuis='2026-11-18T11:06:40Z', par='jarvis') and not any('pirate' in str(x) or 'piégé' in str(x) for x in d['routines'])"
+verif "0.96.0 : un horaire changé depuis JARVIS : en vigueur en clair, « modifié », l'origine en clair ; une ligne piégée ou identique à l'origine ne compte pas" res "r['prix-suivis']['moment'] == 'du lundi au vendredi à 9 h et 9 h 15' and r['prix-suivis']['modifie'] is True and r['prix-suivis']['origine'] == 'chaque jour à 9 h' and r['prix-suivis']['forme'] == dict(jours='ouvres', heures=['09:00', '09:15']) and r['digest-ia']['modifie'] is False and r['reveil']['modifie'] is False"
+verif "0.96.0 : un passage en cours (marque fraîche d'Hermes, moins de 5 minutes) est dit ; une vieille marque ne l'est pas" res "r['prix-suivis']['en_cours'] is True and r['reveil']['en_cours'] is False and r['veille-du-matin']['en_cours'] is False"
+rm -f "$T/routines.pause" "$T/routines.horaire"
 rm -rf "$T/resume"; relancer --a-blanc
 verif "à blanc : aucun résumé écrit (rien n'est touché)" bash -c "[ ! -e '$T/resume' ] && grep -q 'Rien à relancer' '$T/sortie'"
 echo "contenu à ne pas toucher" > "$T/cible"; mkdir -p "$T/resume"; ln -s "$T/cible" "$T/resume/routines.json"; ln -s "$T/cible" "$T/resume/routines.json.tmp"; relancer
@@ -238,6 +263,7 @@ assert f('*/10 * * * *') == 'cron */10 * * * *' and f('0 9 1 * *') == 'cron 0 9 
 
 echo "== Le kit"
 verif "relance.sh : syntaxe, et refuse une option inconnue" bash -c "bash -n '$KIT/relance.sh' && grep -q 'limite.py\" relancer' '$KIT/relance.sh'"
+verif "0.96.0 : relance.sh garde le code de sortie de la relance, puis lance le suivi des routines (ordres.py suivre), jamais à blanc" bash -c "grep -q 'relancer \"\$@\"; code=\$?' '$KIT/relance.sh' && grep -q 'ordres.py\" suivre' '$KIT/relance.sh' && tail -1 '$KIT/relance.sh' | grep -qx 'exit \$code'"
 verif "install.sh pose la copie root, la minuterie (toutes les 10 minutes, rattrapée) et les dossiers (700, avis 750)" bash -c "grep -q 'hermes-relance/limite.py' '$KIT/install.sh' && grep -q 'enable --now hermes-relance.timer' '$KIT/install.sh' && grep -q 'OnCalendar=\*-\*-\* \*:02/10:00' '$KIT/hermes-relance.timer' && grep -q 'Persistent=true' '$KIT/hermes-relance.timer' && grep -q 'hermes-relance-avis' '$KIT/install.sh'"
 verif "l'unité n'exécute que la copie root (jamais le dépôt), sans variable du banc" bash -c "grep -q '^ExecStart=/usr/local/sbin/hermes-relance$' '$KIT/hermes-relance.service' && ! grep -q 'HERMES_RELANCE' '$KIT/hermes-relance.service'"
 verif "le kit portail installe le même limite.py et les hôtes de Claude" bash -c "grep -q '../limite.py\" \"\$LIB/limite.py\"' '$KIT/portail/install.sh' && grep -q 'domaines.defaut\" \"\$LIB/domaines.defaut\"' '$KIT/portail/install.sh'"

@@ -11674,11 +11674,212 @@ void main(){
         tv.textContent = n + (n > 1 ? ' routines' : ' routine');
         ts.textContent = v.passerelle !== 'active' ? 'passerelle ' + (HR_PAS[v.passerelle] || 'état inconnu') : err.length ? 'en erreur : ' + err.map((r) => r.libelle).join(', ') : s ? 'prochaine : ' + s.libelle + ', ' + hrQuand(s.prochain) : 'en direct';
       };
+      window.__HR92 = {vue: hrVue, load: hrLoad, quand: hrQuand};   /* 0.96.0 : le bloc suivant (la feuille d'une routine) lit le même résumé */
       document.head.append(h('style', {id: 'ux-0920', text: ''
         + '.hr-li .hr-t{display:flex;align-items:center;justify-content:space-between;gap:8px}.hr-li .hr-t b{min-width:0}.hr-li.ko{border-color:rgba(var(--warn),.5)}'
         + '.hr-li .hr-mode{flex:0 0 auto}.hr-res.is-ok{color:var(--green);font-weight:600}.hr-res.is-demande{color:#fde68a;font-weight:600}'
         + '.hr-indispo{padding:14px 16px;border-radius:16px;border:1px solid rgba(var(--warn),.45);background:rgba(var(--warn),.07);color:var(--fg);text-align:left}'
         + '.esp-s.hr-clip{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}'}));
+    }
+
+    /* ================= 0.96.0 : administrer les routines d'Hermes depuis JARVIS (sa demande du 27/11/2026 : « les routines, on doit être
+       capable de les relancer depuis JARVIS, soit car elles sont en erreur, ou car on a modifié quelque chose, ou tout simplement pour avoir une
+       nouvelle recherche ; ça doit donner vraiment l'air d'un espace d'administration : pour chaque routine je dois avoir une popup où je peux
+       arrêter une routine jusqu'à nouvel ordre, la relancer, avoir l'historique, et si jamais il y a une erreur voir l'erreur en détail », puis :
+       changer son horaire). Dans « Hermes et ses routines » et Équipe › Routines, toucher une routine ouvre SA FEUILLE (la feuille du bas) :
+       son état en clair, son moment, son mode, dernier et prochain passage ; « Lancer maintenant » (un appui de confirmation), « Mettre en
+       pause » (jusqu'à nouvel ordre ; second appui) ou « Reprendre », « Changer l'horaire » (des jours et des heures, jamais une expression) ;
+       « L'erreur en détail » quand le dernier passage a échoué ; « Ce qu'elle a fait » ; « Historique » (30 passages, réussite, durée
+       moyenne). Une routine en pause, en erreur ou en cours se voit d'un coup d'œil dans la liste (pastille). Sur la carte d'Hermes :
+       « Tout mettre en pause » / « Tout reprendre ». L'app ne fait que demander : JARVIS pose un ordre, root l'exécute et répond (un refus
+       est dit avec sa raison). Le mode réel ou double et la consigne ne se changent pas ici. Comme 0.92.0, rien n'est réécrit : ce bloc
+       range ce qui existe ; il suit le bloc 0.92.0 (dont il lit le résumé par window.__HR92), le bloc 0.87.0 continue d'envelopper Équipe. */
+    {
+      const P92 = window.__HR92 || {vue: () => null, load: () => null, quand: () => ''};
+      const raAPI = () => (SRV_OS ? (window.JarvisServeur && window.JarvisServeur.hermesRoutine ? {detail: window.JarvisServeur.hermesRoutine, ordre: window.JarvisServeur.hermesOrdre, tout: window.JarvisServeur.hermesTout} : null) : window.__HERMES_ADMIN || null);
+      const RA = {nom: null, d: null, cfg: null, boite: null, timer: null, confirme: '', msg: '', envoi: false, hor: null, vus: {}, tout: ''};
+      const JOURS96 = [['lun', 'Lun'], ['mar', 'Mar'], ['mer', 'Mer'], ['jeu', 'Jeu'], ['ven', 'Ven'], ['sam', 'Sam'], ['dim', 'Dim']], NOMS96 = {lun: 'lundi', mar: 'mardi', mer: 'mercredi', jeu: 'jeudi', ven: 'vendredi', sam: 'samedi', dim: 'dimanche'};
+      const maj = (m) => String(m || '').replace(/^./, (c) => c.toUpperCase());
+      const suite96 = (m) => (m.length === 1 ? m[0] : m.slice(0, -1).join(', ') + ' et ' + m[m.length - 1]);
+      const raDuree = (s) => (s === null || s === undefined ? '' : s < 60 ? s + ' s' : s < 3600 ? Math.floor(s / 60) + ' min' + (s % 60 ? ' ' + pad2(s % 60) : '') : Math.floor(s / 3600) + ' h ' + pad2(Math.floor((s % 3600) / 60)));
+      /* la forme fermée d'un horaire, comme le serveur et root la relisent : {ok, jours, heures, texte} ou {ok: false, texte} */
+      function raForme(hor) {
+        const hs = [...new Set(hor.heures)].sort(), js = hor.mode === 'choix' ? JOURS96.map((x) => x[0]).filter((x) => hor.jours.includes(x)) : hor.mode;
+        if (hor.mode === 'choix' && !js.length) return {ok: false, texte: 'Choisis au moins un jour.'};
+        if (new Set(hs.map((x) => x.slice(0, 2))).size * new Set(hs.map((x) => x.slice(3))).size !== hs.length)
+          return {ok: false, texte: 'Ces heures ne tiennent pas dans un seul horaire : garde la même minute (9 h 15 et 13 h 15) ou la même heure (9 h 00 et 9 h 15).'};
+        const quand = 'à ' + suite96(hs.map((x) => +x.slice(0, 2) + ' h' + (+x.slice(3) ? ' ' + x.slice(3) : '')));
+        const jours = Array.isArray(js) && js.length === 7 ? 'tous' : js;
+        return {ok: true, jours, heures: hs, texte: (jours === 'tous' ? 'chaque jour ' : jours === 'ouvres' ? 'du lundi au vendredi ' : suite96(jours.map((x) => 'le ' + NOMS96[x])) + ' ') + quand};
+      }
+      const raEtat = (d) => { const r = d.routine || {}, p = r.pause;
+        return d.etat === 'en pause' ? ['En pause' + (p && p.depuis ? ' depuis ' + P92.quand(p.depuis) : '') + (p && p.par === 'jarvis' ? ', depuis JARVIS' : '') + ' — jusqu’à nouvel ordre', 'pause']
+          : d.etat === 'en cours' ? ['Un passage est en cours', 'cours'] : d.etat === 'en erreur' ? ['En erreur au dernier passage' + (r.cause && r.cause !== 'erreur' ? ' : ' + r.cause : ''), 'ko']
+          : d.etat === 'pas posée' ? ['Pas posée chez Hermes', 'ko'] : d.etat === 'active' ? ['Active', 'ok'] : ['État indisponible', 'ko']; };
+      const raOuverte = () => { const s = $('sheet'); return !!RA.nom && !!s && !s.hidden && SH.cfg === RA.cfg; };
+      function raCharger() {
+        const api = raAPI(), nom = RA.nom; if (!api || !nom) return Promise.resolve();
+        return Promise.resolve(api.detail(nom)).then((d) => { if (RA.nom !== nom) return; RA.d = d && typeof d === 'object' && d.routine ? d : {vide: true, raison: (d && d.raison) || 'le serveur de JARVIS ne répond pas'}; raPeindre(); })
+          .catch(() => { if (RA.nom === nom) { RA.d = {vide: true, raison: 'le serveur de JARVIS ne répond pas'}; raPeindre(); } });
+      }
+      /* relu tant que la feuille est ouverte : toutes les 1,5 seconde tant que le serveur n'a pas répondu à un ordre, toutes les 3 pendant qu'un passage court, sinon toutes les 30 */
+      function raSuite() {
+        clearTimeout(RA.timer); if (!raOuverte()) { RA.nom = null; return; }
+        const o = RA.d && RA.d.ordre, vif = (o && !o.fini) || (RA.d && RA.d.etat === 'en cours');
+        RA.timer = setTimeout(() => { if (!raOuverte()) { RA.nom = null; return; } raCharger().then(() => { const o2 = RA.d && RA.d.ordre; if (o && !o.fini && o2 && o2.fini) P92.load(true); raSuite(); }); }, o && o.etat === 'posé' ? 1500 : vif ? 3000 : 30000);
+      }
+      function raOrdre(corps) {
+        const api = raAPI(); if (!api || RA.envoi) return;
+        RA.envoi = true; RA.msg = ''; RA.confirme = ''; raPeindre(true);
+        Promise.resolve(api.ordre({nom: RA.nom, ...corps})).then((r) => { RA.msg = r && r.ok ? '' : (r && r.error) || 'Le serveur de JARVIS ne répond pas.'; if (r && r.ok && corps.action === 'horaire') RA.hor = null; })
+          .catch(() => { RA.msg = 'Le serveur de JARVIS ne répond pas.'; })
+          .finally(() => { RA.envoi = false; raCharger().then(() => { P92.load(true); raSuite(); }); });
+      }
+      const raBouton = (cle, label, classe, go, plus) => h('button', {type: 'button', class: 'btn ' + classe, 'data-ra': cle, disabled: RA.envoi || (plus && plus.off) ? '' : null, title: (plus && plus.titre) || null, onclick: go}, label);
+      /* un geste à confirmer : le premier appui change le bouton en « Confirmer : … », le second envoie */
+      const raConfirme = (cle, label, oui, classe, corps, plus) => (RA.confirme === cle
+        ? h('span', {class: 'ra-conf'}, raBouton(cle + '-oui', oui, 'main', () => raOrdre(corps)), raBouton(cle + '-non', 'Annuler', 'ghost', () => { RA.confirme = ''; raPeindre(true); }))
+        : raBouton(cle, label, classe, () => { RA.confirme = cle; RA.msg = ''; raPeindre(true); }, plus));
+      function raHoraire(r) {
+        if (!RA.hor) { const f = r.forme; RA.hor = {ouvert: false, mode: f ? (Array.isArray(f.jours) ? 'choix' : f.jours) : 'tous', jours: f && Array.isArray(f.jours) ? f.jours.slice() : ['lun', 'mar', 'mer', 'jeu', 'ven'], heures: f ? f.heures.slice() : ['09:00']}; }
+        const H = RA.hor, f = raForme(H), repeindre = () => raPeindre(true);
+        const choix = (v, t) => h('button', {type: 'button', class: 'chip ra-j' + (H.mode === v ? ' on' : ''), 'aria-pressed': String(H.mode === v), 'data-ra-jours': v, onclick: () => { H.mode = v; RA.confirme = ''; repeindre(); }}, t);
+        const heure = (x, i) => { const sel = (vals, cur, lab, fn) => h('select', {class: 'ra-sel', 'aria-label': lab, onchange: (e) => { fn(e.target.value); RA.confirme = ''; repeindre(); }}, vals.map((v) => h('option', {value: v, selected: v === cur ? '' : null, text: v})));
+          return h('div', {class: 'ra-h', 'data-ra-heure': x},
+            sel(Array.from({length: 24}, (_, k) => pad2(k)), x.slice(0, 2), 'Heure du passage ' + (i + 1), (v) => { H.heures[i] = v + ':' + H.heures[i].slice(3); }), h('span', {text: 'h'}),
+            sel(Array.from({length: 12}, (_, k) => pad2(k * 5)), x.slice(3), 'Minutes du passage ' + (i + 1), (v) => { H.heures[i] = H.heures[i].slice(0, 2) + ':' + v; }),
+            H.heures.length > 1 ? h('button', {type: 'button', class: 'btn ghost sm', 'aria-label': 'Retirer ce passage', onclick: () => { H.heures.splice(i, 1); RA.confirme = ''; repeindre(); }}, 'Retirer') : null); };
+        const corps = [
+          h('p', {class: 'ra-lab', text: 'Quels jours'}),
+          h('div', {class: 'ra-jours'}, choix('tous', 'Tous les jours'), choix('ouvres', 'Du lundi au vendredi'), choix('choix', 'Jours choisis')),
+          H.mode === 'choix' ? h('div', {class: 'ra-jours ra-sem'}, JOURS96.map(([c, t]) => h('button', {type: 'button', class: 'chip ra-j' + (H.jours.includes(c) ? ' on' : ''), 'aria-pressed': String(H.jours.includes(c)), 'data-ra-jour': c,
+            onclick: () => { H.jours = H.jours.includes(c) ? H.jours.filter((y) => y !== c) : H.jours.concat(c); RA.confirme = ''; repeindre(); }}, t))) : null,
+          h('p', {class: 'ra-lab', text: 'À quelle heure (un à quatre passages par jour)'}),
+          h('div', {class: 'ra-heures'}, H.heures.map(heure)),
+          H.heures.length < 4 ? h('button', {type: 'button', class: 'btn ghost sm', 'data-ra': 'heure-plus', onclick: () => { const d = H.heures[H.heures.length - 1]; H.heures.push(pad2((+d.slice(0, 2) + 1) % 24) + ':' + d.slice(3)); RA.confirme = ''; repeindre(); }}, '+ Ajouter un passage') : null,
+          h('p', {class: 'ra-apercu' + (f.ok ? '' : ' ko'), 'data-ra': 'apercu', role: 'status', text: f.ok ? 'Aperçu : ' + f.texte + '.' : f.texte}),
+          r.evenement ? h('p', {class: 'ra-note', text: 'Cette routine se lance aussi sur un événement (un courrier qui arrive, une ligne du Canal) : l’horaire ne change que ses passages programmés.'}) : null,
+          h('div', {class: 'ra-acts'},
+            f.ok ? raConfirme('horaire', 'Demander ce changement', 'Confirmer : ' + f.texte, 'main', {action: 'horaire', jours: f.jours, heures: f.heures}, {off: f.texte === r.moment, titre: f.texte === r.moment ? 'C’est déjà son horaire.' : null}) : null,
+            r.modifie ? raConfirme('origine', 'Revenir à l’horaire d’origine', 'Confirmer : ' + (r.origine || 'horaire d’origine'), '', {action: 'horaire', origine: true}) : null)];
+        return h('details', {class: 'sheet-det ra-sec ra-hor', 'data-ra-sec': 'horaire', open: H.ouvert ? '' : null, ontoggle: (e) => { H.ouvert = e.target.open; }},
+          h('summary', {text: 'Changer l’horaire'}), corps.filter(Boolean));
+      }
+      function raPassage(p, i) {
+        const cle = p.fin + '|' + i, ouvert = !!RA.vus[cle], detail = p.erreur || p.resume;
+        const res = p.attente ? ['compte rendu reçu', ''] : p.resultat === 'ok' ? ['réussi', 'is-ok'] : ['en erreur' + (p.cause && p.cause !== 'erreur' ? ' : ' + p.cause : ''), 'is-demande'];
+        return h('li', {class: 'ra-p' + (p.resultat === 'erreur' ? ' ko' : ''), 'data-ra-passage': p.fin},
+          h('button', {type: 'button', class: 'ra-pb', 'aria-expanded': String(ouvert), disabled: detail ? null : '', onclick: () => { RA.vus[cle] = !ouvert; raPeindre(true); }},
+            h('b', {text: maj(P92.quand(p.fin))}), h('span', {class: 'hr-res ' + res[1], text: res[0]}),
+            h('small', {text: [p.duree !== null && p.duree !== undefined ? raDuree(p.duree) : '', p.lanceDit || (p.attente ? 'le serveur n’a pas encore noté ce passage' : ''), p.mode === 'double' ? 'en double' : ''].filter(Boolean).join(' · ')})),
+          ouvert && detail ? h('div', {class: 'ra-pd'}, p.erreur ? h('pre', {class: 'ra-err', text: p.erreur}) : null, p.resume ? h('p', {class: 'ra-res', text: p.resume}) : null) : null);
+      }
+      function raPeindre(force) {
+        const b = RA.boite, d = RA.d; if (!b) return;
+        const a = document.activeElement; if (!force && a && b.contains(a) && /^(SELECT|INPUT)$/.test(a.tagName)) return;
+        if (!d) { b.replaceChildren(h('p', {class: 'empty', 'data-ra': 'lecture', text: 'Lecture de la routine…'})); return; }
+        if (d.vide) { b.replaceChildren(h('p', {class: 'empty hr-indispo', text: 'Routine illisible : ' + d.raison + '.'})); return; }
+        const r = d.routine, o = d.ordre, [et, cls] = raEtat(d), k = [], enPause = d.etat === 'en pause', posee = !!r.posee;
+        const garde = a && b.contains(a) && a.dataset ? a.dataset.ra || '' : '';
+        k.push(h('p', {class: 'ra-etat ' + cls, 'data-ra': 'etat', 'data-etat': d.etat}, h('i', {class: 'ra-dot'}), h('span', {text: et})));
+        if (!d.disponible && d.raison) k.push(h('p', {class: 'empty hr-indispo', text: 'Routines d’Hermes indisponibles : ' + d.raison + '.'}));
+        k.push(h('dl', {class: 'sheet-facts ra-faits'}, [
+          ['Quand', maj(r.moment) + (r.modifie ? ' (horaire modifié ; à l’origine : ' + (r.origine || 'inconnu') + ')' : '')],
+          ['Mode', r.mode === 'réel' ? 'en réel' : 'en double (à blanc : rien n’est envoyé)'],
+          ['Dernier', r.dernier ? P92.quand(r.dernier) + ' · ' + (r.resultat === 'ok' ? 'réussi' : 'en erreur' + (r.cause && r.cause !== 'erreur' ? ' : ' + r.cause : '')) : 'jamais passée'],
+          ['Prochain', !posee ? 'aucun' : enPause ? 'aucun : en pause' : r.prochain ? P92.quand(r.prochain) : 'pas encore calculé']].filter((x) => x[1]).map(([t, v]) => h('div', {}, h('dt', {text: t}), h('dd', {text: v})))));
+        if (r.evenement) k.push(h('p', {class: 'ra-note', 'data-ra': 'evenement', text: 'Se lance aussi sur un événement : un courrier qui arrive, une ligne du Canal.'}));
+        if (o) k.push(h('p', {class: 'ra-ordre' + (o.etat === 'refusé' || o.etat === 'sans réponse' || o.resultat === 'erreur' ? ' ko' : o.fini ? ' ok' : ' cours'), 'data-ra': 'ordre', 'data-etat': o.etat, role: 'status', text: o.texte}));
+        if (RA.msg) k.push(h('p', {class: 'ra-ordre ko', 'data-ra': 'refus', role: 'alert', text: RA.msg}));
+        if (RA.envoi) k.push(h('p', {class: 'ra-ordre cours', 'data-ra': 'envoi', role: 'status', text: 'Demande envoyée…'}));
+        /* les gestes */
+        const peut = d.peut || {lancer: false, raison: ''}, attend = !!o && !o.fini;
+        k.push(h('div', {class: 'ra-acts', 'data-ra': 'gestes'},
+          raConfirme('lancer', 'Lancer maintenant', 'Confirmer : lancer maintenant', 'main', {action: 'lancer'}, {off: !peut.lancer || attend, titre: peut.lancer ? null : peut.raison}),
+          enPause ? raBouton('reprendre', 'Reprendre', '', () => raOrdre({action: 'reprendre'}), {off: !posee || attend})
+            : raConfirme('pause', 'Mettre en pause', 'Confirmer la pause, jusqu’à nouvel ordre', '', {action: 'pause'}, {off: !posee || attend})));
+        if (!peut.lancer && peut.raison && !attend) k.push(h('p', {class: 'ra-note', 'data-ra': 'pourquoi', text: '« Lancer maintenant » : ' + peut.raison}));
+        /* l'erreur en détail : seulement quand le dernier passage a échoué */
+        if (d.erreur) k.push(h('section', {class: 'ra-sec ra-erreur', 'data-ra-sec': 'erreur'}, h('h3', {text: 'L’erreur en détail'}),
+          h('p', {class: 'ra-cause'}, h('b', {text: maj(d.erreur.cause)}), d.erreur.quand ? ' · ' + P92.quand(d.erreur.quand) : ''),
+          h('p', {class: 'ra-conseil', text: d.erreur.conseil}),
+          d.erreur.detail ? h('pre', {class: 'ra-err', text: d.erreur.detail}) : h('p', {class: 'ra-note', text: 'Le serveur n’a pas gardé le texte de cette erreur (il vient au plus tard 10 minutes après le passage).'})));
+        k.push(h('section', {class: 'ra-sec', 'data-ra-sec': 'fait'}, h('h3', {text: 'Ce qu’elle a fait'}),
+          d.resume ? h('p', {class: 'ra-res'}, h('span', {text: d.resume.texte}), h('small', {text: ' — ' + P92.quand(new Date(d.resume.at).toISOString())}))
+            : h('p', {class: 'ra-note', text: r.mode === 'réel' ? 'Aucun compte rendu reçu pour le moment : il arrive à la fin de chaque passage réel.' : 'En double, la routine ne rend pas compte ici : elle écrit seulement son Journal.'})));
+        if (posee) k.push(raHoraire(r));
+        const hist = d.historique || [], st = d.stats || {};
+        k.push(h('section', {class: 'ra-sec', 'data-ra-sec': 'historique'}, h('h3', {text: 'Historique'}),
+          st.passages ? h('p', {class: 'ra-stats', 'data-ra': 'stats', text: st.passages + (st.passages > 1 ? ' passages' : ' passage') + ' · ' + st.taux + ' % réussis' + (st.dureeMoyenne !== null && st.dureeMoyenne !== undefined ? ' · durée moyenne ' + raDuree(st.dureeMoyenne) : '')}) : null,
+          hist.length ? h('ul', {class: 'ra-hist'}, hist.map(raPassage)) : h('p', {class: 'ra-note', text: 'Aucun passage noté pour le moment (le serveur les relève toutes les 10 minutes).'})));
+        b.replaceChildren(...k);
+        if (garde) { const x = b.querySelector('[data-ra="' + garde + '"], [data-ra="' + garde + '-oui"], [data-ra="' + garde.replace(/-(oui|non)$/, '') + '"]'); if (x && !x.disabled) try { x.focus({preventScroll: true}); } catch (e) { /* rien */ } }
+      }
+      function raOuvrir(nom) {
+        const v = P92.vue(), r = v && v.disponible ? v.routines.find((x) => x.nom === nom) : null;
+        if (!raAPI()) { toast('Routines d’Hermes', 'Cette page n’a pas de quoi administrer les routines.'); return; }
+        RA.nom = nom; RA.d = null; RA.msg = ''; RA.confirme = ''; RA.envoi = false; RA.hor = null; RA.vus = {};
+        RA.boite = h('div', {class: 'ra', id: 'ra', 'data-ra-nom': nom});
+        RA.cfg = {title: r ? r.libelle : nom, kicker: 'Routine d’Hermes', say: '', actions: [], extra: () => RA.boite};
+        openSheet(RA.cfg); raPeindre(true); raCharger().then(raSuite);
+      }
+      window.__RA96 = {ouvrir: raOuvrir};
+      /* dans la liste : chaque routine s'ouvre d'un appui (ou Entrée) et porte une pastille quand elle n'est pas simplement active */
+      const raPastille = (r) => (r.ordre && r.ordre.etat !== 'fait' ? [r.ordre.action === 'lancer' ? 'Lancement demandé' : 'Ordre en route', 'cours'] : r.enCours ? ['En cours', 'cours'] : r.pause || (r.posee && !r.active) ? ['En pause', 'pause'] : r.resultat === 'erreur' ? ['En erreur', 'ko'] : null);
+      function raListe(el) {
+        const v = P92.vue(); if (!v || !v.disponible) return;
+        el.querySelectorAll('[data-hr]').forEach((x) => {
+          const r = v.routines.find((y) => y.nom === x.dataset.hr); if (!r || x.dataset.ra96) return;
+          x.dataset.ra96 = '1'; x.classList.add('ra-ouvre'); x.setAttribute('role', 'button'); x.setAttribute('tabindex', '0'); x.setAttribute('aria-label', r.libelle + ' : ouvrir sa feuille');
+          const ouvrir = () => raOuvrir(r.nom);
+          x.addEventListener('click', ouvrir); x.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); ouvrir(); } });
+          const ps = raPastille(r), tete = x.querySelector('.hr-t, .auto-h');
+          if (ps && tete) { const pst = h('span', {class: 'ra-pst ' + ps[1], 'data-ra-pst': ps[1], text: ps[0]}), nomEl = tete.querySelector('b'); if (nomEl) nomEl.after(pst); else tete.append(pst); }   /* pas la classe « pill » : celle du mode reste la seule de la ligne */
+          if (r.modifie) { const m = x.querySelector('.hr-m, .trk small'); if (m && !/modifié/.test(m.textContent)) m.textContent += ' (horaire modifié)'; }
+        });
+        /* la carte d'Hermes : tout mettre en pause, tout reprendre */
+        const hero = el.querySelector('.hm-hermes'); if (!hero || hero.querySelector('.ra-tout')) return;
+        const posees = v.routines.filter((r) => r.posee), actives = posees.filter((r) => r.active && !r.pause), pauses = posees.filter((r) => r.pause || !r.active);
+        const tout = (action, n) => { const api = raAPI(); if (!api) return; RA.tout = 'envoi'; raListeMaj();
+          Promise.resolve(api.tout(action)).then((x) => { const f = x && x.ok ? x.faits.length : 0, re = x && x.ok ? x.refus.length : 0;
+            RA.tout = x && x.ok ? (action === 'pause' ? 'Pause demandée pour ' : 'Reprise demandée pour ') + f + (f > 1 ? ' routines' : ' routine') + (re ? ' ; ' + re + ' refusée' + (re > 1 ? 's' : '') + ' : ' + x.refus.map((y) => y.libelle).join(', ') : '') + '.' : (x && x.error) || 'Le serveur de JARVIS ne répond pas.'; })
+            .catch(() => { RA.tout = 'Le serveur de JARVIS ne répond pas.'; }).finally(() => { RA.confirme = ''; P92.load(true); raListeMaj(); [4000, 12000].forEach((ms) => setTimeout(() => { P92.load(true); }, ms)); }); };   /* la réponse du serveur arrive en quelques secondes */
+        const bt = (cle, label, action, n) => (RA.confirme === cle
+          ? h('span', {class: 'ra-conf'}, h('button', {type: 'button', class: 'btn sm main', 'data-ra': cle + '-oui', onclick: () => tout(action, n)}, 'Confirmer : ' + n + (n > 1 ? ' routines' : ' routine')), h('button', {type: 'button', class: 'btn sm ghost', onclick: () => { RA.confirme = ''; raListeMaj(); }}, 'Annuler'))
+          : h('button', {type: 'button', class: 'btn sm', 'data-ra': cle, disabled: RA.tout === 'envoi' ? '' : null, onclick: () => { RA.confirme = cle; RA.tout = ''; raListeMaj(); }}, label));
+        hero.append(h('div', {class: 'ra-tout'},
+          actives.length ? bt('tout-pause', 'Tout mettre en pause', 'pause', actives.length) : null, pauses.length ? bt('tout-reprendre', 'Tout reprendre', 'reprendre', pauses.length) : null,
+          RA.tout && RA.tout !== 'envoi' ? h('p', {class: 'ra-ordre ' + (/^(Pause|Reprise) demandée/.test(RA.tout) ? 'ok' : 'ko'), 'data-ra': 'tout-msg', role: 'status', text: RA.tout}) : null));
+      }
+      const raListeMaj = () => { const el = $('view'), hero = el && el.querySelector('.hm-hermes'), t = hero && hero.querySelector('.ra-tout'); if (t) t.remove(); if (el) raListe(el); };
+      const VEQ96 = VIEWS.equipe;
+      VIEWS.equipe = (el) => { VEQ96(el); if (!GOFF.on || (typeof AGENT !== 'undefined' && AGENT)) return; raListe(el); };
+      /* la notification « Hermes : « … » terminée » (ou en erreur) ouvre la feuille de la routine : #voir-routine-<nom> */
+      const VOIRURL96 = voirUrl;
+      voirUrl = function (hash) {
+        const m = String(hash || '').match(/^#voir-routine-([a-z0-9][a-z0-9-]{1,39})$/);
+        if (!m) return VOIRURL96(hash);
+        try { history.replaceState(null, '', '#equipe'); } catch (e) { /* rien */ }
+        go('equipe'); Promise.resolve(P92.load(true)).then(() => setTimeout(() => raOuvrir(m[1]), 250));
+        return true;
+      };
+      document.head.append(h('style', {id: 'ux-0960', text: ''
+        + '.ra-ouvre{cursor:pointer;position:relative}.ra-ouvre:focus-visible{outline:2px solid var(--iris);outline-offset:2px}'
+        + '.ra-pst{flex:0 0 auto;margin-right:auto;display:inline-flex;align-items:center;min-height:22px;padding:0 9px;border-radius:999px;border:1px solid var(--line-2);font:600 11px var(--sans);white-space:nowrap}.ra-pst.ko,.ra-pst.pause{color:var(--amber);border-color:rgba(var(--warn),.45);background:rgba(var(--warn),.1)}.ra-pst.cours{color:var(--iris);border-color:rgba(165,180,252,.5)}'
+        + '.ra{display:flex;flex-direction:column;gap:12px;margin-top:4px}.ra-etat{margin:0;display:flex;align-items:center;gap:8px;font:600 15px/1.3 var(--sans)}.ra-dot{flex:0 0 auto;width:10px;height:10px;border-radius:50%;background:var(--green)}'
+        + '.ra-etat.ko .ra-dot,.ra-etat.pause .ra-dot{background:var(--amber)}.ra-etat.cours .ra-dot{background:var(--iris)}'
+        + '.ra-note{margin:0;font-size:13px;color:var(--muted)}.ra-ordre{margin:0;padding:10px 12px;border-radius:14px;border:1px solid var(--line-2);font-size:14px}.ra-ordre.ko{border-color:rgba(var(--warn),.5);background:rgba(var(--warn),.08)}'
+        + '.ra-ordre.ok{border-color:rgba(74,222,128,.4)}.ra-ordre.cours{border-color:rgba(165,180,252,.5)}'
+        + '.ra-acts,.ra-conf,.ra-tout{display:flex;flex-wrap:wrap;gap:8px;align-items:center}.ra-tout{margin-top:12px}.ra-tout .ra-ordre{flex:1 1 100%}.ra .btn[disabled],.ra-tout .btn[disabled]{opacity:.45}'
+        + '.ra-sec h3{margin:0 0 6px;font:600 11px var(--sans);letter-spacing:.07em;text-transform:uppercase;color:var(--dim)}.ra-sec p{margin:0 0 6px}.ra-res small{color:var(--muted)}'
+        + '.ra-erreur{border:1px solid rgba(var(--warn),.45);border-radius:16px;padding:12px 14px;background:rgba(var(--warn),.06)}'
+        + '.ra-err{margin:6px 0 0;padding:10px 12px;border-radius:12px;background:rgba(0,0,0,.28);font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre-wrap;overflow-wrap:anywhere;max-height:14rem;overflow:auto}'
+        + '.ra-hist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}.ra-pb{width:100%;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 8px;text-align:left;padding:9px 12px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.03);color:var(--fg);font:inherit}'
+        + '.ra-pb small{grid-column:1/-1;color:var(--muted);font-size:12px}.ra-pb[disabled]{opacity:1}.ra-p.ko .ra-pb{border-color:rgba(var(--warn),.4)}.ra-pd{padding:6px 4px 2px}.ra-stats{font-size:13px;color:var(--muted)}'
+        + '.ra-hor>summary{padding:12px 0;font-weight:600;cursor:pointer}.ra-hor[open]{padding-bottom:12px}.ra-lab{margin:8px 0 6px;font-size:13px;color:var(--muted)}.ra-jours{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px}'
+        + '.ra-j{min-height:38px;padding:0 12px;border-radius:999px;border:1px solid var(--line-2);background:transparent;color:var(--fg);font:500 13px var(--sans)}.ra-j.on{background:var(--iris);color:var(--accent-fg);border-color:transparent;font-weight:600}'
+        + '.ra-heures{display:flex;flex-direction:column;gap:6px;margin-bottom:6px}.ra-h{display:flex;align-items:center;gap:6px}.ra-sel{min-height:40px;padding:0 10px;border-radius:12px;border:1px solid var(--line-2);background:var(--glass-2);color:var(--fg);font:500 15px var(--sans)}'
+        + '.ra-apercu{margin:8px 0;font-weight:600}.ra-apercu.ko{color:var(--amber);font-weight:500}'}));
     }
 
     /* ================= 0.87.0 : suite de la refonte UX (ses choix au QCM du 26/11/2026).

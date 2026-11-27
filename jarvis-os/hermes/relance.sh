@@ -13,4 +13,11 @@
 set -uo pipefail
 [ "$(id -u)" = 0 ] || { echo "À lancer en root : sudo hermes-relance"; exit 1; }
 case "${1:-}" in ""|--a-blanc) ;; *) sed -n '5,7p' "$0" | sed 's/^# \{0,3\}//'; exit 1 ;; esac
-exec python3 -I "${HERMES_RELANCE_LIB:-/usr/local/lib/hermes-relance}/limite.py" relancer "$@"
+lib=${HERMES_RELANCE_LIB:-/usr/local/lib/hermes-relance}
+python3 -I "$lib/limite.py" relancer "$@"; code=$?
+# 0.96.0 (administrer les routines depuis JARVIS) : après la relance, l'historique des passages, les pauses posées depuis JARVIS tenues,
+# un ordre que la surveillance du dossier aurait manqué, puis le résumé récrit. Jamais à blanc ; son échec ne change pas le code de la relance.
+if [ "${1:-}" != --a-blanc ] && [ -f "$lib/ordres.py" ]; then
+  python3 -I "$lib/ordres.py" suivre || echo "Suivi des routines pour JARVIS : en échec (sans effet sur la relance)."
+fi
+exit $code

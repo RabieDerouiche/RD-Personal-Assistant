@@ -396,6 +396,12 @@
     santeMaintenant: () => req('/api/sante/maintenant', {}).then((r) => (r.status === 200 ? r.j : null)).catch(() => null),
     /* 0.92.0 : « Hermes et ses routines » en direct (le résumé du cron d'Hermes écrit par root, relu par le serveur) ; null = pas de réponse */
     hermesRoutines: () => req('/api/hermes/routines').then((r) => (r.status === 200 ? r.j : r.status === 404 ? {disponible: false, code: 'ancien', raison: 'le serveur de JARVIS n’est pas encore à jour (0.92.0)'} : null)).catch(() => null),
+    /* 0.96.0 : administrer les routines d'Hermes. La feuille d'une routine (état, historique, erreur en détail), un ordre (lancer, pause,
+       reprendre, horaire : des jours et des heures, jamais une expression) et « tout mettre en pause / tout reprendre ». Le serveur ne fait
+       que poser l'ordre pour root ; un refus revient avec sa raison ({ok: false, error}). */
+    hermesRoutine: (nom) => req('/api/hermes/routine?nom=' + encodeURIComponent(nom)).then((r) => (r.status === 200 ? r.j : {raison: r.status === 404 ? 'le serveur de JARVIS n’est pas encore à jour (0.96.0), ou ne connaît pas cette routine' : (r.j && r.j.error) || 'le serveur de JARVIS ne répond pas'})).catch(() => null),
+    hermesOrdre: (corps) => req('/api/hermes/routine/ordre', corps).then((r) => (r.j && typeof r.j === 'object' && (r.j.ok || r.j.error) ? r.j : {ok: false, error: r.status === 404 ? 'Le serveur de JARVIS n’est pas encore à jour (0.96.0).' : 'Le serveur de JARVIS ne répond pas.'})).catch(() => ({ok: false, error: 'Serveur injoignable.'})),
+    hermesTout: (action) => req('/api/hermes/routines/ordre', {action}).then((r) => (r.j && typeof r.j === 'object' && (r.j.ok || r.j.error) ? r.j : {ok: false, error: 'Le serveur de JARVIS ne répond pas.'})).catch(() => ({ok: false, error: 'Serveur injoignable.'})),
     /* missions de Claude (0.15.0) : lancer une mission longue, suivre les dernières ; notification à la fin */
     mission: (texte, parent) => req('/api/mission', parent ? {texte, parent} : {texte}).then((r) => { try { if (r.j && r.j.ok && window.JarvisActivite) setTimeout(window.JarvisActivite, 300); } catch (e) { /* rien */ } return r.j; }).catch(() => ({ok: false, error: 'Serveur injoignable.'})),   /* 0.33.0 : visible tout de suite dans l'activité */
     /* cartes mises de côté (0.20.0) : liste, ajout (avec ou sans date de retour), retrait */
