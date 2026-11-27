@@ -1232,7 +1232,7 @@ try {
               ok('0.97 CRA signé : aucune route ne rend le PDF gardé', sansRoute.every((x) => x === 404), sansRoute.join());
               fs.mkdirSync(RET, {recursive: true}); fs.writeFileSync(path.join(RET, 'mois-' + ymT + '.json'), JSON.stringify({mois: ymT, resultat: 'validee', at: Date.now()}));
               const v1 = await mois(), o0 = await J('/api/jours/signe/valider', {mois: ymT, empreinte: shaS});
-              ok('0.97 CRA signé : le CRA du mois validé par Hermes : « Hermes vérifie le portail… » ; son oui est refusé tant que root n’a pas rendu « pret »', v1.signe.etat === 'verifie' && v1.signe.dit === 'CRA signé reçu : Hermes vérifie le portail…' && o0.status === 409 && !sg().oui, JSON.stringify([v1.signe, o0.status, o0.body]));
+              ok('0.97 CRA signé : le CRA du mois validé par Hermes : « Hermes vérifie le portail… » ; son oui est refusé tant que root n’a pas rendu « pret »', v1.signe.etat === 'verifie' && /^CRA signé reçu[.: ].*Hermes vérifie le portail…$/.test(v1.signe.dit) && v1.signe.controle === 'illisible' && o0.status === 409 && !sg().oui, JSON.stringify([v1.signe, o0.status, o0.body]));
               fs.writeFileSync(path.join(RET, 'signe-' + ymT + '.json'), JSON.stringify({mois: ymT, etat: 'pret', reel: false, empreinte: shaS, texte: 'Onglet de dépôt trouvé ; aucun CRA signé déposé pour ce mois.', at: Date.now()}));
               const v2 = await mois();
               ok('0.97 CRA signé : compte rendu « pret » de root, lu à l’ouverture de Travail : « CRA signé reçu : Hermes le dépose sur le portail ? », le fichier, sa taille, « Ouvrir le mail », l’empreinte pour son oui',

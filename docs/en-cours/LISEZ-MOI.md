@@ -83,9 +83,17 @@ pas commencé), 6. le dépôt du CRA signé sur le portail par Hermes après son
 - **0.97.0 (dépôt du CRA signé par Hermes)** : coupé par la limite à 15 h, relancé à 16 h 35 ; côté JARVIS écrit (`signe.mjs`, tests en cours), root, app et bancs à faire. Sauvegarde : `chantier-G.patch` (s'applique sur `0d240e3`). Une seconde demande au serveur suivra pour lui (avec l'essai à blanc réel du dépôt pour novembre).
 - Réveil programmé à 21 h 15.
 
-## État au 27/11/2026, 19 h 15
+## État au 27/11/2026, 18 h 50
 
 - **0.96.0 (avec la 0.95.0) : déployée et vérifiée sur le serveur à 16 h 45** par « Serveur JARVIS 2 » (compte rendu recopié dans `docs/jarvis-os.md`). Essai réel pause puis reprise d'une routine : conforme.
 - **0.97.0 (CRA signé déposé par Hermes après son oui)** : l'agent a rendu, relu par la session principale (une garde ajoutée : « déposé » compté seulement sans négation ; une course du banc de l'app corrigée), fusionné dans la branche avec `VERSION` 0.97.0, docs rangées par script, plan du serveur réécrit (`docs/demandes-serveur-en-attente.md` : 0.97.0 seule, avec l'essai à blanc réel de novembre). Bancs en cours au moment de ce commit : résultat dans `scratchpad/g/resultat.txt` (jours, travail, serveur déjà passés sans échec ; portail, relance, app à lire).
 - **Ensuite** : bancs verts → demande de fusion vers main → message à « Serveur JARVIS 2 » (un seul oui là-bas) → récapitulatif final unique avec les 21 captures (`scratchpad/refonte/final/`) et un QCM de choix de maquette.
 - Risques et ce qu'il verra : `suite-cra-signe.md`.
+
+## État au 27/11/2026, 20 h
+
+- **Deux demandes de lui dans la soirée, traitées** : (1) le CRA signé doit être comparé à la saisie puis déposé sans attendre s'il correspond → **0.98.0** (`signe-controle.mjs`, sans IA ; vérifié sur le vrai PDF de novembre : conforme, 15 jours ; oui automatique seulement après un premier dépôt réussi par Hermes) ; (2) le CRA de la semaine du 23/11 : « enregistrée, pas soumise » → cause lue sur la page par « Serveur JARVIS 2 » en lecture seule (le code de temps, une liste déroulante, n'était pas réellement choisi), **skill corrigée**.
+- Branche : `VERSION` 0.98.0, docs et plan du serveur à jour (`docs/demandes-serveur-en-attente.md` : 0.97.0 + 0.98.0 + skill, avec l'essai à blanc réel du dépôt pour novembre). Bancs : jours 143, travail 40, app 442 OK (les 3 échecs liés à la date) ; serveur, portail et relance repassent (`scratchpad/g/resultat3.txt`).
+- **Ensuite** : bancs verts → demande de fusion vers main → UN message à « Serveur JARVIS 2 » (il donne son oui là-bas) → il touche « Relancer Hermes » sur la carte du CRA de la semaine → lire le compte rendu → récapitulatif final unique avec les 21 captures et le QCM de choix de maquette.
+- Pas fait : le faux portail du banc n'a pas de liste de code de temps (la correction de la skill n'est pas prouvée au banc) ; les maquettes ne montrent pas le verdict « conforme à la saisie » (elles montrent « Oui, déposer »).
+

@@ -1,8 +1,8 @@
-# Demandes au serveur en attente (27/11/2026, soir) : JARVIS 0.97.0, le CRA signé déposé par Hermes
+# Demandes au serveur en attente (27/11/2026, soir) : JARVIS 0.98.0 — CRA signé déposé par Hermes, contrôle du PDF, CRA de la semaine
 
 À exécuter par la session « Serveur JARVIS 2 » (`session_01JvDfwzJbpLqSKJPKSk65Mq`). Un seul plan, un seul oui. `<COMMIT>` = le commit de main donné dans le message de la demande. Aucun secret ici ni dans la réponse : pas de nom de portail, pas d'adresse, pas d'hôte, pas de nom de personne, pas de nom de fichier venu d'un mail, pas de contenu de `jours.json`.
 
-La 0.95.0 et la 0.96.0 sont déployées et vérifiées depuis le 27/11 à 16 h 45 (compte rendu : `docs/jarvis-os.md`).
+La 0.95.0 et la 0.96.0 sont déployées et vérifiées depuis le 27/11 à 16 h 45 (compte rendu : `docs/jarvis-os.md`). Ce plan apporte la 0.97.0 (CRA signé déposé par Hermes après son oui), la 0.98.0 (le PDF comparé à la saisie, dépôt sans attendre s'il correspond, après un premier dépôt réussi) et la correction de la skill pour le CRA de la semaine (le code de temps choisi dans la liste : cause trouvée par le passage en lecture seule du 27/11 au soir).
 
 ## Plan
 
@@ -13,14 +13,21 @@ LECTURES DE DÉPART (sans demander)
 - aucune routine d'Hermes dans les 5 minutes avant l'étape 2b, aucun passage du portail en cours (systemctl is-active hermes-portail-essai.service → inactive)
 
 DÉPLOIEMENT (un seul oui)
+0. sudo rm -f /root/consigne-lecture.* /root/lecture-cra.out       (les deux fichiers temporaires du passage en lecture seule du 27/11 ; l'un contient l'adresse)
 1. sudo -u jarvis git -C /opt/rd pull --ff-only                    (attendu : <COMMIT>)
-2. sudo systemctl restart jarvis                                    (version attendue : 0.97.0, sans erreur au démarrage)
+2. sudo systemctl restart jarvis                                    (version attendue : 0.98.0, sans erreur au démarrage)
 2b. sudo bash /opt/rd/jarvis-os/hermes/install.sh                   (limite.py : une unité de plus dans la liste fermée des relances)
-2c. sudo bash /opt/rd/jarvis-os/hermes/portail/install.sh           (commande hermes-portail, skill, hermes-portail-cra-signe.service et .timer, activés)
+2c. sudo bash /opt/rd/jarvis-os/hermes/portail/install.sh           (commande hermes-portail, skill corrigée, hermes-portail-cra-signe.service et .timer, activés)
 
 CONTRÔLES (lecture seule) : les contrôles 1 à 4 de la section « CRA signé », puis
 5. journalctl -u jarvis --since "-10 min" --no-pager | grep -ciE "erreur|error" (et les lignes, s'il y en a) ; systemctl is-active jarvis hermes-gateway hermes-ordres.path
-6. « L'ESSAI À BLANC RÉEL POUR NOVEMBRE 2026 » de la section : il part seul ; relevés a à g.
+6. 0.98.0, le PDF comparé à la saisie (dans les 6 minutes après le redémarrage ; un nombre et un mot, jamais un nom) :
+   sudo python3 -I -c "import json; D=json.load(open('/home/jarvis/.jarvis/jours.json')); c=D['mois'].get('2026-11',{}).get('suivi',{}).get('cra',{}).get('signe',{}).get('controle',{}); print(c.get('etat'), c.get('total'), c.get('attendu'), c.get('detail'), '| premier dépôt déjà fait :', bool(D.get('signePremier')))"
+   → attendu : « conforme 15 15 True | premier dépôt déjà fait : False » (vérifié à la main sur le vrai PDF, hors dépôt). Autre chose : rapporter la ligne telle quelle.
+7. La skill corrigée du CRA de la semaine : sudo grep -c 'Ne te fie jamais au texte' /etc/hermes-portail/skills/portail/portail/SKILL.md → 1
+   L'état de la semaine, sans contenu : sudo python3 -I -c "import json; s=json.load(open('/home/jarvis/.jarvis/jours.json')).get('semaines',{}).get('2026-11-23',{}); print(s.get('etat'))"   → a_la_main (il touchera « Relancer Hermes » dans JARVIS ; NE PAS relancer à sa place, ne pas toucher à tentees.txt)
+8. « L'ESSAI À BLANC RÉEL POUR NOVEMBRE 2026 » de la section : il part seul ; relevés a à g.
+9. S'il a touché « Relancer Hermes » pendant que tu es là (sinon ne l'attends pas) : journalctl -u hermes-portail-cra --since '-20 min' --no-pager -o cat | tail -15 ; sudo tail -2 /var/lib/hermes-portail/cra/soumises.txt → le résultat (« soumise » attendu), et si Hermes dit avoir choisi le code dans la liste et relu sa valeur.
 
 RETOUR ARRIÈRE
 - sudo systemctl disable --now hermes-portail-cra-signe.timer
@@ -28,11 +35,11 @@ RETOUR ARRIÈRE
 - voir aussi le retour arrière de la section.
 
 CE QUE J'ATTENDS EN RETOUR (court, en tableau)
-Commit et version avant/après ; chaque étape : fait ou erreur mot pour mot ; les lectures et contrôles de la section (des nombres, des oui/non) ;
-l'essai à blanc : a à g ; la durée du passage ; l'heure de fin ; ce qui a surpris.
+Commit et version avant/après ; chaque étape : fait ou erreur mot pour mot ; les lectures et contrôles de la section (des nombres, des oui/non) ; les lignes des contrôles 6 et 7 ;
+l'essai à blanc : a à g ; le contrôle 9 s'il a eu lieu ; la durée du passage ; l'heure de fin ; ce qui a surpris.
 ```
 
-## Section « CRA signé » (0.97.0)
+## Section « CRA signé » (0.97.0 et 0.98.0)
 
 `git pull`, le redémarrage de `jarvis`, `sudo bash /opt/rd/jarvis-os/hermes/install.sh` et
 `sudo bash /opt/rd/jarvis-os/hermes/portail/install.sh` sont faits une fois par la demande commune. Ce chantier n'ajoute **aucun**

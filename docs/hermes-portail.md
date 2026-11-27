@@ -730,6 +730,18 @@ tant qu'une routine n'est pas basculée) :
   vides, se valent : la première, les autres restent vides (le portail retire une ligne vide à l'enregistrement,
   d'après la semaine approuvée qui n'en a qu'une : *Likely*, à vérifier au premier « Save ») ; après « Save », le
   total de la semaine doit égaler le nombre de jours « 1 ». À blanc, Hermes dit la ligne choisie.
+- **Premier passage réel, vendredi 27/11/2026 (19 h 06, après son oui) : enregistrée, pas soumise.** Les « 1 » du lundi au
+  vendredi sont enregistrés (« Save for Later », total 5,00, état « Saved »), mais « Submit » a été refusé : « Time Reporting
+  Code is required on row 1 ». **Cause (lue sur la page par un passage en lecture seule de la session du serveur, le soir même)** :
+  le code de temps d'une ligne est une liste déroulante ; sur la semaine vide, la ligne préremplie montre le code mais **aucune
+  option n'est choisie** (valeur réelle vide ; la liste ne propose que le choix vide et le code) ; la semaine approuvée d'avant
+  porte bien le code en valeur réelle. Après l'enregistrement il ne reste qu'une ligne (les lignes vides ont disparu, ou avaient
+  été mal lues). **Corrigé dans la skill** (section « CRA de la semaine », étapes 3 à 6) : la valeur réelle du code se lit par
+  `js()`, jamais dans le texte affiché ; en « MODE CRA », le code est choisi dans la liste s'il est vide, relu, puis « Save »,
+  relecture (quantités et valeur réelle du code), « Submit » ; des quantités déjà enregistrées avec un code vide sont gardées.
+  Pas prouvé au banc (le faux portail n'a pas cette liste) : la relance par « Relancer Hermes » dans JARVIS est l'essai réel.
+  *Aussi* : `essai --consigne-fichier` n'ajoute pas l'adresse à la consigne (la consigne doit la porter) ; le compte rendu rendu à
+  JARVIS ne porte plus de chemin de page et n'est plus coupé au milieu d'une phrase (`propre_texte`).
 - **Chronos a mis en pause ses trois routines** le 26/11/2026 au matin (Canal, ligne 100 : validation du 24, CRA du
   26, CRA du vendredi), sur sa demande du 26/11 (« désactive toutes les routines Chronos qu'on a remplacées »).
   Dès lors, le CRA du mois de novembre est à Hermes, le 26.

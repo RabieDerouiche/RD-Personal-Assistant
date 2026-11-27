@@ -154,21 +154,37 @@ La consigne donne UNE semaine (son lundi), le code de temps à utiliser et, pour
    tes notes disent lesquels). Vérifie que les dates affichées sont celles de la consigne.
 2. Lis l'état de la semaine. Si un seul jour est déjà soumis, approuvé ou en attente d'approbation : ne touche à
    rien, réponds « Résultat : déjà soumise ». Fin.
-3. Choisis la ligne : celle qui porte le code de temps de la consigne. S'il y en a plusieurs, celle qui porte le
+3. Le code de temps d'une ligne est une liste déroulante. **Ne te fie jamais au texte que tu vois dans la grille** :
+   sur une semaine vide, la ligne préremplie peut montrer le code alors qu'aucune option n'est choisie (vu le
+   27/11/2026 : la semaine a été enregistrée avec un code vide et « Submit » a été refusé, « code required on row
+   1 »). Lis la valeur réelle de la liste avec `js()` (la propriété `value` du `select` de la ligne, dans le cadre
+   de la feuille) : vide, ou le code. Une ligne dont la liste est vide mais qui propose le code de la consigne
+   compte comme une ligne de ce code.
+   Choisis la ligne : celle qui porte le code de temps de la consigne. S'il y en a plusieurs, celle qui porte le
    même projet que la dernière semaine approuvée (ouvre la semaine précédente pour le voir, puis reviens).
    Plusieurs lignes identiques (même code, même projet, même activité) et toutes vides : elles se valent ; prends
    la première (la plus haute) et laisse les autres vides (le portail retire une ligne vide à l'enregistrement).
    Si tu ne peux toujours pas trancher (projets différents, ou une de ces lignes déjà remplie autrement) : ne
    saisis rien, réponds « Résultat : rien saisi » et dis pourquoi. Fin.
 4. Relève ce qui est déjà inscrit. Un jour déjà rempli comme la consigne : garde-le. Une quantité sur un jour
-   « rien », une autre quantité ou un autre code : ne saisis rien, réponds « Résultat : rien saisi » et décris
-   l'écart (jour, code, quantité). Fin.
-5. En « MODE CRA À BLANC » : arrête-toi là, sans rien taper ; dis la ligne choisie (sa place, son code, son projet
-   décrit sans numéro) et jour par jour ce que tu inscrirais, puis réponds « Résultat : à blanc ». Fin.
-6. En « MODE CRA » : inscris « 1 » dans la case de quantité de chaque jour « 1 », sur la ligne choisie, et rien
-   ailleurs. Clique « Save », une fois. Recharge la semaine et vérifie, jour par jour, le code et la quantité, et
-   que le total de la semaine égale le nombre de jours « 1 » (une ligne vide restée là n'est pas une différence ;
-   une quantité sur une autre ligne en est une). Tout est juste : clique « Submit », une fois, puis relis l'état.
+   « rien », une autre quantité ou un autre code (une valeur réelle différente de celui de la consigne ; un code
+   vide n'est pas un autre code) : ne saisis rien, réponds « Résultat : rien saisi » et décris l'écart (jour, code,
+   quantité). Fin. Des quantités déjà enregistrées comme la consigne avec un code vide (un passage précédent
+   refusé) : garde-les, il reste le code à choisir (étape 6), puis « Save » et « Submit ».
+5. En « MODE CRA À BLANC » : arrête-toi là, sans rien taper ni rien choisir ; dis la ligne choisie (sa place, la
+   valeur réelle de son code — vide ou non —, son projet décrit sans numéro) et jour par jour ce que tu inscrirais,
+   puis réponds « Résultat : à blanc ». Fin.
+6. En « MODE CRA » : d'abord le code. Si la valeur réelle de la liste de la ligne choisie est vide, choisis dans
+   cette liste l'option du code de la consigne (celle dont la valeur ou le texte commence par ce code ; avec
+   l'outil de sélection du navigateur, à défaut par `js()` en déclenchant l'événement `change`), attends que la
+   page se stabilise, puis relis `value` : ce doit être le code. La liste ne propose pas ce code, ou sa valeur
+   reste vide : ne clique ni « Save » ni « Submit », dis-le, et réponds « Résultat : rien saisi » (ou
+   « Résultat : enregistrée, pas soumise » si des quantités étaient déjà enregistrées). Fin.
+   Ensuite inscris « 1 » dans la case de quantité de chaque jour « 1 », sur la ligne choisie, et rien ailleurs.
+   Clique « Save », une fois. Recharge la semaine et vérifie, jour par jour, la quantité, **la valeur réelle du
+   code (par `js()`, pas le texte affiché)**, et que le total de la semaine égale le nombre de jours « 1 » (une
+   ligne vide restée là n'est pas une différence ; une quantité sur une autre ligne en est une). Tout est juste :
+   clique « Submit », une fois, puis relis l'état.
    Une différence après « Save », une erreur, ou une alerte du portail (heures manquantes, dépassement…) : ne
    clique pas « Submit » et ne corrige rien en devinant ; recopie l'alerte (sans nom ni numéro) et réponds
    « Résultat : enregistrée, pas soumise » (ou « Résultat : rien saisi » si rien n'a été enregistré).
