@@ -39,7 +39,7 @@ import {limiteDe, estLimite, heureParis, ecritureFaite, createAvisRelance} from 
 import {createHermesRoutines} from './hermes-routines.mjs';   /* 0.92.0 : « Hermes et ses routines » en direct (le résumé de root, lu sans rien écrire) */
 const ACT = createActivite();   /* 0.33.0 : ce que fait Claude à l'instant */
 
-const VERSION = '0.89.0';
+const VERSION = '0.94.0';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PORT = +(process.env.PORT || 8787);
 const HOST = process.env.HOST || '127.0.0.1';

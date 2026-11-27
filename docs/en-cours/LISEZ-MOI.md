@@ -18,16 +18,16 @@ fichier d'ici.
 | Chantier | Fichier | État au moment de l'arrêt |
 |---|---|---|
 | C, 0.91.0 : rangement des papiers par JARVIS (dépôt depuis l'app, proposition du dossier et du nom, écriture dans Drive après son oui) | `chantier-C.patch` | serveur (`depot.mjs`), Drive, app et bancs écrits ; restaient le service worker, le manifeste (menu Partager), les bancs à repasser, la note |
-| D, 0.92.0 : Hermes et ses routines en direct (résumé root assaini, route, santé, app) | `chantier-D.patch` | presque fini : restaient les ajouts du banc de la relance et la note |
+| D, 0.92.0 : Hermes et ses routines en direct (résumé root assaini, route, santé, app) | dans la branche | **fini et fusionné dans la branche le 27/11 au matin** ; bancs repassés après fusion (voir le dernier commit « bancs ») ; risques : `suite-routines.md` |
 | E, 0.93.0 : Radar (« déjà dépensé ce mois », historique), feuille d'un jour de l'Agenda sans bots, « Pour moi » : une carte par sujet | `chantier-E.patch` | Radar fini et testé ; bloc de l'app en cours (« Pour moi », Agenda) ; restaient les bancs de l'app et la note |
 | F, 0.94.0 : réponses aux mails du mois suivies (même fil ou nouveau fil, détection toutes les 5 minutes, une notification, carte de Travail) | dans la branche | **fini, fusionné dans la branche et poussé le 26/11 au soir** (travail 31, jours 106, courrier 10, serveur 391) ; sa note : `docs/_chantier-F.md` (entrée de journal, contrôles du serveur, points à décider) |
 
 ## Ordre
 
-1. F (les réponses aux mails : sa priorité), 2. D, 3. E, 4. C, 5. tous les bancs, fusion dans main, **une**
-demande commune à la session « Serveur JARVIS » (A, B, C, D, E, F), 6. les trois maquettes de refonte
+1. F et D : faits. 2. Fusion dans main et **première demande** à la session « Serveur JARVIS » avec ce qui est prêt
+(A, B, D, F ; sections dans `docs/demandes-serveur-en-attente.md` ; VERSION 0.94.0). 3. E, 4. C, puis une seconde demande. 5. les trois maquettes de refonte
 (`essais/jarvis-refonte-b/` et `-c/` : premier jet écrit, pas encore relu ni capturé ; `-a/` « Orbite » :
-pas commencé), 7. le dépôt du CRA signé sur le portail par Hermes après son oui (son choix au QCM du 26/11).
+pas commencé), 6. le dépôt du CRA signé sur le portail par Hermes après son oui (son choix au QCM du 26/11).
 
 ## Décisions du 26/11/2026 au soir (QCM)
 
@@ -38,3 +38,11 @@ pas commencé), 7. le dépôt du CRA signé sur le portail par Hermes après son
 - CRA signé reçu du client : Hermes le dépose sur le portail après son oui dans JARVIS (à blanc d'abord, sa
   validation la première fois).
 - Méthode : séquentiel, plus d'agents en parallèle (ils ont vidé le forfait partagé le 26/11 et coupé Hermes).
+
+## Méthode pour ne rien reperdre (sa demande du 27/11/2026)
+
+- Chaque étape finie est commitée et poussée ; cette note est mise à jour dans le même commit.
+- Un agent coupé par la limite n'est pas relancé pour finir un reste : la session principale finit à partir du travail sauvegardé (fusion, bancs, notes). Un agent neuf reçoit une consigne courte qui pointe ici.
+- Bancs et rangement de la documentation : par script ou en arrière-plan, sans consommer le forfait.
+- Pas de travail lourd dans l'heure qui précède ses routines (Veille 7 h 40, CRA de la semaine le vendredi à midi).
+- À décider et risques du chantier F : `suite-mails.md` (dont la structure de `jours.json` pour le dépôt du CRA signé par Hermes).
