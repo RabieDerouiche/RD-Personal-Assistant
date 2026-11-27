@@ -21,5 +21,7 @@
         - prix_relever
         - sorties_contexte
         - agenda_libre
+        # 0.91.0 (suite) : fin d'un passage réel ; JARVIS signale lui-même la première exécution réelle
+        - routine_fin
       resources: false
       prompts: false

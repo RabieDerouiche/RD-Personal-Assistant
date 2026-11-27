@@ -521,6 +521,24 @@
   /* 0.23.0 : la météo de l'accueil (en vrai : Open-Meteo, à la position de l'iPhone) */
   window.__METEO = {current: {temperature_2m: 9.4, apparent_temperature: 6.2, weather_code: 3}, daily: {time: [fr(D(0)), fr(D(1))], weather_code: [3, 61], temperature_2m_min: [4, 2], temperature_2m_max: [11, 7], precipitation_probability_max: [10, 70]}};
   window.__G = G; window.__MAIL = MAIL; window.__CAL = CAL;
+  /* 0.92.0 : les routines d'Hermes en direct (données inventées, même forme que GET /api/hermes/routines) ; elles ne sont pas celles de
+     l'onglet Routines plus haut (« Semaine à venir » n'y est plus) : la page ne doit montrer que celles-ci. SCEN.hermesIndispo : résumé indisponible */
+  if (SCEN.grokOff) {
+    /* la dernière occurrence passée (sens -1) ou la prochaine (sens 1) d'un horaire : jours de la semaine (0 = dimanche ; null = tous), heures */
+    const hrOcc = (jours, heures, sens) => { for (let k = 0; k < 9; k++) { const c = [];
+      heures.forEach(([hh, mi]) => { const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + sens * k, hh, mi); if ((!jours || jours.includes(d.getDay())) && (sens < 0 ? d <= now : d > now)) c.push(+d); });
+      if (c.length) return new Date(sens < 0 ? Math.max(...c) : Math.min(...c)).toISOString().slice(0, 19) + 'Z'; } return null; };
+    const hr = (nom, libelle, moment, mode, jours, heures, plus) => Object.assign({nom, libelle, moment, mode, posee: true, active: true, dernier: hrOcc(jours, heures, -1), resultat: 'ok', cause: null, prochain: hrOcc(jours, heures, 1)}, plus || {});
+    window.__HERMES_ROUTINES = SCEN.hermesIndispo
+      ? {disponible: false, code: 'vieux', raison: 'dernière écriture du résumé à 07 h 52 : plus de 30 minutes (la relance d’Hermes, hermes-relance, ne passe plus)'}
+      : {disponible: true, at: +now - 4 * 60000, passerelle: 'active', garde: {etat: 'coupé', jusqua: '2026-12-03'}, routines: [
+        hr('veille-du-matin', 'Veille du matin', 'du lundi au vendredi à 7 h 40', 'réel', [1, 2, 3, 4, 5], [[7, 40]]),
+        hr('bilan-hebdo', 'Bilan de la semaine', 'le lundi à 8 h 50', 'réel', [1], [[8, 50]]),
+        hr('reveil', 'Réveil', 'chaque jour à 9 h 15, 13 h 15 et 18 h 15', 'réel', null, [[9, 15], [13, 15], [18, 15]]),
+        hr('digest-ia', 'Digest IA et .NET', 'le lundi à 9 h 10', 'double', [1], [[9, 10]], {active: false, dernier: null, resultat: 'jamais', prochain: null}),
+        hr('prix-suivis', 'Prix suivis', 'chaque jour à 9 h', 'réel', null, [[9, 0]], {resultat: 'erreur', cause: 'limite du forfait'}),
+        hr('sorties-du-week-end', 'Sorties du week-end', 'le jeudi à 19 h', 'réel', [4], [[19, 0]])]};
+  }
   /* 0.85.0 : l'espace « Travail » de la maquette (données inventées, même forme que GET /api/travail) */
   /* 0.86.0 : une note de frais d'Hermes à valider (données inventées, même forme que GET /api/jours/notes) */
   if (SCEN.notes) window.__NOTES = {notes: [{cle: 'box:2026-11', sorte: 'box', mois: '2026-11', nom: 'Note de la box', etat: 'a_valider', valide: false, montant: 39, date: '2026-11-05', jours: null,
@@ -535,4 +553,12 @@
       {id: 'box', bloc: 'frais', titre: 'Box internet', qui: 'chronos', quiDit: 'Chronos', prochaine: 'mar. 15/12', etapes: [['Facture téléchargée', 'fait'], ['Dépense à blanc', 'fait'], ['Identique à Chronos', 'fait'], ['Part seule', ''], ['Bascule', '']], derniere: {quand: '15/11', quoi: 'dépense créée', par: 'Chronos', ok: true}, ouvrir: 'note'},
       {id: 'teletravail', bloc: 'frais', titre: 'Télétravail', qui: 'chronos', quiDit: 'Chronos le 1er · Hermes à blanc le dernier jour', prochaine: 'lun. 30/11', etapes: [['Jours (JARVIS)', 'fait'], ['Électricité', ''], ['Charges et pièces', ''], ['PDF', ''], ['À blanc', '']], derniere: {quand: '01/11', quoi: 'octobre, remboursée', par: 'Chronos', ok: true}, ouvrir: 'note'},
       {id: 'grok', bloc: 'frais', titre: 'Grok Bot', qui: 'chronos', quiDit: 'Chronos', prochaine: 'ven. 04/12', etapes: [['Chronos jusqu’à l’arrêt de Grok', 'fait']], derniere: {quand: '04/11', quoi: 'dépense créée', par: 'Chronos', ok: true}, ouvrir: 'note'}]};
+  /* 0.94.0 : les réponses aux deux mails du mois sont arrivées (données inventées, même forme que GET /api/travail) */
+  if (SCEN.reponses) Object.assign(window.__TRAVAIL.routines.find((r) => r.id === 'mois'), {mois: '2026-11', etapes: [['Congés validés', 'fait'], ['Mail au client', 'fait'], ['CRA validé', 'fait'], ['CRA du client reçu', 'fait'], ['Rattaché', 'encours']],
+    alerte: 'Fin de mission le 30/11/2026. Réponse à ton mail de prolongation reçue le 26/11 à 16 h 20 : à lire.', attend: ['CRA signé reçu : à rattacher', 'Réponse à ton mail de prolongation : à lire'], rattachable: true,
+    toi: 'CRA signé reçu : à rattacher sur le portail (onglet du haut de la page du CRA). Réponse à ton mail de prolongation : à lire.',
+    mails: [{sorte: 'cra', quoi: 'Mail « CRA Novembre 2026 »', quand: '26/11', etat: 'CRA signé reçu', envoye: 'envoyé le 26/11 à 09 h 02', url: 'https://mail.google.com/mail/#all/filcra0001',
+      reponses: [{de: 'Contact Client', quand: 'le 26/11 à 14 h 05', extrait: 'Bonjour, ci-joint le CRA signé. Bonne journée.', pdf: true, lu: true, url: 'https://mail.google.com/mail/#all/filcra0001'}]},
+    {sorte: 'prolongation', quoi: 'Mail « Prolongation de mission »', quand: '26/11', etat: 'réponse reçue', envoye: 'envoyé le 26/11 à 09 h 03', url: 'https://mail.google.com/mail/#all/filpro0001',
+      reponses: [{de: 'Équipe Missions', quand: 'le 26/11 à 16 h 20', extrait: 'Bonjour, nous avons bien reçu ta demande et revenons vers toi. ' + 'x'.repeat(200), pdf: false, lu: false, url: 'javascript:alert(1)'}]}]});
 })();

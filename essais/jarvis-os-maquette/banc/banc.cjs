@@ -1246,6 +1246,27 @@ srv.listen(0, async () => {
       const s = await q.evaluate(() => ({titre: document.getElementById('sheet-title').textContent, mails: document.querySelectorAll('#sheet .trv-mails > div').length, acts: [...document.querySelectorAll('#sheet .sheet-actions .btn')].map((x) => x.firstChild.textContent.trim())}));
       ok('Travail : le détail en feuille du bas (étapes, mails envoyés, « Voir mes jours du mois »)', s.titre === 'CRA de la société de portage' && s.mails === 1 && s.acts[0] === 'Voir mes jours du mois', JSON.stringify(s));
       await q.context().close(); }
+    /* 0.94.0 : les réponses aux deux mails du mois (scénario « reponses ») : la carte « CRA du mois », sa feuille, la ligne de « Pour moi » */
+    { const q = await pageWith({reponses: true}, '#travail'); await q.waitForTimeout(1200);
+      const c = await q.evaluate(() => { const k = document.querySelector('.trv-card[data-trv="mois"]'); return {fait: k.querySelectorAll('.trv-et .fait').length, encours: (k.querySelector('.trv-et .encours') || {}).textContent || '', toi: k.classList.contains('toi'), alerte: [...k.querySelectorAll('.trv-alerte')].map((x) => x.textContent), mails: [...k.querySelectorAll('.trv-mails > .trv-mail')].map((m) => ({t: m.querySelector('.trv-mail-t').textContent, rep: [...m.querySelectorAll('.trv-rep')].map((x) => x.textContent)})), liens: k.querySelectorAll('a').length}; });
+      ok('0.94 : carte « CRA du mois » : 4 étapes faites, « Rattaché » en cours, « CRA signé reçu : à rattacher » en « À toi », l’alerte de fin de mission dit « réponse reçue … : à lire »', c.fait === 4 && /Rattaché/.test(c.encours) && c.toi && c.alerte.some((x) => /Fin de mission le 30\/11\/2026\. Réponse à ton mail de prolongation reçue le 26\/11 à 16 h 20 : à lire\./.test(x)) && c.alerte.some((x) => /^À toi : CRA signé reçu : à rattacher sur le portail/.test(x)), JSON.stringify(c));
+      ok('0.94 : carte : chaque mail « envoyé le … », puis « Réponse de <nom> le … », PDF signalé, extrait de 160 caractères au plus ; aucun lien dans la carte (c’est un bouton)', c.mails.length === 2 && /CRA Novembre 2026 » · envoyé le 26\/11 à 09 h 02/.test(c.mails[0].t) && /CRA signé reçu$/.test(c.mails[0].t) && /^Réponse de Contact Client le 26\/11 à 14 h 05PDF« Bonjour, ci-joint le CRA signé/.test(c.mails[0].rep[0]) && /^Réponse de Équipe Missions le 26\/11 à 16 h 20« /.test(c.mails[1].rep[0]) && (c.mails[1].rep[0].match(/« (.*) »$/) || ['', ''])[1].length === 160 && c.liens === 0, JSON.stringify(c.mails));
+      await q.evaluate(() => document.querySelector('.trv-card[data-trv="mois"]').click()); await q.waitForTimeout(700);
+      const s = await q.evaluate(() => ({acts: [...document.querySelectorAll('#sheet .sheet-actions .btn')].map((x) => x.firstChild.textContent.trim()), liens: [...document.querySelectorAll('#sheet .trv-mails a.trv-ouvrir')].map((a) => a.textContent + ' ' + a.getAttribute('href') + ' ' + a.target + ' ' + a.rel), rep: document.querySelectorAll('#sheet .trv-rep').length}));
+      ok('0.94 : feuille : « C’est rattaché » en premier ; « Ouvrir le mail » sur la réponse (le fil dans Gmail, nouvel onglet) ; une adresse qui n’est pas http(s) ne donne aucun bouton', s.acts[0] === 'C’est rattaché' && s.rep === 2 && s.liens.length === 1 && s.liens[0] === 'Ouvrir le mail https://mail.google.com/mail/#all/filcra0001 _blank noopener', JSON.stringify(s));
+      await q.evaluate(() => [...document.querySelectorAll('#sheet .sheet-actions .btn')].find((x) => /^C’est rattaché/.test(x.textContent)).click()); await q.waitForTimeout(900);
+      const r = await q.evaluate(() => { const k = document.querySelector('.trv-card[data-trv="mois"]'); return {fait: k.querySelectorAll('.trv-et .fait').length, toasts: [...document.querySelectorAll('#toasts .toast')].map((x) => x.textContent).join(' || ')}; });
+      ok('0.94 : « C’est rattaché » : l’étape « Rattaché » passe à faite (5 sur 5)', r.fait === 5 && /CRA signé rattaché/.test(r.toasts), JSON.stringify(r));
+      await q.context().close(); }
+    { const q = await pageWith({reponses: true}, '#demandes'); await q.waitForTimeout(2600);
+      const l = await q.evaluate(() => [...document.querySelectorAll('.pm-travail')].map((x) => ({t: x.firstElementChild.textContent, toi: x.classList.contains('toi')})));
+      ok('0.94 : « Pour moi » : la ligne de Travail dit ce qui attend (« CRA signé reçu : à rattacher », la réponse à lire), une seule ligne', l.length === 1 && l[0].toi && l[0].t === 'CRA signé reçu : à rattacher · Réponse à ton mail de prolongation : à lire', JSON.stringify(l));
+      await q.evaluate(() => document.querySelector('.pm-travail').click()); await q.waitForTimeout(900);
+      ok('0.94 : cette ligne ouvre l’espace Travail', await q.evaluate(() => location.hash === '#travail' && !!document.querySelector('.trv-card[data-trv="mois"]')));
+      await q.context().close(); }
+    { const q = await page('#demandes'); await q.waitForTimeout(2400);
+      ok('0.94 : sans rien qui attend dans Travail, « Pour moi » n’a pas de ligne de Travail en plus', await q.evaluate(() => document.querySelectorAll('.pm-travail.toi').length === 0));
+      await q.context().close(); }
     /* 0.86.0 : une note de frais d'Hermes à valider (la première de sa sorte) : dans « Pour moi », la note entière, « Valider et créer » */
     { const q = await pageWith({notes: true}, '#demandes');
       await q.waitForTimeout(800);
@@ -1589,9 +1610,9 @@ srv.listen(0, async () => {
       await q.context().close(); }
     { const q = await pageWith({grokOff: true}, '#equipe');
       const g = await q.evaluate(() => ({titre: document.querySelector('.view-title').textContent, seg: [...document.querySelectorAll('#view .ux-seg button')].map((x) => x.firstChild.textContent), routines: [...document.querySelectorAll('.hmh-r li b')].map((x) => x.textContent), pause: /Grok en pause/.test(document.getElementById('status') ? document.getElementById('status').textContent : '')}));
-      ok('0.86 : Grok arrêté : Équipe devient « Hermes et ses routines » (sa carte, ses routines lues dans Pilotage), plus de coût de Grok, plus de « Grok en pause »', g.titre === 'Hermes et ses routines' && g.seg.join() === 'Hermes,Demandes,Routines' && g.routines.join() === 'Veille du matin,Semaine à venir,Prix suivis' && !g.pause, JSON.stringify(g));
+      ok('0.86 : Grok arrêté : Équipe devient « Hermes et ses routines » (sa carte, ses routines ; depuis 0.92.0 en direct, plus celles de Pilotage), plus de coût de Grok, plus de « Grok en pause »', g.titre === 'Hermes et ses routines' && g.seg.join() === 'Hermes,Demandes,Routines' && g.routines.join() === 'Veille du matin,Bilan de la semaine,Réveil,Digest IA et .NET,Prix suivis,Sorties du week-end' && !g.pause, JSON.stringify(g));
       await q.evaluate(() => { location.hash = '#espaces'; }); await q.waitForTimeout(1200);
-      ok('0.86 : Grok arrêté : la tuile d’Espaces dit Hermes et ses routines', await q.evaluate(() => { const t = document.querySelector('.esp-tile[data-go="equipe"]'); return !!t && /Hermes/.test(t.textContent) && /3 routines/.test(t.textContent); }));
+      ok('0.86 : Grok arrêté : la tuile d’Espaces dit Hermes et ses routines', await q.evaluate(() => { const t = document.querySelector('.esp-tile[data-go="equipe"]'); return !!t && /Hermes/.test(t.textContent) && /6 routines/.test(t.textContent); }));
       await q.evaluate(() => { location.hash = '#demandes'; }); await q.waitForTimeout(1500);
       const d = await q.evaluate(() => ({oui: /dans son chat|Tes oui à donner dans Grok/i.test(document.getElementById('view').textContent), couts: [...document.querySelectorAll('#view .cost')].map((x) => x.textContent).filter((x) => /passage|chat Grok|reprise/.test(x))}));
       ok('0.86 : Grok arrêté : Pour moi sans « oui à donner dans Grok » ni badge de passage, de chat ou de reprise', !d.oui && !d.couts.length, JSON.stringify(d));
@@ -1682,6 +1703,40 @@ srv.listen(0, async () => {
       ok('0.87 : Grok arrêté : Équipe › Routines ne montre que celles d’Hermes et de JARVIS', ro.aj.join() === 'Hermes' && !ro.titres.length, JSON.stringify(ro));
       await q.evaluate(() => { location.hash = ''; }); await q.waitForTimeout(1500);
       ok('0.87 : Grok arrêté : la phrase de l’accueil ne dit plus « Tes bots sont au travail » ; « En ce moment » sans les lignes « Reprise »', await q.evaluate(() => /Hermes et JARVIS font tes routines\./.test(document.querySelector('.hud-say').textContent) && !/Tes bots sont au travail/.test(document.querySelector('.hud-say').textContent) && !/reprends la demande/.test(document.getElementById('view').textContent)));
+      await q.context().close(); }
+    /* 0.92.0 : « Hermes et ses routines » en direct (le résumé du cron d'Hermes ; données inventées de la maquette), ou « indisponible » */
+    { const q = await pageWith({grokOff: true}, '#equipe');
+      const p = await q.evaluate(() => { const dl = {}; document.querySelectorAll('.hm-hermes .hmh-l div').forEach((d) => { dl[d.querySelector('dt').textContent] = d.querySelector('dd').textContent; });
+        const li = (n) => { const x = document.querySelector('#hr-routines li[data-hr="' + n + '"]'); return x ? {ko: x.classList.contains('ko'), t: [...x.querySelectorAll('b, .pill, small')].map((y) => y.textContent).join(' | ')} : null; };
+        return {dl, n: document.querySelectorAll('#hr-routines li.hr-li').length, modes: [...document.querySelectorAll('#hr-routines .hr-mode')].map((x) => x.textContent).join(), aside: document.querySelector('#hr-routines .panel-h .aside').textContent,
+          veille: li('veille-du-matin'), prix: li('prix-suivis'), digest: li('digest-ia'), vue: document.getElementById('view').innerText}; });
+      ok('0.92 : page Hermes en direct : sa carte dit la passerelle, le garde du forfait, le dernier et le prochain passage ; de Pilotage il ne reste que sa dernière note, datée',
+        p.dl['Passerelle'] === 'en marche' && p.dl['Garde du forfait'] === 'coupé jusqu’au 3 décembre' && /^(aujourd’hui|hier) à \d\d:\d\d · [^·]+ · (réussi|en erreur : limite du forfait)$/.test(p.dl['Dernier passage'] || '') && /^(aujourd’hui|demain) à \d\d:\d\d · [^·]+$/.test(p.dl['Prochain'] || '') && /^Veille du matin faite \(Pilotage, /.test(p.dl['Sa dernière note'] || '') && Object.keys(p.dl).length === 5, JSON.stringify(p.dl));
+      ok('0.92 : page Hermes en direct : six routines (libellé, moment, mode réel ou en double, dernier passage et résultat, prochain passage), l’heure du résumé',
+        p.n === 6 && p.modes === 'réel,réel,réel,en double,réel,réel' && /^6 · à jour à \d\d:\d\d$/.test(p.aside) && !!p.veille && !p.veille.ko && /^Veille du matin \| réel \| Du lundi au vendredi à 7 h 40 \| Dernier passage : .+ à 07:40 · réussi \| Prochain passage : .+ à 07:40$/.test(p.veille.t), JSON.stringify([p.n, p.modes, p.aside, p.veille]));
+      ok('0.92 : une routine en erreur dit sa catégorie (« limite du forfait »), jamais un texte d’erreur ; une routine en pause le dit ; plus aucune ligne de l’onglet Routines de Pilotage',
+        !!p.prix && p.prix.ko && /Dernier passage : .+ à 09:00 · en erreur : limite du forfait \|/.test(p.prix.t) && !!p.digest && /\| en double \|/.test(p.digest.t) && /Dernier passage : jamais passée \| Prochain passage : en pause$/.test(p.digest.t) && !/Semaine à venir|Dim 18h10|Lun-ven 7h40/.test(p.vue), JSON.stringify([p.prix, p.digest]));
+      await q.evaluate(() => { location.hash = '#espaces'; }); await q.waitForTimeout(1200);
+      const tu = await q.evaluate(() => [...document.querySelectorAll('.esp-tile[data-go="equipe"] .esp-n, .esp-tile[data-go="equipe"] .esp-v, .esp-tile[data-go="equipe"] .esp-s')].map((x) => x.textContent).join(' | '));
+      ok('0.92 : la tuile d’Espaces : le nombre de routines en direct et ce qui cloche d’abord', tu === 'Hermes | 6 routines | en erreur : Prix suivis', tu);
+      await q.evaluate(() => { location.hash = '#automatisations'; }); await q.waitForTimeout(1500);
+      const ro = await q.evaluate(() => ({aj: [...document.querySelectorAll('.auto-jump .aj')].map((x) => x.innerText.replace(/\s+/g, ' ')), cartes: [...document.querySelectorAll('#auto-hermes article.auto')].map((x) => x.dataset.hr), pills: [...document.querySelectorAll('#auto-hermes article.auto .pill')].map((x) => x.textContent).join(),
+        aside: document.querySelector('#auto-hermes .panel-h .aside').textContent, prix: [...document.querySelectorAll('#auto-hermes article[data-hr="prix-suivis"] .trk b, #auto-hermes article[data-hr="prix-suivis"] .trk small')].map((x) => x.textContent).join(' | '), vue: document.getElementById('view').innerText}));
+      ok('0.92 : Équipe › Routines : les lignes d’Hermes viennent du direct (panneau « Hermes », six cartes suivies comme une livraison), plus de Pilotage',
+        ro.aj.length === 1 && /^Hermes\s+6 routines · (aujourd’hui|demain) à \d\d:\d\d$/.test(ro.aj[0]) && ro.cartes.join() === 'veille-du-matin,bilan-hebdo,reveil,digest-ia,prix-suivis,sorties-du-week-end' && ro.pills === 'En réel,En réel,En réel,En pause,En réel,En réel' && /^en direct · à jour à \d\d:\d\d$/.test(ro.aside)
+        && /^Programmée \| Chaque jour à 9 h \| Dernier passage \| .+ à 09:00 · en erreur : limite du forfait \| Prochain passage \| .+ à 09:00$/.test(ro.prix) && !/Semaine à venir|Dim 18h10|Aucune routine lue dans Pilotage/.test(ro.vue), JSON.stringify({...ro, vue: ro.vue.length}));
+      await q.context().close(); }
+    { const q = await pageWith({grokOff: true, hermesIndispo: true}, '#equipe');
+      const p = await q.evaluate(() => { const dl = {}; document.querySelectorAll('.hm-hermes .hmh-l div').forEach((d) => { dl[d.querySelector('dt').textContent] = d.querySelector('dd').textContent; });
+        return {dl, n: document.querySelectorAll('#view .hr-li, #view .hmh-r li').length, msg: (document.querySelector('#hr-routines .hr-indispo') || {textContent: ''}).textContent, aside: document.querySelector('#hr-routines .panel-h .aside').textContent, vue: document.getElementById('view').innerText}; });
+      ok('0.92 : résumé indisponible : la page dit « indisponible » avec la raison, aucune routine affichée, jamais la liste périmée de Pilotage',
+        p.n === 0 && /^Routines d’Hermes indisponibles : dernière écriture du résumé à 07 h 52 : plus de 30 minutes/.test(p.msg) && p.aside === 'indisponible' && /^indisponible : dernière écriture/.test(p.dl['En direct'] || '') && !p.dl['Dernier passage'] && !p.dl['Prochain'] && !/Semaine à venir|Prix suivis|Dim 18h10/.test(p.vue), JSON.stringify({...p, vue: p.vue.length}));
+      await q.evaluate(() => { location.hash = '#espaces'; }); await q.waitForTimeout(1200);
+      const tu = await q.evaluate(() => [...document.querySelectorAll('.esp-tile[data-go="equipe"] .esp-n, .esp-tile[data-go="equipe"] .esp-v, .esp-tile[data-go="equipe"] .esp-s')].map((x) => x.textContent).join(' | '));
+      await q.evaluate(() => { location.hash = '#automatisations'; }); await q.waitForTimeout(1500);
+      const ro = await q.evaluate(() => ({n: document.querySelectorAll('#auto-hermes article.auto').length, msg: (document.querySelector('#auto-hermes .hr-indispo') || {textContent: ''}).textContent, aj: [...document.querySelectorAll('.auto-jump .aj')].map((x) => x.innerText.replace(/\s+/g, ' ')).join(), vue: document.getElementById('view').innerText}));
+      ok('0.92 : résumé indisponible : la tuile d’Espaces et Équipe › Routines le disent aussi (« Indisponible », la raison), sans aucune ligne de Pilotage pour Hermes',
+        /^Hermes \| Indisponible \| dernière écriture du résumé à 07 h 52 : plus de 30 minutes/.test(tu) && !/routine/.test(tu) && ro.n === 0 && /indisponibles : dernière écriture/.test(ro.msg) && /^Hermes\s+indisponible$/.test(ro.aj) && !/Semaine à venir|Prix suivis|Veille du matin/.test(ro.vue), JSON.stringify([tu, {...ro, vue: ro.vue.length}]));
       await q.context().close(); }
   } catch (e) { ok('exception', false, e.stack); }
   ok('aucune erreur de page', !errs.length, errs.join(' | '));

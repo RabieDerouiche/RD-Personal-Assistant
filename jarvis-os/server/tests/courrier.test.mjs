@@ -15,7 +15,7 @@ try {
   const sv = surveilles(EXP);
   ok('surveillés : Iris et Kairos en « Immédiat » seulement (ni Chronos, ni le lot du matin)', sv.length === 2 && sv[0].bot === 'Iris' && sv[0].adresses[0] === 'agence-exemple.fr' && sv[1].bot === 'Kairos' && sv[1].qui === 'Alertes inventées', JSON.stringify(sv));
   let t = Date.parse('2026-11-26T09:00:00Z'); const S = {}; let sauve = 0, reveils = [], requetes = [], lus = 0, fils = [];
-  const msg = (id, de, objet, at) => ({id, threadId: 'f' + id, sender: de, subject: objet, internalDate: String(at)});
+  const msg = (id, de, objet, at, labelIds = ['INBOX']) => ({id, threadId: 'f' + id, sender: de, subject: objet, internalDate: String(at), labelIds});
   const C = createCourrier({S, save: () => { sauve++; }, now: () => t, chercher: async (q) => { requetes.push(q); return {threads: fils}; }, lireExpediteurs: async () => { lus++; return EXP; }, reveiller: (r) => reveils.push(r)});
   fils = [{id: 'fA', messages: [msg('a1', 'contact@agence-exemple.fr', 'Ancien', t - 3600e3)]}];
   let r = await C.tic();
@@ -23,12 +23,22 @@ try {
   t += 300e3;
   fils = [{id: 'fA', messages: [msg('a1', 'contact@agence-exemple.fr', 'Ancien', t - 3900e3), msg('a2', 'Agence <gestion@agence-exemple.fr>'.replace(/^.*</, '').replace('>', ''), 'Avis d\'échéance', t - 60e3)]},
     {id: 'fB', messages: [msg('b1', 'alertes@prix-exemple.com', 'Baisse de prix', t - 30e3)]},
-    {id: 'fC', messages: [msg('c1', 'contact@agence-exemple.fr', 'Question', t - 50e3), msg('c2', 'proprietaire@example.org', 'Re: Question', t - 20e3)]},
+    {id: 'fC', messages: [msg('c1', 'contact@agence-exemple.fr', 'Question', t - 50e3), msg('c2', 'proprietaire@example.org', 'Re: Question', t - 20e3, ['SENT'])]},
     {id: 'fD', messages: [msg('d1', 'pirate@autre-exemple.net', 'Faux', t - 10e3)]}];
   r = await C.tic(); const l = C.aTraiter();
   ok('nouveaux : le dernier message d\'un fil d\'un expéditeur surveillé (sous-domaine compris), avec le bot dont c\'était le travail ; ni sa propre réponse, ni un inconnu ; Hermes réveillé une fois', r.nouveaux === 2 && l.length === 2 && l[0].id === 'a2' && l[0].bot === 'Iris' && l[0].objet === 'Avis d\'échéance' && l[1].id === 'b1' && l[1].bot === 'Kairos' && reveils.join() === 'courrier' && lus === 1, JSON.stringify([r, l, reveils]));
   t += 300e3; r = await C.tic();
   ok('un mail déjà repéré ne revient pas ; Expéditeurs relu au plus toutes les 30 minutes', r.nouveaux === 0 && C.aTraiter().length === 2 && reveils.length === 1 && lus === 1, JSON.stringify([r, lus]));
+  /* 0.94.0 : le fil lu message par message : un brouillon ou un tiers en dernier ne cache plus le mail de l'expéditeur surveillé */
+  { t += 300e3; const n0 = C.aTraiter().length;
+    fils = [{id: 'fE', messages: [msg('e1', 'contact@agence-exemple.fr', 'Relance', t - 200e3), msg('e2', 'proprietaire@example.org', 'Re: Relance', t - 60e3, ['DRAFT'])]},                 /* un brouillon de réponse, dernier du fil */
+      {id: 'fF', messages: [msg('f1', 'contact@agence-exemple.fr', 'À tous', t - 190e3), msg('f2', 'voisin@autre-exemple.net', 'Re: À tous', t - 50e3)]},                                 /* un tiers en copie a répondu après */
+      {id: 'fG', messages: [msg('g1', 'contact@agence-exemple.fr', 'Déjà répondu', t - 180e3), msg('g2', 'moi@example.org', 'Re: Déjà répondu', t - 40e3, [])]},                          /* sa réponse, reconnue à son adresse (sans étiquette) */
+      {id: 'fH', messages: [msg('h1', 'contact@agence-exemple.fr', 'Suite', t - 170e3), msg('h2', 'proprietaire@example.org', 'Re: Suite', t - 100e3, ['SENT']), msg('h3', 'contact@agence-exemple.fr', 'Re: Suite', t - 30e3)]}];   /* il a répondu, l'expéditeur a réécrit */
+    const C4 = createCourrier({S, save: () => {}, now: () => t, chercher: async () => ({threads: fils}), lireExpediteurs: async () => EXP, reveiller: (z) => reveils.push(z), moi: () => 'Moi@example.org'});
+    const r4 = await C4.tic(), l4 = C4.aTraiter().slice(n0).map((z) => z.id); t += 300e3; const r5 = await C4.tic();
+    ok('fil lu message par message : un brouillon ou un tiers en dernier ne cache plus le mail surveillé ; sa propre réponse après (étiquette SENT ou son adresse) veut dire « déjà répondu » ; l’expéditeur qui réécrit après sa réponse revient ; rien deux fois', r4.nouveaux === 3 && l4.join() === 'e1,f1,h3' && r5.nouveaux === 0, JSON.stringify([r4, l4, r5]));
+    C4.traite('e1', 'vu'); C4.traite('f1', 'vu'); C4.traite('h3', 'vu'); t -= 600e3; }
   const x = C.traite('a2', 'Dossier mis à jour, échéance posée.'), y = C.traite('inconnu', 'x');
   ok('traité : il sort de la file, avec ce qui a été fait ; un identifiant inconnu ne change rien', x && x.etat === 'traite' && /Dossier mis à jour/.test(x.resume) && y === null && C.aTraiter().length === 1 && C.aTraiter()[0].id === 'b1', JSON.stringify([x, C.aTraiter()]));
   t += 31 * 60e3; await C.tic();

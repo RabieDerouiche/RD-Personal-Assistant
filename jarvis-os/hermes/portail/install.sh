@@ -25,7 +25,7 @@ BANC=${HERMES_BANC:-0}   # 1 = banc d'essai (conteneur sans systemd) : ni servic
 
 dire() { printf '\n== %s\n' "$*"; }
 [ "$(id -u)" = 0 ] || { echo "À lancer en root : sudo bash $0"; exit 1; }
-for f in politique.yaml hermes-portail filtre.py sortie.nft hermes-portail-sortie.service hermes-portail-filtre.service hermes-portail-essai.service hermes-portail-cra.service hermes-portail-cra.timer hermes-portail-teletravail.service hermes-portail-teletravail.timer hermes-portail-ndf.service hermes-portail-ndf.timer domaines.defaut navigateur-regles.json justificatif-essai.pdf facture.mjs teletravail.mjs teletravail.py note.py skills/portail/portail/SKILL.md; do
+for f in politique.yaml hermes-portail filtre.py sortie.nft hermes-portail-sortie.service hermes-portail-filtre.service hermes-portail-essai.service hermes-portail-cra.service hermes-portail-cra.timer hermes-portail-cra-mois.service hermes-portail-cra-mois.timer hermes-portail-teletravail.service hermes-portail-teletravail.timer hermes-portail-ndf.service hermes-portail-ndf.timer domaines.defaut navigateur-regles.json justificatif-essai.pdf facture.mjs teletravail.mjs teletravail.py note.py skills/portail/portail/SKILL.md; do
   [ -f "$ICI/$f" ] || { echo "Fichier manquant : $ICI/$f"; exit 1; }
 done
 [ -f "$ICI/../limite.py" ] && python3 -I -c "import ast,sys; ast.parse(open(sys.argv[1]).read())" "$ICI/../limite.py" || { echo "Fichier manquant ou illisible : $ICI/../limite.py"; exit 1; }
@@ -177,6 +177,9 @@ install -d -o root -g root -m 0700 "$VAR/essais"
 # le CRA de la semaine (25/11/2026) : la minuterie ne fait rien sans /etc/hermes-portail/cra.conf (posé sur le serveur, jamais dans le dépôt)
 install -o root -g root -m 0644 "$ICI/hermes-portail-cra.service" /etc/systemd/system/hermes-portail-cra.service
 install -o root -g root -m 0644 "$ICI/hermes-portail-cra.timer" /etc/systemd/system/hermes-portail-cra.timer
+# le CRA du mois (26/11/2026, son QCM « CRA du mois seul ») : la minuterie ne fait rien sans « adresse_mois= » dans cra.conf
+install -o root -g root -m 0644 "$ICI/hermes-portail-cra-mois.service" /etc/systemd/system/hermes-portail-cra-mois.service
+install -o root -g root -m 0644 "$ICI/hermes-portail-cra-mois.timer" /etc/systemd/system/hermes-portail-cra-mois.timer
 install -o root -g root -m 0644 "$ICI/hermes-portail-teletravail.service" /etc/systemd/system/hermes-portail-teletravail.service
 install -o root -g root -m 0644 "$ICI/hermes-portail-teletravail.timer" /etc/systemd/system/hermes-portail-teletravail.timer
 install -o root -g root -m 0644 "$ICI/hermes-portail-ndf.service" /etc/systemd/system/hermes-portail-ndf.service
@@ -189,9 +192,10 @@ if [ "$BANC" != 1 ]; then
   systemctl enable --now hermes-portail-sortie.service
   systemctl restart hermes-portail-sortie.service
   systemctl enable --now hermes-portail-cra.timer
+  systemctl enable --now hermes-portail-cra-mois.timer
   systemctl enable --now hermes-portail-teletravail.timer
   systemctl enable --now hermes-portail-ndf.timer
-  echo "Relais : $(systemctl is-active hermes-portail-filtre) ; règles réseau : $(systemctl is-active hermes-portail-sortie) ; CRA de la semaine : $(systemctl is-active hermes-portail-cra.timer)$([ -f "$ETC/cra.conf" ] || echo ' (sans cra.conf : ne fait rien)') ; notes de frais du jour : $(systemctl is-active hermes-portail-teletravail.timer) ; notes validées : $(systemctl is-active hermes-portail-ndf.timer)$([ -f "$ETC/teletravail.conf" ] || echo ' (sans teletravail.conf : ne fait rien)')."
+  echo "Relais : $(systemctl is-active hermes-portail-filtre) ; règles réseau : $(systemctl is-active hermes-portail-sortie) ; CRA de la semaine : $(systemctl is-active hermes-portail-cra.timer)$([ -f "$ETC/cra.conf" ] || echo ' (sans cra.conf : ne fait rien)') ; CRA du mois : $(systemctl is-active hermes-portail-cra-mois.timer)$(grep -q '^adresse_mois=.' "$ETC/cra.conf" 2>/dev/null || echo ' (sans adresse_mois dans cra.conf : ne fait rien)') ; notes de frais du jour : $(systemctl is-active hermes-portail-teletravail.timer) ; notes validées : $(systemctl is-active hermes-portail-ndf.timer)$([ -f "$ETC/teletravail.conf" ] || echo ' (sans teletravail.conf : ne fait rien)')."
 fi
 
 dire "Fini"

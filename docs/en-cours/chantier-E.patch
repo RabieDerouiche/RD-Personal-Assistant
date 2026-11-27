@@ -1,0 +1,1013 @@
+diff --git a/docs/_chantier-E.md b/docs/_chantier-E.md
+new file mode 100644
+index 0000000..fd1bbbb
+--- /dev/null
++++ b/docs/_chantier-E.md
+@@ -0,0 +1,90 @@
++# Chantier E : « 0.93.0 : trois retours de l'app »
++
++Note de passage pour le coordinateur (26/11/2026). Rien ici n'est encore dans `docs/jarvis-os.md` ni dans la constante `VERSION` :
++c'est à reporter à la fusion. Aucune donnée personnelle ni montant réel dans ce chantier (exemples inventés).
++
++## 1. Entrée de journal pour `docs/jarvis-os.md`
++
++- **0.93.0 (26/11/2026) : trois retours de l'app** (ses remarques du 26/11/2026 ; bloc « 0.93.0 : trois retours de l'app » en fin de script de l'app, juste avant `boot()` ; rien n'est réécrit, le bloc range ce qui existe). *Argent, « Déjà dépensé ce mois »* : à côté du reste à payer (une ligne sous « Déjà prélevé » dans la grande carte, qui ouvre « Le mois ») et du reste à vivre (une carte dans « Le mois »), le total de ce qui est déjà parti ce mois-ci, avec le détail : ses dépenses fixes dont le jour est passé (jusqu'à hier : celles d'aujourd'hui sont encore dans le reste à payer, les deux font le mois entier ; une dépense qui commence plus tard, finie ou retirée de sa liste ne compte pas ; la facture du mois et le montant du mois d'un contrat sont pris), les échéances passées de ses paiements en plusieurs fois (ou qu'un mail dit payées ; un paiement « plus à payer » ne compte pas du tout), et ce qu'il a noté de ses dépenses courantes (une dépense « une fois par mois » cochée « Fait ce mois-ci » sans note compte pour son montant prévu) ; « Le détail (N) » donne une ligne par dépense. *Historique mois par mois* : à la fin de chaque mois (le premier tic du mois suivant, à minuit de Paris ; sinon le premier calcul si le serveur était arrêté), le Radar garde le bilan du mois clos dans `radar.json` (`historique.mois`, 36 mois, donc 24 au moins) : dépenses fixes payées, échéances, dépenses courantes notées, par poste, le budget des dépenses courantes retenu au fil de l'eau (0.81.0), le reste à vivre s'il avait donné sa paie, la date de clôture ; un mois clos ne bouge plus quand ses dépenses fixes ou sa paie changent ; un mois rattrapé après un arrêt de plusieurs mois est dit « reconstitué ». Dans « Le mois », « Historique » remplace « Six derniers mois » (qui n'est pas doublé : les six mois lisent le bilan gardé quand il existe) : le mois en cours en tête (en direct), puis les mois du plus récent au plus ancien (12 affichés, « Tous les mois » pour le reste), un mois s'ouvre sur son détail ; tant qu'ils ne sont pas gardés, les cinq mois d'avant restent estimés d'après ses dépenses fixes d'aujourd'hui (« ≈ »), comme avant. **Données** : sur son serveur seulement (`radar.json`, 600) ; jamais dans Pilotage, la mémoire, le serveur MCP, le Journal ni la copie chiffrée de Pilotage ; la clôture n'envoie aucune notification et n'écrit rien au journal ; la notification de la veille ne porte ni « déjà dépensé » ni un montant de l'historique. Un fichier d'avant est relu tel quel : l'historique s'ajoute seul, rien n'est perdu ; un mois dont le budget avait déjà été retenu est clos « reconstitué ». Code : `depenseEntre`, `HISTO_MOIS`, `bilanDe`, `cloturer`, `moisDe` (`radar.mjs` ; la page reçoit `mois.depense` et `mois.historique`) ; `radDepense`, `radHisto`, `radHistDetail` (page). *Agenda, Grok arrêté* (interrupteur `GOFF.on` ; avant, rien ne change) : la feuille d'un jour montre l'avatar de JARVIS (plus Chronos), « Écrire à Hermes » (une ligne `Pour = Hermes` dans le Canal, le sujet de la fiche dans le message et dans l'Objet, sans sonnette ; plus « Écrire à Chronos par le Canal ») et « Voir Travail » pour le CRA et les notes de frais ; à côté de chaque ligne, « Hermes », « Hermes suit » (ce que suivait Kairos), « Hermes · voir Travail » (ce que faisait Chronos) ; la fiche d'une échéance prend l'avatar d'Hermes, « Suivi par : Hermes » (« Hermes suit », « Hermes, sur le portail (espace Travail) »), perd « Confier à un autre bot », et pour le CRA met « Voir Travail » en action principale ; la fiche d'un événement ou d'un anniversaire prend l'avatar de JARVIS ; « Un bot s'en occupe » et « Un bot suit » deviennent « Hermes s'en occupe » et « Hermes suit » ; la légende dit « Fait par Hermes » avec une seule ligne à la place des sept bots (son filtre surligne les jours) ; une action sans ordre ne fait plus parler le bot d'avant (« Chronos en tient compte » devient « Hermes en tient compte pour le CRA (espace Travail) », les rappels sont ceux de JARVIS) ; l'historique garde le nom d'origine (« Fait par Chronos »). Les autres fiches qui proposaient « Écrire à <bot> par le Canal » (dossier, papier, prix, tâche, voyage, sortie) proposent aussi « Écrire à Hermes ». Constat : dans 0.87.0, « Écrire à <bot> » n'était jamais remplacé (la règle commence par « É », que `\b` ne voit pas comme une lettre) ; ce bloc le fait à la source. *Pour moi, une seule carte par sujet* : un sujet = un dossier encore ouvert de Pilotage (qu'il attende sa réponse ou celle de quelqu'un d'autre) ; sa carte porte le nom du dossier, montre l'élément le plus urgent (avec ses réponses) et range dessous, sous « Aussi dans ce sujet », la demande du dossier, les demandes venues du Canal, un brouillon Gmail sans carte, la réponse reçue et les échéances ; la plus urgente décide de la place (« À décider » ou « À faire ») et de la couleur (la pastille dit l'échéance la plus proche) ; chaque ligne ouvre la feuille de l'élément, avec ses actions ; la feuille d'une demande liste aussi le reste du sujet ; une notification `#voir-<ligne>` ouvre toujours le bon élément ; « Traiter une par une » passe chaque élément un à un. Le compte « pour toi » (en-tête, pastille, accueil) compte les sujets ; un filtre compte ce qu'il montre (règle 0.73.0, inchangée). **La règle**, dans cet ordre, deux dossiers possibles = aucun : (1) lien explicite : l'Objet de la ligne du Canal, le libellé, ou un nom entre « » ou entre parenthèses est le nom d'un dossier (sans casse, accents ni ponctuation ; avec ou sans la parenthèse du dossier ; dans un message, seulement entre « ») ; (2) un nom raccourci entre parenthèses dont tous les mots significatifs sont dans le nom d'un seul dossier (deux mots, ou un seul d'au moins 6 lettres) ; (3) rapprochement prudent : tous les mots significatifs du nom du dossier (sans sa parenthèse) sont dans le libellé, deux mots au moins dont un d'au moins 5 lettres ; aux niveaux 2 et 3, si les deux portent des nombres (des dates), ceux de l'un doivent tous être dans l'autre. Mot significatif : 3 lettres au moins, pas un nombre, ni un mot vide, ni un mot trop commun des suivis (dossier, relance, rappel, demande, réponse…). Sans dossier, deux demandes ne se réunissent que par le même Objet ou le même libellé. Jamais réunis : un « oui » dans le chat d'un bot, les cartes du CRA et des notes de frais, les brouillons des mails du mois pour le travail. Rien n'est retiré des données : pendant l'affichage de « Pour moi » et de l'accueil, la liste ne garde qu'un élément par sujet. Maquette : `__SCEN.sujets`. Bancs : `radar.test.mjs` 158 (14 nouvelles), `radar-courantes.test.mjs` 21 (3 nouvelles, dont la preuve de bout en bout : tous les outils du serveur MCP en profil exécutant, la mémoire, l'état de l'app et les autres fichiers du serveur ne portent aucun montant du Radar), `fiab-a3.test.mjs` 28 (inchangé), maquette BANC_MAQUETTE ; la vérification de l'agenda qui échouait en fin de mois (rendez-vous à J+6) passe au mois suivant quand il le faut.
++
++## 2. Sur le serveur après déploiement
++
++Rien d'autre que `git pull` et le redémarrage du service. Pas de migration à lancer : au premier calcul, `radar.json` reçoit seul la clé
++`historique` (`{mois: {}, suivi: "AAAA-MM"}`) ; toutes les autres clés sont relues telles quelles (vérifié au banc : dépenses fixes, dépenses
++courantes et leurs notes, paie, budgets retenus, paiements en plusieurs fois, refus, alertes vues). Aucun hôte, aucune variable, aucun droit
++nouveau.
++
++Contrôles en lecture seule (aucun n'affiche un montant : ne pas faire afficher le contenu de `radar.json` dans la session du serveur) :
++
++- droits du fichier : `stat -c '%a' ~/.jarvis/radar.json` → `600` ;
++- l'historique est en place, sans montant à l'écran :
++  `python3 -c "import json,os;h=json.load(open(os.path.expanduser('~/.jarvis/radar.json'))).get('historique') or {};print(h.get('suivi'), sorted((h.get('mois') or {}).keys()))"`
++  → le mois en cours, puis la liste des mois gardés (vide jusqu'au 1er décembre, ou les mois d'avant dont le budget avait été retenu) ;
++  (le chemin du dossier de données est celui de `JARVIS_DATA` s'il est défini) ;
++- journal du service depuis le redémarrage : aucune ligne « radar : radar.json illisible », « radar.json non enregistré » ni « tic impossible » ;
++- le 1er décembre après minuit (heure de Paris) : la même commande montre `2026-11` dans les mois gardés, et aucune notification n'est partie pour cela.
++
++Retour arrière : revenir au commit d'avant et redémarrer. Le serveur d'avant ignore la clé `historique` (il la garde dans le fichier sans
++la lire) et reprend ses « six mois » ; rien à défaire dans `radar.json`. L'app d'avant ne lit ni `mois.depense` ni `mois.historique`.
++Dans l'autre sens, l'app 0.93.0 devant un serveur d'avant garde « Six derniers mois » et ne montre pas « Déjà dépensé ».
++
++## 3. Ce qu'il verra
++
++- **Argent** : dans la grande carte, sous « Déjà prélevé depuis… », « Déjà dépensé en novembre : … › » ; dans « Le mois », une carte
++  « Déjà dépensé en novembre » (le total, « soit … de dépenses fixes déjà passées (N) … et … de dépenses courantes notées (M) », « Le
++  détail »), puis « Historique » : novembre « en cours », et les cinq mois d'avant marqués « ≈ » (estimés) ; à partir du 1er décembre,
++  novembre apparaît « gardé » (« Bilan gardé le 01/12/2026 : il ne change plus »), et ainsi de suite chaque mois.
++- **Agenda** (Grok arrêté) : en touchant un jour, l'avatar de JARVIS, « Écrire à Hermes », « Voir Travail » ; plus de Chronos ni de Kairos
++  (« Hermes suit », « Hermes · voir Travail ») ; la légende dit « Fait par Hermes ».
++- **Pour moi** : une carte par sujet, au nom du dossier, avec « Aussi dans ce sujet · N » ; la pastille de l'onglet baisse d'autant.
++  Sur ses données du jour, voir le point 5 : l'effet dépend de ce qui fait aujourd'hui ses cartes en double.
++
++## 4. Bancs, avant et après
++
++| Banc | Avant | Après |
++|---|---|---|
++| `radar.test.mjs` | 144 (la consigne disait 131) | 158 |
++| `radar-courantes.test.mjs` (Chromium, vrai serveur) | 18 | 21 |
++| `fiab-a3.test.mjs` | 28 | 28 |
++| `server.test.mjs` | non lancé : `server.mjs` n'est pas touché | non lancé |
++| `essais/jarvis-os-maquette/banc/banc.cjs` | 349 OK, 1 échec connu (rendez-vous à J+6) | BANC_APRES |
++| `banc-serveur.mjs` | non lancé (au coordinateur) | relu : il ne s'appuie sur aucun affichage changé (`.rad-big` de la grande carte, pas de compte de cartes de Pour moi, pas de « six mois ») |
++
++## 5. Ce qui n'a pas pu être testé, et les risques
++
++- **La règle de rapprochement sur ses vraies données** (deviné à probable). Pour lui donner sa forme, la structure de Pilotage a été lue
++  une fois, en lecture seule, par `jarvis_pilotage_lire` (À toi, Dossiers, Échéances, Canal) ; rien n'en est recopié ici ni dans les
++  bancs. Ce que cette lecture montre, en termes généraux : (certain) ses dossiers qui attendent sa réponse ont chacun une seule ligne
++  « À toi » ; les échéances citent souvent le dossier par un nom raccourci entre parenthèses, d'où le niveau 2 de la règle ; plusieurs
++  dossiers partagent leur mot principal (même nom à une parenthèse près, plusieurs « fermeture de… ») : ils restent séparés (vérifié au
++  banc sur des noms inventés de même forme). (Probable) ses cartes en double viennent surtout des brouillons Gmail sans carte et des
++  réponses reçues sur un dossier, que l'app ne peut pas montrer ici : c'est pourquoi le bloc les range aussi dans le sujet. (Deviné) un
++  brouillon n'est rattaché que si son objet, ou son objet et les 300 premiers caractères de son texte, portent tous les mots du nom du
++  dossier : un brouillon dont l'objet ne dit pas le sujet restera une carte à part ; à l'inverse, un brouillon sur un autre sujet qui
++  cite tous les mots d'un dossier irait dans sa carte (il y reste visible, en ligne, avec sa feuille).
++- **Un mauvais rapprochement** (risque faible, certain dans son effet) : l'élément n'est pas perdu, il devient une ligne dans la carte
++  d'un autre sujet et le compte baisse de un. Pour le défaire : changer le libellé dans Pilotage, ou retirer le mot en cause de la règle.
++- **Les comptes du serveur** (certain) : le brief du matin, la voix (« Pour moi ») et tout ce que `server.mjs` compte lui-même comptent
++  encore les éléments, pas les sujets : ils peuvent dire un nombre plus grand que la pastille de l'app. `server.mjs` était hors périmètre.
++- **« Traiter une par une »** (certain, voulu) : chaque élément y passe ; son « 1 sur N » est plus grand que la pastille.
++- **Accueil** (certain) : l'ordre « l'urgent d'abord » de « À faire maintenant » suit l'échéance de la demande en tête, pas celle d'une
++  échéance rangée dans la carte.
++- **Clôture d'un vrai mois** (probable) : testée avec une horloge simulée (tic de minuit, rattrapage, horloge qui recule, 40 mois), pas
++  sur un vrai passage de mois du serveur. Le premier bilan réel sera celui de novembre, le 1er décembre : il compte tout novembre d'après
++  sa liste du jour (une dépense fixe ajoutée le 25 compte pour son jour de novembre), et le reste à vivre prend la paie connue ce jour-là.
++- **« Plus à payer »** (choix à confirmer) : un paiement en plusieurs fois dit « plus à payer » ne compte pas du tout dans « déjà
++  dépensé », même ses échéances passées (la page dit « achat annulé, remboursé »). S'il s'en sert pour un achat soldé d'avance, ses
++  échéances déjà payées manqueront au total.
++- **iPhone réel** (non testé) : rendu dans Chromium en émulation iPhone seulement (les lignes de l'historique sont des `<details>` en grille).
++- **Autres agents** : le bloc enveloppe `SHEETCFG.*` (sauf `ordre`, `bot`, `demande`, `note`, `travail`, `draft`), `finish`, `applySmart`,
++  `dayItems`, `dayExtra`, `calendar`, `grokPause`, `radMois`, `radHero`, `pmCard`, `dosReplyCard`, `draftCard`, `pourMoiN`,
++  `VIEWS.demandes`, `VIEWS.accueil`. Il doit rester le dernier bloc avant `boot()` : un bloc posé après lui qui remplacerait
++  `VIEWS.demandes` sans passer par la version enveloppée ferait revenir les cartes en double. Il ne touche ni `hermesPage`, ni
++  `hermesRoutines`, ni `hermesEtat`, ni Papiers › Déposer. `ecrireHermes` (0.86.0) est dans la portée de son bloc : le bloc 0.93.0 a sa
++  propre copie (`ecrireHermes93`, avec le sujet de la fiche), sans toucher au bloc 0.86.0.
++- **Preuve « ni MCP ni mémoire »** (certain pour ce qui est testé) : deux vérifications. Dans `radar.test.mjs`, le câblage : aucun autre
++  module du serveur ne lit le Radar (seul son calendrier peut être importé), et `server.mjs` ne s'en sert que pour `/api/radar` et son
++  minuteur ; elle échouera, à dessein, si quelqu'un branche le Radar ailleurs. Dans `radar-courantes.test.mjs`, de bout en bout sur le vrai
++  serveur : un mois gardé et une paie « sentinelles », tous les outils MCP du profil exécutant appelés, la mémoire et l'état lus, les
++  autres fichiers du dossier de données relus. Limite : les outils sont appelés sans argument (un outil qui ne répondrait qu'avec des
++  arguments précis n'est couvert que par la vérification du câblage).
+diff --git a/essais/jarvis-os-maquette/banc/banc.cjs b/essais/jarvis-os-maquette/banc/banc.cjs
+index 6b854ff..5fce0f0 100644
+--- a/essais/jarvis-os-maquette/banc/banc.cjs
++++ b/essais/jarvis-os-maquette/banc/banc.cjs
+@@ -352,6 +352,8 @@ srv.listen(0, async () => {
+       ok('une par une : changer de rubrique referme le mode (au retour, toute la liste)', await q.evaluate(() => !document.querySelector('.fc-view') && !!document.getElementById('fc-start')));
+       await q.context().close(); }
+     { const q = await page('#agenda');
++      /* 0.93.0 : le rendez-vous d'exemple est à J+6 ; à partir du 25, il tombe le mois suivant : le banc y va (avant, la vérification échouait en fin de mois) */
++      { const d = new Date(); d.setHours(12, 0, 0, 0); const m0 = d.getMonth(); d.setDate(d.getDate() + 6); if (d.getMonth() !== m0) { await q.evaluate(() => document.querySelector('.cal-head button[aria-label="Mois suivant"]').click()); await q.waitForTimeout(500); } }
+       ok('agenda : le rendez-vous écrit aussi dans Échéances n\'est listé qu\'une fois dans le mois, avec le bot qui le suit', await q.evaluate(() => { const rows = [...document.querySelectorAll('#dir .mlist .dl-row')].filter((r) => /notaire/i.test(r.textContent)); return rows.length === 1 && /14h30/.test(rows[0].textContent) && /Iris/.test(rows[0].textContent); }));
+       await q.context().close(); }
+     /* agenda plus vivant (16/11/2026) */
+@@ -1683,6 +1685,183 @@ srv.listen(0, async () => {
+       await q.evaluate(() => { location.hash = ''; }); await q.waitForTimeout(1500);
+       ok('0.87 : Grok arrêté : la phrase de l’accueil ne dit plus « Tes bots sont au travail » ; « En ce moment » sans les lignes « Reprise »', await q.evaluate(() => /Hermes et JARVIS font tes routines\./.test(document.querySelector('.hud-say').textContent) && !/Tes bots sont au travail/.test(document.querySelector('.hud-say').textContent) && !/reprends la demande/.test(document.getElementById('view').textContent)));
+       await q.context().close(); }
++    /* ================= 0.93.0 : trois retours de l'app ================= */
++    /* 1. Argent : « Déjà dépensé ce mois » et l'historique mois par mois (données d'exemple, même forme que le serveur) */
++    { const q = await page('#argent'); await q.waitForTimeout(800);
++      const hero = await q.evaluate(() => { const b = document.querySelector('.rad-hero .rad-deja-mois'), D = window.__RADAR.mois.depense; return {t: b ? b.textContent : '', sous: !!(b && b.previousElementSibling && b.previousElementSibling.classList.contains('rad-prog-l')), nw: b ? b.querySelectorAll('.nw').length : 0, total: D.total, somme: Math.round((D.fixes + D.plans + D.courantes) * 100) / 100}; });
++      const eurM = (n) => Number(n).toLocaleString('fr-FR', {minimumFractionDigits: 2, maximumFractionDigits: 2}).replace(/[   ]/g, ' ') + ' €', plat = (t) => String(t).replace(/[  ]/g, ' ');
++      ok('0.93 : Argent : la grande carte dit « Déjà dépensé en <mois> : <total> » sous « Déjà prélevé », montant insécable, égal aux dépenses fixes passées + dépenses courantes notées',
++        /^Déjà dépensé en \S+ : /.test(hero.t) && plat(hero.t).includes(eurM(hero.total)) && hero.sous && hero.nw === 1 && hero.total === hero.somme && hero.total > 0, JSON.stringify(hero));
++      await q.evaluate(() => document.querySelector('.rad-hero .rad-deja-mois').click()); await q.waitForTimeout(900);
++      const dep = await q.evaluate(() => { const c = document.querySelector('#view .rad-mois .rad-depense'), D = window.__RADAR.mois.depense; if (!c) return null; c.querySelector('details').open = true;
++        return {t: c.innerText, big: c.querySelector('.rad-big').textContent, lignes: c.querySelectorAll('.rad-dep-r').length, n: D.lignes.length, nF: D.nFixes, nN: D.nNotes, mois: [...document.querySelectorAll('#view .ux-seg button, #view .rad-seg button')].some((b) => /Le mois/.test(b.textContent) && b.getAttribute('aria-pressed') === 'true'),
++          apresVivre: !!(c.previousElementSibling && /rad-vivre|rad-mois-dont|lead/.test(c.previousElementSibling.className))}; });
++      ok('0.93 : Argent › Le mois : la carte « Déjà dépensé » avec le détail (dépenses fixes déjà passées, dépenses courantes notées, comptées jusqu’à hier), une ligne par dépense, rien d’absent affiché',
++        !!dep && dep.mois && plat(dep.big) === eurM(hero.total) && new RegExp('de dépenses fixes déjà passées \\(' + dep.nF + '\\)').test(dep.t) && new RegExp('de dépenses courantes notées \\(' + dep.nN + '\\)').test(dep.t) && /jusqu’à hier \(\d\d\/\d\d\)/.test(dep.t)
++        && dep.lignes === dep.n && dep.n > 0 && /Le détail \(\d+\)/.test(dep.t) && !/null|undefined|NaN/.test(dep.t) && dep.apresVivre, JSON.stringify(dep && {...dep, t: dep.t.slice(0, 300)}));
++      const hist = await q.evaluate(() => { const p = document.querySelector('#view .rad-hist'); if (!p) return null; const rows = [...p.querySelectorAll('.rad-hm')];
++        return {titre: p.querySelector('h2').textContent, aside: p.querySelector('.aside').textContent, n: rows.length, mois: rows.map((r) => r.dataset.mois), cours: rows[0].classList.contains('is-cours') && /en cours/.test(rows[0].textContent), six: /Six derniers mois/.test(document.querySelector('#view').textContent), plus: (p.querySelector('.rad-hist-plus') || {}).textContent,
++          gardes: window.__RADAR.mois.historique.filter((g) => !g.estime).length, insecables: rows.every((r) => !!r.querySelector('summary .rad-evo-v .nw'))}; });
++      const cur = (() => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); })();
++      ok('0.93 : Argent : l’historique remplace « Six derniers mois » : le mois en cours en tête (en direct), puis les mois clos du plus récent au plus ancien (12 affichés, « Tous les mois » pour le reste), 24 mois gardés',
++        !!hist && hist.titre === 'Historique' && hist.aside === '24 mois gardés' && hist.gardes >= 24 && hist.n === 13 && hist.mois[0] === cur && hist.cours && hist.mois.every((m, i, l) => !i || l[i - 1] > m) && !hist.six && hist.plus === 'Tous les mois (26)' && hist.insecables, JSON.stringify(hist));
++      await q.evaluate(() => document.querySelector('#view .rad-hist-plus').click()); await q.waitForTimeout(600);
++      const tous = await q.evaluate(() => { const rows = [...document.querySelectorAll('#view .rad-hist .rad-hm')]; return {n: rows.length, estimes: rows.filter((r) => r.classList.contains('is-estime') && /≈/.test(r.querySelector('summary').textContent)).length, recon: rows.filter((r) => /reconstitué/.test(r.querySelector('summary').textContent)).length, note: document.querySelector('#view .rad-hist .rad-evo-note').textContent, plus: document.querySelector('#view .rad-hist-plus').textContent}; });
++      ok('0.93 : Argent : « Tous les mois » montre les 26 mois (24 gardés dont un « reconstitué », 2 plus anciens « ≈ » estimés) et le dit', tous.n === 27 && tous.estimes === 2 && tous.recon === 1 && /24 mois au moins/.test(tous.note) && /« ≈ »/.test(tous.note) && tous.plus === 'Seulement les 12 derniers mois', JSON.stringify(tous));
++      await q.evaluate(() => document.querySelectorAll('#view .rad-hist .rad-hm')[2].querySelector('summary').click()); await q.waitForTimeout(500);
++      const det = await q.evaluate(() => { const r = document.querySelectorAll('#view .rad-hist .rad-hm')[2], g = window.__RADAR.mois.historique[1]; return {open: r.open, mois: r.dataset.mois === g.mois, t: r.querySelector('.rad-hm-b').innerText, postes: r.querySelectorAll('.rad-hm-p li').length, n: g.postes.length}; });
++      await q.evaluate(() => document.querySelector('#view .rad-hist-plus').click()); await q.waitForTimeout(600);
++      const reste = await q.evaluate(() => { const r = document.querySelectorAll('#view .rad-hist .rad-hm')[2]; return !!r && r.open && document.querySelectorAll('#view .rad-hist .rad-hm').length === 13; });
++      ok('0.93 : Argent : un mois s’ouvre sur son détail (dépenses fixes payées, dépenses courantes notées sur le budget prévu, reste à vivre, postes, « Bilan gardé le … ») et reste ouvert quand la liste se redessine',
++        det.open && det.mois && /Dépenses fixes payées/.test(det.t) && /Dépenses courantes notées/.test(det.t) && /sur 520,00\s€ prévus/.test(plat(det.t)) && /Reste à vivre/.test(det.t) && /paie de 3 000,00 €/.test(plat(det.t)) && /Bilan gardé le \d\d\/\d\d\/\d{4} : il ne change plus\./.test(det.t) && det.postes === det.n && det.n >= 5 && reste, JSON.stringify({...det, t: det.t.slice(0, 260), reste}));
++      await q.context().close(); }
++    /* 2. Agenda, Grok arrêté : JARVIS ou Hermes à la place des bots (feuille d'un jour, fiches, légende) */
++    { const BOTS_RE = /Iris|Chronos|Kairos|Ulysse|Athéna|Argus|Plutus/, VIEUX = /par le Canal, réponse à son passage|Un bot s'en occupe|Un bot suit|Confier à un autre bot/;
++      /* le jour d'une échéance d'exemple : dans le mois affiché, sinon le mois d'avant ou d'après (le banc ne dépend pas de la date) */
++      const jourDe = async (q, re) => { for (const sens of [null, 'Mois suivant', 'Mois précédent', 'Mois précédent']) { if (sens) { await q.evaluate((s) => document.querySelector('.cal-head button[aria-label="' + s + '"]').click(), sens); await q.waitForTimeout(500); }
++        const i = await q.evaluate((src) => [...document.querySelectorAll('#view .mg-d')].findIndex((x) => new RegExp(src).test(x.getAttribute('aria-label') || '')), re.source); if (i >= 0) { await q.evaluate((i) => document.querySelectorAll('#view .mg-d')[i].click(), i); await q.waitForTimeout(900); return true; } } return false; };
++      const feuille = (q) => q.evaluate(() => { const s = document.getElementById('sheet'), hd = s.querySelector('.sheet-head .chr'); return {t: s.innerText, avatar: hd ? hd.className : '', lignes: [...s.querySelectorAll('.day-list .dl-row')].map((r) => [r.querySelector('span:not(.dl-ic)').textContent, (r.querySelector('small') || {}).textContent || '']), actions: [...s.querySelectorAll('.sheet-actions .btn')].map((b) => b.childNodes[0].textContent.trim()), talk: [...s.querySelectorAll('.sheet-after .talk > button b')].map((b) => b.textContent)}; });
++      const fermer = (q) => q.evaluate(() => { const b = document.querySelector('#sheet .sheet-close'); if (b) b.click(); });
++      const q = await pageWith({grokOff: true}, '#agenda'); await q.waitForTimeout(1500);
++      await q.evaluate(() => { const d = document.querySelector('#view details.lg-fold'); if (d) d.open = true; }); await q.waitForTimeout(300);
++      const vue = await q.evaluate(() => ({t: document.getElementById('view').innerText, lg: [...document.querySelectorAll('#view .cal-legend .lg-t')].map((x) => x.textContent), puces: [...document.querySelectorAll('#view .cal-legend .lg-row')][1] ? [...[...document.querySelectorAll('#view .cal-legend .lg-row')][1].querySelectorAll('.lg-chip span:not(.mg-ic)')].map((x) => x.textContent) : []}));
++      ok('0.93 : Agenda, Grok arrêté : plus aucun nom de bot ni « Un bot s’en occupe » dans la vue ; la légende dit « Fait par Hermes » avec une seule ligne (plus les sept bots)',
++        !BOTS_RE.test(vue.t) && !VIEUX.test(vue.t) && vue.lg.includes('Fait par Hermes, rien à faire pour toi') && !vue.lg.some((x) => /un bot/i.test(x)) && vue.puces.length === 1 && /^Hermes · /.test(vue.puces[0]), JSON.stringify({noms: (vue.t.match(BOTS_RE) || [])[0], lg: vue.lg, puces: vue.puces}));
++      await q.evaluate(() => [...document.querySelectorAll('#view .cal-legend .lg-row')][1].querySelector('.lg-chip').click()); await q.waitForTimeout(500);
++      const filtre = await q.evaluate(() => ({on: (document.querySelector('#view .lg-on') || {}).textContent, hits: document.querySelectorAll('#view .mg-d.is-hit').length, n: +(([...document.querySelectorAll('#view .cal-legend .lg-row')][1].querySelector('.lg-chip b') || {}).textContent || 0)}));
++      await q.evaluate(() => [...document.querySelectorAll('#view .cal-legend .lg-row')][1].querySelector('.lg-chip').click()); await q.waitForTimeout(400);
++      ok('0.93 : Agenda, Grok arrêté : la ligne « Hermes » de la légende surligne les jours de ce qu’il suit (« Filtre : Hermes »)', filtre.on === 'Filtre : Hermes' && (filtre.n === 0 ? filtre.hits === 0 : filtre.hits >= 1), JSON.stringify(filtre));
++      /* la feuille d'un jour : avatar de JARVIS, « Écrire à Hermes », « Voir Travail » ; à côté d'un prix suivi : « Hermes suit » */
++      const aOffre = await jourDe(q, /Fin de l'offre de lancement/), fo = await feuille(q);
++      ok('0.93 : Agenda, Grok arrêté : la feuille d’un jour montre l’avatar de JARVIS (plus Chronos), « Écrire à Hermes » (plus « Écrire à Chronos par le Canal »), « Voir Travail » pour le CRA et les notes de frais ; à côté de l’offre que suivait Kairos : « Hermes suit »',
++        aOffre && /chr-claude/.test(fo.avatar) && !/chr-medusa/.test(fo.avatar) && fo.talk.join() === 'Discuter avec Claude,Écrire à Hermes,Voir Travail' && !BOTS_RE.test(fo.t) && !VIEUX.test(fo.t) && fo.lignes.some((l) => /Fin de l'offre de lancement/.test(l[0]) && l[1] === 'Hermes suit'), JSON.stringify({...fo, t: fo.t.slice(0, 200)}));
++      /* la fiche de cette échéance, ouverte depuis la feuille du jour */
++      await q.evaluate(() => [...document.querySelectorAll('#sheet .day-list button.dl-row')].find((r) => /Fin de l'offre de lancement/.test(r.textContent)).click()); await q.waitForTimeout(900);
++      const fe = await q.evaluate(() => { const s = document.getElementById('sheet'), d = s.querySelector('details.sheet-det'); if (d) d.open = true; const hd = s.querySelector('.sheet-head .chr'); return {t: s.innerText, avatar: hd ? hd.className : '', talk: [...s.querySelectorAll('.sheet-after .talk > button b')].map((b) => b.textContent)}; });
++      ok('0.93 : Agenda, Grok arrêté : la fiche d’une échéance que suivait Kairos : avatar d’Hermes, « Suivi par : Hermes suit », « Écrire à Hermes », plus de « Confier à un autre bot »',
++        /chr-hermes/.test(fe.avatar) && /Suivi par\s*Hermes suit/.test(fe.t) && fe.talk.join() === 'Discuter avec Claude,Écrire à Hermes' && !BOTS_RE.test(fe.t) && !VIEUX.test(fe.t), JSON.stringify({...fe, t: fe.t.slice(0, 300)}));
++      /* « Écrire à Hermes » depuis la fiche : une ligne pour Hermes dans le Canal, le sujet de la fiche en Objet, sans sonnette */
++      await q.evaluate(() => [...document.querySelectorAll('#sheet .sheet-after .talk > button')].find((b) => /Écrire à Hermes/.test(b.textContent)).click()); await q.waitForTimeout(700);
++      const eh = await q.evaluate(() => { const s = document.getElementById('sheet'), hd = s.querySelector('.sheet-head .chr'); return {titre: s.querySelector('.sheet-title').textContent, avatar: hd ? hd.className : ''}; });
++      await q.evaluate(() => [...document.querySelectorAll('#sheet .sheet-actions .btn')].find((x) => /^Écrire/.test(x.textContent)).click()); await q.waitForTimeout(500);
++      const avantE = await q.evaluate(() => ({canal: window.__G.Canal.length, sends: (window.__calls || []).filter((c) => c.tool === 'send_message').length}));
++      await q.evaluate(() => { const t = document.querySelector('#sheet .sheet-pick textarea'); t.value = 'Garde un œil dessus.'; t.closest('form').requestSubmit(); }); await q.waitForTimeout(6800);
++      const apresE = await q.evaluate(() => ({l: window.__G.Canal[window.__G.Canal.length - 1] || [], canal: window.__G.Canal.length, sends: (window.__calls || []).filter((c) => c.tool === 'send_message').length}));
++      ok('0.93 : Agenda, Grok arrêté : « Écrire à Hermes » depuis une fiche écrit une ligne pour Hermes dans le Canal (le sujet de la fiche dans le message et dans l’Objet), sans sonnette',
++        eh.titre === 'Écrire à Hermes' && /chr-hermes/.test(eh.avatar) && apresE.canal === avantE.canal + 1 && apresE.l[1] === 'Rabie' && apresE.l[2] === 'Hermes' && /À propos de « Fin de l'offre de lancement » : Garde un œil dessus\./.test(apresE.l[4]) && apresE.l[7] === "Fin de l'offre de lancement" && apresE.sends === avantE.sends, JSON.stringify([eh, apresE]));
++      await fermer(q); await q.waitForTimeout(500);
++      /* le CRA : « Hermes · voir Travail » dans la feuille du jour, « Voir Travail » en tête de la fiche */
++      const aCra = await jourDe(q, /CRA client de la semaine/), fc = await feuille(q);
++      await q.evaluate(() => [...document.querySelectorAll('#sheet .day-list button.dl-row')].find((r) => /CRA client de la semaine/.test(r.textContent)).click()); await q.waitForTimeout(900);
++      const fcra = await q.evaluate(() => { const s = document.getElementById('sheet'), d = s.querySelector('details.sheet-det'); if (d) d.open = true; const hd = s.querySelector('.sheet-head .chr'); return {t: s.innerText, avatar: hd ? hd.className : '', kicker: s.querySelector('.sheet-kicker').textContent, mains: [...s.querySelectorAll('.sheet-actions .sa-main .btn')].map((b) => [b.childNodes[0].textContent.trim(), b.classList.contains('main')]), talk: [...s.querySelectorAll('.sheet-after .talk > button b')].map((b) => b.textContent)}; });
++      ok('0.93 : Agenda, Grok arrêté : le CRA que faisait Chronos : « Hermes · voir Travail » dans la feuille du jour ; sa fiche dit « Hermes s’en occupe », « Suivi par : Hermes, sur le portail (espace Travail) », avec « Voir Travail » en action principale',
++        aCra && fc.lignes.some((l) => /CRA client de la semaine/.test(l[0]) && l[1] === 'Hermes · voir Travail') && /chr-hermes/.test(fcra.avatar) && /^Hermes s'en occupe · /i.test(fcra.kicker) && /Suivi par\s*Hermes, sur le portail \(espace Travail\)/.test(fcra.t) && fcra.mains[0][0] === 'Voir Travail' && fcra.mains[0][1] && fcra.mains.filter((m) => m[1]).length === 1
++        && fcra.talk.join() === 'Discuter avec Claude,Écrire à Hermes,Voir Travail' && !BOTS_RE.test(fcra.t) && !VIEUX.test(fcra.t), JSON.stringify({l: fc.lignes, ...fcra, t: fcra.t.slice(0, 200)}));
++      await q.evaluate(() => [...document.querySelectorAll('#sheet .sheet-actions .btn')].find((x) => /^Voir Travail/.test(x.textContent)).click()); await q.waitForTimeout(900);
++      ok('0.93 : Agenda, Grok arrêté : « Voir Travail » ferme la fiche et ouvre l’espace Travail', await q.evaluate(() => location.hash === '#travail' && document.getElementById('sheet').hidden), await q.evaluate(() => location.hash));
++      await q.evaluate(() => { location.hash = '#agenda'; }); await q.waitForTimeout(900);
++      /* un événement de son agenda : avatar de JARVIS, « Écrire à Hermes » (plus « Écrire à Iris ») */
++      const aEv = await jourDe(q, /Dentiste/);
++      await q.evaluate(() => [...document.querySelectorAll('#sheet .day-list button.dl-row')].find((r) => /Dentiste/.test(r.textContent)).click()); await q.waitForTimeout(900);
++      const fev = await q.evaluate(() => { const s = document.getElementById('sheet'), hd = s.querySelector('.sheet-head .chr'); return {t: s.innerText, avatar: hd ? hd.className : '', talk: [...s.querySelectorAll('.sheet-after .talk > button b')].map((b) => b.textContent)}; });
++      ok('0.93 : Agenda, Grok arrêté : la fiche d’un événement : avatar de JARVIS, « Écrire à Hermes » (plus « Écrire à Iris par le Canal »)', aEv && /chr-claude/.test(fev.avatar) && fev.talk.join() === 'Discuter avec Claude,Écrire à Hermes' && !/Écrire à Iris/.test(fev.t) && !VIEUX.test(fev.t), JSON.stringify({...fev, t: fev.t.slice(0, 200)}));
++      await q.context().close();
++      /* tant que Grok n'est pas arrêté, l'ancien affichage reste */
++      const q0 = await page('#agenda'); await q0.waitForTimeout(800);
++      await q0.evaluate(() => { const d = document.querySelector('#view details.lg-fold'); if (d) d.open = true; }); await q0.waitForTimeout(300);
++      const lg0 = await q0.evaluate(() => ({lg: [...document.querySelectorAll('#view .cal-legend .lg-t')].map((x) => x.textContent), puces: [...document.querySelectorAll('#view .cal-legend .lg-row')][1].querySelectorAll('.lg-chip').length}));
++      const a0 = await jourDe(q0, /Fin de l'offre de lancement/), f0 = await feuille(q0);
++      ok('0.93 : Agenda, Grok en service : rien ne change (avatar de Chronos, « Écrire à Chronos » par le Canal, « Kairos » à côté de l’offre, la légende des sept bots)',
++        a0 && /chr-medusa/.test(f0.avatar) && f0.talk.join() === 'Discuter avec Claude,Écrire à Chronos' && /par le Canal, réponse à son passage/.test(f0.t) && f0.lignes.some((l) => /Fin de l'offre de lancement/.test(l[0]) && l[1] === 'Kairos') && lg0.lg.includes('Fait par un bot, rien à faire pour toi') && lg0.puces === 7, JSON.stringify({...f0, t: f0.t.slice(0, 160), lg0}));
++      await q0.context().close(); }
++    /* 3. Pour moi : une seule carte par sujet lié */
++    { const base0 = await (async () => { const z = await page('#demandes'); await z.waitForTimeout(800); const n = await z.evaluate(() => +document.querySelector('.tab[data-tab="demandes"] .badge').textContent); await z.context().close(); return n; })();
++      const q = await pageWith({sujets: true}, '#demandes'); await q.waitForTimeout(1500);
++      const cartes = () => q.evaluate(() => [...document.querySelectorAll('#view .pm-card')].map((c) => ({t: c.querySelector('.pm-title').textContent, de: (c.querySelector('.pm-sj-de') || {}).textContent || '', sec: (c.closest('.pm-sec') || {}).id, pill: (c.querySelector('.pm-head .pill') || {}).textContent || '', sujet: c.dataset.sujet || '', n: +(c.dataset.n || 0), lies: [...c.querySelectorAll('.pm-lie')].map((l) => [l.querySelector('b').textContent, l.querySelector('small').textContent, l.classList.contains('is-urgent')]), titreLies: (c.querySelector('.pm-lies-t') || {}).textContent || ''})));
++      const C1 = await cartes(), de = (re) => C1.filter((c) => re.test(c.t) || re.test(c.de) || c.lies.some((l) => re.test(l[0])));
++      const sin = de(/Sinistre infiltrations|Devis du plombier|Relancer l'assureur|Passage de l'expert/);
++      const brSin = await q.evaluate(() => [...document.querySelectorAll('#view .draft-card')].filter((c) => /Déclaration de sinistre/.test(c.textContent)).length);
++      ok('0.93 : Pour moi : le sinistre tient en une seule carte, au nom du dossier : la demande la plus urgente en tête (« Devis du plombier », venue du Canal, liée par son Objet), et dedans la demande du dossier, le brouillon prêt (lié par les mots de son objet : plus de carte « Brouillon prêt » à part) et ses deux échéances (liées par le nom entre parenthèses)',
++        sin.length === 1 && brSin === 0 && sin[0].t === 'Sinistre infiltrations (appartement)' && sin[0].de === 'Devis du plombier' && sin[0].sujet === 'Sinistre infiltrations (appartement)' && sin[0].n === 5 && sin[0].titreLies === 'Aussi dans ce sujet · 4'
++        && sin[0].lies.map((l) => l[0]).join(' | ') === "Déclarer le sinistre à l'assureur depuis son appli | Déclaration de sinistre : infiltrations dans l'appartement | Relancer l'assureur (Sinistre infiltrations) | Passage de l'expert (sinistre infiltrations)" && /^À faire · Iris/.test(sin[0].lies[0][1])
++        && sin[0].lies[1][1] === 'Brouillon prêt · à sinistres@assureur.example' && /^À faire par toi · demain$/.test(sin[0].lies[2][1]), JSON.stringify([sin, brSin]));
++      ok('0.93 : Pour moi : la plus urgente décide de la place et de la couleur : la carte est sous « À décider » (la question du devis) et sa pastille dit « Dans 1 j » (la relance de demain, avant le devis à 2 jours), ligne en ambre',
++        sin.length === 1 && sin[0].sec === 'pm-dec' && sin[0].pill === 'Dans 1 j' && sin[0].lies[2][2] === true && sin[0].lies[3][2] === false, JSON.stringify(sin[0] && [sin[0].sec, sin[0].pill, sin[0].lies.map((l) => l[2])]));
++      /* un sujet sans demande : deux brouillons et une échéance d'un dossier qui attend quelqu'un d'autre ; une réponse reçue et l'échéance de son dossier */
++      const sans = await q.evaluate(() => { const lies = (c) => [...c.querySelectorAll('.pm-lie')].map((l) => [l.querySelector('b').textContent, l.querySelector('small').textContent]);
++        const br = [...document.querySelectorAll('#view .draft-card')].filter((c) => /caution|recours/i.test(c.textContent)), rp = [...document.querySelectorAll('#view .card.item')].filter((c) => /Réponse reçue/.test((c.querySelector('.item-bot') || {}).textContent || '') && /Dégât des eaux/.test(c.textContent));
++        return {br: br.map((c) => ({sujet: c.dataset.sujet || '', nom: (c.querySelector('.pm-sj-nom') || {}).textContent || '', t: c.querySelector('.item-title').textContent, lies: lies(c), boutons: [...c.querySelectorAll('.row-actions .btn')].length})), rp: rp.map((c) => ({sujet: c.dataset.sujet || '', lies: lies(c), boutons: [...c.querySelectorAll('.row-actions .btn, .row-actions a')].length}))}; });
++      ok('0.93 : Pour moi : un sujet sans demande tient aussi en une carte : les deux brouillons du dossier « Remboursement de la caution » (l’un lié par son objet, l’autre par le début de son texte) et son échéance sous le premier brouillon, qui garde ses boutons et porte le nom du dossier',
++        sans.br.length === 1 && sans.br[0].sujet === 'Remboursement de la caution (ancien logement)' && sans.br[0].nom === 'Remboursement de la caution (ancien logement)' && sans.br[0].boutons >= 1 && sans.br[0].lies.length === 2 && sans.br[0].lies[0][1] === 'Brouillon prêt · à bailleur@delta.example'
++        && [sans.br[0].t, sans.br[0].lies[0][0]].sort().join(' | ') === 'Dernier courrier avant recours | Relance : remboursement de la caution' && sans.br[0].lies[1][0] === 'Point sur le remboursement de la caution', JSON.stringify(sans.br));
++      ok('0.93 : Pour moi : la réponse reçue sur le dossier « Dégât des eaux » porte l’échéance de ce dossier (« Passage de l’expert (Dégât des eaux) »), dans la même carte, avec ses boutons',
++        sans.rp.length === 1 && sans.rp[0].sujet === 'Dégât des eaux' && sans.rp[0].lies.length === 1 && sans.rp[0].lies[0][0] === "Passage de l'expert (Dégât des eaux)" && sans.rp[0].boutons >= 1, JSON.stringify(sans.rp));
++      const exp = de(/Expresso/);
++      ok('0.93 : Pour moi : le rachat de crédit tient en une seule carte, même si le dossier attend quelqu’un d’autre : deux demandes du Canal (un nom raccourci entre parenthèses, « (rachat Expresso) », et les mêmes mots que le dossier) et l’échéance de l’offre',
++        exp.length === 1 && exp[0].t === 'Rachat du crédit Expresso (organisme Alpha)' && exp[0].de === 'Offre de prêt Gamma (rachat Expresso)' && exp[0].n === 3 && exp[0].lies.map((l) => l[0]).join(' | ') === "Pièces pour le rachat du crédit Expresso | Fin de l'offre de prêt Gamma (rachat Expresso)" && exp[0].pill === 'Dans 3 j', JSON.stringify(exp));
++      const ass = C1.filter((c) => /ssurance/.test(c.t));
++      ok('0.93 : Pour moi : les faux amis restent séparés : « Assurance habitation », « Assurance auto » et « Attestation d’assurance » font trois cartes ; le renouvellement de l’assurance auto ne va qu’avec elle ; « Assurance : point annuel » ne va avec aucune',
++        ass.map((c) => c.t).sort().join(' | ') === "Assurance auto | Assurance habitation | Attestation d'assurance" && ass.find((c) => c.t === 'Assurance auto').lies.map((l) => l[0]).join() === "Renouvellement de l'assurance auto" && ass.find((c) => c.t === 'Assurance habitation').lies.length === 0
++        && !C1.some((c) => c.lies.some((l) => /point annuel/.test(l[0]))) && ass.every((c) => !c.de), JSON.stringify(ass.map((c) => [c.t, c.lies.map((l) => l[0])])));
++      /* les comptes : la pastille compte les sujets ; un filtre compte ce qu'il montre */
++      const cpt = await q.evaluate(() => { const n = (f) => +((document.querySelector('#view .ux-seg [data-f="' + f + '"] b') || {}).textContent || 0); return {badge: +document.querySelector('.tab[data-tab="demandes"] .badge').textContent, entete: (document.querySelector('#status .st.is-demande') || {}).textContent || '', dec: n('decider'), faire: n('faire')}; });
++      await q.evaluate(() => document.querySelector('#view .ux-seg [data-f="decider"]').click()); await q.waitForTimeout(500);
++      const vusDec = await q.evaluate(() => ['pm-dec', 'pm-cra', 'pm-jours'].reduce((s, id) => { const x = document.getElementById(id); return s + (x && !x.hidden ? x.querySelectorAll(id === 'pm-jours' ? '.jours-card' : id === 'pm-cra' ? '.cra-card' : '.pm-list > *').length : 0); }, 0));
++      await q.evaluate(() => document.querySelector('#view .ux-seg [data-f="tout"]').click()); await q.waitForTimeout(500);
++      ok('0.93 : Pour moi : le compte « pour toi » compte les sujets (7 demandes et 3 brouillons de plus, dont 2 demandes et 2 brouillons rangés dans la carte de leur sujet : + 6), le même dans l’en-tête et la pastille ; le filtre « Décider » compte ce qu’il montre',
++        cpt.badge === base0 + 6 && new RegExp('^\\s*' + cpt.badge + ' pour toi').test(cpt.entete) && cpt.dec === vusDec && cpt.dec > 0, JSON.stringify({base0, ...cpt, vusDec}));
++      /* chaque élément garde sa feuille et ses actions */
++      await q.evaluate(() => [...document.querySelectorAll('#view .pm-sujet[data-sujet^="Sinistre"] .pm-lie')].find((l) => /Déclarer le sinistre/.test(l.textContent)).click()); await q.waitForTimeout(900);
++      const fd = await q.evaluate(() => { const s = document.getElementById('sheet'); return {ouvert: !s.hidden, titre: s.querySelector('.sheet-title').textContent, actions: [...s.querySelectorAll('.sheet-actions .btn')].map((b) => b.childNodes[0].textContent.trim()), lies: [...s.querySelectorAll('.pm-lie b')].map((b) => b.textContent)}; });
++      await q.evaluate(() => document.querySelector('#sheet .sheet-close').click()); await q.waitForTimeout(500);
++      await q.evaluate(() => [...document.querySelectorAll('#view .pm-sujet[data-sujet^="Sinistre"] .pm-lie')].find((l) => /Relancer l'assureur/.test(l.textContent)).click()); await q.waitForTimeout(900);
++      const fe2 = await q.evaluate(() => { const s = document.getElementById('sheet'); return {titre: s.querySelector('.sheet-title').textContent, actions: [...s.querySelectorAll('.sheet-actions .btn')].map((b) => b.childNodes[0].textContent.trim())}; });
++      await q.evaluate(() => document.querySelector('#sheet .sheet-close').click()); await q.waitForTimeout(500);
++      await q.evaluate(() => [...document.querySelectorAll('#view .pm-sujet[data-sujet^="Sinistre"] .pm-lie')].find((l) => /Déclaration de sinistre/.test(l.textContent)).click()); await q.waitForTimeout(900);
++      const fb = await q.evaluate(() => { const s = document.getElementById('sheet'); return {titre: s.querySelector('.sheet-title').textContent, kicker: s.querySelector('.sheet-kicker').textContent, actions: [...s.querySelectorAll('.sheet-actions .btn')].map((b) => b.childNodes[0].textContent.trim())}; });
++      await q.evaluate(() => document.querySelector('#sheet .sheet-close').click()); await q.waitForTimeout(500);
++      ok('0.93 : Pour moi : le brouillon rangé dans la carte s’ouvre sur sa feuille de brouillon (relire, envoyer)', /Déclaration de sinistre/.test(fb.titre) && /^Brouillon/.test(fb.kicker) && fb.actions.length >= 1, JSON.stringify(fb));
++      ok('0.93 : Pour moi : un élément rangé dans la carte s’ouvre sur sa propre feuille, avec ses actions : la demande du dossier (ses réponses, et les autres éléments du sujet dessous), l’échéance (« C’est fait », « Reporter »)',
++        fd.ouvert && fd.titre === 'Sinistre infiltrations (appartement)' && fd.actions.length >= 2 && fd.lies.join(' | ') === "Devis du plombier | Déclaration de sinistre : infiltrations dans l'appartement | Relancer l'assureur (Sinistre infiltrations) | Passage de l'expert (sinistre infiltrations)"
++        && fe2.titre === "Relancer l'assureur (Sinistre infiltrations)" && fe2.actions.includes("C'est fait") && fe2.actions.includes('Reporter'), JSON.stringify([fd, fe2]));
++      /* une notification « #voir-<ligne> » ouvre toujours le bon élément, même rangé dans la carte d'un autre */
++      const rangs = await q.evaluate(() => ({pieces: window.__G.Canal.findIndex((r) => r[3] === 'Pièces pour le rachat du crédit Expresso') + 1, devis: window.__G.Canal.findIndex((r) => r[3] === 'Devis du plombier') + 1}));
++      await q.evaluate((r) => { location.hash = '#voir-' + r; }, rangs.pieces); await q.waitForTimeout(2500);
++      const v1 = await q.evaluate(() => { const s = document.getElementById('sheet'); return {ouvert: !s.hidden, titre: (s.querySelector('.sheet-title') || {}).textContent, actions: s.querySelectorAll('.sheet-actions .btn').length}; });
++      await q.evaluate(() => { const b = document.querySelector('#sheet .sheet-close'); if (b) b.click(); }); await q.waitForTimeout(500);
++      await q.evaluate((r) => { location.hash = '#voir-' + r; }, rangs.devis); await q.waitForTimeout(2500);
++      const v2 = await q.evaluate(() => { const s = document.getElementById('sheet'); return {ouvert: !s.hidden, titre: (s.querySelector('.sheet-title') || {}).textContent}; });
++      await q.evaluate(() => { const b = document.querySelector('#sheet .sheet-close'); if (b) b.click(); }); await q.waitForTimeout(500);
++      ok('0.93 : Pour moi : « #voir-<ligne> » ouvre le bon élément : la demande « Pièces… » rangée dans la carte du rachat, et « Devis du plombier » en tête de la carte du sinistre',
++        rangs.pieces > 1 && rangs.devis > 1 && v1.ouvert && v1.titre === 'Pièces pour le rachat du crédit Expresso' && v1.actions >= 1 && v2.ouvert && v2.titre === 'Devis du plombier', JSON.stringify([rangs, v1, v2]));
++      /* « une par une » : chaque élément y passe, un à un (rien n'est rangé) */
++      const nAv = (await cartes()).length;
++      await q.evaluate(() => document.getElementById('fc-start').click()); await q.waitForTimeout(700);
++      const fcn = await q.evaluate(() => ({compte: (document.querySelector('.fc-count') || {}).textContent || '', lies: document.querySelectorAll('#view .pm-lies').length}));
++      await q.evaluate(() => document.querySelector('.fc-close').click()); await q.waitForTimeout(600);
++      ok('0.93 : Pour moi : « Traiter une par une » passe chaque élément un à un (les deux demandes rangées y sont, sans liste « Aussi dans ce sujet ») ; au retour, les cartes par sujet reviennent',
++        /^1 sur \d+$/.test(fcn.compte) && fcn.lies === 0 && (await cartes()).length === nAv && (await cartes()).filter((c) => c.sujet).length >= 3, JSON.stringify(fcn));
++      /* l'accueil : un sujet n'y est qu'une fois, et le même compte */
++      await q.evaluate(() => { location.hash = ''; }); await q.waitForTimeout(1500);
++      const acc = await q.evaluate(() => ({t: document.getElementById('view').innerText, hud: (document.querySelector('.hud-ro.q-bl b') || {}).textContent || ''}));
++      ok('0.93 : accueil : le même compte « pour toi » que la pastille ; un sujet n’y est pas deux fois', acc.hud.startsWith(String(cpt.badge)) && (acc.t.match(/Devis du plombier|Déclarer le sinistre/g) || []).length <= 1 && (acc.t.match(/Offre de prêt Gamma|Pièces pour le rachat/g) || []).length <= 1, JSON.stringify([acc.hud, cpt.badge]));
++      /* la règle seule (noms inventés) */
++      const regle = await q.evaluate(() => { const L = window.__sujets93.lier, D = ['Sinistre infiltrations (appartement)', 'Rachat du crédit Expresso (organisme Alpha)', 'Assurance habitation', 'Assurance auto'], N = ['Naturalisation (Alice)', 'Naturalisation (Bob)'], F = ['Fermeture du compte Alpha (02/01)', 'Garde pendant la fermeture de la crèche du 15 au 19/02'];
++        return {objet: L('Question', 'Sinistre infiltrations (appartement)', D), objetSans: L('Question', 'sinistre INFILTRATIONS', D), paren: L('Relancer l’assureur (Sinistre infiltrations)', '', D), court: L('Fin de l’offre de prêt Gamma (rachat Expresso)', '', D), guill: L('Représenter le dossier « Assurance auto »', '', D), message: L('Info', '', D, 'Choix pour « Assurance habitation » : la formule de base (voir assurance auto)'),
++          mots: L('Pièces pour le rachat du crédit Expresso', '', D), inverse: L('Infiltrations appartement', '', D), seul: L('Assurance', '', D), communs: L('Dossier assurance : relance et rappel', '', D), voisin: L('Attestation d’assurance', '', D), bon: L('Renouvellement de l’assurance auto', '', D), heure: L('Rendez-vous (14h30)', '', D), rien: L('Rendez-vous notaire', '', D),
++          natVague: L('Naturalisation', '', N), natQui: L('Test de langue pour la naturalisation de Bob', '', N), natNom: L('Représenter le dossier « Naturalisation (Alice) »', '', N), natPar: L('Rendez-vous en préfecture (naturalisation)', '', N),
++          ferm: L('Fermeture de la crèche du 21 au 25/12', '', F), fermBon: L('Fermeture du compte Alpha : vider le compte avant', '', F), gardeAutre: L('Garde pendant la fermeture de la crèche du 12 au 16/04', '', F), gardeMeme: L('Qui garde ? Garde pendant la fermeture de la crèche (du 15 au 19/02)', '', F), vides: window.__sujets93.mots('Relance du dossier : rappel de la demande, 3e point'), sens: window.__sujets93.mots('Rachat du crédit Expresso (organisme Alpha) du 12/03')}; });
++      ok('0.93 : la règle : lien explicite d’abord (l’Objet du Canal, le nom entre parenthèses ou entre « », avec ou sans la parenthèse du dossier ; dans un message, seulement entre « »), puis un nom raccourci entre parenthèses, puis les mêmes mots significatifs',
++        regle.objet === 'Sinistre infiltrations (appartement)' && regle.objetSans === 'Sinistre infiltrations (appartement)' && regle.paren === 'Sinistre infiltrations (appartement)' && regle.court === 'Rachat du crédit Expresso (organisme Alpha)' && regle.guill === 'Assurance auto' && regle.message === 'Assurance habitation'
++        && regle.mots === 'Rachat du crédit Expresso (organisme Alpha)' && regle.bon === 'Assurance auto' && regle.natQui === 'Naturalisation (Bob)' && regle.natNom === 'Naturalisation (Alice)' && regle.fermBon === 'Fermeture du compte Alpha (02/01)' && regle.gardeMeme === 'Garde pendant la fermeture de la crèche du 15 au 19/02', JSON.stringify(regle));
++      ok('0.93 : la règle, faux amis : dans le doute, rien n’est réuni (un mot commun à deux dossiers, « assurance » seul, un mot trop commun des suivis, un libellé plus court que le nom du dossier, deux dossiers au même nom à une parenthèse près, une fermeture qui n’est pas celle du dossier, la même garde à d’autres dates, une heure entre parenthèses)',
++        regle.seul === null && regle.communs === null && regle.voisin === null && regle.inverse === null && regle.heure === null && regle.rien === null && regle.natVague === null && regle.natPar === null && regle.ferm === null && regle.gardeAutre === null && regle.vides.length === 0 && regle.sens.join() === 'rachat,credit,expresso,organisme,alpha', JSON.stringify(regle));
++      await q.context().close();
++      /* Grok arrêté : la carte du sujet et ses lignes disent Hermes */
++      const g = await pageWith({sujets: true, grokOff: true}, '#demandes'); await g.waitForTimeout(2500);
++      const sg = await g.evaluate(() => { const c = document.querySelector('#view .pm-sujet[data-sujet^="Sinistre"]'); return c ? {who: c.querySelector('.pm-who').textContent, lies: [...c.querySelectorAll('.pm-lie small')].map((x) => x.textContent), n: document.querySelectorAll('#view .pm-sujet[data-sujet^="Sinistre"]').length} : null; });
++      ok('0.93 : Pour moi, Grok arrêté : la carte du sujet et ses lignes disent Hermes (plus Iris)', !!sg && sg.n === 1 && /^Hermes · /.test(sg.who) && /^À faire · Hermes/.test(sg.lies[0]) && !sg.lies.some((x) => /Iris/.test(x)), JSON.stringify(sg));
++      await g.context().close(); }
+   } catch (e) { ok('exception', false, e.stack); }
+   ok('aucune erreur de page', !errs.length, errs.join(' | '));
+   console.log(out.join('\n')); console.log(fails ? fails + ' échec(s)' : 'Tout passe (' + out.length + ' vérifications). Captures : ' + SH);
+diff --git a/essais/jarvis-os-maquette/donnees-fictives.js b/essais/jarvis-os-maquette/donnees-fictives.js
+index cc32191..93e4cf6 100644
+--- a/essais/jarvis-os-maquette/donnees-fictives.js
++++ b/essais/jarvis-os-maquette/donnees-fictives.js
+@@ -161,6 +161,37 @@
+     G['Routines'].push(['Hermes', 'Veille du matin', 'Horaire (serveur de JARVIS)', 'Lun-ven 7h40', 'x', 'x', 'En place'], ['Hermes', 'Semaine à venir', 'Horaire (serveur de JARVIS)', 'Dim 18h10', 'x', 'x', 'En place'], ['Hermes', 'Prix suivis', 'Horaire (serveur de JARVIS)', 'Dim 17h', 'x', 'x', 'En place']);
+     G['État'].push(['Hermes', fr(D(0)) + ' 07:42', 'Veille du matin faite', fr(D(1)) + ' 07:40 (Veille du matin)', '']);
+   }
++  /* 0.93.0 : scénario « sujets » — un même sujet en plusieurs éléments (le dossier, des demandes venues du Canal, des échéances), et des faux
++     amis qui doivent rester séparés (deux dossiers d'assurance). Tout est inventé : aucun montant, aucun organisme réel. */
++  if (SCEN.sujets) {
++    G['Dossiers'].push(
++      ['Sinistre infiltrations (appartement)', 'En attente', "Déclarer le sinistre à l'assureur depuis son appli", fr(D(9)), 'Rabie', fr(D(-6)), 'Référence inventée 123', 'Iris', fr(D(-6)), "À faire : Déclarer le sinistre à l'assureur depuis son appli | Pourquoi : le syndic renvoie vers ton assurance | Temps : 15 min"],
++      ['Rachat du crédit Expresso (organisme Alpha)', 'En cours', "Attendre l'appel du conseiller", fr(D(4)), 'Organisme Beta (conseiller)', fr(D(-8)), '', 'Iris', fr(D(-7)), ''],
++      ['Assurance habitation', 'En attente', "Envoyer l'attestation de l'ancien assureur", '', 'Rabie', fr(D(-3)), '', 'Iris', fr(D(-3)), "À faire : Envoyer l'attestation de l'ancien assureur | Pourquoi : le nouveau contrat l'attend"],
++      ['Assurance auto', 'En attente', 'Choisir la formule', '', 'Rabie', fr(D(-3)), '', 'Iris', fr(D(-3)), 'Choix : Quelle formule ? | Options : Tiers / Tous risques | Pourquoi : le contrat se renouvelle bientôt'],
++      ['Remboursement de la caution (ancien logement)', 'En cours', "Attendre la réponse du bailleur", '', 'Bailleur Delta', fr(D(-9)), '', 'Iris', fr(D(-9)), '']);
++    G['À toi'].push(
++      [fr(D(-6)), 'Iris', 'Sinistre infiltrations (appartement)', "Déclarer le sinistre à l'assureur depuis son appli"],
++      [fr(D(-1)), 'Hermes', 'Devis du plombier', 'Oui/Non : Tu acceptes le devis du plombier ? | Pourquoi : il doit passer avant la fin du mois | Si oui : je confirme le passage | Si non : je demande un autre devis | Avant le : ' + fr(D(2))],
++      [fr(D(-2)), 'Hermes', 'Offre de prêt Gamma (rachat Expresso)', "Oui/Non : Je demande l'offre écrite à Gamma ? | Pourquoi : c'est la meilleure proposition reçue | Avant le : " + fr(D(3))],
++      [fr(D(-1)), 'Hermes', 'Pièces pour le rachat du crédit Expresso', 'À faire : Réunir les trois derniers justificatifs demandés | Pourquoi : le conseiller les demande avant son appel'],
++      [fr(D(-3)), 'Iris', 'Assurance habitation', "Envoyer l'attestation de l'ancien assureur"],
++      [fr(D(-3)), 'Iris', 'Assurance auto', 'Choisir la formule'],
++      [fr(D(-1)), 'Hermes', "Attestation d'assurance", "À faire : Télécharger l'attestation d'assurance scolaire | Pourquoi : l'école la demande"]);
++    G['Canal'].push(
++      [fr(D(-1)), 'Hermes', 'Rabie', 'Devis du plombier', 'Oui/Non : Tu acceptes le devis du plombier ?', 'À faire', '', 'Sinistre infiltrations (appartement)'],
++      [fr(D(-2)), 'Hermes', 'Rabie', 'Offre de prêt Gamma (rachat Expresso)', "Oui/Non : Je demande l'offre écrite à Gamma ?", 'À faire', '', ''],
++      [fr(D(-1)), 'Hermes', 'Rabie', 'Pièces pour le rachat du crédit Expresso', 'À faire : Réunir les trois derniers justificatifs demandés', 'À faire', '', ''],
++      [fr(D(-1)), 'Hermes', 'Rabie', "Attestation d'assurance", "À faire : Télécharger l'attestation d'assurance scolaire", 'À faire', '', '']);
++    G['Échéances'].push(
++      [fr(D(1)), "Relancer l'assureur (Sinistre infiltrations)", 'Logement', '', 'À venir', 'Iris', '', 'À faire par moi'],
++      [fr(D(30)), "Passage de l'expert (sinistre infiltrations)", 'Logement', '', 'À venir', 'Iris', '', 'Date à retenir'],
++      [fr(D(5)), "Fin de l'offre de prêt Gamma (rachat Expresso)", 'Finances', '3 jours avant', 'À venir', 'Iris', '', 'Offre'],
++      [fr(D(20)), "Renouvellement de l'assurance auto", 'Contrats', '', 'À venir', 'Iris', '', 'Fin de validité'],
++      [fr(D(25)), "Assurance : point annuel", 'Contrats', '', 'À venir', 'Iris', '', 'Date à retenir'],
++      [fr(D(8)), "Passage de l'expert (Dégât des eaux)", 'Logement', '', 'À venir', 'Iris', '', 'Date à retenir'],
++      [fr(D(12)), 'Point sur le remboursement de la caution', 'Logement', '', 'À venir', 'Iris', '', 'À faire par moi']);
++  }
+   G['Papiers'] = [
+     ['Document', 'Personne', 'Où il est (lien Drive, ou « papier »)', "Valable jusqu'au", 'Sert pour', 'Mis à jour le', 'Remarque'],
+     ['Passeport', 'Rabie', 'papier, tiroir', fr(D(210)), 'voyage', '', ''],
+@@ -247,6 +278,10 @@
+     ]
+   };
+ 
++  /* 0.93.0, scénario « sujets » : trois brouillons Gmail sans carte (inventés) : un pour le sinistre, deux pour un dossier qui n'attend pas sa réponse */
++  if (SCEN.sujets) MAIL.drafts.push({id: 'DRAFT93', threadId: 'dth93', toRecipients: ['sinistres@assureur.example'], ccRecipients: [], date: new Date(now - 3600000 * 3).toISOString(), subject: "Déclaration de sinistre : infiltrations dans l'appartement", plaintextBody: 'Bonjour,\nJe déclare un sinistre : des infiltrations sont apparues au plafond du salon.'},
++    {id: 'DRAFT94', threadId: 'dth94', toRecipients: ['bailleur@delta.example'], ccRecipients: [], date: new Date(now - 3600000 * 4).toISOString(), subject: 'Relance : remboursement de la caution', plaintextBody: "Bonjour,\nSans nouvelle de votre part depuis l'état des lieux, je vous relance."},
++    {id: 'DRAFT95', threadId: 'dth95', toRecipients: ['bailleur@delta.example'], ccRecipients: [], date: new Date(now - 3600000 * 2).toISOString(), subject: 'Dernier courrier avant recours', plaintextBody: "Bonjour,\nLe remboursement de la caution de l'ancien logement n'est toujours pas arrivé."});
+   if (SCEN.draftPj) MAIL.drafts.push({id: 'DRAFT9', threadId: 'dth9', toRecipients: ['agence@example.org'], ccRecipients: [], date: new Date(now - 3600000).toISOString(), subject: 'Dossier location', plaintextBody: 'Bonjour,\nVoici le dossier.', pieces: ['dossier.pdf']});   /* 0.85.0 : un brouillon avec pièce jointe */
+ 
+   /* plages A1 */
+@@ -518,6 +553,20 @@
+       {id: 'pc', service: 'Garde d’enfant (exemple)', cat: 'Autres', montant: null, jour: 5, jourApprox: true, rythme: 'mensuel', source: 'mail', preuves: 13, dernier: rIso(-18), depuis: '11/2025', exemple: {objet: 'Votre facture du mois (en pièce jointe)', date: rIso(-18)}}],
+     scan: {enCours: false, mois: 13, total: 13, lus: 412, fini: Date.now(), erreur: ''}, google: true,
+     navigo: {mois: rMoisL(1), conseil: 'liberte', joursSite: 9, liberte: 36.72, moisNet: 45.40, texte: '9 jours sur site prévus, avec une semaine de congés : reste en Liberté+ (environ 36,72 €). Le Navigo Mois coûterait 45,40 € après le remboursement de 50 %.'}};
++  /* 0.93.0 : « déjà dépensé ce mois » et l'historique mois par mois, tels que le serveur les donne (montants inventés) : les dépenses fixes
++     de la liste dont le jour est passé, deux notes de courses, puis 26 mois (24 gardés, dont un reconstitué, et deux plus anciens estimés) */
++  { const M93 = window.__RADAR.mois, jour = new Date().getDate(), ymK = (k) => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() + k); return d.getFullYear() + '-' + p2(d.getMonth() + 1); };
++    const c2 = (n) => Math.round(n * 100) / 100, moisIso = (j) => ymK(0) + '-' + p2(j);
++    const passees = window.__RADAR.fixes.filter((f) => f.rythme === 'mensuel' && f.jour < jour).map((f) => ({date: moisIso(f.jour), service: f.service, montant: f.montant, poste: f.cat, sorte: 'fixe'}));
++    const notes = [[3, 62.4], [10, 48.15]].filter(([j]) => j <= jour).map(([j, m]) => ({date: moisIso(j), service: 'Courses', montant: m, poste: 'Alimentation', sorte: 'courante'}));
++    const lignes = passees.concat(notes).sort((a, b) => (a.date < b.date ? -1 : 1)), som = (l) => c2(l.reduce((t, x) => t + x.montant, 0));
++    const postesDe = (l) => { const par = {}; l.forEach((x) => { const k = (x.sorte === 'courante' ? 'c' : 'f') + x.poste; par[k] = par[k] || {label: x.poste, montant: 0, n: 0}; par[k].montant = c2(par[k].montant + x.montant); par[k].n++; if (x.sorte === 'courante') par[k].courant = true; }); return Object.values(par).sort((a, b) => b.montant - a.montant); };
++    M93.depense = {mois: ymK(0), jusqua: jour > 1 ? rIso(-1) : '', total: som(lignes), fixes: som(passees), plans: 0, courantes: som(notes), nFixes: passees.length, nPlans: 0, nNotes: notes.length, postes: postesDe(lignes), lignes};
++    M93.historique = [...Array(26)].map((_, i) => { const fx = c2(1466.57 + ((i * 37) % 90)), co = i < 24 ? c2(380 + ((i * 53) % 140)) : 0, pl = i % 4 === 0 ? 29.55 : 0, total = c2(fx + co + pl), clos = ymK(-i) + '-01';
++      return Object.assign({mois: ymK(-(i + 1)), libelle: rMoisL(-(i + 1)), fixes: fx, plans: pl, courantes: co, total, postes: [{label: 'Logement', montant: c2(fx - 213.07), n: 4}, {label: 'Alimentation', montant: co, n: 6, courant: true}, {label: 'Abonnements', montant: 58.56, n: 5}, {label: 'Transport', montant: 89.02, n: 2}, {label: 'Télécoms', montant: 39.98, n: 2},
++        {label: 'Santé', montant: 24.5, n: 1}].concat(pl ? [{label: 'Paiements en plusieurs fois', montant: pl, n: 1}] : []).filter((x) => x.montant > 0).sort((a, b) => b.montant - a.montant)},
++        i < 24 ? {prevu: 520, paie: 3000, resteAVivre: c2(3000 - total), clos} : {estime: true}, i === 7 ? {reconstitue: true} : {}); });
++  }
+   /* 0.23.0 : la météo de l'accueil (en vrai : Open-Meteo, à la position de l'iPhone) */
+   window.__METEO = {current: {temperature_2m: 9.4, apparent_temperature: 6.2, weather_code: 3}, daily: {time: [fr(D(0)), fr(D(1))], weather_code: [3, 61], temperature_2m_min: [4, 2], temperature_2m_max: [11, 7], precipitation_probability_max: [10, 70]}};
+   window.__G = G; window.__MAIL = MAIL; window.__CAL = CAL;
+diff --git a/essais/jarvis-os-maquette/index.html b/essais/jarvis-os-maquette/index.html
+index 5dbe33f..78e918c 100644
+--- a/essais/jarvis-os-maquette/index.html
++++ b/essais/jarvis-os-maquette/index.html
+@@ -11896,6 +11896,350 @@ void main(){
+     if (notesOn()) setTimeout(() => notesLoad(true), 1300);
+   }
+ 
++  /* ================= 0.93.0 : trois retours de l'app (ses remarques du 26/11/2026). Comme 0.86.0 et 0.87.0, ce bloc range ce qui existe :
++     aucune fonction d'avant n'est réécrite.
++     1. Argent : « Déjà dépensé ce mois » (ses dépenses fixes déjà passées, les échéances passées de ses paiements en plusieurs fois, ce qu'il
++        a noté de ses dépenses courantes), à côté du reste à payer et du reste à vivre, et l'historique mois par mois (au moins 24 mois,
++        gardés par le serveur à la fin de chaque mois ; il remplace « Six derniers mois »). Les montants restent sur son serveur.
++     2. Agenda, Grok arrêté : la feuille d'un jour, la fiche d'un événement ou d'une échéance et la légende disent JARVIS ou Hermes
++        (avatar, « Écrire à Hermes », « Voir Travail » pour le CRA et les notes de frais, « Hermes suit » pour un prix) ; avant l'arrêt,
++        rien ne change. L'historique garde le nom d'origine (« Fait par Chronos »).
++     3. Pour moi : une seule carte par sujet. Le dossier, ses demandes venues du Canal, son brouillon prêt, la réponse reçue et ses
++        échéances tiennent dans une carte ; la plus urgente décide de la place et de la couleur ; chaque élément garde sa feuille et ses
++        actions. ================= */
++  {
++    const GROK93 = ['hydra', 'medusa', 'unicorn', 'mermaid', 'griffon', 'cyclops', 'plutus'];
++    const estGrok = (id) => GROK93.includes(id);
++
++    /* ---------- 1. Argent : déjà dépensé ce mois, et l'historique ---------- */
++    const MOIS_C = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
++    const moisCourt = (ym) => (MOIS_C[+String(ym).slice(5, 7) - 1] || String(ym)) + ' ' + String(ym).slice(2, 4);
++    const moisLong = (ym) => RAD_MOIS[+String(ym).slice(5, 7) - 1] || '';
++    const leJour = (iso) => radDate(iso) + '/' + String(iso).slice(0, 4);
++    const RH = {tout: false, ouvert: ''};
++    function radDepense(m) {
++      const d = m.depense; if (!d) return null;
++      const parts = [[d.fixes, 'de dépenses fixes déjà passées', d.nFixes], [d.plans, 'd’échéances de paiements en plusieurs fois', d.nPlans], [d.courantes, 'de dépenses courantes notées', d.nNotes]].filter((x) => x[0] > 0 || x[2] > 0);
++      const dits = parts.map(([v, l, n]) => radEur(v) + ' ' + l + ' (' + n + ')');
++      const phrase = dits.length ? 'Soit ' + (dits.length > 1 ? dits.slice(0, -1).join(', ') + ' et ' : '') + dits[dits.length - 1] + '.' : 'Rien de passé ni de noté pour l’instant.';
++      const jq = d.jusqua ? ' Les dépenses fixes sont comptées jusqu’à hier (' + radDate(d.jusqua) + ') : celles d’aujourd’hui sont encore dans le reste à payer.' : ' Aucune dépense fixe n’est encore passée ce mois-ci.';
++      const lignes = (d.lignes || []).slice().reverse();
++      const sorte = (l) => (l.sorte === 'courante' ? (l.fait ? 'Dépense courante · cochée « Fait ce mois-ci »' : 'Dépense courante · notée') : l.sorte === 'plan' ? 'Paiement en plusieurs fois' : (l.poste || 'Dépense fixe')) + (l.estime ? ' · montant estimé' : '');
++      return h('section', {class: 'card rad-depense'}, h('small', {class: 'rad-k', text: 'Déjà dépensé en ' + moisLong(d.mois)}), h('b', {class: 'rad-big', text: radEur(d.total)}),
++        h('p', {class: 'muted'}, radNw(phrase + jq)),
++        lignes.length ? h('details', {class: 'rad-dep-det'}, h('summary', {text: 'Le détail (' + lignes.length + ')'}), h('div', {class: 'rad-dep-l'}, lignes.map((l) => h('div', {class: 'rad-dep-r'},
++          h('span', {class: 'rad-evo-m', text: radDate(l.date)}), h('span', {class: 'rad-dep-s'}, h('b', {text: l.service}), h('small', {text: sorte(l)})), h('b', {class: 'rad-evo-v nw', text: radEur(l.montant)}))))) : null);
++    }
++    /* un mois de l'historique, ouvert : ses totaux, ses postes, son reste à vivre, et d'où vient le chiffre */
++    function radHistDetail(g) {
++      const l = [['Dépenses fixes ' + (g.cours ? 'déjà passées' : 'payées'), radEur(g.fixes)]];
++      if (g.plans) l.push(['Paiements en plusieurs fois', radEur(g.plans)]);
++      l.push(['Dépenses courantes notées', radEur(g.courantes) + (g.prevu != null ? ' sur ' + radEur(g.prevu) + ' prévus' : '')]);
++      if (g.paie) l.push(['Reste à vivre', radEur(g.resteAVivre) + ' (paie de ' + radEur(g.paie) + ')']);
++      const postes = g.postes || [];
++      const note = g.cours ? 'Mois en cours : calculé en direct. Son bilan sera gardé à la fin du mois.' : g.estime ? 'Estimé d’après tes dépenses fixes d’aujourd’hui : ce mois-là n’avait pas été gardé.'
++        : g.reconstitue ? 'Reconstitué le ' + leJour(g.clos) + ' : le Radar ne suivait pas encore ce mois-là.' : 'Bilan gardé le ' + leJour(g.clos) + ' : il ne change plus.';
++      return h('div', {class: 'rad-hm-b'}, h('dl', {class: 'rad-hm-l'}, l.map(([k, v]) => h('div', {}, h('dt', {text: k}), h('dd', {}, radNw(v))))),
++        postes.length ? h('ul', {class: 'rad-hm-p'}, postes.map((p) => h('li', {}, h('span', {text: p.label + (p.courant ? ' (noté)' : '')}), h('b', {class: 'nw', text: radEur(p.montant)})))) : null,
++        h('p', {class: 'muted rad-hm-n', text: note}));
++    }
++    function radHisto(m) {
++      const H = m.historique || [], d = m.depense;
++      const tous = (d ? [{cours: true, mois: d.mois, fixes: d.fixes, plans: d.plans, courantes: d.courantes, total: d.total, postes: d.postes, prevu: m.totalCourantes != null ? m.totalCourantes : null}] : []).concat(H);
++      const vus = RH.tout ? tous : tous.slice(0, 13), max = Math.max(1, ...tous.map((g) => g.total || 0)), gardes = H.filter((g) => !g.estime).length;
++      const ligne = (g) => {
++        const det = h('details', {class: 'rad-hm' + (g.cours ? ' is-cours' : '') + (g.estime ? ' is-estime' : ''), 'data-mois': g.mois},
++          h('summary', {class: 'rad-evo', 'data-mois': g.mois}, h('span', {class: 'rad-evo-m', title: moisLong(g.mois) + ' ' + String(g.mois).slice(0, 4), text: moisCourt(g.mois)}),
++            h('div', {class: 'rad-bar-t'}, h('i', {style: 'width:' + Math.max(2, Math.round((g.total || 0) / max * 100)) + '%'})),
++            h('b', {class: 'rad-evo-v'}, h('span', {class: 'nw', text: (g.estime ? '≈ ' : '') + radEur(g.total)}), g.cours ? h('small', {text: 'en cours'}) : g.reconstitue ? h('small', {text: 'reconstitué'}) : null)),
++          radHistDetail(g));
++        det.open = RH.ouvert === g.mois;
++        det.addEventListener('toggle', () => { if (det.open) RH.ouvert = g.mois; else if (RH.ouvert === g.mois) RH.ouvert = ''; });
++        return det;
++      };
++      return h('section', {class: 'panel rad-hist'}, h('header', {class: 'panel-h'}, h('h2', {text: 'Historique'}), h('span', {class: 'aside', text: gardes ? gardes + ' mois gardé' + (gardes > 1 ? 's' : '') : 'mois par mois'})),
++        h('div', {class: 'card rad-evo-box'}, vus.map(ligne)),
++        tous.length > 13 ? h('button', {type: 'button', class: 'link rad-hist-plus', onclick: () => { RH.tout = !RH.tout; renderView(true); }}, RH.tout ? 'Seulement les 12 derniers mois' : 'Tous les mois (' + (tous.length - 1) + ')') : null,
++        h('p', {class: 'muted rad-evo-note', text: 'Ce qui est vraiment parti chaque mois : dépenses fixes passées, paiements en plusieurs fois, dépenses courantes notées. À la fin de chaque mois, ton serveur garde son bilan (24 mois au moins) ; touche un mois pour son détail.'
++          + (H.some((g) => g.estime) ? ' « ≈ » : un mois d’avant ce suivi, estimé d’après tes dépenses fixes d’aujourd’hui.' : '')}));
++    }
++    const RM93 = radMois;
++    radMois = function (m) {
++      const el = RM93.apply(this, arguments);
++      if (!m || !el) return el;
++      const dep = radDepense(m);
++      if (dep) { const pres = el.querySelector(':scope > .rad-vivre') || el.querySelector(':scope > .rad-mois-dont') || el.querySelector(':scope > .lead'); if (pres) pres.after(dep); else el.prepend(dep); }
++      if (m.historique) {   /* l'historique prend la place de « Six derniers mois » (un serveur d'avant garde ses six mois) */
++        const box = el.querySelector('.rad-evo-box'), six = box && box.closest('.panel'), neuf = radHisto(m), fin = el.lastElementChild;
++        if (six) six.replaceWith(neuf); else if (fin) fin.before(neuf); else el.append(neuf);
++      }
++      return el;
++    };
++    /* dans la grande carte, sous « Déjà prélevé » : le total du mois, qui ouvre « Le mois » */
++    const RHO93 = radHero;
++    radHero = function (R, d) {
++      const el = RHO93.apply(this, arguments), dep = d && d.mois && d.mois.depense, pl = el && el.querySelector('.rad-prog-l');
++      if (dep && pl) pl.after(h('button', {type: 'button', class: 'rad-deja-mois', onclick: () => { RAD.f = 'mois'; renderView(true); setTimeout(() => { const e = document.querySelector('.rad-depense'); if (e) e.scrollIntoView({block: 'center', behavior: 'smooth'}); }, 80); }},
++        radNw('Déjà dépensé en ' + moisLong(dep.mois) + ' : ' + radEur(dep.total)), h('span', {'aria-hidden': 'true', text: ' ›'})));
++      return el;
++    };
++
++    /* ---------- 2. Agenda, Grok arrêté : JARVIS ou Hermes à la place des bots ---------- */
++    const NAT93 = {bot: NATURE.bot, suivi: NATURE.suivi}, KL93 = {'e-bot': KLABEL['e-bot'], 'e-suivi': KLABEL['e-suivi']};
++    const GP93 = grokPause;
++    grokPause = function () {
++      const r = GP93.apply(this, arguments);
++      Object.assign(NATURE, GOFF.on ? {bot: "Hermes s'en occupe", suivi: 'Hermes suit'} : NAT93);
++      Object.assign(KLABEL, GOFF.on ? {'e-bot': "Hermes s'en occupe", 'e-suivi': 'Hermes suit'} : KL93);
++      return r;
++    };
++    /* « Écrire à Hermes » depuis une fiche : comme celui d'Équipe (0.86.0), avec le sujet de la fiche dans l'Objet de la ligne */
++    const ecrireHermes93 = (sujet) => openSheet({bot: 'hermes', kicker: 'Hermes', title: 'Écrire à Hermes', say: 'Une ligne pour lui dans le Canal : il la lit à son prochain passage et répond dans la colonne Réponse.',
++      actions: [act('Écrire', {tone: 'main', pick: {kind: 'text', label: 'Ton message pour Hermes', placeholder: 'Écris, ou dicte avec le micro du clavier'},
++        go: (v) => ({title: 'Message à Hermes', bot: 'hydra', objet: sujet || '', order: (sujet ? 'À propos de « ' + sujet + ' » : ' : '') + v.txt, effect: 'Une ligne pour Hermes dans le Canal : « ' + v.txt + ' », lue à son prochain passage.', say: 'Noté pour Hermes.'})})]});
++    const btnHermes = (sujet) => h('button', {type: 'button', class: 'btn talk-bot talk-hermes', style: botVars('hermes'), onclick: () => ecrireHermes93(sujet)}, C('hermes', 26).el,
++      h('span', {}, h('b', {text: 'Écrire à Hermes'}), h('small', {text: 'une ligne dans le Canal, lue à son prochain passage'})));
++    const btnTravail = () => h('button', {type: 'button', class: 'btn talk-bot talk-travail', onclick: () => { closeSheet(true); go('travail'); }}, h('span', {class: 'talk-ic', html: icon('cal', 20)}),
++      h('span', {}, h('b', {text: 'Voir Travail'}), h('small', {text: 'CRA et notes de frais : Hermes les fait sur le portail'})));
++    /* les fiches : l'avatar (JARVIS pour ce que la page et le serveur font eux-mêmes : présence, événement, anniversaire ; Hermes pour ce
++       que suivait un bot), « Suivi par », et « Écrire à Hermes » à la place de « Écrire à <bot> par le Canal ». Les fiches qui racontent
++       le passé (un ordre donné à un bot, la page d'un bot) et celles qui ont déjà leur version d'après Grok ne sont pas touchées. */
++    const SANS93 = new Set(['ordre', 'bot', 'demande', 'note', 'travail', 'draft']), JARVIS93 = new Set(['jour', 'evenement', 'anniv']);
++    Object.keys(SHEETCFG).forEach((type) => {
++      if (SANS93.has(type)) return;
++      const P = SHEETCFG[type];
++      SHEETCFG[type] = (item, ...reste) => {
++        const c = P(item, ...reste);
++        if (!GOFF.on || !c) return c;
++        const ech = type === 'echeance' && item ? item : null, fait = !!(ech && ech.doneBy), chronos = !!(ech && ech.bot === 'medusa'), kairos = !!(ech && ech.bot === 'unicorn');
++        if (!fait) {
++          if (JARVIS93.has(type)) c.bot = 'claude'; else if (estGrok(c.bot)) c.bot = 'hermes';
++          if (ech && estGrok(ech.bot) && Array.isArray(c.facts)) c.facts = c.facts.map((f) => (Array.isArray(f) && f[0] === 'Suivi par' ? ['Suivi par', chronos ? 'Hermes, sur le portail (espace Travail)' : kairos ? 'Hermes suit' : 'Hermes'] : f));
++          if (type === 'prix' && typeof c.kicker === 'string') c.kicker = c.kicker.replace(/Kairos/, 'Hermes suit');
++          if (ech && Array.isArray(c.actions)) {
++            c.actions = c.actions.filter((a) => !(a && a.label === 'Confier à un autre bot'));   /* il n'y a plus d'autre bot */
++            if (chronos) c.actions = [act('Voir Travail', {tone: 'main', cost: 'free', stay: true, go: () => { closeSheet(true); go('travail'); }})].concat(c.actions.map((a) => (a && a.tone === 'main' ? Object.assign({}, a, {tone: 'main2'}) : a)));
++          }
++        }
++        if (c.after) {
++          const A = c.after, sujet = String(c.title || '').slice(0, 120);
++          c.after = () => { const n = A(); if (n && n.querySelectorAll) { const tb = n.querySelectorAll('.talk-bot'); if (tb.length) tb.forEach((x) => x.replaceWith(btnHermes(sujet))); else if (n.querySelector('.talk-claude')) n.append(btnHermes(sujet));
++            if (chronos || type === 'jour') n.append(btnTravail()); } return n; };
++        }
++        return c;
++      };
++    });
++    /* ce qu'une action répond : la présence sert au CRA d'Hermes, les rappels sont ceux de JARVIS ; une action sans ordre ne montre plus le bot d'avant */
++    const QUI93 = '(Iris|Chronos|Kairos|Ulysse|Athéna|Argus|Plutus)';
++    const FIN93 = finish;
++    finish = function (e, ctx) {
++      if (GOFF.on && e && typeof e === 'object') {
++        if (typeof e.effect === 'string') e.effect = e.effect.replace(/ ; Chronos en tient compte\./, ' ; Hermes en tient compte pour le CRA (espace Travail).')
++          .replace(new RegExp('\\b' + QUI93 + '(?= (retire ses rappels|replanifie les rappels|te le rappelle|te la rappelle))', 'g'), 'JARVIS')
++          .replace(new RegExp('\\b' + QUI93 + '(?= (annule la relance|la suit|le suit))', 'g'), 'Hermes').replace(/confiée à Iris\./, 'confiée à Hermes.');
++        if (!e.order && estGrok(e.bot)) e.bot = ctx && JARVIS93.has(ctx.type) ? 'claude' : 'hermes';
++      }
++      return FIN93.apply(this, arguments);
++    };
++    const AS93 = applySmart;
++    applySmart = function (cfg) {
++      const r = AS93.apply(this, arguments);
++      if (GOFF.on && cfg && cfg.smart && typeof cfg.smart.text === 'string') cfg.smart.text = cfg.smart.text.replace(new RegExp('\\b' + QUI93 + '(?= te l[ea] rappelle)', 'g'), 'JARVIS');
++      return r;
++    };
++    /* les jours : ce que suivait un bot porte l'emblème et le nom d'Hermes (mois, semaine, aujourd'hui, feuille du jour) ; ce qu'un bot a
++       déjà fait garde son nom */
++    const DI93 = dayItems;
++    dayItems = function () {
++      const l = DI93.apply(this, arguments);
++      if (!GOFF.on) return l;
++      return l.map((x) => (x && estGrok(x.bot) && !/· fait ✓$/.test(String(x.label || '')) ? Object.assign({}, x, {bot0: x.bot, bot: 'hermes', k: /^b-/.test(x.k) ? 'b-hermes' : x.k}) : x));
++    };
++    const DE93 = dayExtra;
++    dayExtra = function (iso) {
++      const el = DE93.apply(this, arguments);
++      if (!GOFF.on || !el) return el;
++      const its = dayItems(iso).filter((x) => x.k !== 'pr'), rows = el.querySelectorAll('.day-list .dl-row');
++      its.forEach((x, i) => { const sm = rows[i] && rows[i].querySelector('small'); if (!sm) return;
++        if (x.bot0 === 'unicorn') sm.textContent = 'Hermes suit'; else if (x.bot0 === 'medusa') sm.textContent = 'Hermes · voir Travail'; else if (!x.bot0 && estGrok(x.bot)) sm.textContent = 'fait par ' + lvName(x.bot); });
++      return el;
++    };
++    /* la légende : une seule ligne « Hermes » à la place des sept bots */
++    const CAL93 = calendar;
++    calendar = function () {
++      if (GOFF.on && /^b-/.test(CAL.filter || '') && CAL.filter !== 'b-hermes') CAL.filter = 'b-hermes';
++      const box = CAL93.apply(this, arguments);
++      if (!GOFF.on || !box) return box;
++      const t = [...box.querySelectorAll('.cal-legend .lg-t')].find((x) => /^Fait par un bot/.test(x.textContent)), row = t && t.nextElementSibling;
++      if (t && row) {
++        let n = 0; for (let d = 1, nd = new Date(CAL.y, CAL.m + 1, 0).getDate(); d <= nd; d++) n += dayItems(CAL.y + '-' + pad2(CAL.m + 1) + '-' + pad2(d)).filter((x) => x.k === 'b-hermes').length;
++        t.textContent = 'Fait par Hermes, rien à faire pour toi';
++        row.replaceChildren(h('button', {type: 'button', class: 'lg-chip' + (CAL.filter === 'b-hermes' ? ' is-on' : ''), 'aria-pressed': String(CAL.filter === 'b-hermes'), onclick: () => { CAL.filter = CAL.filter === 'b-hermes' ? null : 'b-hermes'; renderView(true); }},
++          kIcon('b-hermes', 14), h('span', {text: 'Hermes · relances, prix suivis, CRA et notes de frais'}), n ? h('b', {text: String(n)}) : null));
++      }
++      return box;
++    };
++
++    /* ---------- 3. Pour moi : une seule carte par sujet lié ----------
++       Un sujet = un dossier de Pilotage encore ouvert (qu'il attende sa réponse ou celle de quelqu'un d'autre). Un élément de « Pour moi »
++       (une demande venue du Canal ou d'un dossier, un brouillon Gmail sans carte, une réponse reçue sur un dossier) ou une échéance lui
++       est rattaché par cette règle, dans cet ordre ; à chaque niveau, deux dossiers possibles = aucun (dans le doute, on ne réunit pas) :
++       1. lien explicite : l'Objet de la ligne du Canal, le libellé lui-même, ou un nom entre « » ou entre parenthèses est le nom d'un
++          dossier (sans la casse, les accents ni la ponctuation ; le nom du dossier avec ou sans sa propre parenthèse) ;
++       2. un nom raccourci entre parenthèses : tous ses mots significatifs sont dans le nom d'un seul dossier (« (rachat Expresso) » pour
++          « Rachat du crédit Expresso (organisme) ») ; deux mots au moins, ou un seul d'au moins 6 lettres ;
++       3. rapprochement prudent : tous les mots significatifs du nom du dossier (sans sa parenthèse) sont dans le libellé ; deux mots au
++          moins, dont un d'au moins 5 lettres. Un libellé plus court que le nom du dossier ne suffit pas.
++       Aux niveaux 2 et 3, si le libellé et le dossier portent tous deux des nombres (des dates), ceux de l'un doivent tous être dans
++       l'autre : « la garde du 12 au 16/04 » ne va pas avec le dossier de « la garde du 15 au 19/02 ».
++       Un mot significatif : 3 lettres au moins, sans accent, pas un nombre, ni un mot vide, ni un mot trop commun des suivis (dossier,
++       relance, rappel, demande, réponse…). Sans dossier, deux demandes ne se réunissent que par un lien explicite (même Objet, même libellé).
++       Un brouillon Gmail est lu par son objet, puis par son objet et le début de son texte ; une réponse reçue appartient au dossier où
++       JARVIS l'a repérée. Ne sont jamais réunis : un « oui » à donner dans le chat d'un bot, les cartes du CRA et des notes de frais, les
++       brouillons des mails du mois pour le travail (CRA, prolongation : espace Travail). */
++    const sjPlat = (t) => String(t == null ? '' : t).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
++    const sjCle = (t) => sjPlat(t).replace(/[^a-z0-9]+/g, ' ').trim();
++    const SJ_VIDES = new Set('les des une aux sur par pour avec sans dans que qui ses son mes mon ton tes nos vos leur leurs est pas plus chez vers sous entre depuis pendant avant apres cette ces cet votre notre tout tous toute toutes the and for from'.split(' '));
++    const SJ_COMMUNS = new Set(('dossier dossiers demande demandes demander relance relancer relances rappel rappels rappeler reponse reponses repondre question questions point suivi suite attente brouillon mail mails message messages courrier appel appeler '
++      + 'rendez vous etape prochaine faire envoyer prendre choisir verifier representer confirmer decision choix info infos ordre reprise urgent nouveau nouvelle date premier premiere dernier derniere').split(' '));
++    const sjMots = (t) => new Set((sjPlat(t).match(/[a-z0-9]+/g) || []).filter((w) => w.length >= 3 && !/^\d+$/.test(w) && !SJ_VIDES.has(w) && !SJ_COMMUNS.has(w)));
++    const sjDans = (a, b) => { for (const w of a) if (!b.has(w)) return false; return true; };
++    const sjLong = (a, n) => [...a].some((w) => w.length >= n);
++    const sjSansPar = (t) => String(t || '').replace(/\s*\([^)]*\)\s*/g, ' ').trim();
++    const sjEntre = (t) => [...String(t || '').matchAll(/\(([^)]{2,80})\)|«\s*([^»]{2,120}?)\s*»/g)].map((m) => ({par: m[1] != null, txt: m[1] != null ? m[1] : m[2]}));
++    const sjNums = (t) => new Set(sjPlat(t).match(/\d+/g) || []);
++    const sjNumsOk = (a, b) => !a.size || !b.size || sjDans(a, b) || sjDans(b, a);
++    const sjSujet = (nom) => { const tout = sjMots(nom), sans = sjMots(sjSansPar(nom)); return {nom: String(nom).trim(), cle: sjCle(nom), cleSans: sjCle(sjSansPar(nom)), mots: tout, coeur: sans.size >= 2 ? sans : tout, nums: sjNums(nom)}; };
++    function sjDossiers() {
++      const out = [], vu = new Set(), add = (n) => { const c = sjCle(n); if (c && !vu.has(c)) { vu.add(c); out.push(sjSujet(n)); } };
++      const rows = LV.t && LV.t.dos && LV.t.dos.rows;
++      if (rows) rows.forEach((r) => { if (r['Dossier'] && !/^(fait|transf|clos|annul|trait)/.test(lvLow(r['Statut']))) add(r['Dossier']); });
++      else { (S.dossiers || []).forEach((k) => add(k.title)); (S.demandes || []).forEach((d) => { if (/^Dossier «/.test(String(d.src || ''))) add(d.title); }); }
++      return out;
++    }
++    function sjLier(label, objet, D, texte) {
++      const un = (l) => (l.length === 1 ? l[0] : null), entre = sjEntre(label).concat(sjEntre(objet));
++      /* 1. explicite (dans un message, seul un nom entre « » compte) */
++      const cles = [sjCle(objet), sjCle(label)].concat(entre.map((x) => sjCle(x.txt)), sjEntre(texte).filter((x) => !x.par).map((x) => sjCle(x.txt))).filter(Boolean);
++      let l = D.filter((d) => cles.includes(d.cle)); if (l.length) return un(l);
++      l = D.filter((d) => d.cleSans && d.cleSans !== d.cle && cles.includes(d.cleSans)); if (l.length) return un(l);
++      /* 2. un nom raccourci entre parenthèses */
++      const nums = sjNums(label + ' ' + (objet || ''));
++      for (const x of entre.filter((y) => y.par)) { const P = sjMots(x.txt); if (!(P.size >= 2 || (P.size === 1 && sjLong(P, 6)))) continue; l = D.filter((d) => sjDans(P, d.mots) && sjNumsOk(nums, d.nums)); if (l.length) return un(l); }
++      /* 3. rapprochement prudent */
++      const B = sjMots(label + ' ' + (objet || ''));
++      return un(D.filter((d) => d.coeur.size >= 2 && sjLong(d.coeur, 5) && sjDans(d.coeur, B) && sjNumsOk(nums, d.nums)));
++    }
++    const sjCanalDe = (d) => (S.canal || []).find((l) => l.subject === d.title && (['toi', 'rabie'].includes(l.to) || /^attend ton oui/i.test(String(l.status || '')))) || null;
++    /* les mails du mois pour le travail (CRA, prolongation) ont leur carte dans l'espace Travail : ils ne sont pas rangés ici */
++    const SJ_TRAVAIL = /\bcra\b|prolongation|feuille de temps|timesheet|compte[- ]rendu d.activit/i;
++    function sujets() {
++      const D = sjDossiers(), G = new Map();
++      const grp = (cle, nom) => { let g = G.get(cle); if (!g) { g = {cle, nom, dem: [], rep: [], br: [], ech: []}; G.set(cle, g); } return g; };
++      (S.demandes || []).forEach((d) => {
++        if (!d || d.kind === 'oui' || d.bot === 'medusa' || isCraDem(d)) return;
++        const ln = /^Dossier «/.test(String(d.src || '')) ? null : sjCanalDe(d), objet = (ln && ln.objet) || '', k = sjLier(d.title, objet, D, d.ask);
++        if (k) grp('d|' + k.cle, k.nom).dem.push(d);
++        else if (sjCle(objet)) grp('o|' + sjCle(objet), String(objet).trim()).dem.push(d);
++        else grp('t|' + sjCle(d.title), d.title).dem.push(d);
++      });
++      /* une réponse reçue : le dossier où JARVIS l'a repérée ; un brouillon Gmail sans carte : son objet, puis son objet et le début de son texte */
++      (S.dosReplies || []).forEach((x) => { if (x && x.k && sjCle(x.k.title)) grp('d|' + sjCle(x.k.title), x.k.title).rep.push(x); });
++      (S.drafts || []).forEach((x) => { if (!x || demandeOfDraft(x) || SJ_TRAVAIL.test(String(x.subject || ''))) return; const k = sjLier(x.subject || '', '', D, x.body) || sjLier(String(x.subject || '') + ' ' + String(x.body || '').slice(0, 300), '', D); if (k) grp('d|' + k.cle, k.nom).br.push(x); });
++      /* les échéances : rattachées à un sujet qui a une carte (un dossier, ou une demande sans dossier : même règle, son libellé comme nom) */
++      const noms = [...G.values()].map((g) => Object.assign(sjSujet(g.nom), {g}));
++      (S.echeances || []).forEach((e) => { if (!e || e.doneBy) return; const k = sjLier(e.title, '', noms); if (k) k.g.ech.push(e); });
++      const X = {tetes: new Map(), absorbe: new Set(), de: new Map()};
++      for (const g of G.values()) {
++        const cartes = g.dem.length + g.rep.length + g.br.length;
++        if (!cartes || cartes + g.ech.length < 2) continue;
++        const urg = (d) => (d.due == null ? 9999 : d.due), sien = (d) => (sjCle(d.title) === sjCle(g.nom) ? 0 : 1);
++        g.dem = g.dem.map((d, i) => ({d, i})).sort((a, b) => urg(a.d) - urg(b.d) || (a.d.kind === 'afaire') - (b.d.kind === 'afaire') || sien(a.d) - sien(b.d) || a.i - b.i).map((x) => x.d);
++        g.ech.sort((a, b) => a.n - b.n);
++        /* en tête : la demande la plus urgente ; sans demande, la réponse reçue, sinon le brouillon */
++        g.tete = g.dem[0] || g.rep[0] || g.br[0];
++        /* la plus urgente : une demande, ou une échéance qui le concerne (pas celle qu'Hermes ou un bot suit seul) */
++        g.due = [...g.dem.map((d) => d.due), ...g.ech.filter((e) => !['bot', 'suivi'].includes(e.nature) && e.n >= -30).map((e) => e.n)].filter((n) => n != null).reduce((a, b) => (a == null || b < a ? b : a), null);
++        X.tetes.set(g.tete, g); g.dem.forEach((d) => X.de.set(d, g));
++        g.dem.concat(g.rep, g.br).forEach((x) => { if (x !== g.tete) X.absorbe.add(x); });
++      }
++      return X;
++    }
++    const sjRow = (ic, titre, sous, urgent, open, k) => h('button', {type: 'button', class: 'pm-lie' + (urgent ? ' is-urgent' : ''), 'data-k': k, onclick: (ev) => { ev.stopPropagation(); open(); }},
++      h('span', {class: 'pm-lie-ic', html: icon(ic, 15)}), h('span', {class: 'pm-lie-tx'}, h('b', {text: titre}), h('small', {text: sous})), h('span', {class: 'pm-lie-go', 'aria-hidden': 'true', text: '›'}));
++    /* ce qui est lié au sujet, sauf l'élément déjà affiché : chaque ligne ouvre la feuille de l'élément, avec ses actions */
++    function sjLies(g, sauf) {
++      const qui = (d) => (GOFF.on && estGrok(d.bot) ? 'Hermes' : lvName(d.bot)), kd = (d) => PM_KIND[d.kind] || PM_KIND.afaire, rows = [];
++      g.dem.filter((d) => d !== sauf).forEach((d) => rows.push(sjRow(kd(d)[1], sjCle(d.title) === sjCle(g.nom) ? (cap1(pmAsk(d)) || d.title) : d.title, kd(d)[0] + ' · ' + qui(d) + (d.due != null ? ' · ' + dueTxt(d.due) : ''), d.due != null && d.due <= 3, () => openItem('demande', d), d.id)));
++      g.rep.filter((x) => x !== sauf).forEach((x) => rows.push(sjRow('inbox', 'Réponse reçue de ' + x.mail.from, x.mail.subject, true, () => openSheet({bot: GOFF.on && estGrok(x.k.bot) ? 'hermes' : x.k.bot, kicker: 'Réponse reçue · ' + x.k.title, title: x.mail.subject, say: x.mail.snippet || 'Une réponse est arrivée sur ce dossier.', extra: () => dosReplyCard(x), actions: []}), x.id)));
++      g.br.filter((x) => x !== sauf).forEach((x) => rows.push(sjRow('send', x.subject || 'Brouillon sans objet', 'Brouillon prêt' + ((x.to || []).length ? ' · à ' + x.to[0] : ' · sans destinataire'), false, () => openItem('draft', x), 'b:' + x.id)));
++      g.ech.forEach((e) => rows.push(sjRow('cal', e.title, NATURE[e.nature] + ' · ' + late(e.n), e.n <= 3 && !['bot', 'suivi'].includes(e.nature), () => openItem('echeance', e), e.id)));
++      return rows.length ? h('div', {class: 'pm-lies'}, h('small', {class: 'pm-lies-t', text: 'Aussi dans ce sujet · ' + rows.length}), rows) : null;
++    }
++    /* pendant l'affichage de « Pour moi » et de l'accueil, la liste ne garde qu'une demande par sujet (la plus urgente) ; les autres sont
++       dans sa carte. Rien n'est retiré pour de bon : les feuilles, les notifications (#voir-<ligne>) et « une par une » voient tout. */
++    const SJ = {X: null};
++    const avecSujets = (fn) => {
++      if (SJ.X) return fn();
++      const X = sujets(); if (!X.tetes.size) return fn();
++      const garde = (l) => (l || []).filter((x) => !X.absorbe.has(x)), dem0 = S.demandes, rep0 = S.dosReplies, br0 = S.drafts, dem1 = garde(dem0), rep1 = garde(rep0), br1 = garde(br0);
++      S.demandes = dem1; S.dosReplies = rep1; S.drafts = br1; SJ.X = X;
++      try { return fn(); } finally { if (S.demandes === dem1) S.demandes = dem0; if (S.dosReplies === rep1) S.dosReplies = rep0; if (S.drafts === br1) S.drafts = br0; SJ.X = null; }
++    };
++    /* la carte du sujet : celle de l'élément en tête, au nom du sujet, avec la pastille de ce qui presse le plus et la liste du reste */
++    const sjPastille = (n) => h('span', {class: 'pill is-amber', text: n < 0 ? 'En retard' : n === 0 ? "Aujourd'hui" : 'Dans ' + n + ' j'});
++    function sjHabille(card, g, tete) {
++      if (!g || !card) return card;
++      card.classList.add('pm-sujet'); card.dataset.sujet = g.nom; card.dataset.n = String(g.dem.length + g.rep.length + g.br.length + g.ech.length);
++      const dem = g.dem.includes(tete), t = card.querySelector(dem ? '.pm-title' : '.item-title'), head = card.querySelector(dem ? '.pm-head' : '.item-head');
++      if (t && dem && sjCle(tete.title) !== sjCle(g.nom)) { t.textContent = g.nom; t.after(h('p', {class: 'pm-sj-de', text: tete.title})); }
++      else if (t && !dem && sjCle(t.textContent) !== sjCle(g.nom)) t.before(h('p', {class: 'pm-sj-de pm-sj-nom', text: g.nom}));
++      if (head && g.due != null && g.due <= 3 && !head.querySelector('.st-exp') && (!dem || tete.due == null || g.due < tete.due)) { const old = head.querySelector('.pill.is-amber'); if (old) old.remove(); head.append(sjPastille(g.due)); }
++      const box = sjLies(g, tete); if (box) card.append(box);
++      return card;
++    }
++    const PMC93 = pmCard;
++    pmCard = function (d) { return sjHabille(PMC93.apply(this, arguments), SJ.X && SJ.X.tetes.get(d), d); };
++    const DRC93 = dosReplyCard;
++    dosReplyCard = function (x) { return sjHabille(DRC93.apply(this, arguments), SJ.X && SJ.X.tetes.get(x), x); };
++    const DC93 = draftCard;
++    draftCard = function (x) { return sjHabille(DC93.apply(this, arguments), SJ.X && SJ.X.tetes.get(x), x); };
++    const SD93 = SHEETCFG.demande;
++    SHEETCFG.demande = (d) => {
++      const c = SD93(d); if (!c) return c;
++      const g = sujets().de.get(d); if (!g) return c;
++      const E = c.extra; c.extra = () => h('div', {class: 'stack'}, sjLies(g, d), E ? E() : null);
++      return c;
++    };
++    const VD93 = VIEWS.demandes;
++    VIEWS.demandes = (el) => (typeof FOCUS === 'object' && FOCUS && FOCUS.on ? VD93(el) : avecSujets(() => VD93(el)));
++    const VA93 = VIEWS.accueil;
++    VIEWS.accueil = (el) => avecSujets(() => VA93(el));
++    /* le compte « pour toi » (en-tête, pastille, accueil) compte les sujets */
++    const PMN93 = pourMoiN;
++    pourMoiN = function () { const n = PMN93.apply(this, arguments); return SJ.X ? n : Math.max(0, n - sujets().absorbe.size); };
++
++    document.head.append(h('style', {id: 'ux-0930', text: ''
++      + '.rad-depense{display:grid;gap:6px;padding:16px}.rad-depense p{margin:0}.rad-dep-det>summary{cursor:pointer;color:var(--muted);font-size:13.5px;padding:6px 0}'
++      + '.rad-dep-l{display:grid;gap:9px;padding-top:6px}.rad-dep-r{display:grid;grid-template-columns:3.2em minmax(0,1fr) auto;gap:10px;align-items:center}'
++      + '.rad-dep-s{display:grid;min-width:0}.rad-dep-s b{font:600 14px var(--sans);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.rad-dep-s small{color:var(--muted);font-size:12.5px}'
++      + '.rad-deja-mois{display:block;margin:8px 0 0;padding:4px 0;background:none;border:0;color:rgb(var(--c2));font:600 13.5px var(--sans);text-align:left;cursor:pointer}'
++      + '.rad-hist .rad-evo-box{gap:3px}.rad-hm>summary{list-style:none;cursor:pointer;min-height:38px}.rad-hm>summary::-webkit-details-marker{display:none}'
++      + '.rad-hm .rad-evo-v{text-align:right}.rad-hm .rad-evo-v small{display:block;font:500 11px var(--sans);color:var(--muted)}.rad-hm.is-estime .rad-evo-v{color:var(--muted)}'
++      + '.rad-hm-b{display:grid;gap:8px;margin:8px 0 6px;padding:10px 12px;border-radius:12px;background:rgba(255,255,255,.04)}'
++      + '.rad-hm-l{margin:0;display:grid;gap:5px}.rad-hm-l div{display:flex;justify-content:space-between;gap:10px}.rad-hm-l dt{color:var(--muted);font-size:13.5px}.rad-hm-l dd{margin:0;font:600 14px var(--display);text-align:right}'
++      + '.rad-hm-p{list-style:none;margin:0;padding:8px 0 0;display:grid;gap:4px;border-top:1px solid rgba(255,255,255,.08)}.rad-hm-p li{display:flex;justify-content:space-between;gap:10px;font-size:13.5px}.rad-hm-p li span{color:var(--muted)}'
++      + '.rad-hm-n{margin:0;font-size:12.5px}.rad-hist-plus{justify-self:start}'
++      + '.talk-travail .talk-ic{display:inline-flex;color:var(--muted)}'
++      + '.pm-sujet .pm-sj-de{margin:-4px 0 0;font:600 13.5px var(--sans);color:var(--muted)}.pm-sujet .pm-sj-nom{margin:0}'
++      + '.pm-lies{display:grid;gap:6px;margin-top:4px;padding-top:10px;border-top:1px solid rgba(255,255,255,.08)}.pm-lies-t{font:600 11px var(--sans);letter-spacing:.08em;text-transform:uppercase;color:var(--dim)}'
++      + '.pm-lie{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:10px;width:100%;min-height:44px;padding:8px 10px;border-radius:12px;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.03);color:var(--fg);text-align:left;cursor:pointer;font:inherit}'
++      + '.pm-lie-tx{display:grid;gap:1px;min-width:0}.pm-lie-tx b{font:600 14px var(--sans);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.pm-lie-tx small{color:var(--muted);font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}'
++      + '.pm-lie.is-urgent{border-color:rgba(251,191,36,.45)}.pm-lie.is-urgent small{color:#fbbf24}.pm-lie-ic{display:inline-flex;color:var(--muted)}.pm-lie-go{color:var(--muted);font-size:18px}'}));
++    /* pour le banc : la règle de rapprochement, seule */
++    window.__sujets93 = {lier: (label, objet, noms, texte) => { const k = sjLier(label, objet, (noms || []).map(sjSujet), texte); return k ? k.nom : null; }, mots: (t) => [...sjMots(t)]};
++  }
++
+   boot();
+ })();
+ </script>
+diff --git a/jarvis-os/server/radar.mjs b/jarvis-os/server/radar.mjs
+index dc34d45..c3f8d27 100644
+--- a/jarvis-os/server/radar.mjs
++++ b/jarvis-os/server/radar.mjs
+@@ -104,6 +104,36 @@ export function courantes(liste, a, b) {
+ export const courantDuMois = (c, Y, M) => courantes([{...c, faits: [], reels: []}], J(Y, M, 1), J(Y, M, dim(Y, M)))[0].montant;
+ export const RANG_COURANT = {courses: 'Alimentation', boucherie: 'Alimentation', marche: 'Alimentation', restaurant: 'Restaurants et repas livrés', livraison: 'Restaurants et repas livrés', essence: 'Voiture', parking: 'Voiture',
+   menage: 'Maison', coiffeur: 'Soin et santé', pharmacie: 'Soin et santé'};
++/* 0.93.0 (sa demande du 26/11/2026 : « déjà dépensé ce mois » et un historique) : ce qui est parti entre deux dates comprises.
++   - ses dépenses fixes dont le jour est passé (`occurrences` : une dépense qui commence plus tard, finie ou résiliée, la facture du mois,
++     le montant du mois d'un contrat ; une dépense retirée de sa liste n'est plus comptée) ;
++   - les échéances de ses paiements en plusieurs fois (comptées à part : `plans`) : celles dont la date est passée, ou qu'un mail dit
++     payées ; un paiement dit « plus à payer » (achat annulé, remboursé) ne compte pas du tout ;
++   - ce qu'il a noté de ses dépenses courantes (`reels`), jusqu'à `notesJusqua` ; une dépense « une fois par mois » cochée « Fait ce
++     mois-ci » sans note compte pour son montant prévu.
++   Rend les totaux, les postes (catégorie des dépenses fixes, rangement des dépenses courantes) et le détail ligne par ligne. */
++export function depenseEntre({fixes = [], courantes: cr = [], plans = {}, plansRetires = []} = {}, a, b, {notesJusqua = b} = {}) {
++  const lignes = [], da = ymd(a), db = ymd(b), dn = ymd(notesJusqua), moisA = da.slice(0, 7), ret = new Set(plansRetires || []);
++  if (b >= a) for (const f of fixes || []) for (const o of occurrences(f, a, b)) lignes.push({date: ymd(o.le), service: o.f.service, montant: cents(o.f.montant) / 100, poste: o.f.cat || 'Autres', sorte: 'fixe', ...(o.f.estime ? {estime: true} : {})});
++  for (const p of Object.values(plans || {})) {
++    if (!p || ret.has(p.id) || !Array.isArray(p.echeances)) continue;
++    const nom = (p.fois ? 'Paiement en ' + p.fois + ' fois : ' : 'Paiement en plusieurs fois : ') + (p.service || '');
++    for (const e of p.echeances) if (e && e.date >= da && (e.date <= db || (e.payee && e.date.slice(0, 7) === moisA && e.date <= dn))) lignes.push({date: e.date, service: nom, montant: cents(e.montant) / 100, poste: 'Paiements en plusieurs fois', sorte: 'plan'});
++  }
++  for (const c of cr || []) {
++    const poste = RANG_COURANT[c.type] || 'Autres dépenses courantes';
++    for (const r of c.reels || []) if (r && r.d >= da && r.d <= dn) lignes.push({date: r.d, service: c.service, montant: cents(r.m) / 100, poste, sorte: 'courante'});
++    if (c.mode === 'mois') for (const ym of c.faits || []) if (ym >= moisA && ym <= dn.slice(0, 7) && !(c.reels || []).some((r) => String(r.d).slice(0, 7) === ym)) lignes.push({date: ym + '-01', service: c.service, montant: cents(c.montant) / 100, poste, sorte: 'courante', fait: true});
++  }
++  lignes.sort((x, y) => (x.date < y.date ? -1 : x.date > y.date ? 1 : cents(y.montant) - cents(x.montant)));
++  const som = (k) => lignes.reduce((t, l) => t + (l.sorte === k ? cents(l.montant) : 0), 0) / 100, nb = (k) => lignes.filter((l) => l.sorte === k).length;
++  const fx = som('fixe'), pl = som('plan'), co = som('courante'), par = new Map();
++  for (const l of lignes) { const k = (l.sorte === 'courante' ? 'c|' : 'f|') + l.poste, x = par.get(k) || {label: l.poste, montant: 0, n: 0, ...(l.sorte === 'courante' ? {courant: true} : {})}; x.montant += cents(l.montant); x.n++; par.set(k, x); }
++  const postes = [...par.values()].map((x) => ({...x, montant: x.montant / 100})).sort((x, y) => y.montant - x.montant || String(x.label).localeCompare(String(y.label), 'fr'));
++  return {fixes: fx, plans: pl, courantes: co, total: Math.round((fx + pl + co) * 100) / 100, nFixes: nb('fixe'), nPlans: nb('plan'), nNotes: nb('courante'), postes, lignes};
++}
++/* 0.93.0 : l'historique garde au moins 24 mois (36 ici) */
++export const HISTO_MOIS = 36;
+ export const eur = (n) => Number(n).toLocaleString('fr-FR', {minimumFractionDigits: 2, maximumFractionDigits: 2}).replace(/ /g, ' ') + ' €';
+ export const jourCourt = (x) => new Intl.DateTimeFormat('fr-FR', {timeZone: 'UTC', weekday: 'short'}).format(x) + ' ' + String(x.getUTCDate()).padStart(2, '0') + '/' + String(x.getUTCMonth() + 1).padStart(2, '0');
+ const MOIS_L = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
+@@ -1111,6 +1141,7 @@ export function createRadar({file, gmail, claude = async () => ({ok: false, erro
+       const t = paris(new Date(now()));
+       if (t.hm >= matin && R.jours.matin !== t.ymd && gmail.lie()) { R.jours.matin = t.ymd; noter(); if (R.scan && R.scan.fini) lancer(quotidien).catch(() => {}); }
+       if (t.hm >= soir && R.jours.soir !== t.ymd) { R.jours.soir = t.ymd; noter(); veille().catch(() => {}); }
++      if (cloturer(auj())) noter();   /* 0.93.0 : le premier tic d'un mois nouveau garde le bilan du mois clos (aucune notification) */
+     } catch (e) { log('radar : tic impossible (' + TXT((e && e.message) || e, 200) + ')'); }
+   }
+   let timer = null;
+@@ -1120,7 +1151,35 @@ export function createRadar({file, gmail, claude = async () => ({ok: false, erro
+   /* le mois : ses dépenses fixes par catégorie. 0.81.0 (ses choix du 24/11/2026) : avec ses dépenses courantes (le mois entier, estimé), ce
+      qu'il a noté avoir dépensé, le reste à vivre s'il a donné le montant de sa paie, et les six derniers mois. Le total des dépenses courantes
+      de chaque mois est retenu au fil de l'eau (`R.evolution`) : un mois d'avant leur saisie n'en a pas. */
++  /* 0.93.0 (sa demande du 26/11/2026) : l'historique mois par mois. À la fin de chaque mois (au premier calcul du mois suivant : le tic de
++     minuit, ou la première ouverture du Radar si le serveur était arrêté), le bilan du mois clos est gardé dans `R.historique.mois` et ne
++     bouge plus : dépenses fixes passées, échéances de ses paiements en plusieurs fois, dépenses courantes notées, par poste, le budget des
++     dépenses courantes retenu au fil de l'eau (`R.evolution`), et le reste à vivre s'il avait donné le montant de sa paie. `suivi` = le mois
++     que le Radar suivait à son dernier calcul : un mois clos sans avoir été suivi (serveur arrêté plusieurs mois) est dit « reconstitué ».
++     Sur ce serveur seulement, comme le reste de radar.json : ni Pilotage, ni mémoire, ni serveur MCP, ni notification, ni journal. */
++  const arr2 = (n) => Math.round(n * 100) / 100;
++  function bilanDe(ym, t, reconstitue) {
++    const [Y, M] = ym.split('-').map(Number), a = J(Y, M - 1, 1), b = J(Y, M - 1, dim(Y, M - 1));
++    const d = depenseEntre({fixes: R.fixes, courantes: R.courantes, plans: vue().plans, plansRetires: R.plansRetires}, a, b), paie = (R.revenus && R.revenus.montant) || null;
++    return {mois: ym, fixes: d.fixes, plans: d.plans, courantes: d.courantes, total: d.total, ...(R.evolution && ym in R.evolution ? {prevu: R.evolution[ym]} : {}), postes: d.postes,
++      ...(paie ? {paie, resteAVivre: arr2(paie - d.total)} : {}), clos: ymd(t), ...(reconstitue ? {reconstitue: true} : {})};
++  }
++  function cloturer(t) {
++    const cur = ymd(t).slice(0, 7);
++    if (!R.historique || typeof R.historique !== 'object' || Array.isArray(R.historique) || !R.historique.mois || typeof R.historique.mois !== 'object') R.historique = {mois: {}, suivi: null};
++    const H = R.historique;
++    if (H.suivi === cur || (H.suivi && H.suivi > cur)) return false;   /* déjà fait ce mois-ci ; une horloge qui recule ne clôt ni n'efface rien */
++    const aClore = [];
++    if (/^\d{4}-\d{2}$/.test(String(H.suivi || ''))) { const p = depuisYmd(H.suivi + '-01'); for (let k = 0; k < 60; k++) { const ym = ymd(J(p.getUTCFullYear(), p.getUTCMonth() + k, 1)).slice(0, 7); if (ym >= cur) break; aClore.push(ym); } }
++    /* première fois (fichier d'avant 0.93.0) : les mois dont le budget des dépenses courantes avait été retenu (0.81.0) sont clos, « reconstitués » */
++    else aClore.push(...Object.keys(R.evolution || {}).filter((k) => /^\d{4}-\d{2}$/.test(k) && k < cur).sort());
++    for (const ym of aClore) if (!H.mois[ym]) H.mois[ym] = bilanDe(ym, t, ym !== H.suivi);
++    H.suivi = cur;
++    for (const k of Object.keys(H.mois).sort().slice(0, -HISTO_MOIS)) delete H.mois[k];
++    return true;
++  }
+   function moisDe(t) {
++    if (cloturer(t)) sauver();
+     const Y0 = t.getUTCFullYear(), M0 = t.getUTCMonth(), occ = (a, b) => R.fixes.flatMap((f) => occurrences(f, a, b)), som = (l) => l.reduce((s, o) => s + cents(o.f.montant), 0) / 100;
+     const bornes = (k) => { const p = J(Y0, M0 - k, 1); return {Y: p.getUTCFullYear(), M: p.getUTCMonth(), a: p, b: J(p.getUTCFullYear(), p.getUTCMonth(), dim(p.getUTCFullYear(), p.getUTCMonth())), ym: ymd(p).slice(0, 7)}; };
+     const cr = R.courantes || [], m = bornes(0), p = bornes(1), ce = occ(m.a, m.b), cats = [...new Set(ce.map((o) => o.f.cat || 'Autres'))];
+@@ -1128,12 +1187,24 @@ export function createRadar({file, gmail, claude = async () => ({ok: false, erro
+     const parts = cr.map((c) => ({c, montant: courantDuMois(c, m.Y, m.M), label: RANG_COURANT[c.type] || 'Autres dépenses courantes'})), totalCourantes = parts.reduce((s, x) => s + cents(x.montant), 0) / 100, totalFixes = som(ce);
+     R.evolution = R.evolution || {};
+     if (cr.length ? R.evolution[m.ym] !== totalCourantes : m.ym in R.evolution) { if (cr.length) R.evolution[m.ym] = totalCourantes; else delete R.evolution[m.ym]; for (const k of Object.keys(R.evolution).sort().slice(0, -24)) delete R.evolution[k]; sauver(); }
+-    const avant = (k) => { const b = bornes(k), f = som(occ(b.a, b.b)), c = k === 0 ? (cr.length ? totalCourantes : null) : (b.ym in R.evolution ? R.evolution[b.ym] : null); return {mois: b.ym, libelle: MOIS_L[b.M] + ' ' + b.Y, fixes: f, courantes: c, reel: reelDe(b.ym), total: Math.round((f + (c || 0)) * 100) / 100}; };
++    /* 0.93.0 : un mois clos garde son bilan (dépenses fixes, budget retenu, notes) : il ne bouge plus quand ses dépenses fixes changent */
++    const HM = R.historique.mois, lib = (ym) => MOIS_L[+ym.slice(5, 7) - 1] + ' ' + ym.slice(0, 4);
++    const avant = (k) => { const b = bornes(k), g = k > 0 ? HM[b.ym] : null; if (g) return {mois: b.ym, libelle: lib(b.ym), fixes: g.fixes, courantes: g.prevu ?? null, reel: g.courantes, total: arr2(g.fixes + (g.prevu || 0))};
++      const f = som(occ(b.a, b.b)), c = k === 0 ? (cr.length ? totalCourantes : null) : (b.ym in R.evolution ? R.evolution[b.ym] : null); return {mois: b.ym, libelle: MOIS_L[b.M] + ' ' + b.Y, fixes: f, courantes: c, reel: reelDe(b.ym), total: Math.round((f + (c || 0)) * 100) / 100}; };
+     const evolution = [5, 4, 3, 2, 1, 0].map(avant), total = Math.round((totalFixes + totalCourantes) * 100) / 100, paie = (R.revenus && R.revenus.montant) || null;
+     const postes = cats.map((c) => { const l = ce.filter((o) => (o.f.cat || 'Autres') === c); return {id: plat(c), label: c, montant: som(l), n: l.length}; })
+       .concat([...new Set(parts.map((x) => x.label))].map((lb) => { const l = parts.filter((x) => x.label === lb); return {id: 'c-' + plat(lb), label: lb, montant: l.reduce((s, x) => s + cents(x.montant), 0) / 100, courant: true, note: l.map((x) => x.c.service).join(', ') + ' · estimé'}; }))
+       .sort((a, b) => b.montant - a.montant);
+-    return {libelle: MOIS_L[M0] + ' ' + Y0, precedentLibelle: MOIS_L[p.M] + ' ' + p.Y, total, precedent: evolution[4].total, fixes: true, totalFixes, totalCourantes, reel: reelDe(m.ym), postes, evolution,
++    /* 0.93.0 : « déjà dépensé ce mois » : ses dépenses fixes passées (jusqu'à hier : celles d'aujourd'hui sont encore dans le reste à payer),
++       les échéances passées de ses paiements en plusieurs fois, et ce qu'il a noté de ses dépenses courantes ce mois-ci */
++    const hier = plus(t, -1), dep = depenseEntre({fixes: R.fixes, courantes: cr, plans: vue().plans, plansRetires: R.plansRetires}, m.a, hier, {notesJusqua: m.b});
++    const depense = {mois: m.ym, jusqua: hier >= m.a ? ymd(hier) : '', total: dep.total, fixes: dep.fixes, plans: dep.plans, courantes: dep.courantes, nFixes: dep.nFixes, nPlans: dep.nPlans, nNotes: dep.nNotes, postes: dep.postes, lignes: dep.lignes.slice(-120)};
++    /* l'historique, du plus récent au plus ancien : les mois clos (gardés), puis, tant qu'ils ne sont pas clos, les mois d'avant des « six mois »
++       (recalculés d'après ses dépenses fixes d'aujourd'hui : « estimé ») */
++    const historique = Object.values(HM).map((g) => ({...g, libelle: lib(g.mois)}))
++      .concat([1, 2, 3, 4, 5].map((k) => bornes(k)).filter((b) => !HM[b.ym]).map((b) => { const f = som(occ(b.a, b.b)), r = reelDe(b.ym); return {mois: b.ym, libelle: lib(b.ym), fixes: f, plans: 0, courantes: r, total: arr2(f + r), ...(b.ym in R.evolution ? {prevu: R.evolution[b.ym]} : {}), estime: true}; }))
++      .sort((x, y) => (x.mois < y.mois ? 1 : -1));
++    return {libelle: MOIS_L[M0] + ' ' + Y0, precedentLibelle: MOIS_L[p.M] + ' ' + p.Y, total, precedent: evolution[4].total, fixes: true, totalFixes, totalCourantes, reel: reelDe(m.ym), postes, evolution, depense, historique,
+       ...(paie ? {paie, resteAVivre: Math.round((paie - total) * 100) / 100} : {})};
+   }
+   /* 0.66.0 : l'historique d'une dépense : un prélèvement par mois (le mail le plus récent du mois, complété par les autres), le plus récent d'abord */
+diff --git a/jarvis-os/server/tests/radar-courantes.test.mjs b/jarvis-os/server/tests/radar-courantes.test.mjs
+index da6f035..967ac73 100644
+--- a/jarvis-os/server/tests/radar-courantes.test.mjs
++++ b/jarvis-os/server/tests/radar-courantes.test.mjs
+@@ -17,6 +17,11 @@ const auj = new Date(), jour = auj.getDate(), dernier = new Date(auj.getFullYear
+ const quarts = [[1, 7], [8, 14], [15, 21], [22, dernier]].filter(([, f]) => f >= jour).length;
+ let jeudis = 0; for (let d = jour; d <= dernier; d++) if (new Date(auj.getFullYear(), auj.getMonth(), d).getDay() === 4) jeudis++;
+ 
++/* 0.93.0 : un mois déjà gardé dans l'historique du Radar, posé avant le démarrage (montant sentinelle, inventé) : il doit s'afficher, et ne
++   sortir ni par le serveur MCP ni par la mémoire */
++const ymDe = (k) => { const d = new Date(auj.getFullYear(), auj.getMonth() + k, 1); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); };
++fs.writeFileSync(path.join(DATA, 'radar.json'), JSON.stringify({version: 7, historique: {suivi: ymDe(0), mois: {[ymDe(-1)]: {mois: ymDe(-1), fixes: 6543.21, plans: 0, courantes: 0, total: 6543.21, postes: [{label: 'Sentinelle', montant: 6543.21, n: 1}], clos: ymDe(0) + '-01'}}}}), {mode: 0o600});
++
+ let srv = null, nav = null;
+ try {
+   const code = execFileSync(process.execPath, [SRV, 'pair'], {env}).toString().match(/: ([A-Z0-9]{4}-[A-Z0-9]{4})/)[1];
+@@ -94,11 +99,20 @@ try {
+   const m1 = plat(await p.locator('.rad-mois').textContent());
+   await p.getByRole('button', {name: 'Donner le montant de ma paie'}).tap(); await p.waitForTimeout(500);
+   await p.locator('.rad-form input[inputmode=decimal]').fill('3000'); await p.locator('.rad-form button[type=submit]').tap(); await p.waitForTimeout(900);
+-  const m2 = plat(await p.locator('.rad-vivre').textContent()), evo = await p.locator('.rad-evo').count(), dernier6 = plat(await p.locator('.rad-evo').last().textContent()), premier6 = plat(await p.locator('.rad-evo-note').textContent());
++  const m2 = plat(await p.locator('.rad-vivre').textContent()), evo = await p.locator('.rad-evo').count(), enCours = plat(await p.locator('.rad-evo').first().textContent()), noteH = plat(await p.locator('.rad-evo-note').textContent());
++  /* 0.93.0 : « Déjà dépensé ce mois » et l'historique, tels que le serveur les donne */
++  const api93 = (await c('/api/radar', {headers: A})).body.mois, dep93 = plat(await p.locator('.rad-depense').textContent()), anciens = await p.locator('.rad-hm.is-estime').count(), garde = plat(await p.locator('.rad-hm[data-mois="' + ymDe(-1) + '"]').textContent());
+   ok('« Le mois » : 520 € en tout (400 de courses + 120 de boucherie, estimés), ce qui est noté, les postes « Alimentation » ; sans montant de paie, il le propose',
+     m1.includes(eur(520)) && m1.includes('environ ' + eur(520) + ' de dépenses courantes (estimé)') && m1.includes('Tu as noté ' + eur(350)) && /Alimentation/.test(m1) && /Donne le montant de ta paie/.test(m1), m1.slice(0, 400));
+-  ok('paie de 3 000 € saisie : « Reste à vivre ce mois-ci » 2 480 € (17 % de la paie partent en dépenses prévues) ; six mois affichés, le dernier avec ses dépenses courantes, les plus anciens sans',
+-    m2.includes(eur(2480)) && m2.includes('17 % de ta paie') && evo === 6 && dernier6.includes(eur(520)) && /prélèvements seulement, tes dépenses courantes n’étaient pas encore saisies/.test(premier6) && (await c('/api/radar', {headers: A})).body.revenus.montant === 3000, [m2, evo, dernier6].join(' | '));
++  ok('paie de 3 000 € saisie : « Reste à vivre ce mois-ci » 2 480 € (17 % de la paie partent en dépenses prévues) ; 0.93.0 : l\'historique à la place des six mois : le mois en cours en tête (en direct), le mois d\'avant tel qu\'il a été gardé (« Bilan gardé le … »), puis quatre mois plus anciens, estimés (« ≈ ») tant qu\'ils ne sont pas gardés',
++    m2.includes(eur(2480)) && m2.includes('17 % de ta paie') && evo === 6 && /en cours/.test(enCours) && enCours.includes(eur(api93.depense.total)) && anciens === 4 && api93.historique.length === 5 && api93.historique[0].mois === ymDe(-1) && !api93.historique[0].estime && api93.historique[0].total === 6543.21
++    && api93.historique.slice(1).every((x) => x.estime) && garde.includes(eur(6543.21)) && /Sentinelle/.test(garde) && /Bilan gardé le \d\d\/\d\d\/\d{4} : il ne change plus\./.test(garde) && /24 mois au moins/.test(noteH) && /« ≈ »/.test(noteH)
++    && (await c('/api/radar', {headers: A})).body.revenus.montant === 3000, [m2, evo, enCours, anciens, garde.slice(0, 160)].join(' | '));
++  ok('0.93.0 : « Déjà dépensé ce mois » sur le vrai serveur : les 350 € notés des courses et la boucherie cochée « Fait ce mois-ci » (120 €) = 470 € de dépenses courantes, plus les dépenses fixes déjà passées ; la carte et le serveur disent le même total',
++    api93.depense.courantes === 470 && api93.depense.nNotes === 2 && api93.depense.total === Math.round((470 + api93.depense.fixes + api93.depense.plans) * 100) / 100 && dep93.includes(eur(api93.depense.total)) && /de dépenses courantes notées \(2\)/.test(dep93) && !/null|undefined|NaN/.test(dep93),
++    JSON.stringify([api93.depense.total, api93.depense.fixes, api93.depense.courantes, dep93.slice(0, 200)]));
++  await seg('Fixes'); const hero93 = plat(await p.locator('.rad-hero .rad-deja-mois').textContent()); await seg('Le mois');
++  ok('0.93.0 : la grande carte dit « Déjà dépensé en <mois> » avec le même total, sous « Déjà prélevé »', /^Déjà dépensé en \S+ : /.test(hero93) && hero93.includes(eur(api93.depense.total)), hero93);
+   if (process.env.COURANTES_CAPTURE) { await p.evaluate(() => { document.querySelectorAll('.toast-x').forEach((b) => b.click()); const e = document.querySelector('.rad-mois'); if (e) e.scrollIntoView({block: 'start'}); }); await p.waitForTimeout(3500); await p.screenshot({path: process.env.COURANTES_CAPTURE + '-mois.png'}); }
+   await seg('Fixes');
+   await ouvrir('Courses'); await fiche.locator('.rad-cr-notes button').tap(); await p.waitForTimeout(800);
+@@ -121,6 +135,20 @@ try {
+     sansCas === 0 && encore === true && (await c('/api/radar', {headers: A})).body.courantes.find((x) => x.service === 'Courses').mode === 'mois', [sansCas, encore].join());
+   await modifier('Femme de ménage'); await form.getByRole('button', {name: 'Retirer cette dépense'}).tap(); await p.waitForTimeout(800);
+   ok('« Retirer cette dépense » : elle sort de la liste et du serveur', await ligne('Femme de ménage').count() === 0 && (await c('/api/radar', {headers: A})).body.courantes.length === 2);
++  /* 0.93.0 : sur le serveur seulement. Un exécutant relié (le profil le plus large du serveur MCP) appelle tous ses outils, la mémoire et l'état de
++     l'app sont lus, les autres fichiers du serveur sont relus : aucun des deux montants sentinelles du Radar (le mois gardé, la paie) n'en sort */
++  { await c('/api/radar/set', {method: 'POST', headers: A, body: JSON.stringify({cle: 'revenus', valeur: {jour: 28, avance: true, montant: 8765.43}})});
++    const SENT = [/6[\s\u00a0\u202f.]?543[.,]21/, /8[\s\u00a0\u202f.]?765[.,]43/], porte = (t) => SENT.filter((re) => re.test(String(t))).length;
++    const rad = JSON.stringify((await c('/api/radar', {headers: A})).body), jm = await c('/api/mcp/jeton', {method: 'POST', headers: A, body: JSON.stringify({nom: 'Banc du Radar', profil: 'executant'})});
++    const rpc = (m, params) => fetch(BASE + '/mcp', {method: 'POST', headers: {'content-type': 'application/json', authorization: 'Bearer ' + ((jm.body && jm.body.jeton) || '')}, body: JSON.stringify({jsonrpc: '2.0', id: 1, method: m, params})}).then(async (x) => ({status: x.status, txt: await x.text()}));
++    const liste = await rpc('tools/list', {}), noms = (((JSON.parse(liste.txt || '{}').result || {}).tools) || []).map((x) => x.name);
++    let sorti = liste.txt; for (const n of noms) sorti += '\n' + (await rpc('tools/call', {name: n, arguments: {}})).txt;
++    const adresses = ['/api/memoire', '/api/memory', '/api/snap', '/api/missions', '/api/mcp'], lues = []; for (const u of adresses) { const x = await c(u, {headers: A}); lues.push(x.status); sorti += '\n' + JSON.stringify(x.body); }
++    const fichiers = []; const voir = (d) => { for (const f of fs.readdirSync(d, {withFileTypes: true})) { const g = path.join(d, f.name); if (f.isDirectory()) voir(g); else if (f.isFile() && g !== path.join(DATA, 'radar.json') && fs.statSync(g).size < 2e6) fichiers.push(g); } }; voir(DATA);
++    const fuites = fichiers.filter((g) => porte(fs.readFileSync(g, 'utf8')) > 0).map((g) => path.relative(DATA, g));
++    ok('0.93.0 : sur le serveur seulement : l\'appareil relié reçoit les deux montants sentinelles du Radar (un mois gardé de l\'historique, la paie) ; aucun outil du serveur MCP (profil exécutant, tous appelés), ni la mémoire, ni l\'état de l\'app, ni aucun autre fichier du serveur ne les porte ; radar.json reste en 600',
++      porte(rad) === 2 && jm.status === 200 && liste.status === 200 && noms.length >= 10 && noms.includes('jarvis_memoire') && noms.includes('pilotage_lire') && lues[0] === 200 && porte(sorti) === 0 && fichiers.length >= 1 && fuites.length === 0
++      && porte(fs.readFileSync(path.join(DATA, 'radar.json'), 'utf8')) === 2 && (fs.statSync(path.join(DATA, 'radar.json')).mode & 0o777) === 0o600, JSON.stringify({radar: porte(rad), outils: noms.length, lues, sorti: porte(sorti), fuites, fichiers: fichiers.length})); }
+   ok('aucune erreur de script dans la page', errs.length === 0, errs.join(' | '));
+   if (process.env.COURANTES_CAPTURE) { await panneau.scrollIntoViewIfNeeded(); await p.screenshot({path: process.env.COURANTES_CAPTURE + '-panneau.png'}); await ajouter(); await p.waitForTimeout(500); await p.screenshot({path: process.env.COURANTES_CAPTURE + '-formulaire.png'}); }
+ } catch (e) { ok('le banc est allé au bout', false, (e && e.stack) || String(e)); }
+diff --git a/jarvis-os/server/tests/radar.test.mjs b/jarvis-os/server/tests/radar.test.mjs
+index dde0751..9b5cac3 100644
+--- a/jarvis-os/server/tests/radar.test.mjs
++++ b/jarvis-os/server/tests/radar.test.mjs
+@@ -1,6 +1,6 @@
+ /* Banc du Radar : node tests/radar.test.mjs (aucun vrai Google, aucun vrai Claude, aucun coût). Mails et montants inventés. */
+ import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path';
+-import {J, ymd, feries, occurrences, paies, resteA, trouverMontant, trouverDate, genre, avantApres, lireMail, regrouper, nomService, categorie, montantDe, createRadar, domaine, montantPdf, rythmeDe, sansPub, prelevementsPdf, calendrierPdf, montantPalier, courantes} from '../radar.mjs';
++import {J, ymd, feries, occurrences, paies, resteA, trouverMontant, trouverDate, genre, avantApres, lireMail, regrouper, nomService, categorie, montantDe, createRadar, domaine, montantPdf, rythmeDe, sansPub, prelevementsPdf, calendrierPdf, montantPalier, courantes, depenseEntre, HISTO_MOIS} from '../radar.mjs';
+ import {textOf} from '../google.mjs';
+ import {texteDePdf} from '../pdf.mjs';
+ import zlib from 'node:zlib';
+@@ -8,6 +8,7 @@ import {interdit} from '../memoire.mjs';
+ const results = []; let fails = 0;
+ const ok = (name, cond, info) => { results.push((cond ? 'OK   ' : 'ÉCHEC') + ' ' + name + (info ? ' :: ' + info : '')); if (!cond) fails++; };
+ const DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'radar-'));
++const eurTxt = (n) => Number(n).toLocaleString('fr-FR', {minimumFractionDigits: 2, maximumFractionDigits: 2}).replace(/\u202f/g, ' ') + ' €';   /* comme `eur` du Radar */
+ try {
+   /* ---------- calendrier : le même que la page (lundi 23/11/2026, paie le 28 = un samedi) ---------- */
+   const F = [['Crédit immobilier', 1150, 5], ['Assurance emprunteur', 38.4, 5], ['Assurance habitation', 16.9, 10], ['Électricité', 48.2, 12], ['Box internet', 29.99, 8], ['Forfait mobile', 9.99, 3],
+@@ -584,6 +585,97 @@ try {
+     ok('Radar 0.81 : un mois plus tard, novembre garde le total de ses dépenses courantes (720 €, retenu au fil de l\'eau) et sert de comparaison ; décembre a 5 jeudis',
+       dec.evolution[4].mois === '2026-11' && dec.evolution[4].courantes === 720 && dec.precedent === 820 && dec.totalCourantes === 770 && garde['2026-11'] === 720 && garde['2026-12'] === 770, JSON.stringify([dec.evolution[4], dec.totalCourantes, garde]));
+   }
++  /* 0.93.0 : « déjà dépensé ce mois » et l'historique mois par mois (services et montants inventés) */
++  { const fx = [{id: 'fa', service: 'Loyer exemple', cat: 'Logement', montant: 100, jour: 10, rythme: 'mensuel'}, {id: 'fb', service: 'Box exemple', cat: 'Télécoms', montant: 30, jour: 20, rythme: 'mensuel'},
++      {id: 'fc', service: 'Salle exemple', cat: 'Autres', montant: 25, jour: 5, rythme: 'mensuel', fin: '2026-10-31'}, {id: 'fd', service: 'Assurance exemple', cat: 'Assurances', montant: 40, jour: 16, rythme: 'mensuel'}];
++    const cr = [{id: 'dca', service: 'Courses', type: 'courses', mode: 'enveloppe', montant: 400, reels: [{d: '2026-11-03', m: 60.5}, {d: '2026-11-10', m: 39.5}, {d: '2026-10-28', m: 15}]},
++      {id: 'dcb', service: 'Boucherie', type: 'boucherie', mode: 'mois', montant: 120, faits: ['2026-11']}, {id: 'dcc', service: 'Ménage', type: 'menage', mode: 'semaine', montant: 50, jour: 4}];
++    const plans = {pl1: {id: 'pl1', service: 'Boutique exemple', fois: 3, total: 88.65, date: '2026-10-05', maj: '2026-10-05', echeances: [{date: '2026-10-05', montant: 29.55, payee: true}, {date: '2026-11-05', montant: 29.55}, {date: '2026-12-05', montant: 29.55}]},
++      pl2: {id: 'pl2', service: 'Magasin exemple', fois: 2, total: 155.54, date: '2026-11-08', maj: '2026-11-08', echeances: [{date: '2026-11-08', montant: 77.77}, {date: '2026-12-08', montant: 77.77}]}};
++    /* la fonction seule : du 1er au 15 novembre, les notes de tout le mois */
++    const d0 = depenseEntre({fixes: fx, courantes: cr, plans, plansRetires: ['pl2']}, J(2026, 10, 1), J(2026, 10, 15), {notesJusqua: J(2026, 10, 30)});
++    ok('Radar 0.93 : déjà dépensé du 1er au 15 novembre : le loyer du 10 (100 €) ; pas la box du 20, ni l’assurance du 16, ni la salle finie en octobre ; l’échéance du 5 d’un paiement en 3 fois (29,55 €), pas celle d’un paiement « plus à payer » ; les notes de novembre (60,50 + 39,50) et la boucherie cochée « Fait ce mois-ci » (120 €) ; 349,55 € en tout',
++      d0.fixes === 100 && d0.nFixes === 1 && d0.plans === 29.55 && d0.nPlans === 1 && d0.courantes === 220 && d0.nNotes === 3 && d0.total === 349.55 && d0.lignes.length === 5 && d0.lignes.find((l) => l.fait).service === 'Boucherie'
++      && JSON.stringify(d0.postes.map((x) => [x.label, x.montant, !!x.courant])) === JSON.stringify([['Alimentation', 220, true], ['Logement', 100, false], ['Paiements en plusieurs fois', 29.55, false]]), JSON.stringify([d0.fixes, d0.plans, d0.courantes, d0.total, d0.postes]));
++    const dv = depenseEntre({fixes: fx, courantes: cr, plans}, J(2026, 10, 1), J(2026, 9, 31), {notesJusqua: J(2026, 10, 30)}), dp = depenseEntre({fixes: [], courantes: [], plans: {p: {id: 'p', service: 'x', echeances: [{date: '2026-11-25', montant: 10, payee: true}, {date: '2026-11-26', montant: 10}]}}}, J(2026, 10, 1), J(2026, 10, 15), {notesJusqua: J(2026, 10, 30)});
++    ok('Radar 0.93 : le 1er du mois, aucune dépense fixe n’est encore passée (les notes du mois comptent) ; une échéance qu’un mail dit payée compte même avant sa date, une échéance à venir non',
++      dv.fixes === 0 && dv.plans === 0 && dv.courantes === 220 && dp.plans === 10 && dp.nPlans === 1, JSON.stringify([dv.fixes, dv.plans, dv.courantes, dp.plans]));
++    /* le Radar : lundi 16 novembre 2026 */
++    let quand = Date.parse('2026-11-16T09:00:00Z'); const pushes = [], logs = [];
++    const fh = path.join(DIR, 'radar93.json');
++    fs.writeFileSync(fh, JSON.stringify({version: 7, fixes: fx, courantes: cr, plans, plansRetires: ['pl2'], scan: {fini: quand, lus: 0, mois: 1, total: 1}, revenus: {jour: 28, avance: true}}), {mode: 0o600});
++    const Rh = createRadar({file: fh, gmail: {lie: () => true, chercher: async () => ({threads: []}), fil: async () => ({messages: []})}, claude: async () => ({ok: true, text: '[]'}), now: () => quand, moisDepart: 1, push: async (m) => { pushes.push(m); return []; }, log: (t) => logs.push(t)});
++    const lu = () => JSON.parse(fs.readFileSync(fh, 'utf8')), set = (cle, valeur) => Rh.traiter('POST', '/api/radar/set', async () => ({cle, valeur}));
++    const m1 = Rh.etat().mois, r1 = resteA(fx, {jour: 28, avance: true}, J(2026, 10, 16), 'mois');
++    ok('Radar 0.93 : la page reçoit « déjà dépensé ce mois » (349,55 € : 100 de dépenses fixes, 29,55 d’échéances, 220 de dépenses courantes), jusqu’à hier (15/11), avec le détail ; les dépenses fixes déjà passées et le reste à payer d’ici la fin du mois font le mois entier (100 + 70 = 170)',
++      m1.depense.total === 349.55 && m1.depense.fixes === 100 && m1.depense.plans === 29.55 && m1.depense.courantes === 220 && m1.depense.jusqua === '2026-11-15' && m1.depense.mois === '2026-11' && m1.depense.lignes.length === 5 && m1.depense.postes.length === 3
++      && r1.total === 70 && m1.depense.fixes + r1.total === m1.totalFixes, JSON.stringify([m1.depense.total, m1.depense.fixes, r1.total, m1.totalFixes]));
++    Rh.plan('pl2', 'remettre'); const remis = Rh.etat().mois.depense.plans; Rh.plan('pl2', 'retirer');
++    await set('fixes', fx.filter((f) => f.id !== 'fa')); const retiree = Rh.etat().mois.depense; await set('fixes', fx);
++    ok('Radar 0.93 : un paiement remis « à payer » recompte son échéance passée (29,55 + 77,77), « plus à payer » la retire ; une dépense fixe retirée de la liste n’est plus comptée',
++      remis === 107.32 && Rh.etat().mois.depense.plans === 29.55 && retiree.fixes === 0 && retiree.total === 249.55 && Rh.etat().mois.depense.fixes === 100, JSON.stringify([remis, retiree.fixes, retiree.total]));
++    const h1 = m1.historique, f1 = lu();
++    ok('Radar 0.93 : avant la première clôture, l’historique montre les cinq mois d’avant, « estimés » d’après les dépenses fixes d’aujourd’hui (octobre : 170 + 25 de la salle + 15 notés), rien de clos ; le fichier retient le mois suivi (2026-11), droits 600',
++      h1.length === 5 && h1[0].mois === '2026-10' && h1[0].libelle === 'octobre 2026' && h1[0].estime === true && h1[0].fixes === 195 && h1[0].courantes === 15 && h1[0].total === 210 && h1[4].mois === '2026-06' && h1.every((x) => x.estime && !x.clos)
++      && f1.historique.suivi === '2026-11' && Object.keys(f1.historique.mois).length === 0 && (fs.statSync(fh).mode & 0o777) === 0o600, JSON.stringify([h1.map((x) => [x.mois, x.total]), f1.historique]));
++    await set('revenus', {jour: 28, avance: true, montant: 3000});
++    /* le premier tic de décembre (00 h 05 à Paris) clôt novembre : aucune notification, rien au journal */
++    const nP = pushes.length, nL = logs.length; quand = Date.parse('2026-11-30T23:05:00Z'); Rh.tic(); await Rh.attendre();
++    const f2 = lu(), nov = f2.historique.mois['2026-11'];
++    ok('Radar 0.93 : le premier tic de décembre garde le bilan de novembre : 170 € de dépenses fixes, 29,55 € d’échéances, 220 € de dépenses courantes notées (419,55 €), par poste, le budget retenu (720 €), le reste à vivre (3 000 − 419,55 = 2 580,45 €), la date de clôture ; aucune notification, aucune ligne de journal',
++      !!nov && nov.fixes === 170 && nov.plans === 29.55 && nov.courantes === 220 && nov.total === 419.55 && nov.prevu === 720 && nov.paie === 3000 && nov.resteAVivre === 2580.45 && nov.clos === '2026-12-01' && !nov.reconstitue && nov.postes.find((x) => x.label === 'Alimentation').montant === 220
++      && nov.postes.find((x) => x.label === 'Logement').n === 1 && f2.historique.suivi === '2026-12' && pushes.length === nP && logs.length === nL && (fs.statSync(fh).mode & 0o777) === 0o600, JSON.stringify([nov, pushes.length - nP, logs.slice(nL)]));
++    /* le bilan gardé ne bouge plus : le loyer passe à 999 €, la paie change, une note est ajoutée en novembre après coup */
++    quand = Date.parse('2026-12-03T09:00:00Z');
++    await set('fixes', fx.map((f) => (f.id === 'fa' ? {...f, montant: 999} : f))); await set('revenus', {jour: 28, avance: true, montant: 4000});
++    const m3 = Rh.etat().mois, n3 = m3.historique.find((x) => x.mois === '2026-11');
++    ok('Radar 0.93 : le mois clos ne bouge plus (le loyer passé à 999 € et la paie à 4 000 € changent décembre, pas novembre) ; les « six mois » lisent le bilan gardé ; octobre, jamais suivi, reste « estimé » ; le mois en cours est calculé en direct (déjà dépensé au 2/12 : rien de passé)',
++      n3.fixes === 170 && n3.total === 419.55 && n3.resteAVivre === 2580.45 && n3.libelle === 'novembre 2026' && !n3.estime && m3.historique[0].mois === '2026-11' && m3.historique[1].mois === '2026-10' && m3.historique[1].estime === true && m3.historique[1].fixes === 1094
++      && m3.evolution[4].mois === '2026-11' && m3.evolution[4].fixes === 170 && m3.evolution[4].courantes === 720 && m3.evolution[4].total === 890 && m3.precedent === 890 && m3.depense.mois === '2026-12' && m3.depense.fixes === 0 && m3.depense.total === 0 && m3.paie === 4000,
++      JSON.stringify([n3, m3.historique.slice(0, 2).map((x) => [x.mois, x.fixes, x.estime]), m3.evolution[4], m3.depense.total]));
++    await set('fixes', fx);
++    /* rattrapage : le serveur est resté arrêté de décembre à mars */
++    quand = Date.parse('2027-03-10T09:00:00Z'); const m4 = Rh.etat().mois, f4 = lu().historique;
++    ok('Radar 0.93 : serveur arrêté de décembre à mars : au premier calcul, décembre (le dernier mois suivi) est clos, janvier et février sont rattrapés et dits « reconstitués » ; novembre est toujours là ; du plus récent au plus ancien',
++      Object.keys(f4.mois).sort().join() === '2026-11,2026-12,2027-01,2027-02' && !f4.mois['2026-12'].reconstitue && f4.mois['2027-01'].reconstitue === true && f4.mois['2027-02'].reconstitue === true && f4.mois['2027-02'].clos === '2027-03-10' && f4.suivi === '2027-03'
++      && f4.mois['2026-12'].fixes === 170 && f4.mois['2026-12'].plans === 29.55 && m4.historique.slice(0, 4).map((x) => x.mois).join() === '2027-02,2027-01,2026-12,2026-11' && m4.historique[4].mois === '2026-10' && m4.historique[4].estime === true,
++      JSON.stringify([Object.keys(f4.mois), m4.historique.map((x) => x.mois)]));
++    /* l'horloge recule : rien n'est clos ni effacé */
++    quand = Date.parse('2027-01-15T09:00:00Z'); Rh.etat(); const f5 = lu().historique; quand = Date.parse('2027-03-10T09:00:00Z');
++    ok('Radar 0.93 : une horloge qui recule ne clôt ni n’efface rien', Object.keys(f5.mois).length === 4 && f5.suivi === '2027-03', JSON.stringify(f5.suivi));
++    /* 40 mois de suite : au moins 24 mois gardés */
++    for (let k = 1; k <= 40; k++) { quand = Date.UTC(2027, 2 + k, 1, 3, 0, 0); Rh.tic(); }
++    await Rh.attendre(); const f6 = lu().historique, cles = Object.keys(f6.mois).sort(), m6 = Rh.etat().mois;
++    ok('Radar 0.93 : quarante mois plus tard, l’historique garde les ' + HISTO_MOIS + ' derniers mois clos (24 au moins), un par mois, sans trou ; la page les reçoit du plus récent au plus ancien ; toujours aucune notification',
++      HISTO_MOIS >= 24 && cles.length === HISTO_MOIS && cles[cles.length - 1] === '2030-06' && cles[0] === '2027-07' && m6.historique.length === HISTO_MOIS && m6.historique[0].mois === '2030-06' && m6.historique[23].mois === '2028-07' && m6.historique.every((x, i, l) => !i || l[i - 1].mois > x.mois)
++      && m6.historique.every((x) => !x.estime && x.fixes === 170) && pushes.length === nP, JSON.stringify([cles.length, cles[0], cles[cles.length - 1], pushes.length - nP]));
++    /* un fichier d'avant 0.93.0 est relu tel quel : rien n'est perdu, l'historique s'ajoute seul */
++    const fv = path.join(DIR, 'radar-avant93.json'), vieux = {version: 7, fixes: fx, courantes: cr, revenus: {jour: 28, avance: true, montant: 3000}, notif: {veille: true, seuil: 20, echec: true}, evolution: {'2026-10': 500, '2026-11': 720}, plans, plansRetires: ['pl2'], scan: {fini: 1, lus: 3, mois: 1, total: 1}, refus: ['exemple.fr'], alertesVues: {a1: 5}};
++    fs.writeFileSync(fv, JSON.stringify(vieux), {mode: 0o600}); quand = Date.parse('2026-11-26T09:00:00Z');
++    const Rv = createRadar({file: fv, gmail: {lie: () => true, chercher: async () => ({threads: []}), fil: async () => ({messages: []})}, claude: async () => ({ok: true, text: '[]'}), now: () => quand, moisDepart: 1});
++    const mv = Rv.etat().mois, apres = JSON.parse(fs.readFileSync(fv, 'utf8'));
++    ok('Radar 0.93 : un radar.json d’avant est relu tel quel (dépenses fixes, dépenses courantes et leurs notes, paie, budgets retenus, paiements en plusieurs fois, refus : rien de perdu) ; octobre, dont le budget avait été retenu, est clos « reconstitué » ; novembre continue en direct',
++      Object.keys(vieux).every((k) => JSON.stringify(apres[k]) === JSON.stringify(vieux[k])) && apres.historique.suivi === '2026-11' && Object.keys(apres.historique.mois).join() === '2026-10' && apres.historique.mois['2026-10'].reconstitue === true && apres.historique.mois['2026-10'].prevu === 500
++      && apres.historique.mois['2026-10'].courantes === 15 && mv.depense.mois === '2026-11' && mv.depense.fixes === 170 && mv.historique[0].mois === '2026-10' && !mv.historique[0].estime && mv.historique[1].estime === true, JSON.stringify([Object.keys(vieux).filter((k) => JSON.stringify(apres[k]) !== JSON.stringify(vieux[k])), apres.historique]));
++    /* un historique abîmé (édition à la main) : remis à neuf sans erreur, le reste intact */
++    const fa = path.join(DIR, 'radar-abime93.json'); fs.writeFileSync(fa, JSON.stringify({version: 7, fixes: fx, historique: ['pas', 'un', 'objet']}), {mode: 0o600});
++    const Ra = createRadar({file: fa, gmail: {lie: () => false}, now: () => quand}); let jete = null; try { Ra.etat(); Ra.tic(); } catch (e) { jete = e; }
++    ok('Radar 0.93 : un historique illisible dans le fichier repart de zéro sans erreur ; les dépenses fixes restent', !jete && JSON.parse(fs.readFileSync(fa, 'utf8')).historique.suivi === '2026-11' && Ra.etat().fixes.length === 4, String(jete));
++    /* sur le serveur seulement : rien ne sort du Radar que par ses adresses /api/radar (appareil relié) ; ni le serveur MCP, ni la mémoire, ni la
++       sauvegarde de Pilotage, ni Pilotage, ni les notifications, ni le journal d'activité ne lisent le Radar */
++    const src = (f) => fs.readFileSync(new URL('../' + f, import.meta.url), 'utf8'), sansCom = (t) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
++    const autres = fs.readdirSync(new URL('../', import.meta.url)).filter((f) => /\.mjs$/.test(f) && !['radar.mjs', 'server.mjs'].includes(f));
++    /* un autre module peut prendre au Radar son calendrier (jours fériés, jours ouvrés), rien d'autre */
++    const CALENDRIER = ['feries', 'ouvre', 'J', 'ymd', 'parisJour'];
++    const fuites = autres.filter((f) => { const t = sansCom(src(f)), imp = [...t.matchAll(/import\s*\{([^}]*)\}\s*from\s*'\.\/radar\.mjs'/g)].flatMap((m) => m[1].split(',').map((x) => x.trim().split(/\s+as\s+/)[0]).filter(Boolean));
++      return imp.some((n) => !CALENDRIER.includes(n)) || /import\s*\(\s*'\.\/radar\.mjs'|import\s+\*[^;]*radar\.mjs|createRadar|radar\.json|depenseEntre|historique\.mois|\bRADAR\b/.test(t) || /radar/i.test(t.replace(/import\s*\{[^}]*\}\s*from\s*'\.\/radar\.mjs';?/g, '')); });
++    const srv = sansCom(src('server.mjs')).split('\n').filter((l) => /\bRADAR\b|createRadar|radar\.json/.test(l)), permis = [/^import \{createRadar\} from '\.\/radar\.mjs';$/, /^const RADAR = createRadar\(\{file: path\.join\(DATA, 'radar\.json'\)/, /^\s*if \(p\.startsWith\('\/api\/radar'\)\) \{ const r = await RADAR\.traiter\(req\.method, p, \(\) => readBody\(req\)\); if \(r\) return json\(res, r\.status, r\.body\); \}/, /^\s*RADAR\.demarrer\(/];
++    ok('Radar 0.93 : l’historique ne peut sortir ni par le serveur MCP ni par la mémoire : aucun autre module du serveur (mcp.mjs, memoire.mjs, sauvegarde.mjs, pilotage-local.mjs, notify.mjs…) ne lit le Radar, et server.mjs ne s’en sert que pour /api/radar (appareil relié) et son minuteur',
++      autres.includes('mcp.mjs') && autres.includes('memoire.mjs') && autres.includes('sauvegarde.mjs') && autres.includes('pilotage-local.mjs') && autres.length >= 20 && fuites.length === 0 && srv.length === 4 && srv.every((l) => permis.some((re) => re.test(l))), JSON.stringify({fuites, srv: srv.map((l) => l.trim().slice(0, 90))}));
++    /* ce que le Radar pousse lui-même : la notification de la veille ne porte ni « déjà dépensé » ni un bilan de l'historique */
++    quand = Date.parse('2030-07-09T18:00:00Z'); pushes.length = 0; const v = await Rh.veille(), H = lu().historique.mois, interdits = [...new Set(Object.values(H).flatMap((g) => [g.total, g.courantes, g.resteAVivre]).concat([Rh.etat().mois.depense.total]).filter((x) => x > 0).map((x) => eurTxt(x)))];
++    ok('Radar 0.93 : la notification de la veille (le loyer de demain) ne porte ni « déjà dépensé » ni un montant de l’historique', !!v && pushes.length === 1 && /Loyer exemple/.test(v.body) && !/dépensé|historique|bilan/i.test(v.title + v.body) && interdits.length > 0 && interdits.every((x) => !(v.title + v.body).includes(x)), JSON.stringify([v, interdits]));
++  }
+   /* la mémoire de JARVIS (lue par le serveur MCP, que Grok Bot peut joindre) refuse les chiffres d'un crédit */
+   ok('Mémoire : refuse les chiffres d’un crédit (règle du 12/11/2026), garde le reste', interdit('Ma mensualité de crédit immobilier est de 1150 €') && interdit('Il reste 180 000 € à rembourser sur le prêt immobilier') && !interdit("J'ai un crédit immobilier à la banque") && !interdit('Je suis prêt à 8h'));
+ } catch (e) { ok('exception', false, e.stack); }

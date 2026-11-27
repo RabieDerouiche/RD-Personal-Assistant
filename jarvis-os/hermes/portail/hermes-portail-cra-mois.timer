@@ -1,0 +1,11 @@
+# JARVIS OS — toutes les 15 minutes : un mois validé dans JARVIS attend-il Hermes ? (hermes-portail-cra-mois.service)
+[Unit]
+Description=CRA du mois : vérifier toutes les 15 minutes si un mois validé attend (le 26 ou après)
+
+[Timer]
+OnBootSec=6min
+OnUnitInactiveSec=15min
+AccuracySec=1min
+
+[Install]
+WantedBy=timers.target

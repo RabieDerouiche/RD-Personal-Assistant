@@ -37,7 +37,7 @@ Charge d'abord la skill `pilotage` (règles de chaque passage, modes « en doubl
    ne notifie que le lundi et le jeudi.
 5. Tu ne rappelles ni les CRA ni les notes de frais (Chronos pose la question) : seulement si un mail demande
    une action de sa part.
-6. Fin de passage (skill `pilotage`) : Journal puis État.
+6. Fin de passage (skill `pilotage`) : Journal, État, puis en réel `routine_fin` (`routine` « veille-du-matin »).
 
 ## Ce que tu écris (Iris le faisait)
 

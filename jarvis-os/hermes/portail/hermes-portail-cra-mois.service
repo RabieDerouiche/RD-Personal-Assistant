@@ -1,0 +1,14 @@
+# JARVIS OS — le CRA du mois (docs/hermes-portail.md ; son QCM du 26/11/2026 : « CRA du mois seul »).
+# Posé par install.sh ; lancé toutes les 15 minutes par hermes-portail-cra-mois.timer. Il ne fait rien sans « adresse_mois= » dans
+# /etc/hermes-portail/cra.conf (root, l'adresse du compte rendu d'activité, jamais dans le dépôt), avant le 26 du mois, ni sans un mois
+# qu'il a validé dans JARVIS (jours.json) et qu'Hermes n'a pas encore validé (mois-valides.txt). Un mois validé : un passage d'Hermes
+# (jours vides complétés, contrôle, « Valider »), le compte rendu pour JARVIS, puis un avis sur ses appareils.
+[Unit]
+Description=CRA du mois : un mois validé dans JARVIS, complété et validé par le Hermes portail (le 26 ou après)
+After=network-online.target hermes-portail-filtre.service hermes-portail-sortie.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/hermes-portail cra-mois-auto
+TimeoutStartSec=1500
+Nice=5

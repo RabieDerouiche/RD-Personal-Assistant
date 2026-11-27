@@ -135,6 +135,10 @@ while IFS=$'\t' read -r ident nom _; do
   case "$voulues" in *" $nom "*) ;; *) hx hermes cron remove "$ident" >/dev/null 2>&1 && echo "  − ${nom#jarvis-} : retirée (plus dans routines.conf)" ;; esac
 done < <(poses)
 mv "$nouvel_etat" "$ETAT" && chmod 0644 "$ETAT"
+# 0.92.0 : la liste que hermes-relance résume pour JARVIS (« Hermes et ses routines » en direct) suit ce qui vient d'être posé :
+# copie root de routines.conf, comme install.sh (la minuterie ne lit jamais un fichier du dépôt)
+RELANCE_LIB=${HERMES_RELANCE_LIB:-/usr/local/lib/hermes-relance}
+[ -d "$RELANCE_LIB" ] && install -o root -g root -m 0644 "$CONF" "$RELANCE_LIB/routines.conf" 2>/dev/null || true
 
 echo; echo "Routines d'Hermes :"; lister
 [ "$(systemctl is-active hermes-gateway 2>/dev/null)" = active ] || [ "${HERMES_BANC:-0}" = 1 ] || echo "Attention : Hermes n'est pas en marche, aucune routine ne passera (sudo systemctl status hermes-gateway)."

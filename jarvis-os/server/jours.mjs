@@ -16,6 +16,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {feries} from './radar.mjs';
 import {paris} from './notify.mjs';
+import {lireEchange} from './reponses.mjs';
 
 export const nrm = (t) => String(t ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[’`]/g, "'").replace(/\s+/g, ' ').trim();
 export const MOIS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
@@ -253,7 +254,7 @@ export function mailCraRempli(modele, ym, jours, envoi) {
   const sub = (s) => String(s || '').replace(/\{JOURS\}/g, p.joursDit).replace(/\{MOIS\}/g, MOIS_MAJ(m)).replace(/\{ANNEE\}/g, y).replace(/\{CONGES\}\n?/g, p.phrases.length ? p.phrases.join('\n') + '\n' : '');
   return {a: [].concat((modele && modele.a) || []), objet: sub((modele && modele.objet) || 'CRA {MOIS} {ANNEE}'), corps: sub((modele && modele.corps) || 'Bonjour,\n\nJ’ai {JOURS} jours sur ce mois.\n{CONGES}\n\nPeux-tu me transmettre le CRA du mois ?\n\nMerci d’avance.'), ...p};
 }
-export function createJours({file, agenda, claude = null, push = async () => [], now = Date.now, log = () => {}, heure = '12:00', retours = '/var/lib/hermes-portail-retours', mails = null}) {
+export function createJours({file, agenda, claude = null, push = async () => [], now = Date.now, log = () => {}, heure = '12:00', retours = '/var/lib/hermes-portail-retours', mails = null, ecrireJournal = null}) {
   const lireFichier = () => {
     try { const j = JSON.parse(fs.readFileSync(file, 'utf8')); if (j && typeof j === 'object' && !Array.isArray(j)) return j; } catch (e) { if (e && e.code === 'ENOENT') return {}; }
     const cote = file.replace(/\.json$/, '') + '-illisible-' + new Date(now()).toISOString().slice(0, 19).replace(/[:T]/g, '-') + '.json';
@@ -528,6 +529,7 @@ export function createJours({file, agenda, claude = null, push = async () => [],
      du même objet déjà envoyé (par lui, par Claude, depuis Gmail) n'est jamais refait. */
   const retourMois = (ym) => { try { const f = path.join(retours, 'mois-' + ym + '.json'); if (!fs.lstatSync(f).isFile()) return null; const r = JSON.parse(fs.readFileSync(f, 'utf8')); return r && typeof r === 'object' ? r : null; } catch { return null; } };
   const remplir = (s, v) => String(s || '').replace(/\{(\w+)\}/g, (m, k) => (Object.prototype.hasOwnProperty.call(v, k) ? v[k] : m));
+  const dejaEnvoye = async (objet) => { try { return !!(await mails.envoye(objet)); } catch (e) { throw new Error('recherche du mail déjà envoyé impossible : ' + TXT((e && e.message) || e, 120)); } };
   async function mailCra(ym, auj) {
     const x = M(ym), mod = ((mails && mails.modeles()) || {}).cra_client;
     if (!mod || ![].concat(mod.a || []).length || x.etat !== 'valide' || !x.valide || !x.valide.jours) return;
@@ -537,14 +539,16 @@ export function createJours({file, agenda, claude = null, push = async () => [],
       return;
     }
     const r = mailCraRempli(mod, ym, x.valide.jours, auj);
-    if (!x.mailCra && mails.envoye && await mails.envoye(r.objet).catch(() => false)) { x.mailCra = {envoye: true, empreinte: emp, at: now()}; x.historique.push({at: now(), quoi: 'mail du CRA déjà envoyé (Gmail)'}); noter(); return; }
+    /* 0.94.0 : une recherche qui échoue (quota de Gmail, réseau) n'est plus prise pour « pas encore envoyé » (un brouillon en double était
+       alors préparé) : l'erreur est écrite au journal du serveur et le passage suivant réessaie */
+    if (!x.mailCra && mails.envoye && await dejaEnvoye(r.objet)) { x.mailCra = {envoye: true, empreinte: emp, objet: r.objet, at: now()}; x.historique.push({at: now(), quoi: 'mail du CRA déjà envoyé (Gmail)'}); noter(); return; }
     let id = '';
     if (x.mailCra && x.mailCra.draftId) {
       try { await mails.majBrouillon({draftId: x.mailCra.draftId, to: r.a, subject: r.objet, body: r.corps}); id = x.mailCra.draftId; }
       catch { x.mailCra = {...x.mailCra, envoye: true, prevenu: emp}; noter(); await push({title: 'Tes congés ont changé après le mail du CRA', body: 'Le brouillon n’existe plus (envoyé ?) : préviens ton contact du client si le nombre de jours change.', url: '/#voir-jours-' + ym, tag: 'mail-cra-' + ym}).catch(() => {}); return; }
     } else { const d = await mails.brouillon({to: r.a, subject: r.objet, body: r.corps}); id = (d && d.id) || ''; }
     if (!id) return;
-    x.mailCra = {draftId: id, empreinte: emp, at: now()}; x.historique.push({at: now(), quoi: 'mail du CRA préparé'}); noter();
+    x.mailCra = {draftId: id, empreinte: emp, objet: r.objet, at: now()}; x.historique.push({at: now(), quoi: 'mail du CRA préparé'}); noter();
     await push({title: 'Mail du CRA prêt : ' + r.objet, body: TXT('À ' + r.a.join(', ') + '. ' + r.texte.replace(/\n/g, ' ') + ' Relis-le et envoie-le depuis JARVIS.', 230), url: '/#voir-brouillon-' + id, tag: 'mail-cra-' + ym}).catch(() => {});
   }
   async function mailProlongation(ym, t, dern) {
@@ -558,18 +562,159 @@ export function createJours({file, agenda, claude = null, push = async () => [],
     const mod = ((mails && mails.modeles()) || {}).prolongation;
     if (!mod || ![].concat(mod.a || []).length) return;
     const v = {FIN: finDit, MOIS: MOIS[t.m - 1], ANNEE: String(t.y)}, objet = remplir(mod.objet || 'Prolongation mission', v), corps = remplir(mod.corps || '', v), a = [].concat(mod.a);
-    if (mails.envoye && await mails.envoye(objet).catch(() => false)) { x.mailProlong = {envoye: true, fin, at: now()}; noter(); return; }
+    if (mails.envoye && await dejaEnvoye(objet)) { x.mailProlong = {envoye: true, fin, objet, at: now()}; x.historique.push({at: now(), quoi: 'mail de prolongation déjà envoyé (Gmail)'}); noter(); return; }
     const d = await mails.brouillon({to: a, subject: objet, body: corps}), id = (d && d.id) || ''; if (!id) return;
-    x.mailProlong = {draftId: id, fin, at: now()}; x.historique.push({at: now(), quoi: 'mail de prolongation préparé'}); noter();
+    x.mailProlong = {draftId: id, fin, objet, at: now()}; x.historique.push({at: now(), quoi: 'mail de prolongation préparé'}); noter();
     await push({title: 'Fin de mission le ' + finDit + ' : mail de prolongation prêt', body: TXT('À ' + a.join(', ') + '. Relis-le et envoie-le depuis JARVIS.', 230), url: '/#voir-brouillon-' + id, tag: 'fin-' + ym}).catch(() => {});
+  }
+
+  /* ---------- 0.94.0 : les réponses aux deux mails du mois, suivies (son constat du 26/11/2026 : « mes deux contacts ont répondu à nos
+     mails et je ne vois aucun impact, aucune trace ; il faut que ce soit rapide, efficace et fluide ») ----------
+     Sans IA. Toutes les 5 minutes, et seulement tant qu'un mail du mois attend (préparé ou attendu, puis 45 jours au plus après son
+     envoi ; le mail du CRA s'arrête au CRA reçu en PDF), une recherche Gmail par mail (les fils de cet objet, identifiants seuls) ; un fil
+     n'est relu en entier que si Gmail dit qu'il a changé. Les messages sont lus un par un (reponses.mjs) : le mail envoyé est son message
+     à lui, avec sa vraie date ; une réponse est un message d'un autre, plus récent, dans le même fil ou dans un autre fil du même objet
+     (« Re : » ôtés), quel que soit l'expéditeur. Pour le CRA, l'ancienne voie reste : un mail d'un destinataire du modèle, avec un PDF,
+     arrivé après l'envoi (seconde recherche, tant qu'aucun PDF n'est reçu). 4 recherches par passage au plus ; un quota de Gmail atteint
+     met le suivi en pause 15 minutes, et c'est écrit au journal du serveur.
+     Chaque réponse vue est gardée dans jours.json (mois du mail : `suivi.cra`, `suivi.prolongation` : qui, quand, message, fil, PDF ou
+     non, extrait de 160 caractères, lue ou non dans Gmail ; `pdfs` : de quoi retrouver chaque PDF sans le télécharger : message, pièce
+     jointe, nom du fichier, taille, type ; `historique`), puis notifiée UNE fois (elle est enregistrée avant l'envoi de
+     la notification : un redémarrage ne la renotifie jamais) et notée dans le Journal de Pilotage (sans nom ni adresse). L'espace Travail
+     lit cet état tel quel : aucun cache à vider. Un mail envoyé à la main (sans brouillon de JARVIS) est suivi pareil. */
+  const SUIVI_MS = 5 * 60e3, SUIVI_FRAIS = 4 * 60e3, SUIVI_JOURS = 45, REP_MAX = 8, QUOTA_MS = 15 * 60e3, SORTES = ['cra', 'prolongation'];
+  const suiviPret = () => !!(mails && mails.chercher && mails.fil) && agenda.lie();   /* Google pas relié : rien n'est cherché */
+  const moisAvant = (ym) => plusJour(ym + '-01', -1).slice(0, 7);
+  const finDe = (ym) => ymdDe(+ym.slice(0, 4), +ym.slice(5, 7), dernierJour(+ym.slice(0, 4), +ym.slice(5, 7)));
+  const quandDit = (at) => { const p = paris(new Date(at)); return p.ymd.slice(8) + '/' + p.ymd.slice(5, 7) + ' à ' + p.hm; };
+  const adresseOk = (a) => /^[^\s@<>(){},;:"\\]+@[^\s@<>(){},;:"\\]+\.[a-z]{2,}$/i.test(String(a || ''));
+  const finMission = (ym) => { const x = D.mois[ym] || {}, R = retourMois(ym); return (x.mailProlong && x.mailProlong.fin) || (R && /^\d{4}-\d{2}-\d{2}$/.test(String(R.fin || '')) ? R.fin : ''); };
+  /* l'objet du mail : celui gardé à la préparation, sinon refait depuis le modèle (un mail envoyé à la main, ou préparé avant la 0.94.0) */
+  function objetDuMail(sorte, ym) {
+    const x = D.mois[ym] || {}, mods = (mails && mails.modeles && mails.modeles()) || {};
+    if (sorte === 'cra') return TXT((x.mailCra && x.mailCra.objet) || mailCraRempli(mods.cra_client, ym, [], ym + '-24').objet, 200);
+    const fin = finMission(ym);
+    return TXT((x.mailProlong && x.mailProlong.objet) || remplir((mods.prolongation || {}).objet || 'Prolongation mission', {FIN: fin.split('-').reverse().join('/'), MOIS: MOIS[+ym.slice(5, 7) - 1], ANNEE: ym.slice(0, 4)}), 200);
+  }
+  const suiviDe = (ym) => { const s = (D.mois[ym] || {}).suivi; return s && typeof s === 'object' ? s : {}; };
+  let suiviReveil = 0;   /* après un envoi depuis JARVIS : tout est relu au passage suivant, même lu à l'instant */
+  const suiviFrais = (sorte, ym) => { const lu = (suiviDe(ym)[sorte] || {}).lu || 0; return lu > suiviReveil && now() - lu < SUIVI_FRAIS; };
+  /* ce mail attend-il encore ? (le passage de 5 minutes ne cherche que dans ce cas) */
+  function enAttente(sorte, ym) {
+    const x = D.mois[ym]; if (!x) return false;
+    const s = suiviDe(ym)[sorte] || {};
+    if (s.clos) return false;
+    if (s.envoi) return now() - s.envoi.at <= SUIVI_JOURS * 864e5;
+    const auj = paris(new Date(now())).ymd, fin = finMission(ym);
+    if (auj > plusJour(finDe(ym), 10)) return false;   /* jamais envoyé : on ne le cherche plus 10 jours après la fin du mois */
+    return sorte === 'cra' ? !!x.mailCra || auj >= ym + '-24' : !!x.mailProlong || (!!fin && fin <= finDe(ym));
+  }
+  /* les fils d'une recherche, en entier ; gardés en mémoire avec leur version (historyId) : un fil inchangé n'est pas relu */
+  const filsLus = new Map();
+  async function filsDe(q, max) {
+    const l = (((await mails.chercher(q)) || {}).threads || []).slice(0, max), out = [];
+    for (const t of l) {
+      const id = String((t && t.id) || ''); if (!id) continue;
+      const c = filsLus.get(id), h = String(t.historyId || '');
+      if (c && h && c.h === h) { out.push(c.f); continue; }
+      const f = await mails.fil(id), o = {id, messages: (f && f.messages) || []};
+      filsLus.delete(id); filsLus.set(id, {h, f: o}); out.push(o);
+    }
+    for (const k of [...filsLus.keys()].slice(0, Math.max(0, filsLus.size - 60))) filsLus.delete(k);
+    return out;
+  }
+  /* un mail d'un mois : lu, comparé à ce qui est déjà gardé, noté, notifié ; rend le nombre de recherches faites */
+  async function suivreUn(ym, sorte) {
+    const x = M(ym); if (!x.suivi || typeof x.suivi !== 'object' || Array.isArray(x.suivi)) x.suivi = {};
+    const s = (x.suivi[sorte] = x.suivi[sorte] && typeof x.suivi[sorte] === 'object' ? x.suivi[sorte] : {reponses: []});
+    if (!Array.isArray(s.reponses)) s.reponses = [];
+    const objet = objetDuMail(sorte, ym); if (!objet) return 0;
+    const y = +ym.slice(0, 4), m = +ym.slice(5, 7), fen = {objet, moi: (mails.moi && mails.moi()) || '', depuis: Date.UTC(y, m - 1, 1) - 864e5, jusqua: Date.UTC(y, m, 21)}, jours = 'newer_than:' + (SUIVI_JOURS + 5) + 'd';
+    const fils = await filsDe('subject:"' + objet.replace(/["\\]/g, ' ') + '" ' + jours, 10);
+    let n = 1, lu = lireEchange({...fen, fils});
+    if (sorte === 'cra' && lu.envoi && !lu.reponses.some((r) => r.pdf) && !s.reponses.some((r) => r.pdf)) {   /* l'ancienne voie : un PDF d'un destinataire, après l'envoi */
+      const dest = [].concat((((mails.modeles && mails.modeles()) || {}).cra_client || {}).a || []).map((a) => String(a).trim()).filter(adresseOk).slice(0, 6);
+      if (dest.length) { const autres = await filsDe('from:(' + dest.join(' OR ') + ') filename:pdf ' + jours, 5); n = 2; lu = lireEchange({...fen, fils, destinataires: dest, autres}); }
+    }
+    const nom = sorte === 'cra' ? 'mail du CRA' : 'mail de prolongation';
+    if (lu.envoi) {
+      if (!s.envoi || s.envoi.id !== lu.envoi.id) x.historique.push({at: now(), quoi: nom + ' : envoyé le ' + quandDit(lu.envoi.at) + ' (vu dans Gmail)'});
+      s.envoi = {id: lu.envoi.id, fil: lu.envoi.fil, at: lu.envoi.at};
+      const mm = sorte === 'cra' ? x.mailCra : x.mailProlong; if (mm && !mm.envoye) { mm.envoye = true; mm.envoyeLe = lu.envoi.at; }   /* parti : plus jamais repréparé */
+    }
+    const connues = new Map(s.reponses.map((r) => [r.id, r])), neuves = [];
+    for (const r of lu.reponses) {
+      const c = connues.get(r.id);
+      if (c) { c.lu = r.lu; if (r.pdfs && r.pdfs.length) c.pdfs = r.pdfs; continue; }   /* déjà notée : « lue dans Gmail » peut changer, et l'identifiant de pièce jointe que Gmail donne (rafraîchi à chaque lecture du fil) */
+      if (s.reponses.length >= REP_MAX && !(sorte === 'cra' && r.pdf)) continue;   /* un long échange : les 8 premières réponses, et toujours le CRA en PDF */
+      const rep = {...r, vu: now(), notifie: now()}; s.reponses.push(rep); neuves.push(rep);
+      x.historique.push({at: now(), quoi: (sorte === 'cra' ? (r.pdf ? 'CRA signé reçu' : 'réponse au mail du CRA, sans le CRA') : 'réponse au mail de prolongation') + ' : ' + TXT(r.nom, 60) + ', le ' + quandDit(r.at)});
+    }
+    s.objet = objet; s.lu = now(); s.erreur = '';
+    if (sorte === 'cra' && s.reponses.some((r) => r.pdf)) s.clos = 'pdf';
+    else if (s.envoi && now() - s.envoi.at > SUIVI_JOURS * 864e5) s.clos = '45j';
+    noter();   /* enregistré AVANT de notifier : une réponse notée n'est jamais renotifiée, même après un redémarrage */
+    for (const r of neuves) {
+      const cra = sorte === 'cra', title = cra ? (r.pdf ? 'CRA signé reçu de ton client' : 'Réponse à ton mail du CRA, sans le CRA') : 'Réponse à ton mail de prolongation';
+      await push({title, body: TXT((r.nom || 'Ton contact') + ' : ' + (r.extrait || '(pas d’extrait)') + (cra && r.pdf ? ' À rattacher sur le portail.' : ''), 230), url: '/#travail', tag: 'rep-' + sorte + '-' + ym})
+        .catch((e) => log('jours : notification de la réponse impossible (' + TXT((e && e.message) || e, 120) + ')'));
+      if (ecrireJournal) await Promise.resolve().then(() => ecrireJournal({sujet: cra ? (r.pdf ? 'CRA du mois : CRA signé reçu' : 'CRA du mois : réponse reçue, sans le CRA') : 'Prolongation de mission : réponse reçue',
+        detail: 'Réponse au mail « ' + objet + ' » reçue le ' + quandDit(r.at) + (r.pdf ? ', avec un PDF' : ', sans PDF') + '. ' + (cra && r.pdf ? 'À rattacher sur le portail.' : 'À lire.')}))
+        .catch((e) => log('jours : ligne du Journal de Pilotage impossible (' + TXT((e && e.message) || e, 120) + ')'));
+    }
+    return n;
+  }
+  /* une erreur n'arrête pas le suivi : elle est écrite au journal du serveur (une fois par erreur) ; un quota atteint met tout en pause 15 minutes */
+  let suiviPause = 0, suiviFile = Promise.resolve(); const suiviDit = {};
+  const estQuota = (e) => !!e && (e.status === 429 || /quota|rate.?limit|too many requests|userratelimit/i.test(String(e.message || e)));
+  async function suivreSur(ym, sorte) {
+    try { const n = await suivreUn(ym, sorte); delete suiviDit[sorte + ym]; return n; }
+    catch (e) {
+      const msg = TXT((e && e.message) || e, 160), q = estQuota(e), s = suiviDe(ym)[sorte];
+      if (s) s.erreur = q ? 'quota de Gmail atteint' : msg;
+      if (q) suiviPause = now() + QUOTA_MS;
+      if (suiviDit[sorte + ym] !== msg) { suiviDit[sorte + ym] = msg; log('jours : suivi des réponses (' + (sorte === 'cra' ? 'mail du CRA' : 'mail de prolongation') + ', ' + ym + ') impossible (' + msg + ')' + (q ? ' : quota de Gmail, nouvel essai dans 15 minutes' : '')); }
+      return 2;
+    }
+  }
+  const enFile = (fn) => { const p = suiviFile.then(fn, fn); suiviFile = p.catch(() => {}); return p; };   /* un seul suivi à la fois (le passage et l'ouverture de Travail) */
+  /* le passage de 5 minutes : le mois en cours et les deux d'avant (une réponse arrive souvent au début du mois suivant ; 45 jours au plus), 4 recherches au plus */
+  let passe = 0;
+  const suivreAttendus = () => enFile(async () => {
+    if (!suiviPret() || now() < suiviPause) return 0;
+    const ym = moisCourant(), taches = [];
+    for (const m of [ym, moisAvant(ym), moisAvant(moisAvant(ym))]) for (const s of SORTES) if (enAttente(s, m) && !suiviFrais(s, m)) taches.push([m, s]);
+    /* plus de mails en attente que de recherches permises (deux mois qui se chevauchent) : chacun son tour, d'un passage à l'autre */
+    const cout = taches.reduce((n, t) => n + (t[1] === 'cra' ? 2 : 1), 0), k = cout > 4 ? passe++ % taches.length : 0; let reste = 4;
+    for (const [m, s] of taches.slice(k).concat(taches.slice(0, k))) { if (reste < (s === 'cra' ? 2 : 1) || now() < suiviPause) break; reste -= await suivreSur(m, s); }
+    return 4 - reste;
+  });
+  /* à l'ouverture de l'espace Travail : le mois affiché est relu si le passage ne vient pas de le faire (même état, mêmes notifications) */
+  const suivre = (ym) => enFile(async () => {
+    if (!okMois(ym) || !suiviPret() || now() < suiviPause) return suiviDe(ym);
+    const courant = ym === moisCourant();
+    for (const s of SORTES) {
+      const sv = suiviDe(ym)[s] || {};
+      if (sv.clos || suiviFrais(s, ym) || now() < suiviPause) continue;
+      if (enAttente(s, ym) || (courant && s === 'cra' && !sv.envoi)) await suivreSur(ym, s);   /* le mail du CRA du mois en cours est cherché dès qu'on regarde, même avant le 24 */
+    }
+    return suiviDe(ym);
+  });
+  /* « C’est rattaché » : il le dit lui-même (le compte rendu du portail ne le dit pas encore) */
+  function rattacher(ym) {
+    const x = okMois(ym) ? D.mois[ym] : null, s = x && suiviDe(ym).cra;
+    if (!s || !(s.reponses || []).some((r) => r.pdf)) return {ok: false, error: 'Aucun CRA signé reçu pour ce mois.'};
+    if (!s.rattache) { s.rattache = now(); x.historique.push({at: now(), quoi: 'CRA signé rattaché sur le portail (dit par toi)'}); noter(); }
+    return {ok: true};
   }
 
   /* le 24 à midi (rattrapé jusqu'à la fin du mois si le serveur était arrêté) ; le dernier jour à midi, relu */
   const avertir = (ym, title, corps) => push({title, body: TXT(corps, 230), url: '/#voir-jours-' + ym, tag: 'jours-' + ym}).catch(() => {});
-  let enTic = false;
+  let enTic = false, mailsPause = 0, dernierSuivi = 0;
   async function tic() {
     if (enTic || !agenda.lie()) return; enTic = true;
     try {
+     try {
       const t = paris(new Date(now())), ym = t.ymd.slice(0, 7), x = M(ym), dern = dernierJour(t.y, t.m);
       await lireRetours();
       if (dowDe(t.ymd) === 5 && t.hm >= heure) {   /* le vendredi à midi : la semaine, une notification */
@@ -587,7 +732,10 @@ export function createJours({file, agenda, claude = null, push = async () => [],
         x.envoye24 = t.ymd; noter(); await lire(ym);
         if (x.bilan && x.etat !== 'valide') await avertir(ym, 'Tes jours de ' + MOIS[t.m - 1], resume(x.bilan) + ' Ton oui sur tes congés sert au CRA du 26.');
       }
-      if (mails && t.d >= 24 && t.hm >= heure) { await mailCra(ym, t.ymd).catch((e) => log('jours : mail du CRA impossible (' + TXT((e && e.message) || e, 160) + ')')); await mailProlongation(ym, t, dern).catch((e) => log('jours : mail de prolongation impossible (' + TXT((e && e.message) || e, 160) + ')')); }
+      if (mails && t.d >= 24 && t.hm >= heure && now() >= mailsPause) {   /* 0.94.0 : après une erreur, nouvel essai 5 minutes plus tard (pas chaque minute) */
+        const rate = (quoi) => (e) => { mailsPause = now() + 5 * 60e3; log('jours : ' + quoi + ' impossible (' + TXT((e && e.message) || e, 160) + ')'); };
+        await mailCra(ym, t.ymd).catch(rate('mail du CRA')); await mailProlongation(ym, t, dern).catch(rate('mail de prolongation'));
+      }
       if (t.d === dern && t.hm >= heure && x.verifFin !== t.ymd) {
         x.verifFin = t.ymd; noter(); await lire(ym);
         /* le raccourci a noté le dernier jour à 11 h : tout est connu, sauf oubli ; rien à dire si tout va bien (la note de télétravail part seule) */
@@ -596,8 +744,10 @@ export function createJours({file, agenda, claude = null, push = async () => [],
         else if (b && x.etat !== 'valide') await avertir(ym, 'Tes jours de ' + MOIS[t.m - 1] + ' : toujours à valider', resume(b));
         else if (b && !b.complet) await avertir(ym, 'Tes jours de ' + MOIS[t.m - 1] + ' : un lieu manque', (b.aConfirmer.length ? 'Ni lieu ni congé noté : ' + b.aConfirmer.map(jourDit).join(', ') + '. ' : '') + (b.aResoudre.length ? 'À résoudre : ' + b.aResoudre.map((r) => jourDit(r.date)).join(', ') + '. ' : '') + 'La note de télétravail attend ta correction.');
       }
-    } catch (e) { log('jours : tic impossible (' + TXT((e && e.message) || e, 200) + ')'); }
-    finally { enTic = false; }
+     } catch (e) { log('jours : tic impossible (' + TXT((e && e.message) || e, 200) + ')'); }
+     /* 0.94.0 : les réponses aux mails du mois, toutes les 5 minutes (dès le premier passage après un démarrage : ce qui est arrivé pendant l'arrêt est rattrapé) */
+     if (suiviPret() && (!dernierSuivi || now() - dernierSuivi >= SUIVI_MS)) { dernierSuivi = now(); await suivreAttendus().catch((e) => log('jours : suivi des réponses impossible (' + TXT((e && e.message) || e, 160) + ')')); }
+    } finally { enTic = false; }
   }
   let timer = null;
   const demarrer = (ms) => { if (!timer) { timer = setInterval(() => { tic().catch(() => {}); }, ms || 60000); if (timer.unref) timer.unref(); } };
@@ -635,5 +785,6 @@ export function createJours({file, agenda, claude = null, push = async () => [],
   }
   /* les jours validés d'un mois (pour le CRA d'Hermes, étape 3) : rien tant qu'il n'a pas dit oui */
   const valides = (ym) => { const x = D.mois[ym]; return x && x.etat === 'valide' && x.valide ? x.valide : null; };
-  return {etat, lire, confirmer, corriger, effacer, tic, demarrer, traiter, valides, lireSemaine, etatSemaine, confirmerSemaine, corrigerSemaine, lireRetours, notesVues, validerNote, brut: () => D};
+  return {etat, lire, confirmer, corriger, effacer, tic, demarrer, traiter, valides, lireSemaine, etatSemaine, confirmerSemaine, corrigerSemaine, lireRetours, notesVues, validerNote, brut: () => D,
+    suivre, suivi: suiviDe, suivreAttendus, rattacher, reveillerSuivi: () => { dernierSuivi = 0; suiviReveil = now(); }};   /* 0.94.0 : les réponses aux mails du mois */
 }

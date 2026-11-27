@@ -80,7 +80,7 @@ autre copie de la session s'en charge (`docs/hermes-portail.md`).
 Méthode, pour chaque routine remplacée : à blanc (`en double`, rien d'écrit hors du Journal, compte rendu entier
 dans le Détail) comparé à la dernière sortie du bot ; puis sa mise en pause chez le bot par une ligne du Canal ;
 puis `routines.sh --reel <nom>` et `routines.sh --lancer <nom>` : la première exécution réelle, hors de son horaire,
-notifiée dans JARVIS pour qu'il la valide. Retour arrière : `routines.sh --double <nom>` et la reprise de la routine
+notifiée dans JARVIS pour qu'il la vérifie (depuis 0.91.0, c'est JARVIS qui l'envoie, à l'appel de `routine_fin` : `docs/hermes.md`). Retour arrière : `routines.sh --double <nom>` et la reprise de la routine
 chez le bot (tant que Grok Bot tourne).
 
 ## La méthode de bascule (pas de compromis sur la qualité)
@@ -261,7 +261,7 @@ Termius) ; le geste d'après le squelette qu'elle rapporte ; les décisions à b
   serveur), `hermes-reveil.path` et `.service` (root), garde coupable par `/etc/hermes/garde.coupe` et `usage.json`.
   Bancs : serveur 365 sur 365, courrier 9 sur 9, garde 21 sur 21, routines du dépôt 6 lignes sans erreur. **Banc
   d'Hermes non relancé** : le banc des portails d'une autre copie tournait dans le même conteneur (même utilisateur
-  hermes) ; ses compteurs sont mis à jour (21 et 8 outils, 7 skills, ports 40180 à 40182).
+  hermes) ; ses compteurs sont mis à jour (21 et 8 outils, 7 skills, ports 40180 à 40182 ; 22 et 9 depuis `routine_fin`, 0.91.0).
 
 ## Autres workflows étudiés pour Hermes (sa question du 24/11/2026)
 
