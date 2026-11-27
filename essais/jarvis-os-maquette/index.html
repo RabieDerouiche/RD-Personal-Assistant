@@ -10982,7 +10982,7 @@ void main(){
         if ((sg.etat === 'pret' || sg.etat === 'echec') && sg.empreinte && r.mois) actions.push(act(sg.etat === 'pret' ? 'Oui, déposer' : 'Réessayer avec Hermes', {tone: 'main', confirm: true, showExtra: true, cost: 'free',
           ask: 'Hermes dépose ' + quoi + ' sur le portail ?', yes: 'Oui, déposer',
           go: () => suite(api && api.signeOui ? api.signeOui(r.mois, sg.empreinte) : Promise.resolve().then(() => maq(true)), 'Ton oui est noté', 'Hermes dépose le CRA signé sur le portail, puis te prévient.')}));
-        if (sg.etat === 'pret' && r.mois) actions.push(act('Je le fais moi-même', {cost: 'free', go: () => suite(api && api.signeMoi ? api.signeMoi(r.mois) : Promise.resolve().then(() => maq(false)), 'Noté', 'Dépose-le sur le portail, puis « C’est rattaché ».')})); }
+        if (sg.etat === 'pret' && r.mois) actions.push(act('Je le fais moi-même', {tone: 'main2', cost: 'free', go: () => suite(api && api.signeMoi ? api.signeMoi(r.mois) : Promise.resolve().then(() => maq(false)), 'Noté', 'Dépose-le sur le portail, puis « C’est rattaché ».')})); }
       /* 0.94.0 : le CRA signé est reçu : « C’est rattaché » quand il l'a déposé sur le portail (l'étape « Rattaché » passe à faite) */
       if (r.rattachable && r.mois) actions.push(act('C’est rattaché', {tone: 'main', cost: 'free', go: () => {
         (api && api.rattache ? api.rattache(r.mois) : Promise.resolve().then(() => { const x = ((window.__TRAVAIL || {}).routines || []).find((y) => y.id === r.id); if (x) { x.rattachable = false; x.toi = ''; x.attend = (x.attend || []).filter((t) => !/rattacher/.test(t)); x.etapes = x.etapes.map((e) => (e[0] === 'Rattaché' ? [e[0], 'fait'] : e)); } return {ok: true}; }))
