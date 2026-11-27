@@ -17,6 +17,11 @@ const auj = new Date(), jour = auj.getDate(), dernier = new Date(auj.getFullYear
 const quarts = [[1, 7], [8, 14], [15, 21], [22, dernier]].filter(([, f]) => f >= jour).length;
 let jeudis = 0; for (let d = jour; d <= dernier; d++) if (new Date(auj.getFullYear(), auj.getMonth(), d).getDay() === 4) jeudis++;
 
+/* 0.93.0 : un mois déjà gardé dans l'historique du Radar, posé avant le démarrage (montant sentinelle, inventé) : il doit s'afficher, et ne
+   sortir ni par le serveur MCP ni par la mémoire */
+const ymDe = (k) => { const d = new Date(auj.getFullYear(), auj.getMonth() + k, 1); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); };
+fs.writeFileSync(path.join(DATA, 'radar.json'), JSON.stringify({version: 7, historique: {suivi: ymDe(0), mois: {[ymDe(-1)]: {mois: ymDe(-1), fixes: 6543.21, plans: 0, courantes: 0, total: 6543.21, postes: [{label: 'Sentinelle', montant: 6543.21, n: 1}], clos: ymDe(0) + '-01'}}}}), {mode: 0o600});
+
 let srv = null, nav = null;
 try {
   const code = execFileSync(process.execPath, [SRV, 'pair'], {env}).toString().match(/: ([A-Z0-9]{4}-[A-Z0-9]{4})/)[1];
@@ -94,11 +99,20 @@ try {
   const m1 = plat(await p.locator('.rad-mois').textContent());
   await p.getByRole('button', {name: 'Donner le montant de ma paie'}).tap(); await p.waitForTimeout(500);
   await p.locator('.rad-form input[inputmode=decimal]').fill('3000'); await p.locator('.rad-form button[type=submit]').tap(); await p.waitForTimeout(900);
-  const m2 = plat(await p.locator('.rad-vivre').textContent()), evo = await p.locator('.rad-evo').count(), dernier6 = plat(await p.locator('.rad-evo').last().textContent()), premier6 = plat(await p.locator('.rad-evo-note').textContent());
+  const m2 = plat(await p.locator('.rad-vivre').textContent()), evo = await p.locator('.rad-evo').count(), enCours = plat(await p.locator('.rad-evo').first().textContent()), noteH = plat(await p.locator('.rad-evo-note').textContent());
+  /* 0.93.0 : « Déjà dépensé ce mois » et l'historique, tels que le serveur les donne */
+  const api93 = (await c('/api/radar', {headers: A})).body.mois, dep93 = plat(await p.locator('.rad-depense').textContent()), anciens = await p.locator('.rad-hm.is-estime').count(), garde = plat(await p.locator('.rad-hm[data-mois="' + ymDe(-1) + '"]').textContent());
   ok('« Le mois » : 520 € en tout (400 de courses + 120 de boucherie, estimés), ce qui est noté, les postes « Alimentation » ; sans montant de paie, il le propose',
     m1.includes(eur(520)) && m1.includes('environ ' + eur(520) + ' de dépenses courantes (estimé)') && m1.includes('Tu as noté ' + eur(350)) && /Alimentation/.test(m1) && /Donne le montant de ta paie/.test(m1), m1.slice(0, 400));
-  ok('paie de 3 000 € saisie : « Reste à vivre ce mois-ci » 2 480 € (17 % de la paie partent en dépenses prévues) ; six mois affichés, le dernier avec ses dépenses courantes, les plus anciens sans',
-    m2.includes(eur(2480)) && m2.includes('17 % de ta paie') && evo === 6 && dernier6.includes(eur(520)) && /prélèvements seulement, tes dépenses courantes n’étaient pas encore saisies/.test(premier6) && (await c('/api/radar', {headers: A})).body.revenus.montant === 3000, [m2, evo, dernier6].join(' | '));
+  ok('paie de 3 000 € saisie : « Reste à vivre ce mois-ci » 2 480 € (17 % de la paie partent en dépenses prévues) ; 0.93.0 : l\'historique à la place des six mois : le mois en cours en tête (en direct), le mois d\'avant tel qu\'il a été gardé (« Bilan gardé le … »), puis quatre mois plus anciens, estimés (« ≈ ») tant qu\'ils ne sont pas gardés',
+    m2.includes(eur(2480)) && m2.includes('17 % de ta paie') && evo === 6 && /en cours/.test(enCours) && enCours.includes(eur(api93.depense.total)) && anciens === 4 && api93.historique.length === 5 && api93.historique[0].mois === ymDe(-1) && !api93.historique[0].estime && api93.historique[0].total === 6543.21
+    && api93.historique.slice(1).every((x) => x.estime) && garde.includes(eur(6543.21)) && /Sentinelle/.test(garde) && /Bilan gardé le \d\d\/\d\d\/\d{4} : il ne change plus\./.test(garde) && /24 mois au moins/.test(noteH) && /« ≈ »/.test(noteH)
+    && (await c('/api/radar', {headers: A})).body.revenus.montant === 3000, [m2, evo, enCours, anciens, garde.slice(0, 160)].join(' | '));
+  ok('0.93.0 : « Déjà dépensé ce mois » sur le vrai serveur : les 350 € notés des courses et la boucherie cochée « Fait ce mois-ci » (120 €) = 470 € de dépenses courantes, plus les dépenses fixes déjà passées ; la carte et le serveur disent le même total',
+    api93.depense.courantes === 470 && api93.depense.nNotes === 2 && api93.depense.total === Math.round((470 + api93.depense.fixes + api93.depense.plans) * 100) / 100 && dep93.includes(eur(api93.depense.total)) && /de dépenses courantes notées \(2\)/.test(dep93) && !/null|undefined|NaN/.test(dep93),
+    JSON.stringify([api93.depense.total, api93.depense.fixes, api93.depense.courantes, dep93.slice(0, 200)]));
+  await seg('Fixes'); const hero93 = plat(await p.locator('.rad-hero .rad-deja-mois').textContent()); await seg('Le mois');
+  ok('0.93.0 : la grande carte dit « Déjà dépensé en <mois> » avec le même total, sous « Déjà prélevé »', /^Déjà dépensé en \S+ : /.test(hero93) && hero93.includes(eur(api93.depense.total)), hero93);
   if (process.env.COURANTES_CAPTURE) { await p.evaluate(() => { document.querySelectorAll('.toast-x').forEach((b) => b.click()); const e = document.querySelector('.rad-mois'); if (e) e.scrollIntoView({block: 'start'}); }); await p.waitForTimeout(3500); await p.screenshot({path: process.env.COURANTES_CAPTURE + '-mois.png'}); }
   await seg('Fixes');
   await ouvrir('Courses'); await fiche.locator('.rad-cr-notes button').tap(); await p.waitForTimeout(800);
@@ -121,6 +135,20 @@ try {
     sansCas === 0 && encore === true && (await c('/api/radar', {headers: A})).body.courantes.find((x) => x.service === 'Courses').mode === 'mois', [sansCas, encore].join());
   await modifier('Femme de ménage'); await form.getByRole('button', {name: 'Retirer cette dépense'}).tap(); await p.waitForTimeout(800);
   ok('« Retirer cette dépense » : elle sort de la liste et du serveur', await ligne('Femme de ménage').count() === 0 && (await c('/api/radar', {headers: A})).body.courantes.length === 2);
+  /* 0.93.0 : sur le serveur seulement. Un exécutant relié (le profil le plus large du serveur MCP) appelle tous ses outils, la mémoire et l'état de
+     l'app sont lus, les autres fichiers du serveur sont relus : aucun des deux montants sentinelles du Radar (le mois gardé, la paie) n'en sort */
+  { await c('/api/radar/set', {method: 'POST', headers: A, body: JSON.stringify({cle: 'revenus', valeur: {jour: 28, avance: true, montant: 8765.43}})});
+    const SENT = [/6[\s\u00a0\u202f.]?543[.,]21/, /8[\s\u00a0\u202f.]?765[.,]43/], porte = (t) => SENT.filter((re) => re.test(String(t))).length;
+    const rad = JSON.stringify((await c('/api/radar', {headers: A})).body), jm = await c('/api/mcp/jeton', {method: 'POST', headers: A, body: JSON.stringify({nom: 'Banc du Radar', profil: 'executant'})});
+    const rpc = (m, params) => fetch(BASE + '/mcp', {method: 'POST', headers: {'content-type': 'application/json', authorization: 'Bearer ' + ((jm.body && jm.body.jeton) || '')}, body: JSON.stringify({jsonrpc: '2.0', id: 1, method: m, params})}).then(async (x) => ({status: x.status, txt: await x.text()}));
+    const liste = await rpc('tools/list', {}), noms = (((JSON.parse(liste.txt || '{}').result || {}).tools) || []).map((x) => x.name);
+    let sorti = liste.txt; for (const n of noms) sorti += '\n' + (await rpc('tools/call', {name: n, arguments: {}})).txt;
+    const adresses = ['/api/memoire', '/api/memory', '/api/snap', '/api/missions', '/api/mcp'], lues = []; for (const u of adresses) { const x = await c(u, {headers: A}); lues.push(x.status); sorti += '\n' + JSON.stringify(x.body); }
+    const fichiers = []; const voir = (d) => { for (const f of fs.readdirSync(d, {withFileTypes: true})) { const g = path.join(d, f.name); if (f.isDirectory()) voir(g); else if (f.isFile() && g !== path.join(DATA, 'radar.json') && fs.statSync(g).size < 2e6) fichiers.push(g); } }; voir(DATA);
+    const fuites = fichiers.filter((g) => porte(fs.readFileSync(g, 'utf8')) > 0).map((g) => path.relative(DATA, g));
+    ok('0.93.0 : sur le serveur seulement : l\'appareil relié reçoit les deux montants sentinelles du Radar (un mois gardé de l\'historique, la paie) ; aucun outil du serveur MCP (profil exécutant, tous appelés), ni la mémoire, ni l\'état de l\'app, ni aucun autre fichier du serveur ne les porte ; radar.json reste en 600',
+      porte(rad) === 2 && jm.status === 200 && liste.status === 200 && noms.length >= 10 && noms.includes('jarvis_memoire') && noms.includes('pilotage_lire') && lues[0] === 200 && porte(sorti) === 0 && fichiers.length >= 1 && fuites.length === 0
+      && porte(fs.readFileSync(path.join(DATA, 'radar.json'), 'utf8')) === 2 && (fs.statSync(path.join(DATA, 'radar.json')).mode & 0o777) === 0o600, JSON.stringify({radar: porte(rad), outils: noms.length, lues, sorti: porte(sorti), fuites, fichiers: fichiers.length})); }
   ok('aucune erreur de script dans la page', errs.length === 0, errs.join(' | '));
   if (process.env.COURANTES_CAPTURE) { await panneau.scrollIntoViewIfNeeded(); await p.screenshot({path: process.env.COURANTES_CAPTURE + '-panneau.png'}); await ajouter(); await p.waitForTimeout(500); await p.screenshot({path: process.env.COURANTES_CAPTURE + '-formulaire.png'}); }
 } catch (e) { ok('le banc est allé au bout', false, (e && e.stack) || String(e)); }

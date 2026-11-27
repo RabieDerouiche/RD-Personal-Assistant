@@ -161,6 +161,37 @@
     G['Routines'].push(['Hermes', 'Veille du matin', 'Horaire (serveur de JARVIS)', 'Lun-ven 7h40', 'x', 'x', 'En place'], ['Hermes', 'Semaine à venir', 'Horaire (serveur de JARVIS)', 'Dim 18h10', 'x', 'x', 'En place'], ['Hermes', 'Prix suivis', 'Horaire (serveur de JARVIS)', 'Dim 17h', 'x', 'x', 'En place']);
     G['État'].push(['Hermes', fr(D(0)) + ' 07:42', 'Veille du matin faite', fr(D(1)) + ' 07:40 (Veille du matin)', '']);
   }
+  /* 0.93.0 : scénario « sujets » — un même sujet en plusieurs éléments (le dossier, des demandes venues du Canal, des échéances), et des faux
+     amis qui doivent rester séparés (deux dossiers d'assurance). Tout est inventé : aucun montant, aucun organisme réel. */
+  if (SCEN.sujets) {
+    G['Dossiers'].push(
+      ['Sinistre infiltrations (appartement)', 'En attente', "Déclarer le sinistre à l'assureur depuis son appli", fr(D(9)), 'Rabie', fr(D(-6)), 'Référence inventée 123', 'Iris', fr(D(-6)), "À faire : Déclarer le sinistre à l'assureur depuis son appli | Pourquoi : le syndic renvoie vers ton assurance | Temps : 15 min"],
+      ['Rachat du crédit Expresso (organisme Alpha)', 'En cours', "Attendre l'appel du conseiller", fr(D(4)), 'Organisme Beta (conseiller)', fr(D(-8)), '', 'Iris', fr(D(-7)), ''],
+      ['Assurance habitation', 'En attente', "Envoyer l'attestation de l'ancien assureur", '', 'Rabie', fr(D(-3)), '', 'Iris', fr(D(-3)), "À faire : Envoyer l'attestation de l'ancien assureur | Pourquoi : le nouveau contrat l'attend"],
+      ['Assurance auto', 'En attente', 'Choisir la formule', '', 'Rabie', fr(D(-3)), '', 'Iris', fr(D(-3)), 'Choix : Quelle formule ? | Options : Tiers / Tous risques | Pourquoi : le contrat se renouvelle bientôt'],
+      ['Remboursement de la caution (ancien logement)', 'En cours', "Attendre la réponse du bailleur", '', 'Bailleur Delta', fr(D(-9)), '', 'Iris', fr(D(-9)), '']);
+    G['À toi'].push(
+      [fr(D(-6)), 'Iris', 'Sinistre infiltrations (appartement)', "Déclarer le sinistre à l'assureur depuis son appli"],
+      [fr(D(-1)), 'Hermes', 'Devis du plombier', 'Oui/Non : Tu acceptes le devis du plombier ? | Pourquoi : il doit passer avant la fin du mois | Si oui : je confirme le passage | Si non : je demande un autre devis | Avant le : ' + fr(D(2))],
+      [fr(D(-2)), 'Hermes', 'Offre de prêt Gamma (rachat Expresso)', "Oui/Non : Je demande l'offre écrite à Gamma ? | Pourquoi : c'est la meilleure proposition reçue | Avant le : " + fr(D(3))],
+      [fr(D(-1)), 'Hermes', 'Pièces pour le rachat du crédit Expresso', 'À faire : Réunir les trois derniers justificatifs demandés | Pourquoi : le conseiller les demande avant son appel'],
+      [fr(D(-3)), 'Iris', 'Assurance habitation', "Envoyer l'attestation de l'ancien assureur"],
+      [fr(D(-3)), 'Iris', 'Assurance auto', 'Choisir la formule'],
+      [fr(D(-1)), 'Hermes', "Attestation d'assurance", "À faire : Télécharger l'attestation d'assurance scolaire | Pourquoi : l'école la demande"]);
+    G['Canal'].push(
+      [fr(D(-1)), 'Hermes', 'Rabie', 'Devis du plombier', 'Oui/Non : Tu acceptes le devis du plombier ?', 'À faire', '', 'Sinistre infiltrations (appartement)'],
+      [fr(D(-2)), 'Hermes', 'Rabie', 'Offre de prêt Gamma (rachat Expresso)', "Oui/Non : Je demande l'offre écrite à Gamma ?", 'À faire', '', ''],
+      [fr(D(-1)), 'Hermes', 'Rabie', 'Pièces pour le rachat du crédit Expresso', 'À faire : Réunir les trois derniers justificatifs demandés', 'À faire', '', ''],
+      [fr(D(-1)), 'Hermes', 'Rabie', "Attestation d'assurance", "À faire : Télécharger l'attestation d'assurance scolaire", 'À faire', '', '']);
+    G['Échéances'].push(
+      [fr(D(1)), "Relancer l'assureur (Sinistre infiltrations)", 'Logement', '', 'À venir', 'Iris', '', 'À faire par moi'],
+      [fr(D(30)), "Passage de l'expert (sinistre infiltrations)", 'Logement', '', 'À venir', 'Iris', '', 'Date à retenir'],
+      [fr(D(5)), "Fin de l'offre de prêt Gamma (rachat Expresso)", 'Finances', '3 jours avant', 'À venir', 'Iris', '', 'Offre'],
+      [fr(D(20)), "Renouvellement de l'assurance auto", 'Contrats', '', 'À venir', 'Iris', '', 'Fin de validité'],
+      [fr(D(25)), "Assurance : point annuel", 'Contrats', '', 'À venir', 'Iris', '', 'Date à retenir'],
+      [fr(D(8)), "Passage de l'expert (Dégât des eaux)", 'Logement', '', 'À venir', 'Iris', '', 'Date à retenir'],
+      [fr(D(12)), 'Point sur le remboursement de la caution', 'Logement', '', 'À venir', 'Iris', '', 'À faire par moi']);
+  }
   G['Papiers'] = [
     ['Document', 'Personne', 'Où il est (lien Drive, ou « papier »)', "Valable jusqu'au", 'Sert pour', 'Mis à jour le', 'Remarque'],
     ['Passeport', 'Rabie', 'papier, tiroir', fr(D(210)), 'voyage', '', ''],
@@ -247,6 +278,10 @@
     ]
   };
 
+  /* 0.93.0, scénario « sujets » : trois brouillons Gmail sans carte (inventés) : un pour le sinistre, deux pour un dossier qui n'attend pas sa réponse */
+  if (SCEN.sujets) MAIL.drafts.push({id: 'DRAFT93', threadId: 'dth93', toRecipients: ['sinistres@assureur.example'], ccRecipients: [], date: new Date(now - 3600000 * 3).toISOString(), subject: "Déclaration de sinistre : infiltrations dans l'appartement", plaintextBody: 'Bonjour,\nJe déclare un sinistre : des infiltrations sont apparues au plafond du salon.'},
+    {id: 'DRAFT94', threadId: 'dth94', toRecipients: ['bailleur@delta.example'], ccRecipients: [], date: new Date(now - 3600000 * 4).toISOString(), subject: 'Relance : remboursement de la caution', plaintextBody: "Bonjour,\nSans nouvelle de votre part depuis l'état des lieux, je vous relance."},
+    {id: 'DRAFT95', threadId: 'dth95', toRecipients: ['bailleur@delta.example'], ccRecipients: [], date: new Date(now - 3600000 * 2).toISOString(), subject: 'Dernier courrier avant recours', plaintextBody: "Bonjour,\nLe remboursement de la caution de l'ancien logement n'est toujours pas arrivé."});
   if (SCEN.draftPj) MAIL.drafts.push({id: 'DRAFT9', threadId: 'dth9', toRecipients: ['agence@example.org'], ccRecipients: [], date: new Date(now - 3600000).toISOString(), subject: 'Dossier location', plaintextBody: 'Bonjour,\nVoici le dossier.', pieces: ['dossier.pdf']});   /* 0.85.0 : un brouillon avec pièce jointe */
 
   /* plages A1 */
@@ -518,6 +553,20 @@
       {id: 'pc', service: 'Garde d’enfant (exemple)', cat: 'Autres', montant: null, jour: 5, jourApprox: true, rythme: 'mensuel', source: 'mail', preuves: 13, dernier: rIso(-18), depuis: '11/2025', exemple: {objet: 'Votre facture du mois (en pièce jointe)', date: rIso(-18)}}],
     scan: {enCours: false, mois: 13, total: 13, lus: 412, fini: Date.now(), erreur: ''}, google: true,
     navigo: {mois: rMoisL(1), conseil: 'liberte', joursSite: 9, liberte: 36.72, moisNet: 45.40, texte: '9 jours sur site prévus, avec une semaine de congés : reste en Liberté+ (environ 36,72 €). Le Navigo Mois coûterait 45,40 € après le remboursement de 50 %.'}};
+  /* 0.93.0 : « déjà dépensé ce mois » et l'historique mois par mois, tels que le serveur les donne (montants inventés) : les dépenses fixes
+     de la liste dont le jour est passé, deux notes de courses, puis 26 mois (24 gardés, dont un reconstitué, et deux plus anciens estimés) */
+  { const M93 = window.__RADAR.mois, jour = new Date().getDate(), ymK = (k) => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() + k); return d.getFullYear() + '-' + p2(d.getMonth() + 1); };
+    const c2 = (n) => Math.round(n * 100) / 100, moisIso = (j) => ymK(0) + '-' + p2(j);
+    const passees = window.__RADAR.fixes.filter((f) => f.rythme === 'mensuel' && f.jour < jour).map((f) => ({date: moisIso(f.jour), service: f.service, montant: f.montant, poste: f.cat, sorte: 'fixe'}));
+    const notes = [[3, 62.4], [10, 48.15]].filter(([j]) => j <= jour).map(([j, m]) => ({date: moisIso(j), service: 'Courses', montant: m, poste: 'Alimentation', sorte: 'courante'}));
+    const lignes = passees.concat(notes).sort((a, b) => (a.date < b.date ? -1 : 1)), som = (l) => c2(l.reduce((t, x) => t + x.montant, 0));
+    const postesDe = (l) => { const par = {}; l.forEach((x) => { const k = (x.sorte === 'courante' ? 'c' : 'f') + x.poste; par[k] = par[k] || {label: x.poste, montant: 0, n: 0}; par[k].montant = c2(par[k].montant + x.montant); par[k].n++; if (x.sorte === 'courante') par[k].courant = true; }); return Object.values(par).sort((a, b) => b.montant - a.montant); };
+    M93.depense = {mois: ymK(0), jusqua: jour > 1 ? rIso(-1) : '', total: som(lignes), fixes: som(passees), plans: 0, courantes: som(notes), nFixes: passees.length, nPlans: 0, nNotes: notes.length, postes: postesDe(lignes), lignes};
+    M93.historique = [...Array(26)].map((_, i) => { const fx = c2(1466.57 + ((i * 37) % 90)), co = i < 24 ? c2(380 + ((i * 53) % 140)) : 0, pl = i % 4 === 0 ? 29.55 : 0, total = c2(fx + co + pl), clos = ymK(-i) + '-01';
+      return Object.assign({mois: ymK(-(i + 1)), libelle: rMoisL(-(i + 1)), fixes: fx, plans: pl, courantes: co, total, postes: [{label: 'Logement', montant: c2(fx - 213.07), n: 4}, {label: 'Alimentation', montant: co, n: 6, courant: true}, {label: 'Abonnements', montant: 58.56, n: 5}, {label: 'Transport', montant: 89.02, n: 2}, {label: 'Télécoms', montant: 39.98, n: 2},
+        {label: 'Santé', montant: 24.5, n: 1}].concat(pl ? [{label: 'Paiements en plusieurs fois', montant: pl, n: 1}] : []).filter((x) => x.montant > 0).sort((a, b) => b.montant - a.montant)},
+        i < 24 ? {prevu: 520, paie: 3000, resteAVivre: c2(3000 - total), clos} : {estime: true}, i === 7 ? {reconstitue: true} : {}); });
+  }
   /* 0.23.0 : la météo de l'accueil (en vrai : Open-Meteo, à la position de l'iPhone) */
   window.__METEO = {current: {temperature_2m: 9.4, apparent_temperature: 6.2, weather_code: 3}, daily: {time: [fr(D(0)), fr(D(1))], weather_code: [3, 61], temperature_2m_min: [4, 2], temperature_2m_max: [11, 7], precipitation_probability_max: [10, 70]}};
   window.__G = G; window.__MAIL = MAIL; window.__CAL = CAL;
