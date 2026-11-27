@@ -75,3 +75,10 @@ pas commencé), 6. le dépôt du CRA signé sur le portail par Hermes après son
 - **En cours : 0.97.0, dépôt du CRA signé sur le portail par Hermes après son oui** (un agent en worktree, lancé à 12 h 55 ; note attendue : `docs/_chantier-G.md`). Limite : ne sera « fini » qu'après un essai à blanc sur le vrai portail (par la session du serveur) et sa validation la première fois.
 - **Ensuite** : fusionner 0.97.0, bancs, PR vers main, UNE demande à « Serveur JARVIS 2 » (0.95.0, 0.96.0, 0.97.0 : mise à jour, redémarrage, les deux `install.sh`, contrôles, essai pause/reprise d'une routine, essai à blanc du dépôt), lire son compte rendu, puis le récapitulatif final unique avec les captures et un QCM de choix de maquette.
 - Limite de la 0.96.0 à lui dire : une routine n'a qu'un horaire technique (passages à la même minute ou à la même heure) ; la lever = plusieurs tâches par routine côté Hermes.
+
+## État au 27/11/2026, 16 h 45
+
+- **main = `6722569` (demande 253) : JARVIS 0.96.0.** Bancs passés seuls après fusion : serveur 427, administration 46, ordres 117, relance 88, verrou 45, dépôt 42, pont 24, garde 25, routines 6, bout en bout 136, app 430 (et les 3 échecs liés à la date).
+- **Demande de déploiement envoyée à « Serveur JARVIS 2 » à 16 h 40** (0.95.0 et 0.96.0 ; le plan est `docs/demandes-serveur-en-attente.md`, lu là-bas par `git show origin/main:…`). Le serveur était en 0.94.0. Lire son compte rendu par `list_events` (kinds `result`) avant de dire que c'est déployé. Cette session attend son oui là-bas (mode par défaut : il doit approuver).
+- **0.97.0 (dépôt du CRA signé par Hermes)** : coupé par la limite à 15 h, relancé à 16 h 35 ; côté JARVIS écrit (`signe.mjs`, tests en cours), root, app et bancs à faire. Sauvegarde : `chantier-G.patch` (s'applique sur `0d240e3`). Une seconde demande au serveur suivra pour lui (avec l'essai à blanc réel du dépôt pour novembre).
+- Réveil programmé à 21 h 15.
