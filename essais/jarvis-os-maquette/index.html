@@ -12859,6 +12859,29 @@ void main(){
       };
     } }
 
+  /* ================= ESSAI « accès » (sa demande du 27/11/2026 à minuit : « garde le même thème mais essaye de rajouter d'une façon clean
+     plus d'icônes ou de tuiles qui emmènent vers les blocs comme Travail, Routines, Papiers… fais une proposition clean et sobre ; et rajoute
+     Réglages quelque part »). Une proposition : rien ne change dans l'app sans « ?acces=1 » dans l'adresse. Sur « Aujourd'hui », juste sous le
+     globe : une rangée « Accès », huit tuiles sobres (une icône, un mot), deux lignes de quatre : Travail, Routines, Papiers, Argent, Achats,
+     Voyages, Sorties, Réglages. Un appui ouvre la rubrique ; aucune donnée, aucun compteur, aucune couleur de plus. ================= */
+  { let accesOn = false; try { accesOn = new URLSearchParams(location.search).get('acces') === '1'; } catch (e) { /* rien */ }
+    if (accesOn) {
+      document.head.append(h('style', {text: '.acc-sec{margin:18px 0 6px}.acc-k{margin:0 0 10px;font:600 12px var(--display);letter-spacing:.18em;text-transform:uppercase;color:rgb(var(--c1))}'
+        + '.acc-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}'
+        + '.acc-t{display:grid;justify-items:center;align-content:center;gap:7px;min-height:76px;padding:10px 4px;border-radius:16px;border:1px solid rgba(var(--c1),.22);background:rgba(var(--c1),.05);color:var(--fg);font:600 12.5px var(--sans);cursor:pointer;-webkit-tap-highlight-color:transparent}'
+        + '.acc-t .ic{display:inline-flex;color:rgb(var(--c1))}.acc-t span:last-child{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}'
+        + '.acc-t:active{background:rgba(var(--c1),.14)}.acc-t:focus-visible{outline:2px solid rgb(var(--c1));outline-offset:2px}'}));
+      const ACCES = [['travail', 'brief', 'Travail'], ['equipe', 'bot', 'Routines'], ['papiers', 'doc', 'Papiers'], ['argent', 'euro', 'Argent'],
+        ['achats', 'tag', 'Achats'], ['voyages', 'plane', 'Voyages'], ['sorties', 'map', 'Sorties'], ['reglages', 'gear', 'Réglages']];
+      const VA_ACC = VIEWS.accueil;
+      VIEWS.accueil = (el) => {
+        VA_ACC(el);
+        const hud = el.querySelector('section.hud'); if (!hud || el.querySelector('.acc-sec')) return;
+        hud.after(h('section', {class: 'acc-sec', 'aria-label': 'Accès aux rubriques'}, h('p', {class: 'acc-k', text: 'Accès'}),
+          h('div', {class: 'acc-grid'}, ACCES.filter(([id]) => typeof VIEWS[id] === 'function').map(([id, ic, nom]) => h('button', {type: 'button', class: 'acc-t', 'data-acc': id, onclick: () => go(id)}, h('span', {class: 'ic', html: icon(ic, 22)}), h('span', {text: nom}))))));
+      };
+    } }
+
   boot();
 })();
 </script>

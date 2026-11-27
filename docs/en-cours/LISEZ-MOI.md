@@ -123,3 +123,10 @@ pas commencé), 6. le dépôt du CRA signé sur le portail par Hermes après son
 - Vu à l'essai : le champ de fichier n'apparaît qu'après un bouton d'import → skill ajustée (étape 5 du dépôt) ; texte du compte rendu coupé au milieu d'un mot → corrigé. Les deux sont sur la branche (0.99.0), pas encore sur le serveur.
 - **Suite** : bancs (`scratchpad/g/resultat4.txt`, puis le banc du portail) → demande de fusion de la 0.99.0 → UN message à « Serveur JARVIS 2 » (plan : `docs/demandes-serveur-en-attente.md`, pull + redémarrage + `install.sh` du portail) → lire son compte rendu, dont ses deux gestes (« Relancer Hermes » pour la semaine, « Oui, déposer » pour le CRA signé).
 
+## État au 28/11/2026, 0 h 30
+
+- **Radar** (sa remarque : « déjà dépensé » ne prenait pas les dépenses courantes dépensées chaque semaine) : corrigé sur la branche (un budget pas noté compte pour ce qui est écoulé, d'après le budget ; `courantesBudget`), banc du Radar 158.
+- **Essai « accès »** (sa demande : plus de tuiles vers Travail, Routines, Papiers…, sobre, et Réglages) : bloc derrière `?acces=1`, capture envoyée (`scratchpad/pile/4-acces-tuiles.png`). Avec la pile (`?pile=1`), deux essais attendent son avis (QCM posé).
+- **CRA de la semaine** : il voit encore l'erreur parce qu'il n'a pas touché « Relancer Hermes » (rien ne repart seul) : redit. À regarder au prochain compte rendu du serveur.
+- Bancs de la 0.99.0 en cours : `scratchpad/g/resultat5.txt` (serveur 434 passé ; portail, app). Ensuite : fusion dans main, message à « Serveur JARVIS 2 » (plan déjà écrit : `docs/demandes-serveur-en-attente.md`).
+
