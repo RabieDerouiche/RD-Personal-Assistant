@@ -73,7 +73,21 @@ chemin_hermes() {   # le PATH du Hermes portail : son Node et son npm à lui, pu
 ENVIRONNEMENT=(HOME="$H" USER="$U" LOGNAME="$U" LANG=C.UTF-8 HERMES_HOME="$HH" HERMES_MANAGED_DIR="$ETC"
   HTTPS_PROXY="http://127.0.0.1:$RELAIS" https_proxy="http://127.0.0.1:$RELAIS" NO_PROXY=localhost,127.0.0.1,::1 no_proxy=localhost,127.0.0.1,::1
   CLAUDE_SUBSCRIPTION_DIRECTSDK_COMMAND="$H/.local/lib/claude-code/node_modules/.bin/claude" DISABLE_AUTOUPDATER=1)
-comme_portail() { (cd "$H" && runuser -u "$U" -- env -i "${ENVIRONNEMENT[@]}" PATH="$(chemin_hermes)" TERM="${TERM:-xterm}" "$@"); }
+comme_portail() { (cd "$H" && runuser -u "$U" -- env -i "${ENVIRONNEMENT[@]}" PATH="$(chemin_hermes)" TERM="${TERM:-xterm}" "$@") 7>&-; }   # 7 : le verrou des passages, jamais donné à l'agent
+
+# 0.102.0 (relecture de sécurité) — un seul passage à la fois. Toutes les tâches partagent la consigne ($H/.consigne), l'unité d'un passage
+# et son fichier de sortie : deux tâches lancées ensemble (un vendredi qui est le dernier jour du mois) se prenaient le compte rendu l'une de
+# l'autre. Le verrou est pris par la commande qui écrit la consigne et tenu jusqu'à sa fin ; une commande lancée par elle ne le reprend pas.
+verrou_passage() {
+  [ -n "${HERMES_PORTAIL_VERROU:-}" ] && return 0
+  install -d -o root -g root -m 0700 "$VAR/essais"
+  exec 7> "$VAR/essais/.verrou-passage"
+  flock -w "${HERMES_PORTAIL_ATTENTE:-1800}" 7 || { echo "Un autre passage d'Hermes sur un portail est en cours depuis plus de 30 minutes : celui-ci n'est pas lancé."; exit 75; }
+  export HERMES_PORTAIL_VERROU=1
+}
+# La consigne (lue sur l'entrée) est écrite chez l'agent SOUS SON NOM : root n'écrit plus dans son dossier et ne lui « donne » plus de fichier
+# (un lien posé à la place de .consigne faisait écrire root ailleurs, puis donnait le fichier visé à l'agent).
+poser_consigne() { (cd / && runuser -u "$U" -- /bin/sh -c 'umask 077; rm -f -- "$1"; cat > "$1"' sh "$H/.consigne"); }
 propre() { sed 's/\x1b\[[0-9;?]*[A-Za-z]//g'; }
 
 # ---- la clé du coffre d'Hermes : en mémoire vive seulement
@@ -84,7 +98,9 @@ memoire_vive() {   # le dossier en mémoire vive et le lien que le coffre d'Herm
   fi
   [ "$(stat -f -c %T "$RAM")" = ramfs ] || { echo "Refus : $RAM n'est pas en mémoire vive (ramfs)."; return 1; }
   chown "$U:$U" "$RAM"; chmod 0700 "$RAM"
-  install -d -o "$U" -g "$U" -m 0700 "$HH/vault"
+  # 0.102.0 : créé sous le nom de l'agent, jamais par root (root suivait un lien posé là et donnait le dossier visé à l'agent)
+  [ ! -L "$HH/vault" ] || { echo "Refus : $HH/vault est un lien."; return 1; }
+  runuser -u "$U" -- install -d -m 0700 "$HH/vault" || { echo "Refus : $HH/vault ne peut pas être créé."; return 1; }
   if [ -e "$HH/vault/vault.key" ] && [ ! -L "$HH/vault/vault.key" ]; then
     echo "Refus : $HH/vault/vault.key est un vrai fichier sur le disque. La clé ne doit exister qu'en mémoire vive."
     echo "S'il vient d'un essai : sudo hermes-portail oublier --tout, puis recommence."; return 1
@@ -701,7 +717,8 @@ FIN
     fi
     cle; rc=$?; [ $rc = 0 ] || exit $rc
     install -d -o root -g root -m 0700 "$VAR/essais"
-    consigne="$H/.consigne"; sortie="$VAR/essais/$(date +%Y-%m-%d_%H%M%S).txt"; rm -f "$consigne"
+    verrou_passage
+    consigne="$H/.consigne"; sortie="$VAR/essais/$(date +%Y-%m-%d_%H%M%S).txt"
     if [ -n "$justificatif" ]; then
       install -d -o root -g "$U" -m 0750 "$DEPOT"; joint="$DEPOT/justificatif.$ext"
       install -o root -g "$U" -m 0640 "$justificatif" "$joint"
@@ -731,8 +748,8 @@ FIN
         echo "----------"; cat "$champs"; echo; echo "----------"
         ligne_code; notes_pour_consigne "$hote"
         echo "Termine par l'étape « Avant de finir » de ta skill (l'attente qui enregistre la session), puis réponds."
-      } > "$consigne"
-    elif [ -n "$fichier" ]; then { cat "$fichier"; ligne_code; notes_pour_consigne "$hote"; } > "$consigne"
+      } | poser_consigne
+    elif [ -n "$fichier" ]; then { cat "$fichier"; ligne_code; notes_pour_consigne "$hote"; } | poser_consigne
     else { cat <<FIN
 Essai en lecture seule, selon ta skill « portail ». Adresse : $adresse
 Ouvre cette adresse. Connecte-toi avec l'identifiant du coffre si une page de connexion s'affiche. Dis où tu
@@ -740,9 +757,8 @@ arrives et ce que tu vois, sans donnée personnelle. Ne crée, ne modifie, ne so
 FIN
         ligne_code; notes_pour_consigne "$hote"
         echo "Termine par l'étape « Avant de finir » de ta skill (l'attente qui enregistre la session), puis réponds."
-      } > "$consigne"
+      } | poser_consigne
     fi
-    chown "$U:$U" "$consigne"; chmod 0600 "$consigne"
     if [ -n "$codemail" ]; then
       id "$JARVIS_U" >/dev/null 2>&1 && [ -f "$JARVIS_SRV/google.mjs" ] || { echo "JARVIS n'est pas installé ici : pas de code par mail."; exit 1; }
       install -d -o root -g "$U" -m 0750 "$DEPOT"; rm -f "$DEPOT/code.txt" "$DEPOT/.code"
@@ -751,7 +767,7 @@ FIN
     if [ -n "$vers" ]; then rm -rf "$RECU"; install -d -o "$U" -g "$U" -m 0700 "$RECU"; else rm -rf "$RECU"; fi
     debut=$(date +%s); lancer_agent "$consigne" "$sortie"; rc=$?
     [ -n "$guet" ] && { kill "$guet" 2>/dev/null; wait "$guet" 2>/dev/null; rm -f "$DEPOT/code.txt" "$DEPOT/.code"; }
-    rm -f "$consigne"; [ -n "$joint" ] && rm -f "$joint"; chmod 0600 "$sortie" 2>/dev/null
+    runuser -u "$U" -- rm -f -- "$consigne" 2>/dev/null; [ -n "$joint" ] && rm -f "$joint"; chmod 0600 "$sortie" 2>/dev/null
     if [ "$commande" = brouillon ] && [ $blanc = 2 ]; then echo "== Note créée pour de vrai, passage du $(date '+%d/%m/%Y %H:%M') ($(( $(date +%s) - debut )) s, code $rc)"
     elif [ "$commande" = brouillon ] && [ $blanc = 1 ]; then echo "== À blanc du $(date '+%d/%m/%Y %H:%M') ($(( $(date +%s) - debut )) s, code $rc)"
     elif [ "$commande" = brouillon ]; then echo "== Brouillon du $(date '+%d/%m/%Y %H:%M') ($(( $(date +%s) - debut )) s, code $rc)"
@@ -812,7 +828,8 @@ print("VENDREDI " + semaine[4].isoformat()); print("PAGE " + l.strftime("%m/%d/%
     fi
     cle; rc=$?; [ $rc = 0 ] || { echo "Résultat CRA : echec (coffre)"; exit $rc; }
     install -d -o root -g root -m 0700 "$VAR/essais"
-    consigne="$H/.consigne"; sortie="$VAR/essais/$(date +%Y-%m-%d_%H%M%S)-cra.txt"; rm -f "$consigne"
+    verrou_passage
+    consigne="$H/.consigne"; sortie="$VAR/essais/$(date +%Y-%m-%d_%H%M%S)-cra.txt"
     { if [ $blanc = 1 ]; then echo "MODE CRA À BLANC, selon ta skill « portail » (section « CRA de la semaine »). Adresse : $adresse"
       else echo "MODE CRA, selon ta skill « portail » (section « CRA de la semaine »). Adresse : $adresse"; fi
       echo "Semaine du lundi $(date -d "$semaine" +%d/%m/%Y) (dans le champ de date de la page : $datepage). Code de temps : $codecra."
@@ -823,11 +840,10 @@ print("VENDREDI " + semaine[4].isoformat()); print("PAGE " + l.strftime("%m/%d/%
       notes_pour_consigne "$hote"
       [ "$SYSTEMD" = 0 ] && [ -n "${HERMES_BANC_CONSIGNE_EN_PLUS:-}" ] && cat "$HERMES_BANC_CONSIGNE_EN_PLUS"   # banc seulement : la suite d'appels du faux modèle
       echo "Termine par l'étape « Avant de finir » de ta skill (l'attente qui enregistre la session), puis réponds."
-    } > "$consigne"
-    chown "$U:$U" "$consigne"; chmod 0600 "$consigne"
+    } | poser_consigne
     rm -rf "$RECU"
     debut=$(date +%s); lancer_agent "$consigne" "$sortie"; rc=$?
-    rm -f "$consigne"; chmod 0600 "$sortie" 2>/dev/null
+    runuser -u "$U" -- rm -f -- "$consigne" 2>/dev/null; chmod 0600 "$sortie" 2>/dev/null
     echo "== CRA$( [ $blanc = 1 ] && echo ' à blanc') du $(date '+%d/%m/%Y %H:%M'), semaine du $semaine ($(( $(date +%s) - debut )) s, code $rc)"
     propre < "$sortie" | grep -v '^session_id:' | tail -40
     echo "(gardé dans $sortie, lisible par root seul)"
@@ -900,7 +916,8 @@ print("LE24 " + datetime.date(a, m, 24).isoformat()); print("LIBELLE " + ["janvi
     fi
     cle; rc=$?; [ $rc = 0 ] || { echo "Résultat CRA du mois : echec (coffre)"; exit $rc; }
     install -d -o root -g root -m 0700 "$VAR/essais"
-    consigne="$H/.consigne"; sortie="$VAR/essais/$(date +%Y-%m-%d_%H%M%S)-cra-mois.txt"; rm -f "$consigne"
+    verrou_passage
+    consigne="$H/.consigne"; sortie="$VAR/essais/$(date +%Y-%m-%d_%H%M%S)-cra-mois.txt"
     { if [ $blanc = 1 ]; then echo "MODE CRA DU MOIS À BLANC, selon ta skill « portail » (section « CRA du mois »). Adresse : $adresse"
       else echo "MODE CRA DU MOIS, selon ta skill « portail » (section « CRA du mois »). Adresse : $adresse"; fi
       echo "Mois : $libelle. Attendu : $total."
@@ -911,11 +928,10 @@ print("LE24 " + datetime.date(a, m, 24).isoformat()); print("LIBELLE " + ["janvi
       notes_pour_consigne "$hote"
       [ "$SYSTEMD" = 0 ] && [ -n "${HERMES_BANC_CONSIGNE_EN_PLUS:-}" ] && cat "$HERMES_BANC_CONSIGNE_EN_PLUS"   # banc seulement : la suite d'appels du faux modèle
       echo "Termine par l'étape « Avant de finir » de ta skill (l'attente qui enregistre la session), puis réponds."
-    } > "$consigne"
-    chown "$U:$U" "$consigne"; chmod 0600 "$consigne"
+    } | poser_consigne
     rm -rf "$RECU"
     debut=$(date +%s); lancer_agent "$consigne" "$sortie"; rc=$?
-    rm -f "$consigne"; chmod 0600 "$sortie" 2>/dev/null
+    runuser -u "$U" -- rm -f -- "$consigne" 2>/dev/null; chmod 0600 "$sortie" 2>/dev/null
     echo "== CRA du mois$( [ $blanc = 1 ] && echo ' à blanc') du $(date '+%d/%m/%Y %H:%M'), $libelle ($(( $(date +%s) - debut )) s, code $rc)"
     propre < "$sortie" | grep -v '^session_id:' | tail -50
     echo "(gardé dans $sortie, lisible par root seul)"
@@ -1186,7 +1202,8 @@ os.replace(tmp, dest)
     fi
     cle; rc=$?; [ $rc = 0 ] || { echo "Résultat CRA signé : coffre"; exit $rc; }   # coffre verrouillé : rien tenté (cra-signe-auto réessaie au quart d'heure suivant)
     install -d -o root -g root -m 0700 "$VAR/essais"
-    consigne="$H/.consigne"; sortie="$VAR/essais/$(date +%Y-%m-%d_%H%M%S)-cra-signe.txt"; rm -f "$consigne"
+    verrou_passage
+    consigne="$H/.consigne"; sortie="$VAR/essais/$(date +%Y-%m-%d_%H%M%S)-cra-signe.txt"
     install -d -o root -g "$U" -m 0750 "$DEPOT"; rm -f "$DEPOT"/CRA-signe-*.pdf
     if [ $blanc = 0 ]; then joint="$DEPOT/CRA-signe-$mois.pdf"; install -o root -g "$U" -m 0640 "$fichier" "$joint"; fi
     { if [ $blanc = 1 ]; then
@@ -1205,11 +1222,10 @@ os.replace(tmp, dest)
       notes_pour_consigne "$hote"
       [ "$SYSTEMD" = 0 ] && [ -n "${HERMES_BANC_CONSIGNE_EN_PLUS:-}" ] && cat "$HERMES_BANC_CONSIGNE_EN_PLUS"   # banc seulement : la suite d'appels du faux modèle
       echo "Termine par l'étape « Avant de finir » de ta skill (l'attente qui enregistre la session), puis réponds."
-    } > "$consigne"
-    chown "$U:$U" "$consigne"; chmod 0600 "$consigne"
+    } | poser_consigne
     rm -rf "$RECU"
     debut=$(date +%s); lancer_agent "$consigne" "$sortie"; rc=$?
-    rm -f "$consigne"; [ -n "$joint" ] && rm -f "$joint"; chmod 0600 "$sortie" 2>/dev/null
+    runuser -u "$U" -- rm -f -- "$consigne" 2>/dev/null; [ -n "$joint" ] && rm -f "$joint"; chmod 0600 "$sortie" 2>/dev/null
     echo "== CRA signé$( [ $blanc = 1 ] && echo ' à blanc') du $(date '+%d/%m/%Y %H:%M'), $libelle ($(( $(date +%s) - debut )) s, code $rc)"
     propre < "$sortie" | grep -v '^session_id:' | tail -40
     echo "(gardé dans $sortie, lisible par root seul)"

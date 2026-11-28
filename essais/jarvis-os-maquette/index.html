@@ -12913,20 +12913,26 @@ void main(){
     if (window.__SCEN && window.__SCEN.sansOrbite) ANCIEN = true;   /* le banc : ses vérifications d'avant portent sur l'accueil d'avant */
     if (!ANCIEN) {
       document.head.append(h('style', {text: '.hud-o .hud-core{height:344px;margin-top:8px;touch-action:pan-y;-webkit-user-select:none;user-select:none}.hud-o .hud-core .holo-stage{z-index:1;pointer-events:none}.hud-o .hud-lines{display:none}'
-        + '.orb-an{position:absolute;inset:0;width:100%;height:100%;z-index:0;pointer-events:none;overflow:visible}.orb-an ellipse{fill:none;stroke:rgb(var(--c2));stroke-width:1}.orb-an .o1{stroke-opacity:.34;stroke-dasharray:2 7;animation:orbfil 14s linear infinite}.orb-an .o2{stroke-opacity:.16;stroke-dasharray:1 9;animation:orbfil 22s linear infinite reverse}'
+        + '.orb-an{position:absolute;inset:0;width:100%;height:100%;z-index:0;pointer-events:none;overflow:visible}.orb-an ellipse{fill:none;stroke:url(#orb-deg);stroke-width:1}.orb-an .o1{stroke-opacity:.34;stroke-dasharray:2 7;animation:orbfil 14s linear infinite}.orb-an .o2{stroke-opacity:.16;stroke-dasharray:1 9;animation:orbfil 22s linear infinite reverse}'
         + '.orb-an .o3{stroke-opacity:.75;stroke-width:1.4;filter:drop-shadow(0 0 4px rgba(var(--c1),.9))}@keyframes orbfil{to{stroke-dashoffset:-180}}'
-        + '.orb-c{--a:var(--c1);--a2:var(--c2);position:absolute;left:0;top:0;z-index:3;display:grid;gap:1px;justify-items:start;min-width:74px;max-width:132px;padding:5px 10px 6px;border-radius:4px 12px 4px 12px;border:1px solid rgba(var(--a),.5);background:rgba(3,10,28,.66);-webkit-backdrop-filter:blur(5px);backdrop-filter:blur(5px);color:var(--fg);font:inherit;text-align:left;cursor:pointer;box-shadow:0 0 16px rgba(var(--a),.22),inset 0 0 12px rgba(var(--a),.08);will-change:transform,opacity;transition:border-color .5s,box-shadow .5s;-webkit-tap-highlight-color:transparent}'
+        + '.orb-c{--a:var(--c1);--a2:var(--c2);--a3:168,85,247;position:absolute;left:0;top:0;z-index:3;display:grid;gap:1px;justify-items:start;min-width:74px;max-width:132px;padding:5px 10px 6px;border-radius:4px 12px 4px 12px;border:1px solid transparent;background:linear-gradient(rgba(3,10,28,.74),rgba(3,10,28,.74)) padding-box,linear-gradient(120deg,rgba(var(--a),.85),rgba(var(--a3),.7)) border-box;-webkit-backdrop-filter:blur(5px);backdrop-filter:blur(5px);color:var(--fg);font:inherit;text-align:left;cursor:pointer;box-shadow:0 0 16px rgba(var(--a),.24),inset 0 0 12px rgba(var(--a3),.10);will-change:transform,opacity;transition:box-shadow .5s;-webkit-tap-highlight-color:transparent}'
         + '.orb-c::before{content:"";position:absolute;left:-2px;top:-2px;width:8px;height:8px;border:2px solid rgb(var(--a2));border-right:0;border-bottom:0;border-radius:4px 0 0 0}.orb-c::after{content:"";position:absolute;left:50%;bottom:-9px;width:1px;height:8px;background:linear-gradient(rgb(var(--a2)),transparent);opacity:.7}'
-        + '.orb-c small{font:700 9.5px var(--display);letter-spacing:.16em;color:rgb(var(--a2));white-space:nowrap}.orb-c b{font:700 13.5px/1.15 var(--display);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:112px}'
-        + '.orb-c.is-front{border-color:rgba(var(--a),.95);box-shadow:0 0 26px rgba(var(--a),.5),inset 0 0 16px rgba(var(--a),.16)}.orb-c.is-front b{text-shadow:0 0 12px rgba(var(--a),.7)}'
-        + '.orb-c.amb{--a:var(--warn);--a2:253,230,138}.orb-c.amb b{color:#fde68a}'
-        + '.orb-c[data-k="TRAVAIL"]:not(.amb){--a:var(--c3);--a2:196,160,255}.orb-c[data-k="ARGENT"]:not(.amb){--a:52,211,153;--a2:110,231,183}.orb-c[data-k="HERMES"]:not(.amb){--a:var(--c4);--a2:165,180,252}.orb-c[data-k="PAPIERS"]:not(.amb){--a:var(--c9);--a2:var(--c9)}'
+        + '.orb-c small{font:700 9.5px var(--display);letter-spacing:.16em;color:rgb(var(--a2));white-space:nowrap;background:linear-gradient(90deg,rgb(var(--a2)),rgb(var(--a3)));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}.orb-c b{font:700 13.5px/1.15 var(--display);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:112px}'
+        + '.orb-c.is-front{background:linear-gradient(rgba(3,10,28,.7),rgba(3,10,28,.7)) padding-box,linear-gradient(120deg,rgb(var(--a)),rgb(var(--a3))) border-box;box-shadow:0 0 22px rgba(var(--a),.5),0 0 34px rgba(var(--a3),.32),inset 0 0 16px rgba(var(--a),.16)}.orb-c.is-front b{text-shadow:0 0 12px rgba(var(--a),.7)}'
+        + '.orb-c.amb{--a:var(--warn);--a2:253,230,138;--a3:251,146,60}.orb-c.amb b{color:#fde68a}'
+        /* 0.102.0 (sa demande du 28/11/2026 : « les mêmes couleurs que la progression sur les tâches de travail… plus vivant, plus animé, plus colorié ;
+           dès que tu lances l'écran d'accueil, il faut que ça parle IA ») : tout l'accueil est dans le dégradé de Travail, du cyan au violet. Un
+           hologramme n'a plus sa couleur à lui : il prend celle de l'endroit où il passe (cyan à gauche, violet à droite), comme les points du globe ;
+           l'ambre reste à ce qui attend son oui. Une aurore tourne derrière le globe ; au lancement, un trait de lumière balaie le globe. */
+        + '.hud-o .hud-core::before{content:"";position:absolute;left:50%;top:50%;width:292px;height:292px;margin:-142px 0 0 -146px;border-radius:50%;background:conic-gradient(from 0deg,rgba(34,211,238,0),rgba(34,211,238,.22),rgba(129,140,248,.16),rgba(168,85,247,.26),rgba(232,121,249,.10),rgba(34,211,238,0));filter:blur(30px);z-index:0;pointer-events:none;animation:orbaura 18s linear infinite}'
+        + '.hud-o .hud-core::after{content:"";position:absolute;left:8%;right:8%;top:0;height:2px;border-radius:2px;background:linear-gradient(90deg,rgba(34,211,238,0),#22d3ee 30%,#a855f7 70%,rgba(168,85,247,0));box-shadow:0 0 18px rgba(99,102,241,.9);opacity:0;z-index:2;pointer-events:none}'
+        + '.hud-o .hud-core.nait::after{animation:orbscan 1.5s cubic-bezier(.3,.1,.3,1) var(--nd,.15s) 1}@keyframes orbscan{0%{opacity:0;transform:translateY(40px)}12%{opacity:.95}88%{opacity:.8}100%{opacity:0;transform:translateY(300px)}}@keyframes orbaura{to{transform:rotate(360deg)}}'
         + '.orb-ping{position:absolute;left:50%;top:50%;z-index:0;width:150px;height:150px;margin:-75px 0 0 -75px;border-radius:50%;border:1.5px solid rgba(var(--f, var(--c1)),.8);opacity:0;pointer-events:none}.orb-ping.va{animation:orbping 1.5s ease-out}@keyframes orbping{0%{transform:scale(.55);opacity:.75}100%{transform:scale(1.65);opacity:0}}'
         + '.orb-foc{--a:var(--c1);--a2:var(--c2);display:block;width:100%;margin:6px 0 0;padding:6px 8px;min-height:44px;background:none;border:0;color:var(--fg);font:500 13.5px/1.35 var(--sans);text-align:center;cursor:pointer}.orb-foc small{font:700 11px var(--display);letter-spacing:.16em;color:rgb(var(--a2));margin-right:8px}.orb-foc b{font:700 14.5px var(--display)}.orb-foc span{color:var(--muted)}.orb-foc i{font-style:normal;color:rgb(var(--a2));margin-left:6px}'
         + '.orb-foc.va{animation:orbfoc .5s ease-out}@keyframes orbfoc{0%{opacity:0;transform:translateY(4px);letter-spacing:.04em}100%{opacity:1;transform:none;letter-spacing:0}}'
         + '.hud-met{display:block;margin:5px 0 0 auto;padding:0;background:none;border:0;font:500 12px var(--sans);letter-spacing:.02em;color:var(--muted);text-align:right;white-space:nowrap;cursor:pointer}.hud-met b{color:var(--fg);font-weight:600}'
         + '.g-neuf{position:absolute;inset:0;width:100%;height:100%;z-index:1;pointer-events:none}.orb-c.eclat{border-color:rgb(var(--a2));box-shadow:0 0 30px rgba(var(--a),.75),inset 0 0 18px rgba(var(--a),.25)}'
-        + '@media (prefers-reduced-motion: reduce){.orb-an ellipse,.orb-ping.va,.orb-foc.va{animation:none}}'}));
+        + '@media (prefers-reduced-motion: reduce){.orb-an ellipse,.orb-ping.va,.orb-foc.va,.hud-o .hud-core::before,.hud-o .hud-core.nait::after{animation:none}}'}));
       /* ---- le globe de particules (son choix du 28/11 parmi six essais en deux familles, particules et plasma) : une sphère de points qui
          tourne et scintille, traversée d'ondes, dessinée ici sur un canevas 2D aux couleurs du thème (--c1, --c2, --k4, lues dans la page) ;
          elle respire, et s'anime davantage pendant que JARVIS dit sa phrase (HUD.g.set('speaking')). Le globe d'avant (jarvis-voix.js)
@@ -12945,16 +12951,29 @@ void main(){
         let graine = 7; const hasard = () => { graine = (graine * 16807) % 2147483647; return graine / 2147483647; };
         let W = 0, H = 0, cx = 0, cy = 0, R = 0; const dpr = Math.min(2, window.devicePixelRatio || 1);
         const cadre = () => { const w = core.clientWidth, hh = core.clientHeight; if (w !== W || hh !== H) { W = w; H = hh; cv.width = Math.round(w * dpr); cv.height = Math.round(hh * dpr); } g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H); cx = W / 2; cy = H / 2 + 4; R = Math.min(W, H) * 0.255; };
-        const halo = (r, a) => { const gr = g.createRadialGradient(cx, cy, r * 0.2, cx, cy, r); gr.addColorStop(0, col(C1, a)); gr.addColorStop(0.55, col(K4, a * 0.45)); gr.addColorStop(1, col(K4, 0)); g.fillStyle = gr; g.beginPath(); g.arc(cx, cy, r, 0, TAU); g.fill(); };
+        const halo = (r, a) => { const gr = g.createRadialGradient(cx - r * 0.18, cy, r * 0.2, cx + r * 0.1, cy, r); gr.addColorStop(0, col(CY, a)); gr.addColorStop(0.5, col('99,102,241', a * 0.5)); gr.addColorStop(0.8, col(VI, a * 0.28)); gr.addColorStop(1, col(VI, 0)); g.fillStyle = gr; g.beginPath(); g.arc(cx, cy, r, 0, TAU); g.fill(); };
+        /* 0.102.0 : les couleurs de la progression de Travail. Un point prend sa couleur là où il est (cyan à gauche, violet à droite) ; au lancement
+           de l'app, les points arrivent de loin et s'assemblent en globe (une fois) ; des liaisons s'allument entre points voisins, par vagues
+           (un réseau qui pense) */
+        const CY = '34,211,238', VI = '168,85,247', teinte = (m, a) => 'rgba(' + Math.round(34 + 134 * m) + ',' + Math.round(211 - 126 * m) + ',' + Math.round(238 + 9 * m) + ',' + Math.max(0, Math.min(1, a)).toFixed(3) + ')';
+        if (!GST.t0) GST.t0 = performance.now();
         const fabPoints = (N, kR, kHalo, sens = 1, incl = 0.42) => { const P = []; for (let i = 0; i < N; i++) { const y = 1 - 2 * (i + 0.5) / N, r = Math.sqrt(1 - y * y), th = i * 2.399963; P.push([Math.cos(th) * r, y, Math.sin(th) * r]); }
-          return (t, e) => { const Rs = R * kR; if (kHalo) halo(Rs * (1.02 + 0.04 * Math.sin(t / 1500)), 0.22 + 0.22 * e);
-            const ay = sens * t * 0.00021, ax = incl, choc = GST.choc ? Math.max(0, 1 - (t - GST.choc) / 900) : 0;
-            for (let i = 0; i < N; i++) { const p = P[i], q = rot(p, ay, ax), onde = (1 + (0.018 + 0.06 * e) * Math.sin(t * 0.0022 - p[1] * 5.5)) * (1 + 0.2 * choc * Math.sin(choc * 9 + i)), k = 1 + q[2] * 0.16, f = (q[2] + 1) / 2;
-              const x = cx + q[0] * Rs * onde * k, y = cy + q[1] * Rs * onde * k, al = (0.14 + 0.86 * f * f) * (0.72 + 0.28 * Math.sin(t * 0.0034 + i * 1.7)), sz = 0.8 + 1.7 * f;
-              if (i % 19 === 0 && f > 0.45) { g.fillStyle = col(C2, al * 0.22); g.beginPath(); g.arc(x, y, sz * 2.6, 0, TAU); g.fill(); g.fillStyle = 'rgba(255,255,255,' + al.toFixed(3) + ')'; }
-              else g.fillStyle = col(C2, al);
+          const X = new Float32Array(N), Y = new Float32Array(N), F = new Float32Array(N);
+          return (t, e) => { const Rs = R * kR, n = reduit ? 1 : Math.max(0, Math.min(1, (t - GST.t0) / 1500)), ez = 1 - Math.pow(1 - n, 3); if (kHalo) halo(Rs * (1.02 + 0.04 * Math.sin(t / 1500)) * (0.6 + 0.4 * ez), (0.24 + 0.22 * e) * ez);
+            const ay = sens * t * 0.00021 + (1 - ez) * 2.6 * sens, ax = incl, choc = GST.choc ? Math.max(0, 1 - (t - GST.choc) / 900) : 0;
+            for (let i = 0; i < N; i++) { const p = P[i], q = rot(p, ay, ax), loin = 1 + (1 - ez) * (1.1 + 2.6 * ((i * 0.618034) % 1)), onde = (1 + (0.018 + 0.06 * e) * Math.sin(t * 0.0022 - p[1] * 5.5)) * (1 + 0.2 * choc * Math.sin(choc * 9 + i)) * loin, k = 1 + q[2] * 0.16, f = (q[2] + 1) / 2, m = (q[0] + 1) / 2;
+              const x = cx + q[0] * Rs * onde * k, y = cy + q[1] * Rs * onde * k, al = (0.14 + 0.86 * f * f) * (0.72 + 0.28 * Math.sin(t * 0.0034 + i * 1.7)) * (0.2 + 0.8 * ez), sz = 0.8 + 1.7 * f;
+              X[i] = x; Y[i] = y; F[i] = f;
+              if (i % 19 === 0 && f > 0.45) { g.fillStyle = teinte(m, al * 0.24); g.beginPath(); g.arc(x, y, sz * 2.6, 0, TAU); g.fill(); g.fillStyle = 'rgba(255,255,255,' + al.toFixed(3) + ')'; }
+              else g.fillStyle = teinte(m, al);
               g.fillRect(x - sz / 2, y - sz / 2, sz, sz); }
-            g.strokeStyle = col(C2, 0.16 + 0.12 * e); g.lineWidth = 1; g.beginPath(); g.arc(cx, cy, Rs * 1.07, 0, TAU); g.stroke(); }; };
+            if (ez > 0.9 && !reduit) { g.lineWidth = 0.8;   /* les liaisons : entre voisins de la face avant, quand la vague passe */
+              /* sur cette sphère, les voisins d'un point sont à 21 et 34 rangs de lui : les liaisons dessinent un maillage, pas des traits au hasard */
+              for (let i = 0; i + 34 < N; i++) { if (F[i] < 0.5) continue; const v = Math.sin(t * 0.0017 + P[i][1] * 5.2 + (i % 5) * 1.3) + 0.35 * e; if (v < 0.86) continue;
+                const j = i + (i % 2 ? 21 : 34); if (F[j] < 0.5) continue;
+                g.strokeStyle = teinte((X[i] - cx) / (2 * Rs) + 0.5, Math.min(0.55, (v - 0.86) * 4) * F[i]); g.beginPath(); g.moveTo(X[i], Y[i]); g.lineTo(X[j], Y[j]); g.stroke(); } }
+            const an = g.createLinearGradient(cx - Rs, cy, cx + Rs, cy); an.addColorStop(0, col(CY, (0.2 + 0.14 * e) * ez)); an.addColorStop(1, col(VI, (0.26 + 0.14 * e) * ez));
+            g.strokeStyle = an; g.lineWidth = 1; g.beginPath(); g.arc(cx, cy, Rs * 1.07, 0, TAU); g.stroke(); }; };
         const dessin = MODE === '2' ? ((d1, d2) => (t, e) => { d2(t, e); d1(t, e); })(fabPoints(560, 1, true), fabPoints(260, 0.58, false, -1.7, -0.5)) : fabPoints(720, 1, true);   /* essai « atome » : deux coquilles en sens contraires */
         const tour = (t) => { if (!cv.isConnected) { GST.raf = 0; return; } cadre(); GST.e += ((GST.parle ? 1 : 0) - GST.e) * 0.06; dessin(reduit ? 4200 : t, GST.e); GST.raf = reduit ? 0 : requestAnimationFrame(tour); };
         if (GST.raf) cancelAnimationFrame(GST.raf); GST.raf = requestAnimationFrame(tour);
@@ -13061,7 +13080,11 @@ void main(){
             on.append(h('button', {type: 'button', class: 'hud-met', 'aria-label': 'Météo', onclick: () => met.click()}, t && t !== '—' ? h('b', {text: t}) : null, (t && t !== '—' ? ' · ' : '') + sub)); } }
         const anciennes = [...core.querySelectorAll('.hud-ro')]; anciennes.forEach((n) => { n.hidden = true; n.style.display = 'none'; });   /* gardées hors écran : leur appui sert encore */
         const NS = 'http://www.w3.org/2000/svg', svg = document.createElementNS(NS, 'svg'); svg.setAttribute('class', 'orb-an'); svg.setAttribute('aria-hidden', 'true');
-        const ell = (c) => { const e = document.createElementNS(NS, 'ellipse'); e.setAttribute('class', c); svg.append(e); return e; }, e2 = ell('o2'), e1 = ell('o1'), e3 = document.createElementNS(NS, 'path'); e3.setAttribute('class', 'o3'); e3.setAttribute('fill', 'none'); e3.setAttribute('stroke', 'rgb(var(--c2))'); svg.append(e3);
+        const ell = (c) => { const e = document.createElementNS(NS, 'ellipse'); e.setAttribute('class', c); svg.append(e); return e; }, e2 = ell('o2'), e1 = ell('o1'), e3 = document.createElementNS(NS, 'path'); e3.setAttribute('class', 'o3'); e3.setAttribute('fill', 'none'); e3.setAttribute('stroke', 'url(#orb-deg)'); svg.append(e3);
+        { const defs = document.createElementNS(NS, 'defs'), lg = document.createElementNS(NS, 'linearGradient'); lg.setAttribute('id', 'orb-deg'); lg.setAttribute('x1', '0'); lg.setAttribute('x2', '1'); lg.setAttribute('y1', '0'); lg.setAttribute('y2', '0');
+          for (const [o, c] of [['0', '#22d3ee'], ['0.5', '#818cf8'], ['1', '#a855f7']]) { const st = document.createElementNS(NS, 'stop'); st.setAttribute('offset', o); st.setAttribute('stop-color', c); lg.append(st); } defs.append(lg); svg.prepend(defs); }
+        /* le trait de lumière : au lancement de l'app, une fois ; l'accueil est redessiné quand les données arrivent : le trait reprend où il en était */
+        { const m = performance.now(); if (!GST.ne) GST.ne = m; if (m - GST.ne < 1700) { core.classList.add('nait'); core.style.setProperty('--nd', (150 - Math.round(m - GST.ne)) + 'ms'); } }
         const ping = h('i', {class: 'orb-ping', 'aria-hidden': 'true'});
         let glisse = false;
         const chips = items.map((it) => h('button', {type: 'button', class: 'orb-c' + (it.amb ? ' amb' : ''), 'data-k': it.k, onclick: (ev) => { if (glisse) { ev.preventDefault(); return; } it.act(); }}, h('small', {text: it.k}), h('b', {text: it.b})));
@@ -13070,10 +13093,16 @@ void main(){
         const foc = h('button', {type: 'button', class: 'orb-foc', 'aria-live': 'polite', onclick: () => { const it = items[ORB.front]; if (it) it.act(); }});
         core.after(foc);
         const reduit = window.matchMedia('(prefers-reduced-motion: reduce)').matches, pas = 360 / items.length;
+        /* 0.102.0 : la couleur d'un hologramme = l'endroit où il passe dans le dégradé (cyan à gauche, violet à droite), relue 8 fois par seconde ;
+           la ligne sous le globe et l'onde prennent celle de l'hologramme au point */
+        const mel = (m, blanc) => { const k = Math.max(0, Math.min(1, m)), c = [34 + 134 * k, 211 - 126 * k, 238 + 9 * k]; return c.map((v) => Math.round(v + (255 - v) * blanc)).join(','); };
+        const teinter = () => { if (!core.isConnected) return; const r0 = core.getBoundingClientRect(); if (!r0.width) return;
+          chips.forEach((c, i) => { if (items[i].amb) return; const r = c.getBoundingClientRect(), m = (r.left + r.width / 2 - r0.left) / r0.width; c.style.setProperty('--a', mel(m, 0)); c.style.setProperty('--a2', mel(m, 0.38)); c.style.setProperty('--a3', mel(m + 0.42, 0)); });
+          const d = chips[ORB.front], it = items[ORB.front]; if (d && it) { const a = it.amb ? 'var(--warn)' : d.style.getPropertyValue('--a') || 'var(--c1)'; core.style.setProperty('--f', a); foc.style.setProperty('--a', a); foc.style.setProperty('--a2', it.amb ? '253,230,138' : d.style.getPropertyValue('--a2') || 'var(--c2)'); } };
+        if (ORB.teinte) clearInterval(ORB.teinte); ORB.teinte = setInterval(() => { if (!core.isConnected) { clearInterval(ORB.teinte); ORB.teinte = 0; return; } teinter(); }, 125);
         const auPoint = (i) => { const it = items[i]; if (!it) return; ORB.front = i;
           chips.forEach((c, k) => c.classList.toggle('is-front', k === i));
-          const coul = it.amb ? 'var(--warn)' : (COUL[it.k] || 'var(--c1)'); core.style.setProperty('--f', coul);
-          foc.className = 'orb-foc'; foc.style.setProperty('--a', coul); foc.style.setProperty('--a2', it.amb ? '253,230,138' : it.k === 'TRAVAIL' ? '196,160,255' : it.k === 'ARGENT' ? '110,231,183' : it.k === 'HERMES' ? '165,180,252' : it.k === 'PAPIERS' ? 'var(--c9)' : 'var(--c2)');
+          foc.className = 'orb-foc'; teinter();
           foc.replaceChildren(h('small', {text: it.k}), h('b', {text: it.b}), it.sub ? h('span', {text: ' — ' + it.sub}) : null, h('i', {text: '›'}));
           if (!reduit) { void foc.offsetWidth; foc.classList.add('va'); ping.classList.remove('va'); void ping.offsetWidth; ping.classList.add('va'); } };
         if (MODE !== '1') { let pris = false; try { autreMoteur({core, svg, e1, e2, e3, ping, chips, items, auPoint, reduit, glisser: (v) => { glisse = v; }}); pris = true; } catch (e) { pris = false; } if (pris) return; }   /* un essai de mouvement prend la main ; en cas d'erreur, l'orbite d'aujourd'hui */
@@ -13087,9 +13116,10 @@ void main(){
           if (!ORB.drag && !reduit && t > ORB.pause && ORB.last) ORB.ang -= Math.min(64, t - ORB.last) * 0.0072;   /* un tour en 50 secondes */
           ORB.last = t;
           let devant = 0, mieux = -2;
-          chips.forEach((c, i) => { const th = (ORB.ang + i * pas) * Math.PI / 180, d = Math.sin(th), p = (d + 1) / 2, x = cx + a * Math.cos(th), y = cy + b * d + (reduit ? 0 : Math.sin(t / 950 + i * 1.9) * 3.5);
-            c.style.transform = 'translate(' + x.toFixed(1) + 'px,' + y.toFixed(1) + 'px) translate(-50%,-50%) scale(' + (0.8 + 0.3 * p + (i === ORB.front ? 0.06 : 0)).toFixed(3) + ')';
-            c.style.opacity = (0.36 + 0.64 * p).toFixed(2); c.style.zIndex = d > -0.2 ? '3' : '0'; if (d > mieux) { mieux = d; devant = i; } });
+          chips.forEach((c, i) => { const th = (ORB.ang + i * pas) * Math.PI / 180, d = Math.sin(th), p = (d + 1) / 2, ne = reduit ? 1 : Math.max(0, Math.min(1, (t - (GST.t0 || t) - 550 - i * 120) / 750)), eo = 1 - Math.pow(1 - ne, 3);   /* 0.102.0 : ils sortent du globe, l'un après l'autre */
+            const x = cx + a * eo * Math.cos(th), y = cy + b * d * eo + (reduit ? 0 : Math.sin(t / 950 + i * 1.9) * 3.5 * eo);
+            c.style.transform = 'translate(' + x.toFixed(1) + 'px,' + y.toFixed(1) + 'px) translate(-50%,-50%) scale(' + ((0.8 + 0.3 * p + (i === ORB.front ? 0.06 : 0)) * (0.35 + 0.65 * eo)).toFixed(3) + ')';
+            c.style.opacity = ((0.36 + 0.64 * p) * eo).toFixed(2); c.style.zIndex = d > -0.2 ? '3' : '0'; if (d > mieux) { mieux = d; devant = i; } });
           if (devant !== ORB.front) auPoint(devant);
           ORB.raf = requestAnimationFrame(image);
         };
@@ -13102,6 +13132,64 @@ void main(){
         if (ORB.raf) cancelAnimationFrame(ORB.raf); ORB.front = -1; ORB.last = 0; ORB.raf = requestAnimationFrame(image);
       };
     } }
+
+  /* ================= JARVIS OS 0.102.0 — Les commandes : tout faire en deux ou trois appuis (sa demande du 28/11/2026 : « Jarvis, c'est un
+     centre de commandement : tout checker, tester, vérifier, administrer de A à Z ; peu importe la tâche, maximum 2 ou 3 appuis, jamais
+     10 ») =================
+     La loupe de l'en-tête est sur toutes les pages : elle s'ouvre maintenant sur les commandes (un appui), et une commande touchée mène droit à
+     son geste (deux appuis) : la feuille d'une routine d'Hermes (lancer, pause, horaire, historique), le CRA de la semaine, déposer un papier,
+     l'état des systèmes, une nouvelle tâche, le verrou… Les mêmes se trouvent en tapant un mot (« lancer », « papier », « santé »). Rien de neuf
+     derrière : chaque commande appelle le geste qui existe déjà (ses aiguillages « #voir-… », ses feuilles), avec ses confirmations. */
+  { const cmdListe = () => {
+      const out = [], add = (id, titre, sous, ic, fn, mots) => out.push({id, titre, sous, ic, fn, cle: gsNorm(titre + ' ' + sous + ' ' + (mots || ''))});
+      const JS = SRV_OS && window.JarvisServeur ? window.JarvisServeur : null;
+      if (VIEWS.travail) add('cra', 'CRA de la semaine', 'Confirmer, soumettre, relancer Hermes', 'check', () => go('travail'), 'travail semaine soumettre hermes portail');
+      add('depot', 'Déposer un papier', 'PDF ou photo : JARVIS propose où le ranger', 'up', () => voirUrl('#voir-papiers-depot'), 'papiers ranger drive document scanner');
+      add('sante', 'État des systèmes', 'Serveur, Google, Hermes : tout vérifier', 'pulse', () => voirUrl('#voir-sante'), 'sante controle verifier tester checker panne erreur diagnostic');
+      let v = null; try { v = window.__HR92 && window.__HR92.vue ? window.__HR92.vue() : null; } catch (e) { v = null; }
+      /* les routines ne sont lues qu'à l'accueil et dans Équipe : ouverte ailleurs, la loupe les demande (une fois) et se redessine */
+      if (!(v && v.disponible) && !cmdListe.demande && window.__HR92 && window.__HR92.load) { cmdListe.demande = true; try { Promise.resolve(window.__HR92.load(true)).then(() => { if (GS.open) gsDraw(); }, () => {}); } catch (e) { /* sans les routines */ } }
+      ((v && v.disponible && v.routines) || []).forEach((r) => add('routine-' + r.nom, r.libelle, 'Routine d’Hermes : lancer, pause, horaire, historique', 'bolt', () => voirUrl('#voir-routine-' + r.nom), 'hermes routine lancer relancer maintenant pause reprendre horaire historique erreur ' + r.nom));
+      if (VIEWS.equipe) add('hermes', 'Hermes et ses routines', 'Toutes ses routines, en direct', 'bot', () => go('equipe'), 'equipe routines automatisations');
+      add('tache', 'Nouvelle tâche', 'Pour toi, avec ou sans date', 'plus', () => openSheet({bot: 'hydra', title: 'Nouvelle tâche', say: 'Une tâche pour toi, avec ou sans date.', extra: newTaskForm, actions: []}), 'ajouter todo rappel');
+      add('evenement', 'Nouvel événement', 'Dans ton agenda principal', 'cal', () => openImportant(), 'agenda rendez-vous ajouter important');
+      add('jours', 'Mes jours du mois', 'Congés, télétravail, CRA du mois', 'cal', () => voirUrl('#voir-jours'), 'conges teletravail mois cra presence');
+      if (VIEWS.argent) add('argent', 'Argent', 'Reste à payer, dépenses, budgets', 'euro', () => go('argent'), 'radar budget depense noter paiement');
+      add('taches', 'Mes tâches', 'Celles du jour et en retard', 'list', () => voirUrl('#voir-taches'), 'todo a faire');
+      add('dates', 'Dates clés', 'Échéances et papiers qui expirent', 'clock', () => voirUrl('#voir-echeances'), 'echeances rappels validite');
+      add('maj', 'Mettre à jour JARVIS', 'Réglages : la dernière version', 'refresh', () => go('reglages'), 'mise a jour version update serveur');
+      if (JS && JS.verrou && JS.verrou.verrouiller) add('verrou', 'Verrouiller maintenant', 'Face ID à la prochaine ouverture', 'lock', () => { JS.verrou.verrouiller(); }, 'verrou face id passkey fermer securite');
+      add('notifs', 'Notifications', 'Ce qui te prévient, et quand', 'sound', () => voirUrl('#voir-reglages-notifs'), 'reglages prevenir alerte');
+      add('memoire', 'Mémoire de JARVIS', 'Ce qu’il retient de toi', 'brief', () => voirUrl('#voir-reglages-memoire'), 'reglages retenir oublier');
+      add('mcp', 'Assistants reliés', 'Claude, Hermes : leurs accès', 'users', () => voirUrl('#voir-reglages-mcp'), 'reglages mcp jeton acces autoriser retirer');
+      add('reglages', 'Réglages', 'Tout le reste', 'gear', () => go('reglages'), 'parametres options');
+      return out; };
+    document.head.append(h('style', {text: '.gs-cmds{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px}.gs-cmd{display:flex;align-items:center;gap:9px;min-width:0;overflow:hidden;min-height:50px;padding:8px 10px;border-radius:14px;border:1px solid transparent;background:linear-gradient(rgba(6,14,34,.9),rgba(6,14,34,.9)) padding-box,linear-gradient(120deg,rgba(34,211,238,.55),rgba(168,85,247,.5)) border-box;color:var(--fg);font:inherit;text-align:left;cursor:pointer;-webkit-tap-highlight-color:transparent}'
+      + '.gs-cmd:active{transform:scale(.97)}.gs-cmd .gs-ic{flex:0 0 28px;height:28px;color:#a5b4fc;border-color:rgba(129,140,248,.35)}.gs-cmd b{font:600 13px/1.2 var(--display);display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.gs-cmd small{display:block;font-size:11px;line-height:1.25;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.gs-cmd span:last-child{min-width:0;flex:1 1 0}.gs-res .gs-hint{white-space:normal}'
+      + '.gs-grp.gs-c h3{background:linear-gradient(90deg,#22d3ee,#a855f7);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;width:max-content}.gs-grp.gs-c h3 small{-webkit-text-fill-color:var(--dim)}'}));
+    const GSDRAW0 = gsDraw;
+    gsDraw = function () {
+      GSDRAW0();
+      const box = $('gs-res'), inp = $('gs-in'); if (!box) return;
+      if (inp) inp.placeholder = 'Chercher, ou lancer une commande';
+      const toks = gsNorm(GS.q.trim()).split(/\s+/).filter((x) => x.length >= 2), L = cmdListe(), vus = toks.length ? L.filter((c) => toks.every((t) => c.cle.indexOf(t) >= 0)) : L;
+      if (!vus.length) return;
+      const lancer = (c) => () => { gsClose(); try { c.fn(); } catch (e) { /* le geste dira lui-même ce qui manque */ } };
+      if (!toks.length) {   /* à l'ouverture : les commandes, deux par ligne (elles tiennent au-dessus du clavier) */
+        const hint = box.querySelector('.gs-hint'); if (hint) hint.textContent = 'Touche une commande, ou tape un mot : un nom, un dossier, un produit, un papier…';
+        const sec = h('section', {class: 'gs-grp gs-c', 'data-cmds': String(vus.length)}, h('h3', {}, 'Commandes', h('small', {text: String(vus.length)})),
+          h('div', {class: 'gs-cmds'}, vus.map((c) => h('button', {type: 'button', class: 'gs-cmd', 'data-cmd': c.id, onclick: lancer(c)}, h('span', {class: 'gs-ic', html: icon(ICONS[c.ic] ? c.ic : 'bolt', 16)}), h('span', {}, h('b', {text: c.titre}), h('small', {text: c.sous}))))));
+        if (hint) hint.after(sec); else box.prepend(sec);
+        return;
+      }
+      const cnt = box.querySelector('.gs-count');   /* avec un mot : les commandes d'abord, puis ce qui a été trouvé */
+      if (cnt && /^Rien pour/.test(cnt.textContent)) cnt.textContent = vus.length + ' commande' + (vus.length > 1 ? 's' : '');
+      const sec = h('section', {class: 'gs-grp gs-c', 'data-cmds': String(vus.length)}, h('h3', {}, 'Commandes', h('small', {text: String(vus.length)})),
+        vus.slice(0, 6).map((c) => h('button', {type: 'button', class: 'gs-row', 'data-cmd': c.id, onclick: lancer(c)}, h('span', {class: 'gs-ic', html: icon(ICONS[c.ic] ? c.ic : 'bolt', 17)}), h('span', {class: 'gs-t'}, h('b', {text: c.titre}), h('small', {text: c.sous})), h('span', {class: 'gs-go', 'aria-hidden': 'true', text: '›'}))));
+      if (cnt) cnt.after(sec); else box.prepend(sec);
+    };
+    { const b = $('gs-btn'); if (b) { b.setAttribute('aria-label', 'Chercher ou lancer une commande'); b.title = 'Chercher ou lancer une commande'; } }
+  }
 
   boot();
 })();

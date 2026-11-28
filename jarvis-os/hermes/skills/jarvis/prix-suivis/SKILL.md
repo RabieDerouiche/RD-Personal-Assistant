@@ -50,5 +50,5 @@ exactement `[SILENT]` sans appeler aucun outil.
   `Sujet` « Prix suivis » ; `Détail` : le compte rendu), `jarvis_notifier` pour un nouveau 🔴 ou 🟡 seulement
   (titre : « 🔴 Achat : <produit> » ; texte : le prix total, le vendeur, le seuil), `pilotage_etat`, puis
   `routine_fin` (`routine` « prix-suivis », `resume` : le compte rendu en une phrase), puis `[SILENT]`. La
-  première fois, JARVIS signale lui-même au propriétaire « Première exécution réelle » ; ne retiens rien dans ta
-  mémoire pour ça. Jamais `routine_fin` en double, ni un jour sans passage.
+  première fois, JARVIS signale lui-même au propriétaire « Première exécution réelle » (tu n'as pas de
+  mémoire dans cette routine). Jamais `routine_fin` en double, ni un jour sans passage.

@@ -22,9 +22,17 @@ hx() { (cd "$H" && runuser -u hermes -- env -i HOME="$H" USER=hermes LOGNAME=her
   HERMES_HOME="$HH" HERMES_MANAGED_DIR="$GERE" "$@"); }
 poses() {   # « identifiant<TAB>nom<TAB>état<TAB>prochain passage » de chaque routine jarvis-… posée
   python3 -I -c '
-import json, sys
-try: jobs = json.load(open(sys.argv[1])).get("jobs") or []
-except (OSError, ValueError): jobs = []
+import json, os, stat, sys
+def lire(chemin):   # 0.102.0 : le fichier est à hermes, lu par root : jamais un lien, un fichier ordinaire, 2 Mo au plus
+    try:
+        fd = os.open(chemin, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+        try:
+            st = os.fstat(fd)
+            if not stat.S_ISREG(st.st_mode) or st.st_size > 2000000: return []
+            return json.loads(os.read(fd, 2000001).decode("utf-8", "replace")).get("jobs") or []
+        finally: os.close(fd)
+    except (OSError, ValueError, AttributeError): return []
+jobs = lire(sys.argv[1])
 for j in jobs:
     n = str(j.get("name") or "")
     if n.startswith("jarvis-"):
@@ -34,15 +42,20 @@ for j in jobs:
 ' "$HH/cron/jobs.json"
 }
 outils_de() {   # la liste exacte des outils d'une routine (enabled_toolsets) : `hermes cron create` n'a pas d'option pour elle
-  python3 -I -c '
+  # 0.102.0 : fait SOUS LE NOM D'HERMES (hx), plus par root : root écrivait puis « donnait » un fichier dans le dossier d'hermes, à travers
+  # un lien s'il y en avait un (un fichier de root écrasé et remis à hermes)
+  hx python3 -I -c '
 import json, os, sys
 chemin, nom, outils = sys.argv[1], sys.argv[2], [x for x in sys.argv[3].split(",") if x]
 d = json.load(open(chemin)); vus = [j for j in d.get("jobs") or [] if j.get("name") == nom]
 if len(vus) != 1: sys.exit(1)
 vus[0]["enabled_toolsets"] = outils
-st = os.stat(chemin); tmp = chemin + ".jarvis"
-with open(tmp, "w") as f: json.dump(d, f, ensure_ascii=False, indent=2)
-os.chown(tmp, st.st_uid, st.st_gid); os.chmod(tmp, 0o600); os.replace(tmp, chemin)
+tmp = chemin + ".jarvis"
+try: os.unlink(tmp)
+except OSError: pass
+fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+with os.fdopen(fd, "w") as f: json.dump(d, f, ensure_ascii=False, indent=2)
+os.replace(tmp, chemin)
 ' "$HH/cron/jobs.json" "$1" "$2"
 }
 lister() {

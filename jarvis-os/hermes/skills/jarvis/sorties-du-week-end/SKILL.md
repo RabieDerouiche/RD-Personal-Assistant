@@ -46,5 +46,5 @@ n'a que les outils du jeton « Veilleur » : `pilotage_lire` (Sources, Prix, Rel
   et la meilleure, « à choisir dans JARVIS »), `pilotage_etat`. Rien de pertinent : PASSAGE, aucune
   notification. Dans les deux cas, en dernier : `routine_fin` (`routine` « sorties-du-week-end »,
   `resume` : le nombre d'idées et la meilleure, en une phrase), puis `[SILENT]`. La première fois, JARVIS signale
-  lui-même au propriétaire « Première exécution réelle » ; ne retiens rien dans ta mémoire pour ça. Jamais
+  lui-même au propriétaire « Première exécution réelle » (tu n'as pas de mémoire dans cette routine). Jamais
   `routine_fin` en double.

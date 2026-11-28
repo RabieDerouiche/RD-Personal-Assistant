@@ -34,6 +34,9 @@ export const pdfsDe = (m) => (m.attachments || []).filter(estPdf).slice(0, 4).ma
 const nomDe = (m) => { const d = (m.addressDisplayNames || [])[0] || {}; return extraitDe(d.displayName || '', 60).replace(/^["'«\s]+|["'»\s]+$/g, '') || String(m.sender || '').split('@')[0].slice(0, 60); };
 const reponseDe = (m, fil, voie) => ({id: String(m.id || ''), fil: String(fil || m.threadId || ''), at: quand(m), de: String(m.sender || '').toLowerCase().slice(0, 120), nom: nomDe(m),
   pdf: aPdf(m), pdfs: pdfsDe(m), pieces: (m.attachments || []).length, extrait: extraitDe(m.snippet), lu: !etiq(m).includes('UNREAD'), voie});
+/* 0.102.0 : les adresses à qui le mail a été envoyé (À et Cc du message parti), plus celles qu'on donne (le modèle du mail) */
+const adr = (a) => sansAccent(typeof a === 'string' ? a : (a && (a.emailAddress || a.address)) || '').trim();
+export const destinatairesDe = (m, plus = []) => new Set([].concat((m && m.toRecipients) || [], (m && m.ccRecipients) || [], plus || []).map(adr).filter((a) => a.includes('@')));
 
 /* Le mail envoyé et ses réponses.
    - fils : les fils trouvés par l'objet (get_thread : [{id, messages}]) ;
@@ -41,8 +44,11 @@ const reponseDe = (m, fil, voie) => ({id: String(m.id || ''), fil: String(fil ||
    - depuis, jusqua : la fenêtre où chercher l'envoi (le mois du mail : un objet qui revient chaque mois n'est pas pris pour celui d'avant) ;
    - destinataires et autres : l'ancienne voie, gardée : un mail d'un destinataire du modèle, avec un PDF, arrivé après l'envoi, quel que
      soit son objet (« autres » : les fils de cette seconde recherche).
-   Rend {envoi: {id, fil, at, objet} | null, reponses: [{id, fil, at, de, nom, pdf, pieces, extrait, lu, voie}]}, des plus anciennes aux plus récentes. */
-export function lireEchange({fils = [], objet = '', moi = '', depuis = 0, jusqua = Infinity, destinataires = [], autres = []}) {
+   - connus (0.102.0) : des adresses de confiance en plus (le modèle du mail). Chaque réponse porte `connu` : vrai si son expéditeur est un
+     destinataire du mail parti ou une de ces adresses. Le même objet suffit à voir une réponse, pas à la croire : un CRA « signé » venu
+     d'une autre adresse n'est jamais déposé sans son oui (jours.mjs).
+   Rend {envoi: {id, fil, at, objet} | null, reponses: [{id, fil, at, de, nom, pdf, pieces, extrait, lu, voie, connu}]}, des plus anciennes aux plus récentes. */
+export function lireEchange({fils = [], objet = '', moi = '', depuis = 0, jusqua = Infinity, destinataires = [], autres = [], connus = []}) {
   const nu = objetNu(objet), tous = [];
   for (const f of fils || []) for (const m of (f && f.messages) || []) if (m && !estBrouillon(m)) tous.push({m, fil: String(f.id || m.threadId || '')});
   /* l'envoi : son message à lui, du même objet, dans la fenêtre ; le premier mail « neuf » (pas une réponse de sa part dans le fil), sinon le plus ancien */
@@ -50,7 +56,8 @@ export function lireEchange({fils = [], objet = '', moi = '', depuis = 0, jusqua
   const e = siens.find((x) => !estSuite(x.m.subject)) || siens[0] || null;
   if (!e) return {envoi: null, reponses: []};
   const envoi = {id: String(e.m.id || ''), fil: e.fil, at: quand(e.m), objet: extraitDe(e.m.subject, 200)}, vus = new Set(), reponses = [];
-  const garder = (m, fil, voie) => { const id = String(m.id || ''); if (!id || vus.has(id) || estBrouillon(m) || estDeLui(m, moi) || !(quand(m) > envoi.at)) return; vus.add(id); reponses.push(reponseDe(m, fil, voie)); };
+  const surs = destinatairesDe(e.m, [].concat(destinataires || [], connus || []));
+  const garder = (m, fil, voie) => { const id = String(m.id || ''); if (!id || vus.has(id) || estBrouillon(m) || estDeLui(m, moi) || !(quand(m) > envoi.at)) return; vus.add(id); reponses.push({...reponseDe(m, fil, voie), connu: surs.has(adr(m.sender))}); };
   for (const x of tous) {
     if (x.fil === envoi.fil) garder(x.m, x.fil, 'fil');                         /* dans le fil du mail envoyé : tout message d'un autre, plus récent */
     else if (objetNu(x.m.subject) === nu) garder(x.m, x.fil, 'objet');          /* dans un autre fil : le même objet, « Re : » ôtés, quel que soit l'expéditeur */

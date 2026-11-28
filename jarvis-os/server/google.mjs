@@ -98,7 +98,7 @@ export function textOf(part) {
 function mailMsg(m, withBody) {
   const from = addrs(hdr(m, 'From'))[0] || {displayName: '', emailAddress: ''};
   const at = +m.internalDate || Date.parse(hdr(m, 'Date')) || 0;
-  const o = {id: m.id, threadId: m.threadId, sender: from.emailAddress, addressDisplayNames: [from], toRecipients: addrs(hdr(m, 'To')).map((a) => a.emailAddress),
+  const o = {id: m.id, threadId: m.threadId, sender: from.emailAddress, addressDisplayNames: [from], toRecipients: addrs(hdr(m, 'To')).map((a) => a.emailAddress), ccRecipients: addrs(hdr(m, 'Cc')).map((a) => a.emailAddress),
     subject: hdr(m, 'Subject'), snippet: m.snippet || '', date: new Date(at).toISOString(), internalDate: String(at), labelIds: m.labelIds || [], viewUrl: 'https://mail.google.com/mail/#all/' + m.threadId};
   if (withBody) { o.plaintextBody = textOf(m.payload); o.attachments = piecesDe(m.payload); }
   return o;

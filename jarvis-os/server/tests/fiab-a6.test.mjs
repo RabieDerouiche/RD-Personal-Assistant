@@ -25,7 +25,8 @@ try {
     const S = {push: {subs: [{endpoint: 'x'}], prefs: {}}};
     const feuilles = {"'Échéances'!A1:H1000": [['Date', 'Sujet', 'Domaine', 'Rappels', 'Statut'], [fr(JOUR), 'Payer la cantine (essai)', 'Famille', '', 'À venir']],
       'Papiers!A1:G300': [['Document', 'Personne', 'Où il est', "Valable jusqu'au"], ['Carte d’essai', 'Lui', 'Drive', fr(JOUR)]],
-      'Canal!A1:H3000': [['Date', 'De', 'Pour', 'Type', 'Message', 'Statut', 'Réponse', 'Objet'], ['24/11/2026', 'Rabie', 'Kairos', 'Ordre', 'Suis la carte', 'À faire', '', '']]};
+      'Canal!A1:H3000': [['Date', 'De', 'Pour', 'Type', 'Message', 'Statut', 'Réponse', 'Objet'], ['24/11/2026', 'Rabie', 'Kairos', 'Ordre', 'Suis la carte', 'À faire', '', '']],
+      'Tâches!A1:E500': [['Tâche', 'Pour', 'Échéance', 'Statut', 'Créée le']]};   /* 0.79.0 lit aussi les tâches (onglet vide ici) : ce banc ne le donnait pas et cassait depuis */
     const read = async (r) => { lus.push(r); if (panne) throw new Error('Google 503'); return feuilles[r]; };
     const N = createNotifier({S, save: () => {}, push: {send: async (m) => { sent.push(m); return [{ok: true}]; }}, read, linked: () => true, pause: async () => parisMs(JOUR, '08:00'), now: () => T});
     const a = await N.tick({only: 'digest'}); T += 5 * 60000; panne = false; const b = await N.tick({only: 'digest'}), lusB = lus.length;

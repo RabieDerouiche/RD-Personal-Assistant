@@ -23,6 +23,7 @@
     let j = {}; try { j = await r.json(); } catch (e) { j = {}; }
     if (r.status === 423 && j && j.verrou) montrerVerrou();   /* 0.75.0 : le serveur est verrouillé pour cet appareil */
     if (r.status === 401 && j && j.error === 'Appareil non relié.') montrerPorte();   /* 0.82.0 : jeton absent, retiré ou périmé : la porte, pas l'app vide */
+    if (r.status === 200 && !/^\/api\/(verrou|health)/.test(p)) donnees = true;   /* 0.102.0 : une première donnée est arrivée (l'écran d'accueil peut partir) */
     return {status: r.status, j};
   };
   const fail = (code, server, message) => { throw {code, server, message: message || code}; };
@@ -196,52 +197,138 @@
      le bouton reste alors le secours, sans message), et l'app se reverrouille quand il revient après plus que le délai réglé (1 minute
      par défaut). Le serveur tient le même compte : la page le prévient quand elle passe à l'arrière-plan. Safari accorde une demande de
      passkey sans toucher par chargement de page : si celle de cette page a déjà servi, la page se recharge avant de poser l'écran. */
-  let ecran = null, enPreuve = false, preuves = 0, autoFait = false, cacheLe = 0, delaiConnu = 60;
+  let ecran = null, enPreuve = false, preuves = 0, autoFait = false, cacheLe = 0, delaiConnu = 60, donnees = false, voulu = '', attenteDonnees = false;
   const visible = () => document.visibilityState !== 'hidden';
-  const etatEcran = (e) => { if (!ecran) return; ecran.dataset.etat = e; ecran.querySelector('.vx-etat').textContent = e === 'scan' ? 'Vérification de ton identité…' : 'JARVIS est verrouillé'; };
+  /* 0.102.0 (sa demande du 28/11/2026 : « la pop-up de passkey s'affiche en bas, donc tout ce que tu écris en bas ne sert à rien ; le temps de
+     se connecter, on ne voit rien ; il faut que les infos soient bien affichées, bien claires, et que ça matche avec l'application ») :
+     - tout tient dans la moitié HAUTE de l'écran (la feuille de Face ID couvre le bas) : la marque, le globe de particules de l'accueil, le
+       salut, puis trois étapes qui disent où on en est : Serveur, Identité, Données ; le bouton de secours est juste dessous, jamais en bas ;
+     - le même écran d'un bout à l'autre : posé dès le lancement (« connexion au serveur »), il passe à Face ID, puis reste pendant le
+       rechargement jusqu'à la première donnée lue (« lecture de tes données »), et s'efface sur l'app prête. Avant : l'app vide, puis
+       l'écran, puis du noir, puis l'app.
+     États : lien (on joint le serveur), scan (Face ID en cours), attente (verrouillé : un toucher), charge (ouvert : on lit), pret, injoignable. */
+  const AKEY = 'jarvis.accueil';   /* sessionStorage : « il vient de prouver » : le rechargement reprend l'écran à « lecture des données » */
+  const TITRES = {lien: 'Connexion à ton serveur…', scan: 'Vérification de ton identité…', attente: 'JARVIS est verrouillé', charge: 'Lecture de tes données…', pret: 'Bienvenue.', injoignable: 'Le serveur ne répond pas'};
+  const ETAPES = {lien: [['cours', 'connexion…'], ['', ''], ['', '']], scan: [['fait', 'joint'], ['cours', 'Face ID…'], ['', '']], attente: [['fait', 'joint'], ['attend', 'à confirmer'], ['', '']],
+    charge: [['fait', 'joint'], ['fait', 'vérifiée'], ['cours', 'lecture…']], pret: [['fait', 'joint'], ['fait', 'vérifiée'], ['fait', 'à jour']], injoignable: [['rate', 'ne répond pas'], ['', ''], ['', '']]};
+  const verrouille = () => !!ecran && (ecran.dataset.etat === 'scan' || ecran.dataset.etat === 'attente');   /* l'écran demande une preuve (les autres états ne bloquent rien) */
+  const etatEcran = (e, ident) => {
+    voulu = e; if (!ecran) return; ecran.dataset.etat = e; ecran.querySelector('.vx-etat').textContent = TITRES[e] || '';
+    const L = ETAPES[e] || []; ecran.querySelectorAll('.vx-etape').forEach((li, i) => { const x = L[i] || ['', '']; li.dataset.e = x[0]; li.querySelector('span').textContent = (i === 1 && ident && x[0] === 'fait' ? ident : x[1]); });
+    const btn = ecran.querySelector('#verrou-ouvrir'); if (btn) { btn.textContent = e === 'injoignable' ? 'Réessayer' : 'Déverrouiller'; btn.disabled = false; }
+    ecran.setAttribute('aria-label', TITRES[e] || 'JARVIS');
+  };
+  /* l'écran s'efface sur l'app : « Bienvenue », puis un fondu */
+  const partir = () => { if (!ecran) return; const x = ecran; etatEcran('pret', x.dataset.ident || ''); setTimeout(() => { x.classList.add('vx-part'); setTimeout(() => { if (ecran === x) cacherVerrou(); else x.remove(); }, 420); }, 260); };
+  /* ouvert : on attend la première donnée lue (7 secondes au plus : l'app dira elle-même ce qui manque) */
+  const attendreDonnees = (ident) => {
+    if (!ecran) return; ecran.dataset.ident = ident || ecran.dataset.ident || ''; etatEcran('charge', ecran.dataset.ident);
+    if (attenteDonnees) return; attenteDonnees = true; const t0 = Date.now();
+    const tic = () => { if (!ecran || ecran.dataset.etat !== 'charge') { attenteDonnees = false; return; } if ((donnees && Date.now() - t0 > 350) || Date.now() - t0 > 7000) { attenteDonnees = false; partir(); return; } setTimeout(tic, 90); };
+    tic();
+  };
   async function ouvrirVerrou(auto) {
     if (!ecran || enPreuve) return;
+    if (ecran.dataset.etat === 'injoignable') { location.reload(); return; }
+    if (!verrouille()) return;
     const btn = ecran.querySelector('#verrou-ouvrir'), msg = ecran.querySelector('[role=status]');
     if (!verrou.possible()) { etatEcran('attente'); if (!auto) msg.textContent = 'Cet appareil ne sait pas présenter de passkey ici.'; return; }
     btn.disabled = true; msg.textContent = ''; etatEcran('scan');
     const t0 = Date.now(), r = await verrou.prouver();
-    if (r && !r.error) { ecran.querySelector('.vx-etat').textContent = 'Bienvenue.'; location.reload(); return; }
+    if (r && !r.error) { etatEcran('charge'); try { sessionStorage.setItem(AKEY, '1'); } catch (e) { /* stockage refusé : l'app se rechargera sans l'écran */ } location.reload(); return; }
     btn.disabled = false;
     if (auto && r && r.refus && Date.now() - t0 < 900 && !autoRedit && visible()) { autoRedit = true; setTimeout(() => ouvrirVerrou(true), 900); return; }   /* refus immédiat (page pas encore au premier plan) : un second essai */
     etatEcran('attente');
     if (!auto) msg.textContent = (r && r.error) || 'Le serveur ne répond pas.';
   }
   let autoRedit = false;
-  const autoVerrou = () => { if (ecran && !autoFait && !enPreuve && visible()) { autoFait = true; setTimeout(() => ouvrirVerrou(true), 350); } };
+  /* 0.102.0 : l'écran est posé pendant le chargement de la page, mais la demande de Face ID part au même moment qu'avant : 350 ms après la
+     fin du chargement (plus tôt, le navigateur la refuse : la page n'est pas encore au premier plan ; vu au banc du verrou, passkey virtuelle) */
+  const apresChargement = (fn) => { if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fn, {once: true}); else fn(); };
+  const autoVerrou = () => { if (verrouille() && !autoFait && !enPreuve && visible()) { autoFait = true; apresChargement(() => setTimeout(() => ouvrirVerrou(true), 350)); } };
   /* le style des deux écrans d'accueil (verrou, porte d'un appareil pas relié) */
   function styleAccueil() {
     if (!document.getElementById('verrou-style')) {
       const st = document.createElement('style'); st.id = 'verrou-style';
-      st.textContent = '#verrou-ecran{position:fixed;inset:0;z-index:2147483647;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:calc(env(safe-area-inset-top,0px) + 30px) 28px calc(env(safe-area-inset-bottom,0px) + 34px);background:radial-gradient(120% 80% at 50% 36%,#0c1d3a 0%,#070b16 48%,#04060c 100%);color:#e6edf7;font:500 16px/1.5 var(--sans,system-ui,-apple-system,sans-serif);text-align:center;overflow:hidden}'
-        + '#verrou-ecran .vx-marque{font:600 15px var(--logo,var(--display,system-ui,sans-serif));letter-spacing:.44em;text-indent:.44em;color:#9ecbff}'
-        + '#verrou-ecran .vx-centre{display:flex;flex-direction:column;align-items:center;gap:20px}'
-        + '#verrou-ecran .vx-orbe{position:relative;width:min(54vw,230px);aspect-ratio:1;display:grid;place-items:center}'
-        + '#verrou-ecran .vx-orbe::before{content:"";position:absolute;inset:-10%;border-radius:50%;background:radial-gradient(circle,rgba(56,189,248,.30),rgba(56,189,248,0) 64%)}'
-        + '#verrou-ecran .vx-orbe img{position:relative;width:100%;height:100%;border-radius:50%;object-fit:cover;-webkit-mask-image:radial-gradient(circle,#000 54%,transparent 70%);mask-image:radial-gradient(circle,#000 54%,transparent 70%);animation:vx-souffle 4.6s ease-in-out infinite}'
-        + '#verrou-ecran .vx-orbe::after{content:"";position:absolute;inset:6%;border-radius:50%;border:2px solid transparent;border-top-color:#38bdf8;border-right-color:rgba(168,85,247,.75);opacity:0;transition:opacity .3s}'
-        + '#verrou-ecran[data-etat=scan] .vx-orbe::after{opacity:1;animation:vx-tour 1.15s linear infinite}'
-        + '#verrou-ecran .vx-salut{margin:0;font:700 31px/1.15 var(--display,system-ui,sans-serif)}'
-        + '#verrou-ecran .vx-date{margin:0;color:#9fb0c8;font-size:15px}'
-        + '#verrou-ecran .vx-etat{margin:6px 0 0;min-height:1.5em;color:#7dd3fc;font-size:14px;letter-spacing:.03em}'
-        + '#verrou-ecran .vx-bas{display:flex;flex-direction:column;align-items:center;gap:10px;min-height:104px;width:100%}'
-        + '#verrou-ouvrir{appearance:none;-webkit-appearance:none;border:0;border-radius:999px;width:min(100%,320px);padding:15px 26px;font:600 16px var(--sans,system-ui,sans-serif);color:#fff;background:linear-gradient(90deg,#0ea5e9,#a855f7);cursor:pointer;transition:opacity .25s}'
-        + '#verrou-ecran[data-etat=scan] #verrou-ouvrir{opacity:0;pointer-events:none}'
-        + '#verrou-ecran [role=status]{margin:0;min-height:1.5em;font-size:14px;color:#fca5a5}'
-        + '@keyframes vx-souffle{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}@keyframes vx-tour{to{transform:rotate(360deg)}}'
-        + '@media (prefers-reduced-motion:reduce){#verrou-ecran .vx-orbe img,#verrou-ecran[data-etat=scan] .vx-orbe::after{animation:none}}';
+      st.textContent = '#verrou-ecran{position:fixed;inset:0;z-index:2147483647;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:0;padding:calc(env(safe-area-inset-top,0px) + 16px) 26px 0;background:radial-gradient(90% 46% at 50% 21%,rgba(34,211,238,.16),rgba(168,85,247,.08) 46%,rgba(4,6,12,0) 74%),linear-gradient(180deg,#071226 0%,#050915 52%,#03050b 100%);color:#e6edf7;font:500 16px/1.4 var(--sans,system-ui,-apple-system,sans-serif);text-align:center;overflow:hidden;opacity:1;transition:opacity .4s ease,transform .4s ease}'
+        + '#verrou-ecran.vx-part{opacity:0;transform:scale(1.035);pointer-events:none}'
+        + '#verrou-ecran .vx-marque{font:600 13px var(--logo,var(--display,system-ui,sans-serif));letter-spacing:.44em;text-indent:.44em;color:#9ecbff;opacity:.9}'
+        + '#verrou-ecran .vx-centre{display:flex;flex-direction:column;align-items:center;gap:0;width:100%}'
+        + '#verrou-ecran .vx-orbe{position:relative;width:min(38vw,17vh,158px);aspect-ratio:1;margin:calc(min(2.2vh,18px)) 0 calc(min(1.4vh,12px));display:grid;place-items:center}'
+        + '#verrou-ecran .vx-orbe canvas{position:absolute;inset:-14%;width:128%;height:128%}'
+        + '#verrou-ecran .vx-orbe::after{content:"";position:absolute;inset:-5%;border-radius:50%;border:2px solid transparent;border-top-color:#22d3ee;border-right-color:rgba(168,85,247,.85);opacity:0;transition:opacity .3s}'
+        + '#verrou-ecran:is([data-etat=scan],[data-etat=lien],[data-etat=charge]) .vx-orbe::after{opacity:1;animation:vx-tour 1.15s linear infinite}'
+        + '#verrou-ecran[data-etat=charge] .vx-orbe::after{animation-duration:.8s;border-top-color:#a855f7;border-right-color:rgba(34,211,238,.85)}'
+        + '#verrou-ecran .vx-salut{margin:0;font:700 clamp(22px,3.1vh,28px)/1.15 var(--display,system-ui,sans-serif)}'
+        + '#verrou-ecran .vx-date{margin:3px 0 0;color:#9fb0c8;font-size:14px}'
+        + '#verrou-ecran .vx-etat{margin:calc(min(1.6vh,14px)) 0 0;min-height:1.4em;font:600 15px/1.4 var(--sans,system-ui,sans-serif);letter-spacing:.02em;background:linear-gradient(90deg,#22d3ee,#a855f7);-webkit-background-clip:text;background-clip:text;color:transparent}'
+        + '#verrou-ecran[data-etat=injoignable] .vx-etat{background:none;color:#fca5a5}'
+        + '#verrou-ecran .vx-etapes{list-style:none;margin:calc(min(1.2vh,10px)) 0 0;padding:9px 14px;width:min(100%,318px);box-sizing:border-box;display:flex;flex-direction:column;gap:7px;border-radius:16px;border:1px solid rgba(125,211,252,.16);background:rgba(10,18,36,.55);text-align:left}'
+        + '#verrou-ecran .vx-etape{display:flex;align-items:center;gap:10px;font-size:14px;line-height:1.25;color:#7f8ea8}'
+        + '#verrou-ecran .vx-etape i{flex:none;width:16px;height:16px;border-radius:50%;box-sizing:border-box;border:1.5px solid rgba(127,142,168,.55);position:relative}'
+        + '#verrou-ecran .vx-etape b{font-weight:600;color:#c7d3e6;min-width:4.6em}'
+        + '#verrou-ecran .vx-etape span{margin-left:auto;font-size:13px;color:#8fa0bb}'
+        + '#verrou-ecran .vx-etape[data-e=fait] i{border:0;background:linear-gradient(135deg,#22d3ee,#a855f7);box-shadow:0 0 10px rgba(34,211,238,.45)}'
+        + '#verrou-ecran .vx-etape[data-e=fait] i::after{content:"";position:absolute;left:5.2px;top:2.6px;width:4px;height:8px;border:solid #04121f;border-width:0 2px 2px 0;transform:rotate(42deg)}'
+        + '#verrou-ecran .vx-etape[data-e=fait] b{color:#e6edf7}#verrou-ecran .vx-etape[data-e=fait] span{color:#7dd3fc}'
+        + '#verrou-ecran .vx-etape[data-e=cours] i{border-color:rgba(34,211,238,.25);border-top-color:#22d3ee;border-right-color:#a855f7;animation:vx-tour .8s linear infinite}'
+        + '#verrou-ecran .vx-etape[data-e=cours] b{color:#fff}#verrou-ecran .vx-etape[data-e=cours] span{color:#e6edf7}'
+        + '#verrou-ecran .vx-etape[data-e=attend] i{border-color:#fbbf24;box-shadow:0 0 8px rgba(251,191,36,.35)}#verrou-ecran .vx-etape[data-e=attend] span{color:#fcd34d}'
+        + '#verrou-ecran .vx-etape[data-e=rate] i{border-color:#f87171}#verrou-ecran .vx-etape[data-e=rate] b,#verrou-ecran .vx-etape[data-e=rate] span{color:#fca5a5}'
+        + '#verrou-ecran .vx-bas{display:flex;flex-direction:column;align-items:center;gap:8px;width:100%;margin-top:calc(min(1.6vh,14px))}'
+        + '#verrou-ouvrir{appearance:none;-webkit-appearance:none;border:0;border-radius:999px;width:min(100%,318px);padding:13px 24px;font:600 16px var(--sans,system-ui,sans-serif);color:#fff;background:linear-gradient(90deg,#0ea5e9,#a855f7);box-shadow:0 6px 22px rgba(14,165,233,.28);cursor:pointer;transition:opacity .25s}'
+        + '#verrou-ecran:is([data-etat=scan],[data-etat=lien],[data-etat=charge],[data-etat=pret]) #verrou-ouvrir{opacity:0;pointer-events:none}'
+        + '#verrou-ecran [role=status]{margin:0;min-height:1.4em;font-size:14px;color:#fca5a5}'
+        + '@keyframes vx-tour{to{transform:rotate(360deg)}}'
+        + '@media (prefers-reduced-motion:reduce){#verrou-ecran .vx-orbe::after,#verrou-ecran .vx-etape[data-e=cours] i{animation:none}}';
       st.textContent = st.textContent.replace(/#verrou-ecran/g, ':is(#verrou-ecran,#porte-ecran)').replace(/#verrou-ouvrir/g, ':is(#verrou-ouvrir,#porte-relier)')
         + '#porte-ecran form{display:flex;flex-direction:column;align-items:center;gap:10px;width:100%}'
         + '#porte-code{width:min(100%,320px);box-sizing:border-box;padding:14px 16px;border-radius:14px;border:1px solid rgba(125,211,252,.35);background:rgba(10,16,32,.85);color:#e6edf7;font:600 20px var(--sans,system-ui,sans-serif);letter-spacing:.14em;text-align:center;text-transform:uppercase}'
         + '#porte-code::placeholder{font-weight:500;font-size:15px;letter-spacing:.02em;text-transform:none;color:#7f8ea8}'
-        + '#porte-ecran .vx-note{margin:0;max-width:26em;color:#9fb0c8;font-size:13px}#porte-ecran .vx-bas{min-height:190px}';
+        + '#porte-ecran .vx-note{margin:0;max-width:26em;color:#9fb0c8;font-size:13px}#porte-ecran .vx-etat{margin-bottom:2px}';
       document.head.append(st);
     }
   }
+  /* le globe de particules de l'accueil, en petit : une sphère de points qui tourne, du cyan au violet (les couleurs de la progression dans
+     Travail) ; elle accélère pendant une vérification et s'ouvre quand l'app est prête. Sans mouvement si l'appareil le demande. */
+  function globe(orbe, de) {
+    const cv = document.createElement('canvas'); cv.setAttribute('aria-hidden', 'true'); orbe.append(cv);
+    const g = cv.getContext && cv.getContext('2d'); if (!g) return;
+    const N = 420, P = [], TAU = Math.PI * 2, dpr = Math.min(2, window.devicePixelRatio || 1), reduit = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+    for (let i = 0; i < N; i++) { const y = 1 - 2 * (i + 0.5) / N, r = Math.sqrt(1 - y * y), th = i * 2.399963; P.push([Math.cos(th) * r, y, Math.sin(th) * r]); }
+    let W = 0, a = 0, v = 1, dernier = 0, ouvre = 0;
+    const tour = (t) => {
+      if (!cv.isConnected) return;
+      const w = cv.clientWidth || 180; if (w !== W) { W = w; cv.width = cv.height = Math.round(w * dpr); }
+      const e = de.dataset.etat, cible = e === 'scan' ? 2.6 : e === 'charge' || e === 'lien' ? 3.4 : e === 'pret' ? 1.2 : 0.8, dt = dernier ? Math.min(50, t - dernier) : 16; dernier = t;
+      v += (cible - v) * 0.05; a += dt * 0.00042 * v; ouvre += ((e === 'pret' ? 1 : 0) - ouvre) * 0.08;
+      g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, W);
+      const c = W / 2, R = W * 0.3 * (1 + 0.5 * ouvre), ax = 0.42, ca = Math.cos(a), sa = Math.sin(a), cx = Math.cos(ax), sx = Math.sin(ax);
+      const h = g.createRadialGradient(c, c, R * 0.15, c, c, R * 1.5); h.addColorStop(0, 'rgba(34,211,238,' + (0.2 * (1 - ouvre)).toFixed(3) + ')'); h.addColorStop(0.55, 'rgba(168,85,247,' + (0.1 * (1 - ouvre)).toFixed(3) + ')'); h.addColorStop(1, 'rgba(37,99,235,0)');
+      g.fillStyle = h; g.beginPath(); g.arc(c, c, R * 1.5, 0, TAU); g.fill();
+      for (let i = 0; i < N; i++) {
+        const p = P[i], x1 = p[0] * ca + p[2] * sa, z1 = -p[0] * sa + p[2] * ca, y1 = p[1] * cx - z1 * sx, z2 = p[1] * sx + z1 * cx;
+        const onde = 1 + (0.02 + 0.03 * (v - 0.8)) * Math.sin(t * 0.0024 - p[1] * 5.5), k = 1 + z2 * 0.16, f = (z2 + 1) / 2, m = (x1 + 1) / 2;   /* m : du cyan (à gauche) au violet (à droite) */
+        const al = (0.14 + 0.86 * f * f) * (0.7 + 0.3 * Math.sin(t * 0.0034 + i * 1.7)) * (1 - 0.85 * ouvre), sz = 0.7 + 1.5 * f;
+        g.fillStyle = i % 17 === 0 && f > 0.5 ? 'rgba(255,255,255,' + al.toFixed(3) + ')' : 'rgba(' + Math.round(34 + 134 * m) + ',' + Math.round(211 - 126 * m) + ',' + Math.round(238 + 9 * m) + ',' + al.toFixed(3) + ')';
+        g.fillRect(c + x1 * R * onde * k - sz / 2, c + y1 * R * onde * k - sz / 2, sz, sz);
+      }
+      if (!reduit) requestAnimationFrame(tour);
+    };
+    requestAnimationFrame(tour);
+  }
+  /* le corps commun des deux écrans d'accueil : la marque, le globe, le salut de l'heure, la date */
+  function corpsAccueil(fond) {
+    const el = (t, cls, txt) => { const x = document.createElement(t); if (cls) x.className = cls; if (txt) x.textContent = txt; return x; };
+    const d = new Date(), hh = d.getHours(), salut = hh >= 5 && hh < 12 ? 'Bonjour.' : hh >= 12 && hh < 18 ? 'Bon après-midi.' : 'Bonsoir.';
+    let quand = ''; try { quand = d.toLocaleDateString('fr-FR', {weekday: 'long', day: 'numeric', month: 'long'}) + ' · ' + d.toLocaleTimeString('fr-FR', {hour: '2-digit', minute: '2-digit'}); } catch (e) { quand = ''; }
+    const orbe = el('div', 'vx-orbe'), centre = el('div', 'vx-centre'); globe(orbe, fond);
+    centre.append(orbe, el('h1', 'vx-salut', salut), el('p', 'vx-date', quand), el('p', 'vx-etat'));
+    fond.append(el('div', 'vx-marque', 'J.A.R.V.I.S'), centre);
+    return {el, centre};
+  }
+  /* dès que <body> existe (sans attendre la fin du chargement de la page : l'écran est là avant l'app) */
+  const quandCorps = (fn) => { if (document.body) { fn(); return; } const o = new MutationObserver(() => { if (document.body) { o.disconnect(); fn(); } }); o.observe(document.documentElement, {childList: true}); };
   /* 0.82.0 (son constat du 24/11/2026 sur son iPad, jamais relié : « ça m'affiche la page d'accueil… il me dit bonjour… ») : un appareil pas
      relié ne voit plus l'app, vide mais entière. Il voit cet écran, le même que celui du verrou, qui demande le code d'appairage donné par le
      serveur (30 minutes, une fois). Relié, la page se recharge : le verrou par passkey prend alors le relais s'il est actif. */
@@ -251,11 +338,8 @@
     const poser = () => {
       if (porte || !document.body) return;
       styleAccueil(); cacherVerrou();
-      const el = (t, cls, txt) => { const x = document.createElement(t); if (cls) x.className = cls; if (txt) x.textContent = txt; return x; };
-      const fond = el('div'); fond.id = 'porte-ecran'; fond.dataset.etat = 'attente'; fond.setAttribute('role', 'dialog'); fond.setAttribute('aria-modal', 'true'); fond.setAttribute('aria-label', 'Cet appareil n’est pas relié à JARVIS');
-      const d = new Date(), hh = d.getHours(), salut = hh >= 5 && hh < 12 ? 'Bonjour.' : hh >= 12 && hh < 18 ? 'Bon après-midi.' : 'Bonsoir.';
-      let quand = ''; try { quand = d.toLocaleDateString('fr-FR', {weekday: 'long', day: 'numeric', month: 'long'}) + ' · ' + d.toLocaleTimeString('fr-FR', {hour: '2-digit', minute: '2-digit'}); } catch (e) { quand = ''; }
-      const orbe = el('div', 'vx-orbe'), img = el('img'); img.alt = ''; img.src = BASE + '/icon-512.png'; img.addEventListener('error', () => { img.style.visibility = 'hidden'; }); orbe.append(img);
+      const fond = document.createElement('div'); fond.id = 'porte-ecran'; fond.dataset.etat = 'attente'; fond.setAttribute('role', 'dialog'); fond.setAttribute('aria-modal', 'true'); fond.setAttribute('aria-label', 'Cet appareil n’est pas relié à JARVIS');
+      const {el, centre} = corpsAccueil(fond); centre.querySelector('.vx-etat').textContent = 'Cet appareil n’est pas relié à JARVIS';
       const code = el('input'); code.id = 'porte-code'; code.type = 'text'; code.maxLength = 12; code.placeholder = 'Code à 8 caractères'; code.setAttribute('autocomplete', 'off'); code.setAttribute('autocapitalize', 'characters'); code.setAttribute('autocorrect', 'off'); code.spellcheck = false; code.setAttribute('aria-label', 'Code donné par ton serveur');
       const btn = el('button', '', 'Relier cet appareil'); btn.type = 'submit'; btn.id = 'porte-relier';
       const msg = el('p'); msg.setAttribute('role', 'status');
@@ -269,61 +353,68 @@
         btn.disabled = false; msg.textContent = (r && r.error) || 'Code refusé.';
       });
       form.append(code, btn, msg, el('p', 'vx-note', 'Le code se demande à ton serveur : il sert une fois, pendant 30 minutes.'));
-      const centre = el('div', 'vx-centre'); centre.append(orbe, el('h1', 'vx-salut', salut), el('p', 'vx-date', quand), el('p', 'vx-etat', 'Cet appareil n’est pas relié à JARVIS'));
-      const bas = el('div', 'vx-bas'); bas.append(form);
-      fond.append(el('div', 'vx-marque', 'J.A.R.V.I.S'), centre, bas);
+      const bas = el('div', 'vx-bas'); bas.append(form); fond.append(bas);
       document.body.append(fond); porte = fond;
     };
-    if (document.body) poser(); else document.addEventListener('DOMContentLoaded', poser);
+    quandCorps(poser);
+  }
+  /* pose l'écran (une fois), dans l'état demandé ; avant <body>, il sera posé dès qu'il existe, dans le dernier état demandé */
+  function poserEcran(e) {
+    voulu = e; if (ecran) { etatEcran(e); return; }
+    quandCorps(() => {
+      if (ecran || !document.body || porte || !voulu) return;
+      /* rien de personnel sur cet écran : il se voit avant toute preuve */
+      styleAccueil();
+      const fond = document.createElement('div'); fond.id = 'verrou-ecran'; fond.setAttribute('role', 'dialog'); fond.setAttribute('aria-modal', 'true');
+      const {el, centre} = corpsAccueil(fond), liste = el('ul', 'vx-etapes'); liste.setAttribute('aria-label', 'Où en est l’ouverture');
+      for (const nom of ['Serveur', 'Identité', 'Données']) { const li = el('li', 'vx-etape'); li.append(el('i'), el('b', '', nom), el('span')); liste.append(li); }
+      const msg = el('p'); msg.setAttribute('role', 'status');
+      const btn = el('button', '', 'Déverrouiller'); btn.type = 'button'; btn.id = 'verrou-ouvrir';
+      btn.addEventListener('click', () => ouvrirVerrou(false));
+      const bas = el('div', 'vx-bas'); bas.append(btn, msg);
+      centre.append(liste); fond.append(bas);
+      document.body.append(fond); ecran = fond; etatEcran(voulu);
+      if (verrouille()) autoVerrou(); else if (voulu === 'charge') attendreDonnees();
+    });
   }
   function montrerVerrou() {
     drapeau(true);
     if (typeof document === 'undefined') return;
+    if (verrouille()) return;   /* déjà posé, il attend déjà la preuve */
     if (!ecran && preuves > 0 && visible()) { mem(false); location.reload(); return; }   /* une page neuve : sa demande sans toucher est intacte */
-    const poser = () => {
-      if (ecran || !document.body) return;
-      /* 0.77.0 (son retour du 24/11/2026 : « refais un bon écran d'accueil le temps de se connecter en Face ID ») : l'orbe de JARVIS qui
-         respire, un anneau qui tourne pendant la vérification, le salut de l'heure et la date ; le bouton n'apparaît que si Face ID n'a
-         pas ouvert tout seul. Rien de personnel sur cet écran : il se voit avant toute preuve. */
-      styleAccueil();
-      const el = (t, cls, txt) => { const x = document.createElement(t); if (cls) x.className = cls; if (txt) x.textContent = txt; return x; };
-      const fond = el('div'); fond.id = 'verrou-ecran'; fond.setAttribute('role', 'dialog'); fond.setAttribute('aria-modal', 'true'); fond.setAttribute('aria-label', 'JARVIS est verrouillé');
-      const d = new Date(), h = d.getHours(), salut = h >= 5 && h < 12 ? 'Bonjour.' : h >= 12 && h < 18 ? 'Bon après-midi.' : 'Bonsoir.';
-      let quand = ''; try { quand = d.toLocaleDateString('fr-FR', {weekday: 'long', day: 'numeric', month: 'long'}) + ' · ' + d.toLocaleTimeString('fr-FR', {hour: '2-digit', minute: '2-digit'}); } catch (e) { quand = ''; }
-      const orbe = el('div', 'vx-orbe'), img = el('img'); img.alt = ''; img.src = BASE + '/icon-512.png'; img.addEventListener('error', () => { img.style.visibility = 'hidden'; }); orbe.append(img);
-      const msg = el('p'); msg.setAttribute('role', 'status');
-      const btn = el('button', '', 'Déverrouiller'); btn.type = 'button'; btn.id = 'verrou-ouvrir';
-      btn.addEventListener('click', () => ouvrirVerrou(false));
-      const centre = el('div', 'vx-centre'); centre.append(orbe, el('h1', 'vx-salut', salut), el('p', 'vx-date', quand), el('p', 'vx-etat'));
-      const bas = el('div', 'vx-bas'); bas.append(btn, msg);
-      fond.append(el('div', 'vx-marque', 'J.A.R.V.I.S'), centre, bas);
-      document.body.append(fond); ecran = fond; mem(false);
-      etatEcran(!autoFait && visible() && verrou.possible() ? 'scan' : 'attente');
-      autoVerrou();
-    };
-    if (document.body) poser(); else document.addEventListener('DOMContentLoaded', poser);
+    /* 0.77.0 (son retour du 24/11/2026 : « refais un bon écran d'accueil le temps de se connecter en Face ID ») ; 0.102.0 : voir plus haut */
+    mem(false); poserEcran(!autoFait && visible() && verrou.possible() ? 'scan' : 'attente'); autoVerrou();
   }
-  const cacherVerrou = () => { if (ecran) { ecran.remove(); ecran = null; } };
+  const cacherVerrou = () => { voulu = ''; if (ecran) { ecran.remove(); ecran = null; } };
   /* ce que dit le serveur fait foi : verrou éteint (retiré dans Termius) → l'écran part ; actif et fermé pour cet appareil → l'écran vient */
-  const lire = (e) => { if (!e) return; drapeau(e.actif); if (typeof e.delai === 'number') delaiConnu = e.delai; if (!e.actif) cacherVerrou(); else if (!e.ouvert) montrerVerrou(); };
+  const lire = (e) => { if (!e) return; drapeau(e.actif); if (typeof e.delai === 'number') delaiConnu = e.delai;
+    if (!e.actif) cacherVerrou(); else if (!e.ouvert) montrerVerrou();
+    else if (voulu === 'lien') { if (ecran) attendreDonnees('session ouverte'); else voulu = 'charge'; }   /* 0.102.0 : ouvert pour cet appareil : il reste à lire les données */
+  };
   const verifierVerrou = () => verrou.etat().then(lire);
   if (!token()) montrerPorte();   /* 0.82.0 : jamais relié (ou délié) : rien de l'app ne se voit */
   if (token() && typeof document !== 'undefined') {   /* seulement dans une page (un banc charge ce fichier sans elle) */
     /* 0.78.0 (son retour du 24/11/2026 : « 5 min, c'est trop court ») : une seule règle, le délai d'absence. L'app relancée ne redemande Face ID
        que si elle est restée fermée plus longtemps que le délai : le serveur le sait (elle l'a prévenu en quittant l'écran) et le dit ici.
        Verrouillée, ses demandes reviennent en 423 et l'écran se pose aussitôt. */
-    if (drapeau()) req('/api/verrou/retour', {}).then((r) => { const e = r.j && typeof r.j.actif === 'boolean' ? r.j : null; if (e && e.actif && e.ouvert) mem(true); lire(e); }).catch(() => null);
-    else verifierVerrou();
+    /* 0.102.0 : l'écran d'abord. Il vient de prouver (rechargement) : la suite du même écran, « lecture de tes données ». Lancement de l'app
+       avec le verrou actif : « connexion à ton serveur », avant que rien de l'app ne se voie ; deux nouveaux essais si le serveur ne répond pas. */
+    let vient = false; try { vient = sessionStorage.getItem(AKEY) === '1'; sessionStorage.removeItem(AKEY); } catch (e) { vient = false; }
+    if (vient) poserEcran('charge'); else if (drapeau() && !mem()) poserEcran('lien');
+    const retour = (essai) => req('/api/verrou/retour', {}).then((r) => { const e = r.j && typeof r.j.actif === 'boolean' ? r.j : null; if (e && e.actif && e.ouvert) mem(true); if (!e && voulu === 'lien' && !porte) throw new Error('sans réponse'); lire(e); })
+      .catch(() => { if (voulu !== 'lien') return; if (essai < 2) setTimeout(() => retour(essai + 1), 1200); else etatEcran('injoignable'); });
+    if (drapeau()) retour(0); else verifierVerrou();
     setInterval(() => { if (visible() && drapeau() && !ecran) verifierVerrou(); }, 30000);   /* signe de vie de l'app à l'écran ; à l'arrière-plan, plus rien ne part */
     document.addEventListener('visibilitychange', () => {
       if (!token() || !drapeau() || enPreuve) return;   /* la feuille de Face ID elle-même ne compte pas comme une absence */
       if (!visible()) {
-        if (ecran || cacheLe) return;
+        if (ecran || cacheLe) return;   /* un écran d'accueil est affiché (verrou, ou la suite d'une preuve qui recharge la page) : ce n'est pas une absence. Sinon, délai « Tout de suite » : le rechargement qui suit Face ID reverrouillait, en boucle */
         cacheLe = Date.now();
         try { fetch(BASE + '/api/verrou/cache', {method: 'POST', keepalive: true, headers: {'content-type': 'application/json', authorization: 'Bearer ' + token()}, body: '{}'}).catch(() => null); } catch (e) { /* rien */ }
         return;
       }
-      if (ecran) { autoFait = false; autoRedit = false; autoVerrou(); return; }
+      if (verrouille()) { autoFait = false; autoRedit = false; autoVerrou(); return; }
+      if (ecran) return;   /* 0.102.0 : l'écran lit les données ou attend le serveur : rien à redemander */
       const absent = cacheLe ? Date.now() - cacheLe : 0; cacheLe = 0;
       if (absent >= delaiConnu * 1000 && absent > 0) { montrerVerrou(); req('/api/verrou/verrouiller', {}).catch(() => null); return; }
       req('/api/verrou/retour', {}).then((r) => lire(r.j && typeof r.j.actif === 'boolean' ? r.j : null)).catch(() => null);
@@ -364,7 +455,7 @@
     update: () => req('/api/update', {}).then((r) => r.j).catch(() => ({ok: false, message: 'Serveur injoignable.'})),
     /* 0.27.0 : mise à jour proposée au lancement (comme Panier) — une version plus récente dans le dépôt ? ; l'empreinte du serveur (sans jeton) */
     maj: (force) => req('/api/maj' + (force ? '?force=1' : '')).then((r) => (r.status === 200 ? r.j : null)).catch(() => null),
-    sante0: () => fetch(BASE + '/api/health', {cache: 'no-store'}).then((r) => (r.ok ? r.json() : null)).catch(() => null),
+    sante0: () => fetch(BASE + '/api/health', {cache: 'no-store', headers: token() ? {authorization: 'Bearer ' + token()} : {}}).then((r) => (r.ok ? r.json() : null)).catch(() => null),   /* 0.102.0 : la version ne se donne plus qu'à un appareil relié */
     voiceInstall: () => req('/api/voice/install', {}).then((r) => r.j).catch(() => null),
     /* 0.22.0 : l'écoute Whisper du serveur (bouton de Réglages) et son état */
     ecouteInstall: () => req('/api/ecoute/install', {}).then((r) => r.j).catch(() => null),

@@ -108,6 +108,13 @@ Mémoire et processeur : `MemoryHigh=850M`, `MemoryMax=1000M` depuis les routine
 soir : 360 Mo au repos, 500 Mo au plus pendant une routine, plus 250 Mo pour son Claude Code ; 650 et 800
 avant), `OOMScoreAdjust=600` (Hermes est tué avant JARVIS), `CPUWeight=20`.
 
+### Relecture de sécurité du 28/11/2026 (0.102.0)
+
+- **Les routines qui lisent le web n'ont plus la mémoire d'Hermes** (`routines.conf` : `web,skills,jarvis-web`). La mémoire est commune à toutes ses routines : une page y laissait de quoi influencer, chaque jour, celles qui lisent les mails. Le Digest relit ce qu'il a déjà dit par l'outil `digest_deja_dit` de JARVIS (ses propres lignes du Journal, rien d'autre). Ne rends pas `memory` à une routine du web.
+- **Un lien écrit par l'exécutant** (qui lit les mails) dans Prix, Relevés ou Sorties, que la routine du web relit et ouvre : seulement vers un site déjà connu de Prix ou de Sources ; sinon JARVIS le retire et écrit le reste de la ligne. Un nouveau vendeur s'ajoute donc d'abord dans Prix ou Sources (par lui, ou par la routine du web).
+- **Root ne touche plus aux dossiers d'hermes en son nom** : la liste d'outils d'une routine est écrite sous le nom d'hermes (`outils_de`, par `hx`) ; `jobs.json` et le jeton de Telegram sont lus sans suivre de lien, bornés, et le jeton n'est accepté que dans sa forme exacte ; le chemin de Node pris sous `~/.hermes/tools` est contrôlé avant d'entrer dans l'unité `hermes-gateway`.
+- **Les kits se lancent depuis `/root/rd`** (clone de root), plus depuis `/opt/rd` : `docs/jarvis-os-reprise.md`.
+
 ## Mesures du banc (conteneur de session, 23/11/2026)
 
 - Installation : 78 s, environ 3 Go sur le disque (dont ffmpeg 440 Mo, Node 230 Mo, Python 260 Mo, Claude
