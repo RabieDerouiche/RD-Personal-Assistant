@@ -364,7 +364,7 @@
     update: () => req('/api/update', {}).then((r) => r.j).catch(() => ({ok: false, message: 'Serveur injoignable.'})),
     /* 0.27.0 : mise à jour proposée au lancement (comme Panier) — une version plus récente dans le dépôt ? ; l'empreinte du serveur (sans jeton) */
     maj: (force) => req('/api/maj' + (force ? '?force=1' : '')).then((r) => (r.status === 200 ? r.j : null)).catch(() => null),
-    sante0: () => fetch(BASE + '/api/health', {cache: 'no-store'}).then((r) => (r.ok ? r.json() : null)).catch(() => null),
+    sante0: () => fetch(BASE + '/api/health', {cache: 'no-store', headers: token() ? {authorization: 'Bearer ' + token()} : {}}).then((r) => (r.ok ? r.json() : null)).catch(() => null),   /* 0.102.0 : la version ne se donne plus qu'à un appareil relié */
     voiceInstall: () => req('/api/voice/install', {}).then((r) => r.j).catch(() => null),
     /* 0.22.0 : l'écoute Whisper du serveur (bouton de Réglages) et son état */
     ecouteInstall: () => req('/api/ecoute/install', {}).then((r) => r.j).catch(() => null),

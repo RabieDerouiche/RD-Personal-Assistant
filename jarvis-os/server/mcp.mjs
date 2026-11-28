@@ -138,7 +138,14 @@ export function createMcp({S, save, now = Date.now, version, base, outils, preve
     const id = alea(24), chiffres = avant ? avant.chiffres : String(crypto.randomInt(0, 10000)).padStart(4, '0'), hote = hoteDe(ru);
     demandes.set(id, {id, client: c.id, nom: c.name, redirect_uri: ru, state: q.get('state') || '', challenge: q.get('code_challenge'), resource: q.get('resource') || '', at: now(), statut: 'attente', chiffres});
     if (!avant) {
-      prevenir({titre: c.name + ' demande l’accès à JARVIS', texte: 'Code ' + chiffres + (hote ? ', retour vers ' + hote : '') + '. Touche Autoriser dans JARVIS seulement si tu viens de le demander toi-même.'});
+      /* 0.102.0 : l'inscription est ouverte à tous (c'est le protocole) : un assistant jamais autorisé ne peut pas envoyer plus de 3 notifications
+         par heure, tous assistants inconnus confondus, et la notification dit qu'il n'a jamais été relié ; au-delà, la demande reste visible
+         dans Réglages, sans bruit. Un assistant déjà autorisé une fois (le sien) prévient toujours. */
+      avisInconnus = avisInconnus.filter((t) => now() - t < 3600000);
+      if (c.autorise || avisInconnus.length < 3) {
+        if (!c.autorise) avisInconnus.push(now());
+        prevenir({titre: c.name + ' demande l’accès à JARVIS', texte: 'Code ' + chiffres + (hote ? ', retour vers ' + hote : '') + (c.autorise ? '' : ' (jamais relié)') + '. Touche Autoriser dans JARVIS seulement si tu viens de le demander toi-même.'});
+      }
       journal('demande', c.name);
     }
     return pageHtml(res, 200, page('Accès demandé',
@@ -185,6 +192,7 @@ export function createMcp({S, save, now = Date.now, version, base, outils, preve
     return err('unsupported_grant_type');
   }
 
+  let avisInconnus = [];   /* 0.102.0 : les heures des notifications envoyées pour des assistants jamais autorisés */
   async function inscrire(req, res) {
     menage();
     const b = await corps(req);

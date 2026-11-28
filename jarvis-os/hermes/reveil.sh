@@ -19,9 +19,17 @@ if [ $((maint - avant)) -lt "$ECART" ]; then
   echo "Réveil trop proche du précédent : reporté de 2 minutes et demie."; exit 0
 fi
 ident=$(python3 -I -c '
-import json, sys
-try: jobs = json.load(open(sys.argv[1])).get("jobs") or []
-except (OSError, ValueError): jobs = []
+import json, os, stat, sys
+def lire(chemin):   # 0.102.0 : le fichier est à hermes, lu par root : jamais un lien, un fichier ordinaire, 2 Mo au plus
+    try:
+        fd = os.open(chemin, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+        try:
+            st = os.fstat(fd)
+            if not stat.S_ISREG(st.st_mode) or st.st_size > 2000000: return []
+            return json.loads(os.read(fd, 2000001).decode("utf-8", "replace")).get("jobs") or []
+        finally: os.close(fd)
+    except (OSError, ValueError, AttributeError): return []
+jobs = lire(sys.argv[1])
 for j in jobs:
     if j.get("name") == "jarvis-reveil" and j.get("enabled", True) and j.get("state") != "paused":
         print(j.get("id")); break

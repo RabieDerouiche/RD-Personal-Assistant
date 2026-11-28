@@ -154,7 +154,9 @@ install -d -o root -g "$U" -m 0750 /var/lib/hermes-portail-depot   # le fichier 
 echo "/usr/local/sbin/hermes-portail, $LIB/filtre.py"
 
 dire "Coffre d'Hermes : sa clé ne vivra qu'en mémoire vive"
-install -d -o "$U" -g "$U" -m 0700 "$HH/vault"
+# 0.102.0 : créé sous le nom de l'agent, jamais par root (root suivait un lien posé là et donnait le dossier visé à l'agent)
+[ ! -L "$HH/vault" ] || { echo "Refus : $HH/vault est un lien. Regarde ce dossier avant de relancer."; exit 1; }
+runuser -u "$U" -- install -d -m 0700 "$HH/vault"
 if [ -e "$HH/vault/vault.key" ] && [ ! -L "$HH/vault/vault.key" ]; then
   echo "ATTENTION : une clé existe sur le disque ($HH/vault/vault.key). Je n'y touche pas : sudo hermes-portail oublier --tout"
 else
@@ -170,6 +172,12 @@ sed "s/@RELAIS@/$RELAIS/g" "$ICI/hermes-portail-filtre.service" > /etc/systemd/s
 # l'unité d'un passage : même PATH que le Hermes principal (son Node et son npm à lui)
 node_bin=$(ls -d "$HH"/tools/node-*/bin 2>/dev/null | sort -V | tail -1)
 npm_bin=$(ls -d "$HH"/tools/npm-*/bin 2>/dev/null | sort -V | tail -1)
+# 0.102.0 (relecture de sécurité) : ces deux chemins viennent du dossier de l'agent et entrent dans une unité systemd écrite par root :
+# un nom de dossier piégé (saut de ligne, « # », « & ») y glissait des lignes (User=root, ExecStartPre=+…). Lettres, chiffres, . _ - seulement.
+for d in "$node_bin" "$npm_bin"; do
+  [ -z "$d" ] || { [[ "$d" == "$HH"/tools/* ]] && [[ "${d#"$HH"/tools/}" =~ ^(node|npm)-[A-Za-z0-9._-]+/bin$ ]]; } \
+    || { echo "Refus : nom de dossier inattendu sous $HH/tools : je n'écris pas l'unité. Regarde ce dossier avant de relancer."; exit 1; }
+done
 chemin="${node_bin:+$node_bin:}${npm_bin:+$npm_bin:}$HH/hermes-agent/node_modules/.bin:$H/.local/bin:/usr/local/bin:/usr/bin:/bin"
 sed -e "s#@PATH@#$chemin#" -e "s/@RELAIS@/$RELAIS/g" "$ICI/hermes-portail-essai.service" > /etc/systemd/system/hermes-portail-essai.service
 chmod 0644 /etc/systemd/system/hermes-portail-essai.service

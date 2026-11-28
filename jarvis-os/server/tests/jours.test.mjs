@@ -384,7 +384,7 @@ fs.rmSync(DIR, {recursive: true, force: true});
     verifierPdf(PDF1) === '' && /pas un PDF/.test(verifierPdf(Buffer.from('<html>'))) && /vide/.test(verifierPdf(Buffer.alloc(0))) && /15 Mo/.test(verifierPdf(Buffer.concat([Buffer.from('%PDF-'), Buffer.alloc(15 * 1024 * 1024)])))
     && tailleDite(48213) === '47 Ko' && tailleDite(2621440) === '2,5 Mo' && sansAdresse('Vu sur https://portail.exemple.invalid/cra?x=1 et intranet.exemple.invalid, écrire à a@exemple.invalid. 21,5 jours.') === 'Vu sur (adresse) et (adresse), écrire à (adresse) 21,5 jours.');
   /* une instance : son dossier de données à elle (le dossier de garde est à côté de jours.json), son faux Gmail, ses comptes rendus de root */
-  const monter = (nom, {pieces = null, octets = null, lien = false} = {}) => {
+  const monter = (nom, {pieces = null, octets = null, lien = false, de = 'contact@exemple.invalid'} = {}) => {
     const dir = path.join(DIR, 'signe-' + nom), RT = path.join(dir, 'retours'); fs.mkdirSync(RT, {recursive: true});
     const X = {push: [], log: [], lectures: 0, pieces: [], erreurPiece: null, dir, RT, garde: path.join(dir, 'cra-signe')};
     if (lien) { fs.mkdirSync(path.join(dir, 'ailleurs')); fs.symlinkSync(path.join(dir, 'ailleurs'), X.garde); }
@@ -394,10 +394,11 @@ fs.rmSync(DIR, {recursive: true, force: true});
     const msg = (id, de, nom2, objet, at, labelIds, attachments = []) => ({id, sender: de, addressDisplayNames: [{displayName: nom2, emailAddress: de}], subject: objet, internalDate: String(at), labelIds, snippet: 'Bonjour, ci-joint le CRA signé.', attachments});
     /* comme Gmail : l'identifiant d'une pièce jointe change à chaque lecture du fil ; seul celui de la dernière lecture est accepté */
     const fil = () => { X.lectures++; return {id: 'fil-cra-0001', messages: [msg('m-envoi', 'moi@exemple.invalid', 'Moi', 'CRA Novembre 2026', tEnvoi, ['SENT']),
-      msg('m-rep', 'contact@exemple.invalid', 'Contact Client', 'RE: CRA Novembre 2026', tRep, ['INBOX'], pj.map((p) => ({filename: p.filename, mimeType: p.mimeType, size: p.size, attachmentId: p.id + '-v' + X.lectures})))]}; };
+      msg('m-rep', de, 'Contact Client', 'RE: CRA Novembre 2026', tRep, ['INBOX'], pj.map((p) => ({filename: p.filename, mimeType: p.mimeType, size: p.size, attachmentId: p.id + '-v' + X.lectures}))),
+      ...(X.vrai ? [msg('m-rep2', 'contact@exemple.invalid', 'Contact Client', 'RE: CRA Novembre 2026', tRep + 3600000, ['INBOX'], pj.map((p) => ({filename: p.filename, mimeType: p.mimeType, size: p.size, attachmentId: p.id + '-v' + X.lectures})))] : [])]}; };
     const mails = {modeles: () => MOD, brouillon: async () => ({id: 'b1'}), majBrouillon: async () => ({}), envoye: async () => true, moi: () => 'moi@exemple.invalid',
-      chercher: async (q) => (/^subject:"CRA Novembre 2026"/.test(q) ? {threads: [{id: 'fil-cra-0001', historyId: '1'}]} : {}), fil: async () => fil(),
-      piece: async (message, piece) => { X.pieces.push(message + '/' + piece); if (X.erreurPiece) throw X.erreurPiece; const [id, v] = String(piece).split('-v'); if (message !== 'm-rep' || +v !== X.lectures || !X.octets[id]) throw new Error('pièce jointe introuvable'); return {size: X.octets[id].length, data: X.octets[id].toString('base64url')}; }};
+      chercher: async (q) => (/^subject:"CRA Novembre 2026"/.test(q) ? {threads: [{id: 'fil-cra-0001', historyId: X.vrai ? '2' : '1'}]} : {}), fil: async () => fil(),
+      piece: async (message, piece) => { X.pieces.push(message + '/' + piece); if (X.erreurPiece) throw X.erreurPiece; const [id, v] = String(piece).split('-v'); if (!['m-rep', 'm-rep2'].includes(message) || +v !== X.lectures || !X.octets[id]) throw new Error('pièce jointe introuvable'); return {size: X.octets[id].length, data: X.octets[id].toString('base64url')}; }};
     X.J = createJours({file: path.join(dir, 'jours.json'), agenda: ag, retours: RT, mails, push: async (m) => { X.push.push(m); return []; }, log: (t) => X.log.push(t), now: () => Ts});
     X.lu = () => JSON.parse(fs.readFileSync(path.join(dir, 'jours.json'), 'utf8')).mois['2026-11']; X.signe = () => X.lu().suivi.cra.signe || {};
     X.retour = (r) => fs.writeFileSync(path.join(RT, 'signe-2026-11.json'), JSON.stringify({mois: '2026-11', at: Ts, ...r}));
@@ -535,7 +536,22 @@ fs.rmSync(DIR, {recursive: true, force: true});
     Nx.retour({etat: 'pret', empreinte: Nx.signe().empreinte, texte: 'Trouvé.'}); Ts += MIN; await Nx.J.tic(); Ts += 6 * MIN; await Nx.J.tic();
     ok('0.98 : écart avec la saisie : aucun oui automatique ; une notification « il ne correspond pas à la saisie » avec l’écart ; la carte reste à « pret » (son oui reste possible)',
       !Nx.signe().oui && Nx.signe().controle.etat === 'ecart' && Nx.J.signe('2026-11').etat === 'pret' && Nx.J.signe('2026-11').controle.etat === 'ecart' && Nx.avis().length === 1 && Nx.avis()[0].title === 'CRA signé de novembre : il ne correspond pas à la saisie' && /le PDF dit 16 jours, la saisie 17/.test(Nx.avis()[0].body)
-      && Nx.J.ouiSigne('2026-11', Nx.signe().empreinte).ok, JSON.stringify([Nx.signe().controle, Nx.avis()])); }
+      && Nx.J.ouiSigne('2026-11', Nx.signe().empreinte).ok, JSON.stringify([Nx.signe().controle, Nx.avis()]));
+    /* O (0.102.0, relecture de sécurité) : le même objet, un PDF conforme, mais d'une adresse qui n'est pas un destinataire du mail :
+       vu, gardé, jamais déposé sans son oui, et la recherche du vrai continue ; le vrai arrivé, il remplace l'autre et repart seul */
+    Ts = Date.parse('2026-11-26T14:00:00Z'); const Ox = monter('o', {octets: {cra: BON, annexe: PDF2}, de: 'quelqu.un@ailleurs.invalid'}); Ox.J.brut().signePremier = 1; await Ox.J.tic(); await valider(Ox); Ox.moisValide(); Ts += 6 * MIN; await Ox.J.tic();
+    Ox.retour({etat: 'pret', empreinte: Ox.signe().empreinte, texte: 'Trouvé.'}); Ts += MIN; await Ox.J.tic(); Ts += 6 * MIN; await Ox.J.tic();
+    const o1 = {signe: Ox.signe(), vu: Ox.J.signe('2026-11'), clos: Ox.lu().suivi.cra.clos || '', rep: Ox.lu().suivi.cra.reponses[0], e1: Ox.signe().empreinte};
+    ok('0.102 : un CRA « signé » conforme venu d’une adresse qui n’est pas un destinataire du mail : gardé et montré avec son adresse, aucun oui automatique, la recherche du vrai n’est pas close ; son oui reste possible',
+      o1.rep.connu === false && o1.signe.inconnu === true && o1.signe.de === 'quelqu.un@ailleurs.invalid' && o1.signe.controle.etat === 'conforme' && !o1.signe.oui && o1.vu.etat === 'pret' && o1.vu.inconnu === true && o1.vu.de === 'quelqu.un@ailleurs.invalid' && o1.clos !== 'pdf'
+      && !Ox.avis().some((p) => /Hermes le dépose/.test(p.title)), JSON.stringify([o1.rep.connu, o1.signe.inconnu, o1.signe.oui, o1.vu.etat, o1.clos, Ox.avis().map((p) => p.title)]));
+    Ox.vrai = true; Ts += 6 * MIN; await Ox.J.tic(); Ts += 6 * MIN; await Ox.J.tic();
+    const o2 = Ox.signe(), reps = Ox.lu().suivi.cra.reponses;
+    ok('0.102 : le PDF du vrai contact arrive ensuite : il remplace celui de l’adresse inconnue (effacé du disque), la recherche est close, et le dépôt automatique redevient possible',
+      reps.length === 2 && reps[1].connu === true && o2.message === 'm-rep2' && !o2.inconnu && Ox.fichiers().length === 1 && Ox.fichiers()[0] === o2.fichier && Ox.lu().suivi.cra.clos === 'pdf' && Ox.lu().historique.some((h) => /remplacé par celui de ton contact/.test(h.quoi)) && Ox.J.signe('2026-11').inconnu === false,
+      JSON.stringify([reps.map((r) => r.connu), o2.message, o2.inconnu, Ox.fichiers().length, Ox.lu().suivi.cra.clos]));
+    Ox.retour({etat: 'pret', empreinte: Ox.signe().empreinte, texte: 'Trouvé.'}); Ts += MIN; await Ox.J.tic();
+    ok('0.102 : … et il part seul (conforme, portail prêt, pas le premier dépôt)', (Ox.signe().oui || {}).auto === true && Ox.signe().oui.empreinte === Ox.signe().empreinte, JSON.stringify(Ox.signe().oui || null)); }
 }
 console.log(results.join('\n'));
 console.log((fails ? 'ÉCHECS : ' + fails : 'Tout est bon') + ' (' + results.length + ' vérifications)');

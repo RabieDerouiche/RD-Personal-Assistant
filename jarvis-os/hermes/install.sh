@@ -147,6 +147,12 @@ install -o root -g root -m 0644 "$ICI/hermes-sortie.service" /etc/systemd/system
 # même PATH que l'unité officielle d'Hermes : son Node et son npm à lui (versions de son gestionnaire de paquets)
 node_bin=$(ls -d "$HH"/tools/node-*/bin 2>/dev/null | sort -V | tail -1)
 npm_bin=$(ls -d "$HH"/tools/npm-*/bin 2>/dev/null | sort -V | tail -1)
+# 0.102.0 (relecture de sécurité) : ces deux chemins viennent du dossier de l'agent et entrent dans une unité systemd écrite par root :
+# un nom de dossier piégé (saut de ligne, « # », « & ») y glissait des lignes (User=root, ExecStartPre=+…). Lettres, chiffres, . _ - seulement.
+for d in "$node_bin" "$npm_bin"; do
+  [ -z "$d" ] || { [[ "$d" == "$HH"/tools/* ]] && [[ "${d#"$HH"/tools/}" =~ ^(node|npm)-[A-Za-z0-9._-]+/bin$ ]]; } \
+    || { echo "Refus : nom de dossier inattendu sous $HH/tools : je n'écris pas l'unité. Regarde ce dossier avant de relancer."; exit 1; }
+done
 chemin="${node_bin:+$node_bin:}${npm_bin:+$npm_bin:}$HH/hermes-agent/node_modules/.bin:$H/.local/bin:/usr/local/bin:/usr/bin:/bin"
 sed "s#@PATH@#$chemin#" "$ICI/hermes-gateway.service" > /etc/systemd/system/hermes-gateway.service
 chmod 0644 /etc/systemd/system/hermes-gateway.service

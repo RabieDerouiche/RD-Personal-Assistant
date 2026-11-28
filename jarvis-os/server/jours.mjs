@@ -626,6 +626,7 @@ export function createJours({file, agenda, claude = null, push = async () => [],
     for (const k of [...filsLus.keys()].slice(0, Math.max(0, filsLus.size - 60))) filsLus.delete(k);
     return out;
   }
+  const pdfSur = (r) => !!(r && r.pdf && r.connu !== false);   /* 0.102.0 : un PDF venu d'un destinataire du mail (les réponses notées avant cette version comptent) */
   /* un mail d'un mois : lu, comparé à ce qui est déjà gardé, noté, notifié ; rend le nombre de recherches faites */
   async function suivreUn(ym, sorte) {
     const x = M(ym); if (!x.suivi || typeof x.suivi !== 'object' || Array.isArray(x.suivi)) x.suivi = {};
@@ -634,9 +635,12 @@ export function createJours({file, agenda, claude = null, push = async () => [],
     const objet = objetDuMail(sorte, ym); if (!objet) return 0;
     const y = +ym.slice(0, 4), m = +ym.slice(5, 7), fen = {objet, moi: (mails.moi && mails.moi()) || '', depuis: Date.UTC(y, m - 1, 1) - 864e5, jusqua: Date.UTC(y, m, 21)}, jours = 'newer_than:' + (SUIVI_JOURS + 5) + 'd';
     const fils = await filsDe('subject:"' + objet.replace(/["\\]/g, ' ') + '" ' + jours, 10);
-    let n = 1, lu = lireEchange({...fen, fils});
-    if (sorte === 'cra' && lu.envoi && !lu.reponses.some((r) => r.pdf) && !s.reponses.some((r) => r.pdf)) {   /* l'ancienne voie : un PDF d'un destinataire, après l'envoi */
-      const dest = [].concat((((mails.modeles && mails.modeles()) || {}).cra_client || {}).a || []).map((a) => String(a).trim()).filter(adresseOk).slice(0, 6);
+    /* 0.102.0 : les adresses du modèle du mail sont de confiance (avec les destinataires du mail parti) : un PDF venu d'ailleurs se voit, mais
+       ne clôt pas la recherche et ne se dépose jamais sans son oui */
+    const modele = ((mails.modeles && mails.modeles()) || {})[sorte === 'cra' ? 'cra_client' : 'prolongation'] || {};
+    const dest = [].concat(modele.a || [], modele.cc || []).map((a) => String(a).trim()).filter(adresseOk).slice(0, 6);
+    let n = 1, lu = lireEchange({...fen, fils, connus: dest});
+    if (sorte === 'cra' && lu.envoi && !lu.reponses.some(pdfSur) && !s.reponses.some(pdfSur)) {   /* l'ancienne voie : un PDF d'un destinataire, après l'envoi */
       if (dest.length) { const autres = await filsDe('from:(' + dest.join(' OR ') + ') filename:pdf ' + jours, 5); n = 2; lu = lireEchange({...fen, fils, destinataires: dest, autres}); }
     }
     const nom = sorte === 'cra' ? 'mail du CRA' : 'mail de prolongation';
@@ -648,13 +652,13 @@ export function createJours({file, agenda, claude = null, push = async () => [],
     const connues = new Map(s.reponses.map((r) => [r.id, r])), neuves = [];
     for (const r of lu.reponses) {
       const c = connues.get(r.id);
-      if (c) { c.lu = r.lu; if (r.pdfs && r.pdfs.length) c.pdfs = r.pdfs; continue; }   /* déjà notée : « lue dans Gmail » peut changer, et l'identifiant de pièce jointe que Gmail donne (rafraîchi à chaque lecture du fil) */
+      if (c) { c.lu = r.lu; if (r.pdfs && r.pdfs.length) c.pdfs = r.pdfs; if (typeof c.connu === 'boolean') c.connu = r.connu; continue; }   /* déjà notée : « lue dans Gmail » peut changer, et l'identifiant de pièce jointe que Gmail donne (rafraîchi à chaque lecture du fil) */
       if (s.reponses.length >= REP_MAX && !(sorte === 'cra' && r.pdf)) continue;   /* un long échange : les 8 premières réponses, et toujours le CRA en PDF */
       const rep = {...r, vu: now(), notifie: now()}; s.reponses.push(rep); neuves.push(rep);
       x.historique.push({at: now(), quoi: (sorte === 'cra' ? (r.pdf ? 'CRA signé reçu' : 'réponse au mail du CRA, sans le CRA') : 'réponse au mail de prolongation') + ' : ' + TXT(r.nom, 60) + ', le ' + quandDit(r.at)});
     }
     s.objet = objet; s.lu = now(); s.erreur = '';
-    if (sorte === 'cra' && s.reponses.some((r) => r.pdf)) s.clos = 'pdf';
+    if (sorte === 'cra' && s.reponses.some(pdfSur)) s.clos = 'pdf';
     else if (s.envoi && now() - s.envoi.at > SUIVI_JOURS * 864e5) s.clos = '45j';
     noter();   /* enregistré AVANT de notifier : une réponse notée n'est jamais renotifiée, même après un redémarrage */
     for (const r of neuves) {
@@ -729,7 +733,8 @@ export function createJours({file, agenda, claude = null, push = async () => [],
   const GARDE = mails && mails.piece ? creerGarde(path.join(path.dirname(file), 'cra-signe')) : null;
   const SIGNE_ESSAIS = 6, SIGNE_PAUSE = 15 * 60e3;
   const craSuivi = (ym) => { const s = suiviDe(ym).cra; return s && typeof s === 'object' ? s : null; };
-  const pdfRecu = (s) => (s && (s.reponses || []).find((r) => r.pdf)) || null;
+  /* 0.102.0 : le PDF d'un destinataire du mail d'abord ; à défaut celui d'une autre adresse, qui attend toujours son oui */
+  const pdfRecu = (s) => (s && ((s.reponses || []).find(pdfSur) || (s.reponses || []).find((r) => r.pdf))) || null;
   const moisDit = (ym) => MOIS[+ym.slice(5, 7) - 1];
   /* ---------- 0.98.0 : le CRA signé comparé à la saisie, puis déposé sans attendre si tout correspond (sa demande du 27/11/2026 : « après
      avoir vérifié que le contenu du PDF correspond à la saisie », « automatisé dès réception du mail si saisie déjà faite ») ----------
@@ -757,7 +762,7 @@ export function createJours({file, agenda, claude = null, push = async () => [],
   }
   async function ouiAuto(ym) {
     const x = D.mois[ym], s = x && craSuivi(ym), g = s && s.signe;
-    if (!GARDE || !D.signePremier || !g || typeof g !== 'object' || !g.fichier || s.rattache || g.moi || g.oui) return false;
+    if (!GARDE || !D.signePremier || !g || typeof g !== 'object' || !g.fichier || s.rattache || g.moi || g.oui || g.inconnu) return false;   /* 0.102.0 : jamais pour un PDF venu d'une adresse qui n'est pas un destinataire du mail */
     const R = g.retour || {}; if (R.etat !== 'pret' || R.reel || !g.controle || g.controle.etat !== 'conforme') return false;
     const buf = GARDE.lire(g.fichier); if (!buf || verifierPdf(buf) || empreinteDe(buf) !== g.empreinte) return false;
     g.controle = controleDe(buf, ym);   /* refait à cet instant : jamais un oui sur un contrôle périmé */
@@ -771,7 +776,10 @@ export function createJours({file, agenda, claude = null, push = async () => [],
   async function garderSigne(ym) {
     const x = D.mois[ym], s = x && craSuivi(ym), rep = pdfRecu(s);
     if (!GARDE || !rep || s.rattache) return false;
-    const g = s.signe && typeof s.signe === 'object' ? s.signe : {};
+    let g = s.signe && typeof s.signe === 'object' ? s.signe : {};
+    if (g.fichier && g.inconnu && rep.connu !== false && g.message !== rep.id && !g.oui && !g.moi) {   /* 0.102.0 : le vrai est arrivé : il remplace celui de l'adresse inconnue */
+      GARDE.effacer(g.fichier); g = s.signe = {}; x.historique.push({at: now(), quoi: 'CRA signé : le PDF reçu d’une autre adresse est remplacé par celui de ton contact'});
+    }
     if (g.fichier || g.refus || g.efface || g.moi) return false;
     if (now() - (rep.vu || rep.at) > SUIVI_JOURS * 864e5 || (g.essais || 0) >= SIGNE_ESSAIS || now() < (g.prochain || 0)) return false;
     const refuser = (raison, nom) => { s.signe = {refus: raison, nom: TXT(nom, 200), at: now()}; x.historique.push({at: now(), quoi: 'CRA signé : PDF pas gardé (' + raison + ')'}); noter(); return true; };
@@ -788,7 +796,8 @@ export function createJours({file, agenda, claude = null, push = async () => [],
       const buf = octetsDe(((await mails.piece(rep.id, ch.piece.attachmentId)) || {}).data), raison = verifierPdf(buf);
       if (raison) return refuser(raison, nom);
       const k = GARDE.garder(buf);
-      s.signe = {message: rep.id, fil: rep.fil, nom, taille: k.taille, autres: ch.autres, fichier: k.fichier, empreinte: k.empreinte, garde: now(), controle: controleDe(buf, ym)};   /* 0.98.0 : comparé à la saisie dès la garde */
+      s.signe = {message: rep.id, fil: rep.fil, nom, taille: k.taille, autres: ch.autres, fichier: k.fichier, empreinte: k.empreinte, garde: now(), controle: controleDe(buf, ym),   /* 0.98.0 : comparé à la saisie dès la garde */
+        ...(rep.connu === false ? {inconnu: true, de: TXT(rep.de, 120)} : {})};
       x.historique.push({at: now(), quoi: 'CRA signé gardé pour le dépôt par Hermes (' + tailleDite(k.taille) + (ch.autres ? ' ; ' + ch.autres + ' autre' + (ch.autres > 1 ? 's' : '') + ' PDF laissé' + (ch.autres > 1 ? 's' : '') + ' de côté' : '') + ')'});
       noter(); return true;
     } catch (e) {
@@ -884,7 +893,8 @@ export function createJours({file, agenda, claude = null, push = async () => [],
       : !rt ? (craValide ? 'verifie' : 'attend_cra') : rt.etat === 'pret' ? 'pret' : rt.reel ? 'echec' : rt.etat === 'introuvable' ? 'introuvable' : 'echec_blanc';
     return {etat, mois: ym, nom: TXT(g.nom, 200), taille: +g.taille || 0, tailleDite: g.taille ? tailleDite(g.taille) : '', autres: +g.autres || 0, empreinte: g.fichier ? g.empreinte : '', fil: rep.fil,
       raison: TXT(g.refus || (rt && rt.etat !== 'pret' ? rt.texte : '') || (!g.fichier ? g.erreur : '') || '', 300), par: s.rattachePar || (s.rattache ? 'toi' : ''), le: s.rattache || 0, premiere: !!(rt && rt.premiere),
-      controle: g.controle ? {etat: g.controle.etat, dit: TXT(g.controle.dit, 300)} : null, auto: !!(g.oui && g.oui.auto)};   /* 0.98.0 */
+      controle: g.controle ? {etat: g.controle.etat, dit: TXT(g.controle.dit, 300)} : null, auto: !!(g.oui && g.oui.auto),   /* 0.98.0 */
+      inconnu: !!g.inconnu || (!g.fichier && rep.connu === false), de: g.inconnu ? TXT(g.de, 120) : (!g.fichier && rep.connu === false ? TXT(rep.de, 120) : '')};   /* 0.102.0 */
   }
 
   /* le 24 à midi (rattrapé jusqu'à la fin du mois si le serveur était arrêté) ; le dernier jour à midi, relu */

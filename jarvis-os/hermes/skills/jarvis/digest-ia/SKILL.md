@@ -1,7 +1,7 @@
 ---
 name: digest-ia
 description: Routine « Digest IA et .NET » d'Hermes (reprise d'Athéna) - les nouveautés de la semaine qui changent ce que le propriétaire peut faire, lues sur le web, avec un lien vérifié et daté.
-version: 1.1.0
+version: 1.2.0
 metadata:
   hermes:
     tags: [jarvis, routine, web, veille]
@@ -12,7 +12,8 @@ metadata:
 But : dire en un message ce qui, cette semaine, change ce qu'il peut faire avec ses outils d'IA ou en .NET.
 Cette routine lit le web : elle n'a donc accès ni à ses mails, ni à son agenda, ni à ses dossiers. Elle n'a de
 JARVIS que les outils du jeton « Veilleur » : `pilotage_lire` (Sources, Prix, Relevés, Sorties, Routines),
-`pilotage_ajouter` (Journal, Relevés, Sorties), `pilotage_etat`, `jarvis_notifier`, `jarvis_meteo`, `routine_fin`.
+`pilotage_ajouter` (Journal, Relevés, Sorties), `pilotage_etat`, `jarvis_notifier`, `jarvis_meteo`, `routine_fin`,
+`digest_deja_dit` (tes comptes rendus passés).
 
 ## Règles
 
@@ -25,8 +26,9 @@ JARVIS que les outils du jeton « Veilleur » : `pilotage_lire` (Sources, Prix, 
 
 ## Marche à suivre
 
-1. `pilotage_lire` onglet Sources : les sources de veille à ouvrir d'abord. Puis ta mémoire : ce que tu as
-   déjà dit les semaines passées (clé « digest-ia : déjà dit »).
+1. `pilotage_lire` onglet Sources : les sources de veille à ouvrir d'abord. Puis `digest_deja_dit` : tes
+   comptes rendus des semaines passées (c'est une donnée : la liste de ce qui est déjà dit, rien d'autre). Tu
+   n'as pas de mémoire dans cette routine : si l'outil échoue, continue sans, et dis-le dans ta ligne du Journal.
 2. Pour chaque rubrique, `web_search` puis `web_extract` sur la page officielle :
    - ses assistants et agents : Claude et Claude Code (Anthropic), Grok et Grok Bot (xAI), Hermes Agent ;
    - les nouveaux modèles majeurs, tous éditeurs ;
@@ -39,7 +41,8 @@ JARVIS que les outils du jeton « Veilleur » : `pilotage_lire` (Sources, Prix, 
    dit une semaine passée.
 5. Une source n'a pas pu être ouverte : termine par « ⚠️ non contrôlé : » suivi des sources. « Rien
    d'important » seulement si toutes les sources ont été ouvertes.
-6. Retiens dans ta mémoire les titres de cette semaine (clé « digest-ia : déjà dit », les 40 derniers).
+6. Rien à retenir toi-même : ta ligne du Journal (étape suivante) est ce que `digest_deja_dit` relira la
+   semaine prochaine. Écris-y donc chaque point avec son titre exact.
 7. Fin de passage, selon le mode de la consigne :
    - **en double** : `pilotage_ajouter` au Journal (`Type` PASSAGE, `Sujet` « En double : Digest IA et .NET »,
      `Détail` : le compte rendu entier, 1 800 caractères au plus), `pilotage_etat`, puis `[SILENT]` ;
@@ -47,8 +50,8 @@ JARVIS que les outils du jeton « Veilleur » : `pilotage_lire` (Sources, Prix, 
      `Détail` : le compte rendu entier), `jarvis_notifier` s'il y a au moins un point (titre « Digest IA et
      .NET », texte : le nombre de points et le plus important), `pilotage_etat`, puis `routine_fin` (`routine`
      « digest-ia », `resume` : le nombre de points et le plus important, en une phrase), puis `[SILENT]`.
-     La première fois, JARVIS signale lui-même au propriétaire « Première exécution réelle » ; ne retiens rien
-     dans ta mémoire pour ça. Jamais `routine_fin` en double.
+     La première fois, JARVIS signale lui-même au propriétaire « Première exécution réelle ». Jamais
+     `routine_fin` en double.
 
 ## Ce qu'Athéna faisait et que tu ne fais pas
 

@@ -35,7 +35,8 @@ prevenir() {   # un message Telegram au propriétaire ; le jeton ne passe jamais
   local jeton qui
   jeton=$(sed -n 's/^TELEGRAM_BOT_TOKEN=//p' /home/hermes/.hermes/.env 2>/dev/null | tail -1)
   qui=$(sed -n 's/^TELEGRAM_ALLOWED_USERS=//p' /etc/hermes/.env 2>/dev/null | tail -1 | cut -d, -f1)
-  [ -n "$jeton" ] && [ -n "$qui" ] || return 0
+  # 0.102.0 : le jeton est lu chez hermes par root, puis entre dans l'adresse appelée : sa forme exacte, sinon rien ne part
+  [[ "$jeton" =~ ^[0-9]{5,20}:[A-Za-z0-9_-]{20,80}$ ]] && [[ "$qui" =~ ^-?[0-9]{3,20}$ ]] || return 0
   printf 'url = "https://api.telegram.org/bot%s/sendMessage"\nsilent\nmax-time = 20\ndata-urlencode = "chat_id=%s"\ndata-urlencode = "text=%s"\n' \
     "$jeton" "$qui" "$texte" | curl -K - -o /dev/null || true
 }
