@@ -12926,7 +12926,7 @@ void main(){
            l'ambre reste à ce qui attend son oui. Une aurore tourne derrière le globe ; au lancement, un trait de lumière balaie le globe. */
         + '.hud-o .hud-core::before{content:"";position:absolute;left:50%;top:50%;width:292px;height:292px;margin:-142px 0 0 -146px;border-radius:50%;background:conic-gradient(from 0deg,rgba(34,211,238,0),rgba(34,211,238,.22),rgba(129,140,248,.16),rgba(168,85,247,.26),rgba(232,121,249,.10),rgba(34,211,238,0));filter:blur(30px);z-index:0;pointer-events:none;animation:orbaura 18s linear infinite}'
         + '.hud-o .hud-core::after{content:"";position:absolute;left:8%;right:8%;top:0;height:2px;border-radius:2px;background:linear-gradient(90deg,rgba(34,211,238,0),#22d3ee 30%,#a855f7 70%,rgba(168,85,247,0));box-shadow:0 0 18px rgba(99,102,241,.9);opacity:0;z-index:2;pointer-events:none}'
-        + '.hud-o .hud-core.nait::after{animation:orbscan 1.5s cubic-bezier(.3,.1,.3,1) .15s 1}@keyframes orbscan{0%{opacity:0;transform:translateY(40px)}12%{opacity:.95}88%{opacity:.8}100%{opacity:0;transform:translateY(300px)}}@keyframes orbaura{to{transform:rotate(360deg)}}'
+        + '.hud-o .hud-core.nait::after{animation:orbscan 1.5s cubic-bezier(.3,.1,.3,1) var(--nd,.15s) 1}@keyframes orbscan{0%{opacity:0;transform:translateY(40px)}12%{opacity:.95}88%{opacity:.8}100%{opacity:0;transform:translateY(300px)}}@keyframes orbaura{to{transform:rotate(360deg)}}'
         + '.orb-ping{position:absolute;left:50%;top:50%;z-index:0;width:150px;height:150px;margin:-75px 0 0 -75px;border-radius:50%;border:1.5px solid rgba(var(--f, var(--c1)),.8);opacity:0;pointer-events:none}.orb-ping.va{animation:orbping 1.5s ease-out}@keyframes orbping{0%{transform:scale(.55);opacity:.75}100%{transform:scale(1.65);opacity:0}}'
         + '.orb-foc{--a:var(--c1);--a2:var(--c2);display:block;width:100%;margin:6px 0 0;padding:6px 8px;min-height:44px;background:none;border:0;color:var(--fg);font:500 13.5px/1.35 var(--sans);text-align:center;cursor:pointer}.orb-foc small{font:700 11px var(--display);letter-spacing:.16em;color:rgb(var(--a2));margin-right:8px}.orb-foc b{font:700 14.5px var(--display)}.orb-foc span{color:var(--muted)}.orb-foc i{font-style:normal;color:rgb(var(--a2));margin-left:6px}'
         + '.orb-foc.va{animation:orbfoc .5s ease-out}@keyframes orbfoc{0%{opacity:0;transform:translateY(4px);letter-spacing:.04em}100%{opacity:1;transform:none;letter-spacing:0}}'
@@ -13083,7 +13083,8 @@ void main(){
         const ell = (c) => { const e = document.createElementNS(NS, 'ellipse'); e.setAttribute('class', c); svg.append(e); return e; }, e2 = ell('o2'), e1 = ell('o1'), e3 = document.createElementNS(NS, 'path'); e3.setAttribute('class', 'o3'); e3.setAttribute('fill', 'none'); e3.setAttribute('stroke', 'url(#orb-deg)'); svg.append(e3);
         { const defs = document.createElementNS(NS, 'defs'), lg = document.createElementNS(NS, 'linearGradient'); lg.setAttribute('id', 'orb-deg'); lg.setAttribute('x1', '0'); lg.setAttribute('x2', '1'); lg.setAttribute('y1', '0'); lg.setAttribute('y2', '0');
           for (const [o, c] of [['0', '#22d3ee'], ['0.5', '#818cf8'], ['1', '#a855f7']]) { const st = document.createElementNS(NS, 'stop'); st.setAttribute('offset', o); st.setAttribute('stop-color', c); lg.append(st); } defs.append(lg); svg.prepend(defs); }
-        if (!GST.ne) { GST.ne = true; core.classList.add('nait'); }   /* le trait de lumière : au lancement de l'app, une fois */
+        /* le trait de lumière : au lancement de l'app, une fois ; l'accueil est redessiné quand les données arrivent : le trait reprend où il en était */
+        { const m = performance.now(); if (!GST.ne) GST.ne = m; if (m - GST.ne < 1700) { core.classList.add('nait'); core.style.setProperty('--nd', (150 - Math.round(m - GST.ne)) + 'ms'); } }
         const ping = h('i', {class: 'orb-ping', 'aria-hidden': 'true'});
         let glisse = false;
         const chips = items.map((it) => h('button', {type: 'button', class: 'orb-c' + (it.amb ? ' amb' : ''), 'data-k': it.k, onclick: (ev) => { if (glisse) { ev.preventDefault(); return; } it.act(); }}, h('small', {text: it.k}), h('b', {text: it.b})));
@@ -13131,6 +13132,64 @@ void main(){
         if (ORB.raf) cancelAnimationFrame(ORB.raf); ORB.front = -1; ORB.last = 0; ORB.raf = requestAnimationFrame(image);
       };
     } }
+
+  /* ================= JARVIS OS 0.102.0 — Les commandes : tout faire en deux ou trois appuis (sa demande du 28/11/2026 : « Jarvis, c'est un
+     centre de commandement : tout checker, tester, vérifier, administrer de A à Z ; peu importe la tâche, maximum 2 ou 3 appuis, jamais
+     10 ») =================
+     La loupe de l'en-tête est sur toutes les pages : elle s'ouvre maintenant sur les commandes (un appui), et une commande touchée mène droit à
+     son geste (deux appuis) : la feuille d'une routine d'Hermes (lancer, pause, horaire, historique), le CRA de la semaine, déposer un papier,
+     l'état des systèmes, une nouvelle tâche, le verrou… Les mêmes se trouvent en tapant un mot (« lancer », « papier », « santé »). Rien de neuf
+     derrière : chaque commande appelle le geste qui existe déjà (ses aiguillages « #voir-… », ses feuilles), avec ses confirmations. */
+  { const cmdListe = () => {
+      const out = [], add = (id, titre, sous, ic, fn, mots) => out.push({id, titre, sous, ic, fn, cle: gsNorm(titre + ' ' + sous + ' ' + (mots || ''))});
+      const JS = SRV_OS && window.JarvisServeur ? window.JarvisServeur : null;
+      if (VIEWS.travail) add('cra', 'CRA de la semaine', 'Confirmer, soumettre, relancer Hermes', 'check', () => go('travail'), 'travail semaine soumettre hermes portail');
+      add('depot', 'Déposer un papier', 'PDF ou photo : JARVIS propose où le ranger', 'up', () => voirUrl('#voir-papiers-depot'), 'papiers ranger drive document scanner');
+      add('sante', 'État des systèmes', 'Serveur, Google, Hermes : tout vérifier', 'pulse', () => voirUrl('#voir-sante'), 'sante controle verifier tester checker panne erreur diagnostic');
+      let v = null; try { v = window.__HR92 && window.__HR92.vue ? window.__HR92.vue() : null; } catch (e) { v = null; }
+      /* les routines ne sont lues qu'à l'accueil et dans Équipe : ouverte ailleurs, la loupe les demande (une fois) et se redessine */
+      if (!(v && v.disponible) && !cmdListe.demande && window.__HR92 && window.__HR92.load) { cmdListe.demande = true; try { Promise.resolve(window.__HR92.load(true)).then(() => { if (GS.open) gsDraw(); }, () => {}); } catch (e) { /* sans les routines */ } }
+      ((v && v.disponible && v.routines) || []).forEach((r) => add('routine-' + r.nom, r.libelle, 'Routine d’Hermes : lancer, pause, horaire, historique', 'bolt', () => voirUrl('#voir-routine-' + r.nom), 'hermes routine lancer relancer maintenant pause reprendre horaire historique erreur ' + r.nom));
+      if (VIEWS.equipe) add('hermes', 'Hermes et ses routines', 'Toutes ses routines, en direct', 'bot', () => go('equipe'), 'equipe routines automatisations');
+      add('tache', 'Nouvelle tâche', 'Pour toi, avec ou sans date', 'plus', () => openSheet({bot: 'hydra', title: 'Nouvelle tâche', say: 'Une tâche pour toi, avec ou sans date.', extra: newTaskForm, actions: []}), 'ajouter todo rappel');
+      add('evenement', 'Nouvel événement', 'Dans ton agenda principal', 'cal', () => openImportant(), 'agenda rendez-vous ajouter important');
+      add('jours', 'Mes jours du mois', 'Congés, télétravail, CRA du mois', 'cal', () => voirUrl('#voir-jours'), 'conges teletravail mois cra presence');
+      if (VIEWS.argent) add('argent', 'Argent', 'Reste à payer, dépenses, budgets', 'euro', () => go('argent'), 'radar budget depense noter paiement');
+      add('taches', 'Mes tâches', 'Celles du jour et en retard', 'list', () => voirUrl('#voir-taches'), 'todo a faire');
+      add('dates', 'Dates clés', 'Échéances et papiers qui expirent', 'clock', () => voirUrl('#voir-echeances'), 'echeances rappels validite');
+      add('maj', 'Mettre à jour JARVIS', 'Réglages : la dernière version', 'refresh', () => go('reglages'), 'mise a jour version update serveur');
+      if (JS && JS.verrou && JS.verrou.verrouiller) add('verrou', 'Verrouiller maintenant', 'Face ID à la prochaine ouverture', 'lock', () => { JS.verrou.verrouiller(); }, 'verrou face id passkey fermer securite');
+      add('notifs', 'Notifications', 'Ce qui te prévient, et quand', 'sound', () => voirUrl('#voir-reglages-notifs'), 'reglages prevenir alerte');
+      add('memoire', 'Mémoire de JARVIS', 'Ce qu’il retient de toi', 'brief', () => voirUrl('#voir-reglages-memoire'), 'reglages retenir oublier');
+      add('mcp', 'Assistants reliés', 'Claude, Hermes : leurs accès', 'users', () => voirUrl('#voir-reglages-mcp'), 'reglages mcp jeton acces autoriser retirer');
+      add('reglages', 'Réglages', 'Tout le reste', 'gear', () => go('reglages'), 'parametres options');
+      return out; };
+    document.head.append(h('style', {text: '.gs-cmds{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px}.gs-cmd{display:flex;align-items:center;gap:9px;min-width:0;overflow:hidden;min-height:50px;padding:8px 10px;border-radius:14px;border:1px solid transparent;background:linear-gradient(rgba(6,14,34,.9),rgba(6,14,34,.9)) padding-box,linear-gradient(120deg,rgba(34,211,238,.55),rgba(168,85,247,.5)) border-box;color:var(--fg);font:inherit;text-align:left;cursor:pointer;-webkit-tap-highlight-color:transparent}'
+      + '.gs-cmd:active{transform:scale(.97)}.gs-cmd .gs-ic{flex:0 0 28px;height:28px;color:#a5b4fc;border-color:rgba(129,140,248,.35)}.gs-cmd b{font:600 13px/1.2 var(--display);display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.gs-cmd small{display:block;font-size:11px;line-height:1.25;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.gs-cmd span:last-child{min-width:0;flex:1 1 0}.gs-res .gs-hint{white-space:normal}'
+      + '.gs-grp.gs-c h3{background:linear-gradient(90deg,#22d3ee,#a855f7);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;width:max-content}.gs-grp.gs-c h3 small{-webkit-text-fill-color:var(--dim)}'}));
+    const GSDRAW0 = gsDraw;
+    gsDraw = function () {
+      GSDRAW0();
+      const box = $('gs-res'), inp = $('gs-in'); if (!box) return;
+      if (inp) inp.placeholder = 'Chercher, ou lancer une commande';
+      const toks = gsNorm(GS.q.trim()).split(/\s+/).filter((x) => x.length >= 2), L = cmdListe(), vus = toks.length ? L.filter((c) => toks.every((t) => c.cle.indexOf(t) >= 0)) : L;
+      if (!vus.length) return;
+      const lancer = (c) => () => { gsClose(); try { c.fn(); } catch (e) { /* le geste dira lui-même ce qui manque */ } };
+      if (!toks.length) {   /* à l'ouverture : les commandes, deux par ligne (elles tiennent au-dessus du clavier) */
+        const hint = box.querySelector('.gs-hint'); if (hint) hint.textContent = 'Touche une commande, ou tape un mot : un nom, un dossier, un produit, un papier…';
+        const sec = h('section', {class: 'gs-grp gs-c', 'data-cmds': String(vus.length)}, h('h3', {}, 'Commandes', h('small', {text: String(vus.length)})),
+          h('div', {class: 'gs-cmds'}, vus.map((c) => h('button', {type: 'button', class: 'gs-cmd', 'data-cmd': c.id, onclick: lancer(c)}, h('span', {class: 'gs-ic', html: icon(ICONS[c.ic] ? c.ic : 'bolt', 16)}), h('span', {}, h('b', {text: c.titre}), h('small', {text: c.sous}))))));
+        if (hint) hint.after(sec); else box.prepend(sec);
+        return;
+      }
+      const cnt = box.querySelector('.gs-count');   /* avec un mot : les commandes d'abord, puis ce qui a été trouvé */
+      if (cnt && /^Rien pour/.test(cnt.textContent)) cnt.textContent = vus.length + ' commande' + (vus.length > 1 ? 's' : '');
+      const sec = h('section', {class: 'gs-grp gs-c', 'data-cmds': String(vus.length)}, h('h3', {}, 'Commandes', h('small', {text: String(vus.length)})),
+        vus.slice(0, 6).map((c) => h('button', {type: 'button', class: 'gs-row', 'data-cmd': c.id, onclick: lancer(c)}, h('span', {class: 'gs-ic', html: icon(ICONS[c.ic] ? c.ic : 'bolt', 17)}), h('span', {class: 'gs-t'}, h('b', {text: c.titre}), h('small', {text: c.sous})), h('span', {class: 'gs-go', 'aria-hidden': 'true', text: '›'}))));
+      if (cnt) cnt.after(sec); else box.prepend(sec);
+    };
+    { const b = $('gs-btn'); if (b) { b.setAttribute('aria-label', 'Chercher ou lancer une commande'); b.title = 'Chercher ou lancer une commande'; } }
+  }
 
   boot();
 })();

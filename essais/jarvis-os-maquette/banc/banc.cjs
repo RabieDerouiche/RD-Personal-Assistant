@@ -19,7 +19,7 @@ srv.listen(0, async () => {
       window.requestAnimationFrame = (cb) => { const id = ++n; m.set(id, setTimeout(() => { m.delete(id); raf(cb); }, 100)); return id; };
       window.cancelAnimationFrame = (id) => { const t = m.get(id); if (t !== undefined) { clearTimeout(t); m.delete(id); } else caf(id); }; } };   /* 0.99.0 : les vérifications d'avant portent sur la liste de « Pour moi » ; la pile a les siennes (sansPile: false) */
   /* une page avec un scénario de la maquette en plus (micro, voix) */
-  const pageWith = async (scen, url) => { const ctx = await b.newContext({...devices['iPhone 15 Pro Max']}); await ctx.addInitScript(PAUSE_INIT); await ctx.addInitScript((sc) => { const d = Object.getOwnPropertyDescriptor(window, '__SCEN'); Object.defineProperty(window, '__SCEN', {configurable: true, get: d.get, set: (x) => d.set.call(window, Object.assign({}, sc, x || {}))}); }, scen); const p = await ctx.newPage(); p.on('pageerror', (e) => errs.push(url + ' : ' + e.message)); await p.goto(base + url); await p.waitForTimeout(3500); return p; };
+  const pageWith = async (scen, url, opt = {}) => { const ctx = await b.newContext({...devices['iPhone 15 Pro Max']}); await ctx.addInitScript(PAUSE_INIT); await ctx.addInitScript((sc) => { const d = Object.getOwnPropertyDescriptor(window, '__SCEN'); Object.defineProperty(window, '__SCEN', {configurable: true, get: d.get, set: (x) => d.set.call(window, Object.assign({}, sc, x || {}))}); }, scen); const p = await ctx.newPage(); p.on('pageerror', (e) => errs.push(url + ' : ' + e.message)); await p.goto(base + url); if (!opt.tot) await p.waitForTimeout(3500); return p; };   /* tot : la page est rendue tout de suite (pour ce qui se joue au lancement) */
   const page = async (url) => { const ctx = await b.newContext({...devices['iPhone 15 Pro Max']}); await ctx.addInitScript(PAUSE_INIT); const p = await ctx.newPage(); p.on('pageerror', (e) => errs.push(url + ' : ' + e.message)); await p.goto(base + url); await p.waitForTimeout(3500); return p; };
   /* 0.87.0 : Achats en un seul filtre ; « Trouver une idée » et « Mes recherches » sont sous « Idées » */
   const versIdees = async (q) => { await q.evaluate(() => { const x = document.querySelector('#view .dm-seg [data-f="idees"]'); if (x) x.click(); }); await q.waitForTimeout(400); };
@@ -2406,6 +2406,46 @@ srv.listen(0, async () => {
         ok('0.93 : Pour moi : avec les sujets regroupés, la ligne de Travail (0.94.0 : « CRA signé reçu : à rattacher · … ») reste une seule ligne à part, hors de toute carte de sujet',
           lt.l.length === 1 && lt.l[0].toi && lt.l[0].t === 'CRA signé reçu : à rattacher · Réponse à ton mail de prolongation : à lire' && !lt.l[0].dans && lt.sin === 1 && lt.sujets >= 5, JSON.stringify(lt));
         await w.context().close(); }
+    });
+    await seg(84, async () => {
+      /* 0.102.0 : les commandes (la loupe de l'en-tête, sur toutes les pages) : un appui les montre, un appui lance le geste ; un mot les trouve */
+      { const c = await pageWith({grokOff: true}, '#agenda'); await c.waitForTimeout(1200);
+        await c.click('#gs-btn'); await c.waitForTimeout(350);
+        const c1 = await c.evaluate(() => { const L = [...document.querySelectorAll('#gs-res .gs-cmd')], W = innerWidth; return {n: L.length, ids: L.map((x) => x.dataset.cmd), titres: L.slice(0, 3).map((x) => x.querySelector('b').textContent), large: L.every((x) => { const r = x.getBoundingClientRect(); return r.left >= 0 && r.right <= W + 0.5 && r.height >= 44; }),
+          ph: document.getElementById('gs-in').placeholder, lab: document.getElementById('gs-btn').getAttribute('aria-label'), routines: L.filter((x) => /^routine-/.test(x.dataset.cmd)).length}; });
+        ok('0.102 commandes : la loupe s’ouvre sur les commandes (deux par ligne, dans l’écran, 44 px au moins) : le CRA de la semaine, déposer un papier, l’état des systèmes en tête, une par routine d’Hermes, les réglages',
+          c1.n >= 14 && c1.titres.join('|') === 'CRA de la semaine|Déposer un papier|État des systèmes' && c1.large && c1.routines >= 3 && ['tache', 'evenement', 'jours', 'maj', 'notifs', 'memoire', 'mcp', 'reglages'].every((k) => c1.ids.includes(k)) && /commande/.test(c1.ph) && /commande/.test(c1.lab), JSON.stringify(c1));
+        await c.click('#gs-res .gs-cmd[data-cmd="depot"]'); await c.waitForTimeout(900);
+        const c2 = await c.evaluate(() => ({h: location.hash, ferme: document.getElementById('gsearch').hidden, depot: !!document.querySelector('#view [class*="depot"], #view input[type=file]'), seg: [...document.querySelectorAll('#view .seg button[aria-pressed="true"], #view .seg button.on, #view .seg .is-on')].map((x) => x.textContent.trim()).join()}));
+        ok('0.102 commandes : « Déposer un papier » depuis l’Agenda : deux appuis, on est dans Papiers › Déposer, la recherche est refermée', c2.h === '#papiers' && c2.ferme && (c2.depot || /Déposer/.test(c2.seg)), JSON.stringify(c2));
+        await c.click('#gs-btn'); await c.waitForTimeout(250); await c.fill('#gs-in', 'santé'); await c.waitForTimeout(300);
+        const c3 = await c.evaluate(() => { const s = document.querySelector('#gs-res .gs-grp.gs-c'); return {premier: !!s && s === document.querySelector('#gs-res .gs-grp'), lignes: s ? [...s.querySelectorAll('.gs-row b')].map((x) => x.textContent) : [], compte: (document.querySelector('#gs-res .gs-count') || {}).textContent}; });
+        await c.click('#gs-res .gs-row[data-cmd="sante"]'); await c.waitForTimeout(900);
+        const c4 = await c.evaluate(() => location.hash);
+        ok('0.102 commandes : un mot les trouve, sans les accents (« santé » : « État des systèmes », en premier), et la commande ouvre Réglages sur l’état des systèmes', c3.premier && c3.lignes[0] === 'État des systèmes' && c4 === '#reglages', JSON.stringify([c3, c4]));
+        await c.click('#gs-btn'); await c.waitForTimeout(250); await c.fill('#gs-in', 'lancer'); await c.waitForTimeout(300);
+        const c5 = await c.evaluate(() => [...document.querySelectorAll('#gs-res .gs-grp.gs-c .gs-row')].map((x) => x.dataset.cmd));
+        await c.click('#gs-res .gs-row[data-cmd^="routine-"]'); await c.waitForTimeout(1600);
+        const c6 = await c.evaluate(() => ({h: location.hash, feuille: !document.getElementById('sheet').hidden, texte: (document.getElementById('sheet').textContent || '').slice(0, 1500)}));
+        ok('0.102 commandes : « lancer » propose les routines d’Hermes ; une routine touchée ouvre sa feuille (lancer maintenant, pause, horaire, historique)', c5.filter((x) => /^routine-/.test(x)).length >= 3 && c6.h === '#equipe' && c6.feuille && /Lancer maintenant/.test(c6.texte), JSON.stringify([c5, c6.h, c6.feuille, c6.texte.slice(0, 120)]));
+        await c.context().close(); }
+    });
+    await seg(85, async () => {
+      /* 0.102.0 : l'accueil dans le dégradé de la progression de Travail (cyan → violet) : la couleur d'un hologramme suit sa place ; l'ambre reste à ce qui attend */
+      { const q = await pageWith({grokOff: true, sujets: true, reponses: true, sansOrbite: false}, '#accueil', {tot: true});
+        const ne = await q.waitForFunction(() => { const c = document.querySelector('.hud-core.nait'); return !!c && /ms$/.test(c.style.getPropertyValue('--nd')); }, null, {timeout: 6000}).then(() => true, () => false); await q.waitForTimeout(3600);
+        const a1 = await q.evaluate(() => { const core = document.querySelector('.hud-core'), r0 = core.getBoundingClientRect(), L = [...core.querySelectorAll('.orb-c')].map((c) => { const r = c.getBoundingClientRect(); return {k: c.dataset.k, amb: c.classList.contains('amb'), m: (r.left + r.width / 2 - r0.left) / r0.width, a: c.style.getPropertyValue('--a'), a3: c.style.getPropertyValue('--a3'), op: +c.style.opacity}; });
+          const foc = document.querySelector('.orb-foc'), fr = core.querySelector('.orb-c.is-front');
+          return {L, deg: !!core.querySelector('svg.orb-an linearGradient#orb-deg') && getComputedStyle(core.querySelector('.orb-an ellipse')).stroke, nait: core.classList.contains('nait'), aura: getComputedStyle(core, '::before').backgroundImage.slice(0, 14), parKey: [...document.styleSheets].some((sh) => { try { return [...sh.cssRules].some((r) => /orb-c\[data-k="TRAVAIL"\]/.test(r.selectorText || '')); } catch (e) { return false; } }),
+            focA: foc ? foc.style.getPropertyValue('--a') : '', frontA: fr ? (fr.classList.contains('amb') ? 'var(--warn)' : fr.style.getPropertyValue('--a')) : ''}; });
+        const libres = a1.L.filter((x) => !x.amb), rouge = (x) => +String(x.a).split(',')[0], gauche = libres.slice().sort((x, y) => x.m - y.m)[0], droite = libres.slice().sort((x, y) => y.m - x.m)[0];
+        ok('0.102 accueil : chaque hologramme prend la couleur de sa place dans le dégradé de Travail (cyan à gauche, violet à droite : plus de couleur propre à chacun), l’ambre reste à ce qui attend ; l’anneau est en dégradé ; une aurore tourne derrière le globe ; la ligne sous le globe suit l’hologramme au point',
+          libres.length >= 2 && libres.every((x) => /^\d+,\d+,\d+$/.test(x.a) && /^\d+,\d+,\d+$/.test(x.a3)) && droite.m - gauche.m > 0.15 && rouge(droite) > rouge(gauche) + 15 && a1.L.filter((x) => x.amb).every((x) => !x.a) && /url\(/.test(a1.deg) && a1.aura === 'conic-gradient' && !a1.parKey && a1.focA === a1.frontA && a1.L.every((x) => x.op > 0.3), JSON.stringify(a1));
+        ok('0.102 accueil : au lancement de l’app, le globe s’assemble et les hologrammes en sortent, une fois (le trait de lumière est posé à la première ouverture)', ne === true);
+        await q.evaluate(() => { location.hash = '#agenda'; }); await q.waitForTimeout(700); await q.evaluate(() => { location.hash = '#accueil'; }); await q.waitForTimeout(900);
+        const a2 = await q.evaluate(() => { const core = document.querySelector('.hud-core'); return {nait: core.classList.contains('nait'), op: [...core.querySelectorAll('.orb-c')].map((c) => +c.style.opacity)}; });
+        ok('0.102 accueil : revenu à l’accueil dans la même session, rien ne rejoue : les hologrammes sont à leur place tout de suite', a2.nait === false && a1.nait === false && a2.op.length === 6 && a2.op.every((x) => x > 0.3), JSON.stringify(a2));
+        await q.context().close(); }
     });
   } catch (e) { ok('exception', false, e.stack); }
   if (LISTE) { console.log(JSON.stringify(vus)); await b.close(); srv.close(); process.exit(0); }

@@ -33,6 +33,8 @@ let RACINE = DEPOT;
 const args = process.argv.slice(2), opt = (n) => args.includes(n), iSeg = args.indexOf('--seg'), SEG = iSeg >= 0 ? args[iSeg + 1] : '';
 const noms = args.filter((a, i) => !a.startsWith('--') && !(iSeg >= 0 && i === iSeg + 1));
 const JOURNAUX = fs.mkdtempSync(path.join(os.tmpdir(), 'bancs-')), COEURS = Math.max(2, Math.min(4, os.cpus().length));
+/* le banc de l'app passe surtout son temps à attendre (animations, textes qui s'écrivent) : il supporte deux navigateurs par cœur */
+const PARTS = Math.max(2, Math.min(8, os.cpus().length * 2));
 if (!args.includes('--quoi') && !args.includes('--sur-place')) { const copie = path.join(JOURNAUX, 'code'); fs.mkdirSync(copie);
   for (const n of fs.readdirSync(DEPOT)) { if (['.git', '.claude', 'node_modules'].includes(n)) continue; fs.cpSync(path.join(DEPOT, n), path.join(copie, n), {recursive: true, filter: (src) => !/(^|\/)(node_modules|__pycache__)(\/|$)/.test(src)}); }
   RACINE = copie; }
@@ -105,7 +107,7 @@ const long = aFaire.filter((x) => x.b.long), serveur = aFaire.filter((x) => x.b.
    l'autre (ils partagent des dossiers du système) ; puis l'app, à quatre navigateurs (trois si le portail tourne encore) */
 const pLong = file(long.map(un), 1);
 await Promise.all([file(serveur.map(un), 3), file(hermes.map(un), 1)]);
-if (lApp) { let fini = false; pLong.then(() => { fini = true; }); const parts = long.length && !fini ? COEURS - 1 : COEURS; finir(lApp, await app(lApp.b, parts)); }
+if (lApp) { let fini = false; pLong.then(() => { fini = true; }); const parts = +process.env.BANCS_PARTS || (long.length && !fini ? PARTS - 2 : PARTS); finir(lApp, await app(lApp.b, parts)); }
 await pLong;
 const rouges = resultats.filter((r) => !r.vert);
 for (const r of resultats) { for (const e of r.echecs) console.log('  ' + r.nom + ' : ' + e); for (const e of r.instables) console.log('  ' + r.nom + ' (instable : a passé seul) : ' + e.slice(0, 200)); if (!r.vert && !r.echecs.length) console.log('  ' + r.nom + ' : ' + r.fin); }

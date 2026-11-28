@@ -477,6 +477,13 @@ Le Hermes de Telegram, lui, a sa mémoire et propose des skills, validées par `
 - **Un passage peut rendre le code 0 sans navigateur** : si Chromium ne démarre pas, Hermes le dit dans sa réponse
   mais sort en 0. Juger un passage à sa réponse (ligne « Connexion »), pas à son code. À corriger.
 
+### Relecture de sécurité du 28/11/2026 (0.102.0)
+
+- **Un seul passage à la fois** : `verrou_passage` (un verrou commun, `/var/lib/hermes-portail/essais/.verrou-passage`, 30 minutes d'attente au plus) est pris par chaque commande qui écrit la consigne (essai, brouillon, cra, cra-mois, cra-signe) et tenu jusqu'à sa fin. Avant, deux tâches lancées ensemble (un vendredi qui est le dernier jour du mois) partageaient la consigne, l'unité et le fichier de sortie : le compte rendu de l'une pouvait être lu comme celui de l'autre.
+- **Root n'écrit plus dans le dossier de l'agent** : la consigne est posée sous son nom (`poser_consigne`), le dossier du coffre aussi (`runuser … install -d`, refus si c'est un lien). Avant, un lien posé à ces endroits faisait écrire root ailleurs, puis lui « donnait » le fichier ou le dossier visé.
+- **Le chemin de Node de l'agent** est contrôlé (lettres, chiffres, `. _ -`) avant d'entrer dans l'unité d'un passage : un nom de dossier ne peut plus y glisser de lignes.
+- Restent à regarder (non prouvés) : les hôtes multi-clients de la liste blanche du relais, et les ports locaux hauts ouverts aux deux agents (`sortie.nft`).
+
 ## La limite du forfait Claude (26/11/2026, sa demande : « Fais en sorte que la relance soit automatique »)
 
 Le Hermes portail tourne sur le même forfait que JARVIS et Hermes : la limite de 5 heures peut couper un passage.
