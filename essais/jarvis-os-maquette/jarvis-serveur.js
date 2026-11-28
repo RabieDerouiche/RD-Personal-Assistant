@@ -242,7 +242,10 @@
     if (!auto) msg.textContent = (r && r.error) || 'Le serveur ne répond pas.';
   }
   let autoRedit = false;
-  const autoVerrou = () => { if (verrouille() && !autoFait && !enPreuve && visible()) { autoFait = true; setTimeout(() => ouvrirVerrou(true), 350); } };
+  /* 0.102.0 : l'écran est posé pendant le chargement de la page, mais la demande de Face ID part au même moment qu'avant : 350 ms après la
+     fin du chargement (plus tôt, le navigateur la refuse : la page n'est pas encore au premier plan ; vu au banc du verrou, passkey virtuelle) */
+  const apresChargement = (fn) => { if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fn, {once: true}); else fn(); };
+  const autoVerrou = () => { if (verrouille() && !autoFait && !enPreuve && visible()) { autoFait = true; apresChargement(() => setTimeout(() => ouvrirVerrou(true), 350)); } };
   /* le style des deux écrans d'accueil (verrou, porte d'un appareil pas relié) */
   function styleAccueil() {
     if (!document.getElementById('verrou-style')) {
@@ -405,7 +408,7 @@
     document.addEventListener('visibilitychange', () => {
       if (!token() || !drapeau() || enPreuve) return;   /* la feuille de Face ID elle-même ne compte pas comme une absence */
       if (!visible()) {
-        if (verrouille() || cacheLe) return;
+        if (ecran || cacheLe) return;   /* un écran d'accueil est affiché (verrou, ou la suite d'une preuve qui recharge la page) : ce n'est pas une absence. Sinon, délai « Tout de suite » : le rechargement qui suit Face ID reverrouillait, en boucle */
         cacheLe = Date.now();
         try { fetch(BASE + '/api/verrou/cache', {method: 'POST', keepalive: true, headers: {'content-type': 'application/json', authorization: 'Bearer ' + token()}, body: '{}'}).catch(() => null); } catch (e) { /* rien */ }
         return;

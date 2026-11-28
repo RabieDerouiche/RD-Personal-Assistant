@@ -20,6 +20,7 @@ const srv = http.createServer((q, r) => {
     if (p === '/api/verrou/retour' || p === '/api/verrou') return json(200, {actif: E.actif, ouvert: E.ouvert, delai: 60});
     if (p === '/api/verrou/defi') return json(200, {challenge: 'AAAA', rpId: 'localhost', allowCredentials: [{id: 'AQID'}], timeout: 60000});
     if (p === '/api/verrou/ouvrir') { E.ouvert = true; return json(200, {actif: true, ouvert: true}); }
+    if (p === '/api/verrou/cache') { E.caches = (E.caches || 0) + 1; return json(200, {}); }   /* « l'app a quitté l'écran » : avec le délai « Tout de suite », le serveur reverrouille */
     if (p.startsWith('/api/verrou/')) return json(200, {});
     if (E.actif && !E.ouvert) return json(423, {verrou: true, error: 'Verrouillé.'});
     return json(200, {}, E.donneesMs);
@@ -69,10 +70,11 @@ srv.listen(0, async () => {
     ok('un toucher sur « Déverrouiller » redemande Face ID ; refusé à la main : le message le dit', n1 === n0 + 1 && x.etat === 'attente' && x.msg === 'Face ID annulé ou refusé.', JSON.stringify([n0, n1, x.msg]));
     await ctx.close();
     /* 4. preuve acceptée : la page se recharge, le MÊME écran revient tout de suite sur « Lecture de tes données… », et ne part qu'à la première donnée */
-    Object.assign(E, {ouvert: false, donneesMs: 2200, appels: []});
+    Object.assign(E, {ouvert: false, donneesMs: 2200, appels: [], caches: 0});
     ({ctx, p} = await neuf({passkey: 'oui'})); await p.goto(base + '/?serveur'); await etat(p, 'scan');
     const ch = await p.waitForFunction(() => { const e = document.getElementById('verrou-ecran'); return !!e && e.dataset.etat === 'charge' && sessionStorage.getItem('jarvis.accueil') === null; }, null, {timeout: 15000}).then(() => true, () => false); x = await lu(p);
     ok('preuve acceptée : après le rechargement, l’écran est là avant l’app (posé pendant le chargement), sur « Lecture de tes données… », Serveur joint, Identité vérifiée, Données en cours ; Face ID n’est pas redemandé', ch && x.vu && x.vu.etat === 'charge' && x.vu.page === 'loading' && x.titre === 'Lecture de tes données…' && x.etapes === 'fait Serveur joint | fait Identité vérifiée | cours Données lecture…' && x.passkey === 0 && x.basBouton === null, JSON.stringify(x));
+    ok('le rechargement qui suit la preuve ne dit pas au serveur que l’app a quitté l’écran (avec le délai « Tout de suite », il reverrouillerait : Face ID en boucle)', !E.caches, String(E.caches || 0));
     await p.waitForTimeout(900); const encore = !!(await lu(p));
     const parti = await p.waitForFunction(() => !document.getElementById('verrou-ecran'), null, {timeout: 9000}).then(() => true, () => false);
     ok('il reste tant qu’aucune donnée n’est lue, puis s’efface sur l’app (« Bienvenue. », fondu) ; l’app est dessous, entière', encore && parti && await p.evaluate(() => !!document.getElementById('tabs') && !document.getElementById('porte-ecran')), JSON.stringify([encore, parti]));

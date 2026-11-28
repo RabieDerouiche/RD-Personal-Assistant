@@ -33,15 +33,18 @@ let RACINE = DEPOT;
 const args = process.argv.slice(2), opt = (n) => args.includes(n), iSeg = args.indexOf('--seg'), SEG = iSeg >= 0 ? args[iSeg + 1] : '';
 const noms = args.filter((a, i) => !a.startsWith('--') && !(iSeg >= 0 && i === iSeg + 1));
 const JOURNAUX = fs.mkdtempSync(path.join(os.tmpdir(), 'bancs-')), COEURS = Math.max(2, Math.min(4, os.cpus().length));
-/* le banc de l'app passe surtout son temps à attendre (animations, textes qui s'écrivent) : il supporte deux navigateurs par cœur */
-const PARTS = Math.max(2, Math.min(8, os.cpus().length * 2));
+/* un navigateur par cœur pour le banc de l'app. Mesuré le 28/11/2026 sur 4 cœurs : à 8 navigateurs, 15 minutes et des contrôles instables,
+   contre 9 à 11 minutes à 4 : c'est le processeur qui limite (chaque page relit 1,4 Mo de code), pas les attentes. BANCS_PARTS pour essayer. */
+const PARTS = COEURS;
 if (!args.includes('--quoi') && !args.includes('--sur-place')) { const copie = path.join(JOURNAUX, 'code'); fs.mkdirSync(copie);
   for (const n of fs.readdirSync(DEPOT)) { if (['.git', '.claude', 'node_modules'].includes(n)) continue; fs.cpSync(path.join(DEPOT, n), path.join(copie, n), {recursive: true, filter: (src) => !/(^|\/)(node_modules|__pycache__)(\/|$)/.test(src)}); }
   RACINE = copie; }
 const APP = 'essais/jarvis-os-maquette', SERVEUR = 'jarvis-os/server', HERMES = 'jarvis-os/hermes';
 
 /* ---------- les bancs et leurs fichiers ---------- */
-const bancs = [{nom: 'app', sorte: 'app', cmd: ['node', APP + '/banc/banc.cjs'], entrees: [APP]}];
+/* le banc de l'app ouvre la page en mode maquette (données d'exemple) : il ne lit ni le pont vers le serveur (jarvis-serveur.js) ni les autres
+   bancs du dossier ; un changement de l'écran de connexion ne le relance donc pas (il a son banc, « ecran », et celui du verrou) */
+const bancs = [{nom: 'app', sorte: 'app', cmd: ['node', APP + '/banc/banc.cjs'], entrees: ['index.html', 'donnees-fictives.js', 'jarvis-voix.js', 'sw.js', 'manifest.webmanifest', 'invite', 'banc/banc.cjs'].map((x) => APP + '/' + x)}];
 for (const f of fs.readdirSync(path.join(RACINE, SERVEUR, 'tests')).filter((x) => x.endsWith('.test.mjs')).sort()) {
   const src = fs.readFileSync(path.join(RACINE, SERVEUR, 'tests', f), 'utf8');
   bancs.push({nom: f.replace('.test.mjs', ''), sorte: 'serveur', cmd: ['node', SERVEUR + '/tests/' + f], entrees: [SERVEUR].concat(/jarvis-os-maquette|essais\//.test(src) ? [APP] : [], /hermes/.test(src) ? [HERMES] : [])});
@@ -80,8 +83,10 @@ async function app(b, parts) {
   for (const [id, ms] of Object.entries(durees).sort((x, y) => y[1] - x[1])) { const m = lots.reduce((a, c) => (c.ms < a.ms ? c : a)); m.segs.push(id); m.ms += ms + 1500; }
   const t0 = Date.now(), res = await Promise.all(lots.filter((x) => x.segs.length).map((x, i) => lancer(b.cmd, {BANC_SEGS: x.segs.join(',')}, path.join(JOURNAUX, 'app-' + (i + 1) + '.log'))));
   let tout = res.map((r) => r.tout).join('\n'), rates = [...new Set(res.flatMap((r) => ((r.tout.match(/^SEGMENTS EN ÉCHEC : (.+)$/m) || [])[1] || '').split(',').filter(Boolean)))], instables = [];
-  if (rates.length) {   /* un segment en échec repasse seul : l'instable (machine chargée) se sépare du vrai défaut */
-    const seul = await lancer(b.cmd, {BANC_SEGS: rates.join(',')}, path.join(JOURNAUX, 'app-reprise.log')), encore = new Set(((seul.tout.match(/^SEGMENTS EN ÉCHEC : (.+)$/m) || [])[1] || '').split(',').filter(Boolean));
+  if (rates.length) {   /* un segment en échec repasse seul : l'instable (machine chargée) se sépare du vrai défaut. Chacun dans son navigateur,
+       en même temps (avant : l'un après l'autre dans un seul, 6 minutes pour trois segments le 28/11/2026) */
+    const reprises = await Promise.all(rates.slice(0, parts * 2).reduce((L, id, i) => { (L[i % parts] = L[i % parts] || []).push(id); return L; }, []).map((ids, i) => lancer(b.cmd, {BANC_SEGS: ids.join(',')}, path.join(JOURNAUX, 'app-reprise-' + (i + 1) + '.log'))));
+    const seul = {tout: reprises.map((r) => r.tout).join('\n')}, encore = new Set(reprises.flatMap((r) => ((r.tout.match(/^SEGMENTS EN ÉCHEC : (.+)$/m) || [])[1] || '').split(',').filter(Boolean)).concat(rates.slice(parts * 2)));
     instables = echecs(tout).filter((x) => !echecs(seul.tout).some((y) => y.split(' :: ')[0] === x.split(' :: ')[0]));
     tout = tout.split('\n').filter((x) => !/^ÉCHEC /.test(x)).join('\n') + '\n' + seul.tout.split('\n').filter((x) => /^ÉCHEC /.test(x)).join('\n'); rates = [...encore];
   }
@@ -107,7 +112,7 @@ const long = aFaire.filter((x) => x.b.long), serveur = aFaire.filter((x) => x.b.
    l'autre (ils partagent des dossiers du système) ; puis l'app, à quatre navigateurs (trois si le portail tourne encore) */
 const pLong = file(long.map(un), 1);
 await Promise.all([file(serveur.map(un), 3), file(hermes.map(un), 1)]);
-if (lApp) { let fini = false; pLong.then(() => { fini = true; }); const parts = +process.env.BANCS_PARTS || (long.length && !fini ? PARTS - 2 : PARTS); finir(lApp, await app(lApp.b, parts)); }
+if (lApp) { let fini = false; pLong.then(() => { fini = true; }); const parts = +process.env.BANCS_PARTS || (long.length && !fini ? PARTS - 1 : PARTS); finir(lApp, await app(lApp.b, parts)); }
 await pLong;
 const rouges = resultats.filter((r) => !r.vert);
 for (const r of resultats) { for (const e of r.echecs) console.log('  ' + r.nom + ' : ' + e); for (const e of r.instables) console.log('  ' + r.nom + ' (instable : a passé seul) : ' + e.slice(0, 200)); if (!r.vert && !r.echecs.length) console.log('  ' + r.nom + ' : ' + r.fin); }

@@ -19,8 +19,23 @@ srv.listen(0, async () => {
       window.requestAnimationFrame = (cb) => { const id = ++n; m.set(id, setTimeout(() => { m.delete(id); raf(cb); }, 100)); return id; };
       window.cancelAnimationFrame = (id) => { const t = m.get(id); if (t !== undefined) { clearTimeout(t); m.delete(id); } else caf(id); }; } };   /* 0.99.0 : les vérifications d'avant portent sur la liste de « Pour moi » ; la pile a les siennes (sansPile: false) */
   /* une page avec un scénario de la maquette en plus (micro, voix) */
-  const pageWith = async (scen, url, opt = {}) => { const ctx = await b.newContext({...devices['iPhone 15 Pro Max']}); await ctx.addInitScript(PAUSE_INIT); await ctx.addInitScript((sc) => { const d = Object.getOwnPropertyDescriptor(window, '__SCEN'); Object.defineProperty(window, '__SCEN', {configurable: true, get: d.get, set: (x) => d.set.call(window, Object.assign({}, sc, x || {}))}); }, scen); const p = await ctx.newPage(); p.on('pageerror', (e) => errs.push(url + ' : ' + e.message)); await p.goto(base + url); if (!opt.tot) await p.waitForTimeout(3500); return p; };   /* tot : la page est rendue tout de suite (pour ce qui se joue au lancement) */
-  const page = async (url) => { const ctx = await b.newContext({...devices['iPhone 15 Pro Max']}); await ctx.addInitScript(PAUSE_INIT); const p = await ctx.newPage(); p.on('pageerror', (e) => errs.push(url + ' : ' + e.message)); await p.goto(base + url); await p.waitForTimeout(3500); return p; };
+  /* 28/11/2026 (sa demande : des bancs plus rapides, pas moins de bancs) : une page ouverte n'attend plus 3,5 secondes fixes. Elle est rendue
+     quand l'app est montée (une page affichée, la barre d'onglets) et que plus rien ne bouge depuis 0,6 seconde, 1,5 seconde au moins après
+     l'ouverture et 6 au plus. Mesuré : prête en 0,3 seconde et calme vers 0,9 sur une machine libre ; sur une machine chargée, l'attente
+     s'allonge d'elle-même (une attente fixe, elle, devenait trop courte). BANC_ATTENTE_FIXE=1 : l'attente d'avant. */
+  const prete = async (p) => {
+    if (process.env.BANC_ATTENTE_FIXE === '1') { await p.waitForTimeout(3500); return; }
+    const t0 = Date.now();
+    try {
+      await p.waitForFunction(() => !!document.querySelector('#view .view-in, #view > *') && !!document.querySelector('#tabs .tab'), null, {timeout: 15000});
+      await p.evaluate(() => new Promise((ok) => { const d0 = performance.now(); let dernier = d0; const vue = document.getElementById('view');
+        const o = new MutationObserver(() => { dernier = performance.now(); }); o.observe(vue, {childList: true, subtree: true, characterData: true});
+        const i = setInterval(() => { const n = performance.now(); if (n - dernier > 600 || n - d0 > 6000) { clearInterval(i); o.disconnect(); ok(); } }, 80); }));
+    } catch (e) { await p.waitForTimeout(3500); return; }
+    const reste = 1500 - (Date.now() - t0); if (reste > 0) await p.waitForTimeout(reste);
+  };
+  const pageWith = async (scen, url, opt = {}) => { const ctx = await b.newContext({...devices['iPhone 15 Pro Max']}); await ctx.addInitScript(PAUSE_INIT); await ctx.addInitScript((sc) => { const d = Object.getOwnPropertyDescriptor(window, '__SCEN'); Object.defineProperty(window, '__SCEN', {configurable: true, get: d.get, set: (x) => d.set.call(window, Object.assign({}, sc, x || {}))}); }, scen); const p = await ctx.newPage(); p.on('pageerror', (e) => errs.push(url + ' : ' + e.message)); await p.goto(base + url); if (!opt.tot) await prete(p); return p; };   /* tot : la page est rendue tout de suite (pour ce qui se joue au lancement) */
+  const page = async (url) => { const ctx = await b.newContext({...devices['iPhone 15 Pro Max']}); await ctx.addInitScript(PAUSE_INIT); const p = await ctx.newPage(); p.on('pageerror', (e) => errs.push(url + ' : ' + e.message)); await p.goto(base + url); await prete(p); return p; };
   /* 0.87.0 : Achats en un seul filtre ; « Trouver une idée » et « Mes recherches » sont sous « Idées » */
   const versIdees = async (q) => { await q.evaluate(() => { const x = document.querySelector('#view .dm-seg [data-f="idees"]'); if (x) x.click(); }); await q.waitForTimeout(400); };
   /* 28/11/2026 (sa demande : « refais une passe sur comment les bancs sont lancés et gérés, ça devient beaucoup trop lent ; pas moins de
@@ -32,7 +47,7 @@ srv.listen(0, async () => {
      et la ferme ; il ne dépend d'aucun autre segment. */
   const SEGS = process.env.BANC_SEGS ? new Set(process.env.BANC_SEGS.split(',').map(Number)) : null, FILTRE = process.env.BANC_FILTRE ? new RegExp(process.env.BANC_FILTRE, 'i') : null, LISTE = process.env.BANC_LISTE === '1', vus = {};
   const seg = async (id, fn) => { const src = fn.toString();
-    if (LISTE) { vus[id] = (src.match(/waitForTimeout\((\d+)\)/g) || []).reduce((t, x) => t + +x.replace(/\D/g, ''), 0) + 3500 * (src.match(/await page(With)?\(/g) || []).length; return; }
+    if (LISTE) { vus[id] = (src.match(/waitForTimeout\((\d+)\)/g) || []).reduce((t, x) => t + +x.replace(/\D/g, ''), 0) + 1500 * (src.match(/await page(With)?\(/g) || []).length; return; }
     if ((SEGS && !SEGS.has(id)) || (FILTRE && !FILTRE.test(src))) return;
     SEGC = id; try { await fn(); } catch (e) { ok('exception (segment ' + id + ')', false, String((e && e.stack) || e).slice(0, 700)); } SEGC = 0; };
   let p = null;
