@@ -143,3 +143,9 @@ pas commencé), 6. le dépôt du CRA signé sur le portail par Hermes après son
 - **Accueil** : essai « les portes autour du globe » derrière `?accueil=1` (dernier bloc du script) ; il a choisi cette direction et la fait peaufiner (détail et ses mots : `docs/journal-jarvis.md`, dernière entrée). Méthode : une capture (`scratchpad/pile/cap.cjs`), son avis par QCM, on recommence. Quand il dit oui : retirer la condition, vérifications au banc.
 - À lui : son oui sur le serveur ; « Relancer Hermes » ; puis « Oui, déposer » après la mise à jour.
 
+## État au 28/11/2026, 3 h
+
+- **Accueil** : il a validé la piste « orbite » (« tu y es presque ») : six hologrammes qui tournent autour du globe, qu'on fait tourner du doigt (`?accueil=1`). Reste **le globe lui-même** : quatre essais (`&globe=a|b|c|d` : Particules, Méridiens, Iris, Plasma), film comparatif envoyé, QCM posé. Quand il a choisi : retirer les conditions `?accueil=1` et `globe=`, garder un seul globe, vérifications au banc (orbite : rotation, glisser, appui ; « réduire les animations »), journal, fusion, « Mettre à jour ».
+- **Serveur** : la demande de la 0.99.0 (`710f1f0`) attend son oui dans « Serveur JARVIS 2 » ; lire le compte rendu (`list_events`, kinds `result`) avant d'en parler comme d'un fait ; puis vider `docs/demandes-serveur-en-attente.md`.
+- Outils des captures et des films : `scratchpad/pile/cap.cjs`, `film.cjs`, `film2.cjs` (à réécrire si le dossier temporaire a disparu : un serveur de fichiers local, Playwright en iPhone 15 Pro Max, `recordVideo`, puis `ffmpeg` vers MP4).
+
