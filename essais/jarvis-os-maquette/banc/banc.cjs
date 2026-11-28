@@ -1340,6 +1340,27 @@ srv.listen(0, async () => {
       q = await pageWith(SCP, '?pile=0#demandes'); await q.waitForTimeout(1200); const e6 = await etat();
       ok('0.99 pile : « ?pile=0 » dans l’adresse la coupe (la liste, comme avant)', !e6.pile && e6.vus === e6.n && e6.n >= 2 && !e6.bascule, JSON.stringify(e6));
       await q.context().close(); }
+    /* 0.101.0 : Travail, on agit depuis la carte (sa remarque du 28/11/2026) ; « Ce qui vient » mène à la carte ; les étapes dans le thème */
+    { let q = await pageWith({grokOff: true, reponses: true, signe: 'pret'}, '#travail'); await q.waitForTimeout(1400);
+      const lire = () => q.evaluate(() => { const k = document.querySelector('.trv-card[data-trv="mois"]'), a = k && k.querySelector('.trv-acts'), et = document.querySelector('.trv-et .fait i');
+        return {balise: k ? k.tagName : '', acts: a ? [...a.querySelectorAll('.btn')].map((x) => x.textContent.trim()) : [], avant: !!(a && k.querySelector('.trv-quand') && (a.compareDocumentPosition(k.querySelector('.trv-quand')) & 4)), atoi: !!(k && k.querySelector('.trv-atoi')),
+          sansAction: [...document.querySelectorAll('.trv-card')].filter((c) => !c.querySelector('.trv-acts')).length, frise: [...document.querySelectorAll('button.trv-ev[data-vers]')].map((x) => x.dataset.vers), fait: et ? getComputedStyle(et).backgroundColor + ' ' + getComputedStyle(et).color : '', feuille: !document.getElementById('sheet').hidden}; });
+      const t1 = await lire();
+      ok('0.101 Travail : la carte du CRA du mois porte ses boutons en haut, sous « À toi » et avant le suivi (« Oui, déposer », « Je le fais moi-même ») ; une carte où rien ne l’attend n’en a pas ; la carte n’est plus un bouton',
+        t1.balise === 'ARTICLE' && t1.acts[0] === 'Oui, déposer' && t1.acts.includes('Je le fais moi-même') && t1.avant && t1.atoi && t1.sansAction >= 1 && !t1.feuille, JSON.stringify(t1));
+      ok('0.101 Travail : une étape faite est aux couleurs du thème (plus de vert)', !!t1.fait && !/rgb\(52, 211, 153\)|rgb\(16, 185, 129\)|rgb\(34, 197, 94\)/.test(t1.fait), t1.fait);
+      await q.evaluate(() => [...document.querySelectorAll('.trv-card[data-trv="mois"] .trv-acts .btn')].find((x) => /moi-même/.test(x.textContent)).click()); await q.waitForTimeout(900);
+      const t2 = await lire(), to = await q.evaluate(() => (document.getElementById('toasts') || {}).textContent || '');
+      ok('0.101 Travail : « Je le fais moi-même » se fait depuis la carte, sans ouvrir la feuille ; la carte propose alors « C’est rattaché »', /Noté/.test(to) && !t2.feuille && t2.acts.includes('C’est rattaché') && !t2.acts.includes('Oui, déposer'), JSON.stringify([to.slice(0, 80), t2.acts]));
+      await q.evaluate(() => document.querySelector('.trv-card[data-trv="mois"] h3').click()); await q.waitForTimeout(700);
+      ok('0.101 Travail : un appui ailleurs sur la carte ouvre toujours sa feuille', (await lire()).feuille);
+      await q.context().close();
+      q = await pageWith({grokOff: true, reponses: true}, '#travail'); await q.waitForTimeout(1400);
+      const f0 = await lire(), cible = f0.frise[f0.frise.length - 1];
+      await q.evaluate((id) => [...document.querySelectorAll('button.trv-ev[data-vers]')].find((x) => x.dataset.vers === id).click(), cible); await q.waitForTimeout(700);
+      const vise = await q.evaluate((id) => { const c = document.querySelector('.trv-card[data-trv="' + id + '"]'), r = c.getBoundingClientRect(); return {vise: c.classList.contains('vise'), visible: r.top < innerHeight && r.bottom > 0}; }, cible);
+      ok('0.101 Travail : « Ce qui vient » : chaque ligne est un bouton qui mène à sa carte (elle défile jusqu’à elle et la fait briller)', f0.frise.length >= 2 && vise.vise && vise.visible, JSON.stringify([f0.frise, cible, vise]));
+      await q.context().close(); }
     /* 0.100.0 : l'accueil en orbite et le globe de particules (son choix du 28/11/2026 ; l'accueil d'avant est gardé : « ?accueil=ancien ») */
     { const SCO = {grokOff: true, sujets: true, reponses: true, sansOrbite: false}, VERS = {AGENDA: '#agenda', 'POUR TOI': '#demandes', TRAVAIL: '#travail', ARGENT: '#argent', HERMES: '#equipe', PAPIERS: '#papiers'};
       let q = await pageWith(SCO, '#accueil'); await q.waitForTimeout(2500);

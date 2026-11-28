@@ -10919,13 +10919,16 @@ void main(){
       + '.trv-et>div{position:relative;display:flex;flex-direction:column;align-items:center;gap:5px;text-align:center;font-size:11px;line-height:1.2;color:var(--muted);min-width:0;padding:0 2px}'
       + '.trv-et i{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font:700 11.5px var(--display);font-style:normal;border:2px solid rgba(var(--c1),.35);background:rgb(var(--k1));z-index:1}'
       + '.trv-et>div::before{content:"";position:absolute;top:11px;left:calc(-50% + 11px);right:calc(50% + 11px);height:2px;background:rgba(var(--c1),.22)}.trv-et>div:first-child::before{display:none}'
-      + '.trv-et .fait i{border-color:var(--green);background:var(--green);color:#052e1c}.trv-et .fait::before{background:var(--green)}.trv-et .fait{color:var(--fg)}'
+      /* 0.101.0 (sa remarque : « les étapes en vert cassent l'immersion ») : une étape faite est aux couleurs du thème, comme la barre dessous */
+      + '.trv-et .fait i{border-color:rgb(var(--c2));background:rgba(var(--c1),.2);color:rgb(var(--c2));box-shadow:0 0 10px rgba(var(--c1),.45)}.trv-et .fait::before{background:linear-gradient(90deg,rgba(var(--c1),.55),rgb(var(--c2)))}.trv-et .fait{color:var(--fg)}'
+      + '.trv-acts{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 2px}.trv-acts .btn{min-height:42px}.trv-atoi{margin:10px 0 0}.trv-card{-webkit-tap-highlight-color:transparent}.trv-card:focus-visible{outline:2px solid rgb(var(--c2));outline-offset:2px}'
+      + 'button.trv-ev{font:inherit;color:var(--fg);text-align:left;cursor:pointer}button.trv-ev:active{transform:scale(.97)}.trv-card.vise{animation:trvvise 1.8s ease-out}@keyframes trvvise{0%,40%{border-color:rgb(var(--c2));box-shadow:0 0 0 2px rgba(var(--c2),.55),0 0 34px rgba(var(--c1),.55)}100%{box-shadow:inset 0 1px 0 rgba(var(--c6),.1),0 10px 26px rgba(0,0,0,.3)}}'
       + '.trv-et .encours i{border-color:rgb(var(--warn));color:rgb(var(--warn))}.trv-et .encours{color:#fde68a;font-weight:600}.trv-et .bloque i{border-color:var(--danger);color:var(--danger)}.trv-et .bloque{color:var(--danger)}'
       + '.trv-barre{height:6px;border-radius:99px;background:rgba(var(--c1),.13);overflow:hidden;margin:2px 0 10px}.trv-barre i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,rgb(var(--c1)),#a855f7)}'
       + '.trv-prevu{display:flex;flex-wrap:wrap;gap:6px;align-items:center}.trv-prevu small{color:var(--muted);font-size:12.5px;margin-right:2px}'
       + '.trv-ch{padding:4px 8px;border-radius:10px;font:600 12px var(--display);background:rgba(var(--c1),.12);border:1px solid rgba(var(--c1),.2);white-space:nowrap}.trv-ch.non{background:none;color:var(--muted)}.trv-ch.amb{color:#fde68a;border-color:rgba(var(--warn),.5)}'
       + '.trv-alerte{margin:10px 0 0;padding:10px 12px;border-radius:14px;border:1px solid rgba(var(--warn),.5);background:rgba(var(--warn),.08);font-size:13.5px}.trv-alerte b{color:#fde68a}'
-      + '.trv-der{margin:10px 0 0;padding-top:9px;border-top:1px solid rgba(var(--c1),.14);color:var(--muted);font-size:13px}.trv-der b{color:var(--fg);font-weight:600}.trv-der .ok{color:var(--green)}.trv-der .ko{color:var(--danger)}'
+      + '.trv-der{margin:10px 0 0;padding-top:9px;border-top:1px solid rgba(var(--c1),.14);color:var(--muted);font-size:13px}.trv-der b{color:var(--fg);font-weight:600}.trv-der .ok{color:rgb(var(--c2))}.trv-der .ko{color:var(--danger)}'
       + '.trv-mails{display:grid;gap:6px;margin:10px 0 0}.trv-mails>div{font-size:13.5px;padding:8px 10px;border-radius:12px;background:rgba(255,255,255,.04);border:1px solid rgba(var(--c1),.14)}.trv-mails em{font-style:normal;color:var(--green);font-weight:600;white-space:nowrap}'
       /* 0.94.0 : un mail du mois, « envoyé le … », puis chaque réponse (qui, quand, PDF, extrait) ; « Ouvrir le mail » dans la feuille */
       + '.trv-mail-t{display:flex;justify-content:space-between;align-items:baseline;gap:8px}.trv-mail-t span{min-width:0;overflow-wrap:anywhere}'
@@ -10962,14 +10965,39 @@ void main(){
         detail && s.controleDit && s.etat !== 'fait' && !s.dit ? h('p', {'data-controle': s.controle || '', text: s.controleDit}) : null,   /* 0.98.0 : le PDF comparé à la saisie */
         detail && s.etat !== 'fait' ? trvLien(s.url) : null].filter(Boolean);
       return l.length ? h('div', {class: 'trv-signe', 'data-signe': s.etat || ''}, l) : null; };
+    /* 0.101.0 (sa remarque du 28/11/2026 : « dans Travail tu ne fais presque que de la consultation ; si tu veux relancer, tu dois aller côté
+       routine ; j'ai passé 2 minutes à chercher comment relancer la saisie du CRA hebdomadaire ; les boutons doivent apparaître, je ne dois
+       pas descendre tout en bas ») : ON AGIT DEPUIS LA CARTE. Ce qui l'attend et ses boutons sont en haut de la carte, juste sous le titre :
+       les actions de la feuille (« Oui, déposer », « Réessayer avec Hermes », « C'est rattaché », « Je le fais moi-même »…) et, pour le CRA
+       de la semaine, « Relancer Hermes » ou « Confirmer et soumettre » (les mêmes gestes que la carte de « Pour moi », un nouveau oui = une
+       nouvelle tentative). La carte n'est plus un bouton (on ne met pas de bouton dans un bouton) : un appui ailleurs ouvre toujours sa feuille. */
+    function trvActs(r) {
+      const l = [], arret = (fn) => (ev) => { ev.stopPropagation(); fn(); };
+      const sem = r.ouvrir === 'semaine' && r.lundi && JRS.data && JRS.data.semaine && JRS.data.semaine.lundi === r.lundi ? JRS.data.semaine : null;
+      if (sem && !sem.bloque && !CRA.busy) {
+        if (sem.etat === 'a_la_main') l.push(btn('Relancer Hermes', arret(() => craAgir('confirmer')), 'sm main trv-agir'));
+        else if (sem.etat === 'a_valider' && sem.confirmable) l.push(btn('Confirmer et soumettre', arret(() => craAgir('confirmer')), 'sm main trv-agir'));
+      }
+      let actions = []; try { actions = (SHEETCFG.travail(r).actions || []).filter((a) => a && a.label !== 'Renommer'); } catch (e) { actions = []; }
+      actions.forEach((a) => { const voir = /^Voir /.test(a.label); if (voir && !r.toi && !sem) return;   /* « Voir… » n'est un bouton de la carte que s'il y a quelque chose à y faire */
+        l.push(btn(a.label, arret(() => ((a.pick || a.confirm) ? openItem('travail', r, a) : finish(a.go(), {type: 'travail', item: r}))), 'sm ' + (!l.length && !voir ? 'main ' : '') + 'trv-agir')); });
+      return l.length ? h('div', {class: 'trv-acts'}, l.slice(0, 3)) : null;
+    }
     function trvCarte(r) {
-      return h('button', {type: 'button', class: 'trv-card' + (r.toi ? ' toi' : ''), 'data-trv': r.id, onclick: () => openItem('travail', r)},
+      const acts = trvActs(r);
+      return h('article', {class: 'trv-card' + (r.toi ? ' toi' : ''), 'data-trv': r.id, role: 'button', tabindex: '0', onclick: () => openItem('travail', r), onkeydown: (ev) => { if (ev.key === 'Enter' && ev.target === ev.currentTarget) openItem('travail', r); }},
         h('div', {class: 'trv-tete'}, h('h3', {text: r.titre}), h('span', {class: 'trv-qui ' + (r.qui || ''), text: r.quiDit})),
+        r.toi ? h('div', {class: 'trv-alerte trv-atoi'}, h('b', {text: 'À toi : '}), r.toi) : null,
+        acts,
         h('p', {class: 'trv-quand'}, 'Prochaine : ', h('b', {text: r.prochaine || '—'})),
         trvEtapes(r), trvPrevu(r),
         r.alerte ? h('div', {class: 'trv-alerte', text: r.alerte}) : null,
-        r.toi ? h('div', {class: 'trv-alerte'}, h('b', {text: 'À toi : '}), r.toi) : null,
         trvSigne(r, false), trvMails(r, false), trvDer(r));
+    }
+    /* « Ce qui vient » : chaque ligne mène à sa carte (sa remarque : « ce sont des blocs statiques alors qu'ils sont censés t'amener au bloc ») */
+    function trvAller(id) {
+      const viser = () => { const c = document.querySelector('#view .trv-card[data-trv="' + id + '"]'); if (!c) return false; c.scrollIntoView({behavior: reduced ? 'auto' : 'smooth', block: 'center'}); c.classList.remove('vise'); void c.offsetWidth; c.classList.add('vise'); setTimeout(() => c.classList.remove('vise'), 1900); return true; };
+      if (!viser() && TRV.f !== 'tout') { TRV.f = 'tout'; renderView(true); setTimeout(viser, 80); }
     }
     SHEETCFG.travail = (r) => {
       const api = travailAPI(), actions = [];
@@ -11009,7 +11037,9 @@ void main(){
       /* ce qui attend son oui : les cartes de « Pour moi », ici aussi */
       if (TRV.f === 'tout' || TRV.f === 'cra' || TRV.f === 'jours') { const pm = [TRV.f !== 'jours' && JRS.data && JRS.data.semaine && JRS.data.semaine.demande ? craCard() : null, TRV.f !== 'cra' && JRS.data && JRS.data.demande ? joursCard() : null].filter(Boolean); if (pm.length) el.append(h('p', {class: 'trv-h', text: 'À toi'}), ...pm); }
       const fr = (d.frise || []).filter((e) => TRV.f === 'tout' || vis.some((r) => e.quoi.indexOf(r.titre) === 0));
-      if (fr.length) el.append(h('p', {class: 'trv-h', text: 'Ce qui vient'}), h('div', {class: 'trv-frise'}, fr.map((e) => h('div', {class: 'trv-ev' + (e.toi ? ' toi' : '')}, h('b', {text: e.quand}), h('span', {text: e.quoi}), h('small', {text: e.qui})))));
+      if (fr.length) el.append(h('p', {class: 'trv-h', text: 'Ce qui vient'}), h('div', {class: 'trv-frise'}, fr.map((e) => { const c = d.routines.filter((r) => e.quoi.indexOf(r.titre) === 0).sort((x, y) => y.titre.length - x.titre.length)[0];   /* 0.101.0 : la ligne mène à sa carte */
+        return c ? h('button', {type: 'button', class: 'trv-ev' + (e.toi ? ' toi' : ''), 'data-vers': c.id, onclick: () => trvAller(c.id)}, h('b', {text: e.quand}), h('span', {text: e.quoi}), h('small', {text: e.qui + ' ›'}))
+          : h('div', {class: 'trv-ev' + (e.toi ? ' toi' : '')}, h('b', {text: e.quand}), h('span', {text: e.quoi}), h('small', {text: e.qui})); })));
       el.append(h('p', {class: 'trv-h', text: 'Tes routines'}), ...vis.map(trvCarte));
     };
     { const VE_TRV = VIEWS.espaces;
