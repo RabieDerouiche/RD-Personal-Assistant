@@ -45,9 +45,10 @@ srv.listen(0, async () => {
      pour les lancer à plusieurs en même temps et relancer seul un segment en échec. Une exception n'arrête plus que son segment. Sans
      variable : tout, dans l'ordre. RÈGLE pour un nouveau contrôle : un bloc `await seg(n, async () => { … })` qui ouvre sa page (`pageWith`)
      et la ferme ; il ne dépend d'aucun autre segment. */
-  const SEGS = process.env.BANC_SEGS ? new Set(process.env.BANC_SEGS.split(',').map(Number)) : null, FILTRE = process.env.BANC_FILTRE ? new RegExp(process.env.BANC_FILTRE, 'i') : null, LISTE = process.env.BANC_LISTE === '1', vus = {};
+  const SEGS = process.env.BANC_SEGS ? new Set(process.env.BANC_SEGS.split(',').map(Number)) : null, FILTRE = process.env.BANC_FILTRE ? new RegExp(process.env.BANC_FILTRE, 'i') : null, LISTE = process.env.BANC_LISTE === '1' || process.env.BANC_LISTE === '2', vus = {}, sig = {}, corps = [];
   const seg = async (id, fn) => { const src = fn.toString();
-    if (LISTE) { vus[id] = (src.match(/waitForTimeout\((\d+)\)/g) || []).reduce((t, x) => t + +x.replace(/\D/g, ''), 0) + 1500 * (src.match(/await page(With)?\(/g) || []).length; return; }
+    if (LISTE) { vus[id] = (src.match(/waitForTimeout\((\d+)\)/g) || []).reduce((t, x) => t + +x.replace(/\D/g, ''), 0) + 1500 * (src.match(/await page(With)?\(/g) || []).length;
+      sig[id] = require('crypto').createHash('sha1').update(src).digest('hex').slice(0, 16); corps.push(src); return; }
     if ((SEGS && !SEGS.has(id)) || (FILTRE && !FILTRE.test(src))) return;
     SEGC = id; try { await fn(); } catch (e) { ok('exception (segment ' + id + ')', false, String((e && e.stack) || e).slice(0, 700)); } SEGC = 0; };
   let p = null;
@@ -2457,13 +2458,25 @@ srv.listen(0, async () => {
         ok('0.102 accueil : chaque hologramme prend la couleur de sa place dans le dégradé de Travail (cyan à gauche, violet à droite : plus de couleur propre à chacun), l’ambre reste à ce qui attend ; l’anneau est en dégradé ; une aurore tourne derrière le globe ; la ligne sous le globe suit l’hologramme au point',
           libres.length >= 2 && libres.every((x) => /^\d+,\d+,\d+$/.test(x.a) && /^\d+,\d+,\d+$/.test(x.a3)) && droite.m - gauche.m > 0.15 && rouge(droite) > rouge(gauche) + 15 && a1.L.filter((x) => x.amb).every((x) => !x.a) && /url\(/.test(a1.deg) && a1.aura === 'conic-gradient' && !a1.parKey && a1.focA === a1.frontA && a1.L.every((x) => x.op > 0.3), JSON.stringify(a1));
         ok('0.102 accueil : au lancement de l’app, le globe s’assemble et les hologrammes en sortent, une fois (le trait de lumière est posé à la première ouverture)', ne === true);
-        await q.evaluate(() => { location.hash = '#agenda'; }); await q.waitForTimeout(700); await q.evaluate(() => { location.hash = '#accueil'; }); await q.waitForTimeout(900);
+        await q.evaluate(() => { location.hash = '#agenda'; }); await q.waitForTimeout(700); await q.evaluate(() => { location.hash = '#accueil'; });
+        await q.waitForFunction(() => { const c = [...document.querySelectorAll('.hud-core .orb-c')]; return c.length === 6 && c.every((x) => x.style.opacity !== ''); }, null, {timeout: 9000}).catch(() => {}); await q.waitForTimeout(300);   /* la première image posée (machine chargée : elle peut tarder) */
         const a2 = await q.evaluate(() => { const core = document.querySelector('.hud-core'); return {nait: core.classList.contains('nait'), op: [...core.querySelectorAll('.orb-c')].map((c) => +c.style.opacity)}; });
         ok('0.102 accueil : revenu à l’accueil dans la même session, rien ne rejoue : les hologrammes sont à leur place tout de suite', a2.nait === false && a1.nait === false && a2.op.length === 6 && a2.op.every((x) => x > 0.3), JSON.stringify(a2));
-        await q.context().close(); }
+        await q.context().close();
+        /* 0.103.0 (son choix au QCM du 28/11/2026 : « 2 Atome ») : l'atome est le mouvement par défaut ; l'orbite d'avant reste derrière « ?orbite=1 » */
+        const lireM = (p) => p.evaluate(() => { const core = document.querySelector('.hud-core'), c = [...core.querySelectorAll('.orb-c')]; return {n: c.length, anneaux: [...core.querySelectorAll('svg.orb-an ellipse')].map((e) => e.getAttribute('class')).join(), arc: getComputedStyle(core.querySelector('svg.orb-an path.o3')).display, pos: c.map((x) => x.style.transform).join('|'), front: (core.querySelector('.orb-c.is-front') || {dataset: {}}).dataset.k || ''}; });
+        const at = await pageWith({grokOff: true, sujets: true, reponses: true, sansOrbite: false}, '#accueil'); await at.waitForTimeout(2600); const m1 = await lireM(at); await at.waitForTimeout(1200); const m2 = await lireM(at);
+        ok('0.103 accueil : par défaut, l’atome (deux anneaux croisés, plus d’arc d’orbite), six hologrammes qui bougent, un au point', m1.n === 6 && m1.anneaux === 'o1,o1' && m1.arc === 'none' && m1.pos !== m2.pos && !!m1.front, JSON.stringify([m1.anneaux, m1.arc, m1.front, m1.pos === m2.pos]));
+        await at.context().close();
+        const ob = await pageWith({grokOff: true, sujets: true, reponses: true, sansOrbite: false}, '?orbite=1#accueil'); await ob.waitForTimeout(2600); const o1 = await lireM(ob); await ob.waitForTimeout(1200); const o2 = await lireM(ob);
+        ok('0.103 accueil : l’orbite d’avant est gardée derrière « ?orbite=1 » (son arc, ses deux ellipses), et tourne', o1.n === 6 && o1.arc !== 'none' && /o2/.test(o1.anneaux) && o1.pos !== o2.pos, JSON.stringify([o1.anneaux, o1.arc, o1.pos === o2.pos]));
+        await ob.context().close(); }
     });
   } catch (e) { ok('exception', false, e.stack); }
-  if (LISTE) { console.log(JSON.stringify(vus)); await b.close(); srv.close(); process.exit(0); }
+  /* BANC_LISTE=2 : en plus des durées, l'empreinte de chaque segment et celle de tout le reste du fichier (« commun ») : le lanceur ne
+     relance que les segments dont le texte a changé quand la page et le commun n'ont pas bougé */
+  if (LISTE) { let reste = fs.readFileSync(__filename, 'utf8'); for (const c of corps) reste = reste.split(c).join('');
+    console.log(JSON.stringify(process.env.BANC_LISTE === '2' ? {durees: vus, sig, commun: require('crypto').createHash('sha1').update(reste).digest('hex').slice(0, 16)} : vus)); await b.close(); srv.close(); process.exit(0); }
   ok('aucune erreur de page', !errs.length, errs.join(' | '));
   console.log(out.join('\n')); if (rates.size) console.log('SEGMENTS EN ÉCHEC : ' + [...rates].join(','));   /* pour `essais/bancs.mjs` : il les relance seuls */
   console.log(fails ? fails + ' échec(s)' : 'Tout passe (' + out.length + ' vérifications). Captures : ' + SH);

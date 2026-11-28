@@ -6,6 +6,7 @@
      node essais/bancs.mjs --tout       tous, sans tenir compte du dernier passage
      node essais/bancs.mjs --quoi       dit seulement ce qui tournerait, et pourquoi
      node essais/bancs.mjs --sur-place  sans copie figée (les bancs lisent le dépôt lui-même)
+     node essais/bancs.mjs --sauf portail   tous sauf celui-là (plusieurs : séparés par des virgules)
      node essais/bancs.mjs app radar    ceux-là seulement (noms : app, portail, ordres, relance, garde, routines-conf, note, et chaque
                                         banc du serveur par son nom de fichier sans « .test.mjs » : server, jours, travail, radar…)
      node essais/bancs.mjs app --seg "0\.101"    le banc de l'app, seulement les segments dont le code contient cette expression (essai rapide
@@ -30,8 +31,8 @@ const DEPOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..'), VER
 /* 5. les bancs tournent sur une COPIE FIGÉE du code (un instantané pris au lancement) : on peut continuer à modifier le dépôt pendant qu'ils
    tournent, et un passage vert vaut pour exactement ce qui a été copié. */
 let RACINE = DEPOT;
-const args = process.argv.slice(2), opt = (n) => args.includes(n), iSeg = args.indexOf('--seg'), SEG = iSeg >= 0 ? args[iSeg + 1] : '';
-const noms = args.filter((a, i) => !a.startsWith('--') && !(iSeg >= 0 && i === iSeg + 1));
+const args = process.argv.slice(2), opt = (n) => args.includes(n), iSeg = args.indexOf('--seg'), SEG = iSeg >= 0 ? args[iSeg + 1] : '', iSauf = args.indexOf('--sauf'), SAUF = iSauf >= 0 ? String(args[iSauf + 1] || '').split(',') : [];
+const noms = args.filter((a, i) => !a.startsWith('--') && !(iSeg >= 0 && i === iSeg + 1) && !(iSauf >= 0 && i === iSauf + 1));
 const JOURNAUX = fs.mkdtempSync(path.join(os.tmpdir(), 'bancs-')), COEURS = Math.max(2, Math.min(4, os.cpus().length));
 /* un navigateur par cœur pour le banc de l'app. Mesuré le 28/11/2026 sur 4 cœurs : à 8 navigateurs, 15 minutes et des contrôles instables,
    contre 9 à 11 minutes à 4 : c'est le processeur qui limite (chaque page relit 1,4 Mo de code), pas les attentes. BANCS_PARTS pour essayer. */
@@ -45,9 +46,11 @@ const APP = 'essais/jarvis-os-maquette', SERVEUR = 'jarvis-os/server', HERMES = 
 /* le banc de l'app ouvre la page en mode maquette (données d'exemple) : il ne lit ni le pont vers le serveur (jarvis-serveur.js) ni les autres
    bancs du dossier ; un changement de l'écran de connexion ne le relance donc pas (il a son banc, « ecran », et celui du verrou) */
 const bancs = [{nom: 'app', sorte: 'app', cmd: ['node', APP + '/banc/banc.cjs'], entrees: ['index.html', 'donnees-fictives.js', 'jarvis-voix.js', 'sw.js', 'manifest.webmanifest', 'invite', 'banc/banc.cjs'].map((x) => APP + '/' + x)}];
+/* la page servie (ce qu'un banc du serveur peut ouvrir) : pas le dossier banc/ ; corriger un contrôle de l'app ne relance pas les bancs du serveur */
+const PAGE = ['index.html', 'jarvis-serveur.js', 'donnees-fictives.js', 'jarvis-voix.js', 'sw.js', 'manifest.webmanifest', 'invite'].map((x) => APP + '/' + x);
 for (const f of fs.readdirSync(path.join(RACINE, SERVEUR, 'tests')).filter((x) => x.endsWith('.test.mjs')).sort()) {
   const src = fs.readFileSync(path.join(RACINE, SERVEUR, 'tests', f), 'utf8');
-  bancs.push({nom: f.replace('.test.mjs', ''), sorte: 'serveur', cmd: ['node', SERVEUR + '/tests/' + f], entrees: [SERVEUR].concat(/jarvis-os-maquette|essais\//.test(src) ? [APP] : [], /hermes/.test(src) ? [HERMES] : [])});
+  bancs.push({nom: f.replace('.test.mjs', ''), sorte: 'serveur', cmd: ['node', SERVEUR + '/tests/' + f], entrees: [SERVEUR].concat(/jarvis-os-maquette|essais\//.test(src) ? PAGE : [], /hermes/.test(src) ? [HERMES] : [])});
 }
 /* l'écran de connexion (0.102.0) : un faux serveur, une fausse passkey, quatre tailles d'écran */
 bancs.push({nom: 'ecran', sorte: 'serveur', cmd: ['node', APP + '/banc/ecran-verrou.cjs'], entrees: [APP + '/jarvis-serveur.js', APP + '/index.html', APP + '/banc/ecran-verrou.cjs']});
@@ -75,10 +78,13 @@ const compte = (t) => { const ok = (t.match(/^OK /gm) || []).length + (t.match(/
 const echecs = (t) => t.split('\n').filter((l) => /^ÉCHEC |^\s*✗/.test(l)).map((l) => l.slice(0, 400));
 
 /* ---------- le banc de l'app : segments répartis sur plusieurs navigateurs ---------- */
-async function app(b, parts) {
+/* ce que le banc de l'app dit de lui-même : la durée et l'empreinte de chaque segment, l'empreinte du reste du fichier */
+async function listeApp(b) { const l = await lancer(b.cmd, {BANC_LISTE: '2'}, path.join(JOURNAUX, 'app-liste.log')); try { const j = JSON.parse(l.tout.trim().split('\n').pop()); return j && j.durees && j.sig ? j : null; } catch { return null; } }
+async function app(b, parts, L, seulement) {
   if (SEG) { const r = await lancer(b.cmd, {BANC_FILTRE: SEG}, path.join(JOURNAUX, 'app-filtre.log')); return {...r, ...compte(r.tout), echecs: echecs(r.tout), partiel: true}; }
-  const l = await lancer(b.cmd, {BANC_LISTE: '1'}, path.join(JOURNAUX, 'app-liste.log')); let durees = {};
-  try { durees = JSON.parse(l.tout.trim().split('\n').pop()); } catch { const r = await lancer(b.cmd, {}, path.join(JOURNAUX, 'app.log')); return {...r, ...compte(r.tout), echecs: echecs(r.tout)}; }
+  let durees = L ? L.durees : null;
+  if (!durees) { const r = await lancer(b.cmd, {}, path.join(JOURNAUX, 'app.log')); return {...r, ...compte(r.tout), echecs: echecs(r.tout)}; }
+  if (seulement) durees = Object.fromEntries(Object.entries(durees).filter(([id]) => seulement.includes(id)));
   const lots = Array.from({length: parts}, () => ({segs: [], ms: 0}));   /* les plus longs d'abord, chacun dans le lot le moins chargé */
   for (const [id, ms] of Object.entries(durees).sort((x, y) => y[1] - x[1])) { const m = lots.reduce((a, c) => (c.ms < a.ms ? c : a)); m.segs.push(id); m.ms += ms + 1500; }
   const t0 = Date.now(), res = await Promise.all(lots.filter((x) => x.segs.length).map((x, i) => lancer(b.cmd, {BANC_SEGS: x.segs.join(',')}, path.join(JOURNAUX, 'app-' + (i + 1) + '.log'))));
@@ -94,16 +100,22 @@ async function app(b, parts) {
 }
 
 /* ---------- le passage ---------- */
-const choisis = bancs.filter((b) => !noms.length || noms.includes(b.nom));
+const choisis = bancs.filter((b) => (!noms.length || noms.includes(b.nom)) && !SAUF.includes(b.nom));   /* --sauf portail,app : tout sauf ceux-là */
 const inconnus = noms.filter((n) => !bancs.some((b) => b.nom === n)); if (inconnus.length) { console.log('Banc inconnu : ' + inconnus.join(', ') + '. Connus : ' + bancs.map((b) => b.nom).join(', ')); process.exit(2); }
 const plan = choisis.map((b) => { const e = empreinte(b), v = verts[b.nom]; return {b, e, saute: !opt('--tout') && !SEG && v && v.e === e ? v : null}; });
+/* 6. le banc de l'app, segment par segment : si la page n'a pas changé (ni rien du banc hors des segments), seuls les segments dont le texte
+   a changé repassent. Corriger ou ajouter un contrôle coûte alors quelques dizaines de secondes, pas dix minutes. */
+{ const x = plan.find((y) => y.b.sorte === 'app');
+  if (x && !SEG && !opt('--quoi') || x && opt('--quoi')) { const L = await listeApp(x.b); x.L = L;
+    if (L) { const base = empreinte({entrees: x.b.entrees.filter((f) => !f.endsWith('banc/banc.cjs'))}), v = verts[x.b.nom]; x.app = {base, commun: L.commun, sig: L.sig};
+      if (!x.saute && !opt('--tout') && v && v.base === base && v.commun === L.commun && v.sig) { x.segs = Object.keys(L.sig).filter((id) => v.sig[id] !== L.sig[id]); if (!x.segs.length) x.saute = v; } } } }
 const aFaire = plan.filter((x) => !x.saute);
 for (const x of plan.filter((y) => y.saute)) console.log('sauté  ' + x.b.nom.padEnd(16) + 'inchangé depuis son passage vert du ' + x.saute.quand + ' (' + x.saute.ok + ' vérifications)');
-if (opt('--quoi')) { for (const x of aFaire) console.log('à faire ' + x.b.nom.padEnd(15) + (verts[x.b.nom] ? 'ses fichiers ont changé' : 'jamais passé vert ici')); process.exit(0); }
+if (opt('--quoi')) { for (const x of aFaire) console.log('à faire ' + x.b.nom.padEnd(16) + (x.segs ? x.segs.length + ' segment(s) changé(s) seulement : ' + x.segs.join(', ') : verts[x.b.nom] ? 'ses fichiers ont changé' : 'jamais passé vert ici')); process.exit(0); }
 if (!aFaire.length) { console.log('Rien à relancer : tout est vert et inchangé.'); process.exit(0); }
 const T0 = Date.now(), resultats = [];
 const finir = (x, r) => { const c = r.ok === undefined ? compte(r.tout) : r, vert = r.code === 0 && !c.ko, stable = empreinte(x.b) === x.e;
-  if (vert && stable && !r.partiel) { verts[x.b.nom] = {e: x.e, quand: new Date().toLocaleString('fr-FR', {timeZone: 'Europe/Paris', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'}), ok: c.ok}; garder(); }
+  if (vert && stable && !r.partiel) { verts[x.b.nom] = {e: x.e, quand: new Date().toLocaleString('fr-FR', {timeZone: 'Europe/Paris', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'}), ok: x.segs && verts[x.b.nom] ? verts[x.b.nom].ok : c.ok, ...(x.app || {})}; garder(); }
   resultats.push({nom: x.b.nom, vert, ...c, ms: r.ms, echecs: r.echecs || echecs(r.tout), instables: r.instables || [], bouge: !stable, partiel: !!r.partiel, lots: r.lots, fin: vert ? '' : r.tout.trim().split('\n').slice(-3).join(' | ').slice(0, 300)});
   console.log((vert ? 'vert   ' : 'ROUGE  ') + x.b.nom.padEnd(16) + c.ok + ' passées' + (c.ko ? ', ' + c.ko + ' en échec' : '') + ' · ' + duree(r.ms) + (r.lots ? ' · ' + r.lots.length + ' navigateurs' : '') + (r.partiel ? ' · partiel (--seg)' : '') + (!stable ? ' · ses fichiers ont changé pendant le passage : pas compté vert' : '')); };
 const un = (x) => async () => { const r = await lancer(x.b.cmd, {}, path.join(JOURNAUX, x.b.nom + '.log')); if (r.code !== 0 || compte(r.tout).ko) { const r2 = await lancer(x.b.cmd, {}, path.join(JOURNAUX, x.b.nom + '-reprise.log')); if (r2.code === 0 && !compte(r2.tout).ko) { r2.instables = echecs(r.tout); finir(x, r2); return; } } finir(x, r); };
@@ -112,7 +124,9 @@ const long = aFaire.filter((x) => x.b.long), serveur = aFaire.filter((x) => x.b.
    l'autre (ils partagent des dossiers du système) ; puis l'app, à quatre navigateurs (trois si le portail tourne encore) */
 const pLong = file(long.map(un), 1);
 await Promise.all([file(serveur.map(un), 3), file(hermes.map(un), 1)]);
-if (lApp) { let fini = false; pLong.then(() => { fini = true; }); const parts = +process.env.BANCS_PARTS || (long.length && !fini ? PARTS - 1 : PARTS); finir(lApp, await app(lApp.b, parts)); }
+if (lApp) { let fini = false; pLong.then(() => { fini = true; }); const parts = +process.env.BANCS_PARTS || (long.length && !fini ? PARTS - 1 : PARTS);
+  if (lApp.segs) console.log('app : la page n\'a pas changé, ' + lApp.segs.length + ' segment(s) du banc ont changé : eux seuls repassent (' + lApp.segs.join(', ') + ')');
+  finir(lApp, await app(lApp.b, parts, lApp.L, lApp.segs)); }
 await pLong;
 const rouges = resultats.filter((r) => !r.vert);
 for (const r of resultats) { for (const e of r.echecs) console.log('  ' + r.nom + ' : ' + e); for (const e of r.instables) console.log('  ' + r.nom + ' (instable : a passé seul) : ' + e.slice(0, 200)); if (!r.vert && !r.echecs.length) console.log('  ' + r.nom + ' : ' + r.fin); }
