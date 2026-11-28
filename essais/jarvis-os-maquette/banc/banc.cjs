@@ -384,7 +384,9 @@ srv.listen(0, async () => {
     });
     await seg(9, async () => {
       { const q = await page('#agenda');
-        ok('agenda : le rendez-vous écrit aussi dans Échéances n\'est listé qu\'une fois dans le mois, avec le bot qui le suit', await q.evaluate(() => { const rows = [...document.querySelectorAll('#dir .mlist .dl-row')].filter((r) => /notaire/i.test(r.textContent)); return rows.length === 1 && /14h30/.test(rows[0].textContent) && /Iris/.test(rows[0].textContent); }));
+        ok('agenda : le rendez-vous écrit aussi dans Échéances n\'est listé qu\'une fois dans le mois, avec le bot qui le suit', await q.evaluate(() => { const rows = [...document.querySelectorAll('#dir .mlist .dl-row')].filter((r) => /notaire/i.test(r.textContent)), j6 = new Date(); j6.setDate(j6.getDate() + 6);
+          if (j6.getMonth() !== new Date().getMonth()) return rows.length === 0;   /* 28/11/2026 : le rendez-vous d'exemple est à J+6 ; à partir du 25, il tombe le mois suivant : le mois affiché ne le liste pas (ce contrôle échouait chaque fin de mois) */
+          return rows.length === 1 && /14h30/.test(rows[0].textContent) && /Iris/.test(rows[0].textContent); }));
         await q.context().close(); }
     });
     await seg(10, async () => {
