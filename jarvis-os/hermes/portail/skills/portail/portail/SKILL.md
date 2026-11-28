@@ -239,23 +239,40 @@ disent où, si tu y es déjà passé). Tu ne fais rien d'autre que ce qui suit.
    « Document signé », « Justificatif client », « Pièce jointe »…), avec un champ de fichier. Tu peux ouvrir un
    onglet de la page pour le voir ; tu ne cliques aucun bouton qui dépose, envoie, enregistre, valide ou supprime.
    Rien de tel sur la page du mois : « Résultat : introuvable », décris les onglets que tu vois. Fin.
-3. Regarde si un document y est déjà déposé pour ce mois. S'il y en a un : ne dépose rien, ne remplace rien, ne
-   supprime rien ; réponds « Résultat : déjà déposé ». Fin.
+3. Lis le **statut** de la ligne du mois dans cette zone (« Non signé », « En attente de validation », « Validé »,
+   « Signé »…) : c'est lui qui dit où en est le dépôt, pas la seule présence d'un fichier. Un autre statut que « Non
+   signé » (ou son équivalent : rien de déposé) : ne dépose rien, ne remplace rien, ne supprime rien ; réponds
+   « Résultat : déjà déposé ». Fin. Statut « Non signé » mais un fichier est déjà joint (un dépôt resté à moitié) :
+   ne joins rien de plus, ne supprime rien ; dis-le (« un fichier est déjà joint, pas envoyé en validation ») et
+   réponds « Résultat : rien déposé ». Fin.
 4. En « MODE DÉPÔT À BLANC » : arrête-toi là. Aucun fichier ne t'est remis et tu n'en cherches aucun. Dis le nom de
    l'onglet ou de la zone, le libellé du bouton de dépôt, ce que la page dit du mois (son statut), puis réponds
    « Résultat : à blanc ». Fin.
-5. En « MODE DÉPÔT, » : dépose le fichier de la ligne « Fichier à déposer », avec `upload_file`, dans ce champ-là,
-   et jamais un autre fichier ni à un autre endroit. Si le champ de fichier n'apparaît qu'après un bouton d'import
-   (« Importer… », « Ajouter un document »…, vu à blanc le 27/11/2026), tu peux cliquer ce bouton-là, une fois :
-   il ouvre le formulaire, il ne dépose rien. Si le formulaire demande autre chose que le fichier (le mois, la
-   mission, un type de document), choisis ce qui correspond à la consigne et rien d'autre ; s'il demande une
-   information que la consigne ne donne pas, ou s'il n'y a ni champ de fichier ni zone de dépôt utilisable avec
-   `upload_file` : annule, ne dépose rien, décris ce que le formulaire demande et réponds « Résultat : rien
-   déposé ». Si le portail demande de confirmer le dépôt de ce fichier, confirme une fois. Puis relis la page : le document doit apparaître pour ce mois. Il apparaît : « Résultat :
-   déposé ». Il n'apparaît pas, ou le portail affiche une erreur : n'essaie pas une seconde fois, recopie l'alerte
-   (sans nom ni numéro) et réponds « Résultat : rien déposé ».
-6. Jamais deux dépôts. Tu ne touches à aucune case du compte rendu, tu ne cliques pas « Valider ce compte rendu
-   d'activité », tu ne changes aucun autre document, aucun autre mois, ni la date de fin de mission.
+5. En « MODE DÉPÔT, » : le dépôt se fait en DEUX temps (vu le 27 et le 28/11/2026 : le fichier joint par un premier
+   « Enregistrer » était resté « Non signé » ; le propriétaire a dû le refaire, avec un second « Enregistrer »).
+   a. *Joindre* : dépose le fichier de la ligne « Fichier à déposer », avec `upload_file`, dans ce champ-là, et
+      jamais un autre fichier ni à un autre endroit. Si le champ de fichier n'apparaît qu'après un bouton d'import
+      (« Importer… », « Ajouter un document »…), tu peux cliquer ce bouton-là, une fois : il ouvre le formulaire,
+      il ne dépose rien. Si le formulaire demande autre chose que le fichier (le mois, la mission, un type de
+      document), choisis ce qui correspond à la consigne et rien d'autre ; s'il demande une information que la
+      consigne ne donne pas, ou s'il n'y a ni champ de fichier ni zone de dépôt utilisable avec `upload_file` :
+      annule, ne dépose rien, décris ce que le formulaire demande et réponds « Résultat : rien déposé ». Fin.
+      Clique le bouton qui enregistre ce fichier (« Enregistrer ») une fois ; attends que la fenêtre se ferme ou
+      qu'un message apparaisse (jusqu'à trente secondes) ; si le portail demande de confirmer, confirme une fois.
+   b. *Envoyer en validation* : relis le statut de la ligne. S'il est encore « Non signé », le fichier n'est que
+      joint : cherche, dans cette même zone (la ligne du mois, sa fenêtre, le bas de l'onglet), le bouton qui
+      enregistre ou envoie ce dépôt (un second « Enregistrer », « Valider le dépôt », « Envoyer », « Soumettre »),
+      et clique-le une fois. Ce n'est jamais « Valider ce compte rendu d'activité », ni un bouton d'une autre zone.
+      Attends de nouveau (trente secondes au plus), puis relis le statut ; une seule relecture de plus après vingt
+      secondes s'il n'a pas bougé.
+   c. *Conclure, d'après le statut seulement* : la ligne dit « En attente de validation » (ou tout autre statut
+      que « Non signé ») : « Résultat : déposé ». Elle dit toujours « Non signé », ou le portail affiche une erreur :
+      n'essaie rien d'autre, ne supprime rien, recopie l'alerte (sans nom ni numéro), dis en une phrase si le
+      fichier est resté joint sans être envoyé (« le fichier est joint sur le portail, pas envoyé en validation :
+      à finir ou à retirer à la main ») et réponds « Résultat : rien déposé ».
+6. Jamais deux fichiers, jamais deux fois le même bouton. Tu ne touches à aucune case du compte rendu, tu ne cliques
+   pas « Valider ce compte rendu d'activité », tu ne changes aucun autre document, aucun autre mois, ni la date de
+   fin de mission.
 7. Ta réponse finit par deux lignes : « Déjà déposé : oui » ou « Déjà déposé : non » (ce que tu as vu en arrivant),
    puis « Résultat : à blanc », « Résultat : déposé », « Résultat : déjà déposé », « Résultat : introuvable » ou
    « Résultat : rien déposé » (la commande lit cette ligne). Avant, deux ou trois phrases sans nom de site, sans

@@ -63,3 +63,9 @@ d'heure (sauf s'il a déjà touché « C'est rattaché »).
 - **Qui peut déclencher un dépôt** (probable) : une réponse dans le fil du mail du CRA (ou sous le même objet) venant d'un destinataire connu, avec un PDF qui porte exactement le bon mois, le bon total et le bon détail. Une adresse usurpée qui enverrait un tel PDF ferait déposer ce document-là : gênant, réparable sur le portail, et il est prévenu à chaque dépôt.
 - **Jours corrigés après coup** : si les jours validés changent, le contrôle est refait ; un oui déjà posé n'est pas retiré (root l'exécute au quart d'heure).
 
+## Premier dépôt réel (27/11/2026) : raté, refait par lui ; skill réécrite le 28/11
+
+- Hermes avait joint le fichier (un « Enregistrer ») sans l'envoyer en validation : le propriétaire a trouvé un dépôt à moitié fait, l'a supprimé et refait (« Enregistrer », puis un second, « Enregistrer aussi, je crois ») ; la ligne est passée à « en attente de validation ».
+- La skill conclut désormais d'après le **statut** de la ligne et fait le dépôt en deux temps. **Pas certain** : le nom et la place du second bouton (son souvenir) ; le dépôt de décembre sera l'essai, avec son oui (`signePremier` n'est pas posé : rien d'automatique).
+- S'il préfère déposer lui-même chaque mois : « Je le fais moi-même » dans la carte, ou couper la minuterie (`sudo systemctl disable --now hermes-portail-cra-signe.timer`).
+
