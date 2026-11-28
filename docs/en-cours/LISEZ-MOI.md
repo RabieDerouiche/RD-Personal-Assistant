@@ -156,3 +156,10 @@ pas commencé), 6. le dépôt du CRA signé sur le portail par Hermes après son
 - **CRA de la semaine du 23/11 : toujours pas relancé par lui** (« Relancer Hermes » dans Pour moi). La skill corrigée est en place depuis le 27/11 à 22 h 52.
 - **0.100.0 sur la branche** : l'accueil en orbite et le globe de particules, actifs par défaut ; l'accueil d'avant gardé (`?accueil=ancien`). Banc de l'app et du serveur en cours (`scratchpad/g/resultat7.txt`). Ensuite : demande de fusion, fusion, puis il touche « Mettre à jour » (rien côté root).
 
+## État au 28/11/2026, 5 h 30
+
+- **main = `f2e681e` (demande 256) : JARVIS 0.100.0** (accueil en orbite, globe de particules, accueil d'avant gardé). Bancs : app 456 OK dont 7 « 0.100 orbite » (1 échec lié à la date, déjà là : « agenda : le rendez-vous écrit aussi dans Échéances… ») ; serveur 434. Le test « plusieurs jours » du banc ne s'arrête plus en fin de mois ; le contrôle de version accepte un numéro à trois chiffres.
+- **Le serveur est encore en 0.99.0** : la 0.100.0 arrive quand il touche « Mettre à jour » dans JARVIS (app seulement, pas de session du serveur). Ne pas dire « déployé » avant qu'il l'ait fait.
+- **À lui** : « Mettre à jour » puis son avis sur l'accueil sur son iPhone (fluidité, appui sur une cible qui bouge) ; regarder le portail pour le CRA signé de novembre (« C'est rattaché » ou « Réessayer avec Hermes ») ; « Relancer Hermes » pour le CRA de la semaine du 23/11.
+- **À la session, selon ses retours** : ajuster l'orbite (vitesse, taille) ou remettre l'accueil d'avant (`ANCIEN = true`) ; ajuster la skill du dépôt du CRA signé si le document n'est pas sur le portail (plan pour « Serveur JARVIS 2 »).
+
