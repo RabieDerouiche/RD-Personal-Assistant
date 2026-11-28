@@ -136,3 +136,23 @@ pas commencé), 6. le dépôt du CRA signé sur le portail par Hermes après son
 - **Accueil** : trois essais refusés (icônes ; tuiles sous le globe en argent ; tuiles autour d'un globe recoloré : « du recoloriage, ce que je déteste le plus »), retirés du code. **À faire, sans se presser** : plusieurs propositions qui repensent l'ORGANISATION de l'accueil, dans la charte actuelle (aucune teinte changée) : maquettes et captures d'abord. Ce qu'il veut : des tuiles qui disent quelque chose et mènent aux blocs (Travail, Routines, Papiers…), autour du globe ; Réglages accessible ; un globe qui évolue (par exemple : ce qu'il représente, pas sa couleur).
 - **Ordre** : 1. banc de l'app vert → demande de fusion de la 0.99.0 → message à « Serveur JARVIS 2 » (plan déjà écrit) ; 2. les propositions d'accueil.
 
+## État au 28/11/2026, 2 h
+
+- **main = `710f1f0` (demande 255) : JARVIS 0.99.0** (Radar : « déjà dépensé » avec les dépenses courantes pas notées, « plus à payer » garde le déjà payé ; pile « Attend ton oui » dans l'app ; skill du dépôt du CRA signé ; maquettes de refonte retirées). Bancs : Radar 158, serveur 434, portail 214, relance 88, app 447 OK (3 échecs liés à la date).
+- **Demande envoyée à « Serveur JARVIS 2 »** (plan : `docs/demandes-serveur-en-attente.md` ; pull, redémarrage, `install.sh` du portail) : elle attend son oui. Lire son compte rendu (`list_events`, kinds `result`), dont ses deux gestes (« Relancer Hermes » pour la semaine, « Oui, déposer » pour le CRA signé) ; puis vider le plan et noter « déployé » dans `CLAUDE.md`.
+- **Accueil** : essai « les portes autour du globe » derrière `?accueil=1` (dernier bloc du script) ; il a choisi cette direction et la fait peaufiner (détail et ses mots : `docs/journal-jarvis.md`, dernière entrée). Méthode : une capture (`scratchpad/pile/cap.cjs`), son avis par QCM, on recommence. Quand il dit oui : retirer la condition, vérifications au banc.
+- À lui : son oui sur le serveur ; « Relancer Hermes » ; puis « Oui, déposer » après la mise à jour.
+
+## État au 28/11/2026, 3 h
+
+- **Accueil** : il a validé la piste « orbite » (« tu y es presque ») : six hologrammes qui tournent autour du globe, qu'on fait tourner du doigt (`?accueil=1`). Reste **le globe lui-même** : quatre essais (`&globe=a|b|c|d` : Particules, Méridiens, Iris, Plasma), film comparatif envoyé, QCM posé. Quand il a choisi : retirer les conditions `?accueil=1` et `globe=`, garder un seul globe, vérifications au banc (orbite : rotation, glisser, appui ; « réduire les animations »), journal, fusion, « Mettre à jour ».
+- **Serveur** : la demande de la 0.99.0 (`710f1f0`) attend son oui dans « Serveur JARVIS 2 » ; lire le compte rendu (`list_events`, kinds `result`) avant d'en parler comme d'un fait ; puis vider `docs/demandes-serveur-en-attente.md`.
+- Outils des captures et des films : `scratchpad/pile/cap.cjs`, `film.cjs`, `film2.cjs` (à réécrire si le dossier temporaire a disparu : un serveur de fichiers local, Playwright en iPhone 15 Pro Max, `recordVideo`, puis `ffmpeg` vers MP4).
+
+## État au 28/11/2026, 4 h 30
+
+- **0.99.0 déployée et vérifiée (1 h 03)**. `docs/demandes-serveur-en-attente.md` est vide.
+- **CRA signé de novembre : premier dépôt réel en échec** (il a touché « Oui, déposer » le 27/11 vers 23 h 10) : fichier joint, « Enregistrer » cliqué sans erreur, ligne restée « non signé ». À lui de regarder le portail ; puis « C'est rattaché » (s'il y est) ou « Réessayer avec Hermes » (un nouveau oui = une nouvelle tentative). Selon ce qu'il voit : ajuster la skill du dépôt (attendre la fermeture de la fenêtre ou un message avant de relire), ce qui demandera un plan pour « Serveur JARVIS 2 ».
+- **CRA de la semaine du 23/11 : toujours pas relancé par lui** (« Relancer Hermes » dans Pour moi). La skill corrigée est en place depuis le 27/11 à 22 h 52.
+- **0.100.0 sur la branche** : l'accueil en orbite et le globe de particules, actifs par défaut ; l'accueil d'avant gardé (`?accueil=ancien`). Banc de l'app et du serveur en cours (`scratchpad/g/resultat7.txt`). Ensuite : demande de fusion, fusion, puis il touche « Mettre à jour » (rien côté root).
+

@@ -12861,36 +12861,131 @@ void main(){
       };
     } }
 
-  /* ================= ESSAI « accueil : huit portes » (28/11/2026). Sa demande : « refais la page d'accueil avec la même charte graphique que
-     les autres pages et les couleurs et tout, mais repense la page d'accueil, donne plusieurs propositions » ; des trois organisations
-     montrées (huit portes, tableau de bord, d'abord ce qui t'attend) il retient la première : « 1 mais revisité, il est pas top mais c'est
-     la bonne direction, tu dois la peaufiner ». Rien ne change sans « ?accueil=1 » dans l'adresse. Aucune teinte, aucun effet nouveau :
-     des places et des tailles, et les tuiles de l'écran de JARVIS telles qu'elles sont.
-     Huit tuiles autour du globe, en trois étages : en haut la journée (Agenda, Météo), larges, le texte entier ; de chaque côté du globe ce
-     qui bouge (Pour toi et Travail à gauche, Argent et Hermes à droite), la ligne du bas sur deux lignes ; en bas ce qui se range (Papiers,
-     Réglages), larges. Travail, Hermes et Papiers reprennent le chiffre et la ligne de leur tuile d'Espaces (mêmes données, même appui).
-     Le globe garde sa place au milieu, dégagé ; chaque tuile lui reste reliée (hudLines). ================= */
-  { let huit = false; try { huit = new URLSearchParams(location.search).get('accueil') === '1'; } catch (e) { /* rien */ }
-    if (huit) {
-      document.head.append(h('style', {text: '.hud-8 .hud-core{height:400px;margin-top:12px}'
-        + '.hud-8.hud .hud-ro.q-t1,.hud-8.hud .hud-ro.q-t2,.hud-8.hud .hud-ro.q-b1,.hud-8.hud .hud-ro.q-b2{width:calc(50% - 22px)}'
-        + '.hud-8 .hud-ro.q-t1{left:8px;top:0}.hud-8 .hud-ro.q-t2{right:8px;top:0;animation-delay:-.6s}.hud-8 .hud-ro.q-b1{left:8px;bottom:0;animation-delay:-3s}.hud-8 .hud-ro.q-b2{right:8px;bottom:0;animation-delay:-3.6s}'
-        + '.hud-8.hud .hud-ro.q-l1,.hud-8.hud .hud-ro.q-l2,.hud-8.hud .hud-ro.q-r1,.hud-8.hud .hud-ro.q-r2{width:112px;min-height:84px}'
-        + '.hud-8 .hud-ro.q-l1{left:8px;top:86px;animation-delay:-1.2s}.hud-8 .hud-ro.q-l2{left:8px;bottom:86px;animation-delay:-2.4s}.hud-8 .hud-ro.q-r1{right:8px;top:86px;animation-delay:-1.8s}.hud-8 .hud-ro.q-r2{right:8px;bottom:86px;animation-delay:-.3s}'
-        + '.hud-8 .hud-ro.q-l1 span,.hud-8 .hud-ro.q-l2 span,.hud-8 .hud-ro.q-r1 span,.hud-8 .hud-ro.q-r2 span{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;line-height:1.25}'
-        + '.hud-8.hud .hud-ro.q-l1 b,.hud-8.hud .hud-ro.q-l2 b,.hud-8.hud .hud-ro.q-r1 b,.hud-8.hud .hud-ro.q-r2 b{font-size:15px}'}));
-      const VA_8 = VIEWS.accueil;
-      const ro = (pos, act, k, b, sub, amb) => h('button', {type: 'button', class: 'hud-ro q-' + pos + (amb ? ' amb' : ''), 'data-k': k, onclick: act}, h('small', {text: k}), h('b', {text: b}), h('span', {text: sub}));
+  /* ================= 0.100.0 : l'accueil en orbite, le globe de particules (28/11/2026). Ses mots, dans l'ordre : « repense la page
+     d'accueil, donne plusieurs propositions » ; des tuiles autour du globe : « c'est la bonne direction, tu dois la peaufiner » ; « Météo pas
+     besoin de son bloc, mets le texte en petit dans le coin droit en haut ; Réglages, une petite icône à côté du refresh ; réduis la taille de
+     ces blocs et donne à chacun une couleur qui va dans le thème mais qui matche le contenu » ; « make them floaty, smaller ; it has to look
+     alive, futuristic and mysterious ; do something unexpected, experiment » ; l'orbite vue : « tu y es presque, maintenant rénove juste le
+     globe, sobre, dans le bleu noir » ; des six globes montrés : « Particules, mais garde à côté la page d'accueil, je pourrai te demander
+     de la remettre en place ».
+     L'ACCUEIL D'AVANT EST GARDÉ TEL QUEL : ce bloc ne réécrit rien, il passe après. « ?accueil=ancien » dans l'adresse le montre ; pour le
+     remettre pour de bon, il suffit de mettre ANCIEN à true ci-dessous (ou de retirer ce bloc). Le banc garde l'accueil d'avant pour ses
+     vérifications d'avant (scénario `sansOrbite`, posé par défaut) et a les siennes pour l'orbite.
+     L'orbite : six petits hologrammes (un mot, une valeur : Agenda, Pour toi, Travail, Argent, Hermes, Papiers) tournent lentement autour
+     du globe sur un anneau incliné : ils passent devant lui puis derrière (on les devine à travers), grossissent en approchant, s'estompent
+     en s'éloignant, flottent chacun à son rythme. Celui qui arrive devant est « au point » : il s'allume, le globe lance une onde de sa
+     couleur, et une ligne sous le globe dit son détail. On fait tourner l'anneau du doigt ; un appui sur un hologramme, ou sur la ligne,
+     ouvre la rubrique. Tout s'arrête avec « réduire les animations » (les six restent répartis, le doigt les fait toujours tourner).
+     Mêmes données que l'écran d'avant et que les tuiles d'Espaces (les quatre tuiles d'origine restent dans la page, cachées : leur appui
+     sert encore) ; couleurs : la palette du thème, une par contenu, l'orange à ce qui l'attend. Météo : une ligne en haut à droite ;
+     Réglages : une roue dans l'en-tête. ================= */
+  { let ANCIEN = false; try { ANCIEN = new URLSearchParams(location.search).get('accueil') === 'ancien'; } catch (e) { /* rien */ }
+    if (window.__SCEN && window.__SCEN.sansOrbite) ANCIEN = true;   /* le banc : ses vérifications d'avant portent sur l'accueil d'avant */
+    if (!ANCIEN) {
+      document.head.append(h('style', {text: '.hud-o .hud-core{height:344px;margin-top:8px;touch-action:pan-y;-webkit-user-select:none;user-select:none}.hud-o .hud-core .holo-stage{z-index:1;pointer-events:none}.hud-o .hud-lines{display:none}'
+        + '.orb-an{position:absolute;inset:0;width:100%;height:100%;z-index:0;pointer-events:none;overflow:visible}.orb-an ellipse{fill:none;stroke:rgb(var(--c2));stroke-width:1}.orb-an .o1{stroke-opacity:.34;stroke-dasharray:2 7;animation:orbfil 14s linear infinite}.orb-an .o2{stroke-opacity:.16;stroke-dasharray:1 9;animation:orbfil 22s linear infinite reverse}'
+        + '.orb-an .o3{stroke-opacity:.75;stroke-width:1.4;filter:drop-shadow(0 0 4px rgba(var(--c1),.9))}@keyframes orbfil{to{stroke-dashoffset:-180}}'
+        + '.orb-c{--a:var(--c1);--a2:var(--c2);position:absolute;left:0;top:0;z-index:3;display:grid;gap:1px;justify-items:start;min-width:74px;max-width:132px;padding:5px 10px 6px;border-radius:4px 12px 4px 12px;border:1px solid rgba(var(--a),.5);background:rgba(3,10,28,.66);-webkit-backdrop-filter:blur(5px);backdrop-filter:blur(5px);color:var(--fg);font:inherit;text-align:left;cursor:pointer;box-shadow:0 0 16px rgba(var(--a),.22),inset 0 0 12px rgba(var(--a),.08);will-change:transform,opacity;transition:border-color .5s,box-shadow .5s;-webkit-tap-highlight-color:transparent}'
+        + '.orb-c::before{content:"";position:absolute;left:-2px;top:-2px;width:8px;height:8px;border:2px solid rgb(var(--a2));border-right:0;border-bottom:0;border-radius:4px 0 0 0}.orb-c::after{content:"";position:absolute;left:50%;bottom:-9px;width:1px;height:8px;background:linear-gradient(rgb(var(--a2)),transparent);opacity:.7}'
+        + '.orb-c small{font:700 9.5px var(--display);letter-spacing:.16em;color:rgb(var(--a2));white-space:nowrap}.orb-c b{font:700 13.5px/1.15 var(--display);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:112px}'
+        + '.orb-c.is-front{border-color:rgba(var(--a),.95);box-shadow:0 0 26px rgba(var(--a),.5),inset 0 0 16px rgba(var(--a),.16)}.orb-c.is-front b{text-shadow:0 0 12px rgba(var(--a),.7)}'
+        + '.orb-c.amb{--a:var(--warn);--a2:253,230,138}.orb-c.amb b{color:#fde68a}'
+        + '.orb-c[data-k="TRAVAIL"]:not(.amb){--a:var(--c3);--a2:196,160,255}.orb-c[data-k="ARGENT"]:not(.amb){--a:52,211,153;--a2:110,231,183}.orb-c[data-k="HERMES"]:not(.amb){--a:var(--c4);--a2:165,180,252}.orb-c[data-k="PAPIERS"]:not(.amb){--a:var(--c9);--a2:var(--c9)}'
+        + '.orb-ping{position:absolute;left:50%;top:50%;z-index:0;width:150px;height:150px;margin:-75px 0 0 -75px;border-radius:50%;border:1.5px solid rgba(var(--f, var(--c1)),.8);opacity:0;pointer-events:none}.orb-ping.va{animation:orbping 1.5s ease-out}@keyframes orbping{0%{transform:scale(.55);opacity:.75}100%{transform:scale(1.65);opacity:0}}'
+        + '.orb-foc{--a:var(--c1);--a2:var(--c2);display:block;width:100%;margin:6px 0 0;padding:6px 8px;min-height:44px;background:none;border:0;color:var(--fg);font:500 13.5px/1.35 var(--sans);text-align:center;cursor:pointer}.orb-foc small{font:700 11px var(--display);letter-spacing:.16em;color:rgb(var(--a2));margin-right:8px}.orb-foc b{font:700 14.5px var(--display)}.orb-foc span{color:var(--muted)}.orb-foc i{font-style:normal;color:rgb(var(--a2));margin-left:6px}'
+        + '.orb-foc.va{animation:orbfoc .5s ease-out}@keyframes orbfoc{0%{opacity:0;transform:translateY(4px);letter-spacing:.04em}100%{opacity:1;transform:none;letter-spacing:0}}'
+        + '.hud-met{display:block;margin:5px 0 0 auto;padding:0;background:none;border:0;font:500 12px var(--sans);letter-spacing:.02em;color:var(--muted);text-align:right;white-space:nowrap;cursor:pointer}.hud-met b{color:var(--fg);font-weight:600}'
+        + '.g-neuf{position:absolute;inset:0;width:100%;height:100%;z-index:1;pointer-events:none}'
+        + '@media (prefers-reduced-motion: reduce){.orb-an ellipse,.orb-ping.va,.orb-foc.va{animation:none}}'}));
+      /* ---- le globe de particules (son choix du 28/11 parmi six essais en deux familles, particules et plasma) : une sphère de points qui
+         tourne et scintille, traversée d'ondes, dessinée ici sur un canevas 2D aux couleurs du thème (--c1, --c2, --k4, lues dans la page) ;
+         elle respire, et s'anime davantage pendant que JARVIS dit sa phrase (HUD.g.set('speaking')). Le globe d'avant (jarvis-voix.js)
+         n'est pas touché : il reste dans la page, caché ; « ?globe=ancien » le montre dans l'orbite. ---- */
+      const GV = (() => { try { return (new URLSearchParams(location.search).get('globe') || '').toLowerCase() === 'ancien' ? '' : 'a'; } catch (e) { return 'a'; } })();
+      const GNOM = {a: 'Particules'}, GST = {parle: false, e: 0, raf: 0};
+      function globeNeuf(core) {
+        if (!GNOM[GV]) return;
+        const anc = core.querySelector('.holo-stage'); if (anc) anc.style.visibility = 'hidden';
+        if (HUD.g && HUD.g.set && !HUD.g.__neuf) { const s0 = HUD.g.set.bind(HUD.g); HUD.g.set = (x) => { GST.parle = x === 'speaking'; return s0(x); }; HUD.g.__neuf = true; }
+        GST.parle = !HUD.done;
+        const cv = h('canvas', {class: 'g-neuf', 'aria-hidden': 'true'}), g = cv.getContext('2d'); core.append(cv);
+        const css = getComputedStyle(document.documentElement), tri = (n, d) => (css.getPropertyValue(n).trim() || d), C1 = tri('--c1', '56,189,248'), C2 = tri('--c2', '103,232,249'), K4 = tri('--k4', '37,99,235');
+        const col = (c, a) => 'rgba(' + c + ',' + Math.max(0, Math.min(1, a)).toFixed(3) + ')', TAU = Math.PI * 2, reduit = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        const rot = (p, ay, ax) => { const x1 = p[0] * Math.cos(ay) + p[2] * Math.sin(ay), z1 = -p[0] * Math.sin(ay) + p[2] * Math.cos(ay); return [x1, p[1] * Math.cos(ax) - z1 * Math.sin(ax), p[1] * Math.sin(ax) + z1 * Math.cos(ax)]; };
+        let graine = 7; const hasard = () => { graine = (graine * 16807) % 2147483647; return graine / 2147483647; };
+        let W = 0, H = 0, cx = 0, cy = 0, R = 0; const dpr = Math.min(2, window.devicePixelRatio || 1);
+        const cadre = () => { const w = core.clientWidth, hh = core.clientHeight; if (w !== W || hh !== H) { W = w; H = hh; cv.width = Math.round(w * dpr); cv.height = Math.round(hh * dpr); } g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H); cx = W / 2; cy = H / 2 + 4; R = Math.min(W, H) * 0.255; };
+        const halo = (r, a) => { const gr = g.createRadialGradient(cx, cy, r * 0.2, cx, cy, r); gr.addColorStop(0, col(C1, a)); gr.addColorStop(0.55, col(K4, a * 0.45)); gr.addColorStop(1, col(K4, 0)); g.fillStyle = gr; g.beginPath(); g.arc(cx, cy, r, 0, TAU); g.fill(); };
+        const fabPoints = (N, kR, kHalo) => { const P = []; for (let i = 0; i < N; i++) { const y = 1 - 2 * (i + 0.5) / N, r = Math.sqrt(1 - y * y), th = i * 2.399963; P.push([Math.cos(th) * r, y, Math.sin(th) * r]); }
+          return (t, e) => { const Rs = R * kR; if (kHalo) halo(Rs * (1.02 + 0.04 * Math.sin(t / 1500)), 0.22 + 0.22 * e);
+            const ay = t * 0.00021, ax = 0.42;
+            for (let i = 0; i < N; i++) { const p = P[i], q = rot(p, ay, ax), onde = 1 + (0.018 + 0.06 * e) * Math.sin(t * 0.0022 - p[1] * 5.5), k = 1 + q[2] * 0.16, f = (q[2] + 1) / 2;
+              const x = cx + q[0] * Rs * onde * k, y = cy + q[1] * Rs * onde * k, al = (0.14 + 0.86 * f * f) * (0.72 + 0.28 * Math.sin(t * 0.0034 + i * 1.7)), sz = 0.8 + 1.7 * f;
+              if (i % 19 === 0 && f > 0.45) { g.fillStyle = col(C2, al * 0.22); g.beginPath(); g.arc(x, y, sz * 2.6, 0, TAU); g.fill(); g.fillStyle = 'rgba(255,255,255,' + al.toFixed(3) + ')'; }
+              else g.fillStyle = col(C2, al);
+              g.fillRect(x - sz / 2, y - sz / 2, sz, sz); }
+            g.strokeStyle = col(C2, 0.16 + 0.12 * e); g.lineWidth = 1; g.beginPath(); g.arc(cx, cy, Rs * 1.07, 0, TAU); g.stroke(); }; };
+        const dessin = fabPoints(720, 1, true);
+        const tour = (t) => { if (!cv.isConnected) { GST.raf = 0; return; } cadre(); GST.e += ((GST.parle ? 1 : 0) - GST.e) * 0.06; dessin(reduit ? 4200 : t, GST.e); GST.raf = reduit ? 0 : requestAnimationFrame(tour); };
+        if (GST.raf) cancelAnimationFrame(GST.raf); GST.raf = requestAnimationFrame(tour);
+      }
+      const VA_O = VIEWS.accueil, ORB = {ang: 20, last: 0, drag: false, pause: 0, front: -1, raf: 0};
+      const COUL = {TRAVAIL: 'var(--c3)', ARGENT: '52,211,153', HERMES: 'var(--c4)', PAPIERS: 'var(--c9)'};
+      /* Réglages : une roue dans l'en-tête, après le rafraîchissement (une seule fois) */
+      { const tools = document.getElementById('top-tools'); if (tools && !document.getElementById('regl-btn')) tools.append(h('button', {type: 'button', class: 'btn icon-btn', id: 'regl-btn', 'aria-label': 'Réglages', title: 'Réglages', onclick: () => go('reglages'), html: icon('gear', 18)})); }
       VIEWS.accueil = (el) => {
-        VA_8(el);
-        const hud = el.querySelector('section.hud'), core = hud && hud.querySelector('.hud-core'); if (!core || hud.classList.contains('hud-8')) return;
+        VA_O(el);
+        const hud = el.querySelector('section.hud'), core = hud && hud.querySelector('.hud-core'); if (!core || hud.classList.contains('hud-o')) return;
         const esp = h('div'); try { VIEWS.espaces(esp); } catch (e) { /* rien */ }
-        const tx = (n, c) => ((n && n.querySelector(c) && n.querySelector(c).textContent) || '').trim();
-        const deTuile = (id, nom, pos) => { const t = esp.querySelector('.esp-tile[data-go="' + id + '"]'); return t ? ro(pos, () => go(id), nom, tx(t, '.esp-v') || '—', tx(t, '.esp-s'), t.classList.contains('amb')) : null; };
-        hud.classList.add('hud-8');
-        [['AGENDA', 't1'], ['MÉTÉO', 't2'], ['POUR TOI', 'l1'], ['ARGENT', 'r1'], ['BONS PRIX', 'r1']].forEach(([k, p]) => { const n = core.querySelector('.hud-ro[data-k="' + k + '"]'); if (n) { n.classList.remove('q-tl', 'q-tr', 'q-bl', 'q-br'); n.classList.add('q-' + p); } });
-        core.append(deTuile('travail', 'TRAVAIL', 'l2'), deTuile('equipe', 'HERMES', 'r2'), deTuile('papiers', 'PAPIERS', 'b1'), ro('b2', () => go('reglages'), 'RÉGLAGES', 'Serveur et accès', 'voix, notifications, Google, mémoire'));
-        requestAnimationFrame(() => requestAnimationFrame(() => { try { hudLines(); } catch (e) { /* rien */ } }));
+        const tx = (n, c) => ((n && n.querySelector(c) && n.querySelector(c).textContent) || '').trim(), R = (k) => core.querySelector('.hud-ro[data-k="' + k + '"]');
+        const deRo = (k) => { const n = R(k); return n ? {k, b: tx(n, 'b') || '—', sub: tx(n, 'span'), amb: n.classList.contains('amb'), act: () => n.click()} : null; };
+        const deEsp = (id, k) => { const t = esp.querySelector('.esp-tile[data-go="' + id + '"]'); return t ? {k, b: tx(t, '.esp-v') || '—', sub: tx(t, '.esp-s'), amb: t.classList.contains('amb'), act: () => go(id)} : null; };
+        const items = [deRo('AGENDA'), deRo('POUR TOI'), deEsp('travail', 'TRAVAIL'), deRo('ARGENT') || deRo('BONS PRIX'), deEsp('equipe', 'HERMES'), deEsp('papiers', 'PAPIERS')].filter(Boolean);
+        if (items.length < 3) return;
+        hud.classList.add('hud-o');
+        /* la météo : une ligne sous « en ligne » ; sa tuile sort du globe mais garde son appui */
+        { const met = R('MÉTÉO'), on = hud.querySelector('.hud-on'); if (met && on) { const t = tx(met, 'b'), sub = tx(met, 'span');
+            on.append(h('button', {type: 'button', class: 'hud-met', 'aria-label': 'Météo', onclick: () => met.click()}, t && t !== '—' ? h('b', {text: t}) : null, (t && t !== '—' ? ' · ' : '') + sub)); } }
+        const anciennes = [...core.querySelectorAll('.hud-ro')]; anciennes.forEach((n) => { n.hidden = true; n.style.display = 'none'; });   /* gardées hors écran : leur appui sert encore */
+        const NS = 'http://www.w3.org/2000/svg', svg = document.createElementNS(NS, 'svg'); svg.setAttribute('class', 'orb-an'); svg.setAttribute('aria-hidden', 'true');
+        const ell = (c) => { const e = document.createElementNS(NS, 'ellipse'); e.setAttribute('class', c); svg.append(e); return e; }, e2 = ell('o2'), e1 = ell('o1'), e3 = document.createElementNS(NS, 'path'); e3.setAttribute('class', 'o3'); e3.setAttribute('fill', 'none'); e3.setAttribute('stroke', 'rgb(var(--c2))'); svg.append(e3);
+        const ping = h('i', {class: 'orb-ping', 'aria-hidden': 'true'});
+        let glisse = false;
+        const chips = items.map((it) => h('button', {type: 'button', class: 'orb-c' + (it.amb ? ' amb' : ''), 'data-k': it.k, onclick: (ev) => { if (glisse) { ev.preventDefault(); return; } it.act(); }}, h('small', {text: it.k}), h('b', {text: it.b})));
+        core.append(svg, ping, ...chips);
+        try { globeNeuf(core); } catch (e) { /* le globe d'aujourd'hui reste */ }
+        const foc = h('button', {type: 'button', class: 'orb-foc', 'aria-live': 'polite', onclick: () => { const it = items[ORB.front]; if (it) it.act(); }});
+        core.after(foc);
+        const reduit = window.matchMedia('(prefers-reduced-motion: reduce)').matches, pas = 360 / items.length;
+        const auPoint = (i) => { const it = items[i]; if (!it) return; ORB.front = i;
+          chips.forEach((c, k) => c.classList.toggle('is-front', k === i));
+          const coul = it.amb ? 'var(--warn)' : (COUL[it.k] || 'var(--c1)'); core.style.setProperty('--f', coul);
+          foc.className = 'orb-foc'; foc.style.setProperty('--a', coul); foc.style.setProperty('--a2', it.amb ? '253,230,138' : it.k === 'TRAVAIL' ? '196,160,255' : it.k === 'ARGENT' ? '110,231,183' : it.k === 'HERMES' ? '165,180,252' : it.k === 'PAPIERS' ? 'var(--c9)' : 'var(--c2)');
+          foc.replaceChildren(h('small', {text: it.k}), h('b', {text: it.b}), it.sub ? h('span', {text: ' — ' + it.sub}) : null, h('i', {text: '›'}));
+          if (!reduit) { void foc.offsetWidth; foc.classList.add('va'); ping.classList.remove('va'); void ping.offsetWidth; ping.classList.add('va'); } };
+        let geo = '';
+        const image = (t) => {
+          if (!core.isConnected) { ORB.raf = 0; return; }
+          const W = core.clientWidth, H = core.clientHeight, cx = W / 2, cy = H / 2 + 4, a = Math.min(W / 2 - 50, 178), b = a * 0.37;
+          if (geo !== W + 'x' + H) { geo = W + 'x' + H; svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+            [[e1, a, b, 0], [e2, a * 0.86, b * 1.5, -24]].forEach(([e, rx, ry, rot]) => { e.setAttribute('cx', cx); e.setAttribute('cy', cy); e.setAttribute('rx', rx); e.setAttribute('ry', ry); e.setAttribute('transform', 'rotate(' + rot + ' ' + cx + ' ' + cy + ')'); });
+            e3.setAttribute('d', 'M' + (cx - a * 0.5).toFixed(1) + ' ' + (cy + b * 0.866).toFixed(1) + ' A' + a + ' ' + b + ' 0 0 0 ' + (cx + a * 0.5).toFixed(1) + ' ' + (cy + b * 0.866).toFixed(1)); }
+          if (!ORB.drag && !reduit && t > ORB.pause && ORB.last) ORB.ang -= Math.min(64, t - ORB.last) * 0.0072;   /* un tour en 50 secondes */
+          ORB.last = t;
+          let devant = 0, mieux = -2;
+          chips.forEach((c, i) => { const th = (ORB.ang + i * pas) * Math.PI / 180, d = Math.sin(th), p = (d + 1) / 2, x = cx + a * Math.cos(th), y = cy + b * d + (reduit ? 0 : Math.sin(t / 950 + i * 1.9) * 3.5);
+            c.style.transform = 'translate(' + x.toFixed(1) + 'px,' + y.toFixed(1) + 'px) translate(-50%,-50%) scale(' + (0.8 + 0.3 * p + (i === ORB.front ? 0.06 : 0)).toFixed(3) + ')';
+            c.style.opacity = (0.36 + 0.64 * p).toFixed(2); c.style.zIndex = d > -0.2 ? '3' : '0'; if (d > mieux) { mieux = d; devant = i; } });
+          if (devant !== ORB.front) auPoint(devant);
+          ORB.raf = requestAnimationFrame(image);
+        };
+        /* faire tourner l'anneau du doigt */
+        let x0 = null, a0 = 0;
+        core.addEventListener('pointerdown', (e) => { x0 = e.clientX; a0 = ORB.ang; glisse = false; });
+        core.addEventListener('pointermove', (e) => { if (x0 == null) return; const dx = e.clientX - x0; if (Math.abs(dx) > 7) { glisse = true; ORB.drag = true; } if (ORB.drag) ORB.ang = a0 - dx * 0.42; });
+        const fin = () => { if (x0 == null) return; x0 = null; if (ORB.drag) { ORB.drag = false; ORB.pause = performance.now() + 2600; setTimeout(() => { glisse = false; }, 60); } };
+        core.addEventListener('pointerup', fin); core.addEventListener('pointercancel', fin); core.addEventListener('pointerleave', fin);
+        if (ORB.raf) cancelAnimationFrame(ORB.raf); ORB.front = -1; ORB.last = 0; ORB.raf = requestAnimationFrame(image);
       };
     } }
 
