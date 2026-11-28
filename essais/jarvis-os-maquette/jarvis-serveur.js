@@ -216,7 +216,7 @@
     voulu = e; if (!ecran) return; ecran.dataset.etat = e; ecran.querySelector('.vx-etat').textContent = TITRES[e] || '';
     const L = ETAPES[e] || []; ecran.querySelectorAll('.vx-etape').forEach((li, i) => { const x = L[i] || ['', '']; li.dataset.e = x[0]; li.querySelector('span').textContent = (i === 1 && ident && x[0] === 'fait' ? ident : x[1]); });
     const btn = ecran.querySelector('#verrou-ouvrir'); if (btn) { btn.textContent = e === 'injoignable' ? 'Réessayer' : 'Déverrouiller'; btn.disabled = false; }
-    ecran.setAttribute('aria-label', TITRES[e] || 'JARVIS');
+    ecran.setAttribute('aria-label', TITRES[e] || 'JARVIS'); placer(ecran);
   };
   /* l'écran s'efface sur l'app : « Bienvenue », puis un fondu */
   const partir = () => { if (!ecran) return; const x = ecran; etatEcran('pret', x.dataset.ident || ''); setTimeout(() => { x.classList.add('vx-part'); setTimeout(() => { if (ecran === x) cacherVerrou(); else x.remove(); }, 420); }, 260); };
@@ -250,11 +250,16 @@
   function styleAccueil() {
     if (!document.getElementById('verrou-style')) {
       const st = document.createElement('style'); st.id = 'verrou-style';
-      st.textContent = '#verrou-ecran{position:fixed;inset:0;z-index:2147483647;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:0;padding:calc(env(safe-area-inset-top,0px) + 16px) 26px 0;background:radial-gradient(90% 46% at 50% 21%,rgba(34,211,238,.16),rgba(168,85,247,.08) 46%,rgba(4,6,12,0) 74%),linear-gradient(180deg,#071226 0%,#050915 52%,#03050b 100%);color:#e6edf7;font:500 16px/1.4 var(--sans,system-ui,-apple-system,sans-serif);text-align:center;overflow:hidden;opacity:1;transition:opacity .4s ease,transform .4s ease}'
+      st.textContent = '#verrou-ecran{position:fixed;inset:0;z-index:2147483647;display:block;box-sizing:border-box;padding:env(safe-area-inset-top,0px) 0 0;background:radial-gradient(130% 36% at 50% 108%,rgba(168,85,247,.15),rgba(34,211,238,.05) 48%,rgba(4,6,12,0) 72%),linear-gradient(180deg,#061022 0%,#050915 50%,#03050b 100%);color:#e6edf7;font:500 16px/1.4 var(--sans,system-ui,-apple-system,sans-serif);text-align:center;overflow:hidden;opacity:1;transition:opacity .4s ease,transform .4s ease}'
         + '#verrou-ecran.vx-part{opacity:0;transform:scale(1.035);pointer-events:none}'
-        + '#verrou-ecran .vx-marque{font:600 13px var(--logo,var(--display,system-ui,sans-serif));letter-spacing:.44em;text-indent:.44em;color:#9ecbff;opacity:.9}'
+        + '#verrou-ecran .vx-pous{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}'
+        + '#verrou-ecran .vx-marque{position:absolute;left:0;right:0;bottom:calc(env(safe-area-inset-bottom,0px) + 26px);font:600 12px var(--logo,var(--display,system-ui,sans-serif));letter-spacing:.44em;text-indent:.44em;color:#8fb4e6;opacity:.7;pointer-events:none;transition:opacity .3s}'
+        + '#verrou-ecran.vx-serre .vx-marque{opacity:0}'
+        + '#verrou-ecran .vx-bloc{position:absolute;left:0;right:0;top:0;box-sizing:border-box;padding:0 26px;display:flex;flex-direction:column;align-items:center;will-change:transform}'
+        + '#verrou-ecran .vx-bloc.vx-vif,#verrou-ecran .vx-vif .vx-orbe{transition:transform .62s cubic-bezier(.2,.8,.2,1)}'
         + '#verrou-ecran .vx-centre{display:flex;flex-direction:column;align-items:center;gap:0;width:100%}'
-        + '#verrou-ecran .vx-orbe{position:relative;width:min(38vw,17vh,158px);aspect-ratio:1;margin:calc(min(2.2vh,18px)) 0 calc(min(1.4vh,12px));display:grid;place-items:center}'
+        + '#verrou-ecran .vx-orbe{position:relative;width:min(44vw,20vh,184px);aspect-ratio:1;margin:0 0 calc(min(1.8vh,16px));display:grid;place-items:center;transform-origin:50% 100%;transform:scale(var(--vx-k,1))}'
+        + '#verrou-ecran .vx-orbe::before{content:"";position:absolute;inset:-95%;border-radius:50%;background:radial-gradient(closest-side,rgba(34,211,238,.17),rgba(168,85,247,.08) 46%,rgba(4,6,12,0) 76%);pointer-events:none}'
         + '#verrou-ecran .vx-orbe canvas{position:absolute;inset:-14%;width:128%;height:128%}'
         + '#verrou-ecran .vx-orbe::after{content:"";position:absolute;inset:-5%;border-radius:50%;border:2px solid transparent;border-top-color:#22d3ee;border-right-color:rgba(168,85,247,.85);opacity:0;transition:opacity .3s}'
         + '#verrou-ecran:is([data-etat=scan],[data-etat=lien],[data-etat=charge]) .vx-orbe::after{opacity:1;animation:vx-tour 1.15s linear infinite}'
@@ -280,7 +285,7 @@
         + '#verrou-ecran:is([data-etat=scan],[data-etat=lien],[data-etat=charge],[data-etat=pret]) #verrou-ouvrir{opacity:0;pointer-events:none}'
         + '#verrou-ecran [role=status]{margin:0;min-height:1.4em;font-size:14px;color:#fca5a5}'
         + '@keyframes vx-tour{to{transform:rotate(360deg)}}'
-        + '@media (prefers-reduced-motion:reduce){#verrou-ecran .vx-orbe::after,#verrou-ecran .vx-etape[data-e=cours] i{animation:none}}';
+        + '@media (prefers-reduced-motion:reduce){#verrou-ecran .vx-orbe::after,#verrou-ecran .vx-etape[data-e=cours] i{animation:none}#verrou-ecran .vx-bloc.vx-vif,#verrou-ecran .vx-vif .vx-orbe{transition:none}}';
       st.textContent = st.textContent.replace(/#verrou-ecran/g, ':is(#verrou-ecran,#porte-ecran)').replace(/#verrou-ouvrir/g, ':is(#verrou-ouvrir,#porte-relier)')
         + '#porte-ecran form{display:flex;flex-direction:column;align-items:center;gap:10px;width:100%}'
         + '#porte-code{width:min(100%,320px);box-sizing:border-box;padding:14px 16px;border-radius:14px;border:1px solid rgba(125,211,252,.35);background:rgba(10,16,32,.85);color:#e6edf7;font:600 20px var(--sans,system-ui,sans-serif);letter-spacing:.14em;text-align:center;text-transform:uppercase}'
@@ -294,7 +299,7 @@
   function globe(orbe, de) {
     const cv = document.createElement('canvas'); cv.setAttribute('aria-hidden', 'true'); orbe.append(cv);
     const g = cv.getContext && cv.getContext('2d'); if (!g) return;
-    const N = 420, P = [], TAU = Math.PI * 2, dpr = Math.min(2, window.devicePixelRatio || 1), reduit = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+    const N = 420, P = [], TAU = Math.PI * 2, dpr = Math.min(3, window.devicePixelRatio || 1) * 1.3, reduit = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
     for (let i = 0; i < N; i++) { const y = 1 - 2 * (i + 0.5) / N, r = Math.sqrt(1 - y * y), th = i * 2.399963; P.push([Math.cos(th) * r, y, Math.sin(th) * r]); }
     let W = 0, a = 0, v = 1, dernier = 0, ouvre = 0;
     const tour = (t) => {
@@ -322,10 +327,62 @@
     const el = (t, cls, txt) => { const x = document.createElement(t); if (cls) x.className = cls; if (txt) x.textContent = txt; return x; };
     const d = new Date(), hh = d.getHours(), salut = hh >= 5 && hh < 12 ? 'Bonjour.' : hh >= 12 && hh < 18 ? 'Bon après-midi.' : 'Bonsoir.';
     let quand = ''; try { quand = d.toLocaleDateString('fr-FR', {weekday: 'long', day: 'numeric', month: 'long'}) + ' · ' + d.toLocaleTimeString('fr-FR', {hour: '2-digit', minute: '2-digit'}); } catch (e) { quand = ''; }
-    const orbe = el('div', 'vx-orbe'), centre = el('div', 'vx-centre'); globe(orbe, fond);
+    const orbe = el('div', 'vx-orbe'), centre = el('div', 'vx-centre'), bloc = el('div', 'vx-bloc'); globe(orbe, fond);
     centre.append(orbe, el('h1', 'vx-salut', salut), el('p', 'vx-date', quand), el('p', 'vx-etat'));
-    fond.append(el('div', 'vx-marque', 'J.A.R.V.I.S'), centre);
-    return {el, centre};
+    bloc.append(centre); fond.append(el('div', 'vx-marque', 'J.A.R.V.I.S'), bloc); poussiere(fond);
+    return {el, centre, bloc};
+  }
+  /* 0.105.0 (son retour du 28/11/2026, capture à l'appui : « trop en hauteur ; à la seconde où le passkey disparaît ça rend bizarre ; même
+     avec le popup c'est trop vers le haut ; et c'est flouté en haut ») : le bloc (globe, salut, état, étapes, bouton) n'est plus collé en haut.
+     - pendant Face ID, il se pose juste au-dessus de la feuille de l'iPhone : le bas des étapes à 56 % de la hauteur ;
+     - le reste du temps (connexion, lecture des données, verrouillé, panne), il est au milieu de l'écran, le globe plus grand ; il glisse de
+       l'un à l'autre, y compris à travers le rechargement qui suit la preuve ;
+     - plus rien d'écrit sous la barre d'état (l'iPhone y floute ce qui passe dessous) : la marque est en pied d'écran, et le bloc commence
+       34 points sous la zone de l'encoche ; le clavier ouvert (porte d'un appareil pas relié), le globe rapetisse pour que tout tienne. */
+  const placer = (fond, comme) => {
+    const bloc = fond && fond.querySelector('.vx-bloc'), orbe = bloc && bloc.querySelector('.vx-orbe'); if (!orbe) return;
+    const vv = window.visualViewport, H = Math.round((vv && vv.height) || window.innerHeight || 0), S = orbe.offsetHeight; if (!H || !S) return;
+    const e = comme || fond.dataset.comme || fond.dataset.etat, auVerrou = fond.id === 'verrou-ecran', feuille = auVerrou && e === 'scan', liste = bloc.querySelector('.vx-etapes');
+    const haut = (parseFloat(getComputedStyle(fond).paddingTop) || 0) + 34;
+    const plein = auVerrou && liste && /^(scan|lien|charge|pret)$/.test(e) ? liste.offsetTop + liste.offsetHeight : bloc.offsetHeight;   /* le bouton caché ne compte pas */
+    const reste = plein - S, bas = feuille ? Math.round(H * 0.56) : H - 40;
+    const k = Math.max(0.55, Math.min(feuille ? 1 : 1.28, (bas - haut - reste) / S)), h = reste + S * k;
+    const y = Math.max(haut, Math.round(feuille ? bas - h : (H - h) * 0.45));
+    fond.classList.toggle('vx-serre', y + h > H - 78);   /* le bloc arrive au pied de l'écran (clavier ouvert, petit écran) : la marque s'efface */
+    bloc.style.setProperty('--vx-k', k.toFixed(3)); bloc.style.transform = 'translate3d(0,' + Math.round(y + S * (k - 1)) + 'px,0)';   /* le globe grandit vers le haut */
+  };
+  /* première pose sans glissement (éventuellement « comme » un autre état : la suite d'un écran d'avant le rechargement), puis les suivantes glissent */
+  const installer = (fond, comme) => {
+    const bloc = fond.querySelector('.vx-bloc'); if (comme) fond.dataset.comme = comme; placer(fond);   /* tant que `comme` est là, tout changement d'état garde cette place */
+    const vif = () => { if (!fond.isConnected) return; bloc.classList.add('vx-vif'); delete fond.dataset.comme; placer(fond); };
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => requestAnimationFrame(vif)); else vif();
+    if (typeof ResizeObserver === 'function') new ResizeObserver(() => placer(fond)).observe(bloc);   /* une police qui arrive, un message qui s'ajoute */
+  };
+  const replacer = () => { if (ecran) placer(ecran); if (porte) placer(porte); };
+  if (typeof window !== 'undefined' && window.addEventListener) { window.addEventListener('resize', replacer); if (window.visualViewport) window.visualViewport.addEventListener('resize', replacer); }
+  /* un fond vivant sur tout l'écran : des poussières de lumière qui montent lentement, du cyan au violet. Rien à lire dedans : ce que la
+     feuille de Face ID couvre ne manque pas. Immobile si l'appareil le demande. */
+  function poussiere(fond) {
+    const cv = document.createElement('canvas'); cv.className = 'vx-pous'; cv.setAttribute('aria-hidden', 'true'); fond.prepend(cv);
+    const g = cv.getContext && cv.getContext('2d'); if (!g) return;
+    const N = 58, P = [], dpr = Math.min(2, window.devicePixelRatio || 1), reduit = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+    let graine = 7; const alea = () => { graine = (graine * 16807) % 2147483647; return graine / 2147483647; };
+    for (let i = 0; i < N; i++) P.push({x: alea(), y: alea(), v: 0.006 + 0.016 * alea(), t: 0.6 + 1.9 * alea(), p: alea() * 6.283, d: (alea() - 0.5) * 0.012});
+    let W = 0, H = 0, dernier = 0;
+    const tour = (t) => {
+      if (!cv.isConnected) return;
+      const w = cv.clientWidth, h = cv.clientHeight; if (w !== W || h !== H) { W = w; H = h; cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
+      const dt = dernier ? Math.min(50, t - dernier) / 1000 : 0; dernier = t;
+      g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+      for (const q of P) {
+        q.y -= q.v * dt; q.x += q.d * dt; if (q.y < -0.02) { q.y = 1.02; q.x = alea(); } if (q.x < 0) q.x += 1; else if (q.x > 1) q.x -= 1;
+        const bord = Math.min(1, q.y / 0.14, (1 - q.y) / 0.1), al = Math.max(0, bord) * (0.16 + 0.42 * (0.5 + 0.5 * Math.sin(t * 0.0011 * q.t + q.p))) * (0.55 + 0.45 * q.y);   /* plus dense vers le bas */
+        g.fillStyle = 'rgba(' + Math.round(34 + 134 * q.x) + ',' + Math.round(211 - 126 * q.x) + ',' + Math.round(238 + 9 * q.x) + ',' + al.toFixed(3) + ')';
+        g.beginPath(); g.arc(q.x * W, q.y * H, q.t * 0.7, 0, 6.283); g.fill();
+      }
+      if (!reduit) requestAnimationFrame(tour);
+    };
+    requestAnimationFrame(tour);
   }
   /* dès que <body> existe (sans attendre la fin du chargement de la page : l'écran est là avant l'app) */
   const quandCorps = (fn) => { if (document.body) { fn(); return; } const o = new MutationObserver(() => { if (document.body) { o.disconnect(); fn(); } }); o.observe(document.documentElement, {childList: true}); };
@@ -339,7 +396,7 @@
       if (porte || !document.body) return;
       styleAccueil(); cacherVerrou();
       const fond = document.createElement('div'); fond.id = 'porte-ecran'; fond.dataset.etat = 'attente'; fond.setAttribute('role', 'dialog'); fond.setAttribute('aria-modal', 'true'); fond.setAttribute('aria-label', 'Cet appareil n’est pas relié à JARVIS');
-      const {el, centre} = corpsAccueil(fond); centre.querySelector('.vx-etat').textContent = 'Cet appareil n’est pas relié à JARVIS';
+      const {el, centre, bloc} = corpsAccueil(fond); centre.querySelector('.vx-etat').textContent = 'Cet appareil n’est pas relié à JARVIS';
       const code = el('input'); code.id = 'porte-code'; code.type = 'text'; code.maxLength = 12; code.placeholder = 'Code à 8 caractères'; code.setAttribute('autocomplete', 'off'); code.setAttribute('autocapitalize', 'characters'); code.setAttribute('autocorrect', 'off'); code.spellcheck = false; code.setAttribute('aria-label', 'Code donné par ton serveur');
       const btn = el('button', '', 'Relier cet appareil'); btn.type = 'submit'; btn.id = 'porte-relier';
       const msg = el('p'); msg.setAttribute('role', 'status');
@@ -353,27 +410,27 @@
         btn.disabled = false; msg.textContent = (r && r.error) || 'Code refusé.';
       });
       form.append(code, btn, msg, el('p', 'vx-note', 'Le code se demande à ton serveur : il sert une fois, pendant 30 minutes.'));
-      const bas = el('div', 'vx-bas'); bas.append(form); fond.append(bas);
-      document.body.append(fond); porte = fond;
+      const bas = el('div', 'vx-bas'); bas.append(form); bloc.append(bas);
+      document.body.append(fond); porte = fond; installer(fond);
     };
     quandCorps(poser);
   }
   /* pose l'écran (une fois), dans l'état demandé ; avant <body>, il sera posé dès qu'il existe, dans le dernier état demandé */
-  function poserEcran(e) {
+  function poserEcran(e, comme) {
     voulu = e; if (ecran) { etatEcran(e); return; }
     quandCorps(() => {
       if (ecran || !document.body || porte || !voulu) return;
       /* rien de personnel sur cet écran : il se voit avant toute preuve */
       styleAccueil();
       const fond = document.createElement('div'); fond.id = 'verrou-ecran'; fond.setAttribute('role', 'dialog'); fond.setAttribute('aria-modal', 'true');
-      const {el, centre} = corpsAccueil(fond), liste = el('ul', 'vx-etapes'); liste.setAttribute('aria-label', 'Où en est l’ouverture');
+      const {el, centre, bloc} = corpsAccueil(fond), liste = el('ul', 'vx-etapes'); liste.setAttribute('aria-label', 'Où en est l’ouverture');
       for (const nom of ['Serveur', 'Identité', 'Données']) { const li = el('li', 'vx-etape'); li.append(el('i'), el('b', '', nom), el('span')); liste.append(li); }
       const msg = el('p'); msg.setAttribute('role', 'status');
       const btn = el('button', '', 'Déverrouiller'); btn.type = 'button'; btn.id = 'verrou-ouvrir';
       btn.addEventListener('click', () => ouvrirVerrou(false));
       const bas = el('div', 'vx-bas'); bas.append(btn, msg);
-      centre.append(liste); fond.append(bas);
-      document.body.append(fond); ecran = fond; etatEcran(voulu);
+      centre.append(liste); bloc.append(bas);
+      document.body.append(fond); ecran = fond; etatEcran(voulu); installer(fond, comme);
       if (verrouille()) autoVerrou(); else if (voulu === 'charge') attendreDonnees();
     });
   }
@@ -400,7 +457,7 @@
     /* 0.102.0 : l'écran d'abord. Il vient de prouver (rechargement) : la suite du même écran, « lecture de tes données ». Lancement de l'app
        avec le verrou actif : « connexion à ton serveur », avant que rien de l'app ne se voie ; deux nouveaux essais si le serveur ne répond pas. */
     let vient = false; try { vient = sessionStorage.getItem(AKEY) === '1'; sessionStorage.removeItem(AKEY); } catch (e) { vient = false; }
-    if (vient) poserEcran('charge'); else if (drapeau() && !mem()) poserEcran('lien');
+    if (vient) poserEcran('charge', 'scan'); else if (drapeau() && !mem()) poserEcran('lien');   /* 0.105.0 : il revient de Face ID : le bloc repart d'où il était, et glisse au milieu */
     const retour = (essai) => req('/api/verrou/retour', {}).then((r) => { const e = r.j && typeof r.j.actif === 'boolean' ? r.j : null; if (e && e.actif && e.ouvert) mem(true); if (!e && voulu === 'lien' && !porte) throw new Error('sans réponse'); lire(e); })
       .catch(() => { if (voulu !== 'lien') return; if (essai < 2) setTimeout(() => retour(essai + 1), 1200); else etatEcran('injoignable'); });
     if (drapeau()) retour(0); else verifierVerrou();
