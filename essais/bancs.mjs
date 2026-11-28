@@ -44,6 +44,8 @@ for (const f of fs.readdirSync(path.join(RACINE, SERVEUR, 'tests')).filter((x) =
   const src = fs.readFileSync(path.join(RACINE, SERVEUR, 'tests', f), 'utf8');
   bancs.push({nom: f.replace('.test.mjs', ''), sorte: 'serveur', cmd: ['node', SERVEUR + '/tests/' + f], entrees: [SERVEUR].concat(/jarvis-os-maquette|essais\//.test(src) ? [APP] : [], /hermes/.test(src) ? [HERMES] : [])});
 }
+/* l'écran de connexion (0.102.0) : un faux serveur, une fausse passkey, quatre tailles d'écran */
+bancs.push({nom: 'ecran', sorte: 'serveur', cmd: ['node', APP + '/banc/ecran-verrou.cjs'], entrees: [APP + '/jarvis-serveur.js', APP + '/index.html', APP + '/banc/ecran-verrou.cjs']});
 const copies = ['jours', 'reponses', 'signe', 'signe-controle', 'radar', 'notify', 'pdf', 'bots', 'google'].map((m) => SERVEUR + '/' + m + '.mjs');
 bancs.push({nom: 'portail', sorte: 'hermes', long: true, cmd: ['bash', 'essais/hermes/portail.test.sh'], entrees: [HERMES + '/portail', HERMES + '/limite.py', 'essais/hermes'].concat(copies)});
 for (const n of ['ordres', 'relance', 'garde', 'routines-conf', 'note']) bancs.push({nom: n, sorte: 'hermes', cmd: ['bash', 'essais/hermes/' + n + '.test.sh'], entrees: [HERMES, 'essais/hermes'].concat(n === 'ordres' ? [SERVEUR + '/hermes-admin.mjs', SERVEUR + '/hermes-routines.mjs'] : [])});
