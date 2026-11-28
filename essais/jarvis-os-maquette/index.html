@@ -10919,13 +10919,16 @@ void main(){
       + '.trv-et>div{position:relative;display:flex;flex-direction:column;align-items:center;gap:5px;text-align:center;font-size:11px;line-height:1.2;color:var(--muted);min-width:0;padding:0 2px}'
       + '.trv-et i{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font:700 11.5px var(--display);font-style:normal;border:2px solid rgba(var(--c1),.35);background:rgb(var(--k1));z-index:1}'
       + '.trv-et>div::before{content:"";position:absolute;top:11px;left:calc(-50% + 11px);right:calc(50% + 11px);height:2px;background:rgba(var(--c1),.22)}.trv-et>div:first-child::before{display:none}'
-      + '.trv-et .fait i{border-color:var(--green);background:var(--green);color:#052e1c}.trv-et .fait::before{background:var(--green)}.trv-et .fait{color:var(--fg)}'
+      /* 0.101.0 (sa remarque : « les étapes en vert cassent l'immersion ») : une étape faite est aux couleurs du thème, comme la barre dessous */
+      + '.trv-et .fait i{border-color:rgb(var(--c2));background:rgba(var(--c1),.2);color:rgb(var(--c2));box-shadow:0 0 10px rgba(var(--c1),.45)}.trv-et .fait::before{background:linear-gradient(90deg,rgba(var(--c1),.55),rgb(var(--c2)))}.trv-et .fait{color:var(--fg)}'
+      + '.trv-acts{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 2px}.trv-acts .btn{min-height:42px}.trv-atoi{margin:10px 0 0}.trv-card{-webkit-tap-highlight-color:transparent}.trv-card:focus-visible{outline:2px solid rgb(var(--c2));outline-offset:2px}'
+      + 'button.trv-ev{font:inherit;color:var(--fg);text-align:left;cursor:pointer}button.trv-ev:active{transform:scale(.97)}.trv-card.vise{animation:trvvise 1.8s ease-out}@keyframes trvvise{0%,40%{border-color:rgb(var(--c2));box-shadow:0 0 0 2px rgba(var(--c2),.55),0 0 34px rgba(var(--c1),.55)}100%{box-shadow:inset 0 1px 0 rgba(var(--c6),.1),0 10px 26px rgba(0,0,0,.3)}}'
       + '.trv-et .encours i{border-color:rgb(var(--warn));color:rgb(var(--warn))}.trv-et .encours{color:#fde68a;font-weight:600}.trv-et .bloque i{border-color:var(--danger);color:var(--danger)}.trv-et .bloque{color:var(--danger)}'
       + '.trv-barre{height:6px;border-radius:99px;background:rgba(var(--c1),.13);overflow:hidden;margin:2px 0 10px}.trv-barre i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,rgb(var(--c1)),#a855f7)}'
       + '.trv-prevu{display:flex;flex-wrap:wrap;gap:6px;align-items:center}.trv-prevu small{color:var(--muted);font-size:12.5px;margin-right:2px}'
       + '.trv-ch{padding:4px 8px;border-radius:10px;font:600 12px var(--display);background:rgba(var(--c1),.12);border:1px solid rgba(var(--c1),.2);white-space:nowrap}.trv-ch.non{background:none;color:var(--muted)}.trv-ch.amb{color:#fde68a;border-color:rgba(var(--warn),.5)}'
       + '.trv-alerte{margin:10px 0 0;padding:10px 12px;border-radius:14px;border:1px solid rgba(var(--warn),.5);background:rgba(var(--warn),.08);font-size:13.5px}.trv-alerte b{color:#fde68a}'
-      + '.trv-der{margin:10px 0 0;padding-top:9px;border-top:1px solid rgba(var(--c1),.14);color:var(--muted);font-size:13px}.trv-der b{color:var(--fg);font-weight:600}.trv-der .ok{color:var(--green)}.trv-der .ko{color:var(--danger)}'
+      + '.trv-der{margin:10px 0 0;padding-top:9px;border-top:1px solid rgba(var(--c1),.14);color:var(--muted);font-size:13px}.trv-der b{color:var(--fg);font-weight:600}.trv-der .ok{color:rgb(var(--c2))}.trv-der .ko{color:var(--danger)}'
       + '.trv-mails{display:grid;gap:6px;margin:10px 0 0}.trv-mails>div{font-size:13.5px;padding:8px 10px;border-radius:12px;background:rgba(255,255,255,.04);border:1px solid rgba(var(--c1),.14)}.trv-mails em{font-style:normal;color:var(--green);font-weight:600;white-space:nowrap}'
       /* 0.94.0 : un mail du mois, « envoyé le … », puis chaque réponse (qui, quand, PDF, extrait) ; « Ouvrir le mail » dans la feuille */
       + '.trv-mail-t{display:flex;justify-content:space-between;align-items:baseline;gap:8px}.trv-mail-t span{min-width:0;overflow-wrap:anywhere}'
@@ -10962,14 +10965,39 @@ void main(){
         detail && s.controleDit && s.etat !== 'fait' && !s.dit ? h('p', {'data-controle': s.controle || '', text: s.controleDit}) : null,   /* 0.98.0 : le PDF comparé à la saisie */
         detail && s.etat !== 'fait' ? trvLien(s.url) : null].filter(Boolean);
       return l.length ? h('div', {class: 'trv-signe', 'data-signe': s.etat || ''}, l) : null; };
+    /* 0.101.0 (sa remarque du 28/11/2026 : « dans Travail tu ne fais presque que de la consultation ; si tu veux relancer, tu dois aller côté
+       routine ; j'ai passé 2 minutes à chercher comment relancer la saisie du CRA hebdomadaire ; les boutons doivent apparaître, je ne dois
+       pas descendre tout en bas ») : ON AGIT DEPUIS LA CARTE. Ce qui l'attend et ses boutons sont en haut de la carte, juste sous le titre :
+       les actions de la feuille (« Oui, déposer », « Réessayer avec Hermes », « C'est rattaché », « Je le fais moi-même »…) et, pour le CRA
+       de la semaine, « Relancer Hermes » ou « Confirmer et soumettre » (les mêmes gestes que la carte de « Pour moi », un nouveau oui = une
+       nouvelle tentative). La carte n'est plus un bouton (on ne met pas de bouton dans un bouton) : un appui ailleurs ouvre toujours sa feuille. */
+    function trvActs(r) {
+      const l = [], arret = (fn) => (ev) => { ev.stopPropagation(); fn(); };
+      const sem = r.ouvrir === 'semaine' && r.lundi && JRS.data && JRS.data.semaine && JRS.data.semaine.lundi === r.lundi ? JRS.data.semaine : null;
+      if (sem && !sem.bloque && !CRA.busy) {
+        if (sem.etat === 'a_la_main') l.push(btn('Relancer Hermes', arret(() => craAgir('confirmer')), 'sm main trv-agir'));
+        else if (sem.etat === 'a_valider' && sem.confirmable) l.push(btn('Confirmer et soumettre', arret(() => craAgir('confirmer')), 'sm main trv-agir'));
+      }
+      let actions = []; try { actions = (SHEETCFG.travail(r).actions || []).filter((a) => a && a.label !== 'Renommer'); } catch (e) { actions = []; }
+      actions.forEach((a) => { const voir = /^Voir /.test(a.label); if (voir && !r.toi && !sem) return;   /* « Voir… » n'est un bouton de la carte que s'il y a quelque chose à y faire */
+        l.push(btn(a.label, arret(() => ((a.pick || a.confirm) ? openItem('travail', r, a) : finish(a.go(), {type: 'travail', item: r}))), 'sm ' + (!l.length && !voir ? 'main ' : '') + 'trv-agir')); });
+      return l.length ? h('div', {class: 'trv-acts'}, l.slice(0, 3)) : null;
+    }
     function trvCarte(r) {
-      return h('button', {type: 'button', class: 'trv-card' + (r.toi ? ' toi' : ''), 'data-trv': r.id, onclick: () => openItem('travail', r)},
+      const acts = trvActs(r);
+      return h('article', {class: 'trv-card' + (r.toi ? ' toi' : ''), 'data-trv': r.id, role: 'button', tabindex: '0', onclick: () => openItem('travail', r), onkeydown: (ev) => { if (ev.key === 'Enter' && ev.target === ev.currentTarget) openItem('travail', r); }},
         h('div', {class: 'trv-tete'}, h('h3', {text: r.titre}), h('span', {class: 'trv-qui ' + (r.qui || ''), text: r.quiDit})),
+        r.toi ? h('div', {class: 'trv-alerte trv-atoi'}, h('b', {text: 'À toi : '}), r.toi) : null,
+        acts,
         h('p', {class: 'trv-quand'}, 'Prochaine : ', h('b', {text: r.prochaine || '—'})),
         trvEtapes(r), trvPrevu(r),
         r.alerte ? h('div', {class: 'trv-alerte', text: r.alerte}) : null,
-        r.toi ? h('div', {class: 'trv-alerte'}, h('b', {text: 'À toi : '}), r.toi) : null,
         trvSigne(r, false), trvMails(r, false), trvDer(r));
+    }
+    /* « Ce qui vient » : chaque ligne mène à sa carte (sa remarque : « ce sont des blocs statiques alors qu'ils sont censés t'amener au bloc ») */
+    function trvAller(id) {
+      const viser = () => { const c = document.querySelector('#view .trv-card[data-trv="' + id + '"]'); if (!c) return false; c.scrollIntoView({behavior: reduced ? 'auto' : 'smooth', block: 'center'}); c.classList.remove('vise'); void c.offsetWidth; c.classList.add('vise'); setTimeout(() => c.classList.remove('vise'), 1900); return true; };
+      if (!viser() && TRV.f !== 'tout') { TRV.f = 'tout'; renderView(true); setTimeout(viser, 80); }
     }
     SHEETCFG.travail = (r) => {
       const api = travailAPI(), actions = [];
@@ -11009,7 +11037,9 @@ void main(){
       /* ce qui attend son oui : les cartes de « Pour moi », ici aussi */
       if (TRV.f === 'tout' || TRV.f === 'cra' || TRV.f === 'jours') { const pm = [TRV.f !== 'jours' && JRS.data && JRS.data.semaine && JRS.data.semaine.demande ? craCard() : null, TRV.f !== 'cra' && JRS.data && JRS.data.demande ? joursCard() : null].filter(Boolean); if (pm.length) el.append(h('p', {class: 'trv-h', text: 'À toi'}), ...pm); }
       const fr = (d.frise || []).filter((e) => TRV.f === 'tout' || vis.some((r) => e.quoi.indexOf(r.titre) === 0));
-      if (fr.length) el.append(h('p', {class: 'trv-h', text: 'Ce qui vient'}), h('div', {class: 'trv-frise'}, fr.map((e) => h('div', {class: 'trv-ev' + (e.toi ? ' toi' : '')}, h('b', {text: e.quand}), h('span', {text: e.quoi}), h('small', {text: e.qui})))));
+      if (fr.length) el.append(h('p', {class: 'trv-h', text: 'Ce qui vient'}), h('div', {class: 'trv-frise'}, fr.map((e) => { const c = d.routines.filter((r) => e.quoi.indexOf(r.titre) === 0).sort((x, y) => y.titre.length - x.titre.length)[0];   /* 0.101.0 : la ligne mène à sa carte */
+        return c ? h('button', {type: 'button', class: 'trv-ev' + (e.toi ? ' toi' : ''), 'data-vers': c.id, onclick: () => trvAller(c.id)}, h('b', {text: e.quand}), h('span', {text: e.quoi}), h('small', {text: e.qui + ' ›'}))
+          : h('div', {class: 'trv-ev' + (e.toi ? ' toi' : '')}, h('b', {text: e.quand}), h('span', {text: e.quoi}), h('small', {text: e.qui})); })));
       el.append(h('p', {class: 'trv-h', text: 'Tes routines'}), ...vis.map(trvCarte));
     };
     { const VE_TRV = VIEWS.espaces;
@@ -12895,7 +12925,7 @@ void main(){
         + '.orb-foc{--a:var(--c1);--a2:var(--c2);display:block;width:100%;margin:6px 0 0;padding:6px 8px;min-height:44px;background:none;border:0;color:var(--fg);font:500 13.5px/1.35 var(--sans);text-align:center;cursor:pointer}.orb-foc small{font:700 11px var(--display);letter-spacing:.16em;color:rgb(var(--a2));margin-right:8px}.orb-foc b{font:700 14.5px var(--display)}.orb-foc span{color:var(--muted)}.orb-foc i{font-style:normal;color:rgb(var(--a2));margin-left:6px}'
         + '.orb-foc.va{animation:orbfoc .5s ease-out}@keyframes orbfoc{0%{opacity:0;transform:translateY(4px);letter-spacing:.04em}100%{opacity:1;transform:none;letter-spacing:0}}'
         + '.hud-met{display:block;margin:5px 0 0 auto;padding:0;background:none;border:0;font:500 12px var(--sans);letter-spacing:.02em;color:var(--muted);text-align:right;white-space:nowrap;cursor:pointer}.hud-met b{color:var(--fg);font-weight:600}'
-        + '.g-neuf{position:absolute;inset:0;width:100%;height:100%;z-index:1;pointer-events:none}'
+        + '.g-neuf{position:absolute;inset:0;width:100%;height:100%;z-index:1;pointer-events:none}.orb-c.eclat{border-color:rgb(var(--a2));box-shadow:0 0 30px rgba(var(--a),.75),inset 0 0 18px rgba(var(--a),.25)}'
         + '@media (prefers-reduced-motion: reduce){.orb-an ellipse,.orb-ping.va,.orb-foc.va{animation:none}}'}));
       /* ---- le globe de particules (son choix du 28/11 parmi six essais en deux familles, particules et plasma) : une sphère de points qui
          tourne et scintille, traversée d'ondes, dessinée ici sur un canevas 2D aux couleurs du thème (--c1, --c2, --k4, lues dans la page) ;
@@ -12916,20 +12946,103 @@ void main(){
         let W = 0, H = 0, cx = 0, cy = 0, R = 0; const dpr = Math.min(2, window.devicePixelRatio || 1);
         const cadre = () => { const w = core.clientWidth, hh = core.clientHeight; if (w !== W || hh !== H) { W = w; H = hh; cv.width = Math.round(w * dpr); cv.height = Math.round(hh * dpr); } g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H); cx = W / 2; cy = H / 2 + 4; R = Math.min(W, H) * 0.255; };
         const halo = (r, a) => { const gr = g.createRadialGradient(cx, cy, r * 0.2, cx, cy, r); gr.addColorStop(0, col(C1, a)); gr.addColorStop(0.55, col(K4, a * 0.45)); gr.addColorStop(1, col(K4, 0)); g.fillStyle = gr; g.beginPath(); g.arc(cx, cy, r, 0, TAU); g.fill(); };
-        const fabPoints = (N, kR, kHalo) => { const P = []; for (let i = 0; i < N; i++) { const y = 1 - 2 * (i + 0.5) / N, r = Math.sqrt(1 - y * y), th = i * 2.399963; P.push([Math.cos(th) * r, y, Math.sin(th) * r]); }
+        const fabPoints = (N, kR, kHalo, sens = 1, incl = 0.42) => { const P = []; for (let i = 0; i < N; i++) { const y = 1 - 2 * (i + 0.5) / N, r = Math.sqrt(1 - y * y), th = i * 2.399963; P.push([Math.cos(th) * r, y, Math.sin(th) * r]); }
           return (t, e) => { const Rs = R * kR; if (kHalo) halo(Rs * (1.02 + 0.04 * Math.sin(t / 1500)), 0.22 + 0.22 * e);
-            const ay = t * 0.00021, ax = 0.42;
-            for (let i = 0; i < N; i++) { const p = P[i], q = rot(p, ay, ax), onde = 1 + (0.018 + 0.06 * e) * Math.sin(t * 0.0022 - p[1] * 5.5), k = 1 + q[2] * 0.16, f = (q[2] + 1) / 2;
+            const ay = sens * t * 0.00021, ax = incl, choc = GST.choc ? Math.max(0, 1 - (t - GST.choc) / 900) : 0;
+            for (let i = 0; i < N; i++) { const p = P[i], q = rot(p, ay, ax), onde = (1 + (0.018 + 0.06 * e) * Math.sin(t * 0.0022 - p[1] * 5.5)) * (1 + 0.2 * choc * Math.sin(choc * 9 + i)), k = 1 + q[2] * 0.16, f = (q[2] + 1) / 2;
               const x = cx + q[0] * Rs * onde * k, y = cy + q[1] * Rs * onde * k, al = (0.14 + 0.86 * f * f) * (0.72 + 0.28 * Math.sin(t * 0.0034 + i * 1.7)), sz = 0.8 + 1.7 * f;
               if (i % 19 === 0 && f > 0.45) { g.fillStyle = col(C2, al * 0.22); g.beginPath(); g.arc(x, y, sz * 2.6, 0, TAU); g.fill(); g.fillStyle = 'rgba(255,255,255,' + al.toFixed(3) + ')'; }
               else g.fillStyle = col(C2, al);
               g.fillRect(x - sz / 2, y - sz / 2, sz, sz); }
             g.strokeStyle = col(C2, 0.16 + 0.12 * e); g.lineWidth = 1; g.beginPath(); g.arc(cx, cy, Rs * 1.07, 0, TAU); g.stroke(); }; };
-        const dessin = fabPoints(720, 1, true);
+        const dessin = MODE === '2' ? ((d1, d2) => (t, e) => { d2(t, e); d1(t, e); })(fabPoints(560, 1, true), fabPoints(260, 0.58, false, -1.7, -0.5)) : fabPoints(720, 1, true);   /* essai « atome » : deux coquilles en sens contraires */
         const tour = (t) => { if (!cv.isConnected) { GST.raf = 0; return; } cadre(); GST.e += ((GST.parle ? 1 : 0) - GST.e) * 0.06; dessin(reduit ? 4200 : t, GST.e); GST.raf = reduit ? 0 : requestAnimationFrame(tour); };
         if (GST.raf) cancelAnimationFrame(GST.raf); GST.raf = requestAnimationFrame(tour);
       }
       const VA_O = VIEWS.accueil, ORB = {ang: 20, last: 0, drag: false, pause: 0, front: -1, raf: 0};
+      /* ---- ESSAIS DE MOUVEMENT (28/11/2026 ; son avis sur l'orbite, après l'avoir eue en main : « ça manque de vie, c'est trop linéaire, presque
+         statique, même les animations partent dans un seul sens ; il faut plus vivant, mieux animé ; tu ne prends aucun risque »). Rien ne
+         change sans « ?orbite=2 », « 3 » ou « 4 » dans l'adresse (sans lui : l'orbite d'aujourd'hui, MODE 1).
+           2 « Atome » : DEUX anneaux croisés, trois hologrammes chacun, qui tournent en sens contraires ; leurs plans se balancent ; ils
+             ralentissent quand un hologramme est bien devant (le temps de lire) puis repartent ; un coup de doigt les lance avec de l'élan,
+             un anneau dans un sens, l'autre dans l'autre ; le globe a deux coquilles de points en sens contraires.
+           3 « Essaim » : plus d'anneau. Chaque hologramme vole sur sa propre trajectoire autour du globe (devant, derrière, à son rythme),
+             relié à lui par un fil de lumière ; ceux qui l'attendent restent près du globe et battent ; ils s'écartent du doigt et les uns
+             des autres ; un appui sur le globe lance une onde qui les repousse, ils reviennent en douceur.
+           4 « Flux » : un anneau avec de l'élan (un coup de doigt le lance, il ralentit), l'arrêt devant ; le globe envoie un flux de
+             particules à l'hologramme au point ; une onde part du globe toutes les six secondes et fait briller chaque hologramme à son
+             passage ; un appui sur le globe inverse le sens et lance une onde. ---- */
+      const MODE = (() => { try { const m = new URLSearchParams(location.search).get('orbite'); return ['2', '3', '4'].includes(m) ? m : '1'; } catch (e) { return '1'; } })();
+      function autreMoteur(C) {
+        const {core, svg, e1, e2, e3, ping, chips, items, auPoint, reduit} = C, n = chips.length, NS = 'http://www.w3.org/2000/svg';
+        const st = {last: 0, f: 1, zmax: 0, ang: [20, 200], elan: 0, sens: 1, doigt: null, bouge: false, off: chips.map(() => [0, 0, 0, 0]), pos: chips.map(() => [0, 0, 0])};
+        let W = 0, H = 0, cx = 0, cy = 0, a = 0, Rg = 0;
+        const mesure = () => { W = core.clientWidth; H = core.clientHeight; cx = W / 2; cy = H / 2 + 4; a = Math.min(W / 2 - 50, 178); Rg = Math.min(W, H) * 0.255; svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H); };
+        const poser = (i, x, y, z, plus) => { const c = chips[i], p = (z + 1) / 2, o = st.off[i], X = cx + x * a + o[0], Y = cy + y * a + o[1]; st.pos[i] = [X, Y, z];
+          c.style.transform = 'translate(' + X.toFixed(1) + 'px,' + Y.toFixed(1) + 'px) translate(-50%,-50%) scale(' + (0.78 + 0.34 * p + (i === ORB.front ? 0.07 : 0) + (plus || 0)).toFixed(3) + ')';
+          c.style.opacity = (0.34 + 0.66 * p).toFixed(2); c.style.zIndex = z > -0.2 ? '3' : '0'; };
+        const ressorts = (dt) => { const k = dt / 16; st.off.forEach((o) => { o[2] += (-o[0] * 0.014 - o[2] * 0.13) * k; o[3] += (-o[1] * 0.014 - o[3] * 0.13) * k; o[0] += o[2] * k; o[1] += o[3] * k; }); };
+        const onde = (force) => { GST.choc = performance.now(); ping.classList.remove('va'); void ping.offsetWidth; ping.classList.add('va'); st.pos.forEach((p, i) => { const dx = p[0] - cx, dy = p[1] - cy, d = Math.hypot(dx, dy) || 1; st.off[i][2] += dx / d * force; st.off[i][3] += dy / d * force; }); };
+        const devant = () => { let d = 0, m = -9; st.pos.forEach((p, i) => { if (p[2] > m) { m = p[2]; d = i; } }); st.zmax = m; if (d !== ORB.front) auPoint(d); };
+        let image = null, dansGlobe = (e) => { const k = core.getBoundingClientRect(); return Math.hypot(e.clientX - k.left - cx, e.clientY - k.top - cy) < Rg * 1.05; };
+        if (MODE === '2') {
+          e3.style.display = 'none'; const INC = 1.2, cI = Math.cos(INC), sI = Math.sin(INC), qui = chips.map((c, i) => i % 2), rang = chips.map((c, i) => Math.floor(i / 2)), par = [Math.ceil(n / 2), Math.floor(n / 2)];
+          image = (t) => { if (!core.isConnected) { ORB.raf = 0; return; } const dt = st.last ? Math.min(64, t - st.last) : 16; st.last = t; mesure();
+            const alpha = [0.44 + 0.13 * Math.sin(t / 4300), -0.44 + 0.13 * Math.sin(t / 5100 + 1)];
+            [e1, e2].forEach((e, r) => { e.setAttribute('class', 'o1'); e.setAttribute('cx', cx); e.setAttribute('cy', cy); e.setAttribute('rx', a); e.setAttribute('ry', a * cI); e.setAttribute('transform', 'rotate(' + (alpha[r] * 180 / Math.PI).toFixed(2) + ' ' + cx + ' ' + cy + ')'); });
+            st.f += ((st.zmax > 0.93 ? 0.22 : 1) - st.f) * 0.05; st.elan *= Math.pow(0.95, dt / 16);
+            if (!st.doigt && !reduit) { st.ang[0] -= dt * (0.0105 * st.f) + st.elan; st.ang[1] += dt * (0.0086 * st.f) + st.elan * 0.8; }
+            chips.forEach((c, i) => { const r = qui[i], th = (st.ang[r] + rang[i] * 360 / par[r]) * Math.PI / 180, x0 = Math.cos(th), y0 = Math.sin(th) * cI, z = Math.sin(th), ca = Math.cos(alpha[r]), sa = Math.sin(alpha[r]);
+              poser(i, x0 * ca - y0 * sa, x0 * sa + y0 * ca + (reduit ? 0 : Math.sin(t / 900 + i * 1.9) * 0.018), z * sI); });
+            ressorts(dt); devant(); ORB.raf = requestAnimationFrame(image); };
+        } else if (MODE === '3') {
+          [e1, e2, e3].forEach((e) => { e.style.display = 'none'; });
+          const fils = chips.map(() => { const l = document.createElementNS(NS, 'line'); l.setAttribute('stroke', 'rgb(var(--c2))'); l.setAttribute('stroke-width', '1'); l.setAttribute('stroke-dasharray', '2 6'); svg.append(l); return l; });
+          let g7 = 11; const hz = () => { g7 = (g7 * 16807) % 2147483647; return g7 / 2147483647; };
+          const vol = chips.map((c, i) => { const pres = items[i].amb ? 0.8 : 1; return {ax: (0.8 + 0.2 * hz()) * pres, ay: (0.36 + 0.2 * hz()) * pres, w1: 0.00026 + hz() * 0.00028, w2: 0.00033 + hz() * 0.0003, w3: 0.0002 + hz() * 0.00024, p1: i * 1.05 + hz(), p2: hz() * 6.28, p3: hz() * 6.28, amb: items[i].amb}; });
+          image = (t) => { if (!core.isConnected) { ORB.raf = 0; return; } const dt = st.last ? Math.min(64, t - st.last) : 16; st.last = t; mesure(); const tt = reduit ? 9000 : t;
+            vol.forEach((v, i) => { let x = v.ax * Math.sin(v.w1 * tt + v.p1), y = v.ay * Math.sin(v.w2 * tt + v.p2) + 0.07 * Math.sin(v.w1 * 2.3 * tt + v.p3); const z = Math.sin(v.w3 * tt + v.p3), r = Math.hypot(x, y / 0.62);
+              if (r < 0.62) { const an = Math.atan2(y / 0.62, x || 0.001); x = 0.62 * Math.cos(an); y = 0.62 * 0.62 * Math.sin(an); }   /* jamais posé sur le globe : il glisse autour */
+              poser(i, x, y, z, v.amb && !reduit ? 0.05 * Math.sin(t / 420) : 0); });
+            /* ils s'écartent les uns des autres, et du doigt */
+            for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) { const dx = st.pos[j][0] - st.pos[i][0], dy = st.pos[j][1] - st.pos[i][1], d = Math.hypot(dx, dy) || 1; if (d < 82) { const k = (82 - d) * 0.012; st.off[i][2] -= dx / d * k; st.off[i][3] -= dy / d * k; st.off[j][2] += dx / d * k; st.off[j][3] += dy / d * k; } }
+            if (st.doigt) st.pos.forEach((p, i) => { const dx = p[0] - st.doigt[0], dy = p[1] - st.doigt[1], d = Math.hypot(dx, dy) || 1; if (d < 120) { const k = (120 - d) * 0.02; st.off[i][2] += dx / d * k; st.off[i][3] += dy / d * k; } });
+            ressorts(dt);
+            fils.forEach((l, i) => { const p = st.pos[i], an = Math.atan2(p[1] - cy, p[0] - cx); l.setAttribute('x1', (cx + Math.cos(an) * Rg).toFixed(1)); l.setAttribute('y1', (cy + Math.sin(an) * Rg).toFixed(1)); l.setAttribute('x2', p[0].toFixed(1)); l.setAttribute('y2', p[1].toFixed(1)); l.setAttribute('stroke-opacity', (0.12 + 0.4 * (p[2] + 1) / 2).toFixed(2)); l.setAttribute('stroke-dashoffset', (-t / 40 % 8).toFixed(1)); });
+            devant(); ORB.raf = requestAnimationFrame(image); };
+        } else {
+          const cvf = h('canvas', {class: 'g-neuf orb-flux', 'aria-hidden': 'true'}), gf = cvf.getContext('2d'), dpr = Math.min(2, window.devicePixelRatio || 1); cvf.style.zIndex = '2'; core.append(cvf);
+          const css = getComputedStyle(document.documentElement), C2 = css.getPropertyValue('--c2').trim() || '103,232,249', pas = 360 / n; let vague = 0;
+          image = (t) => { if (!core.isConnected) { ORB.raf = 0; return; } const dt = st.last ? Math.min(64, t - st.last) : 16; st.last = t; mesure(); const b = a * 0.37;
+            if (cvf.width !== Math.round(W * dpr)) { cvf.width = Math.round(W * dpr); cvf.height = Math.round(H * dpr); } gf.setTransform(dpr, 0, 0, dpr, 0, 0); gf.clearRect(0, 0, W, H);
+            [[e1, a, b, 0], [e2, a * 0.86, b * 1.5, -24]].forEach(([e, rx, ry, ro]) => { e.setAttribute('cx', cx); e.setAttribute('cy', cy); e.setAttribute('rx', rx); e.setAttribute('ry', ry); e.setAttribute('transform', 'rotate(' + ro + ' ' + cx + ' ' + cy + ')'); });
+            e3.setAttribute('d', 'M' + (cx - a * 0.5).toFixed(1) + ' ' + (cy + b * 0.866).toFixed(1) + ' A' + a + ' ' + b + ' 0 0 0 ' + (cx + a * 0.5).toFixed(1) + ' ' + (cy + b * 0.866).toFixed(1));
+            st.f += ((st.zmax > 0.95 ? 0.18 : 1) - st.f) * 0.05; st.elan *= Math.pow(0.955, dt / 16);
+            if (!st.doigt && !reduit) st.ang[0] -= st.sens * dt * 0.0105 * st.f + st.elan;
+            chips.forEach((c, i) => { const th = (st.ang[0] + i * pas) * Math.PI / 180; poser(i, Math.cos(th), Math.sin(th) * 0.37 + (reduit ? 0 : Math.sin(t / 950 + i * 1.9) * 0.02), Math.sin(th)); });
+            ressorts(dt); devant();
+            if (!reduit) {
+              /* le flux : du bord du globe à l'hologramme au point */
+              const p = st.pos[ORB.front] || st.pos[0], an = Math.atan2(p[1] - cy, p[0] - cx), x0 = cx + Math.cos(an) * Rg * 0.9, y0 = cy + Math.sin(an) * Rg * 0.9, mx = (x0 + p[0]) / 2 + (p[1] - y0) * 0.35, my = (y0 + p[1]) / 2 - (p[0] - x0) * 0.35;
+              for (let k = 0; k < 34; k++) { const u = (t * 0.00055 + k / 34) % 1, v = 1 - u, x = v * v * x0 + 2 * v * u * mx + u * u * p[0], y = v * v * y0 + 2 * v * u * my + u * u * p[1] + Math.sin(t / 300 + k) * 1.5, al = Math.sin(Math.PI * u); gf.fillStyle = 'rgba(' + C2 + ',' + (0.75 * al).toFixed(3) + ')'; const z = 1 + 1.6 * al; gf.fillRect(x - z / 2, y - z / 2, z, z); }
+              /* l'onde : part du globe toutes les six secondes, fait briller chaque hologramme à son passage */
+              if (t - vague > 6000) vague = t; const uv = (t - vague) / 2200;
+              if (uv < 1) { const rv = Rg + (a * 1.12 - Rg) * uv; gf.strokeStyle = 'rgba(' + C2 + ',' + (0.5 * (1 - uv)).toFixed(3) + ')'; gf.lineWidth = 1.4; gf.beginPath(); gf.ellipse(cx, cy, rv, rv * (0.5 + 0.5 * uv), 0, 0, 6.2832); gf.stroke();
+                st.pos.forEach((q, i) => { if (Math.abs(Math.hypot(q[0] - cx, (q[1] - cy) / (0.5 + 0.5 * uv)) - rv) < 9 && !chips[i].classList.contains('eclat')) { chips[i].classList.add('eclat'); setTimeout(() => chips[i].classList.remove('eclat'), 520); } }); }
+            }
+            ORB.raf = requestAnimationFrame(image); };
+        }
+        /* le doigt : de l'élan (2 et 4), une répulsion (3) ; un appui sur le globe : une onde (3 et 4), et le sens s'inverse (4) */
+        let x0 = null, xa = 0, ta = 0, ang0 = [0, 0];
+        core.addEventListener('pointerdown', (e) => { const k = core.getBoundingClientRect(); x0 = e.clientX; xa = e.clientX; ta = performance.now(); ang0 = st.ang.slice(); st.bouge = false; C.glisser(false); if (MODE === '3') st.doigt = [e.clientX - k.left, e.clientY - k.top]; });
+        core.addEventListener('pointermove', (e) => { const k = core.getBoundingClientRect(); if (MODE === '3') { if (x0 != null || e.pointerType === 'mouse') st.doigt = [e.clientX - k.left, e.clientY - k.top]; if (x0 != null && Math.abs(e.clientX - x0) > 7) { st.bouge = true; C.glisser(true); } return; }
+          if (x0 == null) return; const dx = e.clientX - x0; if (Math.abs(dx) > 7) { st.bouge = true; C.glisser(true); st.doigt = [0, 0]; }
+          if (st.bouge) { st.ang[0] = ang0[0] - dx * 0.42; st.ang[1] = ang0[1] + dx * 0.34; const maintenant = performance.now(); st.elan = (xa - e.clientX) / Math.max(8, maintenant - ta) * 6.5; xa = e.clientX; ta = maintenant; } });
+        const fin = (e) => { if (x0 == null) { if (MODE === '3') st.doigt = null; return; } const tape = !st.bouge; x0 = null; st.doigt = null; setTimeout(() => C.glisser(false), 60);
+          if (tape && e && e.type === 'pointerup' && MODE !== '2' && !(e.target.closest && e.target.closest('.orb-c')) && dansGlobe(e)) { if (MODE === '4') st.sens *= -1; onde(MODE === '3' ? 11 : 6); } };
+        core.addEventListener('pointerup', fin); core.addEventListener('pointercancel', fin); core.addEventListener('pointerleave', fin);
+        mesure(); if (ORB.raf) cancelAnimationFrame(ORB.raf); ORB.front = -1; ORB.raf = requestAnimationFrame(image);
+      }
       const COUL = {TRAVAIL: 'var(--c3)', ARGENT: '52,211,153', HERMES: 'var(--c4)', PAPIERS: 'var(--c9)'};
       /* Réglages : une roue dans l'en-tête, après le rafraîchissement (une seule fois) */
       { const tools = document.getElementById('top-tools'); if (tools && !document.getElementById('regl-btn')) tools.append(h('button', {type: 'button', class: 'btn icon-btn', id: 'regl-btn', 'aria-label': 'Réglages', title: 'Réglages', onclick: () => go('reglages'), html: icon('gear', 18)})); }
@@ -12963,6 +13076,7 @@ void main(){
           foc.className = 'orb-foc'; foc.style.setProperty('--a', coul); foc.style.setProperty('--a2', it.amb ? '253,230,138' : it.k === 'TRAVAIL' ? '196,160,255' : it.k === 'ARGENT' ? '110,231,183' : it.k === 'HERMES' ? '165,180,252' : it.k === 'PAPIERS' ? 'var(--c9)' : 'var(--c2)');
           foc.replaceChildren(h('small', {text: it.k}), h('b', {text: it.b}), it.sub ? h('span', {text: ' — ' + it.sub}) : null, h('i', {text: '›'}));
           if (!reduit) { void foc.offsetWidth; foc.classList.add('va'); ping.classList.remove('va'); void ping.offsetWidth; ping.classList.add('va'); } };
+        if (MODE !== '1') { let pris = false; try { autreMoteur({core, svg, e1, e2, e3, ping, chips, items, auPoint, reduit, glisser: (v) => { glisse = v; }}); pris = true; } catch (e) { pris = false; } if (pris) return; }   /* un essai de mouvement prend la main ; en cas d'erreur, l'orbite d'aujourd'hui */
         let geo = '';
         const image = (t) => {
           if (!core.isConnected) { ORB.raf = 0; return; }
