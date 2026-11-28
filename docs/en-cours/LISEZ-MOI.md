@@ -163,3 +163,9 @@ pas commencé), 6. le dépôt du CRA signé sur le portail par Hermes après son
 - **À lui** : « Mettre à jour » puis son avis sur l'accueil sur son iPhone (fluidité, appui sur une cible qui bouge) ; regarder le portail pour le CRA signé de novembre (« C'est rattaché » ou « Réessayer avec Hermes ») ; « Relancer Hermes » pour le CRA de la semaine du 23/11.
 - **À la session, selon ses retours** : ajuster l'orbite (vitesse, taille) ou remettre l'accueil d'avant (`ANCIEN = true`) ; ajuster la skill du dépôt du CRA signé si le document n'est pas sur le portail (plan pour « Serveur JARVIS 2 »).
 
+## État au 28/11/2026, 6 h
+
+- **main = `859fb25`** (demandes 256 et 257) : 0.100.0 et la note de reprise. Le serveur reste en 0.99.0 tant qu'il n'a pas touché « Mettre à jour ».
+- **CRA signé de novembre, ce qu'il a vu sur le portail** (ses mots) : « Hermes ne l'a pas bien fait : il a bien rattaché le fichier mais peut-être qu'il n'a pas validé et enregistré après ; j'ai supprimé son fichier et je l'ai fait moi-même ; maintenant il est passé de non signé à en attente de validation ». Donc : (1) le fichier d'Hermes ÉTAIT sur le portail (l'envoi marche), (2) il manque une étape après le fichier joint, (3) **le bon signe de réussite est le statut de la ligne : « non signé » → « en attente de validation »**. Novembre est fait par lui : il doit toucher « C'est rattaché » dans JARVIS (Travail › CRA du mois). `signePremier` n'est pas posé (aucun dépôt réussi par Hermes) : décembre repassera par son oui.
+- **À faire pour décembre** : lui demander (QCM) ce qu'il a cliqué après avoir choisi le fichier, puis corriger la skill du dépôt (étape manquante ; réussite = statut « en attente de validation » ; si le fichier est joint mais le statut inchangé : le dire tel quel, « fichier joint, pas envoyé en validation », pour qu'il ne trouve pas un fichier à moitié déposé) ; `install.sh` du portail → un plan pour « Serveur JARVIS 2 ».
+
