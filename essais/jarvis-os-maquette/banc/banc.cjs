@@ -266,12 +266,14 @@ srv.listen(0, async () => {
       await q.screenshot({path: path.join(SH, 'plusieurs-jours-formulaire.png')});
       await q.evaluate(() => document.querySelector('.ev-form button[type=submit]').click()); await q.waitForTimeout(1000);
       const vue = () => q.evaluate(() => ({liste: [...document.querySelectorAll('.ech-date.is-multi')].map((x) => x.textContent), mois: [...document.querySelectorAll('.mlist .dl-row')].map((x) => x.textContent).filter((t) => /grands-parents/.test(t)), toast: (document.getElementById('toasts') || {}).textContent || ''}));
+      /* 28/11/2026 : en fin de mois, l'événement (de J+2 à J+4) déborde sur le mois suivant : le mois affiché ne montre que ses jours à lui (ce banc échouait depuis le 27, puis s'arrêtait net le 28) */
+      const DM = [2, 3, 4].filter((n) => isoN(n).slice(0, 7) === isoN(0).slice(0, 7)).length;
       const a1 = await vue();
-      ok('plusieurs jours : l\'événement est listé avec sa période et apparaît sur chacun de ses trois jours dans le mois', a1.liste.length === 1 && /au .+3 jours/.test(a1.liste[0]) && a1.mois.length === 3 && /jour 1\/3/.test(a1.mois[0]) && /jour 3\/3/.test(a1.mois[2]) && / du .+ au /.test(a1.toast), JSON.stringify(a1));
+      ok('plusieurs jours : l\'événement est listé avec sa période et apparaît sur chacun de ses jours du mois affiché (les trois, hors fin de mois)', a1.liste.length === 1 && /au .+3 jours/.test(a1.liste[0]) && a1.mois.length === DM && (!DM || (/jour 1\/3/.test(a1.mois[0]) && new RegExp('jour ' + DM + '/3').test(a1.mois[DM - 1]))) && / du .+ au /.test(a1.toast), JSON.stringify(a1));
       await q.waitForTimeout(7000);   /* les 5 secondes d'annulation passées : l'événement part dans l'agenda (faux), puis est relu */
       const ev = await q.evaluate(() => (window.__calls || []).filter((c) => c.tool === 'create_event').map((c) => c.input).pop()), a2 = await vue();
-      ok('plusieurs jours : écrit dans l\'agenda en journées entières, fin au lendemain du dernier jour (règle de Google), et relu sur ses trois jours', !!ev && ev.allDay === true && ev.startTime.slice(0, 10) === isoN(2) && ev.endTime.slice(0, 10) === isoN(5) && a2.mois.length === 3 && a2.liste.length === 1, JSON.stringify([ev, a2]));
-      await q.evaluate(() => [...document.querySelectorAll('.mlist .dl-row')].filter((x) => /grands-parents/.test(x.textContent))[1].click()); await q.waitForTimeout(700);
+      ok('plusieurs jours : écrit dans l\'agenda en journées entières, fin au lendemain du dernier jour (règle de Google), et relu sur ses trois jours', !!ev && ev.allDay === true && ev.startTime.slice(0, 10) === isoN(2) && ev.endTime.slice(0, 10) === isoN(5) && a2.mois.length === DM && a2.liste.length === 1, JSON.stringify([ev, a2]));
+      await q.evaluate(() => { const l = [...document.querySelectorAll('.mlist .dl-row')].filter((x) => /grands-parents/.test(x.textContent)), c = l[1] || l[0] || (document.querySelector('.ech-date.is-multi') || document.body).closest('button, .dl-row, li, article') || document.querySelector('.ech-date.is-multi'); if (c) c.click(); }); await q.waitForTimeout(700);
       ok('plusieurs jours : la feuille donne la période entière (du … au …, 3 jours)', await q.evaluate(() => /Du .+ au .+ · 3 jours, journées entières/.test(document.getElementById('sheet').textContent)));
       await q.screenshot({path: path.join(SH, 'plusieurs-jours.png')});
       await q.context().close(); }
