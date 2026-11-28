@@ -41,7 +41,7 @@ import {createHermesAdmin} from './hermes-admin.mjs';   /* 0.96.0 : administrer 
 import {createHermesRoutines} from './hermes-routines.mjs';   /* 0.92.0 : « Hermes et ses routines » en direct (le résumé de root, lu sans rien écrire) */
 const ACT = createActivite();   /* 0.33.0 : ce que fait Claude à l'instant */
 
-const VERSION = '0.103.0';
+const VERSION = '0.104.0';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PORT = +(process.env.PORT || 8787);
 const HOST = process.env.HOST || '127.0.0.1';
@@ -450,6 +450,22 @@ function consoAdd(kind, u) {
 }
 /* 0.33.0 : secours si le modèle est saturé (--fallback-model, comme la discussion depuis 0.30.0) ; onTool voit chaque outil utilisé (étapes d'une mission) */
 const ACT_TITRES = {mission: 'Mission', siri: 'Question par Siri', tour: 'Tour de JARVIS', bot: 'Ordre à un bot', tache: 'Lignes du Canal pour Claude', verif: 'Revérification', comparatif: 'Comparatif d’un produit', idees: 'Recherche d’idées', test: 'Essai des données'};
+/* 0.104.0 (28/11/2026, son choix : « fermer le mode sans écran », « plafonner les missions » ; « vérifie qu'il n'y a pas d'impact négatif »).
+   - Réglages fermés : par défaut, Claude Code relit les réglages et les skills du dossier où il tourne (.claude/settings.json : un « hook » y
+     lance une commande au démarrage, vérifié le 28/11). Avec `--setting-sources user` il ne lit plus que ceux de son compte, plus le garde-fou
+     qu'on lui passe (`--settings`, toujours appliqué : vérifié). ÉTEINT par défaut : `JARVIS_CLAUDE_SOURCES=user` l'allume, une fois vérifié
+     sur le serveur que les connecteurs Google restent annoncés. Jamais pour une mission : ses skills sont posées dans son dossier.
+   - Plafond d'une mission : `--max-budget-usd` (estimation au prix public, comptée par Claude Code lui-même), `JARVIS_MISSION_BUDGET_USD`
+     (5 par défaut, 0 pour aucun). Une mission qui s'emballe s'arrête, garde ce qu'elle a écrit et le dit ; son délai de 15 minutes reste.
+   - Une option n'est passée que si le Claude Code installé la connaît (son aide, lue une fois au démarrage) : une version plus ancienne
+     tourne comme avant, sans erreur « option inconnue ». */
+const CAPS = {lu: false, sources: false, budget: false};
+try { execFile(CLAUDE, ['--help'], {env: childEnv(), timeout: 30000, maxBuffer: 1 << 20}, (err, out) => { const t = String(out || ''); CAPS.lu = true; CAPS.sources = /--setting-sources\b/.test(t); CAPS.budget = /--max-budget-usd\b/.test(t);
+  console.log('Claude Code : réglages fermés ' + (sourcesArgs('chat').length ? 'allumés (' + SOURCES + ')' : CAPS.sources ? 'éteints (JARVIS_CLAUDE_SOURCES=user pour les allumer)' : 'inconnus de cette version') + ' ; plafond d’une mission : ' + (budgetArgs('mission').length ? MISSION_BUDGET + ' $' : CAPS.budget ? 'aucun' : 'inconnu de cette version')); }); } catch { /* sans l'aide : comme avant */ }
+const SOURCES = (process.env.JARVIS_CLAUDE_SOURCES || '').trim();
+const sourcesArgs = (kind) => (CAPS.sources && /^(user|user,project|project,user)$/.test(SOURCES) && kind !== 'mission' ? ['--setting-sources', SOURCES] : []);
+const MISSION_BUDGET = (() => { const v = process.env.JARVIS_MISSION_BUDGET_USD; const n = v == null || v === '' ? 5 : +v; return isFinite(n) && n > 0 ? Math.min(50, n) : 0; })();
+const budgetArgs = (kind) => (CAPS.budget && MISSION_BUDGET && kind === 'mission' ? ['--max-budget-usd', String(MISSION_BUDGET)] : []);
 function runClaude({prompt, system, model, resume, tools, cwd, timeoutMs, onDelta, settings, effort, kind, onTool, titre}) {
   return new Promise((resolve) => {
     const act = ACT.debut({genre: kind || 'autre', titre: titre || ACT_TITRES[kind] || 'Claude', modele: model});
@@ -457,6 +473,7 @@ function runClaude({prompt, system, model, resume, tools, cwd, timeoutMs, onDelt
     if (model) args.push('--model', model);
     if (model && SECOURS[model] && process.env.JARVIS_SECOURS !== '0') args.push('--fallback-model', SECOURS[model]);
     if (settings) args.push('--settings', settings);
+    args.push(...sourcesArgs(kind), ...budgetArgs(kind));   /* 0.104.0 */
     if (effort) args.push('--effort', effort);
     if (resume) args.push('--resume', resume);
     if (tools.allow.length) args.push('--allowedTools', ...tools.allow);
@@ -465,7 +482,7 @@ function runClaude({prompt, system, model, resume, tools, cwd, timeoutMs, onDelt
     try { child = spawn(CLAUDE, args, {cwd, env: childEnv(), stdio: ['pipe', 'pipe', 'pipe']}); }
     catch (e) { act.fin(false); resolve({ok: false, error: 'Claude Code introuvable sur le serveur.'}); return; }
     child.stdin.on('error', () => { /* 0.73.0 : Claude arrêté avant d'avoir tout lu (EPIPE) : « close » donne l'erreur, le serveur reste debout */ });
-    let buf = '', text = '', final = null, sessionId = resume || null, isError = false, stderr = '', done = false; const used = [];
+    let buf = '', text = '', final = null, sessionId = resume || null, isError = false, stderr = '', done = false, fin = {}; const used = [];
     const finish = (r) => { if (done) return; done = true; clearTimeout(timer); act.fin(r.ok); resolve(r); };
     const timer = setTimeout(() => { child.kill('SIGTERM'); finish({ok: false, error: 'Claude a mis trop de temps à répondre.', text, sessionId}); }, timeoutMs);
     child.on('error', () => finish({ok: false, error: 'Claude Code introuvable sur le serveur.'}));
@@ -480,18 +497,21 @@ function runClaude({prompt, system, model, resume, tools, cwd, timeoutMs, onDelt
         if (ev.type === 'stream_event' && ev.event?.type === 'content_block_delta' && ev.event.delta?.type === 'text_delta') { text += ev.event.delta.text; onDelta?.(text); }
         if (ev.type === 'assistant') for (const c of ev.message?.content || []) if (c.type === 'tool_use' && c.name) { used.push(c.name); act.outil(c.name, c.input || {}); if (onTool) try { onTool(c.name, c.input || {}); } catch { /* rien */ } }
         if (ev.type === 'assistant' && !text) { const t = (ev.message?.content || []).filter((c) => c.type === 'text').map((c) => c.text).join(''); if (t) { text = t; onDelta?.(text); } }
-        else if (ev.type === 'result') { final = typeof ev.result === 'string' ? ev.result : null; isError = !!ev.is_error; consoAdd(kind || 'autre', ev.usage); }
+        else if (ev.type === 'result') { final = typeof ev.result === 'string' ? ev.result : null; isError = !!ev.is_error; consoAdd(kind || 'autre', ev.usage);
+          fin = {sousType: String(ev.subtype || ''), tours: +ev.num_turns || 0, cout: typeof ev.total_cost_usd === 'number' ? Math.round(ev.total_cost_usd * 1000) / 1000 : null}; }   /* 0.104.0 */
       }
     });
     child.on('close', (code) => {
-      const out = (final ?? text).trim();
+      const out = (final ?? text).trim(), mesure = {tours: fin.tours || 0, cout: fin.cout ?? null};
+      /* 0.104.0 : arrêtée par son plafond : pas une panne ; ce qu'elle a dit jusque-là est gardé */
+      if (fin.sousType === 'error_max_budget_usd') { finish({ok: false, plafond: true, error: 'Arrêtée : elle dépassait le plafond prévu pour une mission (' + String(MISSION_BUDGET).replace('.', ',') + ' $ au prix public, ' + (fin.tours || '?') + ' étapes). Ce qu’elle a déjà écrit est gardé ; relance-la en la découpant, ou dis-moi de relever le plafond.', text: (text || out).trim(), sessionId, used, ...mesure}); return; }
       if (isError || (code !== 0 && !out)) {
         /* 0.89.0 : la limite du forfait Claude : son heure de reprise, pour la relance automatique du travail coupé (limite.mjs) */
         const lim = limiteDe(out + ' ' + stderr, now());
         if (lim) S.limite = {jusqua: lim.reprise, at: now()};
         finish({ok: false, error: friendly(out + ' ' + stderr), text: out, sessionId, used, ...(lim ? {limite: lim} : {})});
       }
-      else finish({ok: true, text: out, sessionId, used});
+      else finish({ok: true, text: out, sessionId, used, ...mesure});
     });
     child.stdin.end(prompt);
   });
@@ -562,7 +582,7 @@ function coupeSession(owner) {
 const dateLigne = () => '[Maintenant : ' + new Intl.DateTimeFormat('fr-FR', {timeZone: 'Europe/Paris', weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit'}).format(new Date(now())) + ', heure de Paris]\n';
 function openSession({model, system, allow, deny, resume}) {
   /* conversation à la voix : effort réduit, sans réflexion approfondie (les missions gardent l'effort normal) */
-  const args = ['-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose', '--include-partial-messages', '--append-system-prompt', system, '--model', model, '--effort', 'low', '--settings', guardSettings('chat')];
+  const args = ['-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose', '--include-partial-messages', '--append-system-prompt', system, '--model', model, '--effort', 'low', '--settings', guardSettings('chat'), ...sourcesArgs('chat')];
   if (SECOURS[model] && process.env.JARVIS_SECOURS !== '0') args.push('--fallback-model', SECOURS[model]);
   if (resume) args.push('--resume', resume);
   if (allow.length) args.push('--allowedTools', ...allow);
@@ -634,7 +654,7 @@ function prechauffe() {
   });
 }
 /* 0.30.0 : Claude pour la page, instantané (flux.mjs) : discussion gardée ouverte, réponse mot par mot, file à part, secours */
-const FLUX = createFlux({auBord: (genre, seuil) => GARDE_MEM.noter(genre, seuil), bin: CLAUDE, env: childEnv, settings: () => guardSettings('chat'), cwd: path.join(DATA, 'sample'), conso: consoAdd, friendly, dateLigne: () => dateLigne() + etatJarvisLigne(), activite: ACT,
+const FLUX = createFlux({plus: () => sourcesArgs('chat'), auBord: (genre, seuil) => GARDE_MEM.noter(genre, seuil), bin: CLAUDE, env: childEnv, settings: () => guardSettings('chat'), cwd: path.join(DATA, 'sample'), conso: consoAdd, friendly, dateLigne: () => dateLigne() + etatJarvisLigne(), activite: ACT,
   models: {quick: MODELS.rapide, default: MODELS.equilibre, deep: MODELS.profond, smart: MODELS.profond}});
 const PAGE_SYS = "Tu réponds au propriétaire dans sa page Jarvis (JARVIS OS), en français, en le tutoyant. Réponds exactement au format demandé.";
 function chatFin(r, t0, warm, model, send) {
@@ -673,6 +693,8 @@ async function missionClaude(m, reprise) {
   if (!r.ok && attenteLimite(m, 'mission', r)) return;   /* 0.89.0 : coupée par la limite du forfait : relancée seule, une fois, après sa levée */
   let res = r.ok ? r.text : r.error + suiteLimite(m, r);
   if (r.ok) { const x = relancesDuTexte(res, 'mission'); res = x.text + (x.relance ? '\n\nRelance prévue le ' + new Intl.DateTimeFormat('fr-FR', {timeZone: 'Europe/Paris', weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit'}).format(new Date(x.relance.quand)) + ' : ' + x.relance.quoi : ''); }
+  if (r.tours) m.tours = r.tours; if (r.cout != null) m.cout = r.cout;   /* 0.104.0 : pour régler le plafond sur du réel */
+  if (r.plafond) { m.plafond = true; res = r.error + (r.text ? '\n\nCe qu’elle avait dit :\n' + r.text : ''); }
   m.status = r.ok ? 'terminee' : 'echouee'; m.done = now(); m.result = String(res).slice(0, 6000); save();
   /* 0.15.0 : notification de fin, sur chaque appareil abonné */
   if (S.push && S.push.subs.length) PUSH.send({title: r.ok ? 'Mission terminée' : 'Mission en échec', body: m.text.slice(0, 80) + ' — ' + String(m.result).replace(/\s+/g, ' ').slice(0, 220), url: '/#voir-mission-' + m.id, tag: 'mission-' + m.id}, {urgency: 'high'}).catch(() => {});

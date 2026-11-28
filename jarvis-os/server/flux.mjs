@@ -55,7 +55,7 @@ export function routeurVoix(texte) {
    petites lectures de la page gardent l'effort réduit, sans réflexion. 0.70.0 : à la voix, seulement s'il demande de réfléchir */
 export const PENSE = {effort: 'high'};
 
-export function createFlux({bin, env, settings, cwd, conso, models, friendly, dateLigne, activite, maxActifs = 2, inactifMs = 15 * 60000, ageMaxMs = 2 * 3600000, timeoutMs = 120000, memLibre = () => os.freemem(), prepMem = +process.env.JARVIS_PREP_MEM || 900e6, auBord = () => {}}) {
+export function createFlux({bin, env, settings, cwd, conso, models, friendly, dateLigne, activite, plus = () => [], maxActifs = 2, inactifMs = 15 * 60000, ageMaxMs = 2 * 3600000, timeoutMs = 120000, memLibre = () => os.freemem(), prepMem = +process.env.JARVIS_PREP_MEM || 900e6, auBord = () => {}}) {
   const now = () => Date.now();
   const CONV = {};   /* par modèle : la conversation de la discussion {p, cle, qs (empreintes de ses questions)} */
   const stats = {questions: 0, reprises: 0, preparees: 0, secours: 0, dernier: null};
@@ -65,7 +65,7 @@ export function createFlux({bin, env, settings, cwd, conso, models, friendly, da
 
   function lancer(model, pense) {
     const args = ['-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose', '--include-partial-messages',
-      '--model', model, '--effort', pense ? PENSE.effort : 'low', '--system-prompt', FIXE, '--tools', '', '--strict-mcp-config', '--settings', settings()];
+      '--model', model, '--effort', pense ? PENSE.effort : 'low', '--system-prompt', FIXE, '--tools', '', '--strict-mcp-config', '--settings', settings(), ...plus()];   /* 0.104.0 : `plus` : les réglages fermés, quand le serveur les a allumés */
     if (SECOURS[model] && process.env.JARVIS_SECOURS !== '0') args.push('--fallback-model', SECOURS[model]);
     try { fs.mkdirSync(cwd, {recursive: true}); } catch { /* rien */ }
     let child;

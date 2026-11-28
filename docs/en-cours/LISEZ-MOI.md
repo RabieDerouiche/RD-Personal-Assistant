@@ -1,43 +1,8 @@
-# Travail en cours (26/11/2026, soir) : à reprendre, pas à refaire
+# Travail en cours : à reprendre, pas à refaire
 
-Ce dossier est provisoire : il disparaît quand tout est fusionné. Il sert à ce qu'une autre session reprenne
-sans rien recommencer (sa remarque du 26/11/2026 : « tu recommences à chaque session, fais les choses
-séquentiellement »). **Règle : un chantier à la fois ; chaque chantier fini est fusionné dans la branche et
-poussé avant de commencer le suivant.**
+Sa remarque du 26/11/2026 : « tu recommences à chaque session, fais les choses séquentiellement ». **Un chantier à la fois ; chaque chantier fini est fusionné et poussé avant le suivant.** Branche : `claude/grok-hermes-jarvis-reprise-i864jv`.
 
-Branche : `claude/grok-hermes-jarvis-reprise-i864jv`. Base de tous les chantiers : commit `375cd15`
-(A « CRA du mois seul » et B « routine_fin » y sont, prêts ; leurs demandes au serveur :
-`docs/demandes-serveur-en-attente.md`).
-
-## Reprendre un chantier
-
-`git checkout -b reprise-X 375cd15 && git apply docs/en-cours/chantier-X.patch` (vérifié : chaque fichier
-s'applique sur `375cd15`), terminer, passer ses bancs, fusionner dans la branche, pousser, puis retirer le
-fichier d'ici.
-
-| Chantier | Fichier | État au moment de l'arrêt |
-|---|---|---|
-| C, 0.91.0 : rangement des papiers par JARVIS (dépôt depuis l'app, proposition du dossier et du nom, écriture dans Drive après son oui) | `chantier-C.patch` | serveur (`depot.mjs`), Drive, app et bancs écrits ; restaient le service worker, le manifeste (menu Partager), les bancs à repasser, la note |
-| D, 0.92.0 : Hermes et ses routines en direct (résumé root assaini, route, santé, app) | dans la branche | **fini et fusionné dans la branche le 27/11 au matin** ; bancs repassés après fusion (voir le dernier commit « bancs ») ; risques : `suite-routines.md` |
-| E, 0.93.0 : Radar (« déjà dépensé ce mois », historique), feuille d'un jour de l'Agenda sans bots, « Pour moi » : une carte par sujet | `chantier-E.patch` | Radar fini et testé ; bloc de l'app en cours (« Pour moi », Agenda) ; restaient les bancs de l'app et la note |
-| F, 0.94.0 : réponses aux mails du mois suivies (même fil ou nouveau fil, détection toutes les 5 minutes, une notification, carte de Travail) | dans la branche | **fini, fusionné dans la branche et poussé le 26/11 au soir** (travail 31, jours 106, courrier 10, serveur 391) ; sa note : `docs/_chantier-F.md` (entrée de journal, contrôles du serveur, points à décider) |
-
-## Ordre
-
-1. F et D : faits. 2. Fusion dans main et **première demande** à la session « Serveur JARVIS » avec ce qui est prêt
-(A, B, D, F ; sections dans `docs/demandes-serveur-en-attente.md` ; VERSION 0.94.0). 3. E, 4. C, puis une seconde demande. 5. les trois maquettes de refonte
-(`essais/jarvis-refonte-b/` et `-c/` : premier jet écrit, pas encore relu ni capturé ; `-a/` « Orbite » :
-pas commencé), 6. le dépôt du CRA signé sur le portail par Hermes après son oui (son choix au QCM du 26/11).
-
-## Décisions du 26/11/2026 au soir (QCM)
-
-- Refonte : repenser toute l'app, maquette d'abord ; ce qui le gêne : trop d'écrans et de tuiles, il ne voit
-  pas ce qui tourne ; il aime l'hologramme mais veut 2 ou 3 propositions qui ne soient pas des recoloriages
-  (A « Orbite » : le globe devient la navigation ; B « Poste de contrôle » : trois files et des rails
-  d'étapes ; C « Le fil » : une conversation qui tient lieu d'app).
-- CRA signé reçu du client : Hermes le dépose sur le portail après son oui dans JARVIS (à blanc d'abord, sa
-  validation la première fois).
-- Méthode : séquentiel, plus d'agents en parallèle (ils ont vidé le forfait partagé le 26/11 et coupé Hermes).
+**Un seul « État » ici.** À chaque étape finie, il est **remplacé** (pas empilé : ce fichier se relit à chaque reprise) ; l'ancien part en tête de `docs/en-cours/archives.md` s'il dit comment quelque chose s'est passé. Les états du 26/11 au 28/11 à 15 h y sont.
 
 ## Méthode pour ne rien reperdre (sa demande du 27/11/2026)
 
@@ -47,156 +12,22 @@ pas commencé), 6. le dépôt du CRA signé sur le portail par Hermes après son
 - Pas de travail lourd dans l'heure qui précède ses routines (Veille 7 h 40, CRA de la semaine le vendredi à midi).
 - À décider et risques du chantier F : `suite-mails.md` (dont la structure de `jours.json` pour le dépôt du CRA signé par Hermes).
 
-## État au 27/11/2026, 8 h 30 (heure de Paris)
+## État au 28/11/2026, 16 h
 
-- main = `95c500d` (demande de fusion 250) : A, B, D (0.92.0) et F (0.94.0) y sont ; tous les bancs verts (serveur 404, jours 106, travail 31, courrier 10, relance 80, garde 25, Hermes 88, portail 188, bout en bout 136, app 361 et 3 échecs liés à la date, identiques sur main avant la fusion).
-- **Demande de déploiement envoyée** à la session « Serveur JARVIS » le 27/11 à 8 h 25 (un seul oui : étapes communes, puis les sections 1 à 4 de `docs/demandes-serveur-en-attente.md`, plus deux relevés : appels d'outil mal formés d'Hermes, retard du réveil du 26/11). Son compte rendu se lit par `list_events` (kinds `result`). Tant qu'il n'est pas arrivé : ne rien renvoyer à cette session, ne pas lancer de travail lourd (le forfait est partagé ; CRA de la semaine à midi).
-- Ensuite, dans l'ordre : lire le compte rendu, mettre `CLAUDE.md` et les docs à jour ; reprendre E (`chantier-E.patch`, ou l'agent a93cbe731fb974b72 s'il existe encore dans la session), puis C (`chantier-C.patch`, agent a7f6dfadf7db8f13d) ; seconde demande au serveur ; maquettes ; dépôt du CRA signé par Hermes.
+**Sur le serveur** : JARVIS 0.102.0 (`9c80758`), déployée et vérifiée le 28/11 à 14 h 12 (compte rendu : `docs/jarvis-os.md`, « Déploiement du 28/11/2026 (0.102.0) »). Les corrections de la relecture de sécurité sont en service ; root lance les kits depuis `/root/rd`.
 
-## État au 27/11/2026, 8 h 45
+**Dans main, pas encore sur le serveur** :
+- 0.103.0 : l'atome comme mouvement de l'accueil (son choix). App seulement : il la prend par « Mettre à jour ».
+- 0.104.0 : réglages fermés de Claude Code (`--setting-sources`, **éteints** tant que `JARVIS_CLAUDE_SOURCES=user` n'est pas posé) et plafond d'une mission (`--max-budget-usd`, 5 $). Demande un redémarrage : **plan dans `docs/demandes-serveur-en-attente.md`, qui attend son oui dans « Serveur JARVIS 2 »**. Le plan vérifie sur le serveur que les connecteurs Google restent annoncés avant d'allumer la fermeture ; sinon elle reste éteinte.
 
-- **Déployé et vérifié sur le serveur à 8 h 22** (0.94.0) : compte rendu dans `docs/jarvis-os.md`, « Déploiement du 27/11/2026 ». Plus rien en attente côté serveur.
-- Session du serveur : désormais « Serveur JARVIS 2 » (`session_01JvDfwzJbpLqSKJPKSk65Mq`).
-- **Limite de la semaine en alerte** (remise à zéro lundi 30/11 à 12 h, heure de Paris) : avant de lancer E, C, les maquettes ou le dépôt du CRA signé, lui demander par QCM ce qui passe d'abord et ce qui attend lundi.
+**Ce qu'il a tranché le 28/11** (QCM) : l'atome ; l'ambre gardé pour ce qui attend son oui ; le banc du portail d'abord ; puis, sur les nouveautés de Claude : alléger `CLAUDE.md` et les docs, fermer le mode sans écran, plafonner les missions, sortie typée, « vérifie qu'il n'y a pas d'impact négatif sur l'existant ».
+- **Sortie typée (`--json-schema`) : pas posée.** Mesuré le 28/11 sur Claude Code 2.1.332 : 3 tours au lieu d'un et un coût multiplié par 4 pour une petite lecture. À ne reprendre que si une lecture JSON échoue vraiment souvent.
+- **Allègement fait** : `CLAUDE.md` 35 → 24 Ko (le détail, mot pour mot, dans `docs/instructions-detail.md`) ; `docs/jarvis-os.md` 320 → 98 Ko (versions 0.10.0 à 0.87.0 dans `docs/jarvis-os-historique.md`) ; ce fichier 31 → 4 Ko.
 
-## État au 27/11/2026, 10 h 40
+**À surveiller** :
+- lundi 30/11 à 9 h 10 : premier Digest IA et .NET sans la mémoire d'Hermes (outil `digest_deja_dit`) ;
+- les trois routines du web affichent « jamais passée » depuis le déploiement (recréées) : regarder leur feuille dans JARVIS ;
+- décembre : premier dépôt du CRA signé par Hermes avec la skill réécrite (avec son oui) ;
+- si la conversation de JARVIS refuse d'ouvrir un lien qu'elle vient de trouver : `garde-refus.log` (la transcription lue par le garde-fou s'écrit avec un léger retard).
 
-- **main = `6b118fe` (demande 252) : JARVIS 0.95.0**, avec les quatre chantiers (0.91.0 papiers, 0.92.0 routines en direct, 0.93.0 Radar/Agenda/« Pour moi », 0.94.0 réponses aux mails). Les sauvegardes `chantier-*.patch` sont retirées (tout est fusionné). Suites et risques : `suite-mails.md`, `suite-routines.md`, `suite-papiers.md`, `suite-radar-pour-moi.md`.
-- **Serveur** : il est en 0.94.0 (déployé le 27/11 à 8 h 22). La 0.95.0 n'y est pas encore : elle n'a besoin que de la mise à jour et du redémarrage (le bouton « Mettre à jour » de l'app suffit) ; le plan de contrôle est dans `docs/demandes-serveur-en-attente.md`. **Ne pas l'envoyer seul** : sa consigne du 27/11 est de tout finir puis de lui donner UNE fois ce qu'il a à faire ; la demande au serveur partira avec le chantier 0.96.0 (qui a besoin de `install.sh` d'Hermes), à « Serveur JARVIS 2 » (`session_01JvDfwzJbpLqSKJPKSk65Mq`).
-- **En cours : 0.96.0, administrer les routines d'Hermes depuis JARVIS** (sa demande du 27/11 : lancer maintenant, pause jusqu'à nouvel ordre, reprendre, changer l'horaire — jours et 1 à 4 heures, sans espacement minimal —, historique, erreur en détail). Un agent en worktree, lancé à 10 h 25 ; à son retour : relire (validation des ordres, nettoyage de l'erreur), fusionner, bancs, pousser.
-- **Ordre de la suite (ses consignes du 27/11)** : 1. 0.96.0 ; 2. les trois maquettes de refonte, avec toutes les nouveautés dedans (dépôt des papiers, réponses aux mails et CRA signé, routines en direct et leur administration, Radar, « Pour moi » par sujet) ; 3. dépôt du CRA signé par Hermes ; 4. un seul récapitulatif final : ce qui a changé, les nouveautés, ce qu'il doit faire.
-- **Reprise automatique (sa demande du 27/11)** : garder un réveil programmé (`send_later`) cinq minutes après la prochaine levée probable de la fenêtre de 5 heures tant qu'il reste du travail ; au réveil, reprendre sans lui demander.
-- Banc connu : `fiab-a6.test.mjs` a 2 échecs déjà présents avant ces chantiers (rappels du matin) : à regarder, sans rapport avec eux.
-
-## État au 27/11/2026, 13 h
-
-- **Branche à `0d240e3` : JARVIS 0.96.0** (administrer les routines d'Hermes, fusionné, docs rangées, plan du serveur à jour dans `docs/demandes-serveur-en-attente.md`). Pas encore dans main : ses bancs sur l'ensemble repassent (journaux : `scratchpad/h/`, résultat dans `scratchpad/h/resultat.txt`). main est à `6b118fe` (0.95.0). Le serveur est en 0.94.0.
-- **Maquettes de refonte : finies** (A « Orbite », B « Poste de contrôle », C « Le fil »), commitées, servies à `/maquettes/refonte-a|b|c/` après la prochaine mise à jour du serveur. 21 captures finales : `scratchpad/refonte/final/`. Elles ne lui sont pas encore envoyées : il veut tout à la fin.
-- **En cours : 0.97.0, dépôt du CRA signé sur le portail par Hermes après son oui** (un agent en worktree, lancé à 12 h 55 ; note attendue : `docs/_chantier-G.md`). Limite : ne sera « fini » qu'après un essai à blanc sur le vrai portail (par la session du serveur) et sa validation la première fois.
-- **Ensuite** : fusionner 0.97.0, bancs, PR vers main, UNE demande à « Serveur JARVIS 2 » (0.95.0, 0.96.0, 0.97.0 : mise à jour, redémarrage, les deux `install.sh`, contrôles, essai pause/reprise d'une routine, essai à blanc du dépôt), lire son compte rendu, puis le récapitulatif final unique avec les captures et un QCM de choix de maquette.
-- Limite de la 0.96.0 à lui dire : une routine n'a qu'un horaire technique (passages à la même minute ou à la même heure) ; la lever = plusieurs tâches par routine côté Hermes.
-
-## État au 27/11/2026, 16 h 45
-
-- **main = `6722569` (demande 253) : JARVIS 0.96.0.** Bancs passés seuls après fusion : serveur 427, administration 46, ordres 117, relance 88, verrou 45, dépôt 42, pont 24, garde 25, routines 6, bout en bout 136, app 430 (et les 3 échecs liés à la date).
-- **Demande de déploiement envoyée à « Serveur JARVIS 2 » à 16 h 40** (0.95.0 et 0.96.0 ; le plan est `docs/demandes-serveur-en-attente.md`, lu là-bas par `git show origin/main:…`). Le serveur était en 0.94.0. Lire son compte rendu par `list_events` (kinds `result`) avant de dire que c'est déployé. Cette session attend son oui là-bas (mode par défaut : il doit approuver).
-- **0.97.0 (dépôt du CRA signé par Hermes)** : coupé par la limite à 15 h, relancé à 16 h 35 ; côté JARVIS écrit (`signe.mjs`, tests en cours), root, app et bancs à faire. Sauvegarde : `chantier-G.patch` (s'applique sur `0d240e3`). Une seconde demande au serveur suivra pour lui (avec l'essai à blanc réel du dépôt pour novembre).
-- Réveil programmé à 21 h 15.
-
-## État au 27/11/2026, 18 h 50
-
-- **0.96.0 (avec la 0.95.0) : déployée et vérifiée sur le serveur à 16 h 45** par « Serveur JARVIS 2 » (compte rendu recopié dans `docs/jarvis-os.md`). Essai réel pause puis reprise d'une routine : conforme.
-- **0.97.0 (CRA signé déposé par Hermes après son oui)** : l'agent a rendu, relu par la session principale (une garde ajoutée : « déposé » compté seulement sans négation ; une course du banc de l'app corrigée), fusionné dans la branche avec `VERSION` 0.97.0, docs rangées par script, plan du serveur réécrit (`docs/demandes-serveur-en-attente.md` : 0.97.0 seule, avec l'essai à blanc réel de novembre). Bancs en cours au moment de ce commit : résultat dans `scratchpad/g/resultat.txt` (jours, travail, serveur déjà passés sans échec ; portail, relance, app à lire).
-- **Ensuite** : bancs verts → demande de fusion vers main → message à « Serveur JARVIS 2 » (un seul oui là-bas) → récapitulatif final unique avec les 21 captures (`scratchpad/refonte/final/`) et un QCM de choix de maquette.
-- Risques et ce qu'il verra : `suite-cra-signe.md`.
-
-## État au 27/11/2026, 20 h
-
-- **Deux demandes de lui dans la soirée, traitées** : (1) le CRA signé doit être comparé à la saisie puis déposé sans attendre s'il correspond → **0.98.0** (`signe-controle.mjs`, sans IA ; vérifié sur le vrai PDF de novembre, hors dépôt : conforme ; oui automatique seulement après un premier dépôt réussi par Hermes) ; (2) le CRA de la semaine du 23/11 : « enregistrée, pas soumise » → cause lue sur la page par « Serveur JARVIS 2 » en lecture seule (le code de temps, une liste déroulante, n'était pas réellement choisi), **skill corrigée**.
-- Branche : `VERSION` 0.98.0, docs et plan du serveur à jour (`docs/demandes-serveur-en-attente.md` : 0.97.0 + 0.98.0 + skill, avec l'essai à blanc réel du dépôt pour novembre). Bancs : jours 143, travail 40, app 442 OK (les 3 échecs liés à la date) ; serveur, portail et relance repassent (`scratchpad/g/resultat3.txt`).
-- **Ensuite** : bancs verts → demande de fusion vers main → UN message à « Serveur JARVIS 2 » (il donne son oui là-bas) → il touche « Relancer Hermes » sur la carte du CRA de la semaine → lire le compte rendu → récapitulatif final unique avec les 21 captures et le QCM de choix de maquette.
-- Pas fait : le faux portail du banc n'a pas de liste de code de temps (la correction de la skill n'est pas prouvée au banc) ; les maquettes ne montrent pas le verdict « conforme à la saisie » (elles montrent « Oui, déposer »).
-
-## État au 27/11/2026, 22 h 45
-
-- **main = `011b06c` (demande 254) : JARVIS 0.98.0.** Bancs : jours 143, travail 40, serveur 434 (seul), portail 214, relance 88, app 442 OK et les 3 échecs liés à la date.
-- **Demande envoyée à « Serveur JARVIS 2 » à 22 h 45** (plan : `docs/demandes-serveur-en-attente.md`, lu là-bas par `git show origin/main:…`) : elle attend son oui. Le serveur est en 0.96.0 tant que son compte rendu n'est pas lu (`list_events`, kinds `result`).
-- **À lui** : son oui dans « Serveur JARVIS 2 » ; puis « Relancer Hermes » sur la carte du CRA de la semaine ; puis « Oui, déposer » quand JARVIS annonce le CRA signé prêt (premier dépôt : il vérifie sur le portail) ; le choix d'une maquette (QCM posé avec le récapitulatif final).
-- **Ensuite, pour la session** : lire le compte rendu du serveur (essai à blanc du dépôt : relevés d et e — où se dépose le fichier, autre hôte ou non), ajuster la skill si besoin, mettre `CLAUDE.md` et `docs/jarvis-os.md` à jour (« déployé »), vider `docs/demandes-serveur-en-attente.md`, fusion dans main. Puis appliquer la maquette choisie.
-
-## État au 27/11/2026, 23 h 15
-
-- **Son QCM du soir** : aucune maquette (« je préfère l'IHM actuelle » ; seule la pile de cartes « Attend ton oui » de la maquette A l'intéresse pour « Pour moi ») ; horaires des routines : laisser ; Radar : « Compter le déjà payé ».
-- **0.99.0 sur la branche, PAS dans main** : Radar (un paiement « plus à payer » garde ses échéances déjà payées ; `plansRetiresLe`), `VERSION` 0.99.0, docs. **Ne pas fusionner dans main avant le compte rendu de « Serveur JARVIS 2 »** : son plan attend le commit `011b06c` et la version 0.98.0 ; une fusion avant fausserait ses contrôles. Après son compte rendu : demande de fusion, puis il touche « Mettre à jour » dans JARVIS (rien d'autre : pas de changement côté root).
-- Question posée par QCM : porter la pile « Attend ton oui » de A dans « Pour moi » de l'app actuelle ? retirer les trois maquettes du serveur ?
-
-## État au 27/11/2026, 23 h 45
-
-- Son second QCM : « Montre-moi d'abord » (la pile) et « Tout retirer » (les maquettes). Fait sur la branche (toujours 0.99.0, pas dans main) : maquettes `refonte-a|b|c` retirées de `MAQUETTES` ; **essai de la pile dans l'app derrière `?pile=1`** (bloc « ESSAI pile », fin du script de `essais/jarvis-os-maquette/index.html`) ; trois captures envoyées (`scratchpad/pile/`, script `cap.cjs`). Après « Mettre à jour », il peut l'essayer sur ses vraies données : adresse du serveur + `/?pile=1`.
-- En attente de lui : son avis sur la pile (l'activer pour de bon = retirer la condition `?pile=1` et ajouter des vérifications au banc ; l'abandonner = retirer le bloc).
-- **Travailler dans la copie principale** (`/home/user/RD-Personal-Assistant`) : la copie de travail de l'agent (`.claude/worktrees/agent-a87e…`) est dépassée, ne plus s'en servir.
-- Bancs repassés avant la fusion de la 0.99.0 : voir `scratchpad/g/resultat4.txt` (serveur, Radar, app).
-
-## État au 28/11/2026, 0 h
-
-- **0.98.0 déployée et vérifiée à 22 h 52** (compte rendu de « Serveur JARVIS 2 » recopié dans `docs/jarvis-os.md`). Essai à blanc réel du dépôt du CRA signé : « pret », PDF conforme à la saisie. Il a donc reçu « CRA signé prêt à déposer : ton oui ».
-- Vu à l'essai : le champ de fichier n'apparaît qu'après un bouton d'import → skill ajustée (étape 5 du dépôt) ; texte du compte rendu coupé au milieu d'un mot → corrigé. Les deux sont sur la branche (0.99.0), pas encore sur le serveur.
-- **Suite** : bancs (`scratchpad/g/resultat4.txt`, puis le banc du portail) → demande de fusion de la 0.99.0 → UN message à « Serveur JARVIS 2 » (plan : `docs/demandes-serveur-en-attente.md`, pull + redémarrage + `install.sh` du portail) → lire son compte rendu, dont ses deux gestes (« Relancer Hermes » pour la semaine, « Oui, déposer » pour le CRA signé).
-
-## État au 28/11/2026, 0 h 30
-
-- **Radar** (sa remarque : « déjà dépensé » ne prenait pas les dépenses courantes dépensées chaque semaine) : corrigé sur la branche (un budget pas noté compte pour ce qui est écoulé, d'après le budget ; `courantesBudget`), banc du Radar 158.
-- **Essai « accès »** (sa demande : plus de tuiles vers Travail, Routines, Papiers…, sobre, et Réglages) : bloc derrière `?acces=1`, capture envoyée (`scratchpad/pile/4-acces-tuiles.png`). Avec la pile (`?pile=1`), deux essais attendent son avis (QCM posé).
-- **CRA de la semaine** : il voit encore l'erreur parce qu'il n'a pas touché « Relancer Hermes » (rien ne repart seul) : redit. À regarder au prochain compte rendu du serveur.
-- Bancs de la 0.99.0 en cours : `scratchpad/g/resultat5.txt` (serveur 434 passé ; portail, app). Ensuite : fusion dans main, message à « Serveur JARVIS 2 » (plan déjà écrit : `docs/demandes-serveur-en-attente.md`).
-
-## État au 28/11/2026, 1 h
-
-- **Pile « Attend ton oui » : dans l'app** (son oui au QCM), avec cinq vérifications au banc ; banc complet de l'app en cours (`scratchpad/g/resultat6.txt`).
-- **Accueil** : trois essais refusés (icônes ; tuiles sous le globe en argent ; tuiles autour d'un globe recoloré : « du recoloriage, ce que je déteste le plus »), retirés du code. **À faire, sans se presser** : plusieurs propositions qui repensent l'ORGANISATION de l'accueil, dans la charte actuelle (aucune teinte changée) : maquettes et captures d'abord. Ce qu'il veut : des tuiles qui disent quelque chose et mènent aux blocs (Travail, Routines, Papiers…), autour du globe ; Réglages accessible ; un globe qui évolue (par exemple : ce qu'il représente, pas sa couleur).
-- **Ordre** : 1. banc de l'app vert → demande de fusion de la 0.99.0 → message à « Serveur JARVIS 2 » (plan déjà écrit) ; 2. les propositions d'accueil.
-
-## État au 28/11/2026, 2 h
-
-- **main = `710f1f0` (demande 255) : JARVIS 0.99.0** (Radar : « déjà dépensé » avec les dépenses courantes pas notées, « plus à payer » garde le déjà payé ; pile « Attend ton oui » dans l'app ; skill du dépôt du CRA signé ; maquettes de refonte retirées). Bancs : Radar 158, serveur 434, portail 214, relance 88, app 447 OK (3 échecs liés à la date).
-- **Demande envoyée à « Serveur JARVIS 2 »** (plan : `docs/demandes-serveur-en-attente.md` ; pull, redémarrage, `install.sh` du portail) : elle attend son oui. Lire son compte rendu (`list_events`, kinds `result`), dont ses deux gestes (« Relancer Hermes » pour la semaine, « Oui, déposer » pour le CRA signé) ; puis vider le plan et noter « déployé » dans `CLAUDE.md`.
-- **Accueil** : essai « les portes autour du globe » derrière `?accueil=1` (dernier bloc du script) ; il a choisi cette direction et la fait peaufiner (détail et ses mots : `docs/journal-jarvis.md`, dernière entrée). Méthode : une capture (`scratchpad/pile/cap.cjs`), son avis par QCM, on recommence. Quand il dit oui : retirer la condition, vérifications au banc.
-- À lui : son oui sur le serveur ; « Relancer Hermes » ; puis « Oui, déposer » après la mise à jour.
-
-## État au 28/11/2026, 3 h
-
-- **Accueil** : il a validé la piste « orbite » (« tu y es presque ») : six hologrammes qui tournent autour du globe, qu'on fait tourner du doigt (`?accueil=1`). Reste **le globe lui-même** : quatre essais (`&globe=a|b|c|d` : Particules, Méridiens, Iris, Plasma), film comparatif envoyé, QCM posé. Quand il a choisi : retirer les conditions `?accueil=1` et `globe=`, garder un seul globe, vérifications au banc (orbite : rotation, glisser, appui ; « réduire les animations »), journal, fusion, « Mettre à jour ».
-- **Serveur** : la demande de la 0.99.0 (`710f1f0`) attend son oui dans « Serveur JARVIS 2 » ; lire le compte rendu (`list_events`, kinds `result`) avant d'en parler comme d'un fait ; puis vider `docs/demandes-serveur-en-attente.md`.
-- Outils des captures et des films : `scratchpad/pile/cap.cjs`, `film.cjs`, `film2.cjs` (à réécrire si le dossier temporaire a disparu : un serveur de fichiers local, Playwright en iPhone 15 Pro Max, `recordVideo`, puis `ffmpeg` vers MP4).
-
-## État au 28/11/2026, 4 h 30
-
-- **0.99.0 déployée et vérifiée (1 h 03)**. `docs/demandes-serveur-en-attente.md` est vide.
-- **CRA signé de novembre : premier dépôt réel en échec** (il a touché « Oui, déposer » le 27/11 vers 23 h 10) : fichier joint, « Enregistrer » cliqué sans erreur, ligne restée « non signé ». À lui de regarder le portail ; puis « C'est rattaché » (s'il y est) ou « Réessayer avec Hermes » (un nouveau oui = une nouvelle tentative). Selon ce qu'il voit : ajuster la skill du dépôt (attendre la fermeture de la fenêtre ou un message avant de relire), ce qui demandera un plan pour « Serveur JARVIS 2 ».
-- **CRA de la semaine du 23/11 : toujours pas relancé par lui** (« Relancer Hermes » dans Pour moi). La skill corrigée est en place depuis le 27/11 à 22 h 52.
-- **0.100.0 sur la branche** : l'accueil en orbite et le globe de particules, actifs par défaut ; l'accueil d'avant gardé (`?accueil=ancien`). Banc de l'app et du serveur en cours (`scratchpad/g/resultat7.txt`). Ensuite : demande de fusion, fusion, puis il touche « Mettre à jour » (rien côté root).
-
-## État au 28/11/2026, 5 h 30
-
-- **main = `f2e681e` (demande 256) : JARVIS 0.100.0** (accueil en orbite, globe de particules, accueil d'avant gardé). Bancs : app 456 OK dont 7 « 0.100 orbite » (1 échec lié à la date, déjà là : « agenda : le rendez-vous écrit aussi dans Échéances… ») ; serveur 434. Le test « plusieurs jours » du banc ne s'arrête plus en fin de mois ; le contrôle de version accepte un numéro à trois chiffres.
-- **Le serveur est encore en 0.99.0** : la 0.100.0 arrive quand il touche « Mettre à jour » dans JARVIS (app seulement, pas de session du serveur). Ne pas dire « déployé » avant qu'il l'ait fait.
-- **À lui** : « Mettre à jour » puis son avis sur l'accueil sur son iPhone (fluidité, appui sur une cible qui bouge) ; regarder le portail pour le CRA signé de novembre (« C'est rattaché » ou « Réessayer avec Hermes ») ; « Relancer Hermes » pour le CRA de la semaine du 23/11.
-- **À la session, selon ses retours** : ajuster l'orbite (vitesse, taille) ou remettre l'accueil d'avant (`ANCIEN = true`) ; ajuster la skill du dépôt du CRA signé si le document n'est pas sur le portail (plan pour « Serveur JARVIS 2 »).
-
-## État au 28/11/2026, 6 h
-
-- **main = `859fb25`** (demandes 256 et 257) : 0.100.0 et la note de reprise. Le serveur reste en 0.99.0 tant qu'il n'a pas touché « Mettre à jour ».
-- **CRA signé de novembre, ce qu'il a vu sur le portail** (ses mots) : « Hermes ne l'a pas bien fait : il a bien rattaché le fichier mais peut-être qu'il n'a pas validé et enregistré après ; j'ai supprimé son fichier et je l'ai fait moi-même ; maintenant il est passé de non signé à en attente de validation ». Donc : (1) le fichier d'Hermes ÉTAIT sur le portail (l'envoi marche), (2) il manque une étape après le fichier joint, (3) **le bon signe de réussite est le statut de la ligne : « non signé » → « en attente de validation »**. Novembre est fait par lui : il doit toucher « C'est rattaché » dans JARVIS (Travail › CRA du mois). `signePremier` n'est pas posé (aucun dépôt réussi par Hermes) : décembre repassera par son oui.
-- **À faire pour décembre** : lui demander (QCM) ce qu'il a cliqué après avoir choisi le fichier, puis corriger la skill du dépôt (étape manquante ; réussite = statut « en attente de validation » ; si le fichier est joint mais le statut inchangé : le dire tel quel, « fichier joint, pas envoyé en validation », pour qu'il ne trouve pas un fichier à moitié déposé) ; `install.sh` du portail → un plan pour « Serveur JARVIS 2 ».
-
-## État au 28/11/2026, 10 h
-
-- **Il a la 0.100.0 en main** (il a mis à jour) et **le CRA de la semaine du 23/11 est soumis par Hermes** (vu sur sa capture : la skill corrigée du code de temps a marché). Novembre : CRA signé déposé par lui.
-- **Ses retours du matin** (détail et ses mots : `docs/journal-jarvis.md`) : (1) Travail et Routines mal intégrés : pas de boutons dans Travail, « ce qui vient » statique, étapes en vert → **0.101.0 sur la branche** (boutons en haut des cartes, lignes cliquables, étapes dans le thème, cinq vérifications au banc ; banc de l'app à passer). (2) Pas de suivi de bout en bout du CRA signé : la skill réécrite (statut de la ligne, deux temps) attend d'être posée sur le serveur (plan : `docs/demandes-serveur-en-attente.md`, banc du portail en cours). (3) L'accueil en orbite « manque de vie, trop linéaire, les animations partent dans un seul sens ; tu ne prends aucun risque » : **à faire** : de vrais essais de mouvement, une image et un film chacun.
-- **Ordre** : banc du portail vert → banc de l'app → fusion 0.101.0 + skill → UN message à « Serveur JARVIS 2 » (pull, redémarrage, `install.sh` du portail) → essais d'accueil.
-
-## État au 28/11/2026, 12 h (passe générale : sécurité, écran de connexion, accueil, commandes, bancs)
-
-- **Serveur : 0.101.0 (`e5c5857`), déployée et vérifiée le 28/11 à 10 h 53** (compte rendu de « Serveur JARVIS 2 » : semaine du 23/11 soumise par Hermes, CRA signé de novembre rattaché dans JARVIS).
-- **Sa demande de la fin de matinée, en cinq points** (ses mots : `docs/journal-jarvis.md`) : (1) relecture de sécurité de JARVIS et d'Hermes ; (2) des bancs qui ne coûtent plus une heure ; (3) l'accueil aux couleurs de la progression de Travail, plus vivant, « ça parle IA » ; (4) l'écran de connexion (rien d'utile en bas, la feuille de la passkey le cache) ; (5) tout en 2 ou 3 appuis.
-- **Fait, dans la 0.102.0** (détail : `docs/jarvis-os.md`) : 15 points de sécurité relevés par un agent en lecture seule, revérifiés puis corrigés (le rapport complet est hors dépôt, dans le dossier de travail de la session : ne pas le copier ici) ; écran de connexion refait et son banc (`banc/ecran-verrou.cjs`) ; accueil recoloré et animé ; palette de commandes dans la loupe ; banc `fiab-a6` réparé (cassé depuis la 0.79.0, jamais vu).
-- **Attend son oui dans « Serveur JARVIS 2 »** : le plan de `docs/demandes-serveur-en-attente.md` (pull, redémarrage, clone de root `/root/rd`, les deux `install.sh`, `routines.sh`, contrôles). Tant qu'il n'est pas passé : le serveur est en 0.101.0 et **les corrections de sécurité ne sont pas en service**. Lire son compte rendu (`list_events`, `result`) avant de dire « déployé » ; puis vider le fichier des demandes et mettre l'état à jour dans `CLAUDE.md`.
-- **Son choix au QCM (28/11, midi)** : mouvement « 2 Atome », ambre gardé pour ce qui attend son oui, et la suite : le banc du portail. L'atome est le défaut dans la **0.103.0** (app seulement), **sur la branche, pas encore dans main** : à fusionner seulement après le compte rendu de « Serveur JARVIS 2 » sur la 0.102.0 (son plan attend le commit `9c80758` ; un main qui avance pendant qu'il travaille le ferait douter). Il la verra par « Mettre à jour ».
-- **Le lundi 30/11 à 9 h 10** : premier Digest IA et .NET sans la mémoire d'Hermes (outil `digest_deja_dit`) : regarder son compte rendu (carte « Hermes et ses routines ») ; s'il redit des points de la semaine d'avant, c'est que la ligne du Journal du 23/11 n'a pas le sujet attendu.
-- **Reste, pas commencé** : accélérer le banc du portail lui-même (20 minutes, presque tout en attentes de 32 s « enregistrement de la session » et en démarrages d'Hermes : à chronométrer par partie) ; remplacer les 3,5 s fixes à l'ouverture de chaque page du banc de l'app par une attente sur l'état ; les trois points « à vérifier » du rapport (relais du portail, ports locaux, `retenir` à la voix) ; son avis sur l'iPad (`/maquettes/ipad/`).
-
-## État au 28/11/2026, 14 h
-
-- **La 0.102.0 est sur le serveur** (`9c80758`), déployée par « Serveur JARVIS 2 » vers 12 h 45 : pull, redémarrage, clone de root `/root/rd`, les deux `install.sh`, `routines.sh`. Lu dans sa transcription (pas encore son compte rendu) : santé 0.102.0, version cachée derrière le relais, 0 erreur, services actifs, les trois en-têtes, `WebFetch` dans `guard-chat.json`, unités propres, routines inchangées (toutes en réel) et les trois du web sans `memory`, `jobs.json` toujours à hermes, portail comme avant, skill du Digest posée.
-- **Elle a été coupée par la limite des 5 heures à 12 h 53**, après le contrôle 13 ; il l'a relancée lui-même à 14 h (« Continue »). Restent chez elle : le contrôle 14 (un passage d'essai du portail, qui prouve la consigne posée sous le nom de l'agent et le verrou commun) et son compte rendu. **À lire** (`list_events`, `result`) avant de vider `docs/demandes-serveur-en-attente.md`.
-- **Une erreur de mon plan** : le dossier du coffre du portail n'est pas `/home/hermes-portail/.hermes/vault` mais sous `/home/hermes-portail/hermes/` (le `HERMES_HOME` du portail) : le contrôle 12 et la lecture de départ visaient le mauvais chemin. Sans effet sur le déploiement ; la session le cherche.
-- **0.103.0 dans main** (l'atome par défaut, bancs plus fins) : app seulement, il la prend par « Mettre à jour ».
-- **Bancs** : le lanceur ne relance plus que les segments du banc de l'app dont le texte a changé (`--quoi` le dit) ; un contrôle de l'app ne relance plus les bancs du serveur. Chronométrage du banc du portail fait (1 427 s) : 85 % du temps dans 24 faux passages d'Hermes d'environ 50 s ; « Notes de frais en réel » : 459 s à elle seule. En cours : raccourcir l'attente de 32 s « enregistrement de la session » là où le banc n'en a pas besoin.
-
-## État au 28/11/2026, 15 h
-
-- **0.102.0 déployée et vérifiée** (compte rendu lu, noté dans `docs/jarvis-os.md`, « Déploiement du 28/11/2026 (0.102.0) ») : les corrections de sécurité sont en service. Plus aucune demande au serveur en attente. À surveiller : les trois routines du web affichent « jamais passée » (recréées) ; le Digest du lundi 30/11 à 9 h 10 est le premier sans la mémoire d'Hermes.
-- **0.103.0 dans main** (`fd4f8a7`) : l'atome par défaut ; il la prend par « Mettre à jour ».
-- **Banc du portail** : l'attente de 32 s « enregistrement de la session » n'est gardée qu'au premier essai et après le « redémarrage simulé » (les deux passages dont la session sert ensuite) ; ailleurs 2 s (`BANC_SOMMEIL=32` pour le banc d'avant). Mesuré par le lanceur : 214 contrôles verts en 14 min 25 s (20 à 24 minutes avant). Ce qui reste long : « Notes de frais en réel » (4 minutes, une dizaine de passages de 20 à 50 s) et le balayage du disque à la recherche de la clé en clair (15 s à chaud, 100 s sur un conteneur neuf).
-- **Pas commencé** : les trois points « à vérifier » du rapport de sécurité (relais du portail, ports locaux hauts, « retenir » à la voix), le code de Panier ; le comptage page par page des parcours ; son avis sur l'iPad.
-
+**Pas commencé** : les trois points non prouvés de la relecture de sécurité (liste blanche du relais du portail, ports locaux hauts, « retenir » à la voix), la relecture de Panier ; le comptage page par page des appuis ; son avis sur l'iPad (`/maquettes/ipad/`) ; bancs : un passage d'Hermes coûte encore 17 à 20 s, trois contrôles de l'app instables sous charge (`docs/jarvis-os-reprise.md`, « Les bancs »).
