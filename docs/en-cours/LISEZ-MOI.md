@@ -149,3 +149,10 @@ pas commencé), 6. le dépôt du CRA signé sur le portail par Hermes après son
 - **Serveur** : la demande de la 0.99.0 (`710f1f0`) attend son oui dans « Serveur JARVIS 2 » ; lire le compte rendu (`list_events`, kinds `result`) avant d'en parler comme d'un fait ; puis vider `docs/demandes-serveur-en-attente.md`.
 - Outils des captures et des films : `scratchpad/pile/cap.cjs`, `film.cjs`, `film2.cjs` (à réécrire si le dossier temporaire a disparu : un serveur de fichiers local, Playwright en iPhone 15 Pro Max, `recordVideo`, puis `ffmpeg` vers MP4).
 
+## État au 28/11/2026, 4 h 30
+
+- **0.99.0 déployée et vérifiée (1 h 03)**. `docs/demandes-serveur-en-attente.md` est vide.
+- **CRA signé de novembre : premier dépôt réel en échec** (il a touché « Oui, déposer » le 27/11 vers 23 h 10) : fichier joint, « Enregistrer » cliqué sans erreur, ligne restée « non signé ». À lui de regarder le portail ; puis « C'est rattaché » (s'il y est) ou « Réessayer avec Hermes » (un nouveau oui = une nouvelle tentative). Selon ce qu'il voit : ajuster la skill du dépôt (attendre la fermeture de la fenêtre ou un message avant de relire), ce qui demandera un plan pour « Serveur JARVIS 2 ».
+- **CRA de la semaine du 23/11 : toujours pas relancé par lui** (« Relancer Hermes » dans Pour moi). La skill corrigée est en place depuis le 27/11 à 22 h 52.
+- **0.100.0 sur la branche** : l'accueil en orbite et le globe de particules, actifs par défaut ; l'accueil d'avant gardé (`?accueil=ancien`). Banc de l'app et du serveur en cours (`scratchpad/g/resultat7.txt`). Ensuite : demande de fusion, fusion, puis il touche « Mettre à jour » (rien côté root).
+

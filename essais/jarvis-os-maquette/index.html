@@ -12861,23 +12861,27 @@ void main(){
       };
     } }
 
-  /* ================= ESSAI « accueil : l'orbite » (28/11/2026 ; rien ne change sans « ?accueil=1 » dans l'adresse).
-     Ses mots, dans l'ordre : « repense la page d'accueil, donne plusieurs propositions » ; il retient les tuiles autour du globe (« c'est la
-     bonne direction, tu dois la peaufiner ») ; puis : « Météo pas besoin de son bloc, mets le texte en petit dans le coin droit en haut ;
-     Réglages, une petite icône à côté du refresh ; réduis la taille de ces blocs et donne à chacun une couleur qui va dans le thème mais qui
-     matche le contenu » ; puis, les six tuiles posées de chaque côté : « make them floaty, smaller ; now they look like they are just pasted
-     over the background ; it has to look alive, futuristic and mysterious ; impress me, do something unexpected, don't be afraid of changing
-     things, experiment ».
-     L'expérience : les six tuiles ne sont plus posées, elles ORBITENT. Six petits hologrammes (un mot, une valeur) tournent lentement autour
-     du globe sur un anneau incliné : ils passent devant lui, puis derrière (on les devine à travers sa trame), grossissent en approchant,
-     s'estompent en s'éloignant, et flottent chacun à son rythme. Celui qui arrive devant est « au point » : il s'allume, le globe lance une
-     onde de sa couleur, et une ligne sous le globe dit son détail (« TRAVAIL · 1 à toi — … »). On fait tourner l'anneau du doigt (glisser à
-     gauche ou à droite) ; un appui sur un hologramme, ou sur la ligne, ouvre la rubrique. Tout s'arrête avec « réduire les animations »
-     (les six restent répartis, le doigt les fait toujours tourner). Mêmes données que l'écran d'aujourd'hui et que les tuiles d'Espaces ;
-     couleurs : la palette du thème, une par contenu, l'orange à ce qui l'attend. Météo : une ligne en haut à droite ; Réglages : une roue
-     dans l'en-tête. ================= */
-  { let orbite = false; try { orbite = new URLSearchParams(location.search).get('accueil') === '1'; } catch (e) { /* rien */ }
-    if (orbite) {
+  /* ================= 0.100.0 : l'accueil en orbite, le globe de particules (28/11/2026). Ses mots, dans l'ordre : « repense la page
+     d'accueil, donne plusieurs propositions » ; des tuiles autour du globe : « c'est la bonne direction, tu dois la peaufiner » ; « Météo pas
+     besoin de son bloc, mets le texte en petit dans le coin droit en haut ; Réglages, une petite icône à côté du refresh ; réduis la taille de
+     ces blocs et donne à chacun une couleur qui va dans le thème mais qui matche le contenu » ; « make them floaty, smaller ; it has to look
+     alive, futuristic and mysterious ; do something unexpected, experiment » ; l'orbite vue : « tu y es presque, maintenant rénove juste le
+     globe, sobre, dans le bleu noir » ; des six globes montrés : « Particules, mais garde à côté la page d'accueil, je pourrai te demander
+     de la remettre en place ».
+     L'ACCUEIL D'AVANT EST GARDÉ TEL QUEL : ce bloc ne réécrit rien, il passe après. « ?accueil=ancien » dans l'adresse le montre ; pour le
+     remettre pour de bon, il suffit de mettre ANCIEN à true ci-dessous (ou de retirer ce bloc). Le banc garde l'accueil d'avant pour ses
+     vérifications d'avant (scénario `sansOrbite`, posé par défaut) et a les siennes pour l'orbite.
+     L'orbite : six petits hologrammes (un mot, une valeur : Agenda, Pour toi, Travail, Argent, Hermes, Papiers) tournent lentement autour
+     du globe sur un anneau incliné : ils passent devant lui puis derrière (on les devine à travers), grossissent en approchant, s'estompent
+     en s'éloignant, flottent chacun à son rythme. Celui qui arrive devant est « au point » : il s'allume, le globe lance une onde de sa
+     couleur, et une ligne sous le globe dit son détail. On fait tourner l'anneau du doigt ; un appui sur un hologramme, ou sur la ligne,
+     ouvre la rubrique. Tout s'arrête avec « réduire les animations » (les six restent répartis, le doigt les fait toujours tourner).
+     Mêmes données que l'écran d'avant et que les tuiles d'Espaces (les quatre tuiles d'origine restent dans la page, cachées : leur appui
+     sert encore) ; couleurs : la palette du thème, une par contenu, l'orange à ce qui l'attend. Météo : une ligne en haut à droite ;
+     Réglages : une roue dans l'en-tête. ================= */
+  { let ANCIEN = false; try { ANCIEN = new URLSearchParams(location.search).get('accueil') === 'ancien'; } catch (e) { /* rien */ }
+    if (window.__SCEN && window.__SCEN.sansOrbite) ANCIEN = true;   /* le banc : ses vérifications d'avant portent sur l'accueil d'avant */
+    if (!ANCIEN) {
       document.head.append(h('style', {text: '.hud-o .hud-core{height:344px;margin-top:8px;touch-action:pan-y;-webkit-user-select:none;user-select:none}.hud-o .hud-core .holo-stage{z-index:1;pointer-events:none}.hud-o .hud-lines{display:none}'
         + '.orb-an{position:absolute;inset:0;width:100%;height:100%;z-index:0;pointer-events:none;overflow:visible}.orb-an ellipse{fill:none;stroke:rgb(var(--c2));stroke-width:1}.orb-an .o1{stroke-opacity:.34;stroke-dasharray:2 7;animation:orbfil 14s linear infinite}.orb-an .o2{stroke-opacity:.16;stroke-dasharray:1 9;animation:orbfil 22s linear infinite reverse}'
         + '.orb-an .o3{stroke-opacity:.75;stroke-width:1.4;filter:drop-shadow(0 0 4px rgba(var(--c1),.9))}@keyframes orbfil{to{stroke-dashoffset:-180}}'
@@ -12891,25 +12895,20 @@ void main(){
         + '.orb-foc{--a:var(--c1);--a2:var(--c2);display:block;width:100%;margin:6px 0 0;padding:6px 8px;min-height:44px;background:none;border:0;color:var(--fg);font:500 13.5px/1.35 var(--sans);text-align:center;cursor:pointer}.orb-foc small{font:700 11px var(--display);letter-spacing:.16em;color:rgb(var(--a2));margin-right:8px}.orb-foc b{font:700 14.5px var(--display)}.orb-foc span{color:var(--muted)}.orb-foc i{font-style:normal;color:rgb(var(--a2));margin-left:6px}'
         + '.orb-foc.va{animation:orbfoc .5s ease-out}@keyframes orbfoc{0%{opacity:0;transform:translateY(4px);letter-spacing:.04em}100%{opacity:1;transform:none;letter-spacing:0}}'
         + '.hud-met{display:block;margin:5px 0 0 auto;padding:0;background:none;border:0;font:500 12px var(--sans);letter-spacing:.02em;color:var(--muted);text-align:right;white-space:nowrap;cursor:pointer}.hud-met b{color:var(--fg);font-weight:600}'
-        + '.g-neuf{position:absolute;inset:0;width:100%;height:100%;z-index:1;pointer-events:none}.g-etiq{position:absolute;left:8px;top:2px;z-index:4;font:700 12px var(--display);letter-spacing:.14em;text-transform:uppercase;color:rgb(var(--c2));pointer-events:none}'
+        + '.g-neuf{position:absolute;inset:0;width:100%;height:100%;z-index:1;pointer-events:none}'
         + '@media (prefers-reduced-motion: reduce){.orb-an ellipse,.orb-ping.va,.orb-foc.va{animation:none}}'}));
-      /* ---- le globe rénové : quatre essais (sa demande du 28/11 : « tu y es presque, maintenant rénove juste le globe, ça doit rester sobre,
-         dans le bleu noir, mais rénove : trois ou quatre propositions vivantes »). « &globe=a|b|c|d » dans l'adresse ; sans lui, le globe
-         d'aujourd'hui. Dessinés ici sur un canevas 2D, aux couleurs du thème (--c1, --c2, --k4, lues dans la page) ; ils respirent, et
-         s'animent davantage pendant que JARVIS dit sa phrase (HUD.g.set('speaking')).
-           a « Particules » : une sphère de points qui tourne et scintille, traversée d'ondes ;
-           b « Méridiens » : une planète de lignes fines, des points qui s'allument et des arcs de lumière qui les relient ;
-           c « Iris » : des anneaux segmentés qui tournent en sens contraires autour d'une pupille qui respire, un balayage ;
-           d « Plasma » : un cœur liquide, des veines de lumière qui coulent dans la sphère. ---- */
-      const GV = (() => { try { return (new URLSearchParams(location.search).get('globe') || '').toLowerCase(); } catch (e) { return ''; } })();
-      const GNOM = {a: 'A · Particules', a2: 'A2 · Nuée', a3: 'A3 · Anneaux de points', d: 'D · Plasma', d2: 'D2 · Tourbillon', d3: 'D3 · Plasma et particules'}, GST = {parle: false, e: 0, raf: 0};
+      /* ---- le globe de particules (son choix du 28/11 parmi six essais en deux familles, particules et plasma) : une sphère de points qui
+         tourne et scintille, traversée d'ondes, dessinée ici sur un canevas 2D aux couleurs du thème (--c1, --c2, --k4, lues dans la page) ;
+         elle respire, et s'anime davantage pendant que JARVIS dit sa phrase (HUD.g.set('speaking')). Le globe d'avant (jarvis-voix.js)
+         n'est pas touché : il reste dans la page, caché ; « ?globe=ancien » le montre dans l'orbite. ---- */
+      const GV = (() => { try { return (new URLSearchParams(location.search).get('globe') || '').toLowerCase() === 'ancien' ? '' : 'a'; } catch (e) { return 'a'; } })();
+      const GNOM = {a: 'Particules'}, GST = {parle: false, e: 0, raf: 0};
       function globeNeuf(core) {
         if (!GNOM[GV]) return;
         const anc = core.querySelector('.holo-stage'); if (anc) anc.style.visibility = 'hidden';
         if (HUD.g && HUD.g.set && !HUD.g.__neuf) { const s0 = HUD.g.set.bind(HUD.g); HUD.g.set = (x) => { GST.parle = x === 'speaking'; return s0(x); }; HUD.g.__neuf = true; }
         GST.parle = !HUD.done;
         const cv = h('canvas', {class: 'g-neuf', 'aria-hidden': 'true'}), g = cv.getContext('2d'); core.append(cv);
-        try { if (new URLSearchParams(location.search).get('etiq') === '1') core.append(h('span', {class: 'g-etiq', text: GNOM[GV]})); } catch (e) { /* rien */ }
         const css = getComputedStyle(document.documentElement), tri = (n, d) => (css.getPropertyValue(n).trim() || d), C1 = tri('--c1', '56,189,248'), C2 = tri('--c2', '103,232,249'), K4 = tri('--k4', '37,99,235');
         const col = (c, a) => 'rgba(' + c + ',' + Math.max(0, Math.min(1, a)).toFixed(3) + ')', TAU = Math.PI * 2, reduit = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
         const rot = (p, ay, ax) => { const x1 = p[0] * Math.cos(ay) + p[2] * Math.sin(ay), z1 = -p[0] * Math.sin(ay) + p[2] * Math.cos(ay); return [x1, p[1] * Math.cos(ax) - z1 * Math.sin(ax), p[1] * Math.sin(ax) + z1 * Math.cos(ax)]; };
@@ -12917,7 +12916,6 @@ void main(){
         let W = 0, H = 0, cx = 0, cy = 0, R = 0; const dpr = Math.min(2, window.devicePixelRatio || 1);
         const cadre = () => { const w = core.clientWidth, hh = core.clientHeight; if (w !== W || hh !== H) { W = w; H = hh; cv.width = Math.round(w * dpr); cv.height = Math.round(hh * dpr); } g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H); cx = W / 2; cy = H / 2 + 4; R = Math.min(W, H) * 0.255; };
         const halo = (r, a) => { const gr = g.createRadialGradient(cx, cy, r * 0.2, cx, cy, r); gr.addColorStop(0, col(C1, a)); gr.addColorStop(0.55, col(K4, a * 0.45)); gr.addColorStop(1, col(K4, 0)); g.fillStyle = gr; g.beginPath(); g.arc(cx, cy, r, 0, TAU); g.fill(); };
-        /* les deux familles qu'il retient (QCM du 28/11 : « entre le A et le D, donne d'autres propositions dans les mêmes thèmes ») */
         const fabPoints = (N, kR, kHalo) => { const P = []; for (let i = 0; i < N; i++) { const y = 1 - 2 * (i + 0.5) / N, r = Math.sqrt(1 - y * y), th = i * 2.399963; P.push([Math.cos(th) * r, y, Math.sin(th) * r]); }
           return (t, e) => { const Rs = R * kR; if (kHalo) halo(Rs * (1.02 + 0.04 * Math.sin(t / 1500)), 0.22 + 0.22 * e);
             const ay = t * 0.00021, ax = 0.42;
@@ -12927,59 +12925,7 @@ void main(){
               else g.fillStyle = col(C2, al);
               g.fillRect(x - sz / 2, y - sz / 2, sz, sz); }
             g.strokeStyle = col(C2, 0.16 + 0.12 * e); g.lineWidth = 1; g.beginPath(); g.arc(cx, cy, Rs * 1.07, 0, TAU); g.stroke(); }; };
-        const fabPlasma = (kR, kHalo) => { const NB = 30, veines = []; for (let k = 0; k < NB; k++) veines.push({y: -0.94 + 1.88 * k / (NB - 1), f1: 1.2 + hasard() * 2.2, f2: 2.5 + hasard() * 3, p1: hasard() * TAU, p2: hasard() * TAU, v: 0.00035 + hasard() * 0.0006, a: 0.12 + hasard() * 0.3});
-          return (t, e) => { const Rp = R * kR; if (kHalo) halo(Rp * 1.22, 0.16 + 0.16 * e);
-            g.save(); g.beginPath(); g.arc(cx, cy, Rp, 0, TAU); g.clip();
-            const fond = g.createRadialGradient(cx - Rp * 0.25, cy - Rp * 0.3, Rp * 0.05, cx, cy, Rp); fond.addColorStop(0, col(K4, 0.55)); fond.addColorStop(0.6, 'rgba(6,20,58,.9)'); fond.addColorStop(1, 'rgba(2,6,20,.96)'); g.fillStyle = fond; g.fillRect(cx - Rp, cy - Rp, Rp * 2, Rp * 2);
-            g.globalCompositeOperation = 'lighter';
-            for (const v of veines) { const larg = Math.sqrt(Math.max(0, 1 - v.y * v.y)), amp = (0.07 + 0.09 * e) * larg; g.beginPath();
-              for (let k = 0; k <= 40; k++) { const u = -1 + 2 * k / 40, x = cx + Math.sin(u * Math.PI / 2) * Rp * larg, y = cy + Rp * (v.y + amp * (Math.sin(u * v.f1 * 3 + t * v.v * (1 + e) + v.p1) + 0.6 * Math.sin(u * v.f2 * 3 - t * v.v * 1.7 + v.p2))); if (k) g.lineTo(x, y); else g.moveTo(x, y); }
-              g.strokeStyle = col(v.a > 0.3 ? C2 : C1, v.a * (0.55 + 0.45 * Math.sin(t * 0.0009 + v.p1)) + 0.12 * e); g.lineWidth = 1.1 + v.a * 2; g.stroke(); }
-            const bx = cx + Math.sin(t / 2300) * Rp * 0.22, by = cy + Math.cos(t / 3100) * Rp * 0.18, coeur = g.createRadialGradient(bx, by, 0, bx, by, Rp * (0.5 + 0.12 * e)); coeur.addColorStop(0, col(C2, 0.5 + 0.3 * e)); coeur.addColorStop(0.4, col(C1, 0.18)); coeur.addColorStop(1, col(C1, 0)); g.fillStyle = coeur; g.fillRect(cx - Rp, cy - Rp, Rp * 2, Rp * 2);
-            g.globalCompositeOperation = 'source-over';
-            const ombre = g.createRadialGradient(cx, cy, Rp * 0.55, cx, cy, Rp); ombre.addColorStop(0, 'rgba(2,6,20,0)'); ombre.addColorStop(1, 'rgba(2,6,20,.78)'); g.fillStyle = ombre; g.fillRect(cx - Rp, cy - Rp, Rp * 2, Rp * 2);
-            g.restore();
-            g.strokeStyle = col(C2, 0.6 + 0.2 * e); g.lineWidth = 1.3; g.beginPath(); g.arc(cx, cy, Rp, 0, TAU); g.stroke();
-            g.strokeStyle = 'rgba(255,255,255,.5)'; g.lineWidth = 1.6; g.beginPath(); g.arc(cx, cy, Rp * 0.93, -2.5, -1.75); g.stroke(); }; };
-        let dessin = null;
-        if (GV === 'a') dessin = fabPoints(720, 1, true);
-        else if (GV === 'd') dessin = fabPlasma(1, true);
-        else if (GV === 'a2') {   /* la nuée : des points dans tout le volume, chacun sur son orbite, plus vite près du cœur */
-          const N = 950, Q = []; for (let i = 0; i < N; i++) { const r = 0.1 + 0.98 * Math.pow(hasard(), 0.75); Q.push({r, inc: (hasard() - 0.5) * Math.PI * 0.95, nd: hasard() * TAU, ph: hasard() * TAU, v: 0.00042 / (0.22 + r * r)}); }
-          dessin = (t, e) => { halo(R * 1.12, 0.2 + 0.2 * e);
-            const noy = g.createRadialGradient(cx, cy, 0, cx, cy, R * (0.42 + 0.06 * Math.sin(t / 1300) + 0.1 * e)); noy.addColorStop(0, 'rgba(255,255,255,' + (0.55 + 0.3 * e).toFixed(3) + ')'); noy.addColorStop(0.3, col(C2, 0.42)); noy.addColorStop(1, col(C1, 0)); g.fillStyle = noy; g.beginPath(); g.arc(cx, cy, R * 0.6, 0, TAU); g.fill();
-            const ay = t * 0.00009, ax = 0.32;
-            for (let i = 0; i < N; i++) { const o = Q[i], th = o.ph + t * o.v * (1 + 0.7 * e), rr = o.r * (1 + 0.05 * e * Math.sin(t / 260 + i)), px = rr * Math.cos(th), pz = rr * Math.sin(th);
-              const y1 = -pz * Math.sin(o.inc), z1 = pz * Math.cos(o.inc), q = rot([px * Math.cos(o.nd) + z1 * Math.sin(o.nd), y1, -px * Math.sin(o.nd) + z1 * Math.cos(o.nd)], ay, ax), f = (q[2] + 1.1) / 2.2, k = 1 + q[2] * 0.14;
-              const al = (0.1 + 0.9 * f * f) * (o.r < 0.4 ? 1 : 0.7) * (0.75 + 0.25 * Math.sin(t * 0.003 + i * 2.1)), sz = 0.7 + 1.5 * f;
-              g.fillStyle = o.r < 0.33 ? 'rgba(255,255,255,' + al.toFixed(3) + ')' : col(i % 3 ? C2 : C1, al); g.fillRect(cx + q[0] * R * k - sz / 2, cy + q[1] * R * k - sz / 2, sz, sz); } };
-        } else if (GV === 'a3') {   /* les anneaux de points : des parallèles pointillés qui tournent en sens contraires, une onde d'un pôle à l'autre */
-          const AN = []; for (let k = 0; k < 17; k++) { const la = (-80 + 160 * k / 16) * Math.PI / 180; AN.push({y: Math.sin(la), r: Math.cos(la), n: Math.round(54 * Math.cos(la)) + 6, v: (k % 2 ? -1 : 1) * (0.00018 + 0.00012 * Math.cos(la))}); }
-          dessin = (t, e) => { halo(R * (1.04 + 0.04 * Math.sin(t / 1500)), 0.2 + 0.22 * e);
-            const ay = t * 0.00007, ax = 0.5;
-            AN.forEach((A, k) => { const onde = 1 + (0.03 + 0.07 * e) * Math.sin(t * 0.0019 - k * 0.55), a0 = t * A.v * (1 + 0.6 * e), vif = 0.5 + 0.5 * Math.sin(t * 0.0019 - k * 0.55);
-              for (let n = 0; n < A.n; n++) { const a = a0 + n / A.n * TAU, q = rot([Math.cos(a) * A.r, A.y, Math.sin(a) * A.r], ay, ax), f = (q[2] + 1) / 2, kk = 1 + q[2] * 0.15, sz = 0.8 + 1.7 * f, al = (0.1 + 0.9 * f * f) * (0.55 + 0.45 * vif);
-                g.fillStyle = vif > 0.85 && f > 0.5 ? 'rgba(255,255,255,' + al.toFixed(3) + ')' : col(C2, al); g.fillRect(cx + q[0] * R * onde * kk - sz / 2, cy + q[1] * R * onde * kk - sz / 2, sz, sz); } });
-            const noy = g.createRadialGradient(cx, cy, 0, cx, cy, R * 0.5); noy.addColorStop(0, col(C2, 0.3 + 0.25 * e)); noy.addColorStop(1, col(C1, 0)); g.fillStyle = noy; g.beginPath(); g.arc(cx, cy, R * 0.5, 0, TAU); g.fill(); };
-        } else if (GV === 'd2') {   /* le tourbillon : un disque de plasma incliné qui tourne dans la sphère, un cœur vif */
-          dessin = (t, e) => { halo(R * 1.22, 0.16 + 0.18 * e);
-            g.save(); g.beginPath(); g.arc(cx, cy, R, 0, TAU); g.clip();
-            const fond = g.createRadialGradient(cx, cy, R * 0.05, cx, cy, R); fond.addColorStop(0, col(K4, 0.5)); fond.addColorStop(0.55, 'rgba(6,20,58,.92)'); fond.addColorStop(1, 'rgba(2,6,20,.97)'); g.fillStyle = fond; g.fillRect(cx - R, cy - R, R * 2, R * 2);
-            g.translate(cx, cy); g.rotate(-0.38); g.scale(1, 0.58); g.globalCompositeOperation = 'lighter';
-            const w = t * 0.00055 * (1 + 0.8 * e);
-            for (let b = 0; b < 14; b++) { const gros = b < 5, a0 = b / (gros ? 5 : 9) * TAU + (gros ? 0 : 0.4), tours = gros ? 4.4 : 5.6;
-              for (let k = 0; k < 46; k++) { const s1 = k / 46, s2 = (k + 1) / 46, r1 = R * 1.5 * (0.05 + 0.95 * s1), r2 = R * 1.5 * (0.05 + 0.95 * s2), b1 = a0 + s1 * tours - w * (1.6 - s1) + 0.12 * Math.sin(t / 700 + b + s1 * 9), b2 = a0 + s2 * tours - w * (1.6 - s2) + 0.12 * Math.sin(t / 700 + b + s2 * 9);
-                g.strokeStyle = col(gros ? C2 : C1, (gros ? 0.5 : 0.22) * (1 - s1) * (1 - s1) + 0.03); g.lineWidth = gros ? 2.4 * (1 - s1) + 0.6 : 0.9; g.beginPath(); g.moveTo(Math.cos(b1) * r1, Math.sin(b1) * r1); g.lineTo(Math.cos(b2) * r2, Math.sin(b2) * r2); g.stroke(); } }
-            g.setTransform(dpr, 0, 0, dpr, 0, 0);
-            const rc = R * (0.3 + 0.05 * Math.sin(t / 900) + 0.1 * e), coeur = g.createRadialGradient(cx, cy, 0, cx, cy, rc); coeur.addColorStop(0, 'rgba(255,255,255,' + (0.9).toFixed(2) + ')'); coeur.addColorStop(0.3, col(C2, 0.75)); coeur.addColorStop(1, col(C1, 0)); g.fillStyle = coeur; g.fillRect(cx - R, cy - R, R * 2, R * 2);
-            g.globalCompositeOperation = 'source-over';
-            const ombre = g.createRadialGradient(cx, cy, R * 0.5, cx, cy, R); ombre.addColorStop(0, 'rgba(2,6,20,0)'); ombre.addColorStop(1, 'rgba(2,6,20,.82)'); g.fillStyle = ombre; g.fillRect(cx - R, cy - R, R * 2, R * 2);
-            g.restore(); g.setTransform(dpr, 0, 0, dpr, 0, 0);
-            g.strokeStyle = col(C2, 0.6 + 0.2 * e); g.lineWidth = 1.3; g.beginPath(); g.arc(cx, cy, R, 0, TAU); g.stroke();
-            g.strokeStyle = 'rgba(255,255,255,.5)'; g.lineWidth = 1.6; g.beginPath(); g.arc(cx, cy, R * 0.93, -2.5, -1.75); g.stroke(); };
-        } else {   /* d3 : le plasma et les particules, les deux à la fois : un cœur liquide, une coquille de points autour */
-          const pl = fabPlasma(0.66, true), pt = fabPoints(520, 1.02, false); dessin = (t, e) => { pl(t, e); pt(t, e); };
-        }
+        const dessin = fabPoints(720, 1, true);
         const tour = (t) => { if (!cv.isConnected) { GST.raf = 0; return; } cadre(); GST.e += ((GST.parle ? 1 : 0) - GST.e) * 0.06; dessin(reduit ? 4200 : t, GST.e); GST.raf = reduit ? 0 : requestAnimationFrame(tour); };
         if (GST.raf) cancelAnimationFrame(GST.raf); GST.raf = requestAnimationFrame(tour);
       }

@@ -12,7 +12,7 @@ srv.listen(0, async () => {
   /* 17/11/2026 : la pause de Grok de la maquette se déduisait d'une activité « d'hier » ; du mardi 12h47 au mercredi, elle était donc « finie »
      et la sonnette automatique de reprise masquait des boutons. Le banc pose une pause explicite (onglet Faits), la même quel que soit le jour. */
   const PAUSE_INIT = () => { let v; const d = new Date(Date.now() + 2 * 864e5), p2 = (n) => String(n).padStart(2, '0'); const until = p2(d.getDate()) + '/' + p2(d.getMonth() + 1) + '/' + d.getFullYear() + ' 12h47';
-    Object.defineProperty(window, '__SCEN', {configurable: true, get: () => v, set: (x) => { v = Object.assign({pauseUntil: until, sansPile: true}, x || {}); }}); };   /* 0.99.0 : les vérifications d'avant portent sur la liste de « Pour moi » ; la pile a les siennes (sansPile: false) */
+    Object.defineProperty(window, '__SCEN', {configurable: true, get: () => v, set: (x) => { v = Object.assign({pauseUntil: until, sansPile: true, sansOrbite: true}, x || {}); }}); };   /* 0.99.0 : les vérifications d'avant portent sur la liste de « Pour moi » ; la pile a les siennes (sansPile: false) */
   /* une page avec un scénario de la maquette en plus (micro, voix) */
   const pageWith = async (scen, url) => { const ctx = await b.newContext({...devices['iPhone 15 Pro Max']}); await ctx.addInitScript(PAUSE_INIT); await ctx.addInitScript((sc) => { const d = Object.getOwnPropertyDescriptor(window, '__SCEN'); Object.defineProperty(window, '__SCEN', {configurable: true, get: d.get, set: (x) => d.set.call(window, Object.assign({}, sc, x || {}))}); }, scen); const p = await ctx.newPage(); p.on('pageerror', (e) => errs.push(url + ' : ' + e.message)); await p.goto(base + url); await p.waitForTimeout(3500); return p; };
   const page = async (url) => { const ctx = await b.newContext({...devices['iPhone 15 Pro Max']}); await ctx.addInitScript(PAUSE_INIT); const p = await ctx.newPage(); p.on('pageerror', (e) => errs.push(url + ' : ' + e.message)); await p.goto(base + url); await p.waitForTimeout(3500); return p; };
@@ -1337,6 +1337,36 @@ srv.listen(0, async () => {
       await q.context().close();
       q = await pageWith(SCP, '?pile=0#demandes'); await q.waitForTimeout(1200); const e6 = await etat();
       ok('0.99 pile : « ?pile=0 » dans l’adresse la coupe (la liste, comme avant)', !e6.pile && e6.vus === e6.n && e6.n >= 2 && !e6.bascule, JSON.stringify(e6));
+      await q.context().close(); }
+    /* 0.100.0 : l'accueil en orbite et le globe de particules (son choix du 28/11/2026 ; l'accueil d'avant est gardé : « ?accueil=ancien ») */
+    { const SCO = {grokOff: true, sujets: true, reponses: true, sansOrbite: false}, VERS = {AGENDA: '#agenda', 'POUR TOI': '#demandes', TRAVAIL: '#travail', ARGENT: '#argent', HERMES: '#equipe', PAPIERS: '#papiers'};
+      let q = await pageWith(SCO, '#accueil'); await q.waitForTimeout(2500);
+      const etat = () => q.evaluate(() => { const c = [...document.querySelectorAll('.hud-core .orb-c')], f = document.querySelector('.orb-c.is-front'), foc = document.querySelector('.orb-foc'), anc = document.querySelector('.hud-core .holo-stage');
+        return {hud: !!document.querySelector('section.hud.hud-o'), n: c.length, noms: c.map((x) => x.dataset.k).join(), front: f ? f.dataset.k : '', ligne: foc ? foc.textContent : '', globe: !!document.querySelector('.hud-core canvas.g-neuf'), ancien: anc ? getComputedStyle(anc).visibility : '',
+          met: (document.querySelector('.hud-met') || {}).textContent || '', regl: !!document.getElementById('regl-btn'), cachees: [...document.querySelectorAll('.hud-core .hud-ro')].length >= 3 && [...document.querySelectorAll('.hud-core .hud-ro')].every((x) => x.hidden), pos: c.map((x) => x.style.transform).join('|'), derriere: c.filter((x) => x.style.zIndex === '0').length}; });
+      const e1 = await etat(); await q.waitForTimeout(1500); const e2 = await etat();
+      ok('0.100 orbite : six hologrammes autour du globe (Agenda, Pour toi, Travail, Argent, Hermes, Papiers), un « au point » dont la ligne sous le globe dit le détail ; le globe de particules remplace celui d’avant (caché, pas retiré) ; les quatre tuiles d’avant sont cachées',
+        e1.hud && e1.n === 6 && e1.noms === 'AGENDA,POUR TOI,TRAVAIL,ARGENT,HERMES,PAPIERS' && !!e1.front && e1.ligne.startsWith(e1.front) && /›$/.test(e1.ligne) && e1.globe && e1.ancien === 'hidden' && e1.cachees, JSON.stringify(e1).slice(0, 500));
+      ok('0.100 orbite : ça tourne (les hologrammes ont bougé en une seconde et demie), certains passent derrière le globe ; la météo est une ligne en haut à droite, Réglages une roue dans l’en-tête', e2.pos !== e1.pos && e1.derriere >= 1 && e1.derriere <= 4 && e1.met.length > 2 && e1.regl, JSON.stringify([e1.derriere, e1.met, e1.regl]));
+      const box = await q.evaluate(() => { const r = document.querySelector('.hud-core').getBoundingClientRect(); return {x: r.left + r.width / 2, y: r.top + r.height * 0.5}; });
+      await q.mouse.move(box.x + 100, box.y); await q.mouse.down(); for (let k = 1; k <= 20; k++) { await q.mouse.move(box.x + 100 - k * 10, box.y); await q.waitForTimeout(20); } await q.mouse.up(); await q.waitForTimeout(700);
+      const e3 = await etat();
+      ok('0.100 orbite : glisser du doigt fait tourner l’anneau (un autre hologramme est au point, la ligne suit)', !!e3.front && e3.front !== e2.front && e3.ligne.startsWith(e3.front), JSON.stringify([e2.front, e3.front, e3.ligne]));
+      await q.evaluate(() => document.querySelector('.orb-c.is-front').click()); await q.waitForTimeout(1200);
+      const h1 = await q.evaluate(() => location.hash);
+      ok('0.100 orbite : un appui sur l’hologramme au point ouvre sa rubrique', h1 === VERS[e3.front], JSON.stringify([e3.front, h1]));
+      await q.evaluate(() => { location.hash = '#accueil'; }); await q.waitForTimeout(1500);
+      await q.evaluate(() => document.querySelector('.orb-foc').click()); await q.waitForTimeout(1200);
+      const f2 = await q.evaluate(() => location.hash); await q.evaluate(() => document.getElementById('regl-btn').click()); await q.waitForTimeout(1200); const h3 = await q.evaluate(() => location.hash);
+      ok('0.100 orbite : la ligne sous le globe ouvre la rubrique au point ; la roue de l’en-tête ouvre Réglages', Object.values(VERS).includes(f2) && h3 === '#reglages', JSON.stringify([f2, h3]));
+      await q.context().close();
+      q = await pageWith(SCO, '#accueil'); await q.emulateMedia({reducedMotion: 'reduce'}); await q.reload(); await q.waitForTimeout(3500);
+      const r1 = await etat(); await q.waitForTimeout(1300); const r2 = await etat();
+      ok('0.100 orbite : « réduire les animations » : rien ne tourne, les six hologrammes restent répartis et un reste au point', r1.n === 6 && r1.pos === r2.pos && !!r1.front && r1.globe, JSON.stringify([r1.front, r1.pos === r2.pos]));
+      await q.context().close();
+      q = await pageWith(SCO, '?accueil=ancien#accueil'); await q.waitForTimeout(2500);
+      const a1 = await q.evaluate(() => ({orbite: !!document.querySelector('.hud-o, .orb-c, .g-neuf, #regl-btn'), tuiles: [...document.querySelectorAll('.hud-core .hud-ro')].filter((x) => !x.hidden && x.offsetParent).map((x) => x.dataset.k).join(), globe: !!document.querySelector('.hud-core .holo-stage canvas')}));
+      ok('0.100 orbite : l’accueil d’avant est gardé tel quel (« ?accueil=ancien » : ses quatre tuiles, son globe, ni orbite ni roue)', !a1.orbite && /^AGENDA,MÉTÉO,POUR TOI,(ARGENT|BONS PRIX)$/.test(a1.tuiles) && a1.globe, JSON.stringify(a1));
       await q.context().close(); }
     { const q = await page('#demandes'); await q.waitForTimeout(2400);
       ok('0.94 : sans rien qui attend dans Travail, « Pour moi » n’a pas de ligne de Travail en plus', await q.evaluate(() => document.querySelectorAll('.pm-travail.toi').length === 0));
