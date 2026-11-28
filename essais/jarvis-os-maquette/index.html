@@ -12991,15 +12991,19 @@ void main(){
            4 « Flux » : un anneau avec de l'élan (un coup de doigt le lance, il ralentit), l'arrêt devant ; le globe envoie un flux de
              particules à l'hologramme au point ; une onde part du globe toutes les six secondes et fait briller chaque hologramme à son
              passage ; un appui sur le globe inverse le sens et lance une onde. ---- */
-      const MODE = (() => { try { const m = new URLSearchParams(location.search).get('orbite'); return ['2', '3', '4'].includes(m) ? m : '1'; } catch (e) { return '1'; } })();
+      /* 0.103.0 (son choix au QCM du 28/11/2026, après les quatre films : « 2 Atome ») : l'atome est le mouvement de l'accueil ; l'orbite d'avant
+         (« ?orbite=1 ») et les deux autres essais (« 3 », « 4 ») restent derrière leur paramètre */
+      const MODE = (() => { try { const m = new URLSearchParams(location.search).get('orbite'); return ['1', '2', '3', '4'].includes(m) ? m : '2'; } catch (e) { return '2'; } })();
       function autreMoteur(C) {
         const {core, svg, e1, e2, e3, ping, chips, items, auPoint, reduit} = C, n = chips.length, NS = 'http://www.w3.org/2000/svg';
         const st = {last: 0, f: 1, zmax: 0, ang: [20, 200], elan: 0, sens: 1, doigt: null, bouge: false, off: chips.map(() => [0, 0, 0, 0]), pos: chips.map(() => [0, 0, 0])};
         let W = 0, H = 0, cx = 0, cy = 0, a = 0, Rg = 0;
         const mesure = () => { W = core.clientWidth; H = core.clientHeight; cx = W / 2; cy = H / 2 + 4; a = Math.min(W / 2 - 50, 178); Rg = Math.min(W, H) * 0.255; svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H); };
-        const poser = (i, x, y, z, plus) => { const c = chips[i], p = (z + 1) / 2, o = st.off[i], X = cx + x * a + o[0], Y = cy + y * a + o[1]; st.pos[i] = [X, Y, z];
-          c.style.transform = 'translate(' + X.toFixed(1) + 'px,' + Y.toFixed(1) + 'px) translate(-50%,-50%) scale(' + (0.78 + 0.34 * p + (i === ORB.front ? 0.07 : 0) + (plus || 0)).toFixed(3) + ')';
-          c.style.opacity = (0.34 + 0.66 * p).toFixed(2); c.style.zIndex = z > -0.2 ? '3' : '0'; };
+        /* 0.103.0 : au lancement de l'app, les hologrammes sortent du globe l'un après l'autre (comme dans l'orbite d'avant) */
+        const naitre = (i) => { if (reduit) return 1; const k = Math.max(0, Math.min(1, (performance.now() - (GST.t0 || 0) - 550 - i * 120) / 750)); return 1 - Math.pow(1 - k, 3); };
+        const poser = (i, x, y, z, plus) => { const c = chips[i], p = (z + 1) / 2, o = st.off[i], eo = naitre(i), X = cx + x * a * eo + o[0], Y = cy + y * a * eo + o[1]; st.pos[i] = [X, Y, z];
+          c.style.transform = 'translate(' + X.toFixed(1) + 'px,' + Y.toFixed(1) + 'px) translate(-50%,-50%) scale(' + ((0.78 + 0.34 * p + (i === ORB.front ? 0.07 : 0) + (plus || 0)) * (0.35 + 0.65 * eo)).toFixed(3) + ')';
+          c.style.opacity = ((0.34 + 0.66 * p) * eo).toFixed(2); c.style.zIndex = z > -0.2 ? '3' : '0'; };
         const ressorts = (dt) => { const k = dt / 16; st.off.forEach((o) => { o[2] += (-o[0] * 0.014 - o[2] * 0.13) * k; o[3] += (-o[1] * 0.014 - o[3] * 0.13) * k; o[0] += o[2] * k; o[1] += o[3] * k; }); };
         const onde = (force) => { GST.choc = performance.now(); ping.classList.remove('va'); void ping.offsetWidth; ping.classList.add('va'); st.pos.forEach((p, i) => { const dx = p[0] - cx, dy = p[1] - cy, d = Math.hypot(dx, dy) || 1; st.off[i][2] += dx / d * force; st.off[i][3] += dy / d * force; }); };
         const devant = () => { let d = 0, m = -9; st.pos.forEach((p, i) => { if (p[2] > m) { m = p[2]; d = i; } }); st.zmax = m; if (d !== ORB.front) auPoint(d); };
@@ -13007,7 +13011,7 @@ void main(){
         if (MODE === '2') {
           e3.style.display = 'none'; const INC = 1.2, cI = Math.cos(INC), sI = Math.sin(INC), qui = chips.map((c, i) => i % 2), rang = chips.map((c, i) => Math.floor(i / 2)), par = [Math.ceil(n / 2), Math.floor(n / 2)];
           image = (t) => { if (!core.isConnected) { ORB.raf = 0; return; } const dt = st.last ? Math.min(64, t - st.last) : 16; st.last = t; mesure();
-            const alpha = [0.44 + 0.13 * Math.sin(t / 4300), -0.44 + 0.13 * Math.sin(t / 5100 + 1)];
+            const tb = reduit ? 0 : t, alpha = [0.44 + 0.13 * Math.sin(tb / 4300), -0.44 + 0.13 * Math.sin(tb / 5100 + 1)];   /* « réduire les animations » : les plans ne se balancent pas non plus */
             [e1, e2].forEach((e, r) => { e.setAttribute('class', 'o1'); e.setAttribute('cx', cx); e.setAttribute('cy', cy); e.setAttribute('rx', a); e.setAttribute('ry', a * cI); e.setAttribute('transform', 'rotate(' + (alpha[r] * 180 / Math.PI).toFixed(2) + ' ' + cx + ' ' + cy + ')'); });
             st.f += ((st.zmax > 0.93 ? 0.22 : 1) - st.f) * 0.05; st.elan *= Math.pow(0.95, dt / 16);
             if (!st.doigt && !reduit) { st.ang[0] -= dt * (0.0105 * st.f) + st.elan; st.ang[1] += dt * (0.0086 * st.f) + st.elan * 0.8; }

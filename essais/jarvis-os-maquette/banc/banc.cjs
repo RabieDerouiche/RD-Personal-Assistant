@@ -2460,7 +2460,15 @@ srv.listen(0, async () => {
         await q.evaluate(() => { location.hash = '#agenda'; }); await q.waitForTimeout(700); await q.evaluate(() => { location.hash = '#accueil'; }); await q.waitForTimeout(900);
         const a2 = await q.evaluate(() => { const core = document.querySelector('.hud-core'); return {nait: core.classList.contains('nait'), op: [...core.querySelectorAll('.orb-c')].map((c) => +c.style.opacity)}; });
         ok('0.102 accueil : revenu à l’accueil dans la même session, rien ne rejoue : les hologrammes sont à leur place tout de suite', a2.nait === false && a1.nait === false && a2.op.length === 6 && a2.op.every((x) => x > 0.3), JSON.stringify(a2));
-        await q.context().close(); }
+        await q.context().close();
+        /* 0.103.0 (son choix au QCM du 28/11/2026 : « 2 Atome ») : l'atome est le mouvement par défaut ; l'orbite d'avant reste derrière « ?orbite=1 » */
+        const lireM = (p) => p.evaluate(() => { const core = document.querySelector('.hud-core'), c = [...core.querySelectorAll('.orb-c')]; return {n: c.length, anneaux: [...core.querySelectorAll('svg.orb-an ellipse')].map((e) => e.getAttribute('class')).join(), arc: getComputedStyle(core.querySelector('svg.orb-an path.o3')).display, pos: c.map((x) => x.style.transform).join('|'), front: (core.querySelector('.orb-c.is-front') || {dataset: {}}).dataset.k || ''}; });
+        const at = await pageWith({grokOff: true, sujets: true, reponses: true, sansOrbite: false}, '#accueil'); await at.waitForTimeout(2600); const m1 = await lireM(at); await at.waitForTimeout(1200); const m2 = await lireM(at);
+        ok('0.103 accueil : par défaut, l’atome (deux anneaux croisés, plus d’arc d’orbite), six hologrammes qui bougent, un au point', m1.n === 6 && m1.anneaux === 'o1,o1' && m1.arc === 'none' && m1.pos !== m2.pos && !!m1.front, JSON.stringify([m1.anneaux, m1.arc, m1.front, m1.pos === m2.pos]));
+        await at.context().close();
+        const ob = await pageWith({grokOff: true, sujets: true, reponses: true, sansOrbite: false}, '?orbite=1#accueil'); await ob.waitForTimeout(2600); const o1 = await lireM(ob); await ob.waitForTimeout(1200); const o2 = await lireM(ob);
+        ok('0.103 accueil : l’orbite d’avant est gardée derrière « ?orbite=1 » (son arc, ses deux ellipses), et tourne', o1.n === 6 && o1.arc !== 'none' && /o2/.test(o1.anneaux) && o1.pos !== o2.pos, JSON.stringify([o1.anneaux, o1.arc, o1.pos === o2.pos]));
+        await ob.context().close(); }
     });
   } catch (e) { ok('exception', false, e.stack); }
   if (LISTE) { console.log(JSON.stringify(vus)); await b.close(); srv.close(); process.exit(0); }
