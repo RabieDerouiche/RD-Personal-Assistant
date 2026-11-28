@@ -12,7 +12,12 @@ srv.listen(0, async () => {
   /* 17/11/2026 : la pause de Grok de la maquette se déduisait d'une activité « d'hier » ; du mardi 12h47 au mercredi, elle était donc « finie »
      et la sonnette automatique de reprise masquait des boutons. Le banc pose une pause explicite (onglet Faits), la même quel que soit le jour. */
   const PAUSE_INIT = () => { let v; const d = new Date(Date.now() + 2 * 864e5), p2 = (n) => String(n).padStart(2, '0'); const until = p2(d.getDate()) + '/' + p2(d.getMonth() + 1) + '/' + d.getFullYear() + ' 12h47';
-    Object.defineProperty(window, '__SCEN', {configurable: true, get: () => v, set: (x) => { v = Object.assign({pauseUntil: until, sansPile: true, sansOrbite: true}, x || {}); }}); };   /* 0.99.0 : les vérifications d'avant portent sur la liste de « Pour moi » ; la pile a les siennes (sansPile: false) */
+    Object.defineProperty(window, '__SCEN', {configurable: true, get: () => v, set: (x) => { v = Object.assign({pauseUntil: until, sansPile: true, sansOrbite: true}, x || {}); }});
+    /* 28/11/2026 : les animations en continu (le globe, à chaque page) saturaient la machine quand plusieurs navigateurs tournent ensemble :
+       dans le banc, une image toutes les 100 ms au lieu de 60 par seconde. Les durées (minuteries, transitions CSS) ne changent pas. */
+    { const raf = window.requestAnimationFrame.bind(window), caf = window.cancelAnimationFrame.bind(window), m = new Map(); let n = 0;
+      window.requestAnimationFrame = (cb) => { const id = ++n; m.set(id, setTimeout(() => { m.delete(id); raf(cb); }, 100)); return id; };
+      window.cancelAnimationFrame = (id) => { const t = m.get(id); if (t !== undefined) { clearTimeout(t); m.delete(id); } else caf(id); }; } };   /* 0.99.0 : les vérifications d'avant portent sur la liste de « Pour moi » ; la pile a les siennes (sansPile: false) */
   /* une page avec un scénario de la maquette en plus (micro, voix) */
   const pageWith = async (scen, url) => { const ctx = await b.newContext({...devices['iPhone 15 Pro Max']}); await ctx.addInitScript(PAUSE_INIT); await ctx.addInitScript((sc) => { const d = Object.getOwnPropertyDescriptor(window, '__SCEN'); Object.defineProperty(window, '__SCEN', {configurable: true, get: d.get, set: (x) => d.set.call(window, Object.assign({}, sc, x || {}))}); }, scen); const p = await ctx.newPage(); p.on('pageerror', (e) => errs.push(url + ' : ' + e.message)); await p.goto(base + url); await p.waitForTimeout(3500); return p; };
   const page = async (url) => { const ctx = await b.newContext({...devices['iPhone 15 Pro Max']}); await ctx.addInitScript(PAUSE_INIT); const p = await ctx.newPage(); p.on('pageerror', (e) => errs.push(url + ' : ' + e.message)); await p.goto(base + url); await p.waitForTimeout(3500); return p; };

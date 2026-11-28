@@ -5,6 +5,7 @@
      node essais/bancs.mjs              ce qui a besoin de tourner (les bancs dont les fichiers ont changé depuis leur dernier passage vert)
      node essais/bancs.mjs --tout       tous, sans tenir compte du dernier passage
      node essais/bancs.mjs --quoi       dit seulement ce qui tournerait, et pourquoi
+     node essais/bancs.mjs --sur-place  sans copie figée (les bancs lisent le dépôt lui-même)
      node essais/bancs.mjs app radar    ceux-là seulement (noms : app, portail, ordres, relance, garde, routines-conf, note, et chaque
                                         banc du serveur par son nom de fichier sans « .test.mjs » : server, jours, travail, radar…)
      node essais/bancs.mjs app --seg "0\.101"    le banc de l'app, seulement les segments dont le code contient cette expression (essai rapide
@@ -25,10 +26,16 @@ import os from 'node:os';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 
-const RACINE = path.join(path.dirname(fileURLToPath(import.meta.url)), '..'), VERTS = path.join(RACINE, 'essais', '.bancs-verts.json');
+const DEPOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..'), VERTS = path.join(DEPOT, 'essais', '.bancs-verts.json');
+/* 5. les bancs tournent sur une COPIE FIGÉE du code (un instantané pris au lancement) : on peut continuer à modifier le dépôt pendant qu'ils
+   tournent, et un passage vert vaut pour exactement ce qui a été copié. */
+let RACINE = DEPOT;
 const args = process.argv.slice(2), opt = (n) => args.includes(n), iSeg = args.indexOf('--seg'), SEG = iSeg >= 0 ? args[iSeg + 1] : '';
 const noms = args.filter((a, i) => !a.startsWith('--') && !(iSeg >= 0 && i === iSeg + 1));
 const JOURNAUX = fs.mkdtempSync(path.join(os.tmpdir(), 'bancs-')), COEURS = Math.max(2, Math.min(4, os.cpus().length));
+if (!args.includes('--quoi') && !args.includes('--sur-place')) { const copie = path.join(JOURNAUX, 'code'); fs.mkdirSync(copie);
+  for (const n of fs.readdirSync(DEPOT)) { if (['.git', '.claude', 'node_modules'].includes(n)) continue; fs.cpSync(path.join(DEPOT, n), path.join(copie, n), {recursive: true, filter: (src) => !/(^|\/)(node_modules|__pycache__)(\/|$)/.test(src)}); }
+  RACINE = copie; }
 const APP = 'essais/jarvis-os-maquette', SERVEUR = 'jarvis-os/server', HERMES = 'jarvis-os/hermes';
 
 /* ---------- les bancs et leurs fichiers ---------- */
