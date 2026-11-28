@@ -12902,7 +12902,7 @@ void main(){
            c « Iris » : des anneaux segmentés qui tournent en sens contraires autour d'une pupille qui respire, un balayage ;
            d « Plasma » : un cœur liquide, des veines de lumière qui coulent dans la sphère. ---- */
       const GV = (() => { try { return (new URLSearchParams(location.search).get('globe') || '').toLowerCase(); } catch (e) { return ''; } })();
-      const GNOM = {a: 'A · Particules', b: 'B · Méridiens', c: 'C · Iris', d: 'D · Plasma'}, GST = {parle: false, e: 0, raf: 0};
+      const GNOM = {a: 'A · Particules', a2: 'A2 · Nuée', a3: 'A3 · Anneaux de points', d: 'D · Plasma', d2: 'D2 · Tourbillon', d3: 'D3 · Plasma et particules'}, GST = {parle: false, e: 0, raf: 0};
       function globeNeuf(core) {
         if (!GNOM[GV]) return;
         const anc = core.querySelector('.holo-stage'); if (anc) anc.style.visibility = 'hidden';
@@ -12917,61 +12917,68 @@ void main(){
         let W = 0, H = 0, cx = 0, cy = 0, R = 0; const dpr = Math.min(2, window.devicePixelRatio || 1);
         const cadre = () => { const w = core.clientWidth, hh = core.clientHeight; if (w !== W || hh !== H) { W = w; H = hh; cv.width = Math.round(w * dpr); cv.height = Math.round(hh * dpr); } g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H); cx = W / 2; cy = H / 2 + 4; R = Math.min(W, H) * 0.255; };
         const halo = (r, a) => { const gr = g.createRadialGradient(cx, cy, r * 0.2, cx, cy, r); gr.addColorStop(0, col(C1, a)); gr.addColorStop(0.55, col(K4, a * 0.45)); gr.addColorStop(1, col(K4, 0)); g.fillStyle = gr; g.beginPath(); g.arc(cx, cy, r, 0, TAU); g.fill(); };
-        let dessin = null;
-        if (GV === 'a') {
-          const N = 720, P = []; for (let i = 0; i < N; i++) { const y = 1 - 2 * (i + 0.5) / N, r = Math.sqrt(1 - y * y), th = i * 2.399963; P.push([Math.cos(th) * r, y, Math.sin(th) * r]); }
-          dessin = (t, e) => { halo(R * (1.02 + 0.04 * Math.sin(t / 1500)), 0.22 + 0.22 * e);
+        /* les deux familles qu'il retient (QCM du 28/11 : « entre le A et le D, donne d'autres propositions dans les mêmes thèmes ») */
+        const fabPoints = (N, kR, kHalo) => { const P = []; for (let i = 0; i < N; i++) { const y = 1 - 2 * (i + 0.5) / N, r = Math.sqrt(1 - y * y), th = i * 2.399963; P.push([Math.cos(th) * r, y, Math.sin(th) * r]); }
+          return (t, e) => { const Rs = R * kR; if (kHalo) halo(Rs * (1.02 + 0.04 * Math.sin(t / 1500)), 0.22 + 0.22 * e);
             const ay = t * 0.00021, ax = 0.42;
             for (let i = 0; i < N; i++) { const p = P[i], q = rot(p, ay, ax), onde = 1 + (0.018 + 0.06 * e) * Math.sin(t * 0.0022 - p[1] * 5.5), k = 1 + q[2] * 0.16, f = (q[2] + 1) / 2;
-              const x = cx + q[0] * R * onde * k, y = cy + q[1] * R * onde * k, al = (0.14 + 0.86 * f * f) * (0.72 + 0.28 * Math.sin(t * 0.0034 + i * 1.7)), sz = 0.8 + 1.7 * f;
+              const x = cx + q[0] * Rs * onde * k, y = cy + q[1] * Rs * onde * k, al = (0.14 + 0.86 * f * f) * (0.72 + 0.28 * Math.sin(t * 0.0034 + i * 1.7)), sz = 0.8 + 1.7 * f;
               if (i % 19 === 0 && f > 0.45) { g.fillStyle = col(C2, al * 0.22); g.beginPath(); g.arc(x, y, sz * 2.6, 0, TAU); g.fill(); g.fillStyle = 'rgba(255,255,255,' + al.toFixed(3) + ')'; }
               else g.fillStyle = col(C2, al);
               g.fillRect(x - sz / 2, y - sz / 2, sz, sz); }
-            g.strokeStyle = col(C2, 0.16 + 0.12 * e); g.lineWidth = 1; g.beginPath(); g.arc(cx, cy, R * 1.07, 0, TAU); g.stroke(); };
-        } else if (GV === 'b') {
-          const M = 44, courbes = []; for (let la = -60; la <= 60; la += 20) { const y = Math.sin(la * Math.PI / 180), r = Math.cos(la * Math.PI / 180), c = []; for (let k = 0; k <= M; k++) { const a = k / M * TAU; c.push([Math.cos(a) * r, y, Math.sin(a) * r]); } courbes.push(c); }
-          for (let m = 0; m < 12; m++) { const lo = m / 12 * TAU, c = []; for (let k = 0; k <= M; k++) { const a = -Math.PI / 2 + k / M * Math.PI; c.push([Math.cos(a) * Math.cos(lo), Math.sin(a), Math.cos(a) * Math.sin(lo)]); } courbes.push(c); }
-          const NO = []; for (let i = 0; i < 16; i++) { const y = hasard() * 1.6 - 0.8, r = Math.sqrt(1 - y * y), a = hasard() * TAU; NO.push({p: [Math.cos(a) * r, y, Math.sin(a) * r], feu: 0}); }
-          const arcs = []; let prochain = 0;
-          dessin = (t, e) => { halo(R * 1.16, 0.16 + 0.14 * e);
-            const ay = t * 0.00016, ax = 0.36, av = new Path2D(), ar = new Path2D();
-            for (const c of courbes) { let pr = null; for (const p of c) { const q = rot(p, ay, ax), pt = [cx + q[0] * R, cy + q[1] * R, q[2]]; if (pr) { const ch = (pr[2] + pt[2]) / 2 >= 0 ? av : ar; ch.moveTo(pr[0], pr[1]); ch.lineTo(pt[0], pt[1]); } pr = pt; } }
-            g.lineWidth = 0.8; g.strokeStyle = col(C1, 0.11); g.stroke(ar); g.lineWidth = 1; g.strokeStyle = col(C2, 0.42 + 0.2 * e); g.stroke(av);
-            if (t > prochain && !reduit) { prochain = t + 700 - 350 * e + hasard() * 500; const i = Math.floor(hasard() * NO.length); let j = Math.floor(hasard() * NO.length); if (j === i) j = (j + 1) % NO.length; arcs.push({a: NO[i], b: NO[j], t0: t, dur: 1300 + hasard() * 700}); NO[i].feu = t; }
-            for (let k = arcs.length - 1; k >= 0; k--) { const A = arcs[k], u = (t - A.t0) / A.dur; if (u > 1.35) { arcs.splice(k, 1); continue; } if (u >= 1 && !A.fini) { A.fini = true; A.b.feu = t; }
-              for (let v = Math.max(0, u - 0.4); v <= Math.min(1, u); v += 0.02) { const p = [0, 1, 2].map((n) => A.a.p[n] * (1 - v) + A.b.p[n] * v), l = Math.hypot(p[0], p[1], p[2]) || 1, hsol = 1 + 0.26 * Math.sin(Math.PI * v), q = rot(p.map((n) => n / l * hsol), ay, ax);
-                const al = (1 - (u - v) / 0.4) * (q[2] > -0.15 ? 0.95 : 0.2) * Math.min(1, (1.35 - u) / 0.35); g.fillStyle = col(C2, al); g.fillRect(cx + q[0] * R - 1, cy + q[1] * R - 1, 2, 2); } }
-            for (const n of NO) { const q = rot(n.p, ay, ax), f = (q[2] + 1) / 2, vif = Math.max(0, 1 - (t - n.feu) / 900), x = cx + q[0] * R, y = cy + q[1] * R; if (q[2] < -0.1 && !vif) continue;
-              g.fillStyle = col(C2, (0.25 + 0.5 * f) * 0.3 + vif * 0.35); g.beginPath(); g.arc(x, y, 3.2 + vif * 5, 0, TAU); g.fill(); g.fillStyle = 'rgba(255,255,255,' + (0.35 + 0.6 * f).toFixed(3) + ')'; g.beginPath(); g.arc(x, y, 1.3 + vif * 0.9, 0, TAU); g.fill(); }
-            g.strokeStyle = col(C2, 0.5); g.lineWidth = 1.2; g.beginPath(); g.arc(cx, cy, R, 0, TAU); g.stroke(); };
-        } else if (GV === 'c') {
-          const AN = [[0.44, 3, 0.62, 2.6, 0.00042, 0.75], [0.58, 5, 0.7, 1.4, -0.0003, 0.5], [0.73, 9, 0.8, 5.5, 0.00018, 0.2], [0.88, 14, 0.62, 1.4, -0.00024, 0.55], [1.02, 2, 0.9, 1, 0.00012, 0.4]];
-          dessin = (t, e) => { halo(R * 1.2, 0.14 + 0.16 * e);
-            const souffle = 0.5 + 0.5 * Math.sin(t / 1700), rp = R * (0.2 + 0.05 * souffle + 0.07 * e);
-            /* le balayage */
-            const ab = t * 0.0011; for (let k = 0; k < 26; k++) { g.strokeStyle = col(C1, 0.2 * (1 - k / 26)); g.lineWidth = 2; g.beginPath(); g.arc(cx, cy, R * 0.66, ab - k * 0.035, ab - (k + 1) * 0.035, true); g.stroke(); }
-            for (const [rr, n, plein, ep, vit, al] of AN) { const a0 = t * vit * (1 + 0.8 * e), pas = TAU / n; g.lineWidth = ep; g.strokeStyle = col(rr > 0.7 && rr < 0.8 ? C1 : C2, al + 0.25 * e); g.lineCap = 'butt';
-              for (let k = 0; k < n; k++) { g.beginPath(); g.arc(cx, cy, R * rr * (1 + 0.025 * e * Math.sin(t / 300 + rr * 9)), a0 + k * pas, a0 + k * pas + pas * plein); g.stroke(); } }
-            /* la graduation */
-            g.strokeStyle = col(C2, 0.5); g.lineWidth = 1; g.beginPath(); for (let k = 0; k < 72; k++) { const a = k / 72 * TAU - t * 0.00006, r1 = R * 1.1, r2 = R * (k % 6 === 0 ? 1.19 : 1.14); g.moveTo(cx + Math.cos(a) * r1, cy + Math.sin(a) * r1); g.lineTo(cx + Math.cos(a) * r2, cy + Math.sin(a) * r2); } g.stroke();
-            /* les fibres de l'iris, puis la pupille */
-            for (let k = 0; k < 64; k++) { const a = k / 64 * TAU + t * 0.00009, vif = 0.25 + 0.75 * Math.abs(Math.sin(t * 0.0013 + k * 2.3)); g.strokeStyle = col(C2, 0.1 + 0.34 * vif); g.lineWidth = 1; g.beginPath(); g.moveTo(cx + Math.cos(a) * rp * 1.12, cy + Math.sin(a) * rp * 1.12); g.lineTo(cx + Math.cos(a) * R * (0.33 + 0.07 * vif), cy + Math.sin(a) * R * (0.33 + 0.07 * vif)); g.stroke(); }
-            const gp = g.createRadialGradient(cx, cy, 0, cx, cy, rp); gp.addColorStop(0, 'rgba(255,255,255,' + (0.85 + 0.15 * e).toFixed(3) + ')'); gp.addColorStop(0.35, col(C2, 0.8)); gp.addColorStop(1, col(K4, 0)); g.fillStyle = gp; g.beginPath(); g.arc(cx, cy, rp, 0, TAU); g.fill(); };
-        } else {
-          const NB = 30, veines = []; for (let k = 0; k < NB; k++) veines.push({y: -0.94 + 1.88 * k / (NB - 1), f1: 1.2 + hasard() * 2.2, f2: 2.5 + hasard() * 3, p1: hasard() * TAU, p2: hasard() * TAU, v: 0.00035 + hasard() * 0.0006, a: 0.12 + hasard() * 0.3});
-          dessin = (t, e) => { halo(R * 1.22, 0.16 + 0.16 * e);
-            g.save(); g.beginPath(); g.arc(cx, cy, R, 0, TAU); g.clip();
-            const fond = g.createRadialGradient(cx - R * 0.25, cy - R * 0.3, R * 0.05, cx, cy, R); fond.addColorStop(0, col(K4, 0.55)); fond.addColorStop(0.6, 'rgba(6,20,58,.9)'); fond.addColorStop(1, 'rgba(2,6,20,.96)'); g.fillStyle = fond; g.fillRect(cx - R, cy - R, R * 2, R * 2);
+            g.strokeStyle = col(C2, 0.16 + 0.12 * e); g.lineWidth = 1; g.beginPath(); g.arc(cx, cy, Rs * 1.07, 0, TAU); g.stroke(); }; };
+        const fabPlasma = (kR, kHalo) => { const NB = 30, veines = []; for (let k = 0; k < NB; k++) veines.push({y: -0.94 + 1.88 * k / (NB - 1), f1: 1.2 + hasard() * 2.2, f2: 2.5 + hasard() * 3, p1: hasard() * TAU, p2: hasard() * TAU, v: 0.00035 + hasard() * 0.0006, a: 0.12 + hasard() * 0.3});
+          return (t, e) => { const Rp = R * kR; if (kHalo) halo(Rp * 1.22, 0.16 + 0.16 * e);
+            g.save(); g.beginPath(); g.arc(cx, cy, Rp, 0, TAU); g.clip();
+            const fond = g.createRadialGradient(cx - Rp * 0.25, cy - Rp * 0.3, Rp * 0.05, cx, cy, Rp); fond.addColorStop(0, col(K4, 0.55)); fond.addColorStop(0.6, 'rgba(6,20,58,.9)'); fond.addColorStop(1, 'rgba(2,6,20,.96)'); g.fillStyle = fond; g.fillRect(cx - Rp, cy - Rp, Rp * 2, Rp * 2);
             g.globalCompositeOperation = 'lighter';
             for (const v of veines) { const larg = Math.sqrt(Math.max(0, 1 - v.y * v.y)), amp = (0.07 + 0.09 * e) * larg; g.beginPath();
-              for (let k = 0; k <= 40; k++) { const u = -1 + 2 * k / 40, x = cx + Math.sin(u * Math.PI / 2) * R * larg, y = cy + R * (v.y + amp * (Math.sin(u * v.f1 * 3 + t * v.v * (1 + e) + v.p1) + 0.6 * Math.sin(u * v.f2 * 3 - t * v.v * 1.7 + v.p2))); if (k) g.lineTo(x, y); else g.moveTo(x, y); }
+              for (let k = 0; k <= 40; k++) { const u = -1 + 2 * k / 40, x = cx + Math.sin(u * Math.PI / 2) * Rp * larg, y = cy + Rp * (v.y + amp * (Math.sin(u * v.f1 * 3 + t * v.v * (1 + e) + v.p1) + 0.6 * Math.sin(u * v.f2 * 3 - t * v.v * 1.7 + v.p2))); if (k) g.lineTo(x, y); else g.moveTo(x, y); }
               g.strokeStyle = col(v.a > 0.3 ? C2 : C1, v.a * (0.55 + 0.45 * Math.sin(t * 0.0009 + v.p1)) + 0.12 * e); g.lineWidth = 1.1 + v.a * 2; g.stroke(); }
-            const bx = cx + Math.sin(t / 2300) * R * 0.22, by = cy + Math.cos(t / 3100) * R * 0.18, coeur = g.createRadialGradient(bx, by, 0, bx, by, R * (0.5 + 0.12 * e)); coeur.addColorStop(0, col(C2, 0.5 + 0.3 * e)); coeur.addColorStop(0.4, col(C1, 0.18)); coeur.addColorStop(1, col(C1, 0)); g.fillStyle = coeur; g.fillRect(cx - R, cy - R, R * 2, R * 2);
+            const bx = cx + Math.sin(t / 2300) * Rp * 0.22, by = cy + Math.cos(t / 3100) * Rp * 0.18, coeur = g.createRadialGradient(bx, by, 0, bx, by, Rp * (0.5 + 0.12 * e)); coeur.addColorStop(0, col(C2, 0.5 + 0.3 * e)); coeur.addColorStop(0.4, col(C1, 0.18)); coeur.addColorStop(1, col(C1, 0)); g.fillStyle = coeur; g.fillRect(cx - Rp, cy - Rp, Rp * 2, Rp * 2);
             g.globalCompositeOperation = 'source-over';
-            const ombre = g.createRadialGradient(cx, cy, R * 0.55, cx, cy, R); ombre.addColorStop(0, 'rgba(2,6,20,0)'); ombre.addColorStop(1, 'rgba(2,6,20,.78)'); g.fillStyle = ombre; g.fillRect(cx - R, cy - R, R * 2, R * 2);
+            const ombre = g.createRadialGradient(cx, cy, Rp * 0.55, cx, cy, Rp); ombre.addColorStop(0, 'rgba(2,6,20,0)'); ombre.addColorStop(1, 'rgba(2,6,20,.78)'); g.fillStyle = ombre; g.fillRect(cx - Rp, cy - Rp, Rp * 2, Rp * 2);
             g.restore();
+            g.strokeStyle = col(C2, 0.6 + 0.2 * e); g.lineWidth = 1.3; g.beginPath(); g.arc(cx, cy, Rp, 0, TAU); g.stroke();
+            g.strokeStyle = 'rgba(255,255,255,.5)'; g.lineWidth = 1.6; g.beginPath(); g.arc(cx, cy, Rp * 0.93, -2.5, -1.75); g.stroke(); }; };
+        let dessin = null;
+        if (GV === 'a') dessin = fabPoints(720, 1, true);
+        else if (GV === 'd') dessin = fabPlasma(1, true);
+        else if (GV === 'a2') {   /* la nuée : des points dans tout le volume, chacun sur son orbite, plus vite près du cœur */
+          const N = 950, Q = []; for (let i = 0; i < N; i++) { const r = 0.1 + 0.98 * Math.pow(hasard(), 0.75); Q.push({r, inc: (hasard() - 0.5) * Math.PI * 0.95, nd: hasard() * TAU, ph: hasard() * TAU, v: 0.00042 / (0.22 + r * r)}); }
+          dessin = (t, e) => { halo(R * 1.12, 0.2 + 0.2 * e);
+            const noy = g.createRadialGradient(cx, cy, 0, cx, cy, R * (0.42 + 0.06 * Math.sin(t / 1300) + 0.1 * e)); noy.addColorStop(0, 'rgba(255,255,255,' + (0.55 + 0.3 * e).toFixed(3) + ')'); noy.addColorStop(0.3, col(C2, 0.42)); noy.addColorStop(1, col(C1, 0)); g.fillStyle = noy; g.beginPath(); g.arc(cx, cy, R * 0.6, 0, TAU); g.fill();
+            const ay = t * 0.00009, ax = 0.32;
+            for (let i = 0; i < N; i++) { const o = Q[i], th = o.ph + t * o.v * (1 + 0.7 * e), rr = o.r * (1 + 0.05 * e * Math.sin(t / 260 + i)), px = rr * Math.cos(th), pz = rr * Math.sin(th);
+              const y1 = -pz * Math.sin(o.inc), z1 = pz * Math.cos(o.inc), q = rot([px * Math.cos(o.nd) + z1 * Math.sin(o.nd), y1, -px * Math.sin(o.nd) + z1 * Math.cos(o.nd)], ay, ax), f = (q[2] + 1.1) / 2.2, k = 1 + q[2] * 0.14;
+              const al = (0.1 + 0.9 * f * f) * (o.r < 0.4 ? 1 : 0.7) * (0.75 + 0.25 * Math.sin(t * 0.003 + i * 2.1)), sz = 0.7 + 1.5 * f;
+              g.fillStyle = o.r < 0.33 ? 'rgba(255,255,255,' + al.toFixed(3) + ')' : col(i % 3 ? C2 : C1, al); g.fillRect(cx + q[0] * R * k - sz / 2, cy + q[1] * R * k - sz / 2, sz, sz); } };
+        } else if (GV === 'a3') {   /* les anneaux de points : des parallèles pointillés qui tournent en sens contraires, une onde d'un pôle à l'autre */
+          const AN = []; for (let k = 0; k < 17; k++) { const la = (-80 + 160 * k / 16) * Math.PI / 180; AN.push({y: Math.sin(la), r: Math.cos(la), n: Math.round(54 * Math.cos(la)) + 6, v: (k % 2 ? -1 : 1) * (0.00018 + 0.00012 * Math.cos(la))}); }
+          dessin = (t, e) => { halo(R * (1.04 + 0.04 * Math.sin(t / 1500)), 0.2 + 0.22 * e);
+            const ay = t * 0.00007, ax = 0.5;
+            AN.forEach((A, k) => { const onde = 1 + (0.03 + 0.07 * e) * Math.sin(t * 0.0019 - k * 0.55), a0 = t * A.v * (1 + 0.6 * e), vif = 0.5 + 0.5 * Math.sin(t * 0.0019 - k * 0.55);
+              for (let n = 0; n < A.n; n++) { const a = a0 + n / A.n * TAU, q = rot([Math.cos(a) * A.r, A.y, Math.sin(a) * A.r], ay, ax), f = (q[2] + 1) / 2, kk = 1 + q[2] * 0.15, sz = 0.8 + 1.7 * f, al = (0.1 + 0.9 * f * f) * (0.55 + 0.45 * vif);
+                g.fillStyle = vif > 0.85 && f > 0.5 ? 'rgba(255,255,255,' + al.toFixed(3) + ')' : col(C2, al); g.fillRect(cx + q[0] * R * onde * kk - sz / 2, cy + q[1] * R * onde * kk - sz / 2, sz, sz); } });
+            const noy = g.createRadialGradient(cx, cy, 0, cx, cy, R * 0.5); noy.addColorStop(0, col(C2, 0.3 + 0.25 * e)); noy.addColorStop(1, col(C1, 0)); g.fillStyle = noy; g.beginPath(); g.arc(cx, cy, R * 0.5, 0, TAU); g.fill(); };
+        } else if (GV === 'd2') {   /* le tourbillon : un disque de plasma incliné qui tourne dans la sphère, un cœur vif */
+          dessin = (t, e) => { halo(R * 1.22, 0.16 + 0.18 * e);
+            g.save(); g.beginPath(); g.arc(cx, cy, R, 0, TAU); g.clip();
+            const fond = g.createRadialGradient(cx, cy, R * 0.05, cx, cy, R); fond.addColorStop(0, col(K4, 0.5)); fond.addColorStop(0.55, 'rgba(6,20,58,.92)'); fond.addColorStop(1, 'rgba(2,6,20,.97)'); g.fillStyle = fond; g.fillRect(cx - R, cy - R, R * 2, R * 2);
+            g.translate(cx, cy); g.rotate(-0.38); g.scale(1, 0.58); g.globalCompositeOperation = 'lighter';
+            const w = t * 0.00055 * (1 + 0.8 * e);
+            for (let b = 0; b < 14; b++) { const gros = b < 5, a0 = b / (gros ? 5 : 9) * TAU + (gros ? 0 : 0.4), tours = gros ? 4.4 : 5.6;
+              for (let k = 0; k < 46; k++) { const s1 = k / 46, s2 = (k + 1) / 46, r1 = R * 1.5 * (0.05 + 0.95 * s1), r2 = R * 1.5 * (0.05 + 0.95 * s2), b1 = a0 + s1 * tours - w * (1.6 - s1) + 0.12 * Math.sin(t / 700 + b + s1 * 9), b2 = a0 + s2 * tours - w * (1.6 - s2) + 0.12 * Math.sin(t / 700 + b + s2 * 9);
+                g.strokeStyle = col(gros ? C2 : C1, (gros ? 0.5 : 0.22) * (1 - s1) * (1 - s1) + 0.03); g.lineWidth = gros ? 2.4 * (1 - s1) + 0.6 : 0.9; g.beginPath(); g.moveTo(Math.cos(b1) * r1, Math.sin(b1) * r1); g.lineTo(Math.cos(b2) * r2, Math.sin(b2) * r2); g.stroke(); } }
+            g.setTransform(dpr, 0, 0, dpr, 0, 0);
+            const rc = R * (0.3 + 0.05 * Math.sin(t / 900) + 0.1 * e), coeur = g.createRadialGradient(cx, cy, 0, cx, cy, rc); coeur.addColorStop(0, 'rgba(255,255,255,' + (0.9).toFixed(2) + ')'); coeur.addColorStop(0.3, col(C2, 0.75)); coeur.addColorStop(1, col(C1, 0)); g.fillStyle = coeur; g.fillRect(cx - R, cy - R, R * 2, R * 2);
+            g.globalCompositeOperation = 'source-over';
+            const ombre = g.createRadialGradient(cx, cy, R * 0.5, cx, cy, R); ombre.addColorStop(0, 'rgba(2,6,20,0)'); ombre.addColorStop(1, 'rgba(2,6,20,.82)'); g.fillStyle = ombre; g.fillRect(cx - R, cy - R, R * 2, R * 2);
+            g.restore(); g.setTransform(dpr, 0, 0, dpr, 0, 0);
             g.strokeStyle = col(C2, 0.6 + 0.2 * e); g.lineWidth = 1.3; g.beginPath(); g.arc(cx, cy, R, 0, TAU); g.stroke();
             g.strokeStyle = 'rgba(255,255,255,.5)'; g.lineWidth = 1.6; g.beginPath(); g.arc(cx, cy, R * 0.93, -2.5, -1.75); g.stroke(); };
+        } else {   /* d3 : le plasma et les particules, les deux à la fois : un cœur liquide, une coquille de points autour */
+          const pl = fabPlasma(0.66, true), pt = fabPoints(520, 1.02, false); dessin = (t, e) => { pl(t, e); pt(t, e); };
         }
         const tour = (t) => { if (!cv.isConnected) { GST.raf = 0; return; } cadre(); GST.e += ((GST.parle ? 1 : 0) - GST.e) * 0.06; dessin(reduit ? 4200 : t, GST.e); GST.raf = reduit ? 0 : requestAnimationFrame(tour); };
         if (GST.raf) cancelAnimationFrame(GST.raf); GST.raf = requestAnimationFrame(tour);
