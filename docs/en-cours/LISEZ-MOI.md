@@ -193,3 +193,10 @@ pas commencé), 6. le dépôt du CRA signé sur le portail par Hermes après son
 - **0.103.0 dans main** (l'atome par défaut, bancs plus fins) : app seulement, il la prend par « Mettre à jour ».
 - **Bancs** : le lanceur ne relance plus que les segments du banc de l'app dont le texte a changé (`--quoi` le dit) ; un contrôle de l'app ne relance plus les bancs du serveur. Chronométrage du banc du portail fait (1 427 s) : 85 % du temps dans 24 faux passages d'Hermes d'environ 50 s ; « Notes de frais en réel » : 459 s à elle seule. En cours : raccourcir l'attente de 32 s « enregistrement de la session » là où le banc n'en a pas besoin.
 
+## État au 28/11/2026, 15 h
+
+- **0.102.0 déployée et vérifiée** (compte rendu lu, noté dans `docs/jarvis-os.md`, « Déploiement du 28/11/2026 (0.102.0) ») : les corrections de sécurité sont en service. Plus aucune demande au serveur en attente. À surveiller : les trois routines du web affichent « jamais passée » (recréées) ; le Digest du lundi 30/11 à 9 h 10 est le premier sans la mémoire d'Hermes.
+- **0.103.0 dans main** (`fd4f8a7`) : l'atome par défaut ; il la prend par « Mettre à jour ».
+- **Banc du portail** : l'attente de 32 s « enregistrement de la session » n'est gardée qu'au premier essai et après le « redémarrage simulé » (les deux passages dont la session sert ensuite) ; ailleurs 2 s (`BANC_SOMMEIL=32` pour le banc d'avant). Mesuré par le lanceur : 214 contrôles verts en 14 min 25 s (20 à 24 minutes avant). Ce qui reste long : « Notes de frais en réel » (4 minutes, une dizaine de passages de 20 à 50 s) et le balayage du disque à la recherche de la clé en clair (15 s à chaud, 100 s sur un conteneur neuf).
+- **Pas commencé** : les trois points « à vérifier » du rapport de sécurité (relais du portail, ports locaux hauts, « retenir » à la voix), le code de Panier ; le comptage page par page des parcours ; son avis sur l'iPad.
+
